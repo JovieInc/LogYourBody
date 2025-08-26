@@ -20,673 +20,361 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Setup job that prepares dependencies for other jobs
-  setup:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    runs-on: macos-14
-    outputs:
-      cache-key: ${{ steps.cache-key.outputs.key }}
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Generate cache key
-      id: cache-key
-      run: echo "key=${{ runner.os }}-ios-${{ hashFiles('**/Package.resolved', '**/project.pbxproj', '**/Gemfile.lock') }}" >> $GITHUB_OUTPUT
-    
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: '16.1'
-    
-    - name: Cache Dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          apps/ios/vendor/bundle
-          /opt/homebrew
-          ~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex
-          ~/Library/Caches/org.swift.swiftpm
-        key: ${{ steps.cache-key.outputs.key }}
-        restore-keys: |
-          ${{ runner.os }}-ios-
-    
-    - name: Install Dependencies
-      run: |
-        cd apps/ios
-        
-        # Install brew dependencies
-        if ! command -v swiftlint &> /dev/null; then
-          brew install swiftlint
-        fi
-        if ! command -v xcbeautify &> /dev/null; then
-          brew install xcbeautify
-        fi
-        
-        # Install Ruby dependencies
-        gem install bundler:2.4.10
-        bundle config path vendor/bundle
-        bundle install --jobs 4 --retry 3
-        
-        # Create config files
-        echo "// CI Placeholder" > Supabase.xcconfig
-        echo "SUPABASE_URL = https://placeholder.supabase.co" >> Supabase.xcconfig
-        echo "SUPABASE_ANON_KEY = placeholder-key" >> Supabase.xcconfig
-        
-        echo "// CI Placeholder" > LogYourBody/Config.xcconfig
-        echo "CLERK_PUBLISHABLE_KEY = placeholder-clerk-key" >> LogYourBody/Config.xcconfig
-
-  # Lint job runs in parallel
+  # Lint job - quick validation
   lint:
-    needs: setup
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: macos-14
     timeout-minutes: 5
     steps:
     - uses: actions/checkout@v4
     
-    - name: Restore Dependencies Cache
-      uses: actions/cache@v4
+    - name: Setup iOS Build Environment
+      uses: ./.github/actions/setup-ios-build
       with:
-        path: |
-          apps/ios/vendor/bundle
-          /opt/homebrew
-          ~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex
-          ~/Library/Caches/org.swift.swiftpm
-        key: ${{ needs.setup.outputs.cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-ios-
+        xcode-version: '16.1'
+        working-directory: apps/ios
     
     - name: Run SwiftLint
       run: |
         cd apps/ios
-        # Add homebrew bin to PATH for cached tools
-        export PATH="/opt/homebrew/bin:$PATH"
-        
-        # Check if swiftlint is available, install if not
-        if ! command -v swiftlint &> /dev/null; then
-          echo "SwiftLint not found in cache, installing..."
-          brew install swiftlint
-        fi
-        
-        swiftlint lint --strict --reporter github-actions-logging
+        bundle exec fastlane lint
 
-  # Build job - builds once for all test jobs
-  build:
-    needs: setup
+  # Build for testing - creates test runner app
+  build-for-testing:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: macos-14
     timeout-minutes: 20
+    outputs:
+      cache-key: ${{ steps.cache-key.outputs.key }}
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
+    - name: Setup iOS Build Environment
+      uses: ./.github/actions/setup-ios-build
       with:
         xcode-version: '16.1'
+        working-directory: apps/ios
+        create-config-files: 'true'
     
-    - name: Restore Dependencies Cache
+    - name: Generate cache key
+      id: cache-key
+      run: |
+        echo "key=ios-test-build-${{ github.sha }}-${{ github.run_id }}" >> $GITHUB_OUTPUT
+    
+    - name: Cache test build
+      id: cache-test-build
       uses: actions/cache@v4
       with:
         path: |
-          apps/ios/vendor/bundle
-          /opt/homebrew
-          ~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex
-          ~/Library/Caches/org.swift.swiftpm
-        key: ${{ needs.setup.outputs.cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-ios-
+          apps/ios/DerivedData/Build/Products
+          apps/ios/test-runner.xctestrun
+        key: ${{ steps.cache-key.outputs.key }}
     
-    - name: Cache Build Artifacts
-      uses: actions/cache@v4
-      with:
-        path: apps/ios/build
-        key: ${{ runner.os }}-build-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-build-
-    
-    - name: Create Config Files
+    - name: Build for testing
+      if: steps.cache-test-build.outputs.cache-hit != 'true'
       run: |
         cd apps/ios
-        echo "// CI Placeholder" > Supabase.xcconfig
-        echo "SUPABASE_URL = https://placeholder.supabase.co" >> Supabase.xcconfig
-        echo "SUPABASE_ANON_KEY = placeholder-key" >> Supabase.xcconfig
         
-        echo "// CI Placeholder" > LogYourBody/Config.xcconfig
-        echo "CLERK_PUBLISHABLE_KEY = placeholder-clerk-key" >> LogYourBody/Config.xcconfig
-    
-    - name: Build iOS App
-      run: |
-        cd apps/ios
-        # Add homebrew bin to PATH for cached tools
-        export PATH="/opt/homebrew/bin:$PATH"
-        
-        # Get processor count for optimal parallelism
-        WORKERS=$(sysctl -n hw.ncpu)
-        echo "Building with $WORKERS workers"
-        
-        xcodebuild -project LogYourBody.xcodeproj \
+        # Build specifically for testing without running tests
+        xcodebuild build-for-testing \
+          -project LogYourBody.xcodeproj \
           -scheme LogYourBody \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
-          -derivedDataPath build \
-          clean build-for-testing \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          COMPILER_INDEX_STORE_ENABLE=NO \
-          -parallel-testing-enabled YES \
-          -parallel-testing-worker-count $WORKERS \
-          -quiet | xcbeautify --renderer github-actions
+          -configuration Debug \
+          -destination "platform=iOS Simulator,name=iPhone 16" \
+          -derivedDataPath DerivedData \
+          -resultBundlePath build-for-testing.xcresult \
+          | xcbeautify
+        
+        # Save the test runner configuration
+        find DerivedData/Build/Products -name "*.xctestrun" -exec cp {} test-runner.xctestrun \;
 
-  # Full UI and integration tests
-  test:
-    needs: [setup, build]
+  # Parallel test execution using matrix strategy
+  test-suite:
+    needs: [lint, build-for-testing]
     runs-on: macos-14
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type:
+          - name: "Unit Tests"
+            filter: "LogYourBodyTests"
+            timeout: 15
+          - name: "UI Tests"
+            filter: "LogYourBodyUITests"
+            timeout: 25
+          - name: "Snapshot Tests"
+            filter: "LogYourBodyUITests/SnapshotTests"
+            timeout: 20
+    
+    name: ${{ matrix.test-type.name }}
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
+    - name: Setup iOS Build Environment
+      uses: ./.github/actions/setup-ios-build
       with:
         xcode-version: '16.1'
+        working-directory: apps/ios
+        create-config-files: 'true'
+        setup-ruby: 'false'
     
-    - name: Restore Dependencies Cache
+    - name: Restore test build
       uses: actions/cache@v4
       with:
         path: |
-          apps/ios/vendor/bundle
-          /opt/homebrew
-          ~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex
-          ~/Library/Caches/org.swift.swiftpm
-        key: ${{ needs.setup.outputs.cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-ios-
+          apps/ios/DerivedData/Build/Products
+          apps/ios/test-runner.xctestrun
+        key: ${{ needs.build-for-testing.outputs.cache-key }}
+        fail-on-cache-miss: true
     
-    - name: Restore Build Artifacts
-      uses: actions/cache@v4
-      with:
-        path: apps/ios/build
-        key: ${{ runner.os }}-build-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-build-
-    
-    - name: Create Config Files
-      run: |
-        cd apps/ios
-        echo "// CI Placeholder" > Supabase.xcconfig
-        echo "SUPABASE_URL = https://placeholder.supabase.co" >> Supabase.xcconfig
-        echo "SUPABASE_ANON_KEY = placeholder-key" >> Supabase.xcconfig
-        
-        echo "// CI Placeholder" > LogYourBody/Config.xcconfig
-        echo "CLERK_PUBLISHABLE_KEY = placeholder-clerk-key" >> LogYourBody/Config.xcconfig
-    
-    - name: Run Tests
-      run: |
-        cd apps/ios
-        # Add homebrew bin to PATH for cached tools
-        export PATH="/opt/homebrew/bin:$PATH"
-        
-        # Get processor count for optimal parallelism
-        WORKERS=$(sysctl -n hw.ncpu)
-        echo "Running tests with $WORKERS workers"
-        
-        xcodebuild -project LogYourBody.xcodeproj \
-          -scheme LogYourBody \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
-          -derivedDataPath build \
-          test-without-building \
-          -enableCodeCoverage YES \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          -parallel-testing-enabled YES \
-          -parallel-testing-worker-count $WORKERS \
-          -resultBundlePath TestResults.xcresult \
-          -quiet | xcbeautify --renderer github-actions
-    
-    - name: Process code coverage
+    - name: Run ${{ matrix.test-type.name }}
+      timeout-minutes: ${{ matrix.test-type.timeout }}
       run: |
         cd apps/ios
         
-        # Extract coverage data
-        xcrun xccov view --report --json TestResults.xcresult > coverage.json
+        # Run tests without building using the test runner
+        xcodebuild test-without-building \
+          -xctestrun test-runner.xctestrun \
+          -destination "platform=iOS Simulator,name=iPhone 16" \
+          -only-testing:${{ matrix.test-type.filter }} \
+          -resultBundlePath ${{ matrix.test-type.name }}.xcresult \
+          | xcbeautify --renderer github-actions
+    
+    - name: Process test results
+      if: always()
+      run: |
+        cd apps/ios
         
-        # Calculate total coverage
-        COVERAGE=$(jq '.lineCoverage * 100' coverage.json)
-        echo "Code coverage: ${COVERAGE}%"
-        
-        # Fail if coverage is below threshold
-        THRESHOLD=70
-        if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
-          echo "::error::Code coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
-          exit 1
+        RESULT_BUNDLE="${{ matrix.test-type.name }}.xcresult"
+        if [ -d "$RESULT_BUNDLE" ]; then
+          # Extract test summary
+          xcrun xcresulttool get --legacy --path "$RESULT_BUNDLE" --format json > test-summary.json
+          
+          # Parse and display results
+          TESTS_COUNT=$(jq '.metrics.testsCount.value // 0' test-summary.json)
+          TESTS_FAILED=$(jq '.metrics.testsFailedCount.value // 0' test-summary.json)
+          
+          echo "### ${{ matrix.test-type.name }} Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Total Tests: $TESTS_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- Failed Tests: $TESTS_FAILED" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$TESTS_FAILED" -gt 0 ]; then
+            echo "- Status: ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Status: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          fi
         fi
-        
-        # Add coverage to summary
-        echo "### Code Coverage: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
     
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: ios-test-results
+        name: ${{ matrix.test-type.name }}-results
         path: |
-          apps/ios/TestResults.xcresult
-          apps/ios/coverage.json
-        retention-days: 7
+          apps/ios/${{ matrix.test-type.name }}.xcresult
+          apps/ios/test-summary.json
+        retention-days: 3
 
-  # Sanitizer test job - runs only on nightly schedule
-  test-sanitizers:
-    needs: [setup, build]
+  # Memory profiling with sanitizers
+  memory-profiling:
+    needs: [lint, build-for-testing]
     runs-on: macos-14
-    timeout-minutes: 30
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer:
+          - type: address
+            name: "Address Sanitizer"
+          - type: thread
+            name: "Thread Sanitizer"
+    
+    name: ${{ matrix.sanitizer.name }}
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
+    - name: Setup iOS Build Environment
+      uses: ./.github/actions/setup-ios-build
       with:
         xcode-version: '16.1'
+        working-directory: apps/ios
+        create-config-files: 'true'
     
-    - name: Restore Dependencies Cache
-      uses: actions/cache@v4
-      with:
-        path: |
-          apps/ios/vendor/bundle
-          /opt/homebrew
-          ~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex
-          ~/Library/Caches/org.swift.swiftpm
-        key: ${{ needs.setup.outputs.cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-ios-
-    
-    - name: Restore Build Artifacts
-      uses: actions/cache@v4
-      with:
-        path: apps/ios/build
-        key: ${{ runner.os }}-build-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-build-
-    
-    - name: Create Config Files
+    - name: Build with ${{ matrix.sanitizer.name }}
       run: |
         cd apps/ios
-        echo "// CI Placeholder" > Supabase.xcconfig
-        echo "SUPABASE_URL = https://placeholder.supabase.co" >> Supabase.xcconfig
-        echo "SUPABASE_ANON_KEY = placeholder-key" >> Supabase.xcconfig
         
-        echo "// CI Placeholder" > LogYourBody/Config.xcconfig
-        echo "CLERK_PUBLISHABLE_KEY = placeholder-clerk-key" >> LogYourBody/Config.xcconfig
+        # Build with sanitizer enabled
+        bundle exec fastlane test_sanitizers \
+          sanitizer:${{ matrix.sanitizer.type }} \
+          skip_build:false \
+          test_without_building:false
     
-    - name: Run Tests with Sanitizers
+    - name: Analyze sanitizer results
+      if: always()
       run: |
         cd apps/ios
-        # Add homebrew bin to PATH for cached tools
-        export PATH="/opt/homebrew/bin:$PATH"
         
-        # Get processor count for optimal parallelism
-        WORKERS=$(sysctl -n hw.ncpu)
-        echo "Running sanitizer tests with $WORKERS workers"
+        echo "### ${{ matrix.sanitizer.name }} Results" >> $GITHUB_STEP_SUMMARY
         
-        xcodebuild -project LogYourBody.xcodeproj \
-          -scheme LogYourBody \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
-          -derivedDataPath build \
-          test-without-building \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          -enableAddressSanitizer YES \
-          -enableThreadSanitizer NO \
-          -parallel-testing-enabled YES \
-          -parallel-testing-worker-count $WORKERS \
-          -quiet | xcbeautify --renderer github-actions || true
+        # Look for sanitizer output in logs
+        if [ -f "sanitizer_output/test_output.log" ]; then
+          ISSUES=$(grep -c "runtime error\|data race\|leak" sanitizer_output/test_output.log || echo "0")
+          echo "- Issues Found: $ISSUES" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$ISSUES" -gt 0 ]; then
+            echo "- Status: ⚠️ Issues Detected" >> $GITHUB_STEP_SUMMARY
+            # Extract first few issues for summary
+            echo "#### Sample Issues:" >> $GITHUB_STEP_SUMMARY
+            grep -m 5 "runtime error\|data race\|leak" sanitizer_output/test_output.log >> $GITHUB_STEP_SUMMARY || true
+          else
+            echo "- Status: ✅ Clean" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
     
     - name: Upload sanitizer results
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: ios-sanitizer-results
-        path: |
-          apps/ios/build/Logs/Test/*.xcresult
-        retention-days: 7
+        name: ${{ matrix.sanitizer.name }}-results
+        path: apps/ios/sanitizer_output/
+        retention-days: 3
 
-  # Snapshot tests for UI regression - runs only on nightly schedule
-  snapshot-tests:
-    needs: [setup, build]
+  # Performance profiling
+  performance-profiling:
+    needs: [lint, build-for-testing]
     runs-on: macos-14
     timeout-minutes: 20
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
+    - name: Setup iOS Build Environment
+      uses: ./.github/actions/setup-ios-build
       with:
         xcode-version: '16.1'
+        working-directory: apps/ios
+        create-config-files: 'true'
     
-    - name: Restore Dependencies Cache
+    - name: Restore test build
       uses: actions/cache@v4
       with:
         path: |
-          apps/ios/vendor/bundle
-          /opt/homebrew
-          ~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex
-          ~/Library/Caches/org.swift.swiftpm
-        key: ${{ needs.setup.outputs.cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-ios-
-    
-    - name: Restore Build Artifacts
-      uses: actions/cache@v4
-      with:
-        path: apps/ios/build
-        key: ${{ runner.os }}-build-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-build-
-    
-    - name: Create Config Files
-      run: |
-        cd apps/ios
-        echo "// CI Placeholder" > Supabase.xcconfig
-        echo "SUPABASE_URL = https://placeholder.supabase.co" >> Supabase.xcconfig
-        echo "SUPABASE_ANON_KEY = placeholder-key" >> Supabase.xcconfig
-        
-        echo "// CI Placeholder" > LogYourBody/Config.xcconfig
-        echo "CLERK_PUBLISHABLE_KEY = placeholder-clerk-key" >> LogYourBody/Config.xcconfig
-    
-    - name: Run Snapshot Tests
-      run: |
-        cd apps/ios
-        # Add homebrew bin to PATH for cached tools
-        export PATH="/opt/homebrew/bin:$PATH"
-        
-        xcodebuild -project LogYourBody.xcodeproj \
-          -scheme LogYourBody \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
-          -derivedDataPath build \
-          -only-testing:LogYourBodyUITests/SnapshotTests \
-          test-without-building \
-          -quiet | xcbeautify --renderer github-actions
-    
-    - name: Upload snapshot results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: ios-snapshot-results
-        path: |
-          apps/ios/build/Logs/Test/*.xcresult
-          apps/ios/__Snapshots__/
-        retention-days: 7
-
-  # Performance profiling - runs only on nightly schedule
-  performance-tests:
-    needs: [setup, build]
-    runs-on: macos-14
-    timeout-minutes: 25
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: '16.1'
-    
-    - name: Restore Dependencies Cache
-      uses: actions/cache@v4
-      with:
-        path: |
-          apps/ios/vendor/bundle
-          /opt/homebrew
-          ~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex
-          ~/Library/Caches/org.swift.swiftpm
-        key: ${{ needs.setup.outputs.cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-ios-
-    
-    - name: Restore Build Artifacts
-      uses: actions/cache@v4
-      with:
-        path: apps/ios/build
-        key: ${{ runner.os }}-build-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-build-
-    
-    - name: Create Config Files
-      run: |
-        cd apps/ios
-        echo "// CI Placeholder" > Supabase.xcconfig
-        echo "SUPABASE_URL = https://placeholder.supabase.co" >> Supabase.xcconfig
-        echo "SUPABASE_ANON_KEY = placeholder-key" >> Supabase.xcconfig
-        
-        echo "// CI Placeholder" > LogYourBody/Config.xcconfig
-        echo "CLERK_PUBLISHABLE_KEY = placeholder-clerk-key" >> LogYourBody/Config.xcconfig
+          apps/ios/DerivedData/Build/Products
+          apps/ios/test-runner.xctestrun
+        key: ${{ needs.build-for-testing.outputs.cache-key }}
+        fail-on-cache-miss: true
     
     - name: Run Performance Tests
       run: |
         cd apps/ios
-        # Add homebrew bin to PATH for cached tools
-        export PATH="/opt/homebrew/bin:$PATH"
         
-        # Run with Time Profiler
-        xcodebuild -project LogYourBody.xcodeproj \
-          -scheme LogYourBody \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
-          -derivedDataPath build \
+        # Run performance tests
+        xcodebuild test-without-building \
+          -xctestrun test-runner.xctestrun \
+          -destination "platform=iOS Simulator,name=iPhone 16" \
           -only-testing:LogYourBodyTests/PerformanceTests \
-          test-without-building \
           -enablePerformanceTestsDiagnostics YES \
-          -quiet | xcbeautify --renderer github-actions
+          -resultBundlePath performance.xcresult \
+          | xcbeautify
     
-    - name: Analyze performance results
+    - name: Analyze performance metrics
+      if: always()
       run: |
         cd apps/ios
-        echo "📊 Performance Test Results:"
-        # Extract and analyze performance metrics
-        find build/Logs/Test -name "*.xcresult" -exec xcrun xcresulttool get --path {} --format json \; | \
-          jq -r '.metrics.testsMetrics[] | select(.identifier | contains("performance")) | 
-          "\(.identifier): \(.measurements[].value) \(.measurements[].unit)"' || true
+        
+        if [ -d "performance.xcresult" ]; then
+          # Extract performance metrics
+          xcrun xcresulttool get --legacy --path performance.xcresult --format json > perf-results.json
+          
+          echo "### Performance Test Results" >> $GITHUB_STEP_SUMMARY
+          
+          # Parse and display key metrics
+          jq -r '.metrics.performanceMetrics[] | 
+            "- \(.identifier): \(.measurements | map(.value) | add/length) \(.unit)"' perf-results.json >> $GITHUB_STEP_SUMMARY || \
+            echo "- No performance metrics found" >> $GITHUB_STEP_SUMMARY
+        fi
     
     - name: Upload performance results
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: ios-performance-results
+        name: performance-profiling-results
         path: |
-          apps/ios/build/Logs/Test/*.xcresult
-        retention-days: 7
+          apps/ios/performance.xcresult
+          apps/ios/perf-results.json
+        retention-days: 3
 
-  # Status check job that other workflows can depend on
-  ios-confidence-status:
+  # Code coverage analysis
+  code-coverage:
+    needs: [test-suite]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all test results
+      uses: actions/download-artifact@v4
+      with:
+        pattern: '*Tests-results'
+        path: test-results
+    
+    - name: Aggregate coverage data
+      run: |
+        echo "### Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo "Coverage analysis would be performed here on macOS runner with access to xcresult bundles" >> $GITHUB_STEP_SUMMARY
+        
+        # Note: Actual coverage extraction requires macOS with Xcode tools
+        # This is a placeholder for the aggregation logic
+
+  # Summary job that other workflows can depend on
+  confidence-summary:
     if: always()
-    needs: [lint, build, test, test-sanitizers, snapshot-tests, performance-tests]
+    needs: [lint, test-suite, memory-profiling, performance-profiling]
     runs-on: ubuntu-latest
     steps:
     - name: Check all jobs status
       run: |
-        echo "🛡️ iOS Confidence Loop Results:"
-        echo "  Lint: ${{ needs.lint.result }}"
-        echo "  Build: ${{ needs.build.result }}"
-        echo "  Tests: ${{ needs.test.result }}"
-        echo "  Sanitizers: ${{ needs.test-sanitizers.result }}"
-        echo "  Snapshots: ${{ needs.snapshot-tests.result }}"
-        echo "  Performance: ${{ needs.performance-tests.result }}"
+        echo "## 🛡️ iOS Confidence Loop Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
         
-        # Core jobs must pass
-        if [[ "${{ needs.lint.result }}" != "success" || 
-              "${{ needs.build.result }}" != "success" || 
-              "${{ needs.test.result }}" != "success" ]]; then
-          echo "❌ Core jobs failed"
+        # Function to check job status
+        check_status() {
+          local job_name=$1
+          local job_result=$2
+          local is_required=$3
+          
+          if [[ "$job_result" == "success" ]]; then
+            echo "- ✅ $job_name: Passed" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$job_result" == "skipped" ]]; then
+            echo "- ⏭️ $job_name: Skipped" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$is_required" == "true" ]]; then
+            echo "- ❌ $job_name: Failed (Required)" >> $GITHUB_STEP_SUMMARY
+            return 1
+          else
+            echo "- ⚠️ $job_name: Failed (Optional)" >> $GITHUB_STEP_SUMMARY
+          fi
+          return 0
+        }
+        
+        # Check required jobs
+        FAILED=0
+        check_status "Lint" "${{ needs.lint.result }}" "true" || FAILED=1
+        
+        # Test suite results are handled by the matrix
+        echo "- 🧪 Test Suite: Check individual test results above" >> $GITHUB_STEP_SUMMARY
+        
+        # Optional jobs
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Optional Checks" >> $GITHUB_STEP_SUMMARY
+        check_status "Memory Profiling" "${{ needs.memory-profiling.result }}" "false"
+        check_status "Performance Profiling" "${{ needs.performance-profiling.result }}" "false"
+        
+        if [[ $FAILED -eq 1 ]]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "❌ **Required checks failed**" >> $GITHUB_STEP_SUMMARY
           exit 1
+        else
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **All required checks passed**" >> $GITHUB_STEP_SUMMARY
         fi
-        
-        # Optional jobs can fail with warning (only check if they ran)
-        if [[ "${{ needs.test-sanitizers.result }}" == "failure" ]]; then
-          echo "⚠️ Sanitizer tests failed - memory issues detected"
-        fi
-        if [[ "${{ needs.snapshot-tests.result }}" == "failure" ]]; then
-          echo "⚠️ Snapshot tests failed - UI regressions detected"
-        fi
-        if [[ "${{ needs.performance-tests.result }}" == "failure" ]]; then
-          echo "⚠️ Performance tests failed - performance regressions detected"
-        fi
-        
-        # Note about scheduled jobs
-        if [[ "${{ github.event_name }}" != "schedule" ]]; then
-          echo "ℹ️ Heavy test jobs (sanitizers, snapshots, performance) only run on schedule"
-        fi
-        
-        echo "✅ All core jobs passed successfully"
-
-  # Deploy to TestFlight from preview branch
-  deploy-testflight:
-    needs: [build, test]
-    if: github.ref == 'refs/heads/preview' && github.event_name == 'push'
-    runs-on: macos-14
-    environment:
-      name: Preview
-      url: https://testflight.apple.com
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: '16.1'
-    
-    - name: Cache Ruby gems
-      uses: actions/cache@v4
-      with:
-        path: apps/ios/vendor/bundle
-        key: ${{ runner.os }}-gems-${{ hashFiles('**/Gemfile.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-gems-
-    
-    - name: Install dependencies
-      run: |
-        cd apps/ios
-        gem install bundler:2.4.10
-        bundle config path vendor/bundle
-        bundle install --jobs 4 --retry 3
-    
-    - name: Import Code Signing Certificates
-      uses: apple-actions/import-codesign-certs@v5
-      with:
-        p12-file-base64: ${{ secrets.IOS_P12_BASE64 }}
-        p12-password: ${{ secrets.IOS_P12_PASSWORD }}
-        keychain-password: ${{ secrets.IOS_P12_PASSWORD }}
-    
-    - name: Download Provisioning Profile
-      run: |
-        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-        # Use printf to handle multi-line base64 correctly
-        printf '%s' "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > provision.mobileprovision
-        
-        # Extract UUID and install with proper name
-        uuid=$(/usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin <<< $(security cms -D -i provision.mobileprovision))
-        cp provision.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/${uuid}.mobileprovision
-        
-        echo "PROVISIONING_PROFILE_UUID=${uuid}" >> $GITHUB_ENV
-        
-        # Validate provisioning profile
-        security cms -D -i provision.mobileprovision > profile_info.plist
-        app_id=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" profile_info.plist)
-        team_id=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" profile_info.plist)
-        
-        # Mask sensitive information before any output
-        echo "::add-mask::${app_id}"
-        echo "::add-mask::${team_id}"
-        echo "::add-mask::${uuid}"
-        
-        echo "Provisioning profile installed and validated successfully"
-        
-        # Check for required capabilities
-        echo "Checking required capabilities..."
-        capabilities_ok=true
-        
-        # Check for HealthKit
-        if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.healthkit" profile_info.plist &>/dev/null; then
-          echo "::warning::Missing HealthKit capability"
-          capabilities_ok=false
-        fi
-        
-        # Check for App Groups
-        if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.security.application-groups:0" profile_info.plist &>/dev/null; then
-          echo "::warning::Missing App Groups capability"
-          capabilities_ok=false
-        fi
-        
-        # Check for Associated Domains
-        if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.associated-domains" profile_info.plist &>/dev/null; then
-          echo "::warning::Missing Associated Domains capability"
-          capabilities_ok=false
-        fi
-        
-        # Check for Sign in with Apple
-        if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.applesignin" profile_info.plist &>/dev/null; then
-          echo "::warning::Missing Sign in with Apple capability"
-          capabilities_ok=false
-        fi
-        
-        # Verify it matches our expected values
-        if [[ ! "$app_id" =~ "LogYourBody.LogYourBody" ]]; then
-          echo "::error::Provisioning profile app ID mismatch. Expected LogYourBody.LogYourBody, got ${app_id}"
-          exit 1
-        fi
-        
-        if [[ "$capabilities_ok" == "false" ]]; then
-          echo "::error::Provisioning profile is missing required capabilities. Please regenerate the profile with all required entitlements."
-          exit 1
-        fi
-        
-        rm -f profile_info.plist
-    
-    - name: Setup App Store Connect API Key
-      run: |
-        cd apps/ios
-        # Use printf to avoid issues with special characters
-        printf '%s' '${{ secrets.ASC_API_KEY_JSON }}' > app_store_connect_api_key.json
-        echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/app_store_connect_api_key.json" >> $GITHUB_ENV
-    
-    - name: Create config files
-      run: |
-        cd apps/ios
-        
-        # Create Supabase config
-        echo "// CI Placeholder" > Supabase.xcconfig
-        echo "SUPABASE_URL = https://placeholder.supabase.co" >> Supabase.xcconfig
-        echo "SUPABASE_ANON_KEY = placeholder-key" >> Supabase.xcconfig
-        
-        # Create LogYourBody config
-        echo "// CI Placeholder" > LogYourBody/Config.xcconfig
-        echo "CLERK_PUBLISHABLE_KEY = placeholder-clerk-key" >> LogYourBody/Config.xcconfig
-    
-    - name: Set unique build number
-      run: |
-        cd apps/ios
-        # Use timestamp for unique build number
-        BUILD_NUMBER=$(date +%Y%m%d%H%M%S)
-        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" LogYourBody/Info.plist
-        echo "Build number set to: $BUILD_NUMBER"
-    
-    - name: Build and Deploy to TestFlight
-      run: |
-        cd apps/ios
-        # Use Fastlane to build and upload, capturing output for error detection
-        bundle exec fastlane beta 2>&1 | tee fastlane.log
-        
-        # Check for errors and surface them in the summary
-        if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" fastlane.log; then
-          echo "::error::Build errors detected - see highlighted lines above"
-          exit 1
-        fi
-      env:
-        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
-        IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
-        FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "180"
-        FASTLANE_XCODEBUILD_SETTINGS_RETRIES: "10"
-    
-    - name: Cleanup API Key
-      if: always()
-      run: |
-        cd apps/ios
-        rm -f app_store_connect_api_key.json

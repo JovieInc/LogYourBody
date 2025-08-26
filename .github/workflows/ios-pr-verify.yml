@@ -39,42 +39,10 @@ jobs:
           ${{ runner.os }}-spm-xcode-16.1-
           ${{ runner.os }}-spm-
     
-    - name: SwiftLint
+    - name: Run PR Verification
       run: |
         cd apps/ios
-        swiftlint lint --strict --reporter github-actions-logging
-      continue-on-error: true
-    
-    - name: Build for Testing
-      run: |
-        cd apps/ios
-        set -o pipefail
-        
-        xcodebuild -project LogYourBody.xcodeproj \
-          -scheme LogYourBody \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
-          -derivedDataPath build \
-          clean build-for-testing \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          COMPILER_INDEX_STORE_ENABLE=NO \
-          -quiet | xcbeautify --renderer github-actions
-    
-    - name: Run Unit Tests
-      run: |
-        cd apps/ios
-        set -o pipefail
-        
-        xcodebuild -project LogYourBody.xcodeproj \
-          -scheme LogYourBody \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
-          -derivedDataPath build \
-          test-without-building \
-          -only-testing:LogYourBodyTests \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          COMPILER_INDEX_STORE_ENABLE=NO \
-          -quiet | xcbeautify --renderer github-actions || true
+        bundle exec fastlane pr_verify
     
     - name: Upload test results
       if: always()
@@ -83,4 +51,4 @@ jobs:
         name: ios-pr-test-results
         path: |
           apps/ios/build/Logs/Test/*.xcresult
-        retention-days: 7
+        retention-days: 3

@@ -1,0 +1,265 @@
+name: iOS TestFlight Deploy
+
+on:
+  workflow_call:
+    inputs:
+      distribution_group:
+        description: 'TestFlight distribution group (alpha, beta, or production)'
+        required: true
+        type: string
+      build_number:
+        description: 'Build number for the release'
+        required: true
+        type: string
+      version_name:
+        description: 'Version name for the release'
+        required: false
+        type: string
+        default: ''
+      release_notes:
+        description: 'Release notes for TestFlight'
+        required: false
+        type: string
+        default: ''
+      artifact_name:
+        description: 'Name of the build artifact to deploy'
+        required: false
+        type: string
+        default: 'ios-build'
+      environment:
+        description: 'GitHub environment for deployment'
+        required: false
+        type: string
+        default: 'development'
+    secrets:
+      MATCH_PASSWORD:
+        required: true
+      MATCH_GIT_URL:
+        required: true
+      MATCH_GIT_BASIC_AUTHORIZATION:
+        required: true
+      APP_STORE_CONNECT_API_KEY_ID:
+        required: true
+      APP_STORE_CONNECT_API_KEY_ISSUER_ID:
+        required: true
+      APP_STORE_CONNECT_API_KEY:
+        required: true
+      APPLE_TEAM_ID:
+        required: true
+      APP_STORE_APP_ID:
+        required: true
+
+jobs:
+  deploy-testflight:
+    name: Deploy to TestFlight (${{ inputs.distribution_group }})
+    runs-on: macos-14
+    timeout-minutes: 30
+    environment:
+      name: ${{ inputs.environment }}
+      url: https://testflight.apple.com
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: build
+    
+    - name: Setup iOS Build Environment
+      uses: ./.github/actions/setup-ios-build
+      with:
+        xcode-version: '16.1'
+        working-directory: apps/ios
+        create-config-files: 'true'
+        setup-ruby: 'true'
+    
+    - name: Validate distribution group
+      run: |
+        case "${{ inputs.distribution_group }}" in
+          alpha)
+            echo "TESTFLIGHT_GROUPS=Internal Testers,Alpha Testers" >> $GITHUB_ENV
+            echo "TESTFLIGHT_BETA_APP_REVIEW=false" >> $GITHUB_ENV
+            ;;
+          beta)
+            echo "TESTFLIGHT_GROUPS=Beta Testers" >> $GITHUB_ENV
+            echo "TESTFLIGHT_BETA_APP_REVIEW=true" >> $GITHUB_ENV
+            ;;
+          production)
+            echo "TESTFLIGHT_GROUPS=Production Testers" >> $GITHUB_ENV
+            echo "TESTFLIGHT_BETA_APP_REVIEW=true" >> $GITHUB_ENV
+            echo "SUBMIT_FOR_REVIEW=true" >> $GITHUB_ENV
+            ;;
+          *)
+            echo "::error::Invalid distribution group: ${{ inputs.distribution_group }}"
+            exit 1
+            ;;
+        esac
+    
+    - name: Setup App Store Connect Authentication
+      run: |
+        cd apps/ios
+        # Create API key file from secret
+        mkdir -p fastlane
+        cat > fastlane/api_key.json << 'EOFKEY'
+        {
+          "key_id": "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}",
+          "issuer_id": "${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}",
+          "key": "${{ secrets.APP_STORE_CONNECT_API_KEY }}",
+          "duration": 1200,
+          "in_house": false
+        }
+        EOFKEY
+        
+        # Set API key path for subsequent steps
+        echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> $GITHUB_ENV
+    
+    - name: Sync Certificates with Match
+      uses: ./.github/actions/sync-match
+      with:
+        match_password: ${{ secrets.MATCH_PASSWORD }}
+        match_git_url: ${{ secrets.MATCH_GIT_URL }}
+        match_git_basic: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+        match_git_branch: 'main'
+      env:
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    
+    - name: Prepare release notes
+      run: |
+        cd apps/ios
+        
+        # Use provided release notes or generate default ones
+        if [ -n "${{ inputs.release_notes }}" ]; then
+          echo "${{ inputs.release_notes }}" > release_notes.txt
+        else
+          # Generate release notes based on distribution group
+          case "${{ inputs.distribution_group }}" in
+            alpha)
+              cat > release_notes.txt << EOF
+        Alpha Build ${{ inputs.build_number }}
+        Version: ${{ inputs.version_name || 'Latest' }}
+        
+        This is an automated alpha build for internal testing.
+        Please report any issues found during testing.
+        EOF
+              ;;
+            beta)
+              cat > release_notes.txt << EOF
+        Beta Build ${{ inputs.build_number }}
+        Version: ${{ inputs.version_name || 'Latest' }}
+        
+        This beta release includes the latest features and bug fixes.
+        Your feedback is valuable for improving the app.
+        EOF
+              ;;
+            production)
+              cat > release_notes.txt << EOF
+        Release Build ${{ inputs.build_number }}
+        Version: ${{ inputs.version_name || 'Latest' }}
+        
+        This release includes stability improvements and bug fixes.
+        Thank you for using our app!
+        EOF
+              ;;
+          esac
+        fi
+        
+        echo "Release notes:"
+        cat release_notes.txt
+    
+    - name: Production release checks
+      if: inputs.distribution_group == 'production'
+      run: |
+        cd apps/ios
+        
+        # Run additional checks for production releases
+        echo "🔍 Running production release checks..."
+        
+        # Verify version number is properly set
+        if [ -z "${{ inputs.version_name }}" ]; then
+          echo "::error::Version name is required for production releases"
+          exit 1
+        fi
+        
+        # Check that we're on a release branch or tag
+        CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        if [[ ! "$CURRENT_BRANCH" =~ ^(main|release/.*)$ ]] && [[ ! "$GITHUB_REF" =~ ^refs/tags/ ]]; then
+          echo "::warning::Production releases should be from main, release/* branches, or tags"
+        fi
+        
+        # Verify build configuration
+        echo "✅ Production release checks passed"
+    
+    - name: Upload to TestFlight
+      run: |
+        cd apps/ios
+        
+        # Find the IPA file
+        IPA_PATH=$(find ../build -name "*.ipa" -type f | head -1)
+        if [ -z "$IPA_PATH" ]; then
+          echo "::error::No IPA file found in build artifacts"
+          exit 1
+        fi
+        
+        echo "Found IPA: $IPA_PATH"
+        
+        # Create upload parameters
+        UPLOAD_PARAMS="ipa:\"$IPA_PATH\" "
+        UPLOAD_PARAMS+="groups:\"$TESTFLIGHT_GROUPS\" "
+        UPLOAD_PARAMS+="changelog_file:release_notes.txt "
+        UPLOAD_PARAMS+="beta_app_review_info:$TESTFLIGHT_BETA_APP_REVIEW "
+        
+        if [ "${{ inputs.distribution_group }}" == "production" ]; then
+          UPLOAD_PARAMS+="submit_beta_review:true "
+          UPLOAD_PARAMS+="distribute_external:true "
+        fi
+        
+        # Use Fastlane to upload to TestFlight
+        bundle exec fastlane run upload_to_testflight $UPLOAD_PARAMS
+      env:
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+        FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "180"
+        FASTLANE_XCODEBUILD_SETTINGS_RETRIES: "10"
+    
+    - name: Post deployment notification
+      if: success()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const group = '${{ inputs.distribution_group }}';
+          const buildNumber = '${{ inputs.build_number }}';
+          const version = '${{ inputs.version_name }}' || 'Latest';
+          
+          const emoji = {
+            'alpha': '🔬',
+            'beta': '🧪',
+            'production': '🚀'
+          }[group] || '📱';
+          
+          const body = `${emoji} **iOS ${group.charAt(0).toUpperCase() + group.slice(1)} Deployed to TestFlight!**
+          
+          - **Version**: ${version}
+          - **Build**: ${buildNumber}
+          - **Groups**: ${process.env.TESTFLIGHT_GROUPS}
+          - **TestFlight**: Available for testing
+          
+          ${group === 'production' ? '⚠️ This is a production release candidate.' : `This is a ${group} build for testing.`}`;
+          
+          github.rest.repos.createCommitComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            commit_sha: context.sha,
+            body: body
+          });
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        cd apps/ios
+        rm -f release_notes.txt
+        rm -f fastlane/api_key.json
+        # Clean up any other temp files
+        rm -f /tmp/AuthKey_*.p8 2>/dev/null || true
+        rm -f /var/folders/*/T/tmp.* 2>/dev/null || true

@@ -82,6 +82,8 @@ fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
 fastlane/.env
+fastlane/AuthKey_V9NW6ZGUK3.p8
+fastlane/api_key.json
 fastlane/.env.*
 !fastlane/.env.example
 
@@ -100,3 +102,4 @@ vendor/bundle/
 Config.xcconfig
 *.xcconfig
 !Config.xcconfig.example
+.env

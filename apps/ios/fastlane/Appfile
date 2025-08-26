@@ -4,8 +4,9 @@
 # For more information about the Appfile, see:
 #     https://docs.fastlane.tools/advanced/#appfile
 
+
 # Default values
-app_identifier ENV["APP_IDENTIFIER"] || "com.logyourbody.app"
+app_identifier ENV["APP_IDENTIFIER"] || "LogYourBody.LogYourBody"
 apple_id ENV["APPLE_ID_EMAIL"] || ""
 team_id ENV["APPLE_TEAM_ID"] || ""
 
@@ -16,3 +17,7 @@ team_id ENV["APPLE_TEAM_ID"] || ""
 
 # To select a team for App Store Connect use
 # itc_team_id("1234567890")
+# For more information about the Appfile, see:
+#     https://docs.fastlane.tools/advanced/#appfile
+
+

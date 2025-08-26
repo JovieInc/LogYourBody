@@ -1,0 +1,3 @@
+# iOS Development Dependencies
+brew "swiftlint"
+brew "xcbeautify"

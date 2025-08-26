@@ -1,3 +1,6 @@
+// Unmock the profile module since it's mocked globally in jest.setup.js
+jest.unmock('@/lib/supabase/profile')
+
 import { getProfile, updateProfile, createProfile } from '../profile'
 import { createClient } from '../client'
 import { UserProfile } from '@/types/body-metrics'

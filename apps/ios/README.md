@@ -2,6 +2,10 @@
 
 Native iOS app for LogYourBody that connects to the Next.js backend.
 
+## CI/CD Setup
+
+This project uses Fastlane Match with App Store Connect API authentication for certificate management.
+
 ## Setup Instructions
 
 1. Open Xcode

@@ -47,11 +47,9 @@ enum ButtonSize {
 }
 
 // MARK: - Standard Button
+// Legacy wrapper for BaseButton - use BaseButton directly for new code
 
 struct StandardButton: View {
-    @Environment(\.isEnabled)
-    var isEnabled
-    
     let title: String
     let icon: String?
     let style: StandardButtonStyle
@@ -59,8 +57,6 @@ struct StandardButton: View {
     let isLoading: Bool
     let fullWidth: Bool
     let action: () -> Void
-    
-    @State private var isPressed = false
     
     init(
         _ title: String,
@@ -81,107 +77,53 @@ struct StandardButton: View {
     }
     
     var body: some View {
-        Button(
-            action: {
-                if !isLoading {
-                    // HapticManager.shared.impact(style: .light)
-                    action()
-                }
-            },
-            label: {
-                HStack(spacing: 4) {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: foregroundColor))
-                            .scaleEffect(0.8)
-                    } else {
-                        if let icon = icon {
-                            Image(systemName: icon)
-                                .font(.system(size: size.fontSize * 0.9, weight: .medium))
-                        }
-                        
-                        Text(title)
-                            .font(.system(size: size.fontSize, weight: .semibold, design: .rounded))
-                    }
-                }
-                .foregroundColor(foregroundColor)
-                .frame(maxWidth: fullWidth ? .infinity : nil)
-                .frame(height: size.height)
-                .padding(.horizontal, size.horizontalPadding)
-                .background(backgroundView)
-                .cornerRadius(8)
-                .overlay(overlayView)
-                .scaleEffect(isPressed ? 0.97 : 1.0)
-                .animation(.easeOut(duration: 0.1), value: isPressed)
-                .opacity(isEnabled && !isLoading ? 1.0 : 0.6)
-            }
+        BaseButton(
+            title,
+            configuration: ButtonConfiguration(
+                style: style.baseStyle,
+                size: size.baseSize,
+                isLoading: isLoading,
+                fullWidth: fullWidth,
+                icon: icon
+            ),
+            action: action
         )
-        .buttonStyle(PlainButtonStyle())
-        .disabled(isLoading || !isEnabled)
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            withAnimation(.easeOut(duration: 0.1)) {
-                isPressed = pressing
-            }
-        }, perform: {})
     }
-    
-    // MARK: - Computed Properties
-    
-    private var foregroundColor: Color {
-        switch style {
-        case .primary:
-            return Color.appBackground
-        case .secondary:
-            return .appPrimary
-        case .tertiary:
-            return .primary
-        case .destructive:
-            return .white
-        case .ghost:
-            return .primary
+}
+
+// MARK: - StandardButtonStyle Extension
+
+extension StandardButtonStyle {
+    var baseStyle: ButtonConfiguration.ButtonStyleVariant {
+        switch self {
+        case .primary: return .primary
+        case .secondary: return .secondary
+        case .tertiary: return .tertiary
+        case .destructive: return .destructive
+        case .ghost: return .ghost
         }
     }
-    
-    @ViewBuilder private var backgroundView: some View {
-        switch style {
-        case .primary:
-            Color.appPrimary
-        case .secondary:
-            Color.appPrimary.opacity(0.1)
-        case .tertiary:
-            Color.appCard
-        case .destructive:
-            Color.red
-        case .ghost:
-            Color.clear
-        }
-    }
-    
-    @ViewBuilder private var overlayView: some View {
-        switch style {
-        case .secondary:
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.appPrimary.opacity(0.5), lineWidth: 1.5)
-        case .tertiary:
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.appBorder, lineWidth: 1)
-        default:
-            EmptyView()
+}
+
+// MARK: - ButtonSize Extension
+
+extension ButtonSize {
+    var baseSize: ButtonConfiguration.ButtonSizeVariant {
+        switch self {
+        case .small: return .small
+        case .medium: return .medium
+        case .large: return .large
         }
     }
 }
 
 // MARK: - Icon Button
+// Legacy wrapper for BaseIconButton - use BaseIconButton directly for new code
 
 struct IconButton: View {
-    @Environment(\.isEnabled)
-    var isEnabled
-    
     let icon: String
     let size: CGFloat
     let action: () -> Void
-    
-    @State private var isPressed = false
     
     init(
         icon: String,
@@ -194,39 +136,17 @@ struct IconButton: View {
     }
     
     var body: some View {
-        Button(
-            action: {
-                // HapticManager.shared.impact(style: .light)
-                action()
-            },
-            label: {
-                Image(systemName: icon)
-                    .font(.system(size: size, weight: .medium))
-                    .foregroundColor(.primary)
-                    .frame(width: size * 1.8, height: size * 1.8)
-                    .background(
-                        Circle()
-                            .fill(Color.appCard)
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.appBorder, lineWidth: 1)
-                            )
-                    )
-                    .scaleEffect(isPressed ? 0.9 : 1.0)
-                    .opacity(isEnabled ? 1.0 : 0.6)
-            }
+        BaseIconButton(
+            icon: icon,
+            size: size,
+            style: .outlined,
+            action: action
         )
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!isEnabled)
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            withAnimation(.easeOut(duration: 0.1)) {
-                isPressed = pressing
-            }
-        }, perform: {})
     }
 }
 
 // MARK: - Text Button
+// Legacy wrapper for BaseButton - use BaseButton directly for new code
 
 struct TextButton: View {
     let title: String
@@ -244,22 +164,24 @@ struct TextButton: View {
     }
     
     var body: some View {
-        Button(
-            action: {
-                // HapticManager.shared.selection()
-                action()
-            },
-            label: {
-                Text(title)
-                    .font(.footnote)
-                    .foregroundColor(color ?? .appPrimary)
-            }
+        BaseButton(
+            title,
+            configuration: ButtonConfiguration(
+                style: .ghost,
+                size: .custom(
+                    height: 20,
+                    padding: EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0),
+                    fontSize: 13
+                ),
+                hapticFeedback: .selection
+            ),
+            action: action
         )
-        .buttonStyle(PlainButtonStyle())
     }
 }
 
 // MARK: - Floating Action Button
+// Custom FAB implementation - consider using BaseIconButton for simpler cases
 
 struct FloatingActionButton: View {
     let icon: String
@@ -268,35 +190,39 @@ struct FloatingActionButton: View {
     @State private var isPressed = false
     
     var body: some View {
-        Button(
-            action: {
-                // HapticManager.shared.impact(style: .medium)
-                action()
-            },
-            label: {
-                Image(systemName: icon)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 56, height: 56)
-                    .background(
-                        Circle()
-                            .fill(Color.appPrimary)
-                            .shadow(
-                                color: Color.appPrimary.opacity(0.3),
-                                radius: 8,
-                                x: 0,
-                                y: 4
-                            )
-                    )
-                    .scaleEffect(isPressed ? 0.9 : 1.0)
-            }
-        )
+        Button(action: {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            action()
+        }) {
+            Image(systemName: icon)
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 56, height: 56)
+                .background(
+                    Circle()
+                        .fill(Color.appPrimary)
+                        .shadow(
+                            color: Color.appPrimary.opacity(0.3),
+                            radius: 8,
+                            x: 0,
+                            y: 4
+                        )
+                )
+                .scaleEffect(isPressed ? 0.9 : 1.0)
+                .animation(.easeInOut(duration: 0.1), value: isPressed)
+        }
         .buttonStyle(PlainButtonStyle())
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            withAnimation(.easeOut(duration: 0.1)) {
-                isPressed = pressing
-            }
-        }, perform: {})
+        .onLongPressGesture(
+            minimumDuration: 0,
+            maximumDistance: .infinity,
+            pressing: { pressing in
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isPressed = pressing
+                }
+            },
+            perform: {}
+        )
     }
 }
 

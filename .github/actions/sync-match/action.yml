@@ -1,0 +1,44 @@
+name: 'Sync Certificates with Match'
+description: 'Sync certificates and provisioning profiles using Fastlane match'
+inputs:
+  match_password:
+    description: 'Passphrase for Fastlane match (MATCH_PASSWORD)'
+    required: true
+  match_git_url:
+    description: 'Git URL for Fastlane match repository (MATCH_GIT_URL)'
+    required: true
+  match_git_basic:
+    description: 'Basic auth credentials for git (username:password), embedded in URL'
+    required: false
+  match_git_branch:
+    description: 'Git branch to use for Match certificates'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Ruby and Bundler
+      uses: ./.github/actions/setup-ruby-bundler
+      with:
+        working-directory: apps/ios
+        cache-key-prefix: 'match-gems'
+    - name: Sync certificates and provisioning profiles
+      id: match
+      shell: bash
+      working-directory: apps/ios
+      run: |
+        if [ -z "$MATCH_GIT_URL" ] || [ -z "$MATCH_GIT_BASIC_AUTHORIZATION" ]; then
+          echo "::error::Missing MATCH_GIT_URL or MATCH_GIT_BASIC_AUTHORIZATION secrets. See .github/workflows/ios-secrets-setup.md"
+          exit 1
+        fi
+        # Use our setup_provisioning lane which handles API key setup properly
+        # Run in readonly mode since certificates exist
+        bundle exec fastlane setup_provisioning type:appstore readonly:true
+      env:
+        MATCH_PASSWORD: ${{ inputs.match_password }}
+        MATCH_GIT_URL: ${{ inputs.match_git_url }}
+        MATCH_GIT_BASIC_AUTHORIZATION: ${{ inputs.match_git_basic }}
+        MATCH_GIT_BRANCH: ${{ inputs.match_git_branch }}
+        MATCH_KEYCHAIN_NAME: login.keychain
+        MATCH_KEYCHAIN_PASSWORD: 
+        FL_OUTPUT_DIR: ./logs
+        FASTLANE_HIDE_TIMESTAMP: true

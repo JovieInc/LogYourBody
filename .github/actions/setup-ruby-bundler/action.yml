@@ -1,0 +1,74 @@
+name: 'Setup Ruby and Bundler'
+description: 'Install Ruby, Bundler and cache dependencies'
+inputs:
+  ruby-version:
+    description: 'Ruby version to use'
+    required: false
+    default: '3.3'
+  bundler-version:
+    description: 'Bundler version to use'
+    required: false
+    default: '2.4.10'
+  working-directory:
+    description: 'Working directory containing Gemfile'
+    required: false
+    default: '.'
+  cache-key-prefix:
+    description: 'Prefix for cache key'
+    required: false
+    default: 'gems'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ inputs.ruby-version }}
+        bundler-cache: false  # We'll handle caching ourselves for better control
+
+    - name: Get Ruby version
+      id: ruby-version
+      shell: bash
+      run: echo "version=$(ruby -v | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+    - name: Cache Ruby dependencies
+      uses: actions/cache@v4
+      id: bundler-cache
+      with:
+        path: ${{ inputs.working-directory }}/vendor/bundle
+        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ hashFiles(format('{0}/Gemfile.lock', inputs.working-directory)) }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-
+
+    - name: Install Bundler
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        gem install bundler:${{ inputs.bundler-version }}
+        bundle config path vendor/bundle
+        bundle config set --local deployment 'true'
+        bundle config set --local jobs '4'
+        bundle config set --local retry '3'
+
+    - name: Install dependencies
+      if: steps.bundler-cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: bundle install
+
+    - name: Update bundle if cache hit
+      if: steps.bundler-cache.outputs.cache-hit == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Check if bundle is satisfied, install if needed
+        bundle check || bundle install
+
+    - name: Verify Ruby setup
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "Ruby: $(ruby --version)"
+        echo "Bundler: $(bundle --version)"
+        echo "Bundle path: $(bundle config get path)"

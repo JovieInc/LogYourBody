@@ -1,49 +1,31 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react'
 import LoginPage from '../../signin/page'
-import { useAuth } from '@/contexts/ClerkAuthContext'
 
-// Mock the auth context
-jest.mock('@/contexts/ClerkAuthContext')
-const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>
-
-// Mock the router
-const mockPush = jest.fn()
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
+// Mock lucide-react icon
+jest.mock('lucide-react', () => ({
+  BarChart3: () => <svg className="lucide-bar-chart3" />
 }))
 
 describe('LoginPage', () => {
-  const mockSignIn = jest.fn()
-  const mockSignInWithProvider = jest.fn()
-
-  beforeEach(() => {
-    jest.clearAllMocks()
-    mockUseAuth.mockReturnValue({
-      user: null,
-      session: null,
-      loading: false,
-      signIn: mockSignIn,
-      signUp: jest.fn(),
-      signOut: jest.fn(),
-      signInWithProvider: mockSignInWithProvider,
-    })
-  })
-
-  it('should render login form', () => {
+  it('should render login page with correct content', () => {
     render(<LoginPage />)
 
     expect(screen.getByText('Welcome back')).toBeInTheDocument()
     expect(screen.getByText('Sign in to continue your fitness journey')).toBeInTheDocument()
-    // Check for tabs
-    expect(screen.getByRole('tab', { name: 'Email' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'SMS' })).toBeInTheDocument()
-    // Email tab should be active by default
-    expect(screen.getByRole('tab', { name: 'Email' })).toHaveAttribute('data-state', 'active')
-    // Check form elements within email tab
+  })
+
+  it('should render Clerk SignIn component', () => {
+    render(<LoginPage />)
+    
+    // The Clerk SignIn component is rendered
+    expect(screen.getByTestId('clerk-signin')).toBeInTheDocument()
+  })
+
+  it('should render email and password fields', () => {
+    render(<LoginPage />)
+    
+    // Check form elements from Clerk mock
     expect(screen.getByRole('textbox', { name: /email/i })).toBeInTheDocument()
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Sign in/i })).toBeInTheDocument()
@@ -65,89 +47,6 @@ describe('LoginPage', () => {
     expect(forgotPasswordLink).toHaveAttribute('href', '/forgot-password')
   })
 
-  it('should handle successful sign in', async () => {
-    const user = userEvent.setup()
-    mockSignIn.mockResolvedValue({ error: null })
-
-    render(<LoginPage />)
-
-    await user.type(screen.getByRole('textbox', { name: /email/i }), 'test@example.com')
-    await user.type(screen.getByLabelText('Password'), 'password123')
-    await user.click(screen.getByRole('button', { name: /Sign in/i }))
-
-    await waitFor(() => {
-      expect(mockSignIn).toHaveBeenCalledWith('test@example.com', 'password123')
-      expect(mockPush).toHaveBeenCalledWith('/dashboard')
-    })
-  })
-
-  it('should display error on failed sign in', async () => {
-    const user = userEvent.setup()
-    mockSignIn.mockResolvedValue({ error: new Error('Invalid credentials') })
-
-    render(<LoginPage />)
-
-    await user.type(screen.getByRole('textbox', { name: /email/i }), 'test@example.com')
-    await user.type(screen.getByLabelText('Password'), 'wrongpassword')
-    await user.click(screen.getByRole('button', { name: /Sign in/i }))
-
-    await waitFor(() => {
-      expect(screen.getByText('Invalid credentials')).toBeInTheDocument()
-      expect(mockPush).not.toHaveBeenCalled()
-    })
-  })
-
-  it('should handle OAuth sign in with Google', async () => {
-    const user = userEvent.setup()
-    mockSignInWithProvider.mockResolvedValue({ error: null })
-
-    render(<LoginPage />)
-
-    await user.click(screen.getByRole('button', { name: /Google/i }))
-
-    await waitFor(() => {
-      expect(mockSignInWithProvider).toHaveBeenCalledWith('google')
-    })
-  })
-
-  it('should handle OAuth sign in with Apple', async () => {
-    const user = userEvent.setup()
-    mockSignInWithProvider.mockResolvedValue({ error: null })
-
-    render(<LoginPage />)
-
-    await user.click(screen.getByRole('button', { name: /Apple/i }))
-
-    await waitFor(() => {
-      expect(mockSignInWithProvider).toHaveBeenCalledWith('apple')
-    })
-  })
-
-  it('should display loading state during sign in', async () => {
-    const user = userEvent.setup()
-    mockSignIn.mockImplementation(() => new Promise(() => {})) // Never resolves
-
-    render(<LoginPage />)
-
-    await user.type(screen.getByRole('textbox', { name: /email/i }), 'test@example.com')
-    await user.type(screen.getByLabelText('Password'), 'password123')
-    await user.click(screen.getByRole('button', { name: /Sign in/i }))
-
-    expect(screen.getByText('Signing in...')).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: /email/i })).toBeDisabled()
-    expect(screen.getByLabelText('Password')).toBeDisabled()
-  })
-
-  it('should handle OAuth error', async () => {
-    const user = userEvent.setup()
-    mockSignInWithProvider.mockResolvedValue({ error: new Error('OAuth error') })
-
-    render(<LoginPage />)
-
-    await user.click(screen.getByRole('button', { name: /Google/i }))
-
-    await waitFor(() => {
-      expect(screen.getByText('OAuth error')).toBeInTheDocument()
-    })
-  })
+  // Note: Actual form validation, submission, and OAuth flows are handled internally by Clerk
+  // and cannot be properly tested without mocking Clerk's internal implementation
 })

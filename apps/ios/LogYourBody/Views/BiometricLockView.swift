@@ -2,6 +2,8 @@
 // BiometricLockView.swift
 // LogYourBody
 //
+// Refactored using Atomic Design principles
+//
 import SwiftUI
 import LocalAuthentication
 
@@ -11,58 +13,60 @@ struct BiometricLockView: View {
     @State private var hasAttemptedOnce = false
     @State private var authenticationTimer: Timer?
     
+    private var biometricType: BiometricAuthView.BiometricType {
+        let context = LAContext()
+        var error: NSError?
+        
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            return .faceID // Default
+        }
+        
+        switch context.biometryType {
+        case .faceID:
+            return .faceID
+        case .touchID:
+            return .touchID
+        default:
+            return .faceID
+        }
+    }
+    
     var body: some View {
         ZStack {
+            // Atom: Background
             Color.appBackground
                 .ignoresSafeArea()
             
-            VStack(spacing: 32) {
-                Spacer()
-                
-                // Subtle lock icon with animation
-                Image(systemName: isAuthenticating ? "faceid" : "lock.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.appTextTertiary)
-                    .opacity(0.6)
-                    .scaleEffect(isAuthenticating ? 1.1 : 1.0)
-                    .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: isAuthenticating)
-                
-                if hasAttemptedOnce && !isAuthenticating {
-                    VStack(spacing: 8) {
-                        Text("Tap to unlock")
-                            .font(.appCaption)
-                            .foregroundColor(.appTextTertiary)
-                            .opacity(0.5)
-                        
-                        // Add skip option after failed attempt
-                        Button(
-            action: {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                isUnlocked = true
-                            }
-                        },
-            label: {
-                            Text("Skip")
-                                .font(.appCaption)
-                                .foregroundColor(.appPrimary)
-                                .opacity(0.8)
-                        }
-        )
-                        .padding(.top, 8)
-                    }
-                }
-                
-                Spacer()
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
             if hasAttemptedOnce && !isAuthenticating {
-                authenticate()
+                // Organism: Biometric Auth View with manual trigger
+                BiometricAuthView(
+                    biometricType: biometricType,
+                    onAuthenticate: authenticate,
+                    onUsePassword: {
+                        // Skip biometric and unlock
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            isUnlocked = true
+                        }
+                    }
+                )
+            } else {
+                // Simple loading state while authenticating
+                VStack(spacing: 32) {
+                    Spacer()
+                    
+                    Image(systemName: biometricType.icon)
+                        .font(.system(size: 60))
+                        .foregroundColor(.appTextTertiary)
+                        .opacity(0.6)
+                        .scaleEffect(isAuthenticating ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: isAuthenticating)
+                    
+                    Spacer()
+                }
             }
         }
         .onAppear {
-            // Small delay to let the UI settle before Face ID prompt
+            // Small delay to let the UI settle before biometric prompt
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 authenticate()
             }
@@ -98,52 +102,36 @@ struct BiometricLockView: View {
                 }
             }
             
-            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Unlock LogYourBody") { success, error in
+            let reason = "Unlock LogYourBody"
+            
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, _ in
                 DispatchQueue.main.async {
-                    // Cancel timer since we got a response
                     self.authenticationTimer?.invalidate()
                     self.isAuthenticating = false
                     
                     if success {
-                        // Smooth unlock animation
                         withAnimation(.easeOut(duration: 0.3)) {
                             self.isUnlocked = true
                         }
                     } else {
-                        // Failed - mark that we've attempted once
+                        // Show the retry UI
                         self.hasAttemptedOnce = true
-                        
-                        // Check if it was a user cancellation
-                        if let laError = error as? LAError {
-                            switch laError.code {
-                            case .userCancel, .systemCancel:
-                                // User cancelled - show skip option immediately
-                                break
-                            case .biometryNotAvailable, .biometryNotEnrolled:
-                                // Biometry issues - unlock immediately
-                                withAnimation(.easeOut(duration: 0.3)) {
-                                    self.isUnlocked = true
-                                }
-                            default:
-                                // Other errors - let them retry
-                                break
-                            }
-                        }
                     }
                 }
             }
         } else {
-            // Biometrics not available, unlock immediately
-            withAnimation(.easeOut(duration: 0.3)) {
-                isUnlocked = true
-            }
+            // No biometric available, just unlock
+            isUnlocked = true
         }
     }
 }
 
-struct BiometricLockView_Previews: PreviewProvider {
-    static var previews: some View {
-        BiometricLockView(isUnlocked: .constant(false))
-            .preferredColorScheme(.dark)
-    }
+// MARK: - Preview
+
+#Preview("Face ID") {
+    BiometricLockView(isUnlocked: .constant(false))
+}
+
+#Preview("Unlocked") {
+    BiometricLockView(isUnlocked: .constant(true))
 }

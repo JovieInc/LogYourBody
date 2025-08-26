@@ -2,14 +2,15 @@
 // SignUpView.swift
 // LogYourBody
 //
+// Refactored using Atomic Design principles
+//
 import SwiftUI
 import AuthenticationServices
 import SafariServices
 
 struct SignUpView: View {
     @EnvironmentObject var authManager: AuthManager
-    @Environment(\.dismiss)
-    var dismiss
+    @Environment(\.dismiss) var dismiss
     @State private var email = ""
     @State private var password = ""
     @State private var isLoading = false
@@ -21,288 +22,70 @@ struct SignUpView: View {
     @State private var showTermsSheet = false
     @State private var showPrivacySheet = false
     @State private var showHealthDisclaimerSheet = false
-    @FocusState private var focusedField: Field?
-    
-    enum Field {
-        case email, password
-    }
     
     var body: some View {
         ZStack {
-            // Background
+            // Atom: Background
             Color.appBackground
                 .ignoresSafeArea()
             
             ScrollView {
                 VStack(spacing: 0) {
-                    // Header
+                    // Navigation Bar
                     HStack {
-                        Button(
-            action: { dismiss() },
-            label: {
+                        Button(action: { dismiss() }, label: {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 20))
                                 .foregroundColor(.appText)
                                 .frame(width: 44, height: 44)
-                        }
-        )
+                        })
                         
                         Spacer()
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                     
-                    // Title
-                    VStack(spacing: 16) {
-                        Text("Create Account")
-                            .font(.appTitle)
-                            .foregroundColor(.appText)
-                            .fontWeight(.semibold)
-                        
-                        Text("Start tracking your fitness progress")
-                            .font(.appBody)
-                            .foregroundColor(.appTextSecondary)
-                    }
+                    // Molecule: Auth Header
+                    AuthHeader(
+                        title: "Create Account",
+                        subtitle: "Start tracking your fitness progress"
+                    )
                     .padding(.top, 20)
                     .padding(.bottom, 40)
                     
-                    // Sign Up Form
-                    VStack(spacing: 20) {
-                        // Email Field
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Email")
-                                .font(.appBodySmall)
-                                .foregroundColor(.appTextSecondary)
-                            
-                            TextField("you@example.com", text: $email)
-                                .modernTextFieldStyle()
-                                .autocapitalization(.none)
-                                .keyboardType(.emailAddress)
-                                .textContentType(.emailAddress)
-                                .focused($focusedField, equals: .email)
-                                .onSubmit {
-                                    focusedField = .password
-                                }
-                        }
-                        
-                        // Password Field
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Password")
-                                .font(.appBodySmall)
-                                .foregroundColor(.appTextSecondary)
-                            
-                            SecureField("••••••••", text: $password)
-                                .modernTextFieldStyle()
-                                .textContentType(.newPassword)
-                                .focused($focusedField, equals: .password)
-                                .onSubmit {
-                                    if isValidForm {
-                                        signUp()
-                                    }
-                                }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: password.count >= 8 ? "checkmark.circle.fill" : "circle")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(password.count >= 8 ? .green : .linearTextTertiary)
-                                    Text("At least 8 characters")
-                                        .font(.appCaption)
-                                        .foregroundColor(password.count >= 8 ? .appTextSecondary : .linearTextTertiary)
-                                }
-                                
-                                HStack(spacing: 4) {
-                                    Image(systemName: hasUpperAndLower ? "checkmark.circle.fill" : "circle")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(hasUpperAndLower ? .green : .linearTextTertiary)
-                                    Text("Mix of uppercase and lowercase letters")
-                                        .font(.appCaption)
-                                        .foregroundColor(hasUpperAndLower ? .appTextSecondary : .linearTextTertiary)
-                                }
-                                
-                                HStack(spacing: 4) {
-                                    Image(systemName: hasNumberOrSymbol ? "checkmark.circle.fill" : "circle")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(hasNumberOrSymbol ? .green : .linearTextTertiary)
-                                    Text("At least one number or special character")
-                                        .font(.appCaption)
-                                        .foregroundColor(hasNumberOrSymbol ? .appTextSecondary : .linearTextTertiary)
-                                }
-                            }
-                        }
-                        
-                        // Privacy Consent Checkboxes
-                        VStack(spacing: 16) {
-                            // Terms of Service
-                            HStack(alignment: .top, spacing: 12) {
-                                Button(
-            action: { agreedToTerms.toggle() },
-            label: {
-                                    Image(systemName: agreedToTerms ? "checkmark.square.fill" : "square")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(agreedToTerms ? .white : .appBorder)
-                                }
-        )
-                                .buttonStyle(PlainButtonStyle())
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 4) {
-                                        Text("I agree to the")
-                                            .font(.appCaption)
-                                            .foregroundColor(.appTextSecondary)
-                                        
-                                        Button("Terms of Service") {
-                                            showTermsSheet = true
-                                        }
-                                        .font(.appCaption)
-                                        .foregroundColor(.white)
-                                        .underline()
-                                    }
-                                }
-                                
-                                Spacer()
-                            }
-                            
-                            // Privacy Policy
-                            HStack(alignment: .top, spacing: 12) {
-                                Button(
-            action: { agreedToPrivacy.toggle() },
-            label: {
-                                    Image(systemName: agreedToPrivacy ? "checkmark.square.fill" : "square")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(agreedToPrivacy ? .white : .appBorder)
-                                }
-        )
-                                .buttonStyle(PlainButtonStyle())
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 4) {
-                                        Text("I have read and accept the")
-                                            .font(.appCaption)
-                                            .foregroundColor(.appTextSecondary)
-                                        
-                                        Button("Privacy Policy") {
-                                            showPrivacySheet = true
-                                        }
-                                        .font(.appCaption)
-                                        .foregroundColor(.white)
-                                        .underline()
-                                    }
-                                    
-                                    Text("Including data collection for fitness tracking")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.appTextTertiary)
-                                }
-                                
-                                Spacer()
-                            }
-                            
-                            // Health Disclaimer
-                            HStack(alignment: .top, spacing: 12) {
-                                Button(
-            action: { agreedToHealthDisclaimer.toggle() },
-            label: {
-                                    Image(systemName: agreedToHealthDisclaimer ? "checkmark.square.fill" : "square")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(agreedToHealthDisclaimer ? .white : .appBorder)
-                                }
-        )
-                                .buttonStyle(PlainButtonStyle())
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("I understand LogYourBody is not a medical device")
-                                        .font(.appCaption)
-                                        .foregroundColor(.appTextSecondary)
-                                    
-                                    Text("Consult healthcare professionals for medical advice")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.appTextTertiary)
-                                }
-                                
-                                Spacer()
-                            }
-                        }
-                        .padding(.vertical, 8)
-                        
-                        // Sign Up Button
-                        Button(action: signUp) {
-                            HStack {
-                                if isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: isValidForm ? .black : .white))
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Text("Create account")
-                                        .font(.appBody)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(isValidForm ? .black : .white)
-                                }
-                            }
-                            .frame(height: 48)
-                            .frame(maxWidth: .infinity)
-                            .background(isValidForm ? Color.white : Color.appBorder)
-                            .cornerRadius(Constants.cornerRadius)
-                            .animation(.easeInOut(duration: 0.2), value: isValidForm)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .scaleEffect(isLoading ? 0.98 : 1.0)
-                        .disabled(!isValidForm || isLoading)
-                        
-                        // Divider
-                        HStack(spacing: 16) {
-                            Rectangle()
-                                .fill(Color.appBorder)
-                                .frame(height: 1)
-                            
-                            Text("or")
-                                .font(.appCaption)
-                                .foregroundColor(.linearTextTertiary)
-                            
-                            Rectangle()
-                                .fill(Color.appBorder)
-                                .frame(height: 1)
-                        }
-                        .padding(.vertical, 8)
-                        
-                        // Apple Sign In
-                        Button(
-            action: {
+                    // Organism: Sign Up Form
+                    SignUpForm(
+                        email: $email,
+                        password: $password,
+                        isLoading: $isLoading,
+                        agreedToTerms: $agreedToTerms,
+                        agreedToPrivacy: $agreedToPrivacy,
+                        agreedToHealthDisclaimer: $agreedToHealthDisclaimer,
+                        onSignUp: signUp,
+                        onAppleSignIn: {
                             Task {
                                 await authManager.signInWithAppleOAuth()
                             }
                         },
-            label: {
-                            HStack {
-                                Image(systemName: "apple.logo")
-                                    .font(.system(size: 18))
-                                Text("Continue with Apple")
-                                    .font(.system(size: 17, weight: .medium))
-                            }
-                            .foregroundColor(.black)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background(Color.white)
-                            .cornerRadius(Constants.cornerRadius)
-                        }
-        )
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Already have account
-                        HStack(spacing: 4) {
-                            Text("Already have an account?")
-                                .font(.appBody)
-                                .foregroundColor(.appTextSecondary)
-                            
-                            Button("Sign in") {
-                                dismiss()
-                            }
-                            .font(.appBody)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                        }
-                        .padding(.top, 8)
-                    }
+                        termsURL: URL(string: "https://logyourbody.com/terms")!,
+                        privacyURL: URL(string: "https://logyourbody.com/privacy")!,
+                        healthDisclaimerURL: URL(string: "https://logyourbody.com/health-disclaimer")!
+                    )
                     .padding(.horizontal, 24)
+                    
+                    // Sign In Link
+                    HStack(spacing: 4) {
+                        Text("Already have an account?")
+                            .font(.system(size: 15))
+                            .foregroundColor(.appTextSecondary)
+                        
+                        Button("Sign in") {
+                            dismiss()
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.appPrimary)
+                    }
+                    .padding(.top, 8)
                     
                     Spacer(minLength: 40)
                 }
@@ -315,9 +98,6 @@ struct SignUpView: View {
         } message: {
             Text(errorMessage)
         }
-        .onTapGesture {
-            focusedField = nil
-        }
         .sheet(isPresented: $showTermsSheet) {
             SafariView(url: URL(string: "https://logyourbody.com/terms")!)
                 .ignoresSafeArea()
@@ -326,36 +106,16 @@ struct SignUpView: View {
             SafariView(url: URL(string: "https://logyourbody.com/privacy")!)
                 .ignoresSafeArea()
         }
-    }
-    
-    private var isValidForm: Bool {
-        !email.isEmpty &&
-        email.contains("@") &&
-        password.count >= 8 &&
-        hasUpperAndLower &&
-        hasNumberOrSymbol &&
-        agreedToTerms &&
-        agreedToPrivacy &&
-        agreedToHealthDisclaimer
-    }
-    
-    private var hasUpperAndLower: Bool {
-        let hasUpper = password.rangeOfCharacter(from: .uppercaseLetters) != nil
-        let hasLower = password.rangeOfCharacter(from: .lowercaseLetters) != nil
-        return hasUpper && hasLower
-    }
-    
-    private var hasNumberOrSymbol: Bool {
-        let hasNumber = password.rangeOfCharacter(from: .decimalDigits) != nil
-        let hasSymbol = password.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil
-        return hasNumber || hasSymbol
+        .sheet(isPresented: $showHealthDisclaimerSheet) {
+            SafariView(url: URL(string: "https://logyourbody.com/health-disclaimer")!)
+                .ignoresSafeArea()
+        }
     }
     
     private func signUp() {
         // Prevent multiple submissions
         guard !isLoading else { return }
         
-        focusedField = nil
         isLoading = true
         
         Task { @MainActor in
@@ -382,7 +142,8 @@ struct SignUpView: View {
     }
 }
 
-// Safari View wrapper for showing web content
+// MARK: - Safari View Wrapper
+
 struct SafariView: UIViewControllerRepresentable {
     let url: URL
     
@@ -401,6 +162,8 @@ struct SafariView: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
+
+// MARK: - Preview
 
 #Preview {
     NavigationView {

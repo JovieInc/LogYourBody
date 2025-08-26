@@ -31,6 +31,66 @@ jest.mock('lodash', () => ({
   }
 }))
 
+// Mock UI components
+jest.mock('@/components/ui/button', () => ({
+  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>
+}))
+jest.mock('@/components/ui/card', () => ({
+  Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardDescription: ({ children, ...props }: any) => <p {...props}>{children}</p>,
+  CardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardTitle: ({ children, ...props }: any) => <h3 {...props}>{children}</h3>
+}))
+jest.mock('@/components/ui/input', () => ({
+  Input: (props: any) => <input {...props} />
+}))
+jest.mock('@/components/ui/label', () => ({
+  Label: ({ children, ...props }: any) => <label {...props}>{children}</label>
+}))
+jest.mock('@/components/ui/select', () => ({
+  Select: ({ children, onValueChange, ...props }: any) => <div {...props}>{children}</div>,
+  SelectContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  SelectItem: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  SelectTrigger: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+  SelectValue: ({ children, ...props }: any) => <span {...props}>{children}</span>
+}))
+jest.mock('@/components/ui/avatar', () => ({
+  Avatar: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  AvatarFallback: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  AvatarImage: ({ src, alt, ...props }: any) => <img src={src} alt={alt} {...props} />
+}))
+jest.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  DialogContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  DialogHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  DialogTitle: ({ children, ...props }: any) => <h2 {...props}>{children}</h2>
+}))
+jest.mock('@/components/ui/wheel-picker', () => ({
+  HeightWheelPicker: ({ onSelect, ...props }: any) => <div {...props}>Height Picker</div>,
+  DateWheelPicker: ({ onSelect, ...props }: any) => <div {...props}>Date Picker</div>
+}))
+jest.mock('@/utils/pravatar-utils', () => ({
+  getProfileAvatarUrl: (email: string) => `https://example.com/avatar/${email}`,
+  getRandomAvatarUrl: () => 'https://example.com/random-avatar'
+}))
+
+// Mock lucide-react icons
+jest.mock('lucide-react', () => ({
+  Loader2: () => <svg className="lucide-loader2" />,
+  ArrowLeft: () => <svg className="lucide-arrow-left" />,
+  Camera: () => <svg className="lucide-camera" />,
+  Calendar: () => <svg className="lucide-calendar" />,
+  Ruler: () => <svg className="lucide-ruler" />,
+  Check: () => <svg className="lucide-check" />
+}))
+
+// Mock next/link
+jest.mock('next/link', () => ({
+  __esModule: true,
+  default: ({ children, ...props }: any) => <a {...props}>{children}</a>
+}))
+
 const mockUser = {
   id: 'test-user-id',
   email: 'test@example.com'
@@ -80,7 +140,7 @@ describe('ProfileSettingsPage', () => {
     })
 
     render(<ProfileSettingsPage />)
-    expect(mockPush).toHaveBeenCalledWith('/login')
+    expect(mockPush).toHaveBeenCalledWith('/signin')
   })
 
   it('loads and displays profile data on mount', async () => {

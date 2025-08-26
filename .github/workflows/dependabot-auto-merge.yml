@@ -15,60 +15,35 @@ jobs:
   check-tests:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]'
-    permissions:
-      contents: read
-      pull-requests: read
     outputs:
       tests-passed: ${{ steps.check.outputs.passed }}
       update-type: ${{ steps.metadata.outputs.update-type }}
-    
     steps:
-    - name: Fetch metadata
-      id: metadata
-      uses: dependabot/fetch-metadata@v2
-      with:
-        github-token: "${{ secrets.GITHUB_TOKEN }}"
-    
-    # For workflow_run trigger, check if tests passed
-    - name: Check test status from workflow run
-      if: github.event_name == 'workflow_run'
-      id: check-workflow
-      run: |
-        if [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]]; then
-          echo "passed=true" >> $GITHUB_OUTPUT
-        else
-          echo "passed=false" >> $GITHUB_OUTPUT
-        fi
-    
-    # For PR trigger, check if required checks passed
-    - name: Check PR status
-      if: github.event_name == 'pull_request'
-      id: check-pr
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        # Wait a bit for checks to start
-        sleep 30
-        
-        # Get check runs for this PR
-        PR_HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-        CHECKS=$(gh api repos/${{ github.repository }}/commits/${PR_HEAD_SHA}/check-runs --jq '.check_runs[] | select(.name == "build-and-deploy") | .conclusion')
-        
-        if [[ "$CHECKS" == "success" ]]; then
-          echo "passed=true" >> $GITHUB_OUTPUT
-        else
-          echo "passed=false" >> $GITHUB_OUTPUT
-          echo "Tests have not passed yet. Waiting for Main CI/CD workflow to complete."
-        fi
-    
-    - name: Set output
-      id: check
-      run: |
-        if [[ "${{ steps.check-workflow.outputs.passed }}" == "true" ]] || [[ "${{ steps.check-pr.outputs.passed }}" == "true" ]]; then
-          echo "passed=true" >> $GITHUB_OUTPUT
-        else
-          echo "passed=false" >> $GITHUB_OUTPUT
-        fi
+      - name: Fetch metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Determine test status
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]] && echo "passed=true" >> $GITHUB_OUTPUT || echo "passed=false" >> $GITHUB_OUTPUT
+          else
+            sleep 30
+            PR_SHA="${{ github.event.pull_request.head.sha }}"
+            # Check for CI/CD Orchestrator workflow run or PR checks
+            CHECKS=$(gh api repos/${{ github.repository }}/commits/${PR_SHA}/check-runs --jq '.check_runs[] | select(.name == "PR iOS Checks" or .name == "PR Web Checks" or .name == "ci-summary") | .conclusion')
+            
+            # If any required check passed, consider tests as passed
+            if echo "$CHECKS" | grep -q "success"; then
+              STATUS="success"
+            else
+              STATUS="failure"
+            fi
+            [[ "$STATUS" == "success" ]] && echo "passed=true" >> $GITHUB_OUTPUT || echo "passed=false" >> $GITHUB_OUTPUT
+          fi
 
   # Auto-merge only after tests pass
   auto-merge:

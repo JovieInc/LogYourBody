@@ -180,13 +180,13 @@ struct PhotoAnchoredTimelineSlider: View {
                         
                         if newIndex != selectedIndex && newIndex >= 0 && newIndex < metrics.count {
                             selectedIndex = newIndex
-                            HapticManager.shared.impact(style: .light)
+                            HapticManager.shared.buttonTapped()
                         }
                     }
                     .onEnded { _ in
                         isDragging = false
                         thumbScale = 1.0
-                        HapticManager.shared.impact(style: .light)
+                        HapticManager.shared.buttonTapped()
                     }
             )
         }
@@ -216,7 +216,7 @@ struct PhotoAnchoredTimelineSlider: View {
         for i in stride(from: selectedIndex - 1, through: 0, by: -1) {
             if metrics[i].photoUrl != nil {
                 selectedIndex = i
-                HapticManager.shared.impact(style: .light)
+                HapticManager.shared.buttonTapped()
                 break
             }
         }
@@ -228,7 +228,7 @@ struct PhotoAnchoredTimelineSlider: View {
         for i in (selectedIndex + 1)..<metrics.count {
             if metrics[i].photoUrl != nil {
                 selectedIndex = i
-                HapticManager.shared.impact(style: .light)
+                HapticManager.shared.buttonTapped()
                 break
             }
         }

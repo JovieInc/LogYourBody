@@ -252,21 +252,22 @@ struct BottomNavGlass: View {
     var body: some View {
         HStack(spacing: 0) {
             ForEach(tabs, id: \.1) { icon, title in
+                let isSelected = selectedTab == title
                 Button(
-            action: {
-                    HapticManager.shared.tabSelected()
-                    onTabSelected(title)
-                },
-            label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: icon)
-                            .font(.system(size: 22))
-                            .foregroundColor(selectedTab == title ? .appPrimary : .appTextSecondary)
-                        
-                        Text(title)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(selectedTab == title ? .appPrimary : .appTextSecondary)
-                    }
+                    action: {
+                        HapticManager.shared.buttonTapped()
+                        onTabSelected(title)
+                    },
+                    label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: icon)
+                                .font(.system(size: 22))
+                                .foregroundColor(isSelected ? .appPrimary : .appTextSecondary)
+                            
+                            Text(title)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(isSelected ? .appPrimary : .appTextSecondary)
+                        }
                     .frame(maxWidth: .infinity)
                 }
         )

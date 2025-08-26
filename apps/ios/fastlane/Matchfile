@@ -1,14 +1,25 @@
 # For more information about match, see:
 # https://docs.fastlane.tools/actions/match/
 
-git_url(ENV["MATCH_GIT_URL"] || "")
+git_url(ENV["MATCH_GIT_URL"] || "https://github.com/itstimwhite/certificates.git")
 
 storage_mode("git")
 
 type("development") # The default type, can be: appstore, adhoc, enterprise or development
 
-app_identifier(["com.logyourbody.app"])
-username(ENV["APPLE_ID_EMAIL"] || "")
+app_identifier(["LogYourBody.LogYourBody"])
+
+# API key authentication is required - no username/password fallback
+# Set these environment variables:
+# APP_STORE_CONNECT_API_KEY_ID
+# APP_STORE_CONNECT_API_ISSUER_ID 
+# APP_STORE_CONNECT_API_KEY_PATH or APP_STORE_CONNECT_API_KEY
+
+# Note: API key setup is handled in Fastfile to work around OpenSSL curve issues
+# Do not set api_key_path here - it will be handled by setup_app_store_connect_api lane
+
+# API key authentication is handled in the Fastfile, not here
+# api_key_path(ENV["APP_STORE_CONNECT_API_KEY_PATH"] || "./fastlane/api_key.json")
 
 # For all available options run `fastlane match --help`
 # Remove the # in the beginning of the line to enable the other options

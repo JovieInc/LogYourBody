@@ -53,7 +53,7 @@ jest.mock('@clerk/nextjs', () => ({
         React.createElement('input', { key: 'email', type: 'email', 'aria-label': 'Email', role: 'textbox' }),
         React.createElement('input', { key: 'password', type: 'password', 'aria-label': 'Password' }),
         React.createElement('button', { key: 'submit', type: 'submit' }, 'Create account'),
-        React.createElement('a', { key: 'signin', href: '/login' }, 'Sign in')
+        React.createElement('a', { key: 'signin', href: '/signin' }, 'Sign in')
       ])
     ])
   },

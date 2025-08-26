@@ -1,0 +1,143 @@
+name: 'Setup and Validate Provisioning Profile'
+description: 'Download, install and validate iOS provisioning profile'
+inputs:
+  profile-base64:
+    description: 'Base64 encoded provisioning profile'
+    required: true
+  expected-app-id:
+    description: 'Expected app ID pattern (e.g., *.LogYourBody.LogYourBody)'
+    required: false
+    default: '*.LogYourBody.LogYourBody'
+  validate-capabilities:
+    description: 'Whether to validate required capabilities'
+    required: false
+    default: 'true'
+outputs:
+  profile-uuid:
+    description: 'UUID of the installed profile'
+    value: ${{ steps.install.outputs.uuid }}
+  profile-name:
+    description: 'Name of the provisioning profile'
+    value: ${{ steps.validate.outputs.name }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Download and Install Provisioning Profile
+      id: install
+      shell: bash
+      run: |
+        # Create provisioning profiles directory
+        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+        
+        # Decode and save the profile
+        printf '%s' "${{ inputs.profile-base64 }}" | base64 --decode > provision.mobileprovision
+        
+        # Extract UUID
+        uuid=$(/usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin <<< $(security cms -D -i provision.mobileprovision))
+        
+        # Install with UUID as filename
+        cp provision.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/${uuid}.mobileprovision
+        
+        # Set outputs
+        echo "uuid=${uuid}" >> $GITHUB_OUTPUT
+        echo "PROVISIONING_PROFILE_UUID=${uuid}" >> $GITHUB_ENV
+        echo "PROVISIONING_PROFILE_PATH=$HOME/Library/MobileDevice/Provisioning Profiles/${uuid}.mobileprovision" >> $GITHUB_ENV
+        
+        # Mask sensitive information
+        echo "::add-mask::${uuid}"
+        
+        echo "✅ Provisioning profile installed with UUID: ${uuid}"
+
+    - name: Validate Provisioning Profile
+      id: validate
+      shell: bash
+      run: |
+        # Extract profile information
+        profile_info=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/${{ steps.install.outputs.uuid }}.mobileprovision)
+        
+        # Get key values
+        app_id=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /dev/stdin <<< "$profile_info")
+        team_id=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" /dev/stdin <<< "$profile_info")
+        name=$(/usr/libexec/PlistBuddy -c "Print :Name" /dev/stdin <<< "$profile_info")
+        expiry=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" /dev/stdin <<< "$profile_info")
+        
+        # Mask sensitive information
+        echo "::add-mask::${app_id}"
+        echo "::add-mask::${team_id}"
+        
+        echo "Profile Name: ${name}"
+        echo "name=${name}" >> $GITHUB_OUTPUT
+        
+        # Check app ID
+        expected_pattern="${{ inputs.expected-app-id }}"
+        expected_suffix="${expected_pattern#*.}"
+        if [[ ! "$app_id" =~ ${expected_suffix}$ ]]; then
+          echo "::error::App ID mismatch! Expected pattern: ${expected_pattern}, Got: ${app_id}"
+          exit 1
+        fi
+        echo "✅ App ID matches expected pattern"
+        
+        # Check expiration
+        expiry_epoch=$(date -j -f "%Y-%m-%d %H:%M:%S %z" "$expiry" +%s 2>/dev/null || date -d "$expiry" +%s)
+        current_epoch=$(date +%s)
+        days_until_expiry=$(( (expiry_epoch - current_epoch) / 86400 ))
+        
+        if [ $days_until_expiry -lt 0 ]; then
+          echo "::error::Provisioning profile has expired!"
+          exit 1
+        elif [ $days_until_expiry -lt 30 ]; then
+          echo "::warning::Profile expires in ${days_until_expiry} days"
+        else
+          echo "✅ Profile valid for ${days_until_expiry} days"
+        fi
+        
+        # Validate capabilities if requested
+        if [ "${{ inputs.validate-capabilities }}" == "true" ]; then
+          echo "Checking required capabilities..."
+          
+          # Check each capability
+          capabilities_ok=true
+          
+          # HealthKit
+          if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.healthkit" /dev/stdin <<< "$profile_info" &>/dev/null; then
+            echo "::error::Missing HealthKit capability"
+            capabilities_ok=false
+          else
+            echo "✅ HealthKit"
+          fi
+          
+          # Sign in with Apple
+          if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.applesignin" /dev/stdin <<< "$profile_info" &>/dev/null; then
+            echo "::error::Missing Sign in with Apple capability"
+            capabilities_ok=false
+          else
+            echo "✅ Sign in with Apple"
+          fi
+          
+          # Associated Domains
+          if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.associated-domains" /dev/stdin <<< "$profile_info" &>/dev/null; then
+            echo "::error::Missing Associated Domains capability"
+            capabilities_ok=false
+          else
+            echo "✅ Associated Domains"
+          fi
+          
+          # App Groups
+          if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.security.application-groups:0" /dev/stdin <<< "$profile_info" &>/dev/null; then
+            echo "::warning::Missing App Groups capability"
+            # Not failing for now as it might not be required
+          else
+            echo "✅ App Groups"
+          fi
+          
+          if [ "$capabilities_ok" == "false" ]; then
+            echo "::error::Provisioning profile is missing required capabilities"
+            exit 1
+          fi
+        fi
+        
+        echo "✅ Provisioning profile validation passed!"
+        
+        # Clean up temp file
+        rm -f provision.mobileprovision

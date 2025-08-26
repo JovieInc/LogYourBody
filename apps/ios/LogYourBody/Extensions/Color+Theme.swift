@@ -4,7 +4,7 @@
 //
 import SwiftUI
 
-extension Color {
+public extension Color {
     // MARK: - Primary Colors
     static let linearPurple = Color(hex: "#5B63D3")
     static let linearBlue = Color(hex: "#3B82F6")

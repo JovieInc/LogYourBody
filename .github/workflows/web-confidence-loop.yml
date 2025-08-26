@@ -39,7 +39,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ hashFiles('**/playwright.config.ts') }}
+        key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-playwright-
     
@@ -126,7 +126,7 @@ jobs:
           playwright-report/
           .lighthouseci/
           .next/analyze/
-        retention-days: 7
+        retention-days: 3
 
   deploy-beta:
     name: Deploy to Vercel Beta

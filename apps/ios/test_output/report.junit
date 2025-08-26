@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites tests='6' failures='0' skipped='0' time='49.0015'>
+  <testsuite name='LogYourBodyUITests' time='48.0' tests='4' failures='0' skipped='0'>
+    <testsuite name='LogYourBodyUITests' time='38.0' tests='2' failures='0' skipped='0'>
+      <testcase name='testExample()' classname='LogYourBodyUITests' time='10.0'/>
+      <testcase name='testLaunchPerformance()' classname='LogYourBodyUITests' time='28.0'/>
+    </testsuite>
+    <testsuite name='LogYourBodyUITestsLaunchTests' time='10.0' tests='2' failures='0' skipped='0'>
+      <testcase name='testLaunch(1)' classname='LogYourBodyUITestsLaunchTests' time='5.0'>
+        <properties>
+          <property name='testname' value='testLaunch()'/>
+          <property name='argument' value='1'/>
+        </properties>
+      </testcase>
+      <testcase name='testLaunch(2)' classname='LogYourBodyUITestsLaunchTests' time='5.0'>
+        <properties>
+          <property name='testname' value='testLaunch()'/>
+          <property name='argument' value='2'/>
+        </properties>
+      </testcase>
+    </testsuite>
+    <properties>
+      <property name='Configuration' value='Test Scheme Action'/>
+      <property name='device' value='iPhone 16 (18.5)'/>
+    </properties>
+  </testsuite>
+  <testsuite name='LogYourBodyTests' time='1.0015' tests='2' failures='0' skipped='0'>
+    <testsuite name='LogYourBodyTests' time='1.0015' tests='2' failures='0' skipped='0'>
+      <testcase name='testExample()' classname='LogYourBodyTests' time='0.0015'/>
+      <testcase name='testPerformanceExample()' classname='LogYourBodyTests' time='1.0'/>
+    </testsuite>
+    <properties>
+      <property name='Configuration' value='Test Scheme Action'/>
+      <property name='device' value='iPhone 16 (18.5)'/>
+    </properties>
+  </testsuite>
+</testsuites>

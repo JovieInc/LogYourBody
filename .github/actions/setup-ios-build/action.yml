@@ -1,22 +1,18 @@
 name: 'Setup iOS Build Environment'
-description: 'Complete setup for iOS CI/CD jobs including Xcode, tools, Ruby, and config files'
+description: 'Install and cache iOS build tools (SwiftLint, xcbeautify)'
 inputs:
   xcode-version:
     description: 'Xcode version to use'
     required: false
     default: '16.1'
-  install-tools:
-    description: 'Install SwiftLint and xcbeautify'
+  working-directory:
+    description: 'Working directory for iOS project'
     required: false
-    default: 'true'
-  setup-ruby:
-    description: 'Setup Ruby and Bundler'
-    required: false
-    default: 'true'
+    default: 'apps/ios'
   create-config-files:
-    description: 'Create placeholder config files'
+    description: 'Create placeholder config files for CI builds'
     required: false
-    default: 'true'
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -25,62 +21,82 @@ runs:
       uses: maxim-lobanov/setup-xcode@v1
       with:
         xcode-version: ${{ inputs.xcode-version }}
-    
-    - name: Cache Homebrew tools
-      if: inputs.install-tools == 'true'
+
+    - name: Cache Homebrew packages
+      uses: actions/cache@v4
+      id: homebrew-cache
+      with:
+        path: |
+          /usr/local/Cellar/swiftlint
+          /usr/local/Cellar/xcbeautify
+          /opt/homebrew/Cellar/swiftlint
+          /opt/homebrew/Cellar/xcbeautify
+        key: ${{ runner.os }}-homebrew-swiftlint-xcbeautify-${{ hashFiles('.github/actions/setup-ios-build/action.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-homebrew-swiftlint-xcbeautify-
+
+    - name: Install SwiftLint and xcbeautify
+      shell: bash
+      run: |
+        # Check if tools are already available
+        if ! command -v swiftlint &> /dev/null; then
+          echo "Installing SwiftLint..."
+          # Try to link first if already installed
+          brew link swiftlint 2>/dev/null || brew install swiftlint || {
+            echo "::warning::Failed to install SwiftLint via Homebrew"
+            # Fallback: Download binary directly
+            SWIFTLINT_VERSION="0.57.0"
+            curl -L "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
+            unzip swiftlint.zip -d /usr/local/bin
+            chmod +x /usr/local/bin/swiftlint
+          }
+        else
+          echo "SwiftLint already installed: $(swiftlint version)"
+        fi
+        
+        if ! command -v xcbeautify &> /dev/null; then
+          echo "Installing xcbeautify..."
+          brew install xcbeautify || {
+            echo "::warning::Failed to install xcbeautify via Homebrew"
+            # Fallback: Build from source or use alternative
+            echo "Using xcpretty as fallback"
+            gem install xcpretty
+          }
+        else
+          echo "xcbeautify already installed: $(xcbeautify --version)"
+        fi
+
+    - name: Setup Ruby and Bundler
+      uses: ./.github/actions/setup-ruby-bundler
+      with:
+        working-directory: ${{ inputs.working-directory }}
+        cache-key-prefix: 'ios-gems'
+
+    - name: Cache Swift Package Manager
       uses: actions/cache@v4
       with:
         path: |
-          /opt/homebrew/bin/swiftlint
-          /opt/homebrew/bin/xcbeautify
-          /opt/homebrew/Cellar/swiftlint
-          /opt/homebrew/Cellar/xcbeautify
-        key: ${{ runner.os }}-homebrew-tools-${{ inputs.xcode-version }}
+          ${{ inputs.working-directory }}/SourcePackages
+          ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+        key: ${{ runner.os }}-spm-${{ hashFiles(format('{0}/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', inputs.working-directory)) }}
         restore-keys: |
-          ${{ runner.os }}-homebrew-tools-
-    
-    - name: Install SwiftLint and xcbeautify
-      if: inputs.install-tools == 'true'
+          ${{ runner.os }}-spm-
+
+    - name: Verify tools
       shell: bash
       run: |
-        export PATH="/opt/homebrew/bin:$PATH"
-        if ! command -v swiftlint &> /dev/null; then
-          echo "Installing SwiftLint..."
-          brew install swiftlint
-        else
-          echo "SwiftLint already installed"
-        fi
-        if ! command -v xcbeautify &> /dev/null; then
-          echo "Installing xcbeautify..."
-          brew install xcbeautify
-        else
-          echo "xcbeautify already installed"
-        fi
-    
-    - name: Cache Ruby dependencies
-      if: inputs.setup-ruby == 'true'
-      uses: actions/cache@v4
-      with:
-        path: apps/ios/vendor/bundle
-        key: ${{ runner.os }}-gems-${{ hashFiles('**/Gemfile.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-gems-
-    
-    - name: Setup Ruby and Bundler
-      if: inputs.setup-ruby == 'true'
-      shell: bash
-      run: |
-        cd apps/ios
-        gem install bundler:2.4.10
-        bundle config path vendor/bundle
-        bundle install --jobs 4 --retry 3
-    
+        echo "=== Tool Versions ==="
+        echo "Xcode: $(xcodebuild -version | head -1)"
+        echo "SwiftLint: $(swiftlint version || echo 'Not installed')"
+        echo "xcbeautify: $(xcbeautify --version || echo 'Not installed')"
+        echo "Ruby: $(ruby --version)"
+        echo "Bundler: $(bundle --version)"
+
     - name: Create placeholder config files
       if: inputs.create-config-files == 'true'
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       run: |
-        cd apps/ios
-        
         # Create Supabase config
         echo "// CI Placeholder" > Supabase.xcconfig
         echo "SUPABASE_URL = https://placeholder.supabase.co" >> Supabase.xcconfig
@@ -89,3 +105,5 @@ runs:
         # Create LogYourBody config
         echo "// CI Placeholder" > LogYourBody/Config.xcconfig
         echo "CLERK_PUBLISHABLE_KEY = placeholder-clerk-key" >> LogYourBody/Config.xcconfig
+        
+        echo "✅ Created placeholder config files for CI build"

@@ -158,7 +158,7 @@ struct LiquidGlassTimelineSlider: View {
                 glassDistortion = 1.0
             }
             
-            HapticManager.shared.impact(style: .light)
+            HapticManager.shared.buttonTapped()
         }
         
         // Calculate velocity for liquid effect
@@ -176,9 +176,9 @@ struct LiquidGlassTimelineSlider: View {
             if ticks.first(where: { $0.index == newIndex })?.isPhotoAnchor == true {
                 // Trigger ripple effect
                 triggerRipple()
-                HapticManager.shared.impact(style: .medium)
+                HapticManager.shared.toggleChanged()
             } else {
-                HapticManager.shared.selection()
+                HapticManager.shared.sliderChanged()
             }
         }
     }
@@ -197,7 +197,7 @@ struct LiquidGlassTimelineSlider: View {
         let velocity = value.predictedEndLocation.x - value.location.x
         snapToNearestPhoto(with: velocity, in: geometry)
         
-        HapticManager.shared.impact(style: .light)
+        HapticManager.shared.sliderEnded()
     }
     
     // MARK: - Helper Methods

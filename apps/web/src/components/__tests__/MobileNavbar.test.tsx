@@ -9,6 +9,13 @@ jest.mock('next/navigation', () => ({
   usePathname: jest.fn(),
 }))
 
+// Mock lucide-react icons
+jest.mock('lucide-react', () => ({
+  Home: ({ className }: { className?: string }) => <svg className={className} />,
+  Plus: ({ className }: { className?: string }) => <svg className={className} />,
+  Settings: ({ className }: { className?: string }) => <svg className={className} />
+}))
+
 describe('MobileNavbar', () => {
   const mockPush = jest.fn()
   

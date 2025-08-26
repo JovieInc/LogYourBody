@@ -1,0 +1,198 @@
+name: Regenerate Certificates
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "REGENERATE" to confirm certificate regeneration'
+        required: true
+        type: string
+  schedule:
+    # Run on the 1st of every month at 2 AM UTC
+    - cron: '0 2 1 * *'
+
+jobs:
+  regenerate-certificates:
+    name: Regenerate Match Certificates
+    runs-on: macos-14
+    if: github.event_name == 'schedule' || github.event.inputs.confirm == 'REGENERATE'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup iOS build environment
+        uses: ./.github/actions/setup-ios-build
+        with:
+          xcode-version: '15.4'
+
+      - name: Install Ruby dependencies
+        working-directory: apps/ios
+        run: |
+          bundle config path vendor/bundle
+          bundle install --jobs 4 --retry 3
+
+      - name: Nuke existing certificates
+        working-directory: apps/ios
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          echo "🔥 Nuking all certificates and profiles..."
+          
+          # Create a custom Fastfile for nuking
+          cat > Fastfile.nuke << 'EOF'
+          default_platform(:ios)
+          
+          platform :ios do
+            desc "Nuke all certificates"
+            lane :nuke_all do
+              # Setup API key
+              app_store_connect_api_key(
+                key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+                issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+                key_content: ENV["APP_STORE_CONNECT_API_KEY"],
+                is_key_content_base64: false,
+                duration: 1200,
+                in_house: false
+              )
+              
+              # Nuke certificates - continue even if some fail
+              begin
+                match_nuke(type: "distribution", skip_confirmation: true, api_key_path: nil)
+                UI.success("Distribution certificates nuked")
+              rescue => e
+                UI.message("Distribution nuke failed (may not exist): #{e.message}")
+              end
+              
+              begin
+                match_nuke(type: "development", skip_confirmation: true, api_key_path: nil)
+                UI.success("Development certificates nuked")
+              rescue => e
+                UI.message("Development nuke failed (may not exist): #{e.message}")
+              end
+            end
+          end
+          EOF
+          
+          bundle exec fastlane -f Fastfile.nuke nuke_all || echo "Some certificates may not have existed"
+          rm -f Fastfile.nuke
+
+      - name: Clean certificates repository
+        env:
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
+        run: |
+          echo "🗑️ Cleaning certificates repository..."
+          
+          # Extract the auth token from base64
+          AUTH_HEADER=$(echo $MATCH_GIT_BASIC_AUTHORIZATION | base64 -d)
+          
+          # Clone with authentication
+          git clone https://${AUTH_HEADER}@github.com/itstimwhite/certificates.git certificates-temp
+          cd certificates-temp
+          git checkout $MATCH_GIT_BRANCH || git checkout -b $MATCH_GIT_BRANCH
+          
+          # Clean all certificate files
+          rm -rf certs profiles
+          mkdir -p certs profiles
+          touch certs/.gitkeep profiles/.gitkeep
+          
+          # Commit and push
+          git add -A
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
+          git commit -m "Clean repository for certificate regeneration" || echo "Nothing to commit"
+          git push origin $MATCH_GIT_BRANCH
+          
+          cd ..
+          rm -rf certificates-temp
+
+      - name: Generate new App Store certificates
+        working-directory: apps/ios
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          echo "✨ Generating new App Store certificates..."
+          
+          # Use our setup_provisioning lane with force
+          bundle exec fastlane setup_provisioning type:appstore readonly:false force:true || {
+            echo "❌ Failed to generate App Store certificates"
+            exit 1
+          }
+
+      - name: Generate new Development certificates
+        working-directory: apps/ios
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          echo "✨ Generating new Development certificates..."
+          
+          # Use our setup_provisioning lane with force
+          bundle exec fastlane setup_provisioning type:development readonly:false force:true || {
+            echo "❌ Failed to generate Development certificates"
+            exit 1
+          }
+
+      - name: Test new certificates
+        working-directory: apps/ios
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          echo "🧪 Testing new certificates..."
+          
+          # Try to sync in readonly mode to verify
+          bundle exec fastlane setup_provisioning type:appstore readonly:true || {
+            echo "❌ Failed to verify certificates"
+            exit 1
+          }
+          
+          echo "✅ Certificates regenerated successfully!"
+
+      - name: Send notification on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: '❌ Certificate regeneration failed! Check the workflow logs.'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+
+      - name: Send notification on success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: '✅ Certificates regenerated successfully!'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true

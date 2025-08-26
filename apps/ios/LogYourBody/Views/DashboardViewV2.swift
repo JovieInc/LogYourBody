@@ -274,6 +274,11 @@ struct DashboardViewV2: View {
     
     // MARK: - Enhanced Timeline Slider
     
+    private var sliderProgress: CGFloat {
+        let maxIndex = CGFloat(max(1, bodyMetrics.count - 1))
+        return CGFloat(selectedIndex) / maxIndex
+    }
+    
     @ViewBuilder
     
     private var enhancedTimelineSlider: some View {
@@ -295,6 +300,9 @@ struct DashboardViewV2: View {
             
             // Enhanced slider
             GeometryReader { geometry in
+                let sliderWidth = geometry.size.width
+                let thumbOffset = sliderWidth * sliderProgress - 12
+                
                 ZStack(alignment: .leading) {
                     // Track - 20% white, thicker
                     RoundedRectangle(cornerRadius: 2)
@@ -305,7 +313,7 @@ struct DashboardViewV2: View {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.white)
                         .frame(
-                            width: geometry.size.width * CGFloat(selectedIndex) / CGFloat(max(1, bodyMetrics.count - 1)),
+                            width: sliderWidth * sliderProgress,
                             height: 4
                         )
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedIndex)
@@ -315,21 +323,20 @@ struct DashboardViewV2: View {
                         .fill(Color.white)
                         .frame(width: 24, height: 24)
                         .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-                        .offset(
-                            x: geometry.size.width * CGFloat(selectedIndex) / CGFloat(max(1, bodyMetrics.count - 1)) - 12
-                        )
+                        .offset(x: thumbOffset)
                         .scaleEffect(isDraggingSlider ? 1.2 : 1.0)
                         .animation(.spring(response: 0.3), value: isDraggingSlider)
                         .gesture(
                             DragGesture()
                                 .onChanged { value in
                                     isDraggingSlider = true
-                                    let percent = min(max(0, value.location.x / geometry.size.width), 1)
-                                    let newIndex = Int(round(percent * Double(max(1, bodyMetrics.count - 1))))
+                                    let percent = min(max(0, value.location.x / sliderWidth), 1)
+                                    let maxIndex = Double(max(1, bodyMetrics.count - 1))
+                                    let newIndex = Int(round(percent * maxIndex))
                                     if newIndex != selectedIndex {
                                         selectedIndex = newIndex
                                         loadMetricsForSelectedDate()
-                                        HapticManager.shared.selectionChanged()
+                                        HapticManager.shared.sliderChanged()
                                     }
                                 }
                                 .onEnded { _ in
@@ -429,7 +436,7 @@ struct DashboardViewV2: View {
             }
             
             // Steps
-            if let steps = selectedDateMetrics?.stepCount {
+            if let steps = selectedDateMetrics?.steps {
                 MetricStripItem(
                     icon: "figure.walk",
                     value: formatNumber(steps),
@@ -473,7 +480,7 @@ struct DashboardViewV2: View {
     @ViewBuilder
     
     private var loadingView: some View {
-        EmptyStateView(
+        DashboardEmptyStateView(
             icon: "arrow.triangle.2.circlepath",
             title: "Loading",
             message: "Fetching your data..."
@@ -483,7 +490,7 @@ struct DashboardViewV2: View {
     @ViewBuilder
     
     private var emptyStateView: some View {
-        EmptyStateView(
+        DashboardEmptyStateView(
             icon: "chart.line.downtrend.xyaxis",
             title: "No data yet",
             message: "Log your first measurement to get started"
@@ -555,7 +562,8 @@ struct DashboardViewV2: View {
         }
         
         // Load body metrics
-        bodyMetrics = CoreDataManager.shared.fetchBodyMetrics(userId: userId)
+        let cachedMetrics = CoreDataManager.shared.fetchBodyMetrics(for: userId)
+        bodyMetrics = cachedMetrics.compactMap { $0.toBodyMetrics() }
             .sorted { $0.date < $1.date }
         
         if !bodyMetrics.isEmpty {
@@ -564,7 +572,7 @@ struct DashboardViewV2: View {
         }
         
         // Load daily metrics
-        dailyMetrics = CoreDataManager.shared.fetchTodayMetrics(userId: userId)
+        dailyMetrics = CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date())?.toDailyMetrics()
         
         isLoading = false
     }
@@ -577,9 +585,9 @@ struct DashboardViewV2: View {
         let startOfDay = calendar.startOfDay(for: metric.date)
         
         selectedDateMetrics = CoreDataManager.shared.fetchDailyMetrics(
-            userId: userId,
+            for: userId,
             date: startOfDay
-        ).first
+        )?.toDailyMetrics()
     }
     
     private func refreshData() async {
@@ -593,14 +601,27 @@ struct DashboardViewV2: View {
         
         do {
             let photoUrl = try await PhotoUploadManager.shared.uploadProgressPhoto(
-                image,
                 for: metric,
-                userId: userId
+                image: image
             )
             
             // Update metric with photo URL
-            var updatedMetric = metric
-            updatedMetric.photoUrl = photoUrl
+            let updatedMetric = BodyMetrics(
+                id: metric.id,
+                userId: metric.userId,
+                date: metric.date,
+                weight: metric.weight,
+                weightUnit: metric.weightUnit,
+                bodyFatPercentage: metric.bodyFatPercentage,
+                bodyFatMethod: metric.bodyFatMethod,
+                muscleMass: metric.muscleMass,
+                boneMass: metric.boneMass,
+                notes: metric.notes,
+                photoUrl: photoUrl,
+                dataSource: metric.dataSource,
+                createdAt: metric.createdAt,
+                updatedAt: Date()
+            )
             CoreDataManager.shared.saveBodyMetrics(updatedMetric, userId: userId)
             
             await refreshData()

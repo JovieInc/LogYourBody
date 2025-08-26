@@ -11,9 +11,7 @@ jest.mock('next/navigation', () => ({
   useParams: jest.fn(() => ({}))
 }))
 
-jest.mock('@/contexts/ClerkAuthContext', () => ({
-  useAuth: jest.fn()
-}))
+// Don't mock ClerkAuthContext here as it's already mocked in jest.setup.js
 
 jest.mock('next/image', () => ({
   __esModule: true,
@@ -38,6 +36,44 @@ jest.mock('@/lib/supabase/profile', () => ({
 
 jest.mock('@/lib/supabase/client', () => ({
   createClient: jest.fn()
+}))
+
+jest.mock('@/hooks/use-sync', () => ({
+  useSync: () => ({ isSyncing: false, hasUnsynced: false })
+}))
+
+jest.mock('@/lib/sync/sync-manager', () => ({
+  syncManager: {
+    syncIfNeeded: jest.fn()
+  }
+}))
+
+jest.mock('@/lib/db/indexed-db', () => ({
+  indexedDB: {
+    getBodyMetrics: jest.fn().mockResolvedValue([]),
+    saveBodyMetrics: jest.fn()
+  }
+}))
+
+jest.mock('@/components/MobileNavbar', () => ({
+  MobileNavbar: () => <div data-testid="mobile-navbar" />
+}))
+
+jest.mock('@/components/SyncStatus', () => ({
+  SyncStatus: () => <div data-testid="sync-status" />
+}))
+
+jest.mock('@/components/BodyFatScale', () => ({
+  BodyFatScale: ({ currentBF }: { currentBF?: number }) => <div data-testid="body-fat-scale">{currentBF}</div>
+}))
+
+// Mock the dropdown menu components
+jest.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => 
+    <button onClick={onClick}>{children}</button>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 import { getProfile } from '@/lib/supabase/profile'
@@ -148,7 +184,7 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />)
     
-    expect(mockPush).toHaveBeenCalledWith('/login')
+    expect(mockPush).toHaveBeenCalledWith('/signin')
   })
 
   it('shows loading state', () => {

@@ -99,109 +99,49 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
+    - name: Setup iOS Build Environment
+      uses: ./.github/actions/setup-ios-build
       with:
         xcode-version: '16.1'
+        working-directory: apps/ios
+        create-config-files: 'true'
     
-    - name: Install dependencies
+    - name: Install Compatible OpenSSL
+      run: |
+        brew install openssl@1.1
+        echo "/usr/local/opt/openssl@1.1/bin" >> $GITHUB_PATH
+        
+    - name: Setup Match Authentication
       run: |
         cd apps/ios
-        gem install bundler:2.4.10
-        bundle config path vendor/bundle
-        bundle install --jobs 4 --retry 3
-    
-    - name: Import Code Signing Certificates
-      uses: apple-actions/import-codesign-certs@v5
+        # Create API key file from secret
+        mkdir -p fastlane
+        cat > fastlane/api_key.json << 'EOFKEY'
+        {
+          "key_id": "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}",
+          "issuer_id": "${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}",
+          "key": "${{ secrets.APP_STORE_CONNECT_API_KEY }}",
+          "duration": 1200,
+          "in_house": false
+        }
+        EOFKEY
+        
+        # Set API key path for subsequent steps
+        echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> $GITHUB_ENV
+      
+      
+    - name: Sync Certificates with Match
+      uses: ./.github/actions/sync-match
       with:
-        p12-file-base64: ${{ secrets.IOS_P12_BASE64 }}
-        p12-password: ${{ secrets.IOS_P12_PASSWORD }}
-        keychain-password: ${{ secrets.IOS_P12_PASSWORD }}
+        match_password: ${{ secrets.MATCH_PASSWORD }}
+        match_git_url: ${{ secrets.MATCH_GIT_URL }}
+        match_git_basic: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
     
-    - name: Download Provisioning Profile
-      run: |
-        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-        # Use printf to handle multi-line base64 correctly
-        printf '%s' "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > provision.mobileprovision
-        
-        # Extract UUID and install with proper name
-        uuid=$(/usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin <<< $(security cms -D -i provision.mobileprovision))
-        cp provision.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/${uuid}.mobileprovision
-        
-        echo "PROVISIONING_PROFILE_UUID=${uuid}" >> $GITHUB_ENV
-        
-        # Validate provisioning profile
-        security cms -D -i provision.mobileprovision > profile_info.plist
-        app_id=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" profile_info.plist)
-        team_id=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" profile_info.plist)
-        
-        # Mask sensitive information before any output
-        echo "::add-mask::${app_id}"
-        echo "::add-mask::${team_id}"
-        echo "::add-mask::${uuid}"
-        
-        echo "Provisioning profile installed and validated successfully"
-        
-        # Check for required capabilities
-        echo "Checking required capabilities..."
-        capabilities_ok=true
-        
-        # Check for HealthKit
-        if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.healthkit" profile_info.plist &>/dev/null; then
-          echo "::warning::Missing HealthKit capability"
-          capabilities_ok=false
-        fi
-        
-        # Check for App Groups
-        if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.security.application-groups:0" profile_info.plist &>/dev/null; then
-          echo "::warning::Missing App Groups capability"
-          capabilities_ok=false
-        fi
-        
-        # Check for Associated Domains
-        if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.associated-domains" profile_info.plist &>/dev/null; then
-          echo "::warning::Missing Associated Domains capability"
-          capabilities_ok=false
-        fi
-        
-        # Check for Sign in with Apple
-        if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.applesignin" profile_info.plist &>/dev/null; then
-          echo "::warning::Missing Sign in with Apple capability"
-          capabilities_ok=false
-        fi
-        
-        # Verify it matches our expected values
-        if [[ ! "$app_id" =~ "LogYourBody.LogYourBody" ]]; then
-          echo "::error::Provisioning profile app ID mismatch. Expected LogYourBody.LogYourBody, got ${app_id}"
-          exit 1
-        fi
-        
-        if [[ "$capabilities_ok" == "false" ]]; then
-          echo "::error::Provisioning profile is missing required capabilities. Please regenerate the profile with all required entitlements."
-          exit 1
-        fi
-        
-        rm -f profile_info.plist
-    
-    - name: Setup App Store Connect API Key
+    - name: Set Environment Variables for Build
       run: |
         cd apps/ios
-        # Use printf to avoid issues with special characters
-        printf '%s' '${{ secrets.ASC_API_KEY_JSON }}' > app_store_connect_api_key.json
-        echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/app_store_connect_api_key.json" >> $GITHUB_ENV
-    
-    - name: Create config files
-      run: |
-        cd apps/ios
-        
-        # Create Supabase config
-        echo "// CI Placeholder" > Supabase.xcconfig
-        echo "SUPABASE_URL = https://placeholder.supabase.co" >> Supabase.xcconfig
-        echo "SUPABASE_ANON_KEY = placeholder-key" >> Supabase.xcconfig
-        
-        # Create LogYourBody config
-        echo "// CI Placeholder" > LogYourBody/Config.xcconfig
-        echo "CLERK_PUBLISHABLE_KEY = placeholder-clerk-key" >> LogYourBody/Config.xcconfig
+        echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+        echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> $GITHUB_ENV
     
     - name: Update version and build
       run: |
@@ -226,74 +166,32 @@ jobs:
         fi
       env:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
     
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
         name: ios-release-build
         path: apps/ios/build/*.ipa
-        retention-days: 30
+        retention-days: 3
     
     - name: Cleanup
       if: always()
       run: |
         cd apps/ios
-        rm -f app_store_connect_api_key.json
+        # API key is now handled via environment variables
 
   deploy-testflight:
     name: Deploy to TestFlight
     needs: [validate-release, build-release]
     if: github.event.inputs.release_type != 'app_store'
-    runs-on: macos-14
-    timeout-minutes: 20
-    environment:
-      name: production-testflight
-      url: https://testflight.apple.com
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: ios-release-build
-        path: apps/ios/build
-    
-    - name: Setup dependencies
-      run: |
-        cd apps/ios
-        gem install bundler:2.4.10
-        bundle config path vendor/bundle
-        bundle install --jobs 4 --retry 3
-    
-    - name: Setup App Store Connect API Key
-      run: |
-        cd apps/ios
-        # Use printf to avoid issues with special characters
-        printf '%s' '${{ secrets.ASC_API_KEY_JSON }}' > app_store_connect_api_key.json
-        echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/app_store_connect_api_key.json" >> $GITHUB_ENV
-    
-    - name: Run Fastlane Precheck
-      run: |
-        cd apps/ios
-        bundle exec fastlane precheck 2>&1 | tee precheck.log
-        
-        # Check for errors and surface them in the summary
-        if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" precheck.log; then
-          echo "::error::Precheck errors detected - see highlighted lines above"
-          exit 1
-        fi
-      env:
-        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
-    
-    - name: Upload to TestFlight
-      run: |
-        cd apps/ios
-        
-        # Create release notes
-        cat > release_notes.txt << EOF
+    uses: ./.github/workflows/ios-testflight-deploy.yml
+    with:
+      distribution_group: production
+      build_number: ${{ needs.validate-release.outputs.build_number }}
+      version_name: ${{ needs.validate-release.outputs.version }}
+      artifact_name: ios-release-build
+      environment: production-testflight
+      release_notes: |
         Version ${{ needs.validate-release.outputs.version }}
         Build ${{ needs.validate-release.outputs.build_number }}
         
@@ -304,29 +202,7 @@ jobs:
         - Ready for production release
         
         Please test thoroughly before App Store submission.
-        EOF
-        
-        # Upload to TestFlight
-        bundle exec fastlane upload_testflight \
-          ipa_path:build/*.ipa \
-          groups:"Production Testers,Beta Testers" \
-          changelog_file:release_notes.txt 2>&1 | tee upload.log
-        
-        # Check for errors and surface them in the summary
-        if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" upload.log; then
-          echo "::error::Upload errors detected - see highlighted lines above"
-          exit 1
-        fi
-      env:
-        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
-    
-    - name: Cleanup
-      if: always()
-      run: |
-        cd apps/ios
-        rm -f app_store_connect_api_key.json
-        rm -f release_notes.txt
+    secrets: inherit
 
   deploy-app-store:
     name: Deploy to App Store
@@ -347,19 +223,17 @@ jobs:
         name: ios-release-build
         path: apps/ios/build
     
-    - name: Setup dependencies
-      run: |
-        cd apps/ios
-        gem install bundler:2.4.10
-        bundle config path vendor/bundle
-        bundle install --jobs 4 --retry 3
+    - name: Setup iOS Build Environment
+      uses: ./.github/actions/setup-ios-build
+      with:
+        xcode-version: '16.1'
+        working-directory: apps/ios
     
-    - name: Setup App Store Connect API Key
+    - name: Set Environment Variables for Build
       run: |
         cd apps/ios
-        # Use printf to avoid issues with special characters
-        printf '%s' '${{ secrets.ASC_API_KEY_JSON }}' > app_store_connect_api_key.json
-        echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/app_store_connect_api_key.json" >> $GITHUB_ENV
+        echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+        echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> $GITHUB_ENV
     
     - name: Run Fastlane Precheck
       run: |
@@ -399,7 +273,7 @@ jobs:
       if: always()
       run: |
         cd apps/ios
-        rm -f app_store_connect_api_key.json
+        # API key is now handled via environment variables
 
   create-release:
     name: Create Release
