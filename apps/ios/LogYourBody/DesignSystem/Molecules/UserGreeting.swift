@@ -11,7 +11,7 @@ struct UserGreeting: View {
     let fullName: String?
     var showEmoji: Bool = false
     var compactMode: Bool = false
-    var customGreeting: String? = nil
+    var customGreeting: String?
     
     private var greeting: String {
         if let custom = customGreeting {
@@ -100,7 +100,7 @@ struct UserGreeting: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Compact Mode").font(.headline).foregroundColor(.appText)
             UserGreeting(fullName: "Charlie Brown", compactMode: true)
-            UserGreeting(fullName: "Diana Prince", compactMode: true, showEmoji: true)
+            UserGreeting(fullName: "Diana Prince", showEmoji: true, compactMode: true)
             UserGreeting(fullName: nil, compactMode: true)
         }
         
@@ -110,8 +110,8 @@ struct UserGreeting: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Custom Greetings").font(.headline).foregroundColor(.appText)
             UserGreeting(fullName: "Welcome back", customGreeting: "Welcome back")
-            UserGreeting(fullName: "VIP User", customGreeting: "Hello", showEmoji: true)
-            UserGreeting(fullName: "Admin", customGreeting: "System ready", compactMode: true)
+            UserGreeting(fullName: "VIP User", showEmoji: true, customGreeting: "Hello")
+            UserGreeting(fullName: "Admin", compactMode: true, customGreeting: "System ready")
         }
     }
     .padding()

@@ -63,7 +63,7 @@ struct LegalDocumentView: View {
             
             if isLoading {
                 // Atom: Loading Indicator
-                LoadingIndicator(message: "Loading...")
+                DSLoadingIndicator(message: "Loading...")
             } else if loadError {
                 // Molecule: Error State
                 ErrorStateView(

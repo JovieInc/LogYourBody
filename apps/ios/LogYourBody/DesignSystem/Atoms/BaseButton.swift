@@ -12,7 +12,7 @@ struct ButtonConfiguration {
     var isLoading: Bool = false
     var isEnabled: Bool = true
     var fullWidth: Bool = false
-    var icon: String? = nil
+    var icon: String?
     var iconPosition: IconPosition = .leading
     var hapticFeedback: UIImpactFeedbackGenerator.FeedbackStyle? = .light
     
@@ -185,7 +185,7 @@ struct BaseButton<Label: View>: View {
 
 // MARK: - Convenience Initializers
 
-extension BaseButton where Label == HStack<TupleView<(ConditionalContent<Image, EmptyView>, Text, ConditionalContent<Image, EmptyView>)>> {
+extension BaseButton where Label == AnyView {
     init(
         _ title: String,
         configuration: ButtonConfiguration = ButtonConfiguration(),
@@ -194,23 +194,21 @@ extension BaseButton where Label == HStack<TupleView<(ConditionalContent<Image, 
         self.configuration = configuration
         self.action = action
         self.label = {
-            HStack(spacing: 8) {
-                if configuration.iconPosition == .leading, let icon = configuration.icon {
-                    Image(systemName: icon)
-                        .font(.system(size: configuration.size.iconSize))
-                } else {
-                    EmptyView()
+            AnyView(
+                HStack(spacing: 8) {
+                    if configuration.iconPosition == .leading, let icon = configuration.icon {
+                        Image(systemName: icon)
+                            .font(.system(size: configuration.size.iconSize))
+                    }
+                    
+                    Text(title)
+                    
+                    if configuration.iconPosition == .trailing, let icon = configuration.icon {
+                        Image(systemName: icon)
+                            .font(.system(size: configuration.size.iconSize))
+                    }
                 }
-                
-                Text(title)
-                
-                if configuration.iconPosition == .trailing, let icon = configuration.icon {
-                    Image(systemName: icon)
-                        .font(.system(size: configuration.size.iconSize))
-                } else {
-                    EmptyView()
-                }
-            }
+            )
         }
     }
 }
@@ -353,12 +351,12 @@ struct BaseIconButton: View {
             // Custom content
             Group {
                 Text("Custom Content").font(.headline)
-                BaseButton(configuration: ButtonConfiguration(), action: {}) {
+                BaseButton(configuration: ButtonConfiguration(), action: {}, label: {
                     HStack {
                         Image(systemName: "apple.logo")
                         Text("Sign in with Apple")
                     }
-                }
+                })
             }
         }
         .padding()

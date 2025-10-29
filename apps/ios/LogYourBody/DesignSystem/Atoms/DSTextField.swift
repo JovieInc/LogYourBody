@@ -7,6 +7,7 @@ import SwiftUI
 // MARK: - DSTextField Atom
 // Legacy wrapper for BaseTextField - use BaseTextField directly for new code
 
+@available(*, deprecated, message: "Use BaseTextField directly instead. DSTextField is a legacy wrapper that adds no value. See BaseTextField.swift for comprehensive examples including email, password, and search field configurations.")
 struct DSTextField: View {
     @Binding var text: String
     let placeholder: String

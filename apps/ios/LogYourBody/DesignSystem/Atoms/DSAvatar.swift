@@ -13,7 +13,7 @@ struct DSAvatar: View {
     var size: CGFloat = 32
     var fontSize: CGFloat = 14
     var backgroundColor: Color = .appPrimary
-    var borderColor: Color? = nil
+    var borderColor: Color?
     var borderWidth: CGFloat = 0
     
     private var initials: String {
@@ -50,7 +50,7 @@ struct DSAvatar: View {
                             .aspectRatio(contentMode: .fill)
                             .frame(width: size, height: size)
                             .clipShape(Circle())
-                    case .failure(_):
+                    case .failure:
                         placeholderView
                     @unknown default:
                         placeholderView

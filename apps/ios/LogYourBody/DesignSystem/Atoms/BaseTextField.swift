@@ -9,14 +9,14 @@ import SwiftUI
 struct TextFieldConfiguration {
     var style: TextFieldStyle = .default
     var hasIcon: Bool = false
-    var icon: String? = nil
+    var icon: String?
     var isSecure: Bool = false
     var showToggle: Bool = false
-    var errorMessage: String? = nil
-    var helperText: String? = nil
-    var characterLimit: Int? = nil
+    var errorMessage: String?
+    var helperText: String?
+    var characterLimit: Int?
     var cornerRadius: CGFloat = 10
-    var padding: EdgeInsets = EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
+    var padding = EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
     
     enum TextFieldStyle {
         case `default`
@@ -48,14 +48,14 @@ struct TextFieldConfiguration {
 struct BaseTextField: View {
     @Binding var text: String
     let placeholder: String
-    var configuration: TextFieldConfiguration = TextFieldConfiguration()
+    var configuration = TextFieldConfiguration()
     var keyboardType: UIKeyboardType = .default
-    var textContentType: UITextContentType? = nil
+    var textContentType: UITextContentType?
     var autocapitalization: TextInputAutocapitalization = .sentences
     var autocorrectionDisabled: Bool = false
     var submitLabel: SubmitLabel = .done
-    var onSubmit: (() -> Void)? = nil
-    var onChange: ((String) -> Void)? = nil
+    var onSubmit: (() -> Void)?
+    var onChange: ((String) -> Void)?
     
     @State private var isSecureTextVisible = false
     @FocusState private var isFocused: Bool
@@ -71,7 +71,7 @@ struct BaseTextField: View {
         } else if isFocused {
             return .appPrimary
         } else {
-            return configuration.borderColor ?? .clear
+            return configuration.style.borderColor ?? .clear
         }
     }
     
@@ -170,7 +170,7 @@ struct BaseTextField: View {
             Color.clear
         default:
             RoundedRectangle(cornerRadius: configuration.cornerRadius)
-                .fill(configuration.backgroundColor)
+                .fill(configuration.style.backgroundColor)
         }
     }
     
@@ -290,8 +290,8 @@ extension TextFieldConfiguration {
                     text: .constant("Hello"),
                     placeholder: "Bio",
                     configuration: TextFieldConfiguration(
-                        characterLimit: 150,
-                        helperText: "Tell us about yourself"
+                        helperText: "Tell us about yourself",
+                        characterLimit: 150
                     )
                 )
             }

@@ -1,12 +1,12 @@
 //
-// LoadingIndicator.swift
+// DSLoadingIndicator.swift
 // LogYourBody
 //
 import SwiftUI
 
 // MARK: - Loading Indicator Atom
 
-struct LoadingIndicator: View {
+struct DSLoadingIndicator: View {
     let message: String
     let scale: CGFloat
     
@@ -26,11 +26,11 @@ struct LoadingIndicator: View {
 
 #Preview {
     VStack(spacing: 40) {
-        LoadingIndicator()
+        DSLoadingIndicator()
         
-        LoadingIndicator(message: "Fetching data...")
+        DSLoadingIndicator(message: "Fetching data...")
         
-        LoadingIndicator(message: "Please wait", scale: 1.5)
+        DSLoadingIndicator(message: "Please wait", scale: 1.5)
     }
     .padding()
     .background(Color.appBackground)

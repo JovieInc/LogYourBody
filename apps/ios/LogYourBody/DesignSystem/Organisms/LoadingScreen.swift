@@ -12,7 +12,7 @@ struct LoadingScreen: View {
     @Binding var loadingStatus: String
     let onComplete: () -> Void
     
-    var backgroundColor: Color = Color(red: 0.071, green: 0.071, blue: 0.114)
+    var backgroundColor = Color(red: 0.071, green: 0.071, blue: 0.114)
     var showPercentage: Bool = true
     
     var body: some View {
@@ -39,7 +39,7 @@ struct LoadingScreen: View {
                     // Status text
                     DSText(
                         loadingStatus,
-                        size: .system(size: 14),
+                        style: .footnote,
                         color: .white.opacity(0.7)
                     )
                     .frame(minHeight: 20)
@@ -59,7 +59,8 @@ struct LoadingScreen: View {
                     if showPercentage {
                         DSText(
                             "\(Int(progress * 100))%",
-                            size: .system(size: 12, weight: .medium),
+                            style: .caption,
+                            weight: .medium,
                             color: .white.opacity(0.5)
                         )
                     }
@@ -105,7 +106,7 @@ struct CompactLoadingScreen: View {
                 
                 DSText(
                     message,
-                    size: .system(size: 14),
+                    style: .footnote,
                     color: .appTextSecondary
                 )
             }

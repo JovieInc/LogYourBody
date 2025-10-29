@@ -15,7 +15,7 @@ struct DSMetricCard: View {
     var trendType: DSTrendIndicator.TrendType = .neutral
     var height: CGFloat = 100
     var isInteractive: Bool = false
-    var onTap: (() -> Void)? = nil
+    var onTap: (() -> Void)?
     
     @State private var isPressed = false
     
@@ -121,7 +121,7 @@ struct DSEmptyMetricCard: View {
                 trendType: .neutral,
                 isInteractive: true,
                 onTap: {
-                    print("Weight card tapped")
+                    // Weight card tapped
                 }
             )
             
@@ -143,7 +143,7 @@ struct DSEmptyMetricCard: View {
                 label: "FFMI",
                 isInteractive: true,
                 onTap: {
-                    print("FFMI card tapped")
+                    // FFMI card tapped
                 }
             )
             
@@ -160,9 +160,9 @@ struct DSEmptyMetricCard: View {
                 value: "10,234",
                 unit: "steps",
                 label: "Daily Steps",
-                height: 120,
-                trend: 1234,
-                trendType: .positive
+                trend: 1_234,
+                trendType: .positive,
+                height: 120
             )
             
             DSMetricCard(

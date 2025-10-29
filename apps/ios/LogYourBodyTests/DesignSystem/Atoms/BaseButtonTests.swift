@@ -7,7 +7,6 @@ import SwiftUI
 @testable import LogYourBody
 
 final class BaseButtonTests: XCTestCase {
-    
     // MARK: - Configuration Tests
     
     func testButtonConfigurationDefaults() {

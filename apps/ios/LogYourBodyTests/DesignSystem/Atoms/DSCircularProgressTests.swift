@@ -7,7 +7,6 @@ import SwiftUI
 @testable import LogYourBody
 
 final class DSCircularProgressTests: XCTestCase {
-    
     func testProgressNormalization() {
         // Test that progress values are normalized between 0 and 1
         let testCases: [(input: Double, expected: Double)] = [

@@ -55,8 +55,8 @@ struct DesignSettingsRow: View {
                 }
             },
             label: {
-            HStack(spacing: 12) {
-                // Icon
+                HStack(spacing: 12) {
+                    // Icon
                 if let icon = icon {
                     Image(systemName: icon)
                         .font(.system(size: 20))
@@ -82,15 +82,16 @@ struct DesignSettingsRow: View {
                 
                 // Trailing content
                 trailingContent
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    Color.appBackground
+                        .opacity(isPressed ? 0.5 : 0)
+                )
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(
-                Color.appBackground
-                    .opacity(isPressed ? 0.5 : 0)
-            )
-            .contentShape(Rectangle())
-        }
+        )
         .buttonStyle(PlainButtonStyle())
         .disabled(!isInteractive)
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
@@ -136,7 +137,7 @@ struct DesignSettingsRow: View {
                                 Image(systemName: "checkmark")
                             }
                         }
-                    }
+                    })
                 }
             } label: {
                 HStack(spacing: 4) {
@@ -255,8 +256,8 @@ struct ListRow: View {
                 action?()
             },
             label: {
-            HStack(spacing: 12) {
-                // Leading content
+                HStack(spacing: 12) {
+                    // Leading content
                 if let leading = leading {
                     leading
                 }
@@ -286,15 +287,16 @@ struct ListRow: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(Color.secondary.opacity(0.6))
                 }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    Color.appBackground
+                        .opacity(isPressed ? 0.5 : 0)
+                )
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(
-                Color.appBackground
-                    .opacity(isPressed ? 0.5 : 0)
-            )
-            .contentShape(Rectangle())
-        }
+        )
         .buttonStyle(PlainButtonStyle())
         .disabled(action == nil)
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in

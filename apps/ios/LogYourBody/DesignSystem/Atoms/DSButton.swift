@@ -7,6 +7,7 @@ import SwiftUI
 // MARK: - Design System Button Atom
 // Legacy wrapper for BaseButton - use BaseButton directly for new code
 
+@available(*, deprecated, message: "Use BaseButton directly instead. DSButton is a legacy wrapper that adds unnecessary complexity. See BaseButton.swift for examples.")
 struct DSButton: View {
     let title: String
     let style: ButtonStyle

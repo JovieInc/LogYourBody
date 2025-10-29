@@ -7,7 +7,6 @@ import SwiftUI
 @testable import LogYourBody
 
 final class BaseTextFieldTests: XCTestCase {
-    
     // MARK: - Configuration Tests
     
     func testTextFieldConfigurationDefaults() {

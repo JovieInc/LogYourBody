@@ -26,7 +26,7 @@ struct DSText: View {
     
     var body: some View {
         Text(text)
-            .font(.system(style).weight(weight))
+            .font(.system(style, design: .default).weight(weight))
             .foregroundColor(color)
     }
 }

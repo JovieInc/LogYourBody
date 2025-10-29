@@ -13,8 +13,8 @@ struct DashboardHeader: View {
     let isSyncing: Bool
     var showLiquidGlass: Bool = true
     var showGreetingEmoji: Bool = false
-    var onAvatarTap: (() -> Void)? = nil
-    var onStepsTap: (() -> Void)? = nil
+    var onAvatarTap: (() -> Void)?
+    var onStepsTap: (() -> Void)?
     
     @Environment(\.colorScheme) var colorScheme
     

@@ -91,6 +91,15 @@ apps/ios/fastlane/test_output
 apps/ios/Pods/
 apps/ios/Podfile.lock
 
+# iOS build artifacts and test outputs
+apps/ios/test_output/
+apps/ios/test_results/
+apps/ios/sanitizer_output/
+apps/ios/*.log
+apps/ios/**/*.xcresult
+*.pbxproj.backup*
+*.pbxproj.bak
+
 # Config files with secrets
 apps/ios/LogYourBody/Config.xcconfig
 apps/ios/Supabase.xcconfig

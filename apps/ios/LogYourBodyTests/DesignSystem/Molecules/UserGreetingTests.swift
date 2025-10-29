@@ -7,7 +7,6 @@ import SwiftUI
 @testable import LogYourBody
 
 final class UserGreetingTests: XCTestCase {
-    
     func testFirstNameExtraction() {
         let testCases: [(fullName: String?, expectedFirstName: String)] = [
             ("John Doe", "John"),

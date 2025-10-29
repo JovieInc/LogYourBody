@@ -1,39 +1,53 @@
 //
-// DSDivider.swift
+// Divider.swift
 // LogYourBody
 //
 import SwiftUI
 
-// MARK: - Design System Divider Atom
+// MARK: - Atom: Custom Divider
 
 struct DSDivider: View {
-    private var inset: CGFloat = 0
+    let inset: CGFloat
+    let color: Color
+    let thickness: CGFloat
     
-    var body: some View {
-        Divider()
-            .padding(.leading, inset)
+    init(
+        inset: CGFloat = 0,
+        color: Color? = nil,
+        thickness: CGFloat = 0.5
+    ) {
+        self.inset = inset
+        self.color = color ?? Color(.systemGray4)
+        self.thickness = thickness
     }
     
-    func insetted(_ amount: CGFloat) -> DSDivider {
-        var divider = self
-        divider.inset = amount
-        return divider
+    var body: some View {
+        Rectangle()
+            .fill(color)
+            .frame(height: thickness)
+            .padding(.leading, inset)
     }
 }
 
-// MARK: - Preview
+// MARK: - Convenience Modifiers
+
+extension DSDivider {
+    func insetted(_ amount: CGFloat = 16) -> DSDivider {
+        DSDivider(inset: amount, color: color, thickness: thickness)
+    }
+    
+    func colored(_ color: Color) -> DSDivider {
+        DSDivider(inset: inset, color: color, thickness: thickness)
+    }
+}
 
 #Preview {
     VStack(spacing: 20) {
-        Text("Full Width Divider")
         DSDivider()
-        
-        Text("Insetted Divider")
-        DSDivider().insetted(16)
-        
-        Text("More Insetted Divider")
-        DSDivider().insetted(32)
+        DSDivider().insetted()
+        DSDivider().insetted(40)
+        DSDivider().colored(.red)
     }
     .padding()
-    .background(Color.appBackground)
+    .background(Color.black)
 }

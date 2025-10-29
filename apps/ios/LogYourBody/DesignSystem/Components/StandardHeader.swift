@@ -223,7 +223,7 @@ struct HeaderActionButton: View {
                 action.action()
             },
             label: {
-            ZStack(alignment: .topTrailing) {
+                ZStack(alignment: .topTrailing) {
                 Image(systemName: action.icon)
                     .font(.system(size: 20, weight: .medium))
                     .foregroundColor(.primary)
@@ -246,9 +246,10 @@ struct HeaderActionButton: View {
                         )
                         .offset(x: 6, y: -6)
                 }
+                }
+                .scaleEffect(isPressed ? 0.9 : 1.0)
             }
-            .scaleEffect(isPressed ? 0.9 : 1.0)
-        }
+        )
         .buttonStyle(PlainButtonStyle())
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
             withAnimation(.easeOut(duration: 0.1)) {
@@ -271,21 +272,22 @@ struct BackButton: View {
                 action()
             },
             label: {
-            HStack(spacing: 4) {
+                HStack(spacing: 4) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .semibold))
                 Text("Back")
                     .font(.footnote)
+                }
+                .foregroundColor(.appPrimary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(Color.appPrimary.opacity(0.1))
+                )
+                .scaleEffect(isPressed ? 0.95 : 1.0)
             }
-            .foregroundColor(.appPrimary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(Color.appPrimary.opacity(0.1))
-            )
-            .scaleEffect(isPressed ? 0.95 : 1.0)
-        }
+        )
         .buttonStyle(PlainButtonStyle())
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
             withAnimation(.easeOut(duration: 0.1)) {

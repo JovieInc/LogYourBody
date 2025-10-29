@@ -7,6 +7,7 @@ import SwiftUI
 // MARK: - DSAuthButton Atom
 // Legacy wrapper for BaseButton - use BaseButton directly for new code
 
+@available(*, deprecated, message: "Use BaseButton directly instead. DSAuthButton is a legacy wrapper. For auth buttons, use BaseButton with ButtonConfiguration(style: .custom(background: .white, foreground: .black)). See BaseButton.swift for examples.")
 struct DSAuthButton: View {
     enum Style {
         case primary

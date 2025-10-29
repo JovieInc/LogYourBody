@@ -7,22 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */; };
 		02FF59428632FBC25F9456AA /* DSCircularProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEFB36F814C3D7E8AE709B4 /* DSCircularProgress.swift */; };
-		065BFEFB22D5AD246166C90D /* SecondaryMetricsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55090E3269B8A8F8E45E46D0 /* SecondaryMetricsRow.swift */; };
+		0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A5D6BAAD9FB2F7B8AFACB /* BaseButton.swift */; };
+		0DAECF9694453077367DCB0E /* Font+Custom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CA7B3D87EC0BFA00AC6A9F /* Font+Custom.swift */; };
 		11129CEC79A594A3564C81AE /* CompactMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 524C903734E2308C8A35B5B7 /* CompactMetricCard.swift */; };
 		18A6F3A9477330EC42DC0665 /* DashboardContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C4817DC7BA2D43606C0D8CB /* DashboardContent.swift */; };
-		207F32614E8FEB69F7DFC965 /* DSAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */; };
 		28D96935970646462EC376F4 /* DSTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 564FBAB78ABE3EBE48189BF8 /* DSTextField.swift */; };
 		3CD3199B3979B906B642DB4E /* LegalDocumentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCD81BE70A7B449921973AEA /* LegalDocumentRow.swift */; };
-		3DD714723899D3C4D0C03053 /* CompactMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 524C903734E2308C8A35B5B7 /* CompactMetricCard.swift */; };
 		3E3EA4841197E3CDEC1064A9 /* DSAuthButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B888A15870B6A31C76F2AB16 /* DSAuthButton.swift */; };
+		43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */; };
 		4C2DA948F919366D436CEF26 /* DSIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458AAF24645E3634CCF88E16 /* DSIcon.swift */; };
-		508D7D7C7A4FECB650D5AE08 /* MetricGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */; };
-		56540D4E4FE02FD799145839 /* CoreMetricsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CDBFA72287938694EB369D /* CoreMetricsRow.swift */; };
 		5763B6723CDF6F551543599B /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4590E4EDF067461157CAE028 /* ErrorStateView.swift */; };
+		5952A0969501ACC7277BE893 /* View+Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4BF04D15583E3AE1CA4A836 /* View+Styles.swift */; };
 		5B2F64647650AAF5937280BD /* DSDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2465B2ED058FAFC5389161E /* DSDivider.swift */; };
-		5DDD60638A5D69A9EAF9A599 /* MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F3E230F03B9DA06BCAA669D /* MetricCard.swift */; };
-		5F3C324BF8C051094C3DFCA5 /* DashboardHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898E428E2D5EE162E00B0BD7 /* DashboardHeader.swift */; };
 		614FDFBE0D01B7D3980EFC41 /* CoreMetricsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CDBFA72287938694EB369D /* CoreMetricsRow.swift */; };
 		65DB278F8C39AC800B53D93C /* DSButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26BF217DF4BEE2BDB74046C /* DSButton.swift */; };
 		6C5205839E0D5C677543FBA3 /* DSMetricValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D288685A7D97CBCF127A7B /* DSMetricValue.swift */; };
@@ -30,16 +28,13 @@
 		7063273108B46C6BAE9E8682 /* OTPField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22BF10E43507028B75EE0B6B /* OTPField.swift */; };
 		717301BDF536203C9A49A25E /* MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F3E230F03B9DA06BCAA669D /* MetricCard.swift */; };
 		7244EF0EC36788731EA69D2D /* SocialLoginButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A65AF31E24C0B8890ABB203D /* SocialLoginButton.swift */; };
-		86EB6A835104E33C2FF2FE56 /* DSCircularProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEFB36F814C3D7E8AE709B4 /* DSCircularProgress.swift */; };
 		87532EA234E13B76D5B1656B /* SecondaryMetricsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55090E3269B8A8F8E45E46D0 /* SecondaryMetricsRow.swift */; };
-		880CD55776BAA23217A0FE6B /* StepsIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AC3C23E6923176F103B414 /* StepsIndicator.swift */; };
 		89F49B6560AB71DC7F50C78F /* DSMetricLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4A969A7EF2C7FA9661D869 /* DSMetricLabel.swift */; };
 		89FCC2B284012FAA14EC7A16 /* DSTrendIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 012FFE30028F04055FFF6538 /* DSTrendIndicator.swift */; };
 		936AD43A357EA14452357BE4 /* DocumentHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A28294A184FBD2E6E0D43EF /* DocumentHeader.swift */; };
 		943F92706B6E58D43C5D7C82 /* BiometricAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AB2ACF16AEA86A36EDAD936 /* BiometricAuthView.swift */; };
 		959266B6DE7EC1EDC2A2177D /* DSAuthDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CFEB1A3F5D9DF386EE0836D /* DSAuthDivider.swift */; };
 		967B3CC5CB17B299210CD849 /* AuthHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB947FE422689993FD02B4F6 /* AuthHeader.swift */; };
-		97B7C61F5A6CDD53A9FF5308 /* DSMetricValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D288685A7D97CBCF127A7B /* DSMetricValue.swift */; };
 		9B88D79235D58979AFCFF0F2 /* StepsIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AC3C23E6923176F103B414 /* StepsIndicator.swift */; };
 		A4F541B201F4587D933EF604 /* DSAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */; };
 		A50ADB1035F1D7684F9E7DD1 /* PasswordStrengthIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */; };
@@ -50,14 +45,10 @@
 		AD3E4F652E17A12300345678 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AD3E4F642E17A12300345678 /* HealthKit.framework */; };
 		AD723B152E15FA5D002376C6 /* delete_files.sh in Resources */ = {isa = PBXBuildFile; fileRef = AD722F0E2E15FA5A002376C6 /* delete_files.sh */; };
 		AD723B172E15FA5D002376C6 /* icon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = AD722F102E15FA5A002376C6 /* icon-1024.png */; };
-		AD723B1A2E15FA5D002376C6 /* CONFIGURATION.md in Resources */ = {isa = PBXBuildFile; fileRef = AD722F142E15FA5A002376C6 /* CONFIGURATION.md */; };
-		AD723B1B2E15FA5D002376C6 /* PROJECT_STRUCTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = AD722F152E15FA5A002376C6 /* PROJECT_STRUCTURE.md */; };
 		AD723B1C2E15FA5D002376C6 /* generate_app_icons.sh in Resources */ = {isa = PBXBuildFile; fileRef = AD722F162E15FA5A002376C6 /* generate_app_icons.sh */; };
 		AD7243242E15FA5D002376C6 /* setup-local-testing.sh in Resources */ = {isa = PBXBuildFile; fileRef = AD723ACC2E15FA5C002376C6 /* setup-local-testing.sh */; };
-		AD7243252E15FA5D002376C6 /* CLERK_SETUP.md in Resources */ = {isa = PBXBuildFile; fileRef = AD723ACD2E15FA5C002376C6 /* CLERK_SETUP.md */; };
 		AD7243322E15FA5D002376C6 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AD723ADD2E15FA5C002376C6 /* Preview Assets.xcassets */; };
 		AD7243332E15FA5D002376C6 /* app-icon-180.png in Resources */ = {isa = PBXBuildFile; fileRef = AD723AE12E15FA5C002376C6 /* app-icon-180.png */; };
-		AD7243342E15FA5D002376C6 /* AppIconGuide.md in Resources */ = {isa = PBXBuildFile; fileRef = AD723AE22E15FA5C002376C6 /* AppIconGuide.md */; };
 		AD7243592E15FA5E002376C6 /* Config.xcconfig.example in Resources */ = {isa = PBXBuildFile; fileRef = AD723B0D2E15FA5C002376C6 /* Config.xcconfig.example */; };
 		AD72435C2E15FA5E002376C6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AD723B102E15FA5C002376C6 /* LaunchScreen.storyboard */; };
 		AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30A62E1490810072AA5B /* LogYourBodyTests.swift */; };
@@ -69,9 +60,6 @@
 		ADDC47A02E2D89F3003C97E7 /* OnboardingComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F72E22EE9D00B82C49 /* OnboardingComponents.swift */; };
 		ADDC47A12E2D89F3003C97E7 /* ProcessingImagePlaceholder.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F82E22EE9D00B82C49 /* ProcessingImagePlaceholder.swift */; };
 		ADDC47A32E2D89F3003C97E7 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0054F32E2228F70029E0FF /* SettingsComponents.swift */; };
-		ADDC47A42E2D89F3003C97E7 /* Color+Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AD12E15FA5C002376C6 /* Color+Theme.swift */; };
-		ADDC47A52E2D89F3003C97E7 /* Font+Custom.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AD22E15FA5C002376C6 /* Font+Custom.swift */; };
-		ADDC47A62E2D89F3003C97E7 /* View+Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AD32E15FA5C002376C6 /* View+Styles.swift */; };
 		ADDC47A72E2D89F3003C97E7 /* Changelog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD85525F2E19DC44003552EE /* Changelog.swift */; };
 		ADDC47A82E2D89F3003C97E7 /* BodyMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AD52E15FA5C002376C6 /* BodyMetrics.swift */; };
 		ADDC47A92E2D89F3003C97E7 /* DailyLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AD62E15FA5C002376C6 /* DailyLog.swift */; };
@@ -144,7 +132,6 @@
 		ADDC47F82E2D89F3003C97E7 /* DashboardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B002E25B10100123456 /* DashboardComponents.swift */; };
 		ADDC47F92E2D89F3003C97E7 /* DashboardMetricCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */; };
 		ADDC47FA2E2D89F3003C97E7 /* DietPhaseCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D38C2E24A948001F82A8 /* DietPhaseCard.swift */; };
-		ADDC47FB2E2D89F3003C97E7 /* LiquidGlassTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D38D2E24A948001F82A8 /* LiquidGlassTabBar.swift */; };
 		ADDC47FC2E2D89F3003C97E7 /* LiquidGlassTimelineSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D38E2E24A948001F82A8 /* LiquidGlassTimelineSlider.swift */; };
 		ADDC47FD2E2D89F3003C97E7 /* PhotoAnchoredTimelineSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B0A2E25B10600123456 /* PhotoAnchoredTimelineSlider.swift */; };
 		ADDC47FE2E2D89F3003C97E7 /* SkeletonLoaders.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */; };
@@ -171,18 +158,13 @@
 		ADDC48922E2D8A73003C97E7 /* HeightInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC488D2E2D8A73003C97E7 /* HeightInputView.swift */; };
 		ADDC48932E2D8A73003C97E7 /* GenderInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC488C2E2D8A73003C97E7 /* GenderInputView.swift */; };
 		ADDC48942E2D8A73003C97E7 /* NameInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC488E2E2D8A73003C97E7 /* NameInputView.swift */; };
-		ADE6D3B02E24AE51001F82A8 /* LiquidGlassCTAButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D3AF2E24AE51001F82A8 /* LiquidGlassCTAButton.swift */; };
-		B07A6AE130FF6FC2DDAF689E /* DashboardContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C4817DC7BA2D43606C0D8CB /* DashboardContent.swift */; };
 		B39F620BFA59AFFB07513E46 /* DeveloperToolsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA1CD2B48A471ACA4D8CD1A /* DeveloperToolsList.swift */; };
 		BB5187715A77E1422F6CE947 /* DashboardHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898E428E2D5EE162E00B0BD7 /* DashboardHeader.swift */; };
-		BD0AE8A279A17AC5D8B1D1C5 /* DSTrendIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 012FFE30028F04055FFF6538 /* DSTrendIndicator.swift */; };
 		BE72D7700686D6DF8514A3F5 /* VerificationForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 629DBB90EB2F0C9F3D9D1105 /* VerificationForm.swift */; };
 		BF2DBFBAC3B2277AE19EDC3D /* DeveloperTapHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0401CF23AE214F20C7EB5886 /* DeveloperTapHandler.swift */; };
-		BF379932483113B0620238DB /* DSMetricLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4A969A7EF2C7FA9661D869 /* DSMetricLabel.swift */; };
 		C00904926079E360A71A9DC6 /* MetricGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */; };
 		C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED9F05E697F00813F824903 /* LogoutButton.swift */; };
 		CFEBF01684AD95AF515DFF59 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82670AD733C4BBFF727489CC /* MarkdownView.swift */; };
-		D422A9569B1FAE8FEC9C31C6 /* UserGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03041E8A638B1A252407398 /* UserGreeting.swift */; };
 		DD2B2C6E766FCD6E60668009 /* LoginForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0FE397063AA257AA67F731 /* LoginForm.swift */; };
 		E0E380C2E78BD2BAC87480ED /* DSAuthLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EF9F0EEBB2D999F7FEEF7D0 /* DSAuthLink.swift */; };
 		E714109633DA0CF0B7A6F341 /* LegalSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD8E482BE1E84E0DEAF9819D /* LegalSection.swift */; };
@@ -191,9 +173,14 @@
 		EC7E97F84940FD554A7EB5A1 /* UserGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03041E8A638B1A252407398 /* UserGreeting.swift */; };
 		F032D524300252FDE4C30601 /* SignUpForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2013EF479280EB0CB67121E /* SignUpForm.swift */; };
 		F0451813784DE99328797E5F /* DSText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05F19CFBFEA440516AFCE98B /* DSText.swift */; };
-		F0A6090ABF6B0497684F9816 /* LoadingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D90F6DA60C58AF02CF23737 /* LoadingIndicator.swift */; };
+		4DF78B8A5B5E0DBAF777CBC1 /* DSLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = FECEBC7B2B956D26BF45822F /* DSLogo.swift */; };
+		CCE3FEEC83AAC1B3F1F82BF6 /* DSProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18AA7A0EC7327CC6EB9725D /* DSProgressBar.swift */; };
+		F0A6090ABF6B0497684F9816 /* DSLoadingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D90F6DA60C58AF02CF23737 /* DSLoadingIndicator.swift */; };
+		F44F78267E1DBA90010176C1 /* Color+Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD667EA50710CE217FD95E4C /* Color+Theme.swift */; };
 		FE28F6428506E763B1BD001E /* AuthConsentCheckbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1424DF5DCE3F9859106AB687 /* AuthConsentCheckbox.swift */; };
-/* End PBXBuildFile section */
+
+		2B3C4D5E6F7890ABCDEF1234 /* LoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */; };
+		/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		AD7D30A32E1490810072AA5B /* PBXContainerItemProxy */ = {
@@ -219,6 +206,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+				1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Sources */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -230,7 +218,7 @@
 		0401CF23AE214F20C7EB5886 /* DeveloperTapHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeveloperTapHandler.swift; path = DesignSystem/Molecules/DeveloperTapHandler.swift; sourceTree = "<group>"; };
 		05F19CFBFEA440516AFCE98B /* DSText.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSText.swift; path = DesignSystem/Atoms/DSText.swift; sourceTree = "<group>"; };
 		0AB2ACF16AEA86A36EDAD936 /* BiometricAuthView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BiometricAuthView.swift; path = DesignSystem/Organisms/BiometricAuthView.swift; sourceTree = "<group>"; };
-		0D90F6DA60C58AF02CF23737 /* LoadingIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LoadingIndicator.swift; path = DesignSystem/Atoms/LoadingIndicator.swift; sourceTree = "<group>"; };
+		0D90F6DA60C58AF02CF23737 /* DSLoadingIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLoadingIndicator.swift; path = DesignSystem/Atoms/DSLoadingIndicator.swift; sourceTree = "<group>"; };
 		1424DF5DCE3F9859106AB687 /* AuthConsentCheckbox.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthConsentCheckbox.swift; path = DesignSystem/Molecules/AuthConsentCheckbox.swift; sourceTree = "<group>"; };
 		1A28294A184FBD2E6E0D43EF /* DocumentHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DocumentHeader.swift; path = DesignSystem/Molecules/DocumentHeader.swift; sourceTree = "<group>"; };
 		22BF10E43507028B75EE0B6B /* OTPField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OTPField.swift; path = DesignSystem/Molecules/OTPField.swift; sourceTree = "<group>"; };
@@ -243,15 +231,20 @@
 		564FBAB78ABE3EBE48189BF8 /* DSTextField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSTextField.swift; path = DesignSystem/Atoms/DSTextField.swift; sourceTree = "<group>"; };
 		629DBB90EB2F0C9F3D9D1105 /* VerificationForm.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VerificationForm.swift; path = DesignSystem/Organisms/VerificationForm.swift; sourceTree = "<group>"; };
 		6C4817DC7BA2D43606C0D8CB /* DashboardContent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DashboardContent.swift; path = DesignSystem/Organisms/DashboardContent.swift; sourceTree = "<group>"; };
+		77CA7B3D87EC0BFA00AC6A9F /* Font+Custom.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Font+Custom.swift"; sourceTree = "<group>"; };
+		7B5A5D6BAAD9FB2F7B8AFACB /* BaseButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BaseButton.swift; path = DesignSystem/Atoms/BaseButton.swift; sourceTree = "<group>"; };
 		7CEFB36F814C3D7E8AE709B4 /* DSCircularProgress.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSCircularProgress.swift; path = DesignSystem/Atoms/DSCircularProgress.swift; sourceTree = "<group>"; };
 		7CFEB1A3F5D9DF386EE0836D /* DSAuthDivider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAuthDivider.swift; path = DesignSystem/Molecules/DSAuthDivider.swift; sourceTree = "<group>"; };
 		7D0FE397063AA257AA67F731 /* LoginForm.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LoginForm.swift; path = DesignSystem/Organisms/LoginForm.swift; sourceTree = "<group>"; };
 		7EF9F0EEBB2D999F7FEEF7D0 /* DSAuthLink.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAuthLink.swift; path = DesignSystem/Atoms/DSAuthLink.swift; sourceTree = "<group>"; };
 		82670AD733C4BBFF727489CC /* MarkdownView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MarkdownView.swift; path = DesignSystem/Organisms/MarkdownView.swift; sourceTree = "<group>"; };
 		898E428E2D5EE162E00B0BD7 /* DashboardHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DashboardHeader.swift; path = DesignSystem/Organisms/DashboardHeader.swift; sourceTree = "<group>"; };
+		1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LoadingScreen.swift; path = DesignSystem/Organisms/LoadingScreen.swift; sourceTree = "<group>"; };
+		590EB16B38AD87410DF504FE /* LiquidGlassTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiquidGlassTabBar.swift; path = DesignSystem/Organisms/LiquidGlassTabBar.swift; sourceTree = "<group>"; };
 		9C89CCE0BFAE9B2ACB9A017B /* UserHeaderSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserHeaderSection.swift; path = DesignSystem/Organisms/UserHeaderSection.swift; sourceTree = "<group>"; };
 		9ED9F05E697F00813F824903 /* LogoutButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogoutButton.swift; path = DesignSystem/Molecules/LogoutButton.swift; sourceTree = "<group>"; };
 		9F3E230F03B9DA06BCAA669D /* MetricCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricCard.swift; path = DesignSystem/Molecules/MetricCard.swift; sourceTree = "<group>"; };
+		53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiquidGlassCTAButton.swift; path = DesignSystem/Molecules/LiquidGlassCTAButton.swift; sourceTree = "<group>"; };
 		A65AF31E24C0B8890ABB203D /* SocialLoginButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SocialLoginButton.swift; path = DesignSystem/Molecules/SocialLoginButton.swift; sourceTree = "<group>"; };
 		AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PasswordStrengthIndicator.swift; path = DesignSystem/Molecules/PasswordStrengthIndicator.swift; sourceTree = "<group>"; };
 		AC342BAC136CCEE0B4EF74A2 /* DSSecureField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSSecureField.swift; path = DesignSystem/Atoms/DSSecureField.swift; sourceTree = "<group>"; };
@@ -284,15 +277,9 @@
 		AD722F102E15FA5A002376C6 /* icon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "icon-1024.png"; sourceTree = "<group>"; };
 		AD722F112E15FA5A002376C6 /* LogYourBodyUITests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITests.swift; sourceTree = "<group>"; };
 		AD722F122E15FA5A002376C6 /* LogYourBodyUITestsLaunchTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		AD722F142E15FA5A002376C6 /* CONFIGURATION.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = CONFIGURATION.md; sourceTree = "<group>"; };
-		AD722F152E15FA5A002376C6 /* PROJECT_STRUCTURE.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = PROJECT_STRUCTURE.md; sourceTree = "<group>"; };
 		AD722F162E15FA5A002376C6 /* generate_app_icons.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = generate_app_icons.sh; sourceTree = "<group>"; };
 		AD723ACC2E15FA5C002376C6 /* setup-local-testing.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = "setup-local-testing.sh"; sourceTree = "<group>"; };
-		AD723ACD2E15FA5C002376C6 /* CLERK_SETUP.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = CLERK_SETUP.md; sourceTree = "<group>"; };
 		AD723ACE2E15FA5C002376C6 /* LogYourBodyTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogYourBodyTests.swift; sourceTree = "<group>"; };
-		AD723AD12E15FA5C002376C6 /* Color+Theme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Color+Theme.swift"; sourceTree = "<group>"; };
-		AD723AD22E15FA5C002376C6 /* Font+Custom.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Font+Custom.swift"; sourceTree = "<group>"; };
-		AD723AD32E15FA5C002376C6 /* View+Styles.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "View+Styles.swift"; sourceTree = "<group>"; };
 		AD723AD52E15FA5C002376C6 /* BodyMetrics.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetrics.swift; sourceTree = "<group>"; };
 		AD723AD62E15FA5C002376C6 /* DailyLog.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DailyLog.swift; sourceTree = "<group>"; };
 		AD723AD72E15FA5C002376C6 /* DailyMetrics.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DailyMetrics.swift; sourceTree = "<group>"; };
@@ -301,7 +288,6 @@
 		AD723ADB2E15FA5C002376C6 /* WeightEntry.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WeightEntry.swift; sourceTree = "<group>"; };
 		AD723ADD2E15FA5C002376C6 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		AD723AE12E15FA5C002376C6 /* app-icon-180.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "app-icon-180.png"; sourceTree = "<group>"; };
-		AD723AE22E15FA5C002376C6 /* AppIconGuide.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = AppIconGuide.md; sourceTree = "<group>"; };
 		AD723AE42E15FA5C002376C6 /* AuthManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		AD723AE62E15FA5C002376C6 /* CoreDataManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CoreDataManager.swift; sourceTree = "<group>"; };
 		AD723AE72E15FA5C002376C6 /* HealthKitManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
@@ -412,15 +398,12 @@
 		ADE6D3892E24A566001F82A8 /* IntegrationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationsView.swift; sourceTree = "<group>"; };
 		ADE6D38B2E24A948001F82A8 /* AnimatedTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AnimatedTabView.swift; path = Components/AnimatedTabView.swift; sourceTree = "<group>"; };
 		ADE6D38C2E24A948001F82A8 /* DietPhaseCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DietPhaseCard.swift; path = Components/DietPhaseCard.swift; sourceTree = "<group>"; };
-		ADE6D38D2E24A948001F82A8 /* LiquidGlassTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LiquidGlassTabBar.swift; path = Components/LiquidGlassTabBar.swift; sourceTree = "<group>"; };
 		ADE6D38E2E24A948001F82A8 /* LiquidGlassTimelineSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LiquidGlassTimelineSlider.swift; path = Components/LiquidGlassTimelineSlider.swift; sourceTree = "<group>"; };
 		ADE6D3962E24A96A001F82A8 /* ShakeDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShakeDetector.swift; sourceTree = "<group>"; };
 		ADE6D39B2E24AD30001F82A8 /* LiquidGlassComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassComponents.swift; sourceTree = "<group>"; };
 		ADE6D39D2E24ADB5001F82A8 /* BulkPhotoImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkPhotoImportView.swift; sourceTree = "<group>"; };
 		ADE6D39E2E24ADB5001F82A8 /* IntegrationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationsView.swift; sourceTree = "<group>"; };
 		ADE6D39F2E24ADB5001F82A8 /* LegalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalView.swift; sourceTree = "<group>"; };
-		ADE6D3AF2E24AE51001F82A8 /* LiquidGlassCTAButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LiquidGlassCTAButton.swift; path = LogYourBody/Components/LiquidGlassCTAButton.swift; sourceTree = "<group>"; };
-		ADF287A62E14AC6300198D6F /* AppleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppleSignInButton.swift; path = LogYourBody/Views/AppleSignInButton.swift; sourceTree = "<group>"; };
 		ADF287A72E14AFA900198D6F /* LogYourBody.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LogYourBody.entitlements; sourceTree = "<group>"; };
 		ADF287A82E14AFB000198D6F /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		ADF287AA2E15045900198D6F /* Supabase.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Supabase.xcconfig; sourceTree = "<group>"; };
@@ -447,20 +430,26 @@
 		ADFC6A232E187717004FCE40 /* SupabaseManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseManager.swift; sourceTree = "<group>"; };
 		ADFC6A252E188F96004FCE40 /* OTPInputView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OTPInputView.swift; sourceTree = "<group>"; };
 		B1CDBFA72287938694EB369D /* CoreMetricsRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CoreMetricsRow.swift; path = DesignSystem/Organisms/CoreMetricsRow.swift; sourceTree = "<group>"; };
+		B4BF04D15583E3AE1CA4A836 /* View+Styles.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "View+Styles.swift"; sourceTree = "<group>"; };
 		B888A15870B6A31C76F2AB16 /* DSAuthButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAuthButton.swift; path = DesignSystem/Atoms/DSAuthButton.swift; sourceTree = "<group>"; };
 		BBB847A2050F3135D62950A1 /* AuthFormField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthFormField.swift; path = DesignSystem/Molecules/AuthFormField.swift; sourceTree = "<group>"; };
 		C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SkeletonLoaders.swift; path = Components/SkeletonLoaders.swift; sourceTree = "<group>"; };
 		CCD81BE70A7B449921973AEA /* LegalDocumentRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LegalDocumentRow.swift; path = DesignSystem/Molecules/LegalDocumentRow.swift; sourceTree = "<group>"; };
+		CD667EA50710CE217FD95E4C /* Color+Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Color+Theme.swift"; sourceTree = "<group>"; };
+		CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BaseTextField.swift; path = DesignSystem/Atoms/BaseTextField.swift; sourceTree = "<group>"; };
 		D03041E8A638B1A252407398 /* UserGreeting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserGreeting.swift; path = DesignSystem/Molecules/UserGreeting.swift; sourceTree = "<group>"; };
 		D0D288685A7D97CBCF127A7B /* DSMetricValue.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSMetricValue.swift; path = DesignSystem/Atoms/DSMetricValue.swift; sourceTree = "<group>"; };
 		E2465B2ED058FAFC5389161E /* DSDivider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSDivider.swift; path = DesignSystem/Atoms/DSDivider.swift; sourceTree = "<group>"; };
 		E2AC3C23E6923176F103B414 /* StepsIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StepsIndicator.swift; path = DesignSystem/Molecules/StepsIndicator.swift; sourceTree = "<group>"; };
 		E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAvatar.swift; path = DesignSystem/Atoms/DSAvatar.swift; sourceTree = "<group>"; };
+		FECEBC7B2B956D26BF45822F /* DSLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLogo.swift; path = DesignSystem/Atoms/DSLogo.swift; sourceTree = "<group>"; };
+		D18AA7A0EC7327CC6EB9725D /* DSProgressBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSProgressBar.swift; path = DesignSystem/Atoms/DSProgressBar.swift; sourceTree = "<group>"; };
 		EBA1CD2B48A471ACA4D8CD1A /* DeveloperToolsList.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeveloperToolsList.swift; path = DesignSystem/Organisms/DeveloperToolsList.swift; sourceTree = "<group>"; };
 		F2013EF479280EB0CB67121E /* SignUpForm.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SignUpForm.swift; path = DesignSystem/Organisms/SignUpForm.swift; sourceTree = "<group>"; };
 		F26BF217DF4BEE2BDB74046C /* DSButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSButton.swift; path = DesignSystem/Atoms/DSButton.swift; sourceTree = "<group>"; };
 		FB947FE422689993FD02B4F6 /* AuthHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthHeader.swift; path = DesignSystem/Molecules/AuthHeader.swift; sourceTree = "<group>"; };
 		FD8E482BE1E84E0DEAF9819D /* LegalSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LegalSection.swift; path = DesignSystem/Organisms/LegalSection.swift; sourceTree = "<group>"; };
+
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -500,11 +489,13 @@
 		24F7761465400B9619818144 /* Atoms */ = {
 			isa = PBXGroup;
 			children = (
+				7B5A5D6BAAD9FB2F7B8AFACB /* BaseButton.swift */,
+				CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */,
 				05F19CFBFEA440516AFCE98B /* DSText.swift */,
 				458AAF24645E3634CCF88E16 /* DSIcon.swift */,
 				E2465B2ED058FAFC5389161E /* DSDivider.swift */,
 				F26BF217DF4BEE2BDB74046C /* DSButton.swift */,
-				0D90F6DA60C58AF02CF23737 /* LoadingIndicator.swift */,
+				0D90F6DA60C58AF02CF23737 /* DSLoadingIndicator.swift */,
 				564FBAB78ABE3EBE48189BF8 /* DSTextField.swift */,
 				AC342BAC136CCEE0B4EF74A2 /* DSSecureField.swift */,
 				B888A15870B6A31C76F2AB16 /* DSAuthButton.swift */,
@@ -514,6 +505,8 @@
 				012FFE30028F04055FFF6538 /* DSTrendIndicator.swift */,
 				7CEFB36F814C3D7E8AE709B4 /* DSCircularProgress.swift */,
 				E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */,
+				FECEBC7B2B956D26BF45822F /* DSLogo.swift */,
+				D18AA7A0EC7327CC6EB9725D /* DSProgressBar.swift */,
 			);
 			name = Atoms;
 			sourceTree = "<group>";
@@ -535,7 +528,6 @@
 				AD5C4B002E25B10100123456 /* DashboardComponents.swift */,
 				AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */,
 				ADE6D38C2E24A948001F82A8 /* DietPhaseCard.swift */,
-				ADE6D38D2E24A948001F82A8 /* LiquidGlassTabBar.swift */,
 				ADE6D38E2E24A948001F82A8 /* LiquidGlassTimelineSlider.swift */,
 				AD5C4B0A2E25B10600123456 /* PhotoAnchoredTimelineSlider.swift */,
 				C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */,
@@ -563,7 +555,8 @@
 				524C903734E2308C8A35B5B7 /* CompactMetricCard.swift */,
 				E2AC3C23E6923176F103B414 /* StepsIndicator.swift */,
 				D03041E8A638B1A252407398 /* UserGreeting.swift */,
-				28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */,
+				28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */,				53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */,
+
 			);
 			name = Molecules;
 			sourceTree = "<group>";
@@ -638,9 +631,9 @@
 		AD723AD42E15FA5C002376C6 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
-				AD723AD12E15FA5C002376C6 /* Color+Theme.swift */,
-				AD723AD22E15FA5C002376C6 /* Font+Custom.swift */,
-				AD723AD32E15FA5C002376C6 /* View+Styles.swift */,
+				CD667EA50710CE217FD95E4C /* Color+Theme.swift */,
+				77CA7B3D87EC0BFA00AC6A9F /* Font+Custom.swift */,
+				B4BF04D15583E3AE1CA4A836 /* View+Styles.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -674,7 +667,6 @@
 			children = (
 				AD723AE12E15FA5C002376C6 /* app-icon-180.png */,
 				AD0054EA2E2197600029E0FF /* Legal */,
-				AD723AE22E15FA5C002376C6 /* AppIconGuide.md */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -833,21 +825,16 @@
 		AD7D30892E14907F0072AA5B = {
 			isa = PBXGroup;
 			children = (
-				AD723ACD2E15FA5C002376C6 /* CLERK_SETUP.md */,
-				AD722F142E15FA5A002376C6 /* CONFIGURATION.md */,
 				AD722F0E2E15FA5A002376C6 /* delete_files.sh */,
 				AD722F162E15FA5A002376C6 /* generate_app_icons.sh */,
 				AD722F102E15FA5A002376C6 /* icon-1024.png */,
-				ADE6D3AF2E24AE51001F82A8 /* LiquidGlassCTAButton.swift */,
 				AD723B132E15FA5C002376C6 /* LogYourBody */,
 				AD723ACF2E15FA5C002376C6 /* LogYourBodyTests */,
 				AD722F132E15FA5A002376C6 /* LogYourBodyUITests */,
-				AD722F152E15FA5A002376C6 /* PROJECT_STRUCTURE.md */,
 				AD722F0F2E15FA5A002376C6 /* README.md */,
 				AD723ACC2E15FA5C002376C6 /* setup-local-testing.sh */,
 				ADF287AC2E1507AF00198D6F /* setup-xcode-config.sh */,
 				ADF287AD2E1507C300198D6F /* Supabase.xcconfig */,
-				ADF287A62E14AC6300198D6F /* AppleSignInButton.swift */,
 				ADBD693C2E14A7B900921A30 /* Assets.xcassets */,
 				ADF287AA2E15045900198D6F /* Supabase.xcconfig */,
 				ADBD69332E14A7B900921A30 /* Views */,
@@ -940,8 +927,7 @@
 		};
 		C256EDBE5EC0EF18CBEB8B16 /* Organisms */ = {
 			isa = PBXGroup;
-			children = (
-				9C89CCE0BFAE9B2ACB9A017B /* UserHeaderSection.swift */,
+			children = (9C89CCE0BFAE9B2ACB9A017B /* UserHeaderSection.swift */,
 				EBA1CD2B48A471ACA4D8CD1A /* DeveloperToolsList.swift */,
 				FD8E482BE1E84E0DEAF9819D /* LegalSection.swift */,
 				82670AD733C4BBFF727489CC /* MarkdownView.swift */,
@@ -953,7 +939,7 @@
 				B1CDBFA72287938694EB369D /* CoreMetricsRow.swift */,
 				55090E3269B8A8F8E45E46D0 /* SecondaryMetricsRow.swift */,
 				6C4817DC7BA2D43606C0D8CB /* DashboardContent.swift */,
-			);
+				1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */,);
 			name = Organisms;
 			sourceTree = "<group>";
 		};
@@ -1077,19 +1063,15 @@
 			files = (
 				AD72435C2E15FA5E002376C6 /* LaunchScreen.storyboard in Resources */,
 				AD7243322E15FA5D002376C6 /* Preview Assets.xcassets in Resources */,
-				AD7243252E15FA5D002376C6 /* CLERK_SETUP.md in Resources */,
-				AD723B1A2E15FA5D002376C6 /* CONFIGURATION.md in Resources */,
 				AD723B172E15FA5D002376C6 /* icon-1024.png in Resources */,
 				AD7243332E15FA5D002376C6 /* app-icon-180.png in Resources */,
 				AD7243242E15FA5D002376C6 /* setup-local-testing.sh in Resources */,
 				AD7243592E15FA5E002376C6 /* Config.xcconfig.example in Resources */,
 				AD723B152E15FA5D002376C6 /* delete_files.sh in Resources */,
 				AD723B1C2E15FA5D002376C6 /* generate_app_icons.sh in Resources */,
-				AD723B1B2E15FA5D002376C6 /* PROJECT_STRUCTURE.md in Resources */,
 				AD0054EB2E2197600029E0FF /* privacy-policy.md in Resources */,
 				AD0054EC2E2197600029E0FF /* terms-of-service.md in Resources */,
 				AD0054ED2E2197600029E0FF /* health-disclosure.md in Resources */,
-				AD7243342E15FA5D002376C6 /* AppIconGuide.md in Resources */,
 				ADDC486A2E2D8A4C003C97E7 /* ccpa-compliance.md in Resources */,
 				ADDC486B2E2D8A4C003C97E7 /* open-source-licenses.md in Resources */,
 				ADDC486C2E2D8A4C003C97E7 /* gdpr-compliance.md in Resources */,
@@ -1116,9 +1098,8 @@
 		AD7D309E2E1490810072AA5B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (
-				AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */,
-			);
+			files = (AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */,
+);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AD7D30A82E1490810072AA5B /* Sources */ = {
@@ -1137,13 +1118,9 @@
 				ADDC479D2E2D89F3003C97E7 /* AuthComponents.swift in Sources */,
 				ADDC479E2E2D89F3003C97E7 /* CommonComponents.swift in Sources */,
 				ADDC479F2E2D89F3003C97E7 /* ImageProcessingStatusView.swift in Sources */,
-				ADE6D3B02E24AE51001F82A8 /* LiquidGlassCTAButton.swift in Sources */,
 				ADDC47A02E2D89F3003C97E7 /* OnboardingComponents.swift in Sources */,
 				ADDC47A12E2D89F3003C97E7 /* ProcessingImagePlaceholder.swift in Sources */,
 				ADDC47A32E2D89F3003C97E7 /* SettingsComponents.swift in Sources */,
-				ADDC47A42E2D89F3003C97E7 /* Color+Theme.swift in Sources */,
-				ADDC47A52E2D89F3003C97E7 /* Font+Custom.swift in Sources */,
-				ADDC47A62E2D89F3003C97E7 /* View+Styles.swift in Sources */,
 				ADDC48902E2D8A73003C97E7 /* DateOfBirthInputView.swift in Sources */,
 				ADDC48912E2D8A73003C97E7 /* ProgressPhotosStepView.swift in Sources */,
 				ADDC48922E2D8A73003C97E7 /* HeightInputView.swift in Sources */,
@@ -1235,16 +1212,20 @@
 				ADDC47F82E2D89F3003C97E7 /* DashboardComponents.swift in Sources */,
 				ADDC47F92E2D89F3003C97E7 /* DashboardMetricCards.swift in Sources */,
 				ADDC47FA2E2D89F3003C97E7 /* DietPhaseCard.swift in Sources */,
-				ADDC47FB2E2D89F3003C97E7 /* LiquidGlassTabBar.swift in Sources */,
 				ADDC47FC2E2D89F3003C97E7 /* LiquidGlassTimelineSlider.swift in Sources */,
 				ADDC47FD2E2D89F3003C97E7 /* PhotoAnchoredTimelineSlider.swift in Sources */,
 				ADDC47FE2E2D89F3003C97E7 /* SkeletonLoaders.swift in Sources */,
 				ADDC47FF2E2D89F3003C97E7 /* UIComponents.swift in Sources */,
+				0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */,
+				43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */,
 				F0451813784DE99328797E5F /* DSText.swift in Sources */,
+				4DF78B8A5B5E0DBAF777CBC1 /* DSLogo.swift in Sources */,
+				CCE3FEEC83AAC1B3F1F82BF6 /* DSProgressBar.swift in Sources */,
 				4C2DA948F919366D436CEF26 /* DSIcon.swift in Sources */,
 				5B2F64647650AAF5937280BD /* DSDivider.swift in Sources */,
 				65DB278F8C39AC800B53D93C /* DSButton.swift in Sources */,
-				F0A6090ABF6B0497684F9816 /* LoadingIndicator.swift in Sources */,
+				F0A6090ABF6B0497684F9816 /* DSLoadingIndicator.swift in Sources */,
+				2B3C4D5E6F7890ABCDEF1234 /* LoadingScreen.swift in Sources */,
 				C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */,
 				BF2DBFBAC3B2277AE19EDC3D /* DeveloperTapHandler.swift in Sources */,
 				5763B6723CDF6F551543599B /* ErrorStateView.swift in Sources */,
@@ -1276,6 +1257,7 @@
 				A4F541B201F4587D933EF604 /* DSAvatar.swift in Sources */,
 				717301BDF536203C9A49A25E /* MetricCard.swift in Sources */,
 				11129CEC79A594A3564C81AE /* CompactMetricCard.swift in Sources */,
+				1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Sources */,
 				9B88D79235D58979AFCFF0F2 /* StepsIndicator.swift in Sources */,
 				EC7E97F84940FD554A7EB5A1 /* UserGreeting.swift in Sources */,
 				C00904926079E360A71A9DC6 /* MetricGauge.swift in Sources */,
@@ -1283,6 +1265,9 @@
 				614FDFBE0D01B7D3980EFC41 /* CoreMetricsRow.swift in Sources */,
 				87532EA234E13B76D5B1656B /* SecondaryMetricsRow.swift in Sources */,
 				18A6F3A9477330EC42DC0665 /* DashboardContent.swift in Sources */,
+				F44F78267E1DBA90010176C1 /* Color+Theme.swift in Sources */,
+				0DAECF9694453077367DCB0E /* Font+Custom.swift in Sources */,
+				5952A0969501ACC7277BE893 /* View+Styles.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

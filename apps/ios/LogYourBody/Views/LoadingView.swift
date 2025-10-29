@@ -4,7 +4,7 @@
 //
 import SwiftUI
 
-/// Legacy loading view - use LoadingScreen from Design System instead
+/// Legacy loading view - wraps the LoadingScreen from Design System
 struct LoadingView: View {
     @Binding var progress: Double
     @Binding var loadingStatus: String
