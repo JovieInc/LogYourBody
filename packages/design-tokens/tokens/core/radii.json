@@ -1,0 +1,50 @@
+{
+  "radius": {
+    "xs": {
+      "value": "4",
+      "comment": "Extra small corner radius - 4px"
+    },
+    "sm": {
+      "value": "6",
+      "comment": "Small corner radius - 6px"
+    },
+    "md": {
+      "value": "8",
+      "comment": "Medium corner radius - 8px"
+    },
+    "lg": {
+      "value": "12",
+      "comment": "Large corner radius - 12px"
+    },
+    "xl": {
+      "value": "16",
+      "comment": "Extra large corner radius - 16px"
+    },
+    "xxl": {
+      "value": "24",
+      "comment": "Extra extra large corner radius - 24px"
+    },
+    "full": {
+      "value": "9999",
+      "comment": "Full circle/pill shape"
+    },
+    "semantic": {
+      "button": {
+        "value": "{radius.lg}",
+        "comment": "Standard button radius"
+      },
+      "card": {
+        "value": "{radius.lg}",
+        "comment": "Card corner radius"
+      },
+      "input": {
+        "value": "{radius.md}",
+        "comment": "Input field radius"
+      },
+      "chip": {
+        "value": "{radius.xl}",
+        "comment": "Chip/badge radius"
+      }
+    }
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "font": {
+    "family": {
+      "system": {
+        "value": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+        "comment": "System font stack"
+      },
+      "systemRounded": {
+        "value": "SF Pro Rounded, system-ui, sans-serif",
+        "comment": "Rounded system font (iOS)"
+      },
+      "mono": {
+        "value": "'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace",
+        "comment": "Monospace font for code"
+      }
+    },
+    "size": {
+      "display": {
+        "xl": {
+          "value": "48",
+          "comment": "Extra large display - 48px"
+        },
+        "lg": {
+          "value": "36",
+          "comment": "Large display - 36px"
+        },
+        "md": {
+          "value": "32",
+          "comment": "Medium display - 32px"
+        }
+      },
+      "headline": {
+        "lg": {
+          "value": "28",
+          "comment": "Large headline - 28px"
+        },
+        "md": {
+          "value": "24",
+          "comment": "Medium headline - 24px"
+        },
+        "sm": {
+          "value": "20",
+          "comment": "Small headline - 20px"
+        }
+      },
+      "body": {
+        "lg": {
+          "value": "18",
+          "comment": "Large body text - 18px"
+        },
+        "md": {
+          "value": "16",
+          "comment": "Medium body text - 16px (base)"
+        },
+        "sm": {
+          "value": "14",
+          "comment": "Small body text - 14px"
+        }
+      },
+      "label": {
+        "lg": {
+          "value": "16",
+          "comment": "Large label - 16px"
+        },
+        "md": {
+          "value": "14",
+          "comment": "Medium label - 14px"
+        },
+        "sm": {
+          "value": "12",
+          "comment": "Small label - 12px"
+        }
+      },
+      "caption": {
+        "lg": {
+          "value": "13",
+          "comment": "Large caption - 13px"
+        },
+        "md": {
+          "value": "12",
+          "comment": "Medium caption - 12px"
+        },
+        "sm": {
+          "value": "11",
+          "comment": "Small caption - 11px"
+        }
+      }
+    },
+    "weight": {
+      "regular": {
+        "value": "400",
+        "comment": "Regular weight"
+      },
+      "medium": {
+        "value": "500",
+        "comment": "Medium weight"
+      },
+      "semibold": {
+        "value": "600",
+        "comment": "Semibold weight"
+      },
+      "bold": {
+        "value": "700",
+        "comment": "Bold weight"
+      }
+    },
+    "lineHeight": {
+      "tight": {
+        "value": "1.2",
+        "comment": "Tight line height for headlines"
+      },
+      "normal": {
+        "value": "1.5",
+        "comment": "Normal line height for body text"
+      },
+      "relaxed": {
+        "value": "1.75",
+        "comment": "Relaxed line height for reading"
+      }
+    }
+  }
+}
