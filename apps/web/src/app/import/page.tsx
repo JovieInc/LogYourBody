@@ -46,6 +46,7 @@ interface ParsedData {
     notes?: string
     photo_url?: string
     angle?: string
+    source?: string
   }>
   metadata?: {
     source?: string
@@ -553,17 +554,26 @@ export default function ImportPage() {
         }
       } else {
         // Import body composition or weight data
-        const metricsData = selectedData.map(entry => ({
-          user_id: user.id,
-          date: entry.date,
-          weight: entry.weight,
-          weight_unit: entry.weight_unit || 'kg',
-          body_fat_percentage: entry.body_fat_percentage,
-          waist: entry.waist,
-          hip: entry.hip,
-          notes: entry.notes
-        }))
-        
+        const metricsData = selectedData.map(entry => {
+          const metric: Record<string, unknown> = {
+            user_id: user.id,
+            date: entry.date,
+            weight: entry.weight,
+            weight_unit: entry.weight_unit || 'kg',
+            body_fat_percentage: entry.body_fat_percentage,
+            waist: entry.waist,
+            hip: entry.hip,
+            notes: entry.notes
+          }
+
+          const sourceLabel = (entry.source || parsedData.metadata?.source || '').toLowerCase()
+          if (sourceLabel.includes('bodyspec')) {
+            metric.data_source = 'DEXA'
+          }
+
+          return metric
+        })
+
         const { error } = await supabase
           .from('body_metrics')
           .insert(metricsData)

@@ -1,18 +1,55 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { useOnboarding } from '@/contexts/OnboardingContext'
-import { Upload, FileText, X, Loader2 } from 'lucide-react'
+import { Upload, FileText, X, Loader2, Link2, CheckCircle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { toast } from '@/hooks/use-toast'
+
+type BodyspecSession = {
+  accessToken: string
+  client: string
+  uid: string
+  expiry?: string
+  tokenType?: string
+}
+
+type NormalizedScan = {
+  date: string
+  weight: number | null
+  weight_unit: 'lbs' | 'kg'
+  body_fat_percentage?: number | null
+  lean_mass?: number | null
+  bone_mass?: number | null
+}
+
+type OnboardingUpdates = {
+  weight?: number
+  bodyFatPercentage?: number
+  leanMass?: number
+  fatMass?: number
+  boneMass?: number
+  scanDate?: string
+  dataSource?: 'pdf' | 'bodyspec' | 'manual'
+}
 
 export function DexaUploadStep() {
   const { nextStep, updateData, previousStep } = useOnboarding()
   const [file, setFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [bodyspecDialogOpen, setBodyspecDialogOpen] = useState(false)
+  const [bodyspecEmail, setBodyspecEmail] = useState('')
+  const [bodyspecPassword, setBodyspecPassword] = useState('')
+  const [bodyspecError, setBodyspecError] = useState<string | null>(null)
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [bodyspecSession, setBodyspecSession] = useState<BodyspecSession | null>(null)
+  const canSubmitBodyspec = bodyspecEmail.trim().length > 0 && (bodyspecPassword.trim().length > 0 || bodyspecSession !== null)
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -65,9 +102,117 @@ export function DexaUploadStep() {
     setError(null)
   }
 
+  const handleBodyspecDialogChange = (open: boolean) => {
+    setBodyspecDialogOpen(open)
+    if (!open) {
+      setBodyspecPassword('')
+      setBodyspecError(null)
+      setIsConnecting(false)
+    }
+  }
+
+  const connectBodyspec = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const trimmedEmail = bodyspecEmail.trim()
+
+    if (!trimmedEmail || (!bodyspecPassword && !bodyspecSession)) {
+      setBodyspecError('Enter your BodySpec email and password to continue.')
+      return
+    }
+
+    setIsConnecting(true)
+    setBodyspecError(null)
+
+    try {
+      const response = await fetch('/api/import/bodyspec', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password: bodyspecPassword,
+          session: bodyspecSession ?? undefined
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result?.error || 'Failed to connect to BodySpec')
+      }
+
+      const scans = Array.isArray(result?.scans) ? (result.scans as NormalizedScan[]) : []
+
+      if (scans.length === 0) {
+        setBodyspecError('We couldn’t find any BodySpec scans for this account yet.')
+        return
+      }
+
+      if (result?.session) {
+        setBodyspecSession(result.session as BodyspecSession)
+      }
+
+      updateData({
+        extractedScans: scans,
+        scanCount: scans.length,
+        filename: 'BodySpec Sync',
+        dataSource: 'bodyspec'
+      })
+
+      if (scans.length === 1) {
+        const scan = scans[0]
+        const updates: OnboardingUpdates = {
+          dataSource: 'bodyspec'
+        }
+
+        if (typeof scan.weight === 'number' && !Number.isNaN(scan.weight)) {
+          updates.weight = scan.weight_unit === 'lbs' ? scan.weight * 0.453592 : scan.weight
+        }
+        if (typeof scan.body_fat_percentage === 'number') {
+          updates.bodyFatPercentage = scan.body_fat_percentage
+        }
+        if (typeof scan.lean_mass === 'number') {
+          updates.leanMass = scan.lean_mass
+        }
+        if (typeof scan.bone_mass === 'number') {
+          updates.boneMass = scan.bone_mass
+        }
+        if (scan.date) {
+          updates.scanDate = scan.date
+        }
+
+        if (updates.weight && updates.bodyFatPercentage) {
+          updates.fatMass = updates.weight * (updates.bodyFatPercentage / 100)
+        }
+
+        updateData(updates)
+      }
+
+      toast({
+        title: 'BodySpec connected',
+        description: scans.length === 1
+          ? 'We pulled your latest DEXA scan.'
+          : `Imported ${scans.length} BodySpec scans.`,
+      })
+
+      setBodyspecDialogOpen(false)
+      setBodyspecPassword('')
+      setError(null)
+      nextStep()
+    } catch (err) {
+      console.error('BodySpec connection error:', err)
+      const message = err instanceof Error ? err.message : 'Failed to connect to BodySpec.'
+      setBodyspecError(message)
+    } finally {
+      setIsConnecting(false)
+    }
+  }
+
   const processFile = async () => {
     if (!file) return
-    
+
     setIsProcessing(true)
     setError(null)
     
@@ -109,13 +254,16 @@ export function DexaUploadStep() {
         updateData({
           extractedScans: data.scans,
           scanCount: data.scans.length,
-          filename: result.filename
+          filename: result.filename,
+          dataSource: 'pdf'
         })
         
         // If there's only one scan, also populate the form fields
         if (data.scans.length === 1) {
           const scan = data.scans[0]
-          const updates: any = {}
+          const updates: OnboardingUpdates = {
+            dataSource: 'pdf'
+          }
           
           if (scan.weight) {
             updates.weight = scan.weight_unit === 'lbs' ? scan.weight * 0.453592 : scan.weight
@@ -142,7 +290,9 @@ export function DexaUploadStep() {
         }
       } else {
         // Fallback to old format if no scans array
-        const updates: any = {}
+        const updates: OnboardingUpdates = {
+          dataSource: 'pdf'
+        }
         
         if (data.weight) {
           updates.weight = data.weight_unit === 'lbs' ? data.weight * 0.453592 : data.weight
@@ -214,7 +364,7 @@ export function DexaUploadStep() {
           Support for BodySpec, DexaFit, and other providers
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4 flex-1 overflow-y-auto">
+      <CardContent className="space-y-6 flex-1 overflow-y-auto">
         {!file ? (
           <div
             onDrop={handleDrop}
@@ -267,10 +417,111 @@ export function DexaUploadStep() {
         )}
 
         <p className="text-sm text-linear-text-secondary">
-          We'll extract your body composition data automatically from the PDF.
+          We'll extract your body composition data automatically from a PDF, or connect directly to BodySpec for an instant sync.
         </p>
-        
-        <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+
+        <Dialog open={bodyspecDialogOpen} onOpenChange={handleBodyspecDialogChange}>
+          <div className="rounded-lg border border-linear-border/70 bg-linear-bg/60 p-5 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1 text-left">
+                <p className="text-linear-text font-semibold">Connect to BodySpec</p>
+                <p className="text-sm text-linear-text-secondary">
+                  Import your full DEXA history securely in seconds.
+                </p>
+              </div>
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="bg-linear-purple/10 border-linear-purple/30 text-linear-purple hover:bg-linear-purple/20"
+                >
+                  <Link2 className="mr-2 h-4 w-4" />
+                  Connect to BodySpec
+                </Button>
+              </DialogTrigger>
+            </div>
+            <p className="mt-3 text-xs text-linear-text-tertiary">
+              Your credentials are encrypted in transit and never stored.
+            </p>
+            {bodyspecSession && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-emerald-500">
+                <CheckCircle className="h-3.5 w-3.5" />
+                <span>Connected. Your recent scans are ready to review.</span>
+              </div>
+            )}
+          </div>
+
+          <DialogContent className="bg-linear-card border-linear-border text-linear-text">
+            <DialogHeader>
+              <DialogTitle>Connect to BodySpec</DialogTitle>
+              <DialogDescription className="text-linear-text-secondary">
+                Sign in with your BodySpec credentials so we can import your DEXA scans automatically.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={connectBodyspec} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="bodyspec-email" className="text-linear-text">BodySpec email</Label>
+                <Input
+                  id="bodyspec-email"
+                  type="email"
+                  autoComplete="email"
+                  value={bodyspecEmail}
+                  onChange={(e) => setBodyspecEmail(e.target.value)}
+                  className="bg-linear-bg border-linear-border text-linear-text"
+                  placeholder="you@example.com"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bodyspec-password" className="text-linear-text">Password</Label>
+                <Input
+                  id="bodyspec-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={bodyspecPassword}
+                  onChange={(e) => setBodyspecPassword(e.target.value)}
+                  className="bg-linear-bg border-linear-border text-linear-text"
+                  placeholder="Enter your password"
+                  required={!bodyspecSession}
+                />
+                <p className="text-xs text-linear-text-tertiary">
+                  We only use your password to fetch your scans and never store it.
+                </p>
+              </div>
+              {bodyspecError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{bodyspecError}</AlertDescription>
+                </Alert>
+              )}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleBodyspecDialogChange(false)}
+                  disabled={isConnecting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-linear-purple hover:bg-linear-purple/90 text-white"
+                  disabled={!canSubmitBodyspec || isConnecting}
+                >
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Connecting…
+                    </>
+                  ) : (
+                    'Import from BodySpec'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
           <p className="text-sm text-amber-800 dark:text-amber-300">
             <strong>Tip:</strong> If PDF upload fails, try taking a screenshot of your scan results and uploading it as an image instead.
           </p>

@@ -13,6 +13,7 @@ interface OnboardingData {
   fatMass?: number
   boneMass?: number
   scanDate?: string
+  dataSource?: 'pdf' | 'bodyspec' | 'manual'
   
   // Multiple scans data
   extractedScans?: any[]
@@ -134,7 +135,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           body_fat_method: 'dexa',
           bone_mass: scan.bone_mass ? (scan.weight_unit === 'lbs' ? scan.bone_mass * 0.453592 : scan.bone_mass) : null, // Convert to kg if needed
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          ...(data.dataSource === 'bodyspec' ? { data_source: 'DEXA' } : {}),
         }))
         
         const { error: metricsError } = await supabase
@@ -146,20 +148,26 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         // Single entry (manual or single scan)
         // Convert weight to kg for storage (database expects kg when weight_unit is 'kg')
         const weightInKg = data.weight * 0.453592 // Convert lbs to kg
-        
+
+        const metricsPayload: Record<string, unknown> = {
+          user_id: user.id,
+          date: data.scanDate ? formatDateForDB(data.scanDate) : formatDateForDB(new Date()),
+          weight: weightInKg,
+          weight_unit: 'kg',
+          body_fat_percentage: data.bodyFatPercentage,
+          body_fat_method: 'dexa',
+          bone_mass: data.boneMass ? data.boneMass * 0.453592 : null, // Convert to kg if present
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+
+        if (data.dataSource === 'bodyspec') {
+          metricsPayload.data_source = 'DEXA'
+        }
+
         const { error: metricsError } = await supabase
           .from('body_metrics')
-          .insert({
-            user_id: user.id,
-            date: data.scanDate ? formatDateForDB(data.scanDate) : formatDateForDB(new Date()),
-            weight: weightInKg,
-            weight_unit: 'kg',
-            body_fat_percentage: data.bodyFatPercentage,
-            body_fat_method: 'dexa',
-            bone_mass: data.boneMass ? data.boneMass * 0.453592 : null, // Convert to kg if present
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
+          .insert(metricsPayload)
         
         if (metricsError) throw metricsError
       }
