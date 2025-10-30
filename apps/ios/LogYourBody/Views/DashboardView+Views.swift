@@ -54,21 +54,21 @@ extension DashboardView {
                 if bodyMetrics.count > 1 {
                     VStack(spacing: 0) {
                         timelineSlider
-                            .padding(.horizontal, 20) // Inner padding
+                            .padding(.horizontal, 16) // Standardized padding
                     }
                     .padding(.vertical, 12)
                     .background(Color.appCard.opacity(0.5))
                     // No horizontal padding here - full width
                 }
-                
+
                 // Core Metrics Row
                 coreMetricsRow
-                
+
                 // Secondary Metrics Row - Compact Cards
                 secondaryMetricsRow
-                
+
                 // Bottom padding for floating tab bar
-                Color.clear.frame(height: 90)
+                Color.clear.frame(height: 72) // Reduced from 90 for more content space
             }
         }
         .refreshable {
@@ -144,11 +144,12 @@ extension DashboardView {
                         }
                     }
                     
-                    // Sync indicator
+                    // Sync indicator with enhanced visibility
                     if syncManager.isSyncing {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .appTextSecondary))
-                            .scaleEffect(0.8)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .appPrimary))
+                            .scaleEffect(0.9)
+                            .shadow(color: Color.appPrimary.opacity(0.3), radius: 4, x: 0, y: 0)
                     }
                 }
             }
@@ -168,12 +169,12 @@ extension DashboardView {
                 selectedMetricsIndex: $selectedIndex
             )
             
-            // Camera button overlay - always present but changes based on photo existence
+            // Camera button overlay - floating with glassmorphism
             VStack {
                 Spacer()
                 HStack {
                     Spacer()
-                    
+
                     Button(
             action: {
                         showPhotoOptions = true
@@ -181,34 +182,40 @@ extension DashboardView {
             label: {
                         if currentMetric?.photoUrl == nil || currentMetric?.photoUrl?.isEmpty == true {
                             // Full button when no photo
-                            HStack {
+                            HStack(spacing: 8) {
                                 Image(systemName: "camera.fill")
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(.system(size: 15, weight: .semibold))
                                 Text("Add Photo")
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(.system(size: 15, weight: .semibold))
                             }
                             .foregroundColor(.white)
                             .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 12)
                             .background(
                                 Capsule()
                                     .fill(Color.appPrimary)
+                                    .shadow(color: Color.appPrimary.opacity(0.4), radius: 12, x: 0, y: 4)
                             )
                         } else {
-                            // Just icon when photo exists
+                            // Icon button when photo exists - glassmorphism style
                             Image(systemName: "camera.fill")
-                                .font(.system(size: 16, weight: .medium))
+                                .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
+                                .frame(width: 44, height: 44)
                                 .background(
                                     Circle()
-                                        .fill(Color.black.opacity(0.5))
+                                        .fill(.ultraThinMaterial)
+                                        .overlay(
+                                            Circle()
+                                                .fill(Color.black.opacity(0.3))
+                                        )
+                                        .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
                                 )
                         }
                     }
         )
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 12)
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 16)
                 }
             }
         }
@@ -219,7 +226,7 @@ extension DashboardView {
     @ViewBuilder
     
     var coreMetricsRow: some View {
-        HStack(spacing: 16) {  // Consistent spacing
+        HStack(spacing: 16) {  // Design system standard spacing
             // Body Fat % with simplified progress bar
             let estimatedBF = currentMetric?.bodyFatPercentage == nil && selectedIndex < bodyMetrics.count
                 ? PhotoMetadataService.shared.estimateBodyFat(for: bodyMetrics[selectedIndex].date, metrics: bodyMetrics)
@@ -242,10 +249,10 @@ extension DashboardView {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 100) // Fixed height - reduced from 120
+            .frame(height: 120) // Optimized height for better visual hierarchy
             .background(Color.appCard)
             .cornerRadius(12)
-            
+
             // Weight with trend indicator
             let weightValue = currentMetric?.weight != nil
                 ? convertWeight(currentMetric!.weight!, from: "kg", to: currentSystem.weightUnit)
@@ -269,11 +276,11 @@ extension DashboardView {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 100) // Fixed height - reduced from 120
+            .frame(height: 120) // Optimized height for better visual hierarchy
             .background(Color.appCard)
             .cornerRadius(12)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
     }
     
     // MARK: - Secondary Metrics Row
@@ -317,7 +324,7 @@ extension DashboardView {
                 trendType: .positive
             )
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
     }
     
     // MARK: - Timeline Slider

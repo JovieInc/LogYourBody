@@ -12,6 +12,7 @@ struct DashboardView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var syncManager: SyncManager
     @StateObject var healthKitManager = HealthKitManager.shared
+    @StateObject var backgroundTaskMonitor = BackgroundTaskMonitor.shared
     
     @State var dailyMetrics: DailyMetrics?
     @State var selectedDateMetrics: DailyMetrics?
@@ -63,13 +64,22 @@ struct DashboardView: View {
             ZStack {
                 Color.appBackground
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Custom Header
                     headerView
-                    
+
                     contentView
                 }
+
+                // Background Task Banner - appears below header
+                VStack {
+                    if backgroundTaskMonitor.isAnyTaskActive {
+                        DashboardTaskBanner(taskMonitor: backgroundTaskMonitor)
+                    }
+                    Spacer()
+                }
+                .padding(.top, 60) // Below header height
             }
             .navigationBarHidden(true)
             .id(refreshID)

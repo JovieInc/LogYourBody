@@ -13,7 +13,7 @@ struct DSMetricCard: View {
     let label: String
     var trend: Double?
     var trendType: DSTrendIndicator.TrendType = .neutral
-    var height: CGFloat = 100
+    var height: CGFloat = 120 // Increased for better visual breathing room
     var isInteractive: Bool = false
     var onTap: (() -> Void)?
     
@@ -26,8 +26,8 @@ struct DSMetricCard: View {
                 DSMetricValue(
                     value: value,
                     unit: unit,
-                    size: .system(size: 28, weight: .bold),
-                    unitSize: .system(size: 16, weight: .medium)
+                    size: .system(size: 40, weight: .bold, design: .rounded),
+                    unitSize: .system(size: 18, weight: .medium, design: .rounded)
                 )
                 
                 if trend != nil {
@@ -75,7 +75,7 @@ struct DSMetricCard: View {
 struct DSEmptyMetricCard: View {
     let label: String
     let unit: String
-    var height: CGFloat = 100
+    var height: CGFloat = 120 // Increased to match metric card
     
     var body: some View {
         VStack(spacing: 0) {
@@ -84,9 +84,9 @@ struct DSEmptyMetricCard: View {
                 DSMetricValue(
                     value: "––",
                     unit: unit,
-                    size: .system(size: 28, weight: .bold),
+                    size: .system(size: 40, weight: .bold, design: .rounded),
                     color: .appTextTertiary,
-                    unitSize: .system(size: 16, weight: .medium)
+                    unitSize: .system(size: 18, weight: .medium, design: .rounded)
                 )
             }
             .frame(maxHeight: .infinity)

@@ -13,39 +13,43 @@ struct DSCompactMetricCard: View {
     let label: String
     var trend: Double?
     var trendType: DSTrendIndicator.TrendType = .neutral
+
+    private var isEmptyState: Bool {
+        value == "––"
+    }
     
     var body: some View {
         HStack(spacing: 12) {
             // Icon
             Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(.appTextSecondary)
-            
+                .font(.system(size: 22, weight: .medium))
+                .foregroundColor(isEmptyState ? .appTextTertiary : .appTextSecondary)
+
             // Content
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(value)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.appText)
-                    
-                    if trend != nil {
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(isEmptyState ? .appTextTertiary : .appText)
+
+                    if trend != nil && !isEmptyState {
                         DSTrendIndicator(
                             trend: trend,
                             trendType: trendType,
-                            size: .system(size: 11)
+                            size: .system(size: 12)
                         )
                     }
                 }
-                
+
                 Text(label)
-                    .font(.system(size: 12))
-                    .foregroundColor(.appTextSecondary)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(isEmptyState ? .appTextTertiary.opacity(0.7) : .appTextSecondary)
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 16)
         .background(Color.appCard)
         .cornerRadius(10)
     }

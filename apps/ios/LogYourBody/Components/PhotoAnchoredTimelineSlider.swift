@@ -134,34 +134,36 @@ struct PhotoAnchoredTimelineSlider: View {
                 .padding(.horizontal, 4)
             }
             
-            // Timeline slider
+            // Timeline slider with enhanced polish
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     // Background track
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.white.opacity(0.2))
+                        .fill(Color.white.opacity(0.25))
                         .frame(height: 4)
-                    
-                    // Active track
+
+                    // Active track with subtle glow
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.white.opacity(0.8))
+                        .fill(Color.white)
                         .frame(width: max(4, geometry.size.width * CGFloat(progress)), height: 4)
+                        .shadow(color: Color.white.opacity(0.3), radius: 2, x: 0, y: 0)
                         .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: progress)
                 }
                 .frame(height: 20, alignment: .center)
-                
+
                 // Photo thumbnails only (no tick lines)
                 ForEach(calculateSmartTicks().filter { $0.hasPhoto }, id: \.index) { tick in
                     PhotoThumbnailTick(photoUrl: tick.photoUrl, isSelected: tick.index == selectedIndex)
                         .position(x: tick.position * geometry.size.width, y: 10)
                 }
-                
-                // Thumb
+
+                // Enhanced thumb with glow
                 Circle()
                     .fill(Color.white)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 24, height: 24)
                     .scaleEffect(thumbScale)
-                    .shadow(color: Color.black.opacity(0.3), radius: 2, x: 0, y: 1)
+                    .shadow(color: Color.black.opacity(0.4), radius: 4, x: 0, y: 2)
+                    .shadow(color: isDragging ? Color.white.opacity(0.4) : Color.clear, radius: 8, x: 0, y: 0)
                     .position(x: geometry.size.width * CGFloat(progress), y: 10)
                     .animation(isDragging ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: progress)
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: thumbScale)
@@ -244,30 +246,31 @@ struct PhotoThumbnailTick: View {
     
     var body: some View {
         ZStack {
-            // Thumbnail container
+            // Thumbnail container with enhanced size
             Circle()
-                .fill(Color.white.opacity(0.1))
-                .frame(width: 16, height: 16)
-            
+                .fill(Color.white.opacity(0.15))
+                .frame(width: 18, height: 18)
+
             // Photo thumbnail
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 14, height: 14)
+                    .frame(width: 16, height: 16)
                     .clipShape(Circle())
             } else {
                 // Loading indicator
                 Circle()
                     .fill(Color.appPrimary.opacity(0.3))
-                    .frame(width: 14, height: 14)
+                    .frame(width: 16, height: 16)
             }
-            
-            // Selection indicator
+
+            // Selection indicator with glow
             if isSelected {
                 Circle()
                     .stroke(Color.appPrimary, lineWidth: 2)
-                    .frame(width: 18, height: 18)
+                    .frame(width: 20, height: 20)
+                    .shadow(color: Color.appPrimary.opacity(0.5), radius: 4, x: 0, y: 0)
             }
         }
         .onAppear {

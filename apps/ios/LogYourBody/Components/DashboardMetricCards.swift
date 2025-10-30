@@ -301,32 +301,38 @@ struct MetricValueDisplay: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             
-            // Progress bar
+            // Progress bar with enhanced visibility
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     // Background
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.white.opacity(0.1))
-                        .frame(height: 4)
-                    
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.white.opacity(0.15))
+                        .frame(height: 6)
+
                     // Target zone indicator
                     let targetStart = 0.3
                     let targetEnd = 0.7
                     let targetWidth = CGFloat(targetEnd - targetStart)
-                    
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.appPrimary.opacity(0.2))
-                        .frame(width: targetWidth * geometry.size.width, height: 4)
+
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.appPrimary.opacity(0.25))
+                        .frame(width: targetWidth * geometry.size.width, height: 6)
                         .offset(x: targetStart * geometry.size.width)
-                    
-                    // Active progress
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(isInTargetZone ? Color.appPrimary.opacity(0.8) : Color.white.opacity(0.6))
-                        .frame(width: max(4, normalizedValue * geometry.size.width), height: 4)
+
+                    // Active progress with glow
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(isInTargetZone ? Color.appPrimary : Color.white.opacity(0.7))
+                        .frame(width: max(6, normalizedValue * geometry.size.width), height: 6)
+                        .shadow(
+                            color: isInTargetZone ? Color.appPrimary.opacity(0.5) : Color.clear,
+                            radius: 4,
+                            x: 0,
+                            y: 0
+                        )
                         .animation(.spring(response: 0.6, dampingFraction: 0.8), value: normalizedValue)
                 }
             }
-            .frame(height: 4)
+            .frame(height: 6)
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
             
@@ -406,9 +412,9 @@ struct EmptyMetricPlaceholder: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             
             // Empty progress bar
-            RoundedRectangle(cornerRadius: 2)
+            RoundedRectangle(cornerRadius: 3)
                 .fill(Color.white.opacity(0.1))
-                .frame(height: 4)
+                .frame(height: 6)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
             

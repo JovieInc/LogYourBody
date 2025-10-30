@@ -11,7 +11,8 @@ struct DSTrendIndicator: View {
     let trend: Double?
     let trendType: TrendType
     var showSign: Bool = true
-    var size: Font = .system(size: 12)
+    var size: Font = .system(size: 14, weight: .medium) // Increased for better visibility
+    var showBackground: Bool = false // Optional pill background for better contrast
     
     enum TrendType {
         case positive  // Up is good (e.g., steps, FFMI)
@@ -42,14 +43,26 @@ struct DSTrendIndicator: View {
     
     var body: some View {
         if let trend = trend, trend != 0 {
-            HStack(spacing: 4) {
-                Image(systemName: trendType.icon(for: trend))
-                    .font(size.weight(.medium))
-                
-                Text(formatTrend(trend))
-                    .font(size.weight(.medium))
+            Group {
+                HStack(spacing: 4) {
+                    Image(systemName: trendType.icon(for: trend))
+                        .font(size)
+
+                    Text(formatTrend(trend))
+                        .font(size)
+                }
+                .foregroundColor(trendType.color(for: trend))
             }
-            .foregroundColor(trendType.color(for: trend))
+            .padding(.horizontal, showBackground ? 8 : 0)
+            .padding(.vertical, showBackground ? 4 : 0)
+            .background(
+                Group {
+                    if showBackground {
+                        Capsule()
+                            .fill(trendType.color(for: trend).opacity(0.15))
+                    }
+                }
+            )
         }
     }
     
