@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
+import { serverEnv } from '@/env-server'
 
 export async function GET() {
   try {
-    const hasApiKey = !!process.env.OPENAI_API_KEY
-    const apiKeyPreview = process.env.OPENAI_API_KEY 
-      ? `${process.env.OPENAI_API_KEY.substring(0, 7)}...${process.env.OPENAI_API_KEY.substring(process.env.OPENAI_API_KEY.length - 4)}`
+    const apiKey = serverEnv.OPENAI_API_KEY
+    const hasApiKey = !!apiKey
+    const apiKeyPreview = apiKey
+      ? `${apiKey.substring(0, 7)}...${apiKey.substring(apiKey.length - 4)}`
       : 'Not set'
     
     // Test OpenAI connection
@@ -15,7 +17,7 @@ export async function GET() {
       try {
         const OpenAI = (await import('openai')).default
         const openai = new OpenAI({
-          apiKey: process.env.OPENAI_API_KEY,
+          apiKey,
         })
         
         // Make a simple test request

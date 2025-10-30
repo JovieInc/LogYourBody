@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { serverEnv } from '@/env-server'
 
 // Dynamic import with error handling
 async function loadPdfParse() {
@@ -15,7 +16,7 @@ async function loadPdfParse() {
 export async function POST(request: NextRequest) {
   try {
     // Check if OpenAI API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!serverEnv.OPENAI_API_KEY) {
       console.error('OpenAI API key not configured')
       return NextResponse.json(
         { error: 'OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.' },
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: serverEnv.OPENAI_API_KEY,
     })
 
     // Get the PDF file from the request

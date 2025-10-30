@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { X, Share, Plus, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { publicEnv } from '@/env'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -40,7 +41,7 @@ export function PWAInstallPrompt() {
     setIsStandalone(isInStandaloneMode)
 
     // Debug logging for PWA detection
-    if (process.env.NODE_ENV === 'development') {
+    if (publicEnv.NODE_ENV === 'development') {
       console.log('PWA Detection:', {
         isInStandaloneMode,
         displayModeStandalone: window.matchMedia('(display-mode: standalone)').matches,

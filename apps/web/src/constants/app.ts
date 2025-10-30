@@ -1,6 +1,8 @@
 // Central constants file for LogYourBody
 // These values should be kept in sync with iOS app constants
 
+import { publicEnv } from '@/env'
+
 export const APP_CONFIG = {
   // App Identity
   appName: 'LogYourBody',
@@ -77,14 +79,14 @@ export const APP_CONFIG = {
   
   // API & Backend
   api: {
-    baseUrl: process.env.NEXT_PUBLIC_API_URL || 'https://api.logyourbody.com',
-    websocketUrl: process.env.NEXT_PUBLIC_WS_URL || 'wss://api.logyourbody.com',
+    baseUrl: publicEnv.NEXT_PUBLIC_API_URL || 'https://api.logyourbody.com',
+    websocketUrl: publicEnv.NEXT_PUBLIC_WS_URL || 'wss://api.logyourbody.com',
   },
   
   // Analytics & Tracking
   analytics: {
-    googleAnalyticsId: process.env.NEXT_PUBLIC_GA_ID,
-    mixpanelToken: process.env.NEXT_PUBLIC_MIXPANEL_TOKEN,
+    googleAnalyticsId: publicEnv.NEXT_PUBLIC_GA_ID,
+    mixpanelToken: publicEnv.NEXT_PUBLIC_MIXPANEL_TOKEN,
   },
   
   // PWA Configuration

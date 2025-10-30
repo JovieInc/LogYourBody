@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Button } from './ui/button'
 import { RefreshCw } from 'lucide-react'
+import { publicEnv } from '@/env'
 
 export function ServiceWorkerUpdater() {
   const [showUpdateBar, setShowUpdateBar] = useState(false)
@@ -63,7 +64,7 @@ export function ServiceWorkerUpdater() {
     checkForUpdates()
 
     // Check for updates every 30 seconds in development, every 5 minutes in production
-    const interval = process.env.NODE_ENV === 'development' ? 30000 : 300000
+    const interval = publicEnv.NODE_ENV === 'development' ? 30000 : 300000
     const updateInterval = setInterval(checkForUpdates, interval)
 
     // Also check when the page gains focus

@@ -1,13 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import { useSession } from '@clerk/nextjs'
 import { useMemo } from 'react'
+import { publicEnv } from '@/env'
 
 // Hook for client-side usage with Clerk (based on Clerk docs)
 export function useClerkSupabaseClient() {
   const { session } = useSession()
   
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = publicEnv.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase environment variables')
@@ -34,8 +35,8 @@ export function useClerkSupabaseClient() {
 
 // For server-side usage with Clerk
 export async function createClerkSupabaseClient(getToken: () => Promise<string | null>) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = publicEnv.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase environment variables')

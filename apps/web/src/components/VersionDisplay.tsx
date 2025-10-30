@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import { Badge } from "./ui/badge";
+import { publicEnv } from '@/env'
 
 interface VersionDisplayProps {
   className?: string;
@@ -14,7 +15,7 @@ export const VersionDisplay = React.memo(function VersionDisplay({
 
   const versionInfo = useMemo(
     () => ({
-      version: process.env.NEXT_PUBLIC_VERSION || process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0",
+      version: publicEnv.NEXT_PUBLIC_VERSION || publicEnv.NEXT_PUBLIC_APP_VERSION || "1.0.0",
     }),
     [],
   );

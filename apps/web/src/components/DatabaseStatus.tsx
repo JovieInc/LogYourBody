@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
+import { publicEnv } from '@/env'
 import { 
   Database, 
   CheckCircle, 
@@ -92,9 +93,9 @@ export function DatabaseStatus() {
     }
   }
 
-  const vercelEnv = process.env.NEXT_PUBLIC_VERCEL_ENV || 'development'
-  const hasSupabaseUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL
-  const hasSupabaseKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const vercelEnv = publicEnv.NEXT_PUBLIC_VERCEL_ENV || 'development'
+  const hasSupabaseUrl = !!publicEnv.NEXT_PUBLIC_SUPABASE_URL
+  const hasSupabaseKey = !!publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   return (
     <Card className="border-linear-border bg-linear-card/50 backdrop-blur-sm">
@@ -125,7 +126,7 @@ export function DatabaseStatus() {
           <div>
             <div className="text-xs text-linear-text-tertiary mb-1">Node Environment</div>
             <Badge variant="outline" className="text-xs">
-              {process.env.NODE_ENV || 'unknown'}
+              {publicEnv.NODE_ENV || 'unknown'}
             </Badge>
           </div>
         </div>
@@ -191,14 +192,14 @@ export function DatabaseStatus() {
               <div>
                 <span className="text-linear-text-tertiary">URL: </span>
                 <span className="text-linear-text font-mono text-[10px]">
-                  {process.env.NEXT_PUBLIC_SUPABASE_URL || 'Not set'}
+                  {publicEnv.NEXT_PUBLIC_SUPABASE_URL || 'Not set'}
                 </span>
               </div>
               <div>
                 <span className="text-linear-text-tertiary">Key: </span>
                 <span className="text-linear-text font-mono text-[10px]">
-                  {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 
-                    `${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 20)}...` : 
+                  {publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ?
+                    `${publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 20)}...` :
                     'Not set'}
                 </span>
               </div>
@@ -222,8 +223,8 @@ export function DatabaseStatus() {
             <div>
               <span className="text-linear-text-secondary font-medium">Environment Variables:</span>
               <div className="mt-1 space-y-1 text-linear-text-tertiary">
-                <div>VERCEL_ENV: {process.env.VERCEL_ENV || 'undefined'}</div>
-                <div>NODE_ENV: {process.env.NODE_ENV || 'undefined'}</div>
+                <div>VERCEL_ENV: {publicEnv.VERCEL_ENV || 'undefined'}</div>
+                <div>NODE_ENV: {publicEnv.NODE_ENV || 'undefined'}</div>
                 <div>NEXT_PUBLIC_SUPABASE_URL: {hasSupabaseUrl ? '✓ Set' : '✗ Missing'}</div>
                 <div>NEXT_PUBLIC_SUPABASE_ANON_KEY: {hasSupabaseKey ? '✓ Set' : '✗ Missing'}</div>
               </div>

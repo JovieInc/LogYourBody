@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
+import { publicEnv } from '@/env'
 
 export default function DebugAuthPage() {
   const { user, session, loading: authLoading } = useAuth()
@@ -109,8 +110,8 @@ export default function DebugAuthPage() {
             <CardTitle>Environment Check</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p><strong>NEXT_PUBLIC_SUPABASE_URL:</strong> {process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not Set'}</p>
-            <p><strong>NEXT_PUBLIC_SUPABASE_ANON_KEY:</strong> {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Not Set'}</p>
+            <p><strong>NEXT_PUBLIC_SUPABASE_URL:</strong> {publicEnv.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not Set'}</p>
+            <p><strong>NEXT_PUBLIC_SUPABASE_ANON_KEY:</strong> {publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Not Set'}</p>
           </CardContent>
         </Card>
       </div>

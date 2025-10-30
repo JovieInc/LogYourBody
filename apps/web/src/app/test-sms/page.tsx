@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { publicEnv } from '@/env'
 
 export default function TestSMSPage() {
   const [phone, setPhone] = useState('')
@@ -201,7 +202,7 @@ export default function TestSMSPage() {
           <div className="pt-4 border-t border-linear-border">
             <h3 className="text-sm font-medium text-linear-text mb-2">Test Information</h3>
             <ul className="space-y-1 text-xs text-linear-text-secondary">
-              <li>• Supabase URL: {process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 30)}...</li>
+              <li>• Supabase URL: {publicEnv.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 30)}...</li>
               <li>• SMS Provider: Twilio (configured in Supabase)</li>
               <li>• Auth Method: OTP via SMS</li>
               <li>• Session will be cleared after successful test</li>

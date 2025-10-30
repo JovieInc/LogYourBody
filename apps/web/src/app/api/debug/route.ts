@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
+import { publicEnv } from '@/env'
+import { serverEnv } from '@/env-server'
 
 export async function GET() {
   // Only show debug info in non-production or with a secret
-  const isDebugAllowed = process.env.NODE_ENV !== 'production' || 
-                        process.env.DEBUG_SECRET === 'your-secret-here'
+  const isDebugAllowed = publicEnv.NODE_ENV !== 'production' ||
+                        serverEnv.DEBUG_SECRET === 'your-secret-here'
   
   if (!isDebugAllowed) {
     return NextResponse.json({ error: 'Debug not allowed' }, { status: 403 })
@@ -11,13 +13,13 @@ export async function GET() {
   
   const debugInfo = {
     node_version: process.version,
-    vercel_env: process.env.VERCEL_ENV,
-    node_env: process.env.NODE_ENV,
-    has_supabase_url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-    has_anon_key: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    has_database_url: !!process.env.DATABASE_URL,
-    has_postgres_url: !!process.env.POSTGRES_URL,
-    build_target: process.env.BUILD_TARGET,
+    vercel_env: publicEnv.VERCEL_ENV,
+    node_env: publicEnv.NODE_ENV,
+    has_supabase_url: !!publicEnv.NEXT_PUBLIC_SUPABASE_URL,
+    has_anon_key: !!publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    has_database_url: !!serverEnv.DATABASE_URL,
+    has_postgres_url: !!serverEnv.POSTGRES_URL,
+    build_target: serverEnv.BUILD_TARGET,
     next_version: process.env.npm_package_dependencies_next || 'unknown',
   }
   

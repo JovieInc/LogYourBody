@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, Download, Mail, FileJson, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { MobileNavbar } from '@/components/MobileNavbar'
+import { publicEnv } from '@/env'
 
 export default function DataExportPage() {
   const { user } = useAuth()
@@ -28,7 +29,7 @@ export default function DataExportPage() {
     try {
       const token = await user.getToken()
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/export-user-data`, {
+      const response = await fetch(`${publicEnv.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/export-user-data`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

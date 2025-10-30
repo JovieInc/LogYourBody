@@ -1,6 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { publicEnv } from "@/env";
 
 interface StepContainerProps {
   children: React.ReactNode;
@@ -8,7 +9,7 @@ interface StepContainerProps {
 }
 
 export function StepContainer({ children, className }: StepContainerProps) {
-  const isTestEnv = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+  const isTestEnv = publicEnv.NODE_ENV === "test";
   
   return isTestEnv ? (
     <div className={cn("space-y-8", className)}>
@@ -43,7 +44,7 @@ export function StepHeader({
   iconColor = "text-linear-purple",
 }: StepHeaderProps) {
   // Use regular div in test environment to avoid motion prop warnings
-  const isTestEnv = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+  const isTestEnv = publicEnv.NODE_ENV === "test";
   
   return (
     <div className="space-y-4 text-center">
@@ -94,7 +95,7 @@ export function QuickPresets<T = unknown>({
   formatLabel = (preset) => preset.label,
   className,
 }: QuickPresetsProps<T>) {
-  const isTestEnv = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+  const isTestEnv = publicEnv.NODE_ENV === "test";
   
   const content = (
     <>
@@ -158,7 +159,7 @@ export function FormField({
   helper,
   className,
 }: FormFieldProps) {
-  const isTestEnv = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+  const isTestEnv = publicEnv.NODE_ENV === "test";
   
   const content = (
     <>

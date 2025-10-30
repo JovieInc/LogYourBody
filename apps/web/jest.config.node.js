@@ -8,6 +8,8 @@ const createJestConfig = nextJest({
 const nodeJestConfig = {
   testEnvironment: 'node',
   moduleNameMapper: {
+    '^@/env-server$': '<rootDir>/src/env-server',
+    '^@/env$': '<rootDir>/src/env',
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   testMatch: [

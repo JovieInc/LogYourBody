@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useResponsive } from "@/hooks/use-responsive";
 import { Dialog, DialogContent, DialogPortal, DialogOverlay, DialogTitle, DialogDescription } from "./dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { publicEnv } from "@/env"
 
 interface ResponsiveFlowWrapperProps {
   isOpen: boolean;
@@ -232,7 +233,7 @@ export function StepperActions({
 
         {/* Next/Complete Button */}
         {(() => {
-          const isTestEnv = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+          const isTestEnv = publicEnv.NODE_ENV === "test";
           const buttonProps = {
             onClick: onNext,
             disabled: !canGoNext,

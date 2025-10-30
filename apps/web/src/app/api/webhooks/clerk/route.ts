@@ -3,11 +3,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Webhook } from 'svix'
 import { WebhookEvent } from '@clerk/nextjs/server'
 import { createClient } from '@supabase/supabase-js'
+import { publicEnv } from '@/env'
+import { serverEnv } from '@/env-server'
 
 // Initialize Supabase Admin client (lazy initialization to prevent build errors)
 function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = publicEnv.NEXT_PUBLIC_SUPABASE_URL
+  const key = serverEnv.SUPABASE_SERVICE_ROLE_KEY
   
   if (!url || !key) {
     throw new Error('Missing Supabase environment variables')
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
   const body = JSON.stringify(payload)
 
   // Create a new Svix instance with your webhook secret
-  const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET || '')
+  const wh = new Webhook(serverEnv.CLERK_WEBHOOK_SECRET || '')
 
   let evt: WebhookEvent
 

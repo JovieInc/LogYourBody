@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { publicEnv } from '@/env'
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     // Set auth cookie
     response.cookies.set('auth-token', data.session?.access_token || '', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: publicEnv.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     })

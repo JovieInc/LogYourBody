@@ -1,7 +1,6 @@
 /**
  * @jest-environment node
  */
-import { POST } from '../route'
 import OpenAI from 'openai'
 
 // Mock Next.js server components
@@ -55,6 +54,10 @@ jest.mock('pdf-parse', () => {
 })
 
 describe('PDF Parsing API', () => {
+  const originalEnv = process.env
+
+  const loadRoute = async () => import('../route')
+
   const mockOpenAIResponse = (data: any) => {
     const mockCreate = jest.fn().mockResolvedValue({
       choices: [{
@@ -78,8 +81,14 @@ describe('PDF Parsing API', () => {
   }
 
   beforeEach(() => {
+    jest.resetModules()
     jest.clearAllMocks()
+    process.env = { ...originalEnv }
     process.env.OPENAI_API_KEY = 'test-api-key'
+  })
+
+  afterAll(() => {
+    process.env = originalEnv
   })
 
   describe('Single Scan Extraction', () => {
@@ -108,6 +117,7 @@ describe('PDF Parsing API', () => {
         body: formData
       })
 
+      const { POST } = await loadRoute()
       const response = await POST(request)
       const data = await response.json()
 
@@ -160,6 +170,7 @@ describe('PDF Parsing API', () => {
         body: formData
       })
 
+      const { POST } = await loadRoute()
       const response = await POST(request)
       const data = await response.json()
 
@@ -200,6 +211,7 @@ describe('PDF Parsing API', () => {
         body: formData
       })
 
+      const { POST } = await loadRoute()
       const response = await POST(request)
       const data = await response.json()
 
@@ -232,6 +244,7 @@ describe('PDF Parsing API', () => {
         body: formData
       })
 
+      const { POST } = await loadRoute()
       const response = await POST(request)
       const data = await response.json()
 
@@ -259,6 +272,7 @@ describe('PDF Parsing API', () => {
         body: formData
       })
 
+      const { POST } = await loadRoute()
       const response = await POST(request)
       const data = await response.json()
 
@@ -283,6 +297,7 @@ describe('PDF Parsing API', () => {
         body: formData
       })
 
+      const { POST } = await loadRoute()
       const response = await POST(request)
       const data = await response.json()
 
@@ -302,6 +317,7 @@ describe('PDF Parsing API', () => {
         body: formData
       })
 
+      const { POST } = await loadRoute()
       const response = await POST(request)
       const data = await response.json()
 
