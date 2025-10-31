@@ -8,6 +8,7 @@ import Combine
 // MARK: - Background Task Monitor
 
 /// Centralized service that monitors all background tasks and provides unified state
+@MainActor
 class BackgroundTaskMonitor: ObservableObject {
     static let shared = BackgroundTaskMonitor()
 
@@ -56,12 +57,14 @@ class BackgroundTaskMonitor: ObservableObject {
         bulkImportManager.$isImporting
             .combineLatest(
                 bulkImportManager.$overallProgress,
-                bulkImportManager.$completedCount,
-                bulkImportManager.$totalCount,
+                bulkImportManager.$importTasks,
                 bulkImportManager.$currentPhotoName
             )
-            .sink { [weak self] isImporting, progress, completed, total, photoName in
-                self?.updateImportingTask(
+            .sink { [weak self] isImporting, progress, tasks, photoName in
+                guard let self = self else { return }
+                let completed = tasks.filter { $0.status == .completed || $0.status == .failed }.count
+                let total = tasks.count
+                self.updateImportingTask(
                     isImporting: isImporting,
                     progress: progress,
                     completed: completed,
@@ -140,13 +143,13 @@ class BackgroundTaskMonitor: ObservableObject {
     private func updateUploadingTask(
         isUploading: Bool,
         progress: Double,
-        currentPhoto: PhotoUploadTask?,
+        currentPhoto: BackgroundPhotoUploadService.PhotoUploadTask?,
         queueCount: Int
     ) {
         removeTask(ofType: .uploading)
 
         if isUploading, let photo = currentPhoto {
-            let fileName = extractFileName(from: photo.metric.photoUrl)
+            let fileName = extractFileName(from: photo.photoUrl)
             let task = BackgroundTaskInfo(
                 type: .uploading,
                 title: "Uploading photo",
@@ -159,7 +162,7 @@ class BackgroundTaskMonitor: ObservableObject {
         }
     }
 
-    private func updateProcessingTask(activeCount: Int, tasks: [ProcessingTask]) {
+    private func updateProcessingTask(activeCount: Int, tasks: [ImageProcessingService.ProcessingTask]) {
         removeTask(ofType: .processing)
 
         if activeCount > 0 {

@@ -61,11 +61,14 @@ struct LoginForm: View {
             }
             
             // Login Button
-            DSAuthButton(
-                title: "Sign in",
-                style: .primary,
-                isLoading: isLoading,
-                isEnabled: isFormValid,
+            BaseButton(
+                "Sign in",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .white, foreground: .black),
+                    isLoading: isLoading,
+                    isEnabled: isFormValid,
+                    fullWidth: true
+                ),
                 action: onLogin
             )
             

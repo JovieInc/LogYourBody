@@ -45,11 +45,14 @@ struct VerificationForm: View {
             )
             
             // Verify Button
-            DSAuthButton(
-                title: "Verify",
-                style: .primary,
-                isLoading: isLoading,
-                isEnabled: verificationCode.count == 6,
+            BaseButton(
+                "Verify",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .white, foreground: .black),
+                    isLoading: isLoading,
+                    isEnabled: verificationCode.count == 6,
+                    fullWidth: true
+                ),
                 action: onVerify
             )
             

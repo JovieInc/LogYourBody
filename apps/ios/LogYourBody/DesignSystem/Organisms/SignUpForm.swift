@@ -103,11 +103,14 @@ struct SignUpForm: View {
             }
             
             // Sign Up Button
-            DSAuthButton(
-                title: "Create Account",
-                style: .primary,
-                isLoading: isLoading,
-                isEnabled: isFormValid,
+            BaseButton(
+                "Create Account",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .white, foreground: .black),
+                    isLoading: isLoading,
+                    isEnabled: isFormValid,
+                    fullWidth: true
+                ),
                 action: onSignUp
             )
             

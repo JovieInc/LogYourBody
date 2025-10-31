@@ -36,11 +36,18 @@ struct DSAuthDivider: View {
 #Preview {
     VStack(spacing: 40) {
         DSAuthDivider()
-        
+
         DSAuthDivider(text: "or continue with")
-        
+
         VStack(spacing: 16) {
-            DSAuthButton(title: "Sign In", action: {})
+            BaseButton(
+                "Sign In",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .white, foreground: .black),
+                    fullWidth: true
+                ),
+                action: {}
+            )
             DSAuthDivider()
             SocialLoginButton(provider: .apple, action: {})
         }

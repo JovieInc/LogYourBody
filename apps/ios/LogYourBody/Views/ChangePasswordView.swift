@@ -142,24 +142,16 @@ struct ChangePasswordView: View {
                     }
                     
                     // Submit Button
-                    Button(action: changePassword) {
-                        HStack {
-                            if isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            } else {
-                                Text("Update Password")
-                                    .fontWeight(.semibold)
-                            }
-                        }
-                        .frame(height: 48)
-                        .frame(maxWidth: .infinity)
-                        .foregroundColor(.white)
-                    }
-                    .background(isValidForm ? Color.appPrimary : Color.gray)
-                    .cornerRadius(SettingsDesign.cornerRadius)
-                    .disabled(!isValidForm || isLoading)
+                    BaseButton(
+                        "Update Password",
+                        configuration: ButtonConfiguration(
+                            style: isValidForm ? .custom(background: .appPrimary, foreground: .white) : .custom(background: .gray, foreground: .white),
+                            isLoading: isLoading,
+                            isEnabled: isValidForm,
+                            fullWidth: true
+                        ),
+                        action: changePassword
+                    )
                     .animation(.easeInOut(duration: 0.2), value: isValidForm)
                     .padding(.horizontal, 20)
                     .padding(.top, 20)

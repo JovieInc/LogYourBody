@@ -146,7 +146,7 @@ struct DashboardTaskBanner: View {
         }
         .onLongPressGesture {
             if task.canCancel {
-                HapticManager.shared.impact()
+                HapticManager.shared.toggleChanged()
                 showCancelConfirmation = true
             }
         }
