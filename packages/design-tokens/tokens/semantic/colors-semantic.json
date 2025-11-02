@@ -1,0 +1,79 @@
+{
+  "comment": "Semantic color mappings that reference core colors",
+  "color": {
+    "action": {
+      "primary": {
+        "default": {
+          "value": "{color.semantic.primary}",
+          "comment": "Primary action color"
+        },
+        "hover": {
+          "value": "{color.semantic.primaryHover}",
+          "comment": "Primary action hover state"
+        }
+      },
+      "destructive": {
+        "default": {
+          "value": "{color.semantic.error}",
+          "comment": "Destructive action color"
+        },
+        "hover": {
+          "value": "{color.semantic.errorHover}",
+          "comment": "Destructive action hover state"
+        }
+      }
+    },
+    "status": {
+      "success": {
+        "value": "{color.semantic.success}",
+        "comment": "Success state color"
+      },
+      "warning": {
+        "value": "{color.semantic.warning}",
+        "comment": "Warning state color"
+      },
+      "error": {
+        "value": "{color.semantic.error}",
+        "comment": "Error state color"
+      },
+      "info": {
+        "value": "{color.semantic.primary}",
+        "comment": "Info state color"
+      }
+    },
+    "ui": {
+      "background": {
+        "primary": {
+          "value": "{color.semantic.background}",
+          "comment": "Primary background"
+        },
+        "secondary": {
+          "value": "{color.semantic.card}",
+          "comment": "Secondary background (cards)"
+        },
+        "tertiary": {
+          "value": "{color.semantic.border}",
+          "comment": "Tertiary background"
+        }
+      },
+      "foreground": {
+        "primary": {
+          "value": "{color.semantic.text.primary}",
+          "comment": "Primary text"
+        },
+        "secondary": {
+          "value": "{color.semantic.text.secondary}",
+          "comment": "Secondary text"
+        },
+        "tertiary": {
+          "value": "{color.semantic.text.tertiary}",
+          "comment": "Tertiary text"
+        },
+        "disabled": {
+          "value": "{color.semantic.text.disabled}",
+          "comment": "Disabled text"
+        }
+      }
+    }
+  }
+}

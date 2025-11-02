@@ -48,10 +48,12 @@ struct ErrorStateView: View {
             }
             
             // Action Button
-            DSButton(
-                title: buttonTitle,
-                style: .primary,
-                size: .medium,
+            BaseButton(
+                buttonTitle,
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .white, foreground: .black),
+                    size: .medium
+                ),
                 action: buttonAction
             )
         }

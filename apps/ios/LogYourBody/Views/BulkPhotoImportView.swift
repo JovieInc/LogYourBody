@@ -138,33 +138,28 @@ struct BulkPhotoImportView: View {
             Spacer()
             
             VStack(spacing: 12) {
-                Button(
-            action: {
-                    showWelcomeScreen = false
-                    hasStartedScan = true
-                    checkPermissionAndScan()
-                },
-            label: {
-                    Text("Start Scanning")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Color.appPrimary)
-                        .cornerRadius(12)
-                }
-        )
-                
-                Button(
-            action: {
-                    dismiss()
-                },
-            label: {
-                    Text("Cancel")
-                        .font(.system(size: 17))
-                        .foregroundColor(.appTextSecondary)
-                }
-        )
+                BaseButton(
+                    "Start Scanning",
+                    configuration: ButtonConfiguration(
+                        style: .custom(background: .appPrimary, foreground: .white),
+                        fullWidth: true
+                    ),
+                    action: {
+                        showWelcomeScreen = false
+                        hasStartedScan = true
+                        checkPermissionAndScan()
+                    }
+                )
+
+                BaseButton(
+                    "Cancel",
+                    configuration: ButtonConfiguration(
+                        style: .tertiary
+                    ),
+                    action: {
+                        dismiss()
+                    }
+                )
             }
             .padding(.horizontal)
             .padding(.bottom, 40)
@@ -201,28 +196,24 @@ struct BulkPhotoImportView: View {
             }
             
             Spacer()
-            
-            Button(
-            action: {
-                Task {
-                    let authorized = await scanner.requestAuthorization()
-                    if authorized {
-                        await scanner.scanPhotoLibrary()
-                    } else {
-                        showPermissionAlert = true
+
+            BaseButton(
+                "Allow Access",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .appPrimary, foreground: .white),
+                    fullWidth: true
+                ),
+                action: {
+                    Task {
+                        let authorized = await scanner.requestAuthorization()
+                        if authorized {
+                            await scanner.scanPhotoLibrary()
+                        } else {
+                            showPermissionAlert = true
+                        }
                     }
                 }
-            },
-            label: {
-                Text("Allow Access")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color.appPrimary)
-                    .cornerRadius(12)
-            }
-        )
+            )
             .padding(.horizontal)
             .padding(.bottom, 40)
         }
@@ -251,23 +242,19 @@ struct BulkPhotoImportView: View {
             }
             
             Spacer()
-            
-            Button(
-            action: {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
+
+            BaseButton(
+                "Open Settings",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .appPrimary, foreground: .white),
+                    fullWidth: true
+                ),
+                action: {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
                 }
-            },
-            label: {
-                Text("Open Settings")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color.appPrimary)
-                    .cornerRadius(12)
-            }
-        )
+            )
             .padding(.horizontal)
             .padding(.bottom, 40)
         }
@@ -316,18 +303,17 @@ struct BulkPhotoImportView: View {
             }
             
             Spacer()
-            
-            Button(
-            action: {
-                scanner.cancelScan()
-                dismiss()
-            },
-            label: {
-                Text("Cancel")
-                    .font(.system(size: 17))
-                    .foregroundColor(.appTextSecondary)
-            }
-        )
+
+            BaseButton(
+                "Cancel",
+                configuration: ButtonConfiguration(
+                    style: .tertiary
+                ),
+                action: {
+                    scanner.cancelScan()
+                    dismiss()
+                }
+            )
             .padding(.bottom, 40)
         }
     }
@@ -355,21 +341,17 @@ struct BulkPhotoImportView: View {
             }
             
             Spacer()
-            
-            Button(
-            action: {
-                dismiss()
-            },
-            label: {
-                Text("Done")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color.appPrimary)
-                    .cornerRadius(12)
-            }
-        )
+
+            BaseButton(
+                "Done",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .appPrimary, foreground: .white),
+                    fullWidth: true
+                ),
+                action: {
+                    dismiss()
+                }
+            )
             .padding(.horizontal)
             .padding(.bottom, 40)
         }
@@ -415,23 +397,17 @@ struct BulkPhotoImportView: View {
                 VStack(spacing: 0) {
                     Divider()
                     
-                    Button(
-            action: {
-                        showImportConfirmation = true
-                    },
-            label: {
-                        HStack {
-                            Image(systemName: "square.and.arrow.down")
-                            Text("Import \(selectedCount) Photo\(selectedCount == 1 ? "" : "s")")
+                    BaseButton(
+                        "Import \(selectedCount) Photo\(selectedCount == 1 ? "" : "s")",
+                        configuration: ButtonConfiguration(
+                            style: .custom(background: .appPrimary, foreground: .white),
+                            fullWidth: true,
+                            icon: "square.and.arrow.down"
+                        ),
+                        action: {
+                            showImportConfirmation = true
                         }
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Color.appPrimary)
-                        .cornerRadius(12)
-                    }
-        )
+                    )
                     .padding()
                     .background(Color.appCard)
                 }
@@ -481,17 +457,16 @@ struct BulkPhotoImportView: View {
             }
             
             Spacer()
-            
-            Button(
-            action: {
-                dismiss()
-            },
-            label: {
-                Text("Continue in Background")
-                    .font(.system(size: 17))
-                    .foregroundColor(.appPrimary)
-            }
-        )
+
+            BaseButton(
+                "Continue in Background",
+                configuration: ButtonConfiguration(
+                    style: .tertiary
+                ),
+                action: {
+                    dismiss()
+                }
+            )
             .padding(.bottom, 40)
         }
     }

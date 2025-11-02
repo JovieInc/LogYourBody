@@ -22,25 +22,20 @@ struct AuthFormField: View {
             Text(label)
                 .font(.system(size: 14))
                 .foregroundColor(.appTextSecondary)
-            
+
             // Input Field
-            if isSecure {
-                DSSecureField(
-                    text: $text,
-                    placeholder: placeholder.isEmpty ? label : placeholder,
-                    textContentType: textContentType,
-                    isDisabled: isDisabled
-                )
-            } else {
-                DSTextField(
-                    text: $text,
-                    placeholder: placeholder.isEmpty ? label : placeholder,
-                    keyboardType: keyboardType,
-                    textContentType: textContentType,
-                    autocapitalization: autocapitalization,
-                    isDisabled: isDisabled
-                )
-            }
+            BaseTextField(
+                text: $text,
+                placeholder: placeholder.isEmpty ? label : placeholder,
+                configuration: TextFieldConfiguration(
+                    isSecure: isSecure,
+                    showToggle: isSecure
+                ),
+                keyboardType: keyboardType,
+                textContentType: textContentType,
+                autocapitalization: autocapitalization
+            )
+            .disabled(isDisabled)
         }
     }
 }

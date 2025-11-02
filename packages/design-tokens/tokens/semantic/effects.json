@@ -1,0 +1,64 @@
+{
+  "glass": {
+    "blur": {
+      "value": "ultraThinMaterial",
+      "comment": "iOS Material type for glassmorphism blur"
+    },
+    "opacity": {
+      "value": "0.8",
+      "comment": "Base opacity for glass effect"
+    },
+    "border": {
+      "width": {
+        "value": "0.5",
+        "comment": "Border width for glass containers"
+      },
+      "opacity": {
+        "value": "0.15",
+        "comment": "Border opacity (white overlay)"
+      }
+    },
+    "background": {
+      "opacity": {
+        "value": "0.05",
+        "comment": "Background overlay opacity"
+      }
+    }
+  },
+  "backdrop": {
+    "blur": {
+      "sm": {
+        "value": "8",
+        "comment": "Small blur - 8px (web)"
+      },
+      "md": {
+        "value": "16",
+        "comment": "Medium blur - 16px (web)"
+      },
+      "lg": {
+        "value": "24",
+        "comment": "Large blur - 24px (web)"
+      },
+      "xl": {
+        "value": "32",
+        "comment": "Extra large blur - 32px (web)"
+      }
+    }
+  },
+  "opacity": {
+    "overlay": {
+      "light": {
+        "value": "0.05",
+        "comment": "Light overlay"
+      },
+      "medium": {
+        "value": "0.1",
+        "comment": "Medium overlay"
+      },
+      "dark": {
+        "value": "0.2",
+        "comment": "Dark overlay"
+      }
+    }
+  }
+}

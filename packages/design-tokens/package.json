@@ -1,0 +1,41 @@
+{
+  "name": "@logyourbody/design-tokens",
+  "version": "1.0.0",
+  "description": "Shared design tokens for iOS and Web platforms",
+  "type": "module",
+  "main": "build/web/tokens.js",
+  "types": "build/web/tokens.d.ts",
+  "files": [
+    "build",
+    "tokens"
+  ],
+  "scripts": {
+    "build": "npm run build:ios && npm run build:web",
+    "build:ios": "node scripts/build-ios.js",
+    "build:web": "node scripts/build-web.js",
+    "build:all": "npm run build",
+    "watch": "nodemon --watch tokens --exec npm run build",
+    "validate": "node scripts/validate-tokens.js",
+    "test": "npm run validate",
+    "clean": "rm -rf build"
+  },
+  "dependencies": {
+    "style-dictionary": "^4.2.0"
+  },
+  "devDependencies": {
+    "chroma-js": "^3.1.1",
+    "nodemon": "^3.1.7"
+  },
+  "keywords": [
+    "design-tokens",
+    "design-system",
+    "style-dictionary",
+    "ios",
+    "web",
+    "swiftui",
+    "tailwind"
+  ],
+  "author": "LogYourBody",
+  "license": "UNLICENSED",
+  "private": true
+}

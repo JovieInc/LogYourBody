@@ -7,17 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */; };
 		02FF59428632FBC25F9456AA /* DSCircularProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEFB36F814C3D7E8AE709B4 /* DSCircularProgress.swift */; };
 		0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A5D6BAAD9FB2F7B8AFACB /* BaseButton.swift */; };
 		0DAECF9694453077367DCB0E /* Font+Custom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CA7B3D87EC0BFA00AC6A9F /* Font+Custom.swift */; };
 		11129CEC79A594A3564C81AE /* CompactMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 524C903734E2308C8A35B5B7 /* CompactMetricCard.swift */; };
+		1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */; };
 		18A6F3A9477330EC42DC0665 /* DashboardContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C4817DC7BA2D43606C0D8CB /* DashboardContent.swift */; };
 		28D96935970646462EC376F4 /* DSTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 564FBAB78ABE3EBE48189BF8 /* DSTextField.swift */; };
+		2B3C4D5E6F7890ABCDEF1234 /* LoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */; };
 		3CD3199B3979B906B642DB4E /* LegalDocumentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCD81BE70A7B449921973AEA /* LegalDocumentRow.swift */; };
 		3E3EA4841197E3CDEC1064A9 /* DSAuthButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B888A15870B6A31C76F2AB16 /* DSAuthButton.swift */; };
 		43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */; };
 		4C2DA948F919366D436CEF26 /* DSIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458AAF24645E3634CCF88E16 /* DSIcon.swift */; };
+		4DF78B8A5B5E0DBAF777CBC1 /* DSLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = FECEBC7B2B956D26BF45822F /* DSLogo.swift */; };
 		5763B6723CDF6F551543599B /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4590E4EDF067461157CAE028 /* ErrorStateView.swift */; };
 		5952A0969501ACC7277BE893 /* View+Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4BF04D15583E3AE1CA4A836 /* View+Styles.swift */; };
 		5B2F64647650AAF5937280BD /* DSDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2465B2ED058FAFC5389161E /* DSDivider.swift */; };
@@ -54,6 +56,12 @@
 		AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30A62E1490810072AA5B /* LogYourBodyTests.swift */; };
 		AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */; };
 		AD7D30B32E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */; };
+		AD8872312EB4050B0041C426 /* LiquidGlassCTAButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */; };
+		AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872322EB405C00041C426 /* BackgroundTaskType.swift */; };
+		AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */; };
+		AD8872372EB406430041C426 /* BackgroundTaskDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */; };
+		AD8872392EB4066D0041C426 /* AnimatedTaskIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872382EB4066D0041C426 /* AnimatedTaskIcon.swift */; };
+		AD88723B2EB4068D0041C426 /* DashboardTaskBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88723A2EB4068D0041C426 /* DashboardTaskBanner.swift */; };
 		ADDC479D2E2D89F3003C97E7 /* AuthComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F22E22EE9D00B82C49 /* AuthComponents.swift */; };
 		ADDC479E2E2D89F3003C97E7 /* CommonComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */; };
 		ADDC479F2E2D89F3003C97E7 /* ImageProcessingStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F42E22EE9D00B82C49 /* ImageProcessingStatusView.swift */; };
@@ -129,11 +137,11 @@
 		ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B0E2E15FA5C002376C6 /* ContentView.swift */; };
 		ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B122E15FA5C002376C6 /* LogYourBodyApp.swift */; };
 		ADDC47F72E2D89F3003C97E7 /* AnimatedTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D38B2E24A948001F82A8 /* AnimatedTabView.swift */; };
-		ADDC47F82E2D89F3003C97E7 /* DashboardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B002E25B10100123456 /* DashboardComponents.swift */; };
-		ADDC47F92E2D89F3003C97E7 /* DashboardMetricCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */; };
+		ADDC47F82E2D89F3003C97E7 /* Components/DashboardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */; };
+		ADDC47F92E2D89F3003C97E7 /* Components/DashboardMetricCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B022E25B10200123456 /* Components/DashboardMetricCards.swift */; };
 		ADDC47FA2E2D89F3003C97E7 /* DietPhaseCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D38C2E24A948001F82A8 /* DietPhaseCard.swift */; };
 		ADDC47FC2E2D89F3003C97E7 /* LiquidGlassTimelineSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D38E2E24A948001F82A8 /* LiquidGlassTimelineSlider.swift */; };
-		ADDC47FD2E2D89F3003C97E7 /* PhotoAnchoredTimelineSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B0A2E25B10600123456 /* PhotoAnchoredTimelineSlider.swift */; };
+		ADDC47FD2E2D89F3003C97E7 /* Components/PhotoAnchoredTimelineSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B0A2E25B10600123456 /* Components/PhotoAnchoredTimelineSlider.swift */; };
 		ADDC47FE2E2D89F3003C97E7 /* SkeletonLoaders.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */; };
 		ADDC47FF2E2D89F3003C97E7 /* UIComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA923002E22EF4600B82C49 /* UIComponents.swift */; };
 		ADDC486A2E2D8A4C003C97E7 /* ccpa-compliance.md in Resources */ = {isa = PBXBuildFile; fileRef = ADDC48672E2D8A4C003C97E7 /* ccpa-compliance.md */; };
@@ -164,6 +172,7 @@
 		BF2DBFBAC3B2277AE19EDC3D /* DeveloperTapHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0401CF23AE214F20C7EB5886 /* DeveloperTapHandler.swift */; };
 		C00904926079E360A71A9DC6 /* MetricGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */; };
 		C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED9F05E697F00813F824903 /* LogoutButton.swift */; };
+		CCE3FEEC83AAC1B3F1F82BF6 /* DSProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18AA7A0EC7327CC6EB9725D /* DSProgressBar.swift */; };
 		CFEBF01684AD95AF515DFF59 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82670AD733C4BBFF727489CC /* MarkdownView.swift */; };
 		DD2B2C6E766FCD6E60668009 /* LoginForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0FE397063AA257AA67F731 /* LoginForm.swift */; };
 		E0E380C2E78BD2BAC87480ED /* DSAuthLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EF9F0EEBB2D999F7FEEF7D0 /* DSAuthLink.swift */; };
@@ -173,14 +182,10 @@
 		EC7E97F84940FD554A7EB5A1 /* UserGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03041E8A638B1A252407398 /* UserGreeting.swift */; };
 		F032D524300252FDE4C30601 /* SignUpForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2013EF479280EB0CB67121E /* SignUpForm.swift */; };
 		F0451813784DE99328797E5F /* DSText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05F19CFBFEA440516AFCE98B /* DSText.swift */; };
-		4DF78B8A5B5E0DBAF777CBC1 /* DSLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = FECEBC7B2B956D26BF45822F /* DSLogo.swift */; };
-		CCE3FEEC83AAC1B3F1F82BF6 /* DSProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18AA7A0EC7327CC6EB9725D /* DSProgressBar.swift */; };
 		F0A6090ABF6B0497684F9816 /* DSLoadingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D90F6DA60C58AF02CF23737 /* DSLoadingIndicator.swift */; };
 		F44F78267E1DBA90010176C1 /* Color+Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD667EA50710CE217FD95E4C /* Color+Theme.swift */; };
 		FE28F6428506E763B1BD001E /* AuthConsentCheckbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1424DF5DCE3F9859106AB687 /* AuthConsentCheckbox.swift */; };
-
-		2B3C4D5E6F7890ABCDEF1234 /* LoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */; };
-		/* End PBXBuildFile section */
+/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		AD7D30A32E1490810072AA5B /* PBXContainerItemProxy */ = {
@@ -206,7 +211,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Sources */,
+				1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -221,12 +226,14 @@
 		0D90F6DA60C58AF02CF23737 /* DSLoadingIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLoadingIndicator.swift; path = DesignSystem/Atoms/DSLoadingIndicator.swift; sourceTree = "<group>"; };
 		1424DF5DCE3F9859106AB687 /* AuthConsentCheckbox.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthConsentCheckbox.swift; path = DesignSystem/Molecules/AuthConsentCheckbox.swift; sourceTree = "<group>"; };
 		1A28294A184FBD2E6E0D43EF /* DocumentHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DocumentHeader.swift; path = DesignSystem/Molecules/DocumentHeader.swift; sourceTree = "<group>"; };
+		1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LoadingScreen.swift; path = DesignSystem/Organisms/LoadingScreen.swift; sourceTree = "<group>"; };
 		22BF10E43507028B75EE0B6B /* OTPField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OTPField.swift; path = DesignSystem/Molecules/OTPField.swift; sourceTree = "<group>"; };
 		28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricGauge.swift; path = DesignSystem/Molecules/MetricGauge.swift; sourceTree = "<group>"; };
 		2C4A969A7EF2C7FA9661D869 /* DSMetricLabel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSMetricLabel.swift; path = DesignSystem/Atoms/DSMetricLabel.swift; sourceTree = "<group>"; };
 		458AAF24645E3634CCF88E16 /* DSIcon.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSIcon.swift; path = DesignSystem/Atoms/DSIcon.swift; sourceTree = "<group>"; };
 		4590E4EDF067461157CAE028 /* ErrorStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ErrorStateView.swift; path = DesignSystem/Molecules/ErrorStateView.swift; sourceTree = "<group>"; };
 		524C903734E2308C8A35B5B7 /* CompactMetricCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CompactMetricCard.swift; path = DesignSystem/Molecules/CompactMetricCard.swift; sourceTree = "<group>"; };
+		53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiquidGlassCTAButton.swift; path = DesignSystem/Molecules/LiquidGlassCTAButton.swift; sourceTree = "<group>"; };
 		55090E3269B8A8F8E45E46D0 /* SecondaryMetricsRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SecondaryMetricsRow.swift; path = DesignSystem/Organisms/SecondaryMetricsRow.swift; sourceTree = "<group>"; };
 		564FBAB78ABE3EBE48189BF8 /* DSTextField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSTextField.swift; path = DesignSystem/Atoms/DSTextField.swift; sourceTree = "<group>"; };
 		629DBB90EB2F0C9F3D9D1105 /* VerificationForm.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VerificationForm.swift; path = DesignSystem/Organisms/VerificationForm.swift; sourceTree = "<group>"; };
@@ -239,12 +246,9 @@
 		7EF9F0EEBB2D999F7FEEF7D0 /* DSAuthLink.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAuthLink.swift; path = DesignSystem/Atoms/DSAuthLink.swift; sourceTree = "<group>"; };
 		82670AD733C4BBFF727489CC /* MarkdownView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MarkdownView.swift; path = DesignSystem/Organisms/MarkdownView.swift; sourceTree = "<group>"; };
 		898E428E2D5EE162E00B0BD7 /* DashboardHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DashboardHeader.swift; path = DesignSystem/Organisms/DashboardHeader.swift; sourceTree = "<group>"; };
-		1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LoadingScreen.swift; path = DesignSystem/Organisms/LoadingScreen.swift; sourceTree = "<group>"; };
-		590EB16B38AD87410DF504FE /* LiquidGlassTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiquidGlassTabBar.swift; path = DesignSystem/Organisms/LiquidGlassTabBar.swift; sourceTree = "<group>"; };
 		9C89CCE0BFAE9B2ACB9A017B /* UserHeaderSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserHeaderSection.swift; path = DesignSystem/Organisms/UserHeaderSection.swift; sourceTree = "<group>"; };
 		9ED9F05E697F00813F824903 /* LogoutButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogoutButton.swift; path = DesignSystem/Molecules/LogoutButton.swift; sourceTree = "<group>"; };
 		9F3E230F03B9DA06BCAA669D /* MetricCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricCard.swift; path = DesignSystem/Molecules/MetricCard.swift; sourceTree = "<group>"; };
-		53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiquidGlassCTAButton.swift; path = DesignSystem/Molecules/LiquidGlassCTAButton.swift; sourceTree = "<group>"; };
 		A65AF31E24C0B8890ABB203D /* SocialLoginButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SocialLoginButton.swift; path = DesignSystem/Molecules/SocialLoginButton.swift; sourceTree = "<group>"; };
 		AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PasswordStrengthIndicator.swift; path = DesignSystem/Molecules/PasswordStrengthIndicator.swift; sourceTree = "<group>"; };
 		AC342BAC136CCEE0B4EF74A2 /* DSSecureField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSSecureField.swift; path = DesignSystem/Atoms/DSSecureField.swift; sourceTree = "<group>"; };
@@ -266,12 +270,12 @@
 		AD3B4C5E2E25A7B100123456 /* DietPhaseHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietPhaseHistoryView.swift; sourceTree = "<group>"; };
 		AD3E4F642E17A12300345678 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		AD4F5E7A2E18C23400456789 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
-		AD5C4B002E25B10100123456 /* DashboardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardComponents.swift; sourceTree = "<group>"; };
-		AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardMetricCards.swift; sourceTree = "<group>"; };
+		AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardComponents.swift; sourceTree = "<group>"; };
+		AD5C4B022E25B10200123456 /* Components/DashboardMetricCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardMetricCards.swift; sourceTree = "<group>"; };
 		AD5C4B042E25B10300123456 /* DashboardView+Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardView+Views.swift"; sourceTree = "<group>"; };
 		AD5C4B062E25B10400123456 /* DashboardView+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardView+Helpers.swift"; sourceTree = "<group>"; };
 		AD5C4B082E25B10500123456 /* DashboardView+Calculations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardView+Calculations.swift"; sourceTree = "<group>"; };
-		AD5C4B0A2E25B10600123456 /* PhotoAnchoredTimelineSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/PhotoAnchoredTimelineSlider.swift; sourceTree = "<group>"; };
+		AD5C4B0A2E25B10600123456 /* Components/PhotoAnchoredTimelineSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/PhotoAnchoredTimelineSlider.swift; sourceTree = "<group>"; };
 		AD722F0E2E15FA5A002376C6 /* delete_files.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = delete_files.sh; sourceTree = "<group>"; };
 		AD722F0F2E15FA5A002376C6 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		AD722F102E15FA5A002376C6 /* icon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "icon-1024.png"; sourceTree = "<group>"; };
@@ -349,6 +353,11 @@
 		AD8552702E19E4DF003552EE /* WhatsNewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewView.swift; sourceTree = "<group>"; };
 		AD85527E2E1C3653003552EE /* PhotoUploadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUploadManager.swift; sourceTree = "<group>"; };
 		AD8552932E1CC15B003552EE /* BackgroundRemovalService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundRemovalService.swift; sourceTree = "<group>"; };
+		AD8872322EB405C00041C426 /* BackgroundTaskType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskType.swift; sourceTree = "<group>"; };
+		AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskMonitor.swift; sourceTree = "<group>"; };
+		AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskDetailsSheet.swift; sourceTree = "<group>"; };
+		AD8872382EB4066D0041C426 /* AnimatedTaskIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedTaskIcon.swift; sourceTree = "<group>"; };
+		AD88723A2EB4068D0041C426 /* DashboardTaskBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardTaskBanner.swift; sourceTree = "<group>"; };
 		AD933DFA2E24328A00801078 /* DietPhaseHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietPhaseHistoryView.swift; sourceTree = "<group>"; };
 		AD933DFC2E249DAD00801078 /* BulkPhotoImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkPhotoImportView.swift; sourceTree = "<group>"; };
 		AD933DFE2E249EA000801078 /* BulkImportManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkImportManager.swift; sourceTree = "<group>"; };
@@ -439,17 +448,16 @@
 		CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BaseTextField.swift; path = DesignSystem/Atoms/BaseTextField.swift; sourceTree = "<group>"; };
 		D03041E8A638B1A252407398 /* UserGreeting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserGreeting.swift; path = DesignSystem/Molecules/UserGreeting.swift; sourceTree = "<group>"; };
 		D0D288685A7D97CBCF127A7B /* DSMetricValue.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSMetricValue.swift; path = DesignSystem/Atoms/DSMetricValue.swift; sourceTree = "<group>"; };
+		D18AA7A0EC7327CC6EB9725D /* DSProgressBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSProgressBar.swift; path = DesignSystem/Atoms/DSProgressBar.swift; sourceTree = "<group>"; };
 		E2465B2ED058FAFC5389161E /* DSDivider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSDivider.swift; path = DesignSystem/Atoms/DSDivider.swift; sourceTree = "<group>"; };
 		E2AC3C23E6923176F103B414 /* StepsIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StepsIndicator.swift; path = DesignSystem/Molecules/StepsIndicator.swift; sourceTree = "<group>"; };
 		E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAvatar.swift; path = DesignSystem/Atoms/DSAvatar.swift; sourceTree = "<group>"; };
-		FECEBC7B2B956D26BF45822F /* DSLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLogo.swift; path = DesignSystem/Atoms/DSLogo.swift; sourceTree = "<group>"; };
-		D18AA7A0EC7327CC6EB9725D /* DSProgressBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSProgressBar.swift; path = DesignSystem/Atoms/DSProgressBar.swift; sourceTree = "<group>"; };
 		EBA1CD2B48A471ACA4D8CD1A /* DeveloperToolsList.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeveloperToolsList.swift; path = DesignSystem/Organisms/DeveloperToolsList.swift; sourceTree = "<group>"; };
 		F2013EF479280EB0CB67121E /* SignUpForm.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SignUpForm.swift; path = DesignSystem/Organisms/SignUpForm.swift; sourceTree = "<group>"; };
 		F26BF217DF4BEE2BDB74046C /* DSButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSButton.swift; path = DesignSystem/Atoms/DSButton.swift; sourceTree = "<group>"; };
 		FB947FE422689993FD02B4F6 /* AuthHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthHeader.swift; path = DesignSystem/Molecules/AuthHeader.swift; sourceTree = "<group>"; };
 		FD8E482BE1E84E0DEAF9819D /* LegalSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LegalSection.swift; path = DesignSystem/Organisms/LegalSection.swift; sourceTree = "<group>"; };
-
+		FECEBC7B2B956D26BF45822F /* DSLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLogo.swift; path = DesignSystem/Atoms/DSLogo.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -525,11 +533,11 @@
 			isa = PBXGroup;
 			children = (
 				ADE6D38B2E24A948001F82A8 /* AnimatedTabView.swift */,
-				AD5C4B002E25B10100123456 /* DashboardComponents.swift */,
-				AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */,
+				AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */,
+				AD5C4B022E25B10200123456 /* Components/DashboardMetricCards.swift */,
 				ADE6D38C2E24A948001F82A8 /* DietPhaseCard.swift */,
 				ADE6D38E2E24A948001F82A8 /* LiquidGlassTimelineSlider.swift */,
-				AD5C4B0A2E25B10600123456 /* PhotoAnchoredTimelineSlider.swift */,
+				AD5C4B0A2E25B10600123456 /* Components/PhotoAnchoredTimelineSlider.swift */,
 				C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */,
 				ADA923012E22EF4600B82C49 /* Common */,
 			);
@@ -555,8 +563,8 @@
 				524C903734E2308C8A35B5B7 /* CompactMetricCard.swift */,
 				E2AC3C23E6923176F103B414 /* StepsIndicator.swift */,
 				D03041E8A638B1A252407398 /* UserGreeting.swift */,
-				28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */,				53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */,
-
+				28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */,
+				53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */,
 			);
 			name = Molecules;
 			sourceTree = "<group>";
@@ -650,6 +658,11 @@
 				AD723AD92E15FA5C002376C6 /* OnboardingData.swift */,
 				AD723ADA2E15FA5C002376C6 /* User.swift */,
 				AD723ADB2E15FA5C002376C6 /* WeightEntry.swift */,
+				AD8872322EB405C00041C426 /* BackgroundTaskType.swift */,
+				AD8872382EB4066D0041C426 /* AnimatedTaskIcon.swift */,
+				AD88723A2EB4068D0041C426 /* DashboardTaskBanner.swift */,
+				AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */,
+				AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -927,7 +940,8 @@
 		};
 		C256EDBE5EC0EF18CBEB8B16 /* Organisms */ = {
 			isa = PBXGroup;
-			children = (9C89CCE0BFAE9B2ACB9A017B /* UserHeaderSection.swift */,
+			children = (
+				9C89CCE0BFAE9B2ACB9A017B /* UserHeaderSection.swift */,
 				EBA1CD2B48A471ACA4D8CD1A /* DeveloperToolsList.swift */,
 				FD8E482BE1E84E0DEAF9819D /* LegalSection.swift */,
 				82670AD733C4BBFF727489CC /* MarkdownView.swift */,
@@ -939,7 +953,8 @@
 				B1CDBFA72287938694EB369D /* CoreMetricsRow.swift */,
 				55090E3269B8A8F8E45E46D0 /* SecondaryMetricsRow.swift */,
 				6C4817DC7BA2D43606C0D8CB /* DashboardContent.swift */,
-				1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */,);
+				1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */,
+			);
 			name = Organisms;
 			sourceTree = "<group>";
 		};
@@ -1098,8 +1113,9 @@
 		AD7D309E2E1490810072AA5B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */,
-);
+			files = (
+				AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AD7D30A82E1490810072AA5B /* Sources */ = {
@@ -1135,6 +1151,7 @@
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
 				ADDC487C2E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift in Sources */,
 				ADDC487D2E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift in Sources */,
+				AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */,
 				ADDC487E2E2D8A6B003C97E7 /* DashboardViewV2.swift in Sources */,
 				ADDC487F2E2D8A6B003C97E7 /* CameraView.swift in Sources */,
 				ADDC48802E2D8A6B003C97E7 /* ChangePasswordView.swift in Sources */,
@@ -1203,17 +1220,19 @@
 				ADDC47E92E2D89F3003C97E7 /* LoginView.swift in Sources */,
 				ADDC47EA2E2D89F3003C97E7 /* LogWeightView.swift in Sources */,
 				ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */,
+				AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */,
 				ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */,
 				ADDC47ED2E2D89F3003C97E7 /* SettingsView.swift in Sources */,
 				ADDC47EE2E2D89F3003C97E7 /* SignUpView.swift in Sources */,
 				ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */,
 				ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */,
 				ADDC47F72E2D89F3003C97E7 /* AnimatedTabView.swift in Sources */,
-				ADDC47F82E2D89F3003C97E7 /* DashboardComponents.swift in Sources */,
-				ADDC47F92E2D89F3003C97E7 /* DashboardMetricCards.swift in Sources */,
+				ADDC47F82E2D89F3003C97E7 /* Components/DashboardComponents.swift in Sources */,
+				ADDC47F92E2D89F3003C97E7 /* Components/DashboardMetricCards.swift in Sources */,
+				AD8872392EB4066D0041C426 /* AnimatedTaskIcon.swift in Sources */,
 				ADDC47FA2E2D89F3003C97E7 /* DietPhaseCard.swift in Sources */,
 				ADDC47FC2E2D89F3003C97E7 /* LiquidGlassTimelineSlider.swift in Sources */,
-				ADDC47FD2E2D89F3003C97E7 /* PhotoAnchoredTimelineSlider.swift in Sources */,
+				ADDC47FD2E2D89F3003C97E7 /* Components/PhotoAnchoredTimelineSlider.swift in Sources */,
 				ADDC47FE2E2D89F3003C97E7 /* SkeletonLoaders.swift in Sources */,
 				ADDC47FF2E2D89F3003C97E7 /* UIComponents.swift in Sources */,
 				0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */,
@@ -1231,10 +1250,12 @@
 				5763B6723CDF6F551543599B /* ErrorStateView.swift in Sources */,
 				3CD3199B3979B906B642DB4E /* LegalDocumentRow.swift in Sources */,
 				936AD43A357EA14452357BE4 /* DocumentHeader.swift in Sources */,
+				AD88723B2EB4068D0041C426 /* DashboardTaskBanner.swift in Sources */,
 				E890A5CBBCF0CD3A8CD5D440 /* UserHeaderSection.swift in Sources */,
 				B39F620BFA59AFFB07513E46 /* DeveloperToolsList.swift in Sources */,
 				E714109633DA0CF0B7A6F341 /* LegalSection.swift in Sources */,
 				CFEBF01684AD95AF515DFF59 /* MarkdownView.swift in Sources */,
+				AD8872372EB406430041C426 /* BackgroundTaskDetailsSheet.swift in Sources */,
 				28D96935970646462EC376F4 /* DSTextField.swift in Sources */,
 				EC3987B52CE2B863BBEE67F8 /* DSSecureField.swift in Sources */,
 				3E3EA4841197E3CDEC1064A9 /* DSAuthButton.swift in Sources */,
@@ -1257,7 +1278,7 @@
 				A4F541B201F4587D933EF604 /* DSAvatar.swift in Sources */,
 				717301BDF536203C9A49A25E /* MetricCard.swift in Sources */,
 				11129CEC79A594A3564C81AE /* CompactMetricCard.swift in Sources */,
-				1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Sources */,
+				AD8872312EB4050B0041C426 /* LiquidGlassCTAButton.swift in Sources */,
 				9B88D79235D58979AFCFF0F2 /* StepsIndicator.swift in Sources */,
 				EC7E97F84940FD554A7EB5A1 /* UserGreeting.swift in Sources */,
 				C00904926079E360A71A9DC6 /* MetricGauge.swift in Sources */,

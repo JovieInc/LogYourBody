@@ -1,0 +1,62 @@
+{
+  "spacing": {
+    "xxxs": {
+      "value": "2",
+      "comment": "Extra extra extra small - 2px"
+    },
+    "xxs": {
+      "value": "4",
+      "comment": "Extra extra small - 4px"
+    },
+    "xs": {
+      "value": "8",
+      "comment": "Extra small - 8px"
+    },
+    "sm": {
+      "value": "12",
+      "comment": "Small - 12px"
+    },
+    "md": {
+      "value": "16",
+      "comment": "Medium - 16px (base spacing)"
+    },
+    "lg": {
+      "value": "24",
+      "comment": "Large - 24px"
+    },
+    "xl": {
+      "value": "32",
+      "comment": "Extra large - 32px"
+    },
+    "xxl": {
+      "value": "48",
+      "comment": "Extra extra large - 48px"
+    },
+    "xxxl": {
+      "value": "64",
+      "comment": "Extra extra extra large - 64px"
+    },
+    "semantic": {
+      "element": {
+        "value": "{spacing.xs}",
+        "comment": "Standard element spacing"
+      },
+      "section": {
+        "value": "{spacing.lg}",
+        "comment": "Section spacing"
+      },
+      "screen": {
+        "value": "{spacing.md}",
+        "comment": "Screen edge padding"
+      },
+      "card": {
+        "value": "{spacing.md}",
+        "comment": "Card internal padding"
+      },
+      "listItem": {
+        "value": "{spacing.sm}",
+        "comment": "List item spacing"
+      }
+    }
+  }
+}

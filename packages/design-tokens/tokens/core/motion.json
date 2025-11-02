@@ -1,0 +1,86 @@
+{
+  "motion": {
+    "duration": {
+      "ultraFast": {
+        "value": "100",
+        "comment": "Ultra fast - 100ms"
+      },
+      "fast": {
+        "value": "200",
+        "comment": "Fast - 200ms"
+      },
+      "medium": {
+        "value": "300",
+        "comment": "Medium - 300ms"
+      },
+      "slow": {
+        "value": "500",
+        "comment": "Slow - 500ms"
+      }
+    },
+    "easing": {
+      "ease": {
+        "value": "cubic-bezier(0.4, 0.0, 0.2, 1)",
+        "comment": "Standard ease"
+      },
+      "easeIn": {
+        "value": "cubic-bezier(0.4, 0.0, 1, 1)",
+        "comment": "Ease in"
+      },
+      "easeOut": {
+        "value": "cubic-bezier(0.0, 0.0, 0.2, 1)",
+        "comment": "Ease out"
+      },
+      "easeInOut": {
+        "value": "cubic-bezier(0.4, 0.0, 0.6, 1)",
+        "comment": "Ease in out"
+      },
+      "linear": {
+        "value": "linear",
+        "comment": "Linear easing"
+      }
+    },
+    "spring": {
+      "standard": {
+        "response": {
+          "value": "0.4",
+          "comment": "Standard spring response"
+        },
+        "damping": {
+          "value": "0.8",
+          "comment": "Standard spring damping"
+        }
+      },
+      "bouncy": {
+        "response": {
+          "value": "0.5",
+          "comment": "Bouncy spring response"
+        },
+        "damping": {
+          "value": "0.7",
+          "comment": "Bouncy spring damping"
+        }
+      },
+      "smooth": {
+        "response": {
+          "value": "0.6",
+          "comment": "Smooth spring response"
+        },
+        "damping": {
+          "value": "0.9",
+          "comment": "Smooth spring damping"
+        }
+      },
+      "interactive": {
+        "response": {
+          "value": "0.3",
+          "comment": "Interactive spring response"
+        },
+        "damping": {
+          "value": "0.8",
+          "comment": "Interactive spring damping"
+        }
+      }
+    }
+  }
+}

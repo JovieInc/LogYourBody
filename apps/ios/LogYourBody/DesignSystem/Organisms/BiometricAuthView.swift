@@ -68,10 +68,13 @@ struct BiometricAuthView: View {
             
             // Actions
             VStack(spacing: 16) {
-                DSAuthButton(
-                    title: "Use \(biometricType.title)",
-                    style: .primary,
-                    icon: biometricType.icon,
+                BaseButton(
+                    "Use \(biometricType.title)",
+                    configuration: ButtonConfiguration(
+                        style: .custom(background: .white, foreground: .black),
+                        fullWidth: true,
+                        icon: biometricType.icon
+                    ),
                     action: onAuthenticate
                 )
                 

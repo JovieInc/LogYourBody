@@ -1,0 +1,72 @@
+{
+  "shadow": {
+    "sm": {
+      "blur": {
+        "value": "4"
+      },
+      "offset": {
+        "x": {
+          "value": "0"
+        },
+        "y": {
+          "value": "2"
+        }
+      },
+      "opacity": {
+        "value": "0.1"
+      },
+      "comment": "Small shadow for subtle elevation"
+    },
+    "md": {
+      "blur": {
+        "value": "8"
+      },
+      "offset": {
+        "x": {
+          "value": "0"
+        },
+        "y": {
+          "value": "4"
+        }
+      },
+      "opacity": {
+        "value": "0.2"
+      },
+      "comment": "Medium shadow for cards"
+    },
+    "lg": {
+      "blur": {
+        "value": "12"
+      },
+      "offset": {
+        "x": {
+          "value": "0"
+        },
+        "y": {
+          "value": "8"
+        }
+      },
+      "opacity": {
+        "value": "0.3"
+      },
+      "comment": "Large shadow for modals"
+    },
+    "xl": {
+      "blur": {
+        "value": "20"
+      },
+      "offset": {
+        "x": {
+          "value": "0"
+        },
+        "y": {
+          "value": "10"
+        }
+      },
+      "opacity": {
+        "value": "0.4"
+      },
+      "comment": "Extra large shadow for floating elements"
+    }
+  }
+}

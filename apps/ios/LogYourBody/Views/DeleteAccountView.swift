@@ -89,32 +89,19 @@ struct DeleteAccountView: View {
                     }
                     
                     // Delete Button
-                    Button(
-            action: {
-                        isTextFieldFocused = false
-                        deleteAccount()
-                    },
-            label: {
-                        if isDeleting {
-                            HStack {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                                Text("Deleting...")
-                                    .foregroundColor(.white)
-                            }
-                            .frame(maxWidth: .infinity)
-                        } else {
-                            Text("Delete My Account")
-                                .frame(maxWidth: .infinity)
+                    BaseButton(
+                        "Delete My Account",
+                        configuration: ButtonConfiguration(
+                            style: confirmationText == confirmationPhrase ? .custom(background: .red, foreground: .white) : .custom(background: .gray, foreground: .white),
+                            isLoading: isDeleting,
+                            isEnabled: confirmationText == confirmationPhrase,
+                            fullWidth: true
+                        ),
+                        action: {
+                            isTextFieldFocused = false
+                            deleteAccount()
                         }
-                    }
-        )
-                    .foregroundColor(.white)
-                    .padding()
-                    .background(confirmationText == confirmationPhrase ? Color.red : Color.gray)
-                    .cornerRadius(SettingsDesign.cornerRadius)
-                    .disabled(confirmationText != confirmationPhrase || isDeleting)
+                    )
                     .padding(.horizontal, 20)
                     
                     // Bottom padding

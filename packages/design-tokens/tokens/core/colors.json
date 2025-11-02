@@ -1,0 +1,148 @@
+{
+  "color": {
+    "base": {
+      "black": {
+        "value": "#000000",
+        "comment": "Pure black"
+      },
+      "white": {
+        "value": "#FFFFFF",
+        "comment": "Pure white"
+      },
+      "gray": {
+        "50": {
+          "value": "#F9FAFB",
+          "comment": "Lightest gray"
+        },
+        "100": {
+          "value": "#F3F4F6"
+        },
+        "200": {
+          "value": "#E5E7EB"
+        },
+        "300": {
+          "value": "#D1D5DB"
+        },
+        "400": {
+          "value": "#9CA3AF"
+        },
+        "500": {
+          "value": "#6B7280"
+        },
+        "600": {
+          "value": "#4B5563"
+        },
+        "700": {
+          "value": "#374151"
+        },
+        "800": {
+          "value": "#1F2937"
+        },
+        "900": {
+          "value": "#111827",
+          "comment": "Darkest gray"
+        }
+      },
+      "purple": {
+        "400": {
+          "value": "#6B73DD"
+        },
+        "500": {
+          "value": "#5B63D3",
+          "comment": "Primary brand purple"
+        },
+        "600": {
+          "value": "#4B52C3",
+          "comment": "High contrast variant"
+        },
+        "700": {
+          "value": "#3B42B3"
+        }
+      },
+      "red": {
+        "500": {
+          "value": "#F44336",
+          "comment": "Error red"
+        },
+        "600": {
+          "value": "#E53935"
+        }
+      },
+      "green": {
+        "500": {
+          "value": "#4CAF50",
+          "comment": "Success green"
+        },
+        "600": {
+          "value": "#43A047"
+        }
+      },
+      "orange": {
+        "500": {
+          "value": "#FF9800",
+          "comment": "Warning orange"
+        },
+        "600": {
+          "value": "#FB8C00"
+        }
+      }
+    },
+    "semantic": {
+      "background": {
+        "value": "#111111",
+        "comment": "Premium near-black background"
+      },
+      "card": {
+        "value": "#1A1A1A",
+        "comment": "Card background (slightly lighter)"
+      },
+      "border": {
+        "value": "#2A2A2A",
+        "comment": "Subtle border color"
+      },
+      "primary": {
+        "value": "{color.base.purple.500}",
+        "comment": "Primary brand color"
+      },
+      "primaryHover": {
+        "value": "{color.base.purple.600}"
+      },
+      "error": {
+        "value": "{color.base.red.500}"
+      },
+      "errorHover": {
+        "value": "{color.base.red.600}"
+      },
+      "success": {
+        "value": "{color.base.green.500}"
+      },
+      "successHover": {
+        "value": "{color.base.green.600}"
+      },
+      "warning": {
+        "value": "{color.base.orange.500}"
+      },
+      "warningHover": {
+        "value": "{color.base.orange.600}"
+      },
+      "text": {
+        "primary": {
+          "value": "#F7F8F8",
+          "comment": "Primary text - high contrast"
+        },
+        "secondary": {
+          "value": "#9CA0A8",
+          "comment": "Secondary text - medium contrast"
+        },
+        "tertiary": {
+          "value": "#6E7178",
+          "comment": "Tertiary text - low contrast"
+        },
+        "disabled": {
+          "value": "#4B5563",
+          "comment": "Disabled text"
+        }
+      }
+    }
+  }
+}
