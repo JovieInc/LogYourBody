@@ -27,9 +27,9 @@ struct DeveloperTapIndicator: View {
                     ForEach(0..<totalTaps, id: \.self) { index in
                         Circle()
                             .fill(
-                                index < (totalTaps - remainingTaps) 
-                                    ? DesignSystem.colors.primary 
-                                    : DesignSystem.colors.border
+                                index < (totalTaps - remainingTaps)
+                                    ? Color.linearPurple
+                                    : Color.linearBorder
                             )
                             .frame(width: 4, height: 4)
                     }
@@ -37,18 +37,18 @@ struct DeveloperTapIndicator: View {
                 
                 // Remaining count
                 Text("\(remainingTaps)")
-                    .font(DesignSystem.typography.captionSmall)
-                    .foregroundColor(DesignSystem.colors.textTertiary)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Color.linearTextTertiary)
                     .monospacedDigit()
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
                 Capsule()
-                    .fill(DesignSystem.colors.surface)
+                    .fill(Color.linearCard)
                     .overlay(
                         Capsule()
-                            .strokeBorder(DesignSystem.colors.border, lineWidth: 1)
+                            .strokeBorder(Color.linearBorder, lineWidth: 1)
                     )
             )
             .transition(.opacity.combined(with: .scale))

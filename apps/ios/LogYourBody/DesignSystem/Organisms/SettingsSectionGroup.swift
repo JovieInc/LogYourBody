@@ -21,7 +21,7 @@ struct SettingsSectionGroup<Content: View>: View {
     }
     
     var body: some View {
-        VStack(spacing: DesignSystem.spacing.lg) {
+        VStack(spacing: 24) {
             ForEach(sections, id: \.id) { section in
                 SettingsSection(
                     header: section.header,
@@ -46,7 +46,7 @@ struct SettingsLinkRow<Destination: View>: View {
         icon: String,
         title: String,
         value: String? = nil,
-        tintColor: Color = DesignSystem.colors.text,
+        tintColor: Color = .linearText,
         @ViewBuilder destination: @escaping () -> Destination
     ) {
         self.icon = icon
@@ -80,7 +80,7 @@ struct SettingsActionRow: View {
     init(
         icon: String,
         title: String,
-        tintColor: Color = DesignSystem.colors.text,
+        tintColor: Color = .linearText,
         action: @escaping () -> Void
     ) {
         self.icon = icon
@@ -183,7 +183,7 @@ struct SettingsSectionBuilder {
             SettingsActionRow(
                 icon: "trash",
                 title: "Delete Account",
-                tintColor: DesignSystem.colors.error,
+                tintColor: .red,
                 action: onDeleteAccount
             )
         }

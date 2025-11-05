@@ -20,11 +20,19 @@ struct ContentView: View {
     
     // Check if user profile is complete
     private var isProfileComplete: Bool {
-        guard let profile = authManager.currentUser?.profile else { return false }
-        return profile.fullName != nil &&
-               profile.dateOfBirth != nil &&
-               profile.height != nil &&
-               profile.gender != nil
+        // Safely check if profile exists and is complete
+        guard let user = authManager.currentUser,
+              let profile = user.profile else {
+            return false
+        }
+
+        // Check all required fields exist
+        let hasName = profile.fullName != nil && !(profile.fullName?.isEmpty ?? true)
+        let hasDOB = profile.dateOfBirth != nil
+        let hasHeight = profile.height != nil && profile.height ?? 0 > 0
+        let hasGender = profile.gender != nil && !(profile.gender?.isEmpty ?? true)
+
+        return hasName && hasDOB && hasHeight && hasGender
     }
     
     private var shouldShowOnboarding: Bool {

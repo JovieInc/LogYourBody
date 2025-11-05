@@ -173,7 +173,7 @@ struct TextButton: View {
                     padding: EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0),
                     fontSize: 13
                 ),
-                hapticFeedback: .selection
+                hapticFeedback: .light
             ),
             action: action
         )

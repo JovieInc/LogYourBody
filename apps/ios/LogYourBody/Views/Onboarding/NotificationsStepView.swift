@@ -24,7 +24,7 @@ struct NotificationsStepView: View {
                     Button(
             action: {
                         viewModel.previousStep()
-                        // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+                        // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
                     },
             label: {
                         Image(systemName: "chevron.left")
@@ -164,13 +164,13 @@ struct NotificationsStepView: View {
     }
     
     private func requestNotificationPermission() {
-        // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+        // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
         
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
             DispatchQueue.main.async {
                 viewModel.data.notificationsEnabled = granted
                 if granted {
-                    // HapticManager.shared.success() // TODO: Add HapticManager to Xcode project
+                    // HapticManager.shared.successAction() // TODO: Add HapticManager to Xcode project
                 }
                 viewModel.nextStep()
             }

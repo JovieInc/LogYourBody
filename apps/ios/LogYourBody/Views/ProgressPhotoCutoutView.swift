@@ -180,7 +180,7 @@ struct ProgressPhotoCutoutView: View {
                         .onChange(of: selectedPhotoIndex) { _, newIndex in
                             // Update timeline when photo changes
                             if !isDragging, let metricsIdx = metricsIndex(for: newIndex) {
-                                HapticManager.shared.sliderChanged()
+                                // HapticManager.shared.selection()
                                 selectedMetricsIndex = metricsIdx
                             }
                         }

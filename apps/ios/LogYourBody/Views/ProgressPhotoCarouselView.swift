@@ -47,47 +47,37 @@ struct ProgressPhotoCarouselView: View {
     let currentMetric: BodyMetrics?
     let historicalMetrics: [BodyMetrics]
     @Binding var selectedMetricsIndex: Int
-    @State private var selectedPhotoIndex: Int = 0
+    @Binding var displayMode: BodyVisualizationMode
     @State private var isDragging = false
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var processingService = ImageProcessingService.shared
-    
-    // Computed properties
+
+    // Now displayMetrics is ALL metrics, not just those with photos
     private var displayMetrics: [BodyMetrics] {
-        historicalMetrics.filter { $0.photoUrl != nil }
-    }
-    
-    // Map photo index to metrics index
-    private func metricsIndex(for photoIndex: Int) -> Int? {
-        guard photoIndex < displayMetrics.count else { return nil }
-        let photoMetric = displayMetrics[photoIndex]
-        return historicalMetrics.firstIndex { $0.id == photoMetric.id }
-    }
-    
-    // Map metrics index to photo index
-    private func photoIndex(for metricsIndex: Int) -> Int? {
-        guard metricsIndex < historicalMetrics.count else { return nil }
-        let metric = historicalMetrics[metricsIndex]
-        return displayMetrics.firstIndex { $0.id == metric.id }
+        historicalMetrics
     }
     
     var body: some View {
         ZStack {
             // Background - edge to edge
             Color.appBackground
-            
+
             if displayMetrics.isEmpty {
                 // Empty state
-                EmptyPhotoState()
+                EmptyDataState()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // TabView carousel - one photo at a time
-                TabView(selection: $selectedPhotoIndex) {
+                // TabView carousel - all metrics (photo or avatar)
+                TabView(selection: $selectedMetricsIndex) {
                     ForEach(Array(displayMetrics.enumerated()), id: \.element.id) { index, metric in
-                        PhotoCard(metric: metric)
-                            .tag(index)
+                        VisualCard(
+                            metric: metric,
+                            displayMode: displayMode,
+                            gender: authManager.currentUser?.profile?.gender
+                        )
+                        .tag(index)
                     }
-                    
+
                     // Processing placeholders
                     let processingTasks = processingService.processingTasks.filter { task in
                         task.status != .completed && task.status != .failed
@@ -99,10 +89,9 @@ struct ProgressPhotoCarouselView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onChange(of: selectedPhotoIndex) { _, newIndex in
-                    if !isDragging, let metricsIdx = metricsIndex(for: newIndex) {
-                        HapticManager.shared.sliderChanged()
-                        selectedMetricsIndex = metricsIdx
+                .onChange(of: selectedMetricsIndex) { _, newIndex in
+                    if !isDragging {
+                        // HapticManager.shared.selection()
                     }
                 }
                 .simultaneousGesture(
@@ -115,38 +104,27 @@ struct ProgressPhotoCarouselView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .onAppear {
-            if let photoIdx = photoIndex(for: selectedMetricsIndex) {
-                selectedPhotoIndex = photoIdx
-            }
-            
             // Preload adjacent photos for smooth scrolling
             preloadAdjacentPhotos()
         }
-        .onChange(of: selectedMetricsIndex) { _, newIndex in
-            if !isDragging, let photoIdx = photoIndex(for: newIndex) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    selectedPhotoIndex = photoIdx
-                }
-            }
-        }
-        .onChange(of: selectedPhotoIndex) { _, _ in
+        .onChange(of: selectedMetricsIndex) { _, _ in
             // Preload adjacent photos when selection changes
             preloadAdjacentPhotos()
         }
     }
     
     // MARK: - Photo Preloading for Smooth Experience
-    
+
     private func preloadAdjacentPhotos() {
         // Preload photos around current selection for smooth scrolling
-        let currentIndex = selectedPhotoIndex
+        let currentIndex = selectedMetricsIndex
         let range = max(0, currentIndex - 2)...min(displayMetrics.count - 1, currentIndex + 2)
-        
+
         let urlsToPreload = range.compactMap { index -> String? in
             guard index < displayMetrics.count else { return nil }
             return displayMetrics[index].photoUrl
         }
-        
+
         // Preload in background without blocking UI
         Task.detached(priority: .background) {
             for urlString in urlsToPreload {
@@ -157,17 +135,57 @@ struct ProgressPhotoCarouselView: View {
     }
 }
 
-// MARK: - Photo Card with Face-Centered Crop
-struct PhotoCard: View {
+// MARK: - Visual Card (Photo or Avatar)
+struct VisualCard: View {
     let metric: BodyMetrics
-    @State private var loadedImage: UIImage?
-    
+    let displayMode: BodyVisualizationMode
+    let gender: String?
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 // Background
                 Color.appBackground
-                
+
+                // Display based on mode
+                switch displayMode {
+                case .photo:
+                    // Photo mode - show photo if available, otherwise avatar
+                    if let photoUrl = metric.photoUrl {
+                        PhotoCard(metric: metric)
+                    } else {
+                        // No photo - show avatar
+                        AvatarBodyRenderer(
+                            bodyFatPercentage: metric.bodyFatPercentage,
+                            gender: gender,
+                            height: geometry.size.height
+                        )
+                    }
+
+                case .avatar:
+                    // Avatar mode - always show avatar
+                    AvatarBodyRenderer(
+                        bodyFatPercentage: metric.bodyFatPercentage,
+                        gender: gender,
+                        height: geometry.size.height
+                    )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Photo Card with Face-Centered Crop
+struct PhotoCard: View {
+    let metric: BodyMetrics
+    @State private var loadedImage: UIImage?
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Background
+                Color.appBackground
+
                 // Photo content
                 if let photoUrl = metric.photoUrl {
                     if let loadedImage = loadedImage {
@@ -192,7 +210,7 @@ struct PhotoCard: View {
             }
         }
     }
-    
+
     private func loadImage(from urlString: String) {
         Task.detached(priority: .userInitiated) {
             // Load image on background thread to avoid UI blocking
@@ -205,19 +223,19 @@ struct PhotoCard: View {
     }
 }
 
-// MARK: - Empty Photo State
-struct EmptyPhotoState: View {
+// MARK: - Empty Data State
+struct EmptyDataState: View {
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "camera.fill")
+            Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.system(size: 48))
                 .foregroundColor(.white.opacity(0.3))
-            
-            Text("No photos yet")
+
+            Text("No data yet")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
-            
-            Text("Add a progress photo to track your transformation")
+
+            Text("Log your first entry to start tracking")
                 .font(.system(size: 14))
                 .foregroundColor(.white.opacity(0.3))
                 .multilineTextAlignment(.center)
@@ -294,10 +312,12 @@ class ImageLoader {
     ProgressPhotoCarouselView(
         currentMetric: nil,
         historicalMetrics: [],
-        selectedMetricsIndex: .constant(0)
+        selectedMetricsIndex: .constant(0),
+        displayMode: .constant(.photo)
     )
     .environmentObject(AuthManager.shared)
     .frame(height: 400)
     .padding()
     .background(Color.appBackground)
 }
+//

@@ -34,7 +34,7 @@ struct DateOfBirthInputView: View {
                 Button(
             action: {
                     viewModel.previousStep()
-                    // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+                    // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
                 },
             label: {
                     Image(systemName: "chevron.left")
@@ -93,7 +93,7 @@ struct DateOfBirthInputView: View {
                                 withAnimation(.spring(response: 0.3)) {
                                     isEditing = true
                                 }
-                                // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+                                // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
                             },
             label: {
                                 Text("Edit")

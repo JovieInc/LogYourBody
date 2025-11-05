@@ -31,7 +31,7 @@ struct CompletionStepView: View {
                 Button(
             action: {
                     viewModel.previousStep()
-                    // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+                    // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
                 },
             label: {
                     Image(systemName: "chevron.left")

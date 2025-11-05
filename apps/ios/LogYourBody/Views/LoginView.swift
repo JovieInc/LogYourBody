@@ -42,7 +42,7 @@ struct LoginView: View {
                         },
                         onAppleSignIn: {
                             Task {
-                                await authManager.signInWithAppleOAuth()
+                                await authManager.handleAppleSignIn()
                             }
                         }
                     )

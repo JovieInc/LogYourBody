@@ -64,7 +64,7 @@ struct SignUpView: View {
                         onSignUp: signUp,
                         onAppleSignIn: {
                             Task {
-                                await authManager.signInWithAppleOAuth()
+                                await authManager.handleAppleSignIn()
                             }
                         },
                         termsURL: URL(string: "https://logyourbody.com/terms")!,

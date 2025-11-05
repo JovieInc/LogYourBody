@@ -10,8 +10,8 @@ enum Trend {
     case neutral
 }
 
-// MARK: - Metric Card Component
-struct MetricCard: View {
+// MARK: - Metric Card Component (Legacy - use StandardCard instead)
+struct LegacyMetricCard: View {
     let value: String
     let label: String
     let icon: String
@@ -255,7 +255,7 @@ struct BottomNavGlass: View {
                 let isSelected = selectedTab == title
                 Button(
                     action: {
-                        HapticManager.shared.buttonTapped()
+                        // HapticManager.shared.buttonTap()
                         onTabSelected(title)
                     },
                     label: {

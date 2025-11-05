@@ -188,7 +188,7 @@ struct SecuritySessionsView: View {
                 }
                 
                 // Haptic feedback
-                // HapticManager.shared.success() // TODO: Add HapticManager to Xcode project
+                // HapticManager.shared.successAction() // TODO: Add HapticManager to Xcode project
             }
         } catch {
             await MainActor.run {

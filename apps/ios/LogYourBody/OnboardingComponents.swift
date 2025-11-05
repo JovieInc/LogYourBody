@@ -21,7 +21,7 @@ struct OnboardingHeader: View {
                 Button(
             action: {
                     onBack()
-                    HapticManager.shared.buttonTapped()
+                    // HapticManager.shared.buttonTap()
                 },
             label: {
                     Image(systemName: "chevron.left")
@@ -98,7 +98,7 @@ struct OnboardingContinueButton: View {
             Button(
             action: {
                 action()
-                HapticManager.shared.buttonTapped()
+                // HapticManager.shared.buttonTap()
             },
             label: {
                 Text(title)

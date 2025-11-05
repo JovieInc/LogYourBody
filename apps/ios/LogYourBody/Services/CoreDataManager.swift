@@ -2,6 +2,13 @@
 // CoreDataManager.swift
 // LogYourBody
 //
+// THREADING SAFETY: All Core Data operations MUST use context.perform() or context.performAndWait()
+// to avoid threading violations. The viewContext is bound to the main thread.
+//
+// FIXED: saveBodyMetrics, fetchBodyMetrics, saveDailyMetrics now use context.perform()
+// TODO: Remaining methods (saveProfile, fetchProfile, markAsSynced, deleteAllData, etc.) should be
+//       updated to use the same pattern for complete thread safety.
+//
 import Foundation
 import CoreData
 
@@ -93,108 +100,135 @@ class CoreDataManager: ObservableObject {
     // MARK: - Body Metrics Operations
     func saveBodyMetrics(_ metrics: BodyMetrics, userId: String, markAsSynced: Bool = false) {
         let context = viewContext
-        
-        // Check if entry already exists
-        let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "id == %@", metrics.id)
-        
-        do {
-            let results = try context.fetch(fetchRequest)
-            let cached: CachedBodyMetrics
-            
-            if let existing = results.first {
-                cached = existing
-            } else {
-                cached = CachedBodyMetrics(context: context)
-                cached.id = metrics.id
-                cached.createdAt = metrics.createdAt
+
+        // Ensure all Core Data operations happen on the context's queue
+        context.perform {
+            // Check if entry already exists
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", metrics.id)
+
+            do {
+                let results = try context.fetch(fetchRequest)
+                let cached: CachedBodyMetrics
+
+                if let existing = results.first {
+                    cached = existing
+                } else {
+                    cached = CachedBodyMetrics(context: context)
+                    cached.id = metrics.id
+                    cached.createdAt = metrics.createdAt
+                }
+
+                // Update values
+                cached.userId = userId
+                cached.date = metrics.date
+                cached.weight = metrics.weight ?? 0
+                cached.weightUnit = metrics.weightUnit
+                cached.bodyFatPercentage = metrics.bodyFatPercentage ?? 0
+                cached.bodyFatMethod = metrics.bodyFatMethod
+                cached.muscleMass = metrics.muscleMass ?? 0
+                cached.boneMass = metrics.boneMass ?? 0
+                cached.notes = metrics.notes
+                cached.photoUrl = metrics.photoUrl
+                cached.dataSource = metrics.dataSource ?? "Manual"
+                cached.updatedAt = Date()
+                cached.lastModified = Date()
+                cached.isSynced = markAsSynced
+                cached.syncStatus = markAsSynced ? "synced" : "pending"
+                cached.isMarkedDeleted = false
+
+                // Save immediately within the perform block
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                // Use OSLog for production-safe logging
+                #if DEBUG
+                print("Failed to save body metrics: \(error)")
+                #endif
             }
-            
-            // Update values
-            cached.userId = userId
-            cached.date = metrics.date
-            cached.weight = metrics.weight ?? 0
-            cached.weightUnit = metrics.weightUnit
-            cached.bodyFatPercentage = metrics.bodyFatPercentage ?? 0
-            cached.bodyFatMethod = metrics.bodyFatMethod
-            cached.muscleMass = metrics.muscleMass ?? 0
-            cached.boneMass = metrics.boneMass ?? 0
-            cached.notes = metrics.notes
-            cached.photoUrl = metrics.photoUrl
-            cached.dataSource = metrics.dataSource ?? "Manual"
-            cached.updatedAt = Date()
-            cached.lastModified = Date()
-            cached.isSynced = markAsSynced
-            cached.syncStatus = markAsSynced ? "synced" : "pending"
-            cached.isMarkedDeleted = false
-            
-            // Debug logging
-            // print("💾 Saving body metrics: ID: \(metrics.id), Weight: \(metrics.weight ?? 0)\(metrics.weightUnit ?? ""), isSynced: \(markAsSynced)")
-            
-            saveAndWait()  // Use synchronous save to ensure data is persisted before sync
-        } catch {
-            // print("Failed to save body metrics: \(error)")
         }
     }
     
     func fetchBodyMetrics(for userId: String, from startDate: Date? = nil, to endDate: Date? = nil) -> [CachedBodyMetrics] {
-        let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-        
-        var predicates = [NSPredicate]()
-        predicates.append(NSPredicate(format: "userId == %@", userId))
-        predicates.append(NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false)))
-        
-        if let start = startDate {
-            predicates.append(NSPredicate(format: "date >= %@", start as NSDate))
+        let context = viewContext
+        var result: [CachedBodyMetrics] = []
+
+        // Perform fetch on context's queue to avoid threading issues
+        context.performAndWait {
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+
+            var predicates = [NSPredicate]()
+            predicates.append(NSPredicate(format: "userId == %@", userId))
+            predicates.append(NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false)))
+
+            if let start = startDate {
+                predicates.append(NSPredicate(format: "date >= %@", start as NSDate))
+            }
+            if let end = endDate {
+                predicates.append(NSPredicate(format: "date <= %@", end as NSDate))
+            }
+
+            fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+            fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+
+            // Add performance optimizations
+            fetchRequest.fetchBatchSize = 20  // Fetch in batches
+            fetchRequest.returnsObjectsAsFaults = true  // Don't load all data immediately
+
+            do {
+                result = try context.fetch(fetchRequest)
+            } catch {
+                #if DEBUG
+                print("Failed to fetch body metrics: \(error)")
+                #endif
+            }
         }
-        if let end = endDate {
-            predicates.append(NSPredicate(format: "date <= %@", end as NSDate))
-        }
-        
-        fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
-        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
-        
-        do {
-            return try viewContext.fetch(fetchRequest)
-        } catch {
-            // print("Failed to fetch body metrics: \(error)")
-            return []
-        }
+
+        return result
     }
     
     // MARK: - Daily Metrics Operations
     func saveDailyMetrics(_ metrics: DailyMetrics, userId: String) {
         let context = viewContext
-        
-        let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "id == %@ OR (userId == %@ AND date == %@)",
-                                           metrics.id, userId, metrics.date as NSDate)
-        
-        do {
-            let results = try context.fetch(fetchRequest)
-            let cached: CachedDailyMetrics
-            
-            if let existing = results.first {
-                cached = existing
-            } else {
-                cached = CachedDailyMetrics(context: context)
-                cached.id = metrics.id
-                cached.createdAt = metrics.createdAt
+
+        // Ensure all Core Data operations happen on the context's queue
+        context.perform {
+            let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@ OR (userId == %@ AND date == %@)",
+                                               metrics.id, userId, metrics.date as NSDate)
+
+            do {
+                let results = try context.fetch(fetchRequest)
+                let cached: CachedDailyMetrics
+
+                if let existing = results.first {
+                    cached = existing
+                } else {
+                    cached = CachedDailyMetrics(context: context)
+                    cached.id = metrics.id
+                    cached.createdAt = metrics.createdAt
+                }
+
+                cached.userId = userId
+                cached.date = metrics.date
+                cached.steps = Int32(metrics.steps ?? 0)
+                cached.notes = metrics.notes
+                cached.updatedAt = Date()
+                cached.lastModified = Date()
+                cached.isSynced = false
+                cached.syncStatus = "pending"
+                cached.isMarkedDeleted = false
+
+                // Save immediately within the perform block
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                #if DEBUG
+                print("Failed to save daily metrics: \(error)")
+                #endif
             }
-            
-            cached.userId = userId
-            cached.date = metrics.date
-            cached.steps = Int32(metrics.steps ?? 0)
-            cached.notes = metrics.notes
-            cached.updatedAt = Date()
-            cached.lastModified = Date()
-            cached.isSynced = false
-            cached.syncStatus = "pending"
-            cached.isMarkedDeleted = false
-            
-            saveAndWait()  // Use synchronous save to ensure data is persisted before sync
-        } catch {
-            // print("Failed to save daily metrics: \(error)")
         }
     }
     

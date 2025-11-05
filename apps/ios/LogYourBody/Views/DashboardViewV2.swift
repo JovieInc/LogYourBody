@@ -24,8 +24,8 @@ struct DashboardViewV2: View {
     @Namespace private var namespace
     @AppStorage(Constants.preferredMeasurementSystemKey) private var measurementSystem = PreferencesView.defaultMeasurementSystem
     
-    var currentSystem: PreferencesView.MeasurementSystem {
-        PreferencesView.MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+    var currentSystem: MeasurementSystem {
+        MeasurementSystem(rawValue: measurementSystem) ?? .imperial
     }
     
     var currentMetric: BodyMetrics? {
@@ -147,7 +147,7 @@ struct DashboardViewV2: View {
                 Circle()
                     .fill(Color.white.opacity(0.1))
                     .frame(width: 48, height: 48)
-                
+
                 if let avatarUrl = authManager.currentUser?.avatarUrl,
                    let url = URL(string: avatarUrl) {
                     AsyncImage(url: url) { image in
@@ -161,53 +161,63 @@ struct DashboardViewV2: View {
                             .font(.system(size: 20))
                             .foregroundColor(.white.opacity(0.5))
                     }
+                    .accessibilityLabel("Profile picture")
                 } else {
                     Text(authManager.currentUser?.profile?.fullName?.prefix(1).uppercased() ?? "U")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.white)
+                        .accessibilityLabel("Profile initial")
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Profile avatar")
             
             // User info
             VStack(alignment: .leading, spacing: 4) {
                 if let name = authManager.currentUser?.profile?.fullName {
                     Text(name)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.appBodyLarge.weight(.semibold))
                         .foregroundColor(.white)
+                        .accessibilityLabel("User name: \(name)")
                 }
-                
+
                 HStack(spacing: 12) {
                     if let age = userAge {
                         Label("\(age)y", systemImage: "person")
-                            .font(.system(size: 13))
+                            .font(.appBodySmall)
                             .foregroundColor(.white.opacity(0.7))
+                            .accessibilityLabel("Age: \(age) years")
                     }
-                    
+
                     if let gender = authManager.currentUser?.profile?.gender {
                         Text(gender == "Male" ? "♂" : "♀")
-                            .font(.system(size: 13))
+                            .font(.appBodySmall)
                             .foregroundColor(.white.opacity(0.7))
+                            .accessibilityLabel("Gender: \(gender)")
                     }
-                    
+
                     if let height = authManager.currentUser?.profile?.height, height > 0 {
                         let displayHeight = currentSystem == .imperial ?
                             formatHeightToFeetInches(height) : "\(Int(height * 2.54))cm"
                         Label(displayHeight, systemImage: "ruler")
-                            .font(.system(size: 13))
+                            .font(.appBodySmall)
                             .foregroundColor(.white.opacity(0.7))
+                            .accessibilityLabel("Height: \(displayHeight)")
                     }
                 }
             }
+            .accessibilityElement(children: .combine)
             
             Spacer()
             
             // Sync indicator
             if syncManager.isSyncing {
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 16))
+                    .font(.appBody)
                     .foregroundColor(.white.opacity(0.7))
                     .rotationEffect(.degrees(syncManager.isSyncing ? 360 : 0))
                     .animation(Animation.linear(duration: 1).repeatForever(autoreverses: false), value: syncManager.isSyncing)
+                    .accessibilityLabel("Syncing in progress")
             }
         }
         .padding(16)
@@ -251,7 +261,7 @@ struct DashboardViewV2: View {
                 Button(
             action: {
                     showPhotoOptions = true
-                    HapticManager.shared.buttonTapped()
+                    // HapticManager.shared.buttonTap()
                 },
             label: {
                     ZStack {
@@ -319,31 +329,7 @@ struct DashboardViewV2: View {
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedIndex)
                     
                     // Enhanced thumb - 24pt
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 24, height: 24)
-                        .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-                        .offset(x: thumbOffset)
-                        .scaleEffect(isDraggingSlider ? 1.2 : 1.0)
-                        .animation(.spring(response: 0.3), value: isDraggingSlider)
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    isDraggingSlider = true
-                                    let percent = min(max(0, value.location.x / sliderWidth), 1)
-                                    let maxIndex = Double(max(1, bodyMetrics.count - 1))
-                                    let newIndex = Int(round(percent * maxIndex))
-                                    if newIndex != selectedIndex {
-                                        selectedIndex = newIndex
-                                        loadMetricsForSelectedDate()
-                                        HapticManager.shared.sliderChanged()
-                                    }
-                                }
-                                .onEnded { _ in
-                                    isDraggingSlider = false
-                                    HapticManager.shared.sliderChanged()
-                                }
-                        )
+                    timelineThumbView(sliderWidth: sliderWidth, thumbOffset: thumbOffset)
                 }
             }
             .frame(height: 24)
@@ -359,7 +345,64 @@ struct DashboardViewV2: View {
     }
     
     @State private var isDraggingSlider = false
-    
+
+    // MARK: - Timeline Thumb Helper
+
+    @ViewBuilder
+    private func timelineThumbView(sliderWidth: CGFloat, thumbOffset: CGFloat) -> some View {
+        let accessibilityLabel = "Timeline slider"
+        let accessibilityValue = "Entry \(selectedIndex + 1) of \(bodyMetrics.count), \(formatDateShort(bodyMetrics[selectedIndex].date))"
+        let accessibilityHint = "Swipe left or right to navigate through your progress entries"
+
+        Circle()
+            .fill(Color.white)
+            .frame(width: 24, height: 24)
+            .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+            .offset(x: thumbOffset)
+            .scaleEffect(isDraggingSlider ? 1.2 : 1.0)
+            .animation(.spring(response: 0.3), value: isDraggingSlider)
+            .accessibilityElement()
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityValue(accessibilityValue)
+            .accessibilityHint(accessibilityHint)
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment:
+                    if selectedIndex < bodyMetrics.count - 1 {
+                        selectedIndex += 1
+                        loadMetricsForSelectedDate()
+                        // HapticManager.shared.selection()
+                    }
+                case .decrement:
+                    if selectedIndex > 0 {
+                        selectedIndex -= 1
+                        loadMetricsForSelectedDate()
+                        // HapticManager.shared.selection()
+                    }
+                @unknown default:
+                    break
+                }
+            }
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        isDraggingSlider = true
+                        let percent = min(max(0, value.location.x / sliderWidth), 1)
+                        let maxIndex = Double(max(1, bodyMetrics.count - 1))
+                        let newIndex = Int(round(percent * maxIndex))
+                        if newIndex != selectedIndex {
+                            selectedIndex = newIndex
+                            loadMetricsForSelectedDate()
+                            // HapticManager.shared.selection()
+                        }
+                    }
+                    .onEnded { _ in
+                        isDraggingSlider = false
+                        // HapticManager.shared.selection()
+                    }
+            )
+    }
+
     // MARK: - Clean Metrics Section
     
     @ViewBuilder
@@ -377,14 +420,16 @@ struct DashboardViewV2: View {
                 label: "Weight",
                 unit: currentSystem == .imperial ? "lbs" : "kg"
             )
-            
+            .accessibilityLabel("Weight gauge")
+            .accessibilityValue("\(String(format: "%.1f", weightInCurrentUnit)) \(currentSystem == .imperial ? "pounds" : "kilograms")")
+
             // Body Fat gauge
             let estimatedBF = currentMetric?.bodyFatPercentage == nil && selectedIndex < bodyMetrics.count
                 ? PhotoMetadataService.shared.estimateBodyFat(for: bodyMetrics[selectedIndex].date, metrics: bodyMetrics)
                 : nil
-            
+
             let bodyFatValue = currentMetric?.bodyFatPercentage ?? estimatedBF?.value ?? 0
-            
+
             CleanMetricGauge(
                 value: bodyFatValue,
                 maxValue: 50,
@@ -392,6 +437,8 @@ struct DashboardViewV2: View {
                 unit: "%",
                 isEstimated: currentMetric?.bodyFatPercentage == nil && estimatedBF != nil
             )
+            .accessibilityLabel("Body fat percentage gauge")
+            .accessibilityValue("\(String(format: "%.1f", bodyFatValue)) percent\(currentMetric?.bodyFatPercentage == nil && estimatedBF != nil ? ", estimated" : "")")
         }
     }
     
@@ -706,13 +753,15 @@ struct EnhancedPhotoCarousel: View {
     let currentMetric: BodyMetrics?
     let historicalMetrics: [BodyMetrics]
     @Binding var selectedMetricsIndex: Int
-    
+    @State private var displayMode: BodyVisualizationMode = .photo
+
     var body: some View {
         // Placeholder - would use Vision to detect faces and rotate
         ProgressPhotoCarouselView(
             currentMetric: currentMetric,
             historicalMetrics: historicalMetrics,
-            selectedMetricsIndex: $selectedMetricsIndex
+            selectedMetricsIndex: $selectedMetricsIndex,
+            displayMode: $displayMode
         )
     }
 }

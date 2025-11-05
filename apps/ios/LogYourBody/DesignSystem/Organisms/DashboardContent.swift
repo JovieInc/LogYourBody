@@ -12,10 +12,11 @@ struct DashboardContent: View {
     let selectedIndex: Int
     let dailyMetrics: DailyMetrics?
     let selectedDateMetrics: DailyMetrics?
-    let currentSystem: PreferencesView.MeasurementSystem
+    let currentSystem: MeasurementSystem
     let userAge: Int?
     let onPhotoAction: () -> Void
     @Binding var selectedMetricsIndex: Int
+    @State private var displayMode: BodyVisualizationMode = .photo
     
     // Computed properties for current metric
     private var currentMetric: BodyMetrics? {
@@ -75,7 +76,8 @@ struct DashboardContent: View {
             ProgressPhotoCarouselView(
                 currentMetric: currentMetric,
                 historicalMetrics: bodyMetrics,
-                selectedMetricsIndex: $selectedMetricsIndex
+                selectedMetricsIndex: $selectedMetricsIndex,
+                displayMode: $displayMode
             )
             
             // Camera button overlay

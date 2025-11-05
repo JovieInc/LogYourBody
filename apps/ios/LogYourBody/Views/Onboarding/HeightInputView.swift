@@ -28,7 +28,7 @@ struct HeightInputView: View {
                 Button(
             action: {
                     viewModel.previousStep()
-                    // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+                    // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
                 },
             label: {
                     Image(systemName: "chevron.left")
@@ -86,7 +86,7 @@ struct HeightInputView: View {
                                     isEditing = true
                                     showingPicker = true
                                 }
-                                // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+                                // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
                             },
             label: {
                                 Text("Edit")
@@ -106,7 +106,7 @@ struct HeightInputView: View {
                     Button(
             action: {
                         showingPicker = true
-                        // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+                        // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
                     },
             label: {
                         HStack {

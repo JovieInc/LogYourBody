@@ -10,14 +10,29 @@ import CoreData
 class PhotoMetadataService {
     static let shared = PhotoMetadataService()
     private init() {}
-    
+
+    /// Extract EXIF orientation from photo metadata
+    func extractOrientation(from data: Data) -> CGImagePropertyOrientation {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
+            return .up
+        }
+
+        // Get orientation value (1-8)
+        if let orientationValue = properties[kCGImagePropertyOrientation as String] as? UInt32 {
+            return CGImagePropertyOrientation(rawValue: orientationValue) ?? .up
+        }
+
+        return .up
+    }
+
     /// Extract date from photo metadata or PHAsset
     func extractDate(from data: Data) -> Date? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
             return nil
         }
-        
+
         // Try to get EXIF date
         if let exifDict = properties[kCGImagePropertyExifDictionary as String] as? [String: Any] {
             // Try DateTimeOriginal first (when photo was taken)
@@ -29,13 +44,13 @@ class PhotoMetadataService {
                 return parseExifDate(dateString)
             }
         }
-        
+
         // Try TIFF date
         if let tiffDict = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any],
            let dateString = tiffDict[kCGImagePropertyTIFFDateTime as String] as? String {
             return parseExifDate(dateString)
         }
-        
+
         return nil
     }
     
