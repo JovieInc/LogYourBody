@@ -6,7 +6,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var selectedTab = AnimatedTabView.Tab.dashboard
-    @StateObject private var healthKitManager = HealthKitManager.shared
+    @ObservedObject private var healthKitManager = HealthKitManager.shared
     @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
     @Namespace private var namespace
     @State private var showAddEntrySheet = false
@@ -23,42 +23,28 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case .dashboard:
-                    DashboardView()
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .trailing).combined(with: .opacity)
-                        ))
-                case .dietPhases:
-                    DietPhaseHistoryView()
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
+                    DashboardViewLiquid()
                 case .log:
-                    DashboardView() // Stay on dashboard when log is tapped
-                        .onAppear {
-                            showAddEntrySheet = true
-                            // Reset tab back to dashboard
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                selectedTab = .dashboard
-                            }
-                        }
-                case .settings:
-                    SettingsView()
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
+                    // Don't show any content for log tab - it's action-only
+                    EmptyView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             
-            // Floating Tab Bar
+            // Floating Tab Bar - centered with fixed width
             AnimatedTabView(selectedTab: $selectedTab)
-                .padding(.horizontal, 16)
+                .frame(width: 200) // Fixed width for compact look
                 .padding(.bottom, 20) // Space from bottom edge
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedTab)
+        .onChange(of: selectedTab) { oldValue, newValue in
+            // Handle Log tab tap - show sheet and revert to previous tab
+            if newValue == .log {
+                showAddEntrySheet = true
+                // Revert to previous tab (or dashboard if no previous)
+                selectedTab = oldValue == .log ? .dashboard : oldValue
+            }
+        }
         // Toast presenter removed - handle notifications at view level
         .sheet(isPresented: $showAddEntrySheet) {
             AddEntrySheet(isPresented: $showAddEntrySheet)

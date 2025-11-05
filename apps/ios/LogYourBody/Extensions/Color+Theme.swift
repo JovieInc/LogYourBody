@@ -18,21 +18,32 @@ public extension Color {
     // MARK: - Text Colors
     static let linearText = Color(hex: "#F7F8F8")
     static let linearTextSecondary = Color(hex: "#9CA0A8")
-    static let linearTextTertiary = Color(hex: "#6E7178")
+    static let linearTextTertiary = Color(hex: "#8B8E95")  // Updated for WCAG AA compliance (4.5:1 contrast ratio)
+
+    // MARK: - Liquid Glass Dark Mode (Apple Health-inspired)
+    static let liquidBg = Color(hex: "#000000")  // True black for OLED
+    static let liquidTextPrimary = Color(hex: "#F5F5F7")  // Off-white for reduced eye strain
+    static let liquidAccent = Color(hex: "#6EE7F0")  // Cyan accent
     
     // MARK: - Semantic Colors
     static let success = Color(hex: "#4CAF50")
     static let warning = Color(hex: "#FF9800")
     static let error = Color(hex: "#F44336")
-    
-    // MARK: - App Specific
+
+    // MARK: - State Colors
+    static let linearDisabled = Color(hex: "#3A3A3A")
+    static let linearDisabledText = Color(hex: "#5A5A5A")
+
+    // MARK: - App Specific (Aliases for consistency)
     static let appBackground = linearBg
     static let appCard = linearCard
     static let appBorder = linearBorder
-    static let appPrimary = linearPurple
+    static let appPrimary = linearPurple  // Note: linearPurple is the canonical name
     static let appText = linearText
     static let appTextSecondary = linearTextSecondary
     static let appTextTertiary = linearTextTertiary
+    static let appDisabled = linearDisabled
+    static let appDisabledText = linearDisabledText
 }
 
 // MARK: - Hex Color Extension

@@ -14,7 +14,7 @@ enum HeaderStyle {
 // MARK: - Standard Header
 
 struct StandardHeader: View {
-    @Environment(\.isEnabled)
+    @Environment(\.dismiss)
     var dismiss
     
     let title: String

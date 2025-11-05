@@ -36,22 +36,22 @@ struct DSBadge: View {
         var backgroundColor: Color {
             switch self {
             case .number:
-                return DesignSystem.colors.primary
+                return .linearPurple
             case .text:
-                return DesignSystem.colors.surface
+                return .linearCard
             case .subtle:
-                return DesignSystem.colors.surface.opacity(0.5)
+                return .linearCard.opacity(0.5)
             }
         }
-        
+
         var foregroundColor: Color {
             switch self {
             case .number:
                 return .white
             case .text:
-                return DesignSystem.colors.text
+                return .linearText
             case .subtle:
-                return DesignSystem.colors.textSecondary
+                return .linearTextSecondary
             }
         }
     }
@@ -73,7 +73,7 @@ struct DSBadge: View {
             .overlay(
                 Capsule()
                     .strokeBorder(
-                        style == .text ? DesignSystem.colors.border : Color.clear,
+                        style == .text ? .linearBorder : Color.clear,
                         lineWidth: 1
                     )
             )

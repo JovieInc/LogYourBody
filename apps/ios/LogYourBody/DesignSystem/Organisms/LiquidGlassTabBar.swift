@@ -28,7 +28,7 @@ struct LiquidGlassTabBar: View {
                         withAnimation(.interactiveSpring(response: 0.5, dampingFraction: 0.7, blendDuration: 0)) {
                             selectedTab = tab
                             selectedRect = rect
-                            HapticManager.shared.buttonTapped()
+                            // HapticManager.shared.buttonTap()
                         }
                     }
                 }
@@ -118,15 +118,12 @@ struct LiquidTabButton: View {
                             .allowsHitTesting(false)
                         
                         // Icon with liquid animation
-                        DSIcon(
-                            systemName: tab.icon,
-                            size: 24,
-                            weight: isSelected ? .medium : .regular,
-                            color: isSelected ? .white : Color.white.opacity(0.5)
-                        )
-                        .scaleEffect(isSelected ? 1.15 : 1.0)
-                        .rotationEffect(.degrees(isSelected ? 360 : 0))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isSelected)
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 24, weight: isSelected ? .medium : .regular))
+                            .foregroundColor(isSelected ? .white : Color.white.opacity(0.5))
+                            .scaleEffect(isSelected ? 1.15 : 1.0)
+                            .rotationEffect(.degrees(isSelected ? 360 : 0))
+                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isSelected)
                     }
                     .frame(width: 44, height: 44)
                 }

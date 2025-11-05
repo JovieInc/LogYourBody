@@ -95,40 +95,39 @@ class ImageProcessingService: ObservableObject {
     // MARK: - Private Processing Methods
     
     private func performImageProcessing(_ image: UIImage, taskId: UUID) throws -> ProcessedImageResult {
-        guard let cgImage = image.cgImage else {
+        // Step 0: Apply EXIF-aware orientation first
+        let orientationFixedImage = image.fixedOrientation()
+
+        guard let cgImage = orientationFixedImage.cgImage else {
             throw ProcessingError.invalidImage
         }
-        
+
         // Step 1: Detect human bounding box
         updateTaskProgress(taskId, status: .detecting, progress: 0.2)
         let boundingBox = try detectHumanBoundingBox(in: cgImage)
-        
-        // Step 2: Crop to bounding box
+
+        // Step 2: Crop to bounding box (person-centered)
         updateTaskProgress(taskId, status: .cropping, progress: 0.4)
         let croppedImage = try cropToHuman(cgImage: cgImage, boundingBox: boundingBox)
-        
-        // Step 3: Apply aspect fill to target size
+
+        // Step 3: Apply aspect fill to target size (centered on person)
         let targetSize = CGSize(width: 600, height: 800) // Standard portrait size
-        let aspectFilledImage = try aspectFillToSize(croppedImage, targetSize: targetSize)
-        
+        let aspectFilledImage = try aspectFillToSize(croppedImage, targetSize: targetSize, centerOnPerson: true)
+
         // Step 4: Remove background
         updateTaskProgress(taskId, status: .removingBackground, progress: 0.6)
         let backgroundRemovedImage = try removeBackground(from: aspectFilledImage)
-        
+
         // Step 5: Create thumbnail
         updateTaskProgress(taskId, status: .finalizing, progress: 0.8)
         let thumbnailImage = try createThumbnail(from: backgroundRemovedImage, size: CGSize(width: 150, height: 200))
-        
-        // Step 6: Fix orientation
-        let finalImage = backgroundRemovedImage.fixedOrientation()
-        let finalThumbnail = thumbnailImage.fixedOrientation()
-        
+
         updateTaskProgress(taskId, status: .completed, progress: 1.0)
-        
+
         return ProcessedImageResult(
-            originalImage: image,
-            finalImage: finalImage,
-            thumbnailImage: finalThumbnail,
+            originalImage: orientationFixedImage,
+            finalImage: backgroundRemovedImage,
+            thumbnailImage: thumbnailImage,
             boundingBox: boundingBox
         )
     }
@@ -264,42 +263,80 @@ class ImageProcessingService: ObservableObject {
         return UIImage(cgImage: croppedCGImage)
     }
     
-    private func aspectFillToSize(_ image: UIImage, targetSize: CGSize) throws -> UIImage {
+    private func aspectFillToSize(_ image: UIImage, targetSize: CGSize, centerOnPerson: Bool = true) throws -> UIImage {
         guard let cgImage = image.cgImage else {
             throw ProcessingError.invalidImage
         }
-        
+
         let sourceWidth = CGFloat(cgImage.width)
         let sourceHeight = CGFloat(cgImage.height)
-        
+
         // Calculate scale to fill target
         let scale = max(targetSize.width / sourceWidth, targetSize.height / sourceHeight)
-        
+
         // Calculate scaled size
         let scaledWidth = sourceWidth * scale
         let scaledHeight = sourceHeight * scale
-        
-        // Calculate offset to center
-        let offsetX = (scaledWidth - targetSize.width) / 2
-        let offsetY = (scaledHeight - targetSize.height) / 2
-        
+
+        // Calculate offset to center (person-aware if needed)
+        var offsetX = (scaledWidth - targetSize.width) / 2
+        var offsetY = (scaledHeight - targetSize.height) / 2
+
+        // If centering on person, detect center of mass and adjust offset
+        if centerOnPerson {
+            if let personCenter = try? detectPersonCenter(in: cgImage) {
+                // Convert normalized person center to scaled coordinates
+                let scaledPersonX = personCenter.x * scaledWidth
+                let scaledPersonY = personCenter.y * scaledHeight
+
+                // Try to center the crop on the person
+                offsetX = max(0, min(scaledWidth - targetSize.width, scaledPersonX - targetSize.width / 2))
+                offsetY = max(0, min(scaledHeight - targetSize.height, scaledPersonY - targetSize.height / 2))
+            }
+        }
+
         // Create transform
         var transform = CGAffineTransform.identity
         transform = transform.scaledBy(x: scale, y: scale)
         transform = transform.translatedBy(x: -offsetX / scale, y: -offsetY / scale)
-        
+
         // Apply transform using Core Image
         let ciImage = CIImage(cgImage: cgImage)
-        
+
         let transformedImage = ciImage.transformed(by: transform)
         let cropRect = CGRect(origin: .zero, size: targetSize)
         let croppedImage = transformedImage.cropped(to: cropRect)
-        
+
         guard let outputCGImage = ciContext.createCGImage(croppedImage, from: cropRect) else {
             throw ProcessingError.processingFailed
         }
-        
+
         return UIImage(cgImage: outputCGImage)
+    }
+
+    /// Detect the center point of the person in the image
+    private func detectPersonCenter(in cgImage: CGImage) throws -> CGPoint {
+        var centerPoint = CGPoint(x: 0.5, y: 0.5) // Default center
+
+        let request = VNDetectHumanRectanglesRequest { request, error in
+            guard error == nil,
+                  let observations = request.results as? [VNHumanObservation],
+                  let firstHuman = observations.first else {
+                return
+            }
+
+            let box = firstHuman.boundingBox
+            // Calculate center of bounding box
+            centerPoint = CGPoint(
+                x: box.midX,
+                y: box.midY
+            )
+        }
+
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        try? handler.perform([request])
+
+        return centerPoint
     }
     
     private func removeBackground(from image: UIImage) throws -> UIImage {

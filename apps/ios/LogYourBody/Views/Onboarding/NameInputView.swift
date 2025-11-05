@@ -22,7 +22,7 @@ struct NameInputView: View {
                 Button(
             action: {
                     viewModel.previousStep()
-                    HapticManager.shared.buttonTapped()
+                    // HapticManager.shared.buttonTap()
                 },
             label: {
                     Image(systemName: "chevron.left")

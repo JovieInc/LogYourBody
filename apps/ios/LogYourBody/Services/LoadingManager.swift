@@ -67,20 +67,18 @@ class LoadingManager: ObservableObject {
         
         // Step 2: Check Authentication
         await updateProgress(for: .checkAuth, partial: 0.5)
-        
-        // Wait for Clerk to be loaded first
-        while !authManager.isClerkLoaded {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+
+        // Skip Clerk loading wait if using mock auth
+        if !Constants.useMockAuth {
+            // Wait for Clerk to be loaded with timeout
+            let startTime = Date()
+            let maxWaitTime: TimeInterval = 3.0 // Allow 3 seconds for Clerk to initialize
+
+            while !authManager.isClerkLoaded && Date().timeIntervalSince(startTime) < maxWaitTime {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s polling interval
+            }
         }
-        
-        // Add timeout for auth check with minimal wait
-        let startTime = Date()
-        let maxWaitTime: TimeInterval = 0.5 // Quick timeout - auth can complete in background
-        
-        while !authManager.isClerkLoaded && Date().timeIntervalSince(startTime) < maxWaitTime {
-            try? await Task.sleep(nanoseconds: 20_000_000) // 0.02s polling interval
-        }
-        
+
         await updateProgress(for: .checkAuth)
         
         // Step 3: Load Profile (if authenticated)

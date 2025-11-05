@@ -527,8 +527,8 @@ struct ProfileSettingsViewV2: View {
                     try await authManager.consolidateNameUpdate(editableName)
                 }
                 
-                // Calculate height in inches for storage
-                let heightInInches = useMetricHeight ? Double(editableHeightCm) / 2.54 : Double(editableHeightCm) / 2.54
+                // Calculate height in inches for storage (editableHeightCm is always in cm)
+                let heightInInches = Double(editableHeightCm) / 2.54
                 
                 // Create updated profile
                 let updatedProfile = UserProfile(

@@ -6,274 +6,128 @@ import Foundation
 import SwiftUI
 
 extension DashboardView {
-    // MARK: - Unit Conversion
-    
-    func convertWeight(_ weight: Double, from: String, to: String) -> Double {
-        if from == to {
+    // MARK: - Weight Conversions
+
+    private var currentMeasurementSystem: MeasurementSystem {
+        MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+    }
+
+    func convertWeight(_ weight: Double?, to system: MeasurementSystem) -> Double? {
+        guard let weight = weight else { return nil }
+
+        // Weight is ALWAYS stored in kg in the database
+        switch system {
+        case .metric:
+            // Already in kg
             return weight
+        case .imperial:
+            // Convert kg to lbs
+            return weight * 2.20462
         }
-        
-        let weightInKg = from == "lbs" ? weight * 0.453592 : weight
-        return to == "lbs" ? weightInKg * 2.20462 : weightInKg
     }
-    
-    func formatHeightToFeetInches(_ heightCm: Double) -> String {
-        let totalInches = heightCm / 2.54
-        let feet = Int(totalInches / 12)
-        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
-        return "\(feet)'\(inches)\""
+
+    func formatWeight(_ weight: Double?) -> String {
+        guard let weight = weight else { return "N/A" }
+
+        let system = currentMeasurementSystem
+        let convertedWeight = convertWeight(weight, to: system) ?? weight
+        let unit = system.weightUnit
+
+        return String(format: "%.1f %@", convertedWeight, unit)
     }
-    
+
     // MARK: - Body Composition Calculations
-    
-    func calculateFFMI() -> Double? {
-        guard let weight = currentMetric?.weight,
-              let bodyFat = currentMetric?.bodyFatPercentage ??
-              (selectedIndex < bodyMetrics.count
-                ? PhotoMetadataService.shared.estimateBodyFat(for: bodyMetrics[selectedIndex].date, metrics: bodyMetrics)?.value
-                : nil),
-              let heightCm = authManager.currentUser?.profile?.height,
-              heightCm > 0 else { return nil }
-        
-        let heightM = heightCm / 100.0
-        let leanMass = weight * (1 - bodyFat / 100)
-        let ffmi = leanMass / (heightM * heightM)
-        
-        return ffmi
-    }
-    
-    func calculateLeanMass() -> Double? {
-        guard let weight = currentMetric?.weight else { return nil }
-        
-        let bodyFat = currentMetric?.bodyFatPercentage ??
-            (selectedIndex < bodyMetrics.count
-                ? PhotoMetadataService.shared.estimateBodyFat(for: bodyMetrics[selectedIndex].date, metrics: bodyMetrics)?.value
-                : nil)
-        
-        guard let bf = bodyFat else { return nil }
-        
-        return weight * (1 - bf / 100)
-    }
-    
-    // MARK: - Color Calculations
-    
-    func getBodyFatColor(for value: Double, gender: String?) -> Color {
-        let ranges: [(Double, Double)]
-        
-        if gender == "Male" {
-            ranges = [(0, 6), (6, 13), (14, 17), (18, 24), (25, 100)]
+
+    /// Convert height to inches regardless of stored unit
+    func convertHeightToInches(height: Double?, heightUnit: String?) -> Double? {
+        guard let height = height else { return nil }
+
+        if heightUnit == "cm" {
+            return height / 2.54  // Convert cm to inches
         } else {
-            ranges = [(0, 14), (14, 20), (21, 24), (25, 31), (32, 100)]
+            return height  // Already in inches
         }
-        
-        if value <= ranges[0].1 {
-            return .blue // Essential fat
-        } else if value <= ranges[1].1 {
-            return .green // Athletes
-        } else if value <= ranges[2].1 {
-            return .green // Fitness
-        } else if value <= ranges[3].1 {
-            return .yellow // Average
+    }
+
+    func calculateLeanMass(weight: Double?, bodyFat: Double?) -> Double? {
+        guard let weight = weight, let bodyFat = bodyFat else { return nil }
+        return weight * (1 - bodyFat / 100)
+    }
+
+    func calculateFFMI(weight: Double?, bodyFat: Double?, heightInches: Double?) -> Double? {
+        guard let weight = weight,
+              let bodyFat = bodyFat,
+              let heightInches = heightInches else {
+            return nil
+        }
+
+        // Weight is already in kg from database
+        let heightMeters = heightInches * 0.0254
+        let leanMassKg = weight * (1 - bodyFat / 100)
+
+        // FFMI = lean mass (kg) / height (m)^2
+        return leanMassKg / (heightMeters * heightMeters)
+    }
+
+    // MARK: - Health Ranges
+
+    func getBodyFatColor(bodyFat: Double?, gender: String?) -> Color {
+        guard let bodyFat = bodyFat else { return .gray }
+
+        // Gender-specific body fat % ranges
+        let isMale = gender?.lowercased() == "male"
+
+        if isMale {
+            switch bodyFat {
+            case ..<6: return .blue // Essential fat
+            case 6..<14: return .green // Athletes
+            case 14..<18: return .cyan // Fitness
+            case 18..<25: return .yellow // Average
+            default: return .red // Above average
+            }
         } else {
-            return .red // Obese
+            switch bodyFat {
+            case ..<14: return .blue // Essential fat
+            case 14..<21: return .green // Athletes
+            case 21..<25: return .cyan // Fitness
+            case 25..<32: return .yellow // Average
+            default: return .red // Above average
+            }
         }
     }
-    
-    func isInHealthyWeightRange() -> Bool {
-        guard let weight = currentMetric?.weight,
-              let heightCm = authManager.currentUser?.profile?.height,
-              heightCm > 0 else { return false }
-        
-        let heightM = heightCm / 100.0
-        let bmi = weight / (heightM * heightM)
-        
-        return bmi >= 18.5 && bmi < 25
+
+    func getOptimalBodyFatRange(gender: String?) -> String {
+        let isMale = gender?.lowercased() == "male"
+        return isMale ? "14-18%" : "21-25%"
     }
-    
-    // MARK: - Optimal Range Calculations
-    
-    func getOptimalBodyFatRange() -> ClosedRange<Double> {
-        let gender = authManager.currentUser?.profile?.gender
-        if gender == "Male" {
-            return 10...15
+
+    func isInHealthyWeightRange(weight: Double?, heightInches: Double?) -> Bool {
+        guard let weight = weight, let heightInches = heightInches else {
+            return false
+        }
+
+        // Calculate BMI - weight is already in kg from database
+        let heightMeters = heightInches * 0.0254
+        let bmi = weight / (heightMeters * heightMeters)
+
+        // Healthy BMI range: 18.5 - 24.9
+        return bmi >= 18.5 && bmi <= 24.9
+    }
+
+    // MARK: - Formatting Helpers
+
+    func formatHeightToFeetInches(_ heightInches: Double?) -> String {
+        guard let heightInches = heightInches else { return "N/A" }
+
+        let system = currentMeasurementSystem
+
+        if system == .metric {
+            let cm = heightInches * 2.54
+            return String(format: "%.0f cm", cm)
         } else {
-            return 18...25
+            let feet = Int(heightInches / 12)
+            let inches = Int(heightInches.truncatingRemainder(dividingBy: 12))
+            return "\(feet)'\(inches)\""
         }
-    }
-    
-    func getOptimalFFMIRange() -> ClosedRange<Double> {
-        let gender = authManager.currentUser?.profile?.gender
-        if gender == "Male" {
-            return 19...22
-        } else {
-            return 16...19
-        }
-    }
-    
-    func getOptimalWeightRange() -> ClosedRange<Double>? {
-        guard let heightCm = authManager.currentUser?.profile?.height,
-              heightCm > 0 else { return nil }
-        
-        let heightM = heightCm / 100.0
-        let minWeight = 18.5 * heightM * heightM
-        let maxWeight = 24.9 * heightM * heightM
-        
-        return minWeight...maxWeight
-    }
-    
-    // MARK: - Trend Calculations
-    
-    func calculateBodyFatTrend() -> Double? {
-        guard bodyMetrics.count > 1,
-              selectedIndex > 0,
-              let currentDate = currentMetric?.date else { return nil }
-        
-        // Look for previous body fat measurement
-        for i in stride(from: selectedIndex - 1, through: 0, by: -1) {
-            if let previousBF = bodyMetrics[i].bodyFatPercentage,
-               let currentBF = currentMetric?.bodyFatPercentage {
-                let daysDiff = Calendar.current.dateComponents([.day],
-                    from: bodyMetrics[i].date,
-                    to: currentDate).day ?? 1
-                
-                // Calculate change per month (30 days)
-                let change = currentBF - previousBF
-                let changePerMonth = (change / Double(max(daysDiff, 1))) * 30
-                
-                // Only show trend if change is meaningful (> 0.2% per month)
-                return abs(changePerMonth) > 0.2 ? changePerMonth : nil
-            }
-        }
-        
-        return nil
-    }
-    
-    func calculateFFMITrend() -> Double? {
-        guard bodyMetrics.count > 1,
-              selectedIndex > 0,
-              let currentFFMI = calculateFFMI(),
-              let currentDate = currentMetric?.date else { return nil }
-        
-        // Store the current selectedIndex temporarily
-        let currentIndex = selectedIndex
-        
-        // Find previous FFMI
-        for i in stride(from: currentIndex - 1, through: 0, by: -1) {
-            // Temporarily set selectedIndex to calculate FFMI for previous date
-            selectedIndex = i
-            
-            if let previousFFMI = calculateFFMI() {
-                // Restore selectedIndex
-                selectedIndex = currentIndex
-                
-                let daysDiff = Calendar.current.dateComponents([.day],
-                    from: bodyMetrics[i].date,
-                    to: currentDate).day ?? 1
-                
-                // Calculate change per month (30 days)
-                let change = currentFFMI - previousFFMI
-                let changePerMonth = (change / Double(max(daysDiff, 1))) * 30
-                
-                // Only show trend if change is meaningful (> 0.1 per month)
-                return abs(changePerMonth) > 0.1 ? changePerMonth : nil
-            }
-        }
-        
-        // Restore selectedIndex
-        selectedIndex = currentIndex
-        return nil
-    }
-    
-    func calculateWeightTrend() -> Double? {
-        guard bodyMetrics.count > 1,
-              selectedIndex > 0,
-              let currentWeight = currentMetric?.weight,
-              let currentDate = currentMetric?.date else { return nil }
-        
-        // Look for previous weight measurement
-        for i in stride(from: selectedIndex - 1, through: 0, by: -1) {
-            if let previousWeight = bodyMetrics[i].weight {
-                let daysDiff = Calendar.current.dateComponents([.day],
-                    from: bodyMetrics[i].date,
-                    to: currentDate).day ?? 1
-                
-                // Calculate change per month (30 days) in kg
-                let change = currentWeight - previousWeight
-                let changePerMonth = (change / Double(max(daysDiff, 1))) * 30
-                
-                // Only show trend if change is meaningful (> 0.2 kg per month)
-                return abs(changePerMonth) > 0.2 ? changePerMonth : nil
-            }
-        }
-        
-        return nil
-    }
-    
-    func calculateStepsTrend() -> Double? {
-        guard let currentSteps = selectedDateMetrics?.steps,
-              selectedIndex > 0 else { return nil }
-        
-        // Calculate 7-day average
-        let calendar = Calendar.current
-        let endDate = currentMetric?.date ?? Date()
-        let startDate = calendar.date(byAdding: .day, value: -7, to: endDate) ?? endDate
-        
-        if let userId = authManager.currentUser?.id {
-            var dailyMetrics: [CachedDailyMetrics] = []
-            var currentDate = startDate
-            while currentDate <= endDate {
-                if let metrics = CoreDataManager.shared.fetchDailyMetrics(for: userId, date: currentDate) {
-                    dailyMetrics.append(metrics)
-                }
-                currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
-            }
-            
-            let stepCounts = dailyMetrics.compactMap { $0.steps }.map { Int($0) }
-            guard !stepCounts.isEmpty else { return nil }
-            
-            let average = Double(stepCounts.reduce(0, +)) / Double(stepCounts.count)
-            let trend = Double(currentSteps) - average
-            
-            // Only show trend if difference is > 500 steps
-            return abs(trend) > 500 ? trend : nil
-        }
-        
-        return nil
-    }
-    
-    func calculateLeanMassTrend() -> Double? {
-        guard let currentLeanMass = calculateLeanMass(),
-              bodyMetrics.count > 1,
-              selectedIndex > 0,
-              let currentDate = currentMetric?.date else { return nil }
-        
-        // Store the current selectedIndex temporarily
-        let currentIndex = selectedIndex
-        
-        // Find previous metric with enough data
-        for i in stride(from: currentIndex - 1, through: 0, by: -1) {
-            // Temporarily set selectedIndex to calculate lean mass for previous date
-            selectedIndex = i
-            
-            if let previousLeanMass = calculateLeanMass() {
-                // Restore selectedIndex
-                selectedIndex = currentIndex
-                
-                let daysDiff = Calendar.current.dateComponents([.day],
-                    from: bodyMetrics[i].date,
-                    to: currentDate).day ?? 1
-                
-                // Calculate change per month (30 days)
-                let change = currentLeanMass - previousLeanMass
-                let changePerMonth = (change / Double(max(daysDiff, 1))) * 30
-                
-                // Only show trend if change is meaningful (> 0.2 kg per month)
-                return abs(changePerMonth) > 0.2 ? changePerMonth : nil
-            }
-        }
-        
-        // Restore selectedIndex
-        selectedIndex = currentIndex
-        return nil
     }
 }

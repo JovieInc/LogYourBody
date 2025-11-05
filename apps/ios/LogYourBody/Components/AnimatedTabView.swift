@@ -11,34 +11,26 @@ struct AnimatedTabView: View {
     
     enum Tab: Int, CaseIterable {
         case dashboard = 0
-        case dietPhases = 1
-        case log = 2
-        case settings = 3
-        
+        case log = 1
+
         var icon: String {
             switch self {
             case .dashboard: return "house"
             case .log: return "plus"
-            case .dietPhases: return "chart.line.uptrend.xyaxis"
-            case .settings: return "gearshape"
             }
         }
-        
+
         var title: String {
             switch self {
             case .dashboard: return "Dashboard"
             case .log: return "Log"
-            case .dietPhases: return "Diet Phases"
-            case .settings: return "Settings"
             }
         }
-        
+
         var accessibilityLabel: String {
             switch self {
             case .dashboard: return "Dashboard tab"
             case .log: return "Add new entry"
-            case .dietPhases: return "Diet phase history"
-            case .settings: return "Settings tab"
             }
         }
     }
@@ -53,56 +45,46 @@ struct AnimatedTabView: View {
                 ) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         selectedTab = tab
-                        HapticManager.shared.buttonTapped()
+                        // HapticManager.shared.buttonTap()
                         bounceAnimation.toggle()
                     }
                 }
             }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 56) // Increased height for better tap targets
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(
-            // Liquid Glass effect with dynamic animations
+            // Liquid Glass effect - matches LiquidGlassCard design
             ZStack {
-                // Base glass layer
-                RoundedRectangle(cornerRadius: 28)
+                // Base glass layer with material blur
+                RoundedRectangle(cornerRadius: 24)
                     .fill(.ultraThinMaterial)
-                
-                // Animated shimmer overlay
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.0),
-                                Color.white.opacity(0.05),
-                                Color.white.opacity(0.0)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(Color.white.opacity(0.03))
                     )
-                    .offset(x: bounceAnimation ? -100 : 100)
-                    .animation(.easeInOut(duration: 1.5), value: bounceAnimation)
-                
-                // Glass border
-                RoundedRectangle(cornerRadius: 28)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.15),
-                                Color.white.opacity(0.05)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24)
+                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
                     )
+
+                // Subtle top highlight
+                VStack {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.15),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 4)
+                    Spacer()
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 24))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 28))
         )
-        .shadow(color: Color.black.opacity(0.3), radius: 12, x: 0, y: 6)
-        .scaleEffect(bounceAnimation ? 1.02 : 1.0)
-        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: bounceAnimation)
+        .shadow(color: Color.black.opacity(0.20), radius: 12, x: 0, y: 6)
     }
 }
 

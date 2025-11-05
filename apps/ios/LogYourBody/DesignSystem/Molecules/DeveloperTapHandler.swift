@@ -36,17 +36,7 @@ struct DeveloperTapHandler<Content: View>: View {
 }
 
 // MARK: - Developer Tap Indicator Atom
-
-struct DeveloperTapIndicator: View {
-    let remainingTaps: Int
-    
-    var body: some View {
-        Text("\(remainingTaps)")
-            .font(.caption2)
-            .foregroundColor(.appTextTertiary)
-            .transition(.opacity)
-    }
-}
+// Note: DeveloperTapIndicator is defined in DeveloperTapIndicator.swift
 
 // MARK: - Preview
 

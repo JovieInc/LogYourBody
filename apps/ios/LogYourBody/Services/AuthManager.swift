@@ -82,22 +82,27 @@ class AuthManager: NSObject, ObservableObject {
     }
     
     func initializeClerk() async {
-        // print("🔧 Initializing Clerk SDK")
-        
+        print("🔧 Initializing Clerk SDK")
+        print("🔧 Publishable Key: \(Constants.clerkPublishableKey.prefix(20))...")
+
         // Configure Clerk with publishable key
         clerk.configure(publishableKey: Constants.clerkPublishableKey)
-        
+
         // Load Clerk
         do {
+            print("🔧 Attempting to load Clerk...")
             try await clerk.load()
-            // print("✅ Clerk SDK loaded successfully")
-            
+            print("✅ Clerk SDK loaded successfully")
+
             await MainActor.run {
                 self.isClerkLoaded = true
                 self.observeSessionChanges()
             }
         } catch {
-            // print("❌ Failed to load Clerk: \(error)")
+            print("❌ Failed to load Clerk: \(error)")
+            print("❌ Error type: \(type(of: error))")
+            print("❌ Error details: \(String(describing: error))")
+            // Don't set isClerkLoaded on error - let the timeout in LoadingManager handle it
         }
     }
     
@@ -525,8 +530,39 @@ class AuthManager: NSObject, ObservableObject {
     // MARK: - Unified Apple Sign In Handler
     @MainActor
     func handleAppleSignIn() async {
-        guard isClerkLoaded else {
-            showAuthError("Authentication service not ready. Please try again.")
+        // Allow Apple Sign In with mock auth for testing
+        if !Constants.useMockAuth {
+            guard isClerkLoaded else {
+                showAuthError("Authentication service not ready. Please try again.")
+                return
+            }
+        } else {
+            // Mock Apple Sign In for testing
+            let mockUser = LocalUser(
+                id: "mock_apple_user_123",
+                email: "test@apple.com",
+                name: "Apple Test User",
+                avatarUrl: nil,
+                profile: UserProfile(
+                    id: "mock_apple_user_123",
+                    email: "test@apple.com",
+                    username: nil,
+                    fullName: "Apple Test User",
+                    dateOfBirth: nil,
+                    height: nil,
+                    heightUnit: "cm",
+                    gender: nil,
+                    activityLevel: nil,
+                    goalWeight: nil,
+                    goalWeightUnit: "kg"
+                )
+            )
+
+            await MainActor.run {
+                self.currentUser = mockUser
+                self.isAuthenticated = true
+                UserDefaults.standard.set(false, forKey: Constants.hasCompletedOnboardingKey)
+            }
             return
         }
         
@@ -1377,11 +1413,17 @@ class AuthManager: NSObject, ObservableObject {
             return appleSignInName
         }
         
-        // Fall back to email prefix
+        // Fall back to email prefix (but not for private relay emails)
         if let email = currentUser?.email ?? clerk.user?.emailAddresses.first?.emailAddress {
+            // Don't use email prefix for Apple private relay or other privacy-focused emails
+            if email.contains("@privaterelay.appleid.com") ||
+               email.contains("@icloud.com") ||
+               email.hasPrefix("no-reply") {
+                return "User"
+            }
             return email.components(separatedBy: "@").first ?? "User"
         }
-        
+
         return "User"
     }
     

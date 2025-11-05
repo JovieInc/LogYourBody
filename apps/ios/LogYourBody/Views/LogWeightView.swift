@@ -23,8 +23,8 @@ struct LogWeightView: View {
         case weight, bodyFat
     }
     
-    var currentSystem: PreferencesView.MeasurementSystem {
-        PreferencesView.MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+    var currentSystem: MeasurementSystem {
+        MeasurementSystem(rawValue: measurementSystem) ?? .imperial
     }
     
     var body: some View {

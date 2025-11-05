@@ -14,29 +14,34 @@ struct Constants {
     static let appVersion = "1.0.0"
     static let buildNumber = "1"
     
-    // MARK: - API Configuration
-    #if DEBUG
-    static let baseURL = "https://www.logyourbody.com"  // Use production API even in debug
-    #else
-    static let baseURL = "https://www.logyourbody.com"
-    #endif
-    
-    // MARK: - Clerk Configuration
-    static let clerkPublishableKey = "pk_live_Y2xlcmsubG9neW91cmJvZHkuY29tJA"
-    static let clerkFrontendAPI = "https://clerk.logyourbody.com"
-    static let useMockAuth = false  // Disable mock auth - using production
-    
-    static var isClerkConfigured: Bool {
-        let keyValid = !clerkPublishableKey.isEmpty && clerkPublishableKey.hasPrefix("pk_")
-        if !keyValid {
-            // print("⚠️ Invalid Clerk publishable key format")
-        }
-        return keyValid
+    // MARK: - API Configuration (from Config.xcconfig via Info.plist)
+    static var baseURL: String {
+        Configuration.apiBaseURL
     }
-    
-    // MARK: - Supabase Configuration (for data storage)
-    static let supabaseURL = "https://ihivupqpctpkrgqgxfjf.supabase.co"
-    static let supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImloaXZ1cHFwY3Rwa3JncWd4ZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwODc4MTksImV4cCI6MjA2NTY2MzgxOX0.Vihex-nnnn-au1Z-dwGNZUnp9CTGa37t3lNk9RLB-8o"
+
+    // MARK: - Clerk Configuration (from Config.xcconfig via Info.plist)
+    static var clerkPublishableKey: String {
+        Configuration.clerkPublishableKey
+    }
+
+    static var clerkFrontendAPI: String {
+        Configuration.clerkFrontendAPI
+    }
+
+    static let useMockAuth = true  // Enable mock auth for testing UI
+
+    static var isClerkConfigured: Bool {
+        Configuration.isClerkConfigured
+    }
+
+    // MARK: - Supabase Configuration (from Config.xcconfig via Info.plist)
+    static var supabaseURL: String {
+        Configuration.supabaseURL
+    }
+
+    static var supabaseAnonKey: String {
+        Configuration.supabaseAnonKey
+    }
     
     // MARK: - UserDefaults Keys
     static let authTokenKey = "authToken"

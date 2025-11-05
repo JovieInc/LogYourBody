@@ -60,8 +60,76 @@
 		AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872322EB405C00041C426 /* BackgroundTaskType.swift */; };
 		AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */; };
 		AD8872372EB406430041C426 /* BackgroundTaskDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */; };
-		AD8872392EB4066D0041C426 /* AnimatedTaskIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872382EB4066D0041C426 /* AnimatedTaskIcon.swift */; };
-		AD88723B2EB4068D0041C426 /* DashboardTaskBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88723A2EB4068D0041C426 /* DashboardTaskBanner.swift */; };
+		AD8872402EB87EF80041C426 /* DashboardViewSimple.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88723F2EB87EF80041C426 /* DashboardViewSimple.swift */; };
+		AD8872412EB87EF80041C426 /* DashboardViewLiquid.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */; };
+		AD8872432EB87F290041C426 /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872422EB87F290041C426 /* ProgressRing.swift */; };
+		AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872442EB87F480041C426 /* LiquidGlassCard.swift */; };
+		AD8872472EB9461D0041C426 /* MetricsInterpolationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872462EB9461D0041C426 /* MetricsInterpolationService.swift */; };
+		AD8872932EB946BE0041C426 /* DeveloperTapHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726D2EB946BE0041C426 /* DeveloperTapHandler.swift */; };
+		AD8872952EB946BE0041C426 /* CoreMetricsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727F2EB946BE0041C426 /* CoreMetricsRow.swift */; };
+		AD8872962EB946BE0041C426 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872912EB946BE0041C426 /* Theme.swift */; };
+		AD8872972EB946BE0041C426 /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872712EB946BE0041C426 /* ErrorStateView.swift */; };
+		AD8872982EB946BE0041C426 /* LiquidGlassTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872862EB946BE0041C426 /* LiquidGlassTabBar.swift */; };
+		AD8872992EB946BE0041C426 /* DSAuthDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872702EB946BE0041C426 /* DSAuthDivider.swift */; };
+		AD88729A2EB946BE0041C426 /* DSText.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725A2EB946BE0041C426 /* DSText.swift */; };
+		AD88729B2EB946BE0041C426 /* AuthFormField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726A2EB946BE0041C426 /* AuthFormField.swift */; };
+		AD88729C2EB946BE0041C426 /* StandardTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872632EB946BE0041C426 /* StandardTextField.swift */; };
+		AD88729D2EB946BE0041C426 /* UserGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727C2EB946BE0041C426 /* UserGreeting.swift */; };
+		AD88729E2EB946BE0041C426 /* DSMetricLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872562EB946BE0041C426 /* DSMetricLabel.swift */; };
+		AD88729F2EB946BE0041C426 /* CommonModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872672EB946BE0041C426 /* CommonModifiers.swift */; };
+		AD8872A02EB946BE0041C426 /* SettingsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725F2EB946BE0041C426 /* SettingsRow.swift */; };
+		AD8872A12EB946BE0041C426 /* DSIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872522EB946BE0041C426 /* DSIcon.swift */; };
+		AD8872A22EB946BE0041C426 /* BiometricAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727E2EB946BE0041C426 /* BiometricAuthView.swift */; };
+		AD8872A32EB946BE0041C426 /* SocialLoginButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872792EB946BE0041C426 /* SocialLoginButton.swift */; };
+		AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724C2EB946BE0041C426 /* DSAuthLink.swift */; };
+		AD8872A52EB946BE0041C426 /* LoginForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872882EB946BE0041C426 /* LoginForm.swift */; };
+		AD8872A62EB946BE0041C426 /* DSBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724E2EB946BE0041C426 /* DSBadge.swift */; };
+		AD8872A72EB946BE0041C426 /* LoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872872EB946BE0041C426 /* LoadingScreen.swift */; };
+		AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728D2EB946BE0041C426 /* UserHeaderSection.swift */; };
+		AD8872A92EB946BE0041C426 /* DSTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725B2EB946BE0041C426 /* DSTextField.swift */; };
+		AD8872AA2EB946BE0041C426 /* DSLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872552EB946BE0041C426 /* DSLogo.swift */; };
+		AD8872AB2EB946BE0041C426 /* DSAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724D2EB946BE0041C426 /* DSAvatar.swift */; };
+		AD8872AC2EB946BE0041C426 /* StepsIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727A2EB946BE0041C426 /* StepsIndicator.swift */; };
+		AD8872AD2EB946BE0041C426 /* DashboardHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872812EB946BE0041C426 /* DashboardHeader.swift */; };
+		AD8872AE2EB946BE0041C426 /* StandardButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872602EB946BE0041C426 /* StandardButton.swift */; };
+		AD8872AF2EB946BE0041C426 /* UserAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727B2EB946BE0041C426 /* UserAvatar.swift */; };
+		AD8872B02EB946BE0041C426 /* SecondaryMetricsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728A2EB946BE0041C426 /* SecondaryMetricsRow.swift */; };
+		AD8872B12EB946BE0041C426 /* MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872752EB946BE0041C426 /* MetricCard.swift */; };
+		AD8872B22EB946BE0041C426 /* AuthHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726B2EB946BE0041C426 /* AuthHeader.swift */; };
+		AD8872B32EB946BE0041C426 /* LegalSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872852EB946BE0041C426 /* LegalSection.swift */; };
+		AD8872B42EB946BE0041C426 /* DSInterpolationIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872532EB946BE0041C426 /* DSInterpolationIcon.swift */; };
+		AD8872B52EB946BE0041C426 /* LiquidGlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725D2EB946BE0041C426 /* LiquidGlassCard.swift */; };
+		AD8872B62EB946BE0041C426 /* DeveloperToolsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872842EB946BE0041C426 /* DeveloperToolsList.swift */; };
+		AD8872B72EB946BE0041C426 /* AuthConsentCheckbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872692EB946BE0041C426 /* AuthConsentCheckbox.swift */; };
+		AD8872B82EB946BE0041C426 /* DSProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872582EB946BE0041C426 /* DSProgressBar.swift */; };
+		AD8872B92EB946BE0041C426 /* DSCircularProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872502EB946BE0041C426 /* DSCircularProgress.swift */; };
+		AD8872BA2EB946BE0041C426 /* DocumentHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726F2EB946BE0041C426 /* DocumentHeader.swift */; };
+		AD8872BB2EB946BE0041C426 /* DeveloperTapIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726E2EB946BE0041C426 /* DeveloperTapIndicator.swift */; };
+		AD8872BC2EB946BE0041C426 /* DSAuthButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724B2EB946BE0041C426 /* DSAuthButton.swift */; };
+		AD8872BD2EB946BE0041C426 /* AnimatedTaskIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872482EB946BE0041C426 /* AnimatedTaskIcon.swift */; };
+		AD8872BE2EB946BE0041C426 /* OTPField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872772EB946BE0041C426 /* OTPField.swift */; };
+		AD8872BF2EB946BE0041C426 /* DashboardContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872802EB946BE0041C426 /* DashboardContent.swift */; };
+		AD8872C02EB946BE0041C426 /* MetricGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872762EB946BE0041C426 /* MetricGauge.swift */; };
+		AD8872C12EB946BE0041C426 /* DSSecureField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872592EB946BE0041C426 /* DSSecureField.swift */; };
+		AD8872C22EB946BE0041C426 /* PasswordStrengthIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872782EB946BE0041C426 /* PasswordStrengthIndicator.swift */; };
+		AD8872C32EB946BE0041C426 /* DSLoadingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872542EB946BE0041C426 /* DSLoadingIndicator.swift */; };
+		AD8872C42EB946BE0041C426 /* LogoutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872742EB946BE0041C426 /* LogoutButton.swift */; };
+		AD8872C52EB946BE0041C426 /* DSButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724F2EB946BE0041C426 /* DSButton.swift */; };
+		AD8872C62EB946BE0041C426 /* BaseButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872492EB946BE0041C426 /* BaseButton.swift */; };
+		AD8872C82EB946BE0041C426 /* VerificationForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728E2EB946BE0041C426 /* VerificationForm.swift */; };
+		AD8872C92EB946BE0041C426 /* SettingsSectionGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728B2EB946BE0041C426 /* SettingsSectionGroup.swift */; };
+		AD8872CA2EB946BE0041C426 /* StateViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872642EB946BE0041C426 /* StateViews.swift */; };
+		AD8872CB2EB946BE0041C426 /* DSDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872512EB946BE0041C426 /* DSDivider.swift */; };
+		AD8872CC2EB946BE0041C426 /* LegalDocumentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872722EB946BE0041C426 /* LegalDocumentRow.swift */; };
+		AD8872CD2EB946BE0041C426 /* SignUpForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728C2EB946BE0041C426 /* SignUpForm.swift */; };
+		AD8872CE2EB946BE0041C426 /* DSMetricValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872572EB946BE0041C426 /* DSMetricValue.swift */; };
+		AD8872CF2EB946BE0041C426 /* StandardHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872622EB946BE0041C426 /* StandardHeader.swift */; };
+		AD8872D02EB946BE0041C426 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872892EB946BE0041C426 /* MarkdownView.swift */; };
+		AD8872D12EB946BE0041C426 /* StandardCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872612EB946BE0041C426 /* StandardCard.swift */; };
+		AD8872D22EB946BE0041C426 /* LiquidGlassCTAButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872732EB946BE0041C426 /* LiquidGlassCTAButton.swift */; };
+		AD8872D32EB946BE0041C426 /* DSTrendIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725C2EB946BE0041C426 /* DSTrendIndicator.swift */; };
+		AD8872D42EB946BE0041C426 /* BaseTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724A2EB946BE0041C426 /* BaseTextField.swift */; };
+		AD8872D62EB946BE0041C426 /* CompactMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726C2EB946BE0041C426 /* CompactMetricCard.swift */; };
 		ADDC479D2E2D89F3003C97E7 /* AuthComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F22E22EE9D00B82C49 /* AuthComponents.swift */; };
 		ADDC479E2E2D89F3003C97E7 /* CommonComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */; };
 		ADDC479F2E2D89F3003C97E7 /* ImageProcessingStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F42E22EE9D00B82C49 /* ImageProcessingStatusView.swift */; };
@@ -98,7 +166,6 @@
 		ADDC47C82E2D89F3003C97E7 /* LiquidGlassComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D39B2E24AD30001F82A8 /* LiquidGlassComponents.swift */; };
 		ADDC47C92E2D89F3003C97E7 /* ShakeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D3962E24A96A001F82A8 /* ShakeDetector.swift */; };
 		ADDC47CA2E2D89F3003C97E7 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3304BF2E241FE80043C4AC /* AppVersion.swift */; };
-		ADDC47CB2E2D89F3003C97E7 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF5C1B92E1DFE3100E3FB4D /* DesignSystem.swift */; };
 		ADDC47CC2E2D89F3003C97E7 /* VersionInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8552612E19DC9C003552EE /* VersionInfo.swift */; };
 		ADDC47CD2E2D89F3003C97E7 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AEE2E15FA5C002376C6 /* Configuration.swift */; };
 		ADDC47CE2E2D89F3003C97E7 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AEF2E15FA5C002376C6 /* Constants.swift */; };
@@ -356,8 +423,76 @@
 		AD8872322EB405C00041C426 /* BackgroundTaskType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskType.swift; sourceTree = "<group>"; };
 		AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskMonitor.swift; sourceTree = "<group>"; };
 		AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskDetailsSheet.swift; sourceTree = "<group>"; };
-		AD8872382EB4066D0041C426 /* AnimatedTaskIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedTaskIcon.swift; sourceTree = "<group>"; };
-		AD88723A2EB4068D0041C426 /* DashboardTaskBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardTaskBanner.swift; sourceTree = "<group>"; };
+		AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewLiquid.swift; sourceTree = "<group>"; };
+		AD88723F2EB87EF80041C426 /* DashboardViewSimple.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewSimple.swift; sourceTree = "<group>"; };
+		AD8872422EB87F290041C426 /* ProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProgressRing.swift; path = Components/ProgressRing.swift; sourceTree = "<group>"; };
+		AD8872442EB87F480041C426 /* LiquidGlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LiquidGlassCard.swift; path = DesignSystem/Atoms/LiquidGlassCard.swift; sourceTree = "<group>"; };
+		AD8872462EB9461D0041C426 /* MetricsInterpolationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsInterpolationService.swift; sourceTree = "<group>"; };
+		AD8872482EB946BE0041C426 /* AnimatedTaskIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedTaskIcon.swift; sourceTree = "<group>"; };
+		AD8872492EB946BE0041C426 /* BaseButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseButton.swift; sourceTree = "<group>"; };
+		AD88724A2EB946BE0041C426 /* BaseTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseTextField.swift; sourceTree = "<group>"; };
+		AD88724B2EB946BE0041C426 /* DSAuthButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSAuthButton.swift; sourceTree = "<group>"; };
+		AD88724C2EB946BE0041C426 /* DSAuthLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSAuthLink.swift; sourceTree = "<group>"; };
+		AD88724D2EB946BE0041C426 /* DSAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSAvatar.swift; sourceTree = "<group>"; };
+		AD88724E2EB946BE0041C426 /* DSBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSBadge.swift; sourceTree = "<group>"; };
+		AD88724F2EB946BE0041C426 /* DSButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSButton.swift; sourceTree = "<group>"; };
+		AD8872502EB946BE0041C426 /* DSCircularProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSCircularProgress.swift; sourceTree = "<group>"; };
+		AD8872512EB946BE0041C426 /* DSDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSDivider.swift; sourceTree = "<group>"; };
+		AD8872522EB946BE0041C426 /* DSIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSIcon.swift; sourceTree = "<group>"; };
+		AD8872532EB946BE0041C426 /* DSInterpolationIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSInterpolationIcon.swift; sourceTree = "<group>"; };
+		AD8872542EB946BE0041C426 /* DSLoadingIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSLoadingIndicator.swift; sourceTree = "<group>"; };
+		AD8872552EB946BE0041C426 /* DSLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSLogo.swift; sourceTree = "<group>"; };
+		AD8872562EB946BE0041C426 /* DSMetricLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSMetricLabel.swift; sourceTree = "<group>"; };
+		AD8872572EB946BE0041C426 /* DSMetricValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSMetricValue.swift; sourceTree = "<group>"; };
+		AD8872582EB946BE0041C426 /* DSProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSProgressBar.swift; sourceTree = "<group>"; };
+		AD8872592EB946BE0041C426 /* DSSecureField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSSecureField.swift; sourceTree = "<group>"; };
+		AD88725A2EB946BE0041C426 /* DSText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSText.swift; sourceTree = "<group>"; };
+		AD88725B2EB946BE0041C426 /* DSTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSTextField.swift; sourceTree = "<group>"; };
+		AD88725C2EB946BE0041C426 /* DSTrendIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSTrendIndicator.swift; sourceTree = "<group>"; };
+		AD88725D2EB946BE0041C426 /* LiquidGlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassCard.swift; sourceTree = "<group>"; };
+		AD88725F2EB946BE0041C426 /* SettingsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRow.swift; sourceTree = "<group>"; };
+		AD8872602EB946BE0041C426 /* StandardButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StandardButton.swift; sourceTree = "<group>"; };
+		AD8872612EB946BE0041C426 /* StandardCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StandardCard.swift; sourceTree = "<group>"; };
+		AD8872622EB946BE0041C426 /* StandardHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StandardHeader.swift; sourceTree = "<group>"; };
+		AD8872632EB946BE0041C426 /* StandardTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StandardTextField.swift; sourceTree = "<group>"; };
+		AD8872642EB946BE0041C426 /* StateViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateViews.swift; sourceTree = "<group>"; };
+		AD8872672EB946BE0041C426 /* CommonModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonModifiers.swift; sourceTree = "<group>"; };
+		AD8872692EB946BE0041C426 /* AuthConsentCheckbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthConsentCheckbox.swift; sourceTree = "<group>"; };
+		AD88726A2EB946BE0041C426 /* AuthFormField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthFormField.swift; sourceTree = "<group>"; };
+		AD88726B2EB946BE0041C426 /* AuthHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthHeader.swift; sourceTree = "<group>"; };
+		AD88726C2EB946BE0041C426 /* CompactMetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactMetricCard.swift; sourceTree = "<group>"; };
+		AD88726D2EB946BE0041C426 /* DeveloperTapHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperTapHandler.swift; sourceTree = "<group>"; };
+		AD88726E2EB946BE0041C426 /* DeveloperTapIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperTapIndicator.swift; sourceTree = "<group>"; };
+		AD88726F2EB946BE0041C426 /* DocumentHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentHeader.swift; sourceTree = "<group>"; };
+		AD8872702EB946BE0041C426 /* DSAuthDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSAuthDivider.swift; sourceTree = "<group>"; };
+		AD8872712EB946BE0041C426 /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
+		AD8872722EB946BE0041C426 /* LegalDocumentRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalDocumentRow.swift; sourceTree = "<group>"; };
+		AD8872732EB946BE0041C426 /* LiquidGlassCTAButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassCTAButton.swift; sourceTree = "<group>"; };
+		AD8872742EB946BE0041C426 /* LogoutButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoutButton.swift; sourceTree = "<group>"; };
+		AD8872752EB946BE0041C426 /* MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCard.swift; sourceTree = "<group>"; };
+		AD8872762EB946BE0041C426 /* MetricGauge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricGauge.swift; sourceTree = "<group>"; };
+		AD8872772EB946BE0041C426 /* OTPField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPField.swift; sourceTree = "<group>"; };
+		AD8872782EB946BE0041C426 /* PasswordStrengthIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStrengthIndicator.swift; sourceTree = "<group>"; };
+		AD8872792EB946BE0041C426 /* SocialLoginButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialLoginButton.swift; sourceTree = "<group>"; };
+		AD88727A2EB946BE0041C426 /* StepsIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepsIndicator.swift; sourceTree = "<group>"; };
+		AD88727B2EB946BE0041C426 /* UserAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAvatar.swift; sourceTree = "<group>"; };
+		AD88727C2EB946BE0041C426 /* UserGreeting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserGreeting.swift; sourceTree = "<group>"; };
+		AD88727E2EB946BE0041C426 /* BiometricAuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuthView.swift; sourceTree = "<group>"; };
+		AD88727F2EB946BE0041C426 /* CoreMetricsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreMetricsRow.swift; sourceTree = "<group>"; };
+		AD8872802EB946BE0041C426 /* DashboardContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardContent.swift; sourceTree = "<group>"; };
+		AD8872812EB946BE0041C426 /* DashboardHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardHeader.swift; sourceTree = "<group>"; };
+		AD8872842EB946BE0041C426 /* DeveloperToolsList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperToolsList.swift; sourceTree = "<group>"; };
+		AD8872852EB946BE0041C426 /* LegalSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalSection.swift; sourceTree = "<group>"; };
+		AD8872862EB946BE0041C426 /* LiquidGlassTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassTabBar.swift; sourceTree = "<group>"; };
+		AD8872872EB946BE0041C426 /* LoadingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingScreen.swift; sourceTree = "<group>"; };
+		AD8872882EB946BE0041C426 /* LoginForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginForm.swift; sourceTree = "<group>"; };
+		AD8872892EB946BE0041C426 /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownView.swift; sourceTree = "<group>"; };
+		AD88728A2EB946BE0041C426 /* SecondaryMetricsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondaryMetricsRow.swift; sourceTree = "<group>"; };
+		AD88728B2EB946BE0041C426 /* SettingsSectionGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSectionGroup.swift; sourceTree = "<group>"; };
+		AD88728C2EB946BE0041C426 /* SignUpForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpForm.swift; sourceTree = "<group>"; };
+		AD88728D2EB946BE0041C426 /* UserHeaderSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserHeaderSection.swift; sourceTree = "<group>"; };
+		AD88728E2EB946BE0041C426 /* VerificationForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerificationForm.swift; sourceTree = "<group>"; };
+		AD8872912EB946BE0041C426 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		AD933DFA2E24328A00801078 /* DietPhaseHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietPhaseHistoryView.swift; sourceTree = "<group>"; };
 		AD933DFC2E249DAD00801078 /* BulkPhotoImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkPhotoImportView.swift; sourceTree = "<group>"; };
 		AD933DFE2E249EA000801078 /* BulkImportManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkImportManager.swift; sourceTree = "<group>"; };
@@ -422,7 +557,6 @@
 		ADF5C1B32E1CDB9C00E3FB4D /* PhotoMetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoMetadataService.swift; sourceTree = "<group>"; };
 		ADF5C1B52E1CF89E00E3FB4D /* BackgroundPhotoUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPhotoUploadService.swift; sourceTree = "<group>"; };
 		ADF5C1B72E1CF8E000E3FB4D /* ProfilePreparationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilePreparationView.swift; sourceTree = "<group>"; };
-		ADF5C1B92E1DFE3100E3FB4D /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		ADF5C1BB2E1DFE4000E3FB4D /* WidgetDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataManager.swift; sourceTree = "<group>"; };
 		ADF5C1C22E1DFE7800E3FB4D /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		ADF5C1C42E1DFE7900E3FB4D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -534,6 +668,8 @@
 			children = (
 				ADE6D38B2E24A948001F82A8 /* AnimatedTabView.swift */,
 				AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */,
+				AD8872422EB87F290041C426 /* ProgressRing.swift */,
+				AD8872442EB87F480041C426 /* LiquidGlassCard.swift */,
 				AD5C4B022E25B10200123456 /* Components/DashboardMetricCards.swift */,
 				ADE6D38C2E24A948001F82A8 /* DietPhaseCard.swift */,
 				ADE6D38E2E24A948001F82A8 /* LiquidGlassTimelineSlider.swift */,
@@ -659,8 +795,6 @@
 				AD723ADA2E15FA5C002376C6 /* User.swift */,
 				AD723ADB2E15FA5C002376C6 /* WeightEntry.swift */,
 				AD8872322EB405C00041C426 /* BackgroundTaskType.swift */,
-				AD8872382EB4066D0041C426 /* AnimatedTaskIcon.swift */,
-				AD88723A2EB4068D0041C426 /* DashboardTaskBanner.swift */,
 				AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */,
 				AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */,
 			);
@@ -687,6 +821,7 @@
 		AD723AED2E15FA5C002376C6 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				AD8872462EB9461D0041C426 /* MetricsInterpolationService.swift */,
 				ADA922EA2E22E7A600B82C49 /* BackgroundPhotoUploadService+Processing.swift */,
 				ADA922EB2E22E7A600B82C49 /* ImageProcessingService.swift */,
 				ADA922EC2E22E7A600B82C49 /* VisionOrientationService.swift */,
@@ -716,7 +851,6 @@
 				ADE6D39B2E24AD30001F82A8 /* LiquidGlassComponents.swift */,
 				ADE6D3962E24A96A001F82A8 /* ShakeDetector.swift */,
 				AD3304BF2E241FE80043C4AC /* AppVersion.swift */,
-				ADF5C1B92E1DFE3100E3FB4D /* DesignSystem.swift */,
 				AD8552612E19DC9C003552EE /* VersionInfo.swift */,
 				AD723AEE2E15FA5C002376C6 /* Configuration.swift */,
 				AD723AEF2E15FA5C002376C6 /* Constants.swift */,
@@ -753,6 +887,8 @@
 		AD723B0A2E15FA5C002376C6 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */,
+				AD88723F2EB87EF80041C426 /* DashboardViewSimple.swift */,
 				ADDC486D2E2D8A6B003C97E7 /* BiometricLockView.swift */,
 				ADDC486E2E2D8A6B003C97E7 /* CameraView.swift */,
 				ADDC486F2E2D8A6B003C97E7 /* ChangePasswordView.swift */,
@@ -800,6 +936,7 @@
 		AD723B132E15FA5C002376C6 /* LogYourBody */ = {
 			isa = PBXGroup;
 			children = (
+				AD8872922EB946BE0041C426 /* DesignSystem */,
 				ADA922F22E22EE9D00B82C49 /* AuthComponents.swift */,
 				ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */,
 				ADA922F42E22EE9D00B82C49 /* ImageProcessingStatusView.swift */,
@@ -891,6 +1028,126 @@
 				AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */,
 			);
 			path = LogYourBodyUITests;
+			sourceTree = "<group>";
+		};
+		AD88725E2EB946BE0041C426 /* Atoms */ = {
+			isa = PBXGroup;
+			children = (
+				AD8872482EB946BE0041C426 /* AnimatedTaskIcon.swift */,
+				AD8872492EB946BE0041C426 /* BaseButton.swift */,
+				AD88724A2EB946BE0041C426 /* BaseTextField.swift */,
+				AD88724B2EB946BE0041C426 /* DSAuthButton.swift */,
+				AD88724C2EB946BE0041C426 /* DSAuthLink.swift */,
+				AD88724D2EB946BE0041C426 /* DSAvatar.swift */,
+				AD88724E2EB946BE0041C426 /* DSBadge.swift */,
+				AD88724F2EB946BE0041C426 /* DSButton.swift */,
+				AD8872502EB946BE0041C426 /* DSCircularProgress.swift */,
+				AD8872512EB946BE0041C426 /* DSDivider.swift */,
+				AD8872522EB946BE0041C426 /* DSIcon.swift */,
+				AD8872532EB946BE0041C426 /* DSInterpolationIcon.swift */,
+				AD8872542EB946BE0041C426 /* DSLoadingIndicator.swift */,
+				AD8872552EB946BE0041C426 /* DSLogo.swift */,
+				AD8872562EB946BE0041C426 /* DSMetricLabel.swift */,
+				AD8872572EB946BE0041C426 /* DSMetricValue.swift */,
+				AD8872582EB946BE0041C426 /* DSProgressBar.swift */,
+				AD8872592EB946BE0041C426 /* DSSecureField.swift */,
+				AD88725A2EB946BE0041C426 /* DSText.swift */,
+				AD88725B2EB946BE0041C426 /* DSTextField.swift */,
+				AD88725C2EB946BE0041C426 /* DSTrendIndicator.swift */,
+				AD88725D2EB946BE0041C426 /* LiquidGlassCard.swift */,
+			);
+			path = Atoms;
+			sourceTree = "<group>";
+		};
+		AD8872652EB946BE0041C426 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				AD88725F2EB946BE0041C426 /* SettingsRow.swift */,
+				AD8872602EB946BE0041C426 /* StandardButton.swift */,
+				AD8872612EB946BE0041C426 /* StandardCard.swift */,
+				AD8872622EB946BE0041C426 /* StandardHeader.swift */,
+				AD8872632EB946BE0041C426 /* StandardTextField.swift */,
+				AD8872642EB946BE0041C426 /* StateViews.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		AD8872662EB946BE0041C426 /* Foundation */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Foundation;
+			sourceTree = "<group>";
+		};
+		AD8872682EB946BE0041C426 /* Modifiers */ = {
+			isa = PBXGroup;
+			children = (
+				AD8872672EB946BE0041C426 /* CommonModifiers.swift */,
+			);
+			path = Modifiers;
+			sourceTree = "<group>";
+		};
+		AD88727D2EB946BE0041C426 /* Molecules */ = {
+			isa = PBXGroup;
+			children = (
+				AD8872692EB946BE0041C426 /* AuthConsentCheckbox.swift */,
+				AD88726A2EB946BE0041C426 /* AuthFormField.swift */,
+				AD88726B2EB946BE0041C426 /* AuthHeader.swift */,
+				AD88726C2EB946BE0041C426 /* CompactMetricCard.swift */,
+				AD88726D2EB946BE0041C426 /* DeveloperTapHandler.swift */,
+				AD88726E2EB946BE0041C426 /* DeveloperTapIndicator.swift */,
+				AD88726F2EB946BE0041C426 /* DocumentHeader.swift */,
+				AD8872702EB946BE0041C426 /* DSAuthDivider.swift */,
+				AD8872712EB946BE0041C426 /* ErrorStateView.swift */,
+				AD8872722EB946BE0041C426 /* LegalDocumentRow.swift */,
+				AD8872732EB946BE0041C426 /* LiquidGlassCTAButton.swift */,
+				AD8872742EB946BE0041C426 /* LogoutButton.swift */,
+				AD8872752EB946BE0041C426 /* MetricCard.swift */,
+				AD8872762EB946BE0041C426 /* MetricGauge.swift */,
+				AD8872772EB946BE0041C426 /* OTPField.swift */,
+				AD8872782EB946BE0041C426 /* PasswordStrengthIndicator.swift */,
+				AD8872792EB946BE0041C426 /* SocialLoginButton.swift */,
+				AD88727A2EB946BE0041C426 /* StepsIndicator.swift */,
+				AD88727B2EB946BE0041C426 /* UserAvatar.swift */,
+				AD88727C2EB946BE0041C426 /* UserGreeting.swift */,
+			);
+			path = Molecules;
+			sourceTree = "<group>";
+		};
+		AD88728F2EB946BE0041C426 /* Organisms */ = {
+			isa = PBXGroup;
+			children = (
+				AD88727E2EB946BE0041C426 /* BiometricAuthView.swift */,
+				AD88727F2EB946BE0041C426 /* CoreMetricsRow.swift */,
+				AD8872802EB946BE0041C426 /* DashboardContent.swift */,
+				AD8872812EB946BE0041C426 /* DashboardHeader.swift */,
+				AD8872842EB946BE0041C426 /* DeveloperToolsList.swift */,
+				AD8872852EB946BE0041C426 /* LegalSection.swift */,
+				AD8872862EB946BE0041C426 /* LiquidGlassTabBar.swift */,
+				AD8872872EB946BE0041C426 /* LoadingScreen.swift */,
+				AD8872882EB946BE0041C426 /* LoginForm.swift */,
+				AD8872892EB946BE0041C426 /* MarkdownView.swift */,
+				AD88728A2EB946BE0041C426 /* SecondaryMetricsRow.swift */,
+				AD88728B2EB946BE0041C426 /* SettingsSectionGroup.swift */,
+				AD88728C2EB946BE0041C426 /* SignUpForm.swift */,
+				AD88728D2EB946BE0041C426 /* UserHeaderSection.swift */,
+				AD88728E2EB946BE0041C426 /* VerificationForm.swift */,
+			);
+			path = Organisms;
+			sourceTree = "<group>";
+		};
+		AD8872922EB946BE0041C426 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				AD88725E2EB946BE0041C426 /* Atoms */,
+				AD8872652EB946BE0041C426 /* Components */,
+				AD8872662EB946BE0041C426 /* Foundation */,
+				AD8872682EB946BE0041C426 /* Modifiers */,
+				AD88727D2EB946BE0041C426 /* Molecules */,
+				AD88728F2EB946BE0041C426 /* Organisms */,
+				AD8872912EB946BE0041C426 /* Theme.swift */,
+			);
+			path = DesignSystem;
 			sourceTree = "<group>";
 		};
 		ADA923012E22EF4600B82C49 /* Common */ = {
@@ -1147,6 +1404,7 @@
 				ADDC47A92E2D89F3003C97E7 /* DailyLog.swift in Sources */,
 				ADDC47AA2E2D89F3003C97E7 /* DailyMetrics.swift in Sources */,
 				ADDC47AB2E2D89F3003C97E7 /* LogYourBody.xcdatamodeld in Sources */,
+				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AC2E2D89F3003C97E7 /* OnboardingData.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
 				ADDC487C2E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift in Sources */,
@@ -1170,6 +1428,7 @@
 				ADDC47B72E2D89F3003C97E7 /* VisionOrientationService.swift in Sources */,
 				ADDC47B82E2D89F3003C97E7 /* AppVersionManager.swift in Sources */,
 				ADDC47B92E2D89F3003C97E7 /* BulkImportManager.swift in Sources */,
+				AD8872432EB87F290041C426 /* ProgressRing.swift in Sources */,
 				ADDC47BA2E2D89F3003C97E7 /* PhotoLibraryScanner.swift in Sources */,
 				ADDC47BB2E2D89F3003C97E7 /* WidgetDataManager.swift in Sources */,
 				ADDC47BC2E2D89F3003C97E7 /* RealtimeSyncManager.swift in Sources */,
@@ -1178,6 +1437,7 @@
 				ADDC47BF2E2D89F3003C97E7 /* SupabaseManager.swift in Sources */,
 				ADDC47C02E2D89F3003C97E7 /* PhotoUploadManager.swift in Sources */,
 				ADDC47C12E2D89F3003C97E7 /* AuthManager.swift in Sources */,
+				AD8872472EB9461D0041C426 /* MetricsInterpolationService.swift in Sources */,
 				ADDC47C22E2D89F3003C97E7 /* CoreDataManager.swift in Sources */,
 				ADDC47C32E2D89F3003C97E7 /* BackgroundPhotoUploadService.swift in Sources */,
 				ADDC47C42E2D89F3003C97E7 /* HealthKitManager.swift in Sources */,
@@ -1187,7 +1447,6 @@
 				ADDC47C82E2D89F3003C97E7 /* LiquidGlassComponents.swift in Sources */,
 				ADDC47C92E2D89F3003C97E7 /* ShakeDetector.swift in Sources */,
 				ADDC47CA2E2D89F3003C97E7 /* AppVersion.swift in Sources */,
-				ADDC47CB2E2D89F3003C97E7 /* DesignSystem.swift in Sources */,
 				ADDC47CC2E2D89F3003C97E7 /* VersionInfo.swift in Sources */,
 				ADDC47CD2E2D89F3003C97E7 /* Configuration.swift in Sources */,
 				ADDC47CE2E2D89F3003C97E7 /* Constants.swift in Sources */,
@@ -1229,7 +1488,6 @@
 				ADDC47F72E2D89F3003C97E7 /* AnimatedTabView.swift in Sources */,
 				ADDC47F82E2D89F3003C97E7 /* Components/DashboardComponents.swift in Sources */,
 				ADDC47F92E2D89F3003C97E7 /* Components/DashboardMetricCards.swift in Sources */,
-				AD8872392EB4066D0041C426 /* AnimatedTaskIcon.swift in Sources */,
 				ADDC47FA2E2D89F3003C97E7 /* DietPhaseCard.swift in Sources */,
 				ADDC47FC2E2D89F3003C97E7 /* LiquidGlassTimelineSlider.swift in Sources */,
 				ADDC47FD2E2D89F3003C97E7 /* Components/PhotoAnchoredTimelineSlider.swift in Sources */,
@@ -1246,11 +1504,75 @@
 				F0A6090ABF6B0497684F9816 /* DSLoadingIndicator.swift in Sources */,
 				2B3C4D5E6F7890ABCDEF1234 /* LoadingScreen.swift in Sources */,
 				C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */,
+				AD8872932EB946BE0041C426 /* DeveloperTapHandler.swift in Sources */,
+				AD8872952EB946BE0041C426 /* CoreMetricsRow.swift in Sources */,
+				AD8872962EB946BE0041C426 /* Theme.swift in Sources */,
+				AD8872972EB946BE0041C426 /* ErrorStateView.swift in Sources */,
+				AD8872982EB946BE0041C426 /* LiquidGlassTabBar.swift in Sources */,
+				AD8872992EB946BE0041C426 /* DSAuthDivider.swift in Sources */,
+				AD88729A2EB946BE0041C426 /* DSText.swift in Sources */,
+				AD88729B2EB946BE0041C426 /* AuthFormField.swift in Sources */,
+				AD88729C2EB946BE0041C426 /* StandardTextField.swift in Sources */,
+				AD88729D2EB946BE0041C426 /* UserGreeting.swift in Sources */,
+				AD88729E2EB946BE0041C426 /* DSMetricLabel.swift in Sources */,
+				AD88729F2EB946BE0041C426 /* CommonModifiers.swift in Sources */,
+				AD8872A02EB946BE0041C426 /* SettingsRow.swift in Sources */,
+				AD8872A12EB946BE0041C426 /* DSIcon.swift in Sources */,
+				AD8872A22EB946BE0041C426 /* BiometricAuthView.swift in Sources */,
+				AD8872A32EB946BE0041C426 /* SocialLoginButton.swift in Sources */,
+				AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */,
+				AD8872A52EB946BE0041C426 /* LoginForm.swift in Sources */,
+				AD8872A62EB946BE0041C426 /* DSBadge.swift in Sources */,
+				AD8872A72EB946BE0041C426 /* LoadingScreen.swift in Sources */,
+				AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */,
+				AD8872A92EB946BE0041C426 /* DSTextField.swift in Sources */,
+				AD8872AA2EB946BE0041C426 /* DSLogo.swift in Sources */,
+				AD8872AB2EB946BE0041C426 /* DSAvatar.swift in Sources */,
+				AD8872AC2EB946BE0041C426 /* StepsIndicator.swift in Sources */,
+				AD8872AD2EB946BE0041C426 /* DashboardHeader.swift in Sources */,
+				AD8872AE2EB946BE0041C426 /* StandardButton.swift in Sources */,
+				AD8872AF2EB946BE0041C426 /* UserAvatar.swift in Sources */,
+				AD8872B02EB946BE0041C426 /* SecondaryMetricsRow.swift in Sources */,
+				AD8872B12EB946BE0041C426 /* MetricCard.swift in Sources */,
+				AD8872B22EB946BE0041C426 /* AuthHeader.swift in Sources */,
+				AD8872B32EB946BE0041C426 /* LegalSection.swift in Sources */,
+				AD8872B42EB946BE0041C426 /* DSInterpolationIcon.swift in Sources */,
+				AD8872B52EB946BE0041C426 /* LiquidGlassCard.swift in Sources */,
+				AD8872B62EB946BE0041C426 /* DeveloperToolsList.swift in Sources */,
+				AD8872B72EB946BE0041C426 /* AuthConsentCheckbox.swift in Sources */,
+				AD8872B82EB946BE0041C426 /* DSProgressBar.swift in Sources */,
+				AD8872B92EB946BE0041C426 /* DSCircularProgress.swift in Sources */,
+				AD8872BA2EB946BE0041C426 /* DocumentHeader.swift in Sources */,
+				AD8872BB2EB946BE0041C426 /* DeveloperTapIndicator.swift in Sources */,
+				AD8872BC2EB946BE0041C426 /* DSAuthButton.swift in Sources */,
+				AD8872BD2EB946BE0041C426 /* AnimatedTaskIcon.swift in Sources */,
+				AD8872BE2EB946BE0041C426 /* OTPField.swift in Sources */,
+				AD8872BF2EB946BE0041C426 /* DashboardContent.swift in Sources */,
+				AD8872C02EB946BE0041C426 /* MetricGauge.swift in Sources */,
+				AD8872C12EB946BE0041C426 /* DSSecureField.swift in Sources */,
+				AD8872C22EB946BE0041C426 /* PasswordStrengthIndicator.swift in Sources */,
+				AD8872C32EB946BE0041C426 /* DSLoadingIndicator.swift in Sources */,
+				AD8872C42EB946BE0041C426 /* LogoutButton.swift in Sources */,
+				AD8872C52EB946BE0041C426 /* DSButton.swift in Sources */,
+				AD8872C62EB946BE0041C426 /* BaseButton.swift in Sources */,
+				AD8872C82EB946BE0041C426 /* VerificationForm.swift in Sources */,
+				AD8872C92EB946BE0041C426 /* SettingsSectionGroup.swift in Sources */,
+				AD8872CA2EB946BE0041C426 /* StateViews.swift in Sources */,
+				AD8872CB2EB946BE0041C426 /* DSDivider.swift in Sources */,
+				AD8872CC2EB946BE0041C426 /* LegalDocumentRow.swift in Sources */,
+				AD8872CD2EB946BE0041C426 /* SignUpForm.swift in Sources */,
+				AD8872CE2EB946BE0041C426 /* DSMetricValue.swift in Sources */,
+				AD8872CF2EB946BE0041C426 /* StandardHeader.swift in Sources */,
+				AD8872D02EB946BE0041C426 /* MarkdownView.swift in Sources */,
+				AD8872D12EB946BE0041C426 /* StandardCard.swift in Sources */,
+				AD8872D22EB946BE0041C426 /* LiquidGlassCTAButton.swift in Sources */,
+				AD8872D32EB946BE0041C426 /* DSTrendIndicator.swift in Sources */,
+				AD8872D42EB946BE0041C426 /* BaseTextField.swift in Sources */,
+				AD8872D62EB946BE0041C426 /* CompactMetricCard.swift in Sources */,
 				BF2DBFBAC3B2277AE19EDC3D /* DeveloperTapHandler.swift in Sources */,
 				5763B6723CDF6F551543599B /* ErrorStateView.swift in Sources */,
 				3CD3199B3979B906B642DB4E /* LegalDocumentRow.swift in Sources */,
 				936AD43A357EA14452357BE4 /* DocumentHeader.swift in Sources */,
-				AD88723B2EB4068D0041C426 /* DashboardTaskBanner.swift in Sources */,
 				E890A5CBBCF0CD3A8CD5D440 /* UserHeaderSection.swift in Sources */,
 				B39F620BFA59AFFB07513E46 /* DeveloperToolsList.swift in Sources */,
 				E714109633DA0CF0B7A6F341 /* LegalSection.swift in Sources */,
@@ -1259,6 +1581,8 @@
 				28D96935970646462EC376F4 /* DSTextField.swift in Sources */,
 				EC3987B52CE2B863BBEE67F8 /* DSSecureField.swift in Sources */,
 				3E3EA4841197E3CDEC1064A9 /* DSAuthButton.swift in Sources */,
+				AD8872402EB87EF80041C426 /* DashboardViewSimple.swift in Sources */,
+				AD8872412EB87EF80041C426 /* DashboardViewLiquid.swift in Sources */,
 				E0E380C2E78BD2BAC87480ED /* DSAuthLink.swift in Sources */,
 				6E12FF06B7836C9AFAEC5560 /* AuthFormField.swift in Sources */,
 				7244EF0EC36788731EA69D2D /* SocialLoginButton.swift in Sources */,
@@ -1438,7 +1762,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = LogYourBody/LogYourBody.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20250725010900;
+				CURRENT_PROJECT_VERSION = 20251104164617;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1472,7 +1796,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = LogYourBody/LogYourBody.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20250725010900;
+				CURRENT_PROJECT_VERSION = 20251104164617;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1504,7 +1828,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20250725010900;
+				CURRENT_PROJECT_VERSION = 20251104164617;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1523,7 +1847,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20250725010900;
+				CURRENT_PROJECT_VERSION = 20251104164617;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1541,7 +1865,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20250725010900;
+				CURRENT_PROJECT_VERSION = 20251104164617;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1559,7 +1883,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20250725010900;
+				CURRENT_PROJECT_VERSION = 20251104164617;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

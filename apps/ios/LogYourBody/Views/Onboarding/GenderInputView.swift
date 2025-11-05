@@ -22,7 +22,7 @@ struct GenderInputView: View {
                 Button(
             action: {
                     viewModel.previousStep()
-                    HapticManager.shared.buttonTapped()
+                    // HapticManager.shared.buttonTap()
                 },
             label: {
                     Image(systemName: "chevron.left")
@@ -82,7 +82,7 @@ struct GenderInputView: View {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                                         isEditing = true
                                     }
-                                    HapticManager.shared.buttonTapped()
+                                    // HapticManager.shared.buttonTap()
                                 },
             label: {
                                     Text("Edit")
@@ -130,7 +130,7 @@ struct GenderInputView: View {
                                                 isEditing = false
                                             }
                                         }
-                                        HapticManager.shared.buttonTapped()
+                                        // HapticManager.shared.buttonTap()
                                     }
                                 )
                             }

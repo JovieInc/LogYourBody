@@ -6,44 +6,45 @@ import SwiftUI
 import Foundation
 import LocalAuthentication
 
+// MARK: - Measurement System Enum (Global)
+enum MeasurementSystem: String, CaseIterable {
+    case imperial = "Imperial"
+    case metric = "Metric"
+
+    var weightUnit: String {
+        switch self {
+        case .imperial: return "lbs"
+        case .metric: return "kg"
+        }
+    }
+
+    var heightUnit: String {
+        switch self {
+        case .imperial: return "ft"
+        case .metric: return "cm"
+        }
+    }
+
+    var heightDisplay: String {
+        switch self {
+        case .imperial: return "feet & inches"
+        case .metric: return "centimeters"
+        }
+    }
+}
+
 struct PreferencesView: View {
     @AppStorage(Constants.preferredMeasurementSystemKey) private var measurementSystem = PreferencesView.defaultMeasurementSystem
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     @State private var biometricType: LABiometryType = .none
-    
+
     private let context = LAContext()
-    
-    enum MeasurementSystem: String, CaseIterable {
-        case imperial = "Imperial"
-        case metric = "Metric"
-        
-        var weightUnit: String {
-            switch self {
-            case .imperial: return "lbs"
-            case .metric: return "kg"
-            }
-        }
-        
-        var heightUnit: String {
-            switch self {
-            case .imperial: return "ft"
-            case .metric: return "cm"
-            }
-        }
-        
-        var heightDisplay: String {
-            switch self {
-            case .imperial: return "feet & inches"
-            case .metric: return "centimeters"
-            }
-        }
-    }
-    
+
     // Default to imperial as requested
     static var defaultMeasurementSystem: String {
         return MeasurementSystem.imperial.rawValue
     }
-    
+
     var currentSystem: MeasurementSystem {
         MeasurementSystem(rawValue: measurementSystem) ?? .imperial
     }

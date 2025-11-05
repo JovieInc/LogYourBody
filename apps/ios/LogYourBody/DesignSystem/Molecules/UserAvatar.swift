@@ -61,18 +61,18 @@ struct UserAvatar: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(DesignSystem.colors.surface)
+                .fill(Color.linearCard)
                 .overlay(
                     Circle()
                         .strokeBorder(
-                            showBorder ? DesignSystem.colors.border : Color.clear,
+                            showBorder ? Color.linearBorder : Color.clear,
                             lineWidth: showBorder ? 2 : 0
                         )
                 )
-            
+
             Text(initials)
                 .font(.system(size: size.fontSize, weight: .semibold))
-                .foregroundColor(DesignSystem.colors.textSecondary)
+                .foregroundColor(Color.linearTextSecondary)
         }
         .frame(width: size.dimension, height: size.dimension)
     }
@@ -86,25 +86,25 @@ struct UserAvatarWithInfo: View {
     let avatarSize: UserAvatar.AvatarSize
     
     var body: some View {
-        HStack(spacing: DesignSystem.spacing.sm) {
+        HStack(spacing: 12) {
             UserAvatar(
                 name: name,
                 email: email,
                 size: avatarSize
             )
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(name ?? "User")
-                    .font(DesignSystem.typography.labelLarge)
-                    .foregroundColor(DesignSystem.colors.text)
-                
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.linearText)
+
                 if let email = email {
                     Text(email)
-                        .font(DesignSystem.typography.captionMedium)
-                        .foregroundColor(DesignSystem.colors.textSecondary)
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundColor(.linearTextSecondary)
                 }
             }
-            
+
             Spacer()
         }
     }

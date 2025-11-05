@@ -19,12 +19,22 @@ class HealthKitManager: ObservableObject {
     @Published var latestStepCount: Int?
     @Published var latestStepCountDate: Date?
     
-    // Health types
-    private let weightType = HKQuantityType.quantityType(forIdentifier: .bodyMass)!
-    private let bodyFatType = HKQuantityType.quantityType(forIdentifier: .bodyFatPercentage)!
-    private let heightType = HKQuantityType.quantityType(forIdentifier: .height)!
-    private let dateOfBirthType = HKCharacteristicType.characteristicType(forIdentifier: .dateOfBirth)!
-    private let stepCountType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
+    // Health types - using computed properties to avoid crashes if HealthKit types fail to initialize
+    private var weightType: HKQuantityType {
+        return HKQuantityType.quantityType(forIdentifier: .bodyMass)!
+    }
+    private var bodyFatType: HKQuantityType {
+        return HKQuantityType.quantityType(forIdentifier: .bodyFatPercentage)!
+    }
+    private var heightType: HKQuantityType {
+        return HKQuantityType.quantityType(forIdentifier: .height)!
+    }
+    private var dateOfBirthType: HKCharacteristicType {
+        return HKCharacteristicType.characteristicType(forIdentifier: .dateOfBirth)!
+    }
+    private var stepCountType: HKQuantityType {
+        return HKQuantityType.quantityType(forIdentifier: .stepCount)!
+    }
     
     // Sync management
     private var isSyncingWeight = false
@@ -44,7 +54,7 @@ class HealthKitManager: ObservableObject {
             isAuthorized = false
             return
         }
-        
+
         // Check if we have any permissions for weight data
         // Note: We can't check read permissions directly, but we can check write permissions
         let writeStatus = healthStore.authorizationStatus(for: weightType)
@@ -73,13 +83,13 @@ class HealthKitManager: ObservableObject {
     // Request authorization
     func requestAuthorization() async -> Bool {
         guard isHealthKitAvailable else { return false }
-        
+
         let typesToRead: Set<HKObjectType> = [weightType, bodyFatType, heightType, dateOfBirthType, stepCountType]
         let typesToWrite: Set<HKQuantityType> = [weightType, bodyFatType]
-        
+
         do {
             try await healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead)
-            
+
             // Check if we got permission
             let status = healthStore.authorizationStatus(for: weightType)
             await MainActor.run {
@@ -98,18 +108,18 @@ class HealthKitManager: ObservableObject {
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }
-        
+
         // Convert to kg (HealthKit uses kg internally)
         let weightInKg = weight * 0.453592 // Convert lbs to kg
         let quantity = HKQuantity(unit: HKUnit.gramUnit(with: .kilo), doubleValue: weightInKg)
-        
+
         let sample = HKQuantitySample(
             type: weightType,
             quantity: quantity,
             start: date,
             end: date
         )
-        
+
         try await healthStore.save(sample)
     }
     

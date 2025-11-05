@@ -22,7 +22,7 @@ struct HealthKitStepView: View {
                 Button(
             action: {
                     viewModel.previousStep()
-                    // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+                    // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
                 },
             label: {
                     Image(systemName: "chevron.left")
@@ -41,7 +41,7 @@ struct HealthKitStepView: View {
                 
                 Button("Skip") {
                     viewModel.nextStep()
-                    // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+                    // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
                 }
                 .font(.system(size: 15, weight: .regular))
                 .foregroundColor(.appTextSecondary)
@@ -104,7 +104,7 @@ struct HealthKitStepView: View {
             action: {
                     if !isConnecting {
                         connectHealthKit()
-                        // HapticManager.shared.buttonTapped() // TODO: Add HapticManager to Xcode project
+                        // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
                     }
                 },
             label: {

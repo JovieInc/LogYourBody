@@ -29,7 +29,7 @@ struct ProgressPhotosStepView: View {
                     Button(
             action: {
                         viewModel.previousStep()
-                        HapticManager.shared.buttonTapped()
+                        // HapticManager.shared.buttonTap()
                     },
             label: {
                         Image(systemName: "chevron.left")
@@ -187,7 +187,7 @@ struct ProgressPhotosStepView: View {
                         .padding(.horizontal, 24)
                         .onChange(of: selectedPhotos) { _, newValue in
                             if !newValue.isEmpty {
-                                HapticManager.shared.success()
+                                // HapticManager.shared.successAction()
                             }
                         }
                     }
@@ -244,7 +244,7 @@ struct ProgressPhotosStepView: View {
     }
     
     private func handleContinue() {
-        HapticManager.shared.buttonTapped()
+        // HapticManager.shared.buttonTap()
         
         if !selectedPhotos.isEmpty {
             // Queue photos for background upload

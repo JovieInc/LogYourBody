@@ -78,6 +78,9 @@ struct OnboardingContainerView: View {
                         }
                         .padding(.horizontal, Constants.paddingLarge)
                         .padding(.vertical, Constants.padding)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Onboarding progress")
+                        .accessibilityValue("Step \(viewModel.currentStep.rawValue) of \(OnboardingViewModel.OnboardingStep.allCases.filter { $0 != .welcome && $0 != .profilePreparation }.count)")
                         
                         // Subtle separator
                         Rectangle()
@@ -147,7 +150,7 @@ struct OnboardingContainerView: View {
 struct StepIndicator: View {
     let isActive: Bool
     let isCompleted: Bool
-    
+
     var body: some View {
         Circle()
             .fill(
@@ -155,8 +158,8 @@ struct StepIndicator: View {
                 isActive ? Color.appPrimary :
                 Color.appBorder
             )
-            .frame(width: 5, height: 5)
-            .opacity(isCompleted ? 1 : isActive ? 1 : 0.3)
+            .frame(width: isActive ? 8 : 6, height: isActive ? 8 : 6)
+            .opacity(isCompleted ? 1 : isActive ? 1 : 0.5)
             .animation(.easeOut(duration: 0.2), value: isActive)
             .animation(.easeOut(duration: 0.2), value: isCompleted)
     }

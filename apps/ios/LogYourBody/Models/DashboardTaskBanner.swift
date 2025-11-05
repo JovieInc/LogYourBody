@@ -141,12 +141,12 @@ struct DashboardTaskBanner: View {
         .padding(.top, 8)
         .contentShape(Rectangle())
         .onTapGesture {
-            HapticManager.shared.buttonTapped()
+            // HapticManager.shared.buttonTap()
             showDetails = true
         }
         .onLongPressGesture {
             if task.canCancel {
-                HapticManager.shared.toggleChanged()
+                // HapticManager.shared.selection()
                 showCancelConfirmation = true
             }
         }

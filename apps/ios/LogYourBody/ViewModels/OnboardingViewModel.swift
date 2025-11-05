@@ -122,53 +122,100 @@ class OnboardingViewModel: ObservableObject {
     
     
     func completeOnboarding(authManager: AuthManager) async {
+        print("🔵 Starting onboarding completion")
+
         // Validate required fields before completing
         guard !data.name.isEmpty,
               data.dateOfBirth != nil,
               data.totalHeightInInches > 0,
               data.gender != nil else {
-            // Don't complete onboarding if required fields are missing
-            isLoading = false
+            print("❌ Validation failed - missing required fields")
+            await MainActor.run {
+                isLoading = false
+            }
             return
         }
-        
-        isLoading = true
-        
+
+        print("✅ Validation passed")
+
         await MainActor.run {
-            // Mark onboarding as completed
+            isLoading = true
+        }
+
+        print("🔵 Step 1: Getting current user")
+        // Update user profile
+        let currentUser = await MainActor.run { authManager.currentUser }
+
+        guard let user = currentUser else {
+            print("❌ No current user found")
+            await MainActor.run {
+                isLoading = false
+            }
+            return
+        }
+        print("✅ Current user found: \(user.id)")
+
+        print("🔵 Step 2: Updating name if needed")
+        // Update name using consolidated method
+        if !data.name.isEmpty && data.name != authManager.getUserDisplayName() {
+            do {
+                print("  - Updating name to: \(data.name)")
+                try await authManager.consolidateNameUpdate(data.name)
+                print("✅ Name updated successfully")
+            } catch {
+                print("❌ Failed to update name: \(error)")
+            }
+        } else {
+            print("  - Name update not needed")
+        }
+
+        print("🔵 Step 3: Creating profile update dictionary")
+        // Create profile update data (without name, as it's handled above)
+        var updates: [String: Any] = [
+            "height": Double(data.totalHeightInInches),
+            "heightUnit": "in",
+            "onboardingCompleted": true
+        ]
+
+        // Only add dateOfBirth if it's not nil
+        if let dob = data.dateOfBirth {
+            print("  - Adding dateOfBirth: \(dob)")
+            updates["dateOfBirth"] = dob
+        }
+
+        // Only add gender if it's not nil
+        if let gender = data.gender {
+            print("  - Adding gender: \(gender.rawValue)")
+            updates["gender"] = gender.rawValue
+        }
+
+        print("  - Updates dictionary: \(updates)")
+        print("✅ Dictionary created")
+
+        print("🔵 Step 4: Calling authManager.updateProfile")
+        // Update profile through AuthManager (which will sync to Supabase)
+        await authManager.updateProfile(updates)
+        print("✅ Profile updated")
+
+        // IMPORTANT: Wait a bit to ensure profile is fully saved before marking onboarding complete
+        print("🔵 Step 5: Waiting for profile to be fully saved")
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        print("✅ Wait complete")
+
+        print("🔵 Step 6: Setting UserDefaults to mark onboarding complete")
+        await MainActor.run {
+            // Mark onboarding as completed AFTER profile is saved
             UserDefaults.standard.set(true, forKey: Constants.hasCompletedOnboardingKey)
-            
+
             // Force notification to ensure UI updates
             NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: nil)
         }
-        
-        // Update user profile
-        let currentUser = await MainActor.run { authManager.currentUser }
-        if let user = currentUser {
-            // Update name using consolidated method
-            if !data.name.isEmpty && data.name != authManager.getUserDisplayName() {
-                do {
-                    try await authManager.consolidateNameUpdate(data.name)
-                } catch {
-                    // Failed to update name during onboarding
-                }
-            }
-            
-            // Create profile update data (without name, as it's handled above)
-            let updates: [String: Any] = [
-                "dateOfBirth": data.dateOfBirth as Any,
-                "height": Double(data.totalHeightInInches),
-                "heightUnit": "in",
-                "gender": data.gender?.rawValue as Any,
-                "onboardingCompleted": true
-            ]
-            
-            // Update profile through AuthManager (which will sync to Supabase)
-            await authManager.updateProfile(updates)
-        }
-        
+        print("✅ UserDefaults updated")
+
+        print("🔵 Step 7: Setting isLoading to false")
         await MainActor.run {
             isLoading = false
         }
+        print("✅ Onboarding completion finished successfully")
     }
 }
