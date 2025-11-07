@@ -5,6 +5,7 @@
 import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var syncManager: SyncManager
     @StateObject private var loadingManager: LoadingManager
     @State private var hasCompletedOnboarding = false
     @State private var isLoadingComplete = false
@@ -158,4 +159,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environmentObject(AuthManager.shared)
+        .environmentObject(SyncManager.shared)
 }

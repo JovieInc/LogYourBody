@@ -28,7 +28,7 @@ struct Constants {
         Configuration.clerkFrontendAPI
     }
 
-    static let useMockAuth = true  // Enable mock auth for testing UI
+    static let useMockAuth = false  // Disable mock auth, use Clerk
 
     static var isClerkConfigured: Bool {
         Configuration.isClerkConfigured
