@@ -37,6 +37,9 @@
     "legacy-react/**/*",
     "cypress/**/*",
     "capacitor.config.ts",
-    "scripts/**/*"
+    "scripts/**/*",
+    "src/**/__tests__/**",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx"
   ]
 }

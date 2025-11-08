@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     description: "Track your body composition with precision. Monitor body fat percentage, weight, FFMI, and lean body mass.",
     images: [
       {
-        url: "/og-image.png",
+        url: "/android-chrome-512x512.png",
         width: 1200,
         height: 630,
         alt: "LogYourBody - Track your body composition with precision",
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
     creator: "@itstimwhite",
     title: "LogYourBody - Body Composition Tracker",
     description: "Track your body composition with precision. Monitor body fat percentage, weight, FFMI, and lean body mass.",
-    images: ["/og-image.png"],
+    images: ["/android-chrome-512x512.png"],
   },
   robots: {
     index: true,

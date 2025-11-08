@@ -1,0 +1,10 @@
+venv/
+venv-*/
+**/venv/
+coverage/
+.turbo/
+.next/cache/
+*.log
+*.log.*
+*.lcov
+
