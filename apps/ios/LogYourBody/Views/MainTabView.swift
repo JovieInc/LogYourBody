@@ -11,6 +11,7 @@ struct MainTabView: View {
     @Namespace private var namespace
     @State private var showAddEntrySheet = false
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var syncManager: SyncManager
     
     init() {
         // Hide default tab bar since we're using custom one
@@ -72,4 +73,5 @@ struct MainTabView: View {
 #Preview {
     MainTabView()
         .environmentObject(AuthManager())
+        .environmentObject(SyncManager.shared)
 }
