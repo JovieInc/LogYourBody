@@ -34,15 +34,26 @@ struct PaywallView: View {
                     featuresSection
 
                     // Pricing Card
-                    if let package = revenueCatManager.annualPackage {
+                    if let package = firstAvailablePackage {
                         pricingCard(package: package)
                     } else if isLoading {
                         ProgressView()
                             .tint(Color(hex: "#6EE7F0"))
+                    } else {
+                        // No packages available - show error
+                        Text("No subscription plans available")
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding()
+
+                        Text("Please check your internet connection and try again")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
 
                     // Purchase Button
-                    if let package = revenueCatManager.annualPackage {
+                    if let package = firstAvailablePackage {
                         purchaseButton(package: package)
                     }
 
@@ -94,6 +105,22 @@ struct PaywallView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Computed Properties
+
+    /// Returns the first available package, preferring annual but falling back to any available package
+    private var firstAvailablePackage: Package? {
+        // Try annual first (preferred)
+        if let annual = revenueCatManager.currentOffering?.package(identifier: "$rc_annual") {
+            return annual
+        }
+        // Fallback to monthly
+        if let monthly = revenueCatManager.currentOffering?.package(identifier: "$rc_monthly") {
+            return monthly
+        }
+        // Fallback to first available package of any type
+        return revenueCatManager.currentOffering?.availablePackages.first
     }
 
     // MARK: - Components
