@@ -47,6 +47,9 @@ class RevenueCatManager: NSObject, ObservableObject {
     /// Cache expiry duration (24 hours)
     private let cacheExpiryDuration: TimeInterval = 24 * 60 * 60
 
+    /// Flag to track if SDK has been configured
+    private var isConfigured: Bool = false
+
     // MARK: - Initialization
 
     private override init() {
@@ -72,11 +75,26 @@ class RevenueCatManager: NSObject, ObservableObject {
         // Set up delegate to listen for customer info updates
         Purchases.shared.delegate = self
 
-        // Note: refreshCustomerInfo() should be called separately after UI is ready
+        // Mark as configured
+        Task { @MainActor in
+            await self.markAsConfigured()
+        }
+
+        print("💰 RevenueCat SDK configured successfully")
+    }
+
+    /// Mark SDK as configured (must be called on MainActor)
+    private func markAsConfigured() {
+        isConfigured = true
     }
 
     /// Identify the user with their Clerk user ID
     func identifyUser(userId: String) async {
+        guard isConfigured else {
+            print("⚠️ SDK not configured yet, skipping identifyUser()")
+            return
+        }
+
         print("💰 Identifying user: \(userId)")
 
         do {
@@ -114,6 +132,11 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     /// Refresh customer info and subscription status
     func refreshCustomerInfo() async {
+        guard isConfigured else {
+            print("⚠️ SDK not configured yet, skipping refreshCustomerInfo()")
+            return
+        }
+
         print("💰 Refreshing customer info")
 
         do {
@@ -149,6 +172,11 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     /// Fetch available offerings from RevenueCat
     func fetchOfferings() async {
+        guard isConfigured else {
+            print("⚠️ SDK not configured yet, skipping fetchOfferings()")
+            return
+        }
+
         print("💰 Fetching offerings")
 
         do {
