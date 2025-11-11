@@ -54,22 +54,26 @@ struct LogYourBodyApp: App {
                     // Initialize Clerk (critical path)
                     await authManager.initializeClerk()
 
-                    // Configure RevenueCat SDK (non-blocking, no network call)
+                    // Configure RevenueCat SDK (synchronous, no network call)
                     let apiKey = Constants.revenueCatAPIKey
                     if !apiKey.isEmpty {
                         await MainActor.run {
                             revenueCatManager.configure(apiKey: apiKey)
                         }
-                    }
 
-                    // Background task: Identify user and fetch subscription status (lower priority)
-                    Task.detached(priority: .userInitiated) { @MainActor in
+                        // Small delay to ensure SDK delegate registration completes
+                        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+
+                        // Identify user and fetch subscription status (sequential to avoid race condition)
                         if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
                             await revenueCatManager.identifyUser(userId: userId)
                         } else {
                             // If not authenticated, still refresh to check anonymous status
                             await revenueCatManager.refreshCustomerInfo()
                         }
+
+                        // Preload offerings for faster paywall display
+                        await revenueCatManager.fetchOfferings()
                     }
 
                     // Check HealthKit authorization status on app launch

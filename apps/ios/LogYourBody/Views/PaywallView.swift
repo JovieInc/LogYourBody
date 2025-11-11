@@ -83,8 +83,16 @@ struct PaywallView: View {
         } message: {
             Text(revenueCatManager.errorMessage ?? "No active subscription found")
         }
-        .task {
-            await loadOfferings()
+        .onAppear {
+            // Use cached offerings if available, otherwise fetch
+            if revenueCatManager.currentOffering != nil {
+                isLoading = false
+                print("💰 Using cached offerings")
+            } else {
+                Task {
+                    await loadOfferings()
+                }
+            }
         }
     }
 

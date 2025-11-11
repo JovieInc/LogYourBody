@@ -7,6 +7,7 @@
 import Foundation
 import Combine
 import RevenueCat
+import SwiftUI
 
 @MainActor
 class RevenueCatManager: NSObject, ObservableObject {
@@ -29,16 +30,32 @@ class RevenueCatManager: NSObject, ObservableObject {
     /// Error message for display
     @Published var errorMessage: String?
 
+    // MARK: - Cached Properties (AppStorage)
+
+    /// Cached subscription status for faster app startup
+    @AppStorage("revenuecat_isSubscribed") private var cachedIsSubscribed: Bool = false
+
+    /// Timestamp of last successful customer info fetch
+    @AppStorage("revenuecat_lastFetchTimestamp") private var lastFetchTimestamp: Double = 0
+
     // MARK: - Constants
 
     /// The entitlement identifier that grants pro access
     /// IMPORTANT: This must match the entitlement lookup_key in RevenueCat dashboard
     private let proEntitlementID = "Premium"
 
+    /// Cache expiry duration (24 hours)
+    private let cacheExpiryDuration: TimeInterval = 24 * 60 * 60
+
     // MARK: - Initialization
 
     private override init() {
+        super.init()
         print("💰 RevenueCatManager initialized")
+
+        // Load cached subscription status for instant UI update
+        self.isSubscribed = cachedIsSubscribed
+        print("💰 Loaded cached subscription status: \(cachedIsSubscribed)")
     }
 
     // MARK: - Configuration
@@ -65,8 +82,7 @@ class RevenueCatManager: NSObject, ObservableObject {
         do {
             let (customerInfo, _) = try await Purchases.shared.logIn(userId)
             await MainActor.run {
-                self.customerInfo = customerInfo
-                self.isSubscribed = customerInfo.entitlements[proEntitlementID]?.isActive == true
+                self.updateSubscriptionStatus(customerInfo: customerInfo)
             }
             print("💰 User identified successfully")
         } catch {
@@ -86,6 +102,7 @@ class RevenueCatManager: NSObject, ObservableObject {
             await MainActor.run {
                 self.customerInfo = nil
                 self.isSubscribed = false
+                self.cachedIsSubscribed = false
                 self.currentOffering = nil
             }
         } catch {
@@ -102,8 +119,7 @@ class RevenueCatManager: NSObject, ObservableObject {
         do {
             let customerInfo = try await Purchases.shared.customerInfo()
             await MainActor.run {
-                self.customerInfo = customerInfo
-                self.isSubscribed = customerInfo.entitlements[proEntitlementID]?.isActive == true
+                self.updateSubscriptionStatus(customerInfo: customerInfo)
                 print("💰 Subscription status: \(self.isSubscribed ? "Active" : "Inactive")")
             }
         } catch {
@@ -162,8 +178,7 @@ class RevenueCatManager: NSObject, ObservableObject {
             let (_, customerInfo, _) = try await Purchases.shared.purchase(package: package)
 
             await MainActor.run {
-                self.customerInfo = customerInfo
-                self.isSubscribed = customerInfo.entitlements[proEntitlementID]?.isActive == true
+                self.updateSubscriptionStatus(customerInfo: customerInfo)
                 self.isPurchasing = false
             }
 
@@ -214,8 +229,7 @@ class RevenueCatManager: NSObject, ObservableObject {
             let customerInfo = try await Purchases.shared.restorePurchases()
 
             await MainActor.run {
-                self.customerInfo = customerInfo
-                self.isSubscribed = customerInfo.entitlements[proEntitlementID]?.isActive == true
+                self.updateSubscriptionStatus(customerInfo: customerInfo)
                 self.isPurchasing = false
             }
 
@@ -263,6 +277,25 @@ class RevenueCatManager: NSObject, ObservableObject {
 
         return nil
     }
+
+    // MARK: - Private Helper Methods
+
+    /// Update subscription status and cache it for faster app startup
+    /// Call this method whenever customerInfo is updated to keep cache in sync
+    private func updateSubscriptionStatus(customerInfo: CustomerInfo) {
+        self.customerInfo = customerInfo
+        let isActive = customerInfo.entitlements[proEntitlementID]?.isActive == true
+        self.isSubscribed = isActive
+        self.cachedIsSubscribed = isActive
+        self.lastFetchTimestamp = Date().timeIntervalSince1970
+        print("💰 Updated subscription status: \(isActive) (cached)")
+    }
+
+    /// Check if cache is expired (older than 24 hours)
+    var isCacheExpired: Bool {
+        let currentTime = Date().timeIntervalSince1970
+        return (currentTime - lastFetchTimestamp) > cacheExpiryDuration
+    }
 }
 
 // MARK: - PurchasesDelegate
@@ -271,8 +304,7 @@ extension RevenueCatManager: PurchasesDelegate {
     nonisolated func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
         Task { @MainActor in
             print("💰 Received updated customer info")
-            self.customerInfo = customerInfo
-            self.isSubscribed = customerInfo.entitlements[self.proEntitlementID]?.isActive == true
+            self.updateSubscriptionStatus(customerInfo: customerInfo)
         }
     }
 }
