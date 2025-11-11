@@ -64,6 +64,9 @@ struct LogYourBodyApp: App {
                         // Small delay to ensure SDK delegate registration completes
                         try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
 
+                        // Mark SDK as configured so other methods can proceed
+                        await revenueCatManager.markAsConfigured()
+
                         // Identify user and fetch subscription status (sequential to avoid race condition)
                         if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
                             await revenueCatManager.identifyUser(userId: userId)

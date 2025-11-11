@@ -75,17 +75,13 @@ class RevenueCatManager: NSObject, ObservableObject {
         // Set up delegate to listen for customer info updates
         Purchases.shared.delegate = self
 
-        // Mark as configured
-        Task { @MainActor in
-            await self.markAsConfigured()
-        }
-
         print("💰 RevenueCat SDK configured successfully")
     }
 
-    /// Mark SDK as configured (must be called on MainActor)
-    private func markAsConfigured() {
+    /// Mark SDK as configured after delegate setup completes
+    func markAsConfigured() {
         isConfigured = true
+        print("✅ SDK marked as configured")
     }
 
     /// Identify the user with their Clerk user ID
