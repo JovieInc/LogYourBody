@@ -172,8 +172,19 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     /// Fetch available offerings from RevenueCat
     func fetchOfferings() async {
+        // Wait for SDK to be configured (with timeout)
+        var retries = 0
+        while !isConfigured && retries < 50 {
+            print("⚠️ SDK not configured yet, waiting... (retry \(retries + 1)/50)")
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            retries += 1
+        }
+
         guard isConfigured else {
-            print("⚠️ SDK not configured yet, skipping fetchOfferings()")
+            print("❌ SDK not configured after timeout, cannot fetch offerings")
+            await MainActor.run {
+                self.errorMessage = "Service not ready. Please try again."
+            }
             return
         }
 
