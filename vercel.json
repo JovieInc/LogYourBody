@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "buildCommand": "npm run build --workspace=apps/web",
+  "outputDirectory": "apps/web/.next",
+  "installCommand": "npm install",
+  "devCommand": "npm run dev --workspace=apps/web",
+  "framework": "nextjs",
+  "git": {
+    "deploymentEnabled": {
+      "dev": true,
+      "main": true,
+      "preview": true
+    }
+  }
+}

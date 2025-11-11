@@ -8,13 +8,14 @@ import Clerk
 @main
 struct LogYourBodyApp: App {
     @StateObject private var authManager = AuthManager.shared
+    @StateObject private var revenueCatManager = RevenueCatManager.shared
     @StateObject private var healthKitManager = HealthKitManager.shared
     @StateObject private var syncManager = SyncManager.shared
     @StateObject private var widgetDataManager = WidgetDataManager.shared
     @State private var clerk = Clerk.shared
     @State private var showAddEntrySheet = false
     @State private var selectedEntryTab = 0
-    
+
     let persistenceController = CoreDataManager.shared
     
     var body: some Scene {
@@ -23,6 +24,7 @@ struct LogYourBodyApp: App {
                 .environment(\.managedObjectContext, persistenceController.viewContext)
                 .environmentObject(authManager)
                 .environmentObject(syncManager)
+                .environmentObject(revenueCatManager)
                 .environment(clerk)
                 .sheet(isPresented: $showAddEntrySheet) {
                     AddEntrySheet(isPresented: $showAddEntrySheet)
@@ -42,16 +44,34 @@ struct LogYourBodyApp: App {
                     // Perform app version management and cleanup
                     // TODO: Add AppVersionManager.swift to Xcode project, then uncomment:
                     // AppVersionManager.shared.performStartupMaintenance()
-                    
+
                     // Repair any corrupted Core Data entries on startup
                     let repairedCount = CoreDataManager.shared.repairCorruptedEntries()
                     if repairedCount > 0 {
                         // print("🔧 App startup: Repaired \(repairedCount) corrupted entries")
                     }
-                    
-                    // Initialize Clerk
+
+                    // Initialize Clerk (critical path)
                     await authManager.initializeClerk()
-                    
+
+                    // Configure RevenueCat SDK (non-blocking, no network call)
+                    let apiKey = Constants.revenueCatAPIKey
+                    if !apiKey.isEmpty {
+                        await MainActor.run {
+                            revenueCatManager.configure(apiKey: apiKey)
+                        }
+                    }
+
+                    // Background task: Identify user and fetch subscription status (lower priority)
+                    Task.detached(priority: .userInitiated) { @MainActor in
+                        if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
+                            await revenueCatManager.identifyUser(userId: userId)
+                        } else {
+                            // If not authenticated, still refresh to check anonymous status
+                            await revenueCatManager.refreshCustomerInfo()
+                        }
+                    }
+
                     // Check HealthKit authorization status on app launch
                     healthKitManager.checkAuthorizationStatus()
                     

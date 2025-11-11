@@ -1,0 +1,139 @@
+{
+  "identifier" : "7C34A145",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6739360530",
+    "_developerTeamID" : "GMUM85SPMP",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 803687513.71668601,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "258EE27F",
+      "localizations" : [
+
+      ],
+      "name" : "Standard",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "79.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "15C0F4D8",
+          "introductoryOffer" : {
+            "internalID" : "ANNUALTRIAL",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "localizations" : [
+            {
+              "description" : "Annual subscription to LogYourBody Pro with 3-day free trial",
+              "displayName" : "LogYourBody Pro Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.logyourbody.app.pro.annual.3daytrial",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "LogYourBody Pro Annual (3-Day Trial)",
+          "subscriptionGroupID" : "258EE27F",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "569A07CD",
+          "introductoryOffer" : {
+            "internalID" : "MONTHLYTRIAL",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "localizations" : [
+            {
+              "description" : "Monthly subscription to LogYourBody Pro with 3-day free trial",
+              "displayName" : "LogYourBody Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.logyourbody.app.pro.monthly.3daytrial",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "LogYourBody Pro Monthly (3-Day Trial)",
+          "subscriptionGroupID" : "258EE27F",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
