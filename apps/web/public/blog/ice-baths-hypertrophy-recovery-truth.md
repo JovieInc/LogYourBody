@@ -1,5 +1,5 @@
 ---
-title: Ice Baths and Cold Exposure: The Truth About Hypertrophy and Recovery
+title: "Ice Baths and Cold Exposure: The Truth About Hypertrophy and Recovery"
 date: 2024-11-08
 author: LogYourBody Team
 tags:
@@ -66,7 +66,7 @@ As Mike Israetel explains, the inflammation response after training is not damag
 
 **Results:**
 - CWI reduced p38 MAPK activation (growth signal)
-- CWI reduced PGC-1± expression (mitochondrial biogenesis)
+- CWI reduced PGC-1ï¿½ expression (mitochondrial biogenesis)
 - CWI blunted inflammatory markers that trigger adaptation
 
 **Conclusion:** The mechanisms by which muscle grows are suppressed by CWI.
@@ -186,7 +186,7 @@ Mike Israetel considers sleep the most important recovery tool:
 **Target:**
 - 7-9 hours per night
 - Consistent schedule
-- Dark, cool room (65-68°F)
+- Dark, cool room (65-68ï¿½F)
 - No screens 1 hour before bed
 
 ### 4. Massage and Soft Tissue Work
@@ -234,7 +234,7 @@ Interestingly, heat exposure (sauna) may have opposite effects to cold:
 
 **Practical approach:**
 - 15-20 minutes post-workout
-- Temperature: 170-190°F
+- Temperature: 170-190ï¿½F
 - Hydrate adequately
 - Listen to your body
 

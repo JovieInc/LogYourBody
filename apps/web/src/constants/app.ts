@@ -61,7 +61,7 @@ export const APP_CONFIG = {
   
   // Feature Flags
   features: {
-    webAppEnabled: false, // Currently iOS only
+    webAppEnabled: true, // Web app is now live
     androidAppEnabled: false, // Coming soon
     removeOriginalsEnabled: true, // New privacy feature
   },

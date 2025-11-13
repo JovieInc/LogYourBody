@@ -1,5 +1,5 @@
 ---
-title: Muscle Protein Synthesis: The Complete Guide
+title: "Muscle Protein Synthesis: The Complete Guide"
 date: 2024-11-12
 author: LogYourBody Team
 tags:
@@ -76,7 +76,7 @@ Mike Israetel emphasizes that recovery is when muscle growth actually happens. D
 **Recommendations:**
 - **Sleep duration**: 7-9 hours per night
 - **Pre-bed protein**: 30-40g of casein or whole food protein
-- **Sleep quality**: Dark room, cool temperature (65-68°F), consistent schedule
+- **Sleep quality**: Dark room, cool temperature (65-68ï¿½F), consistent schedule
 
 ## MPS and Caloric Status
 

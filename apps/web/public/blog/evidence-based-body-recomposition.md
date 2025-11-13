@@ -1,5 +1,5 @@
 ---
-title: Evidence-Based Body Recomposition: Building Muscle While Losing Fat
+title: "Evidence-Based Body Recomposition: Building Muscle While Losing Fat"
 date: 2024-11-10
 author: LogYourBody Team
 tags:
