@@ -1588,9 +1588,25 @@ extension DashboardViewLiquid {
     }
 
     private func generateStepsChartData() -> [MetricDataPoint] {
-        // Get last 7 days of step data (placeholder - you'd fetch from Core Data)
-        // For now, return empty array
-        return []
+        guard let userId = authManager.currentUser?.id else { return [] }
+
+        // Get last 7 days of step data
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        return (0..<7).compactMap { daysAgo in
+            guard let date = calendar.date(byAdding: .day, value: -daysAgo, to: today) else {
+                return nil
+            }
+
+            // Fetch daily metrics for this date
+            if let dailyData = CoreDataManager.shared.fetchDailyMetrics(for: userId, date: date),
+               let steps = dailyData.steps, steps > 0 {
+                return MetricDataPoint(index: 6 - daysAgo, value: Double(steps))
+            }
+
+            return nil
+        }.reversed()
     }
 
     private func generateWeightChartData() -> [MetricDataPoint] {
@@ -1655,7 +1671,7 @@ private struct MetricSummaryCard: View {
                 .fill(Color(.secondarySystemBackground))
         }
         .overlay(
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 // TOP ROW: label + time
                 HStack {
                     HStack(spacing: 4) {
@@ -1711,7 +1727,7 @@ private struct MetricSummaryCard: View {
                     }
                 }
             }
-            .padding(20)
+            .padding(16)
         )
         .frame(maxWidth: .infinity, minHeight: 120)
     }

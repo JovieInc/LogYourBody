@@ -22,7 +22,7 @@ struct MetricSummaryCard: View {
     let chartData: [MetricDataPoint]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             // Header: Icon + Label + Time
             HStack(alignment: .center, spacing: 8) {
                 Image(systemName: icon)
@@ -45,8 +45,8 @@ struct MetricSummaryCard: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.appTextSecondary.opacity(0.5))
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
 
             // Value + Chart Row
             HStack(alignment: .bottom, spacing: 16) {
@@ -82,8 +82,8 @@ struct MetricSummaryCard: View {
                     .frame(width: 120, height: 50)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
         .background(Color.appCard)
         .cornerRadius(16)
