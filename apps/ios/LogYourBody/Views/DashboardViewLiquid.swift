@@ -80,6 +80,14 @@ struct DashboardViewLiquid: View {
         case ffmi
     }
 
+    enum DashboardMetricKind {
+        case steps
+        case weight
+        case bodyFat
+        case ffmi
+        case waist
+    }
+
     enum MetricIdentifier: String, Codable, CaseIterable, Identifiable {
         case steps
         case weight
@@ -220,7 +228,9 @@ struct DashboardViewLiquid: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)) { _ in
             // Only reload if NOT currently syncing (prevents constant UI updates)
             guard !isSyncingData else { return }
-            loadData()
+            Task {
+                await loadData()
+            }
         }
         .onChange(of: selectedIndex) { _, newIndex in
             updateAnimatedValues(for: newIndex)
@@ -512,8 +522,15 @@ struct DashboardViewLiquid: View {
         VStack(spacing: 20) {
             ForEach(metricsOrder) { metricId in
                 metricCardView(for: metricId)
+                    .scaleEffect(draggedMetric == metricId ? 1.05 : 1.0)
+                    .opacity(draggedMetric == metricId ? 0.7 : 1.0)
+                    .animation(.easeInOut(duration: 0.2), value: draggedMetric)
                     .onDrag {
-                        self.draggedMetric = metricId
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            self.draggedMetric = metricId
+                        }
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
                         return NSItemProvider(object: metricId.rawValue as NSString)
                     }
                     .onDrop(of: [.text], delegate: MetricDropDelegate(
@@ -1327,8 +1344,8 @@ extension DashboardViewLiquid {
             return
         }
 
-        // Load body metrics from CoreData
-        let fetchedMetrics = CoreDataManager.shared.fetchBodyMetrics(for: userId)
+        // Load body metrics from CoreData (using sync version for compatibility)
+        let fetchedMetrics = CoreDataManager.shared.fetchBodyMetricsSync(for: userId)
         let allMetrics = fetchedMetrics
             .compactMap { $0.toBodyMetrics() }
             .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
@@ -1364,8 +1381,8 @@ extension DashboardViewLiquid {
             }
         }
 
-        // Load today's daily metrics
-        if let todayMetrics = CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date()) {
+        // Load today's daily metrics (using sync version for compatibility)
+        if let todayMetrics = CoreDataManager.shared.fetchDailyMetricsSync(for: userId, date: Date()) {
             dailyMetrics = todayMetrics.toDailyMetrics()
         }
 
@@ -1379,11 +1396,11 @@ extension DashboardViewLiquid {
         if let lastRefresh = lastRefreshDate {
             let timeSinceLastRefresh = Date().timeIntervalSince(lastRefresh)
             if timeSinceLastRefresh < 180 { // 3 minutes in seconds
-                // Just reload from cache for quick refresh
-                await MainActor.run {
-                    loadData()
+                // Just reload from cache for quick refresh (async - won't block UI)
+                await loadData()
 
-                    // Subtle haptic for quick refresh
+                // Subtle haptic for quick refresh
+                await MainActor.run {
                     let generator = UIImpactFeedbackGenerator(style: .light)
                     generator.impactOccurred()
                 }
@@ -1422,12 +1439,16 @@ extension DashboardViewLiquid {
         // Wait for sync operations to complete
         try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
 
-        // Reload from local cache
+        // Re-enable Core Data observer
         await MainActor.run {
-            isSyncingData = false  // Re-enable Core Data observer
-            loadData()
+            isSyncingData = false
+        }
 
-            // Update last refresh timestamp
+        // Reload from local cache (async - won't block UI)
+        await loadData()
+
+        // Update last refresh timestamp and provide haptic feedback
+        await MainActor.run {
             lastRefreshDate = Date()
 
             // Provide haptic feedback based on result
@@ -1456,7 +1477,7 @@ extension DashboardViewLiquid {
 
         let today = Date()
 
-        if let existingMetrics = CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today) {
+        if let existingMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today) {
             // Update existing metrics
             existingMetrics.steps = Int32(steps)
             existingMetrics.updatedAt = Date()
@@ -1599,10 +1620,12 @@ extension DashboardViewLiquid {
                 return nil
             }
 
-            // Fetch daily metrics for this date
-            if let dailyData = CoreDataManager.shared.fetchDailyMetrics(for: userId, date: date),
-               let steps = dailyData.steps, steps > 0 {
-                return MetricDataPoint(index: 6 - daysAgo, value: Double(steps))
+            // Fetch daily metrics for this date (using sync version for compatibility)
+            if let dailyData = CoreDataManager.shared.fetchDailyMetricsSync(for: userId, date: date) {
+                let steps = dailyData.steps
+                if steps > 0 {
+                    return MetricDataPoint(index: 6 - daysAgo, value: Double(steps))
+                }
             }
 
             return nil
@@ -1765,6 +1788,7 @@ private struct MetricChartDataPoint: Identifiable {
     let id = UUID()
     let date: Date
     let value: Double
+    var isEstimated: Bool = false
 }
 
 private struct FullMetricChartView: View {
@@ -1780,6 +1804,9 @@ private struct FullMetricChartView: View {
     let onAdd: () -> Void
 
     @State private var selectedTimeRange: TimeRange = .week
+    @State private var selectedDate: Date?
+    @State private var selectedPoint: MetricChartDataPoint?
+    @State private var isLoadingData: Bool = false
 
     var body: some View {
         ZStack {
@@ -1879,55 +1906,132 @@ private struct FullMetricChartView: View {
     private var currentValueDisplay: some View {
         VStack(spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(currentValue)
-                    .font(.system(size: 52, weight: .bold))
+                Text(displayValue)
+                    .font(.system(size: 68, weight: .bold))
                     .foregroundColor(.white)
 
                 Text(unit)
-                    .font(.system(size: 22, weight: .medium))
+                    .font(.system(size: 26, weight: .medium))
                     .foregroundColor(.white.opacity(0.6))
             }
 
-            Text(currentDate)
-                .font(.system(size: 17, weight: .regular))
-                .foregroundColor(.white.opacity(0.5))
+            HStack(spacing: 8) {
+                Text(displayDate)
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundColor(.white.opacity(0.5))
+
+                // Show "Estimated" badge when displaying estimated data
+                if let point = selectedPoint, point.isEstimated {
+                    Text("Estimated")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.15))
+                        )
+                }
+            }
         }
+    }
+
+    // Computed properties for display value and date (selected or current)
+    private var displayValue: String {
+        if let point = selectedPoint {
+            return String(format: "%.1f", point.value)
+        }
+        return currentValue
+    }
+
+    private var displayDate: String {
+        if let point = selectedPoint {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            return formatter.string(from: point.date)
+        }
+        return currentDate
     }
 
     private var chartView: some View {
         VStack {
-            if filteredChartData.isEmpty {
+            if isLoadingData {
+                loadingState
+            } else if filteredChartData.isEmpty {
                 emptyState
             } else {
                 Chart {
                     ForEach(filteredChartData) { point in
-                        LineMark(
+                        // Area fill gradient (render first, below the line)
+                        AreaMark(
                             x: .value("Date", point.date),
                             y: .value("Value", point.value)
                         )
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [iconColor, iconColor.opacity(0.8)],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                                colors: [
+                                    iconColor.opacity(point.isEstimated ? 0.15 : 0.3),
+                                    iconColor.opacity(0.0)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
                             )
                         )
                         .interpolationMethod(.catmullRom)
-                        .lineStyle(StrokeStyle(lineWidth: 3))
 
-                        PointMark(
+                        // Line (dotted for estimated data)
+                        LineMark(
                             x: .value("Date", point.date),
                             y: .value("Value", point.value)
                         )
-                        .foregroundStyle(iconColor)
-                        .symbolSize(60)
+                        .foregroundStyle(iconColor.gradient)
+                        .interpolationMethod(.catmullRom)
+                        .lineStyle(StrokeStyle(
+                            lineWidth: 3,
+                            dash: point.isEstimated ? [8, 4] : []
+                        ))
+                        .opacity(point.isEstimated ? 0.7 : 1.0)
+
+                        // Points (smaller, subtle, only show when scrubbing)
+                        if selectedDate != nil {
+                            PointMark(
+                                x: .value("Date", point.date),
+                                y: .value("Value", point.value)
+                            )
+                            .foregroundStyle(iconColor)
+                            .symbolSize(30)
+                            .opacity(0.5)
+                        }
+                    }
+
+                    // Vertical scrubber line
+                    if let selectedDate = selectedDate,
+                       let selectedPoint = selectedPoint {
+                        RuleMark(x: .value("Selected", selectedDate))
+                            .foregroundStyle(Color.white.opacity(0.3))
+                            .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
+
+                        // Highlight selected point
+                        PointMark(
+                            x: .value("Date", selectedPoint.date),
+                            y: .value("Value", selectedPoint.value)
+                        )
+                        .foregroundStyle(Color.white)
+                        .symbolSize(120)
+                        .symbol {
+                            Circle()
+                                .fill(iconColor)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.white, lineWidth: 3)
+                                )
+                        }
                     }
                 }
                 .chartXAxis {
                     AxisMarks(preset: .aligned, values: .automatic(desiredCount: 7)) { value in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.white.opacity(0.1))
-
+                        // Grid lines hidden by default (Apple Health style)
                         if let date = value.as(Date.self) {
                             AxisValueLabel {
                                 Text(formatAxisDate(date))
@@ -1939,9 +2043,7 @@ private struct FullMetricChartView: View {
                 }
                 .chartYAxis {
                     AxisMarks(preset: .aligned, position: .trailing, values: .automatic(desiredCount: 5)) { value in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.white.opacity(0.1))
-
+                        // Grid lines hidden by default (Apple Health style)
                         AxisValueLabel {
                             if let doubleValue = value.as(Double.self) {
                                 Text(formatAxisValue(doubleValue))
@@ -1955,9 +2057,46 @@ private struct FullMetricChartView: View {
                     plotArea
                         .background(Color.clear)
                 }
-                .frame(height: 300)
+                .frame(height: 360)
+                .chartAngleSelection(value: $selectedDate)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            // Find nearest point to drag location
+                            if let point = findNearestPoint(to: value.location) {
+                                selectedDate = point.date
+                                selectedPoint = point
+
+                                // Haptic feedback
+                                let impact = UIImpactFeedbackGenerator(style: .light)
+                                impact.impactOccurred()
+                            }
+                        }
+                        .onEnded { _ in
+                            // Clear selection after a delay
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                withAnimation {
+                                    selectedDate = nil
+                                    selectedPoint = nil
+                                }
+                            }
+                        }
+                )
             }
         }
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .tint(.white)
+
+            Text("Loading chart data...")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.white.opacity(0.5))
+        }
+        .frame(height: 360)
     }
 
     private var emptyState: some View {
@@ -1970,7 +2109,7 @@ private struct FullMetricChartView: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white.opacity(0.6))
         }
-        .frame(height: 300)
+        .frame(height: 360)
     }
 
     private var filteredChartData: [MetricChartDataPoint] {
@@ -2002,6 +2141,24 @@ private struct FullMetricChartView: View {
 
     private func formatAxisValue(_ value: Double) -> String {
         return String(format: "%.0f", value)
+    }
+
+    private func findNearestPoint(to location: CGPoint) -> MetricChartDataPoint? {
+        guard !filteredChartData.isEmpty else { return nil }
+
+        // Simple implementation: find point closest in time based on X position
+        // The chart width corresponds to the time range
+        let chartWidth: CGFloat = UIScreen.main.bounds.width - 40 // accounting for padding
+
+        guard chartWidth > 0 else { return nil }
+
+        let xPosition = location.x
+        let percentage = max(0, min(1, xPosition / chartWidth))
+
+        let index = Int(percentage * CGFloat(filteredChartData.count - 1))
+        let clampedIndex = max(0, min(filteredChartData.count - 1, index))
+
+        return filteredChartData[clampedIndex]
     }
 }
 
@@ -2056,7 +2213,7 @@ struct MetricDropDelegate: DropDelegate {
             return
         }
 
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        withAnimation(.easeInOut(duration: 0.2)) {
             metrics.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
         }
     }

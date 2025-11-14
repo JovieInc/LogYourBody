@@ -143,7 +143,7 @@ class BackgroundPhotoUploadService: ObservableObject {
         let userId = authManager.currentUser?.id ?? ""
         
         // Check if metrics already exist for this date
-        let existingMetrics = coreDataManager.fetchBodyMetrics(for: userId)
+        let existingMetrics = await coreDataManager.fetchBodyMetrics(for: userId)
             .first { metrics in
                 guard let metricsDate = metrics.date else { return false }
                 return Calendar.current.isDate(metricsDate, inSameDayAs: date)

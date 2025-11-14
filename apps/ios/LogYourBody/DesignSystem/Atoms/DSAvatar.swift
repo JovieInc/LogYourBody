@@ -56,6 +56,7 @@ struct DSAvatar: View {
                         placeholderView
                     }
                 }
+                .id(urlString) // Prevent unnecessary reloads when URL doesn't change
             } else {
                 placeholderView
             }

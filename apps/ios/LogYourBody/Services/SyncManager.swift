@@ -21,9 +21,11 @@ class SyncManager: ObservableObject {
     private let supabaseManager = SupabaseManager.shared
     private let networkMonitor = NWPathMonitor()
     private let syncQueue = DispatchQueue(label: "com.logyourbody.sync", qos: .background)
-    
+
     private var syncTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
+    private var lastNetworkSyncTrigger: Date?
+    private let networkSyncDebounceInterval: TimeInterval = 30.0 // 30 seconds
     
     enum SyncStatus {
         case idle
@@ -41,20 +43,32 @@ class SyncManager: ObservableObject {
     private func setupNetworkMonitoring() {
         let queue = DispatchQueue.global(qos: .background)
         networkMonitor.start(queue: queue)
-        
+
         networkMonitor.pathUpdateHandler = { [weak self] path in
             if path.status == .satisfied {
-                // Network is available, attempt sync
+                // Network is available, attempt sync with debouncing
                 Task { @MainActor [weak self] in
-                    self?.syncIfNeeded()
+                    guard let self = self else { return }
+
+                    // Debounce: Only sync if enough time has passed since last network sync trigger
+                    let now = Date()
+                    if let lastTrigger = self.lastNetworkSyncTrigger,
+                       now.timeIntervalSince(lastTrigger) < self.networkSyncDebounceInterval {
+                        // Too soon, skip this sync
+                        return
+                    }
+
+                    // Update last trigger time and sync
+                    self.lastNetworkSyncTrigger = now
+                    self.syncIfNeeded()
                 }
             }
         }
     }
     
     private func setupAutoSync() {
-        // Sync every 5 minutes when app is active
-        syncTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+        // Sync every 15 minutes when app is active (reduced for better battery life)
+        syncTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.syncIfNeeded()
             }
@@ -103,7 +117,7 @@ class SyncManager: ObservableObject {
                 }
             }
             
-            let unsynced = self.coreDataManager.fetchUnsyncedEntries()
+            let unsynced = await self.coreDataManager.fetchUnsyncedEntries()
             let totalUnsynced = unsynced.bodyMetrics.count + unsynced.dailyMetrics.count + unsynced.profiles.count
             
             // print("📊 Unsynced items: \(unsynced.bodyMetrics.count) body metrics, \(unsynced.dailyMetrics.count) daily metrics, \(unsynced.profiles.count) profiles")
@@ -161,11 +175,153 @@ class SyncManager: ObservableObject {
         }
     }
     
+    func downloadRemoteChanges() async {
+        guard authManager.isAuthenticated else { return }
+        guard let userId = authManager.currentUser?.id else { return }
+
+        Task { @MainActor in
+            self.isSyncing = true
+            self.syncStatus = .syncing
+        }
+
+        syncQueue.async { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+
+                // Get the Clerk session token
+                guard let session = self.authManager.clerkSession else {
+                    self.isSyncing = false
+                    self.syncStatus = .error("No active session")
+                    return
+                }
+
+                do {
+                    // Get JWT token from Clerk session
+                    let tokenResource = try await session.getToken()
+                    guard let token = tokenResource?.jwt else {
+                        self.isSyncing = false
+                        self.syncStatus = .error("Failed to get authentication token")
+                        return
+                    }
+
+                    await self.performDownloadSync(token: token, userId: userId)
+                } catch {
+                    self.isSyncing = false
+                    self.syncStatus = .error("Token error: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    private func performDownloadSync(token: String, userId: String) async {
+        do {
+            // Fetch data updated in the last 30 days to cover most recent changes
+            let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+
+            // Fetch body metrics from Supabase
+            let remoteBodyMetrics = try await supabaseManager.fetchBodyMetrics(userId: userId, since: thirtyDaysAgo, token: token)
+
+            // Fetch daily metrics from Supabase
+            let remoteDailyMetrics = try await supabaseManager.fetchDailyMetrics(userId: userId, since: thirtyDaysAgo, token: token)
+
+            // Process and save remote body metrics to CoreData
+            for remoteMetric in remoteBodyMetrics {
+                if let bodyMetric = parseBodyMetric(from: remoteMetric, userId: userId) {
+                    // Save with markAsSynced=true since it's coming from the server
+                    await MainActor.run {
+                        coreDataManager.saveBodyMetrics(bodyMetric, userId: userId, markAsSynced: true)
+                    }
+                }
+            }
+
+            // Process and save remote daily metrics to CoreData
+            for remoteDailyMetric in remoteDailyMetrics {
+                if let dailyMetric = parseDailyMetric(from: remoteDailyMetric, userId: userId) {
+                    await MainActor.run {
+                        coreDataManager.saveDailyMetrics(dailyMetric, userId: userId)
+                        // Mark as synced
+                        coreDataManager.markAsSynced(entityName: "CachedDailyMetrics", id: dailyMetric.id)
+                    }
+                }
+            }
+
+            await MainActor.run {
+                self.isSyncing = false
+                self.syncStatus = .success
+                self.lastSyncDate = Date()
+            }
+        } catch {
+            await MainActor.run {
+                self.isSyncing = false
+                self.syncStatus = .error("Download failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func parseBodyMetric(from dict: [String: Any], userId: String) -> BodyMetrics? {
+        guard let id = dict["id"] as? String else { return nil }
+
+        let dateFormatter = ISO8601DateFormatter()
+        guard let date = (dict["date"] as? String).flatMap({ dateFormatter.date(from: $0) }) else { return nil }
+        let createdAt = (dict["created_at"] as? String).flatMap { dateFormatter.date(from: $0) } ?? Date()
+        let updatedAt = (dict["updated_at"] as? String).flatMap { dateFormatter.date(from: $0) } ?? Date()
+
+        // Parse optional fields, handling NSNull
+        let weight = dict["weight"] as? Double
+        let weightUnit = dict["weight_unit"] as? String ?? "kg"
+        let bodyFatPercentage = dict["body_fat_percentage"] as? Double
+        let bodyFatMethod = dict["body_fat_method"] as? String
+        let muscleMass = dict["muscle_mass"] as? Double
+        let boneMass = dict["bone_mass"] as? Double
+        let notes = dict["notes"] as? String
+        let photoUrl = dict["photo_url"] as? String
+        let dataSource = dict["data_source"] as? String ?? "Manual"
+
+        return BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: weight,
+            weightUnit: weightUnit,
+            bodyFatPercentage: bodyFatPercentage,
+            bodyFatMethod: bodyFatMethod,
+            muscleMass: muscleMass,
+            boneMass: boneMass,
+            notes: notes,
+            photoUrl: photoUrl,
+            dataSource: dataSource,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+
+    private func parseDailyMetric(from dict: [String: Any], userId: String) -> DailyMetrics? {
+        guard let id = dict["id"] as? String else { return nil }
+
+        let dateFormatter = ISO8601DateFormatter()
+        guard let date = (dict["date"] as? String).flatMap({ dateFormatter.date(from: $0) }) else { return nil }
+        let createdAt = (dict["created_at"] as? String).flatMap { dateFormatter.date(from: $0) } ?? Date()
+        let updatedAt = (dict["updated_at"] as? String).flatMap { dateFormatter.date(from: $0) } ?? Date()
+
+        let steps = dict["steps"] as? Int
+        let notes = dict["notes"] as? String
+
+        return DailyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            steps: steps,
+            notes: notes,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+
     private func performSync(token: String) {
         Task.detached { [weak self] in
             guard let self = self else { return }
             do {
-                let unsynced = coreDataManager.fetchUnsyncedEntries()
+                let unsynced = await coreDataManager.fetchUnsyncedEntries()
                 var hasErrors = false
                 
                 // print("📤 Starting sync: \(unsynced.bodyMetrics.count) body metrics, \(unsynced.dailyMetrics.count) daily metrics")
@@ -486,7 +642,7 @@ class SyncManager: ObservableObject {
     func updatePendingSyncCount() {
         Task.detached { [weak self] in
             guard let self = self else { return }
-            let unsynced = self.coreDataManager.fetchUnsyncedEntries()
+            let unsynced = await self.coreDataManager.fetchUnsyncedEntries()
             let count = unsynced.bodyMetrics.count + unsynced.dailyMetrics.count + unsynced.profiles.count
             
             await MainActor.run {
@@ -531,19 +687,20 @@ class SyncManager: ObservableObject {
     }
     
     // Check if weight entry exists for a specific date
-    func weightEntryExists(for date: Date) -> Bool {
+    func weightEntryExists(for date: Date) async -> Bool {
         guard let userId = authManager.currentUser?.id else { return false }
-        
+
         let calendar = Calendar.current
         // Check within a 1-hour window to handle minor time differences
         let hourBefore = calendar.date(byAdding: .hour, value: -1, to: date) ?? date
         let hourAfter = calendar.date(byAdding: .hour, value: 1, to: date) ?? date
-        
-        return !coreDataManager.fetchBodyMetrics(
+
+        let metrics = await coreDataManager.fetchBodyMetrics(
             for: userId,
             from: hourBefore,
             to: hourAfter
-        ).isEmpty
+        )
+        return !metrics.isEmpty
     }
     
     // Save weight entry from HealthKit
@@ -613,10 +770,10 @@ class SyncManager: ObservableObject {
     }
     
     // Check if daily metrics exist for a specific date
-    func dailyMetricsExists(for date: Date) -> Bool {
+    func dailyMetricsExists(for date: Date) async -> Bool {
         guard let userId = authManager.currentUser?.id else { return false }
-        
-        return coreDataManager.fetchDailyMetrics(for: userId, date: date) != nil
+
+        return await coreDataManager.fetchDailyMetrics(for: userId, date: date) != nil
     }
     
     // Save daily metrics from HealthKit
@@ -672,16 +829,16 @@ class SyncManager: ObservableObject {
         syncIfNeeded()
     }
     
-    func fetchLocalBodyMetrics(from startDate: Date? = nil, to endDate: Date? = nil) -> [BodyMetrics] {
+    func fetchLocalBodyMetrics(from startDate: Date? = nil, to endDate: Date? = nil) async -> [BodyMetrics] {
         guard let userId = authManager.currentUser?.id else { return [] }
-        
-        let cached = coreDataManager.fetchBodyMetrics(for: userId, from: startDate, to: endDate)
+
+        let cached = await coreDataManager.fetchBodyMetrics(for: userId, from: startDate, to: endDate)
         return cached.compactMap { $0.toBodyMetrics() }
     }
-    
-    func fetchLocalDailyMetrics(for date: Date) -> DailyMetrics? {
+
+    func fetchLocalDailyMetrics(for date: Date) async -> DailyMetrics? {
         guard let userId = authManager.currentUser?.id else { return nil }
-        
-        return coreDataManager.fetchDailyMetrics(for: userId, date: date)?.toDailyMetrics()
+
+        return await coreDataManager.fetchDailyMetrics(for: userId, date: date)?.toDailyMetrics()
     }
 }

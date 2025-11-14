@@ -51,6 +51,11 @@ struct LogYourBodyApp: App {
                         // print("🔧 App startup: Repaired \(repairedCount) corrupted entries")
                     }
 
+                    // Set up chart data cache invalidation for Core Data changes
+                    // TODO: Add MetricChartDataHelper.swift, MetricDetailView.swift, PeriodSelector.swift
+                    // and other new files to Xcode project, then uncomment:
+                    // MetricChartDataHelper.setupCacheInvalidation()
+
                     // Initialize Clerk (critical path)
                     await authManager.initializeClerk()
 

@@ -609,17 +609,17 @@ struct DashboardViewV2: View {
         }
         
         // Load body metrics
-        let cachedMetrics = CoreDataManager.shared.fetchBodyMetrics(for: userId)
+        let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
         bodyMetrics = cachedMetrics.compactMap { $0.toBodyMetrics() }
             .sorted { $0.date < $1.date }
-        
+
         if !bodyMetrics.isEmpty {
             selectedIndex = bodyMetrics.count - 1
             loadMetricsForSelectedDate()
         }
-        
+
         // Load daily metrics
-        dailyMetrics = CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date())?.toDailyMetrics()
+        dailyMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date())?.toDailyMetrics()
         
         isLoading = false
     }
@@ -627,14 +627,16 @@ struct DashboardViewV2: View {
     private func loadMetricsForSelectedDate() {
         guard let metric = currentMetric,
               let userId = authManager.currentUser?.id else { return }
-        
+
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: metric.date)
-        
-        selectedDateMetrics = CoreDataManager.shared.fetchDailyMetrics(
-            for: userId,
-            date: startOfDay
-        )?.toDailyMetrics()
+
+        Task {
+            selectedDateMetrics = await CoreDataManager.shared.fetchDailyMetrics(
+                for: userId,
+                date: startOfDay
+            )?.toDailyMetrics()
+        }
     }
     
     private func refreshData() async {
@@ -753,7 +755,7 @@ struct EnhancedPhotoCarousel: View {
     let currentMetric: BodyMetrics?
     let historicalMetrics: [BodyMetrics]
     @Binding var selectedMetricsIndex: Int
-    @State private var displayMode: BodyVisualizationMode = .photo
+    @State private var displayMode: DashboardDisplayMode = .photo
 
     var body: some View {
         // Placeholder - would use Vision to detect faces and rotate

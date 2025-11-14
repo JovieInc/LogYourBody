@@ -542,7 +542,8 @@ struct ProfileSettingsViewV2: View {
                     gender: editableGender.rawValue,
                     activityLevel: currentUser.profile?.activityLevel,
                     goalWeight: currentUser.profile?.goalWeight,
-                    goalWeightUnit: currentUser.profile?.goalWeightUnit
+                    goalWeightUnit: currentUser.profile?.goalWeightUnit,
+                    onboardingCompleted: currentUser.profile?.onboardingCompleted
                 )
                 
                 // Save to Core Data
@@ -822,7 +823,8 @@ struct DatePickerSheet: View {
                         gender: "Male",
                         activityLevel: nil,
                         goalWeight: nil,
-                        goalWeightUnit: nil
+                        goalWeightUnit: nil,
+                        onboardingCompleted: true
                     ),
                     onboardingCompleted: true
                 )

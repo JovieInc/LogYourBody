@@ -94,6 +94,20 @@ enum Configuration {
         }
     }
 
+    // MARK: - RevenueCat Configuration
+
+    static var revenueCatAPIKey: String {
+        do {
+            return try Configuration.value(for: "REVENUE_CAT_API_KEY")
+        } catch {
+            #if DEBUG
+            print("⚠️ REVENUE_CAT_API_KEY not configured in Config.xcconfig")
+            print("⚠️ Add REVENUE_CAT_API_KEY = your_api_key_here to Config.xcconfig")
+            #endif
+            return ""
+        }
+    }
+
     // MARK: - Validation
 
     static var isClerkConfigured: Bool {

@@ -28,7 +28,7 @@ struct Constants {
         Configuration.clerkFrontendAPI
     }
 
-    static let useMockAuth = false  // Disable mock auth, use Clerk
+    static let useMockAuth = false  // Clerk authentication enabled
 
     static var isClerkConfigured: Bool {
         Configuration.isClerkConfigured
@@ -42,14 +42,34 @@ struct Constants {
     static var supabaseAnonKey: String {
         Configuration.supabaseAnonKey
     }
-    
+
+    // MARK: - RevenueCat Configuration (from Config.xcconfig via Info.plist)
+    static var revenueCatAPIKey: String {
+        Configuration.revenueCatAPIKey
+    }
+
+    // RevenueCat Entitlement ID (must match RevenueCat dashboard)
+    static let proEntitlementID = "Premium"
+
     // MARK: - UserDefaults Keys
     static let authTokenKey = "authToken"
     static let currentUserKey = "currentUser"
     static let preferredWeightUnitKey = "preferredWeightUnit"
     static let preferredMeasurementSystemKey = "preferredMeasurementSystem"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
-    
+
+    // Goal Keys
+    static let goalBodyFatPercentageKey = "goalBodyFatPercentage"
+    static let goalFFMIKey = "goalFFMI"
+    static let goalWeightKey = "goalWeight"
+
+    // Timeline Keys
+    static let timelineModeKey = "timelineMode"
+
+    // Photo Management Keys
+    static let deletePhotosAfterImportKey = "deletePhotosAfterImportKey"
+    static let hasPromptedDeletePhotosKey = "hasPromptedDeletePhotosKey"
+
     // MARK: - Units
     static let weightUnits = ["kg", "lbs"]
     static let heightUnits = ["cm", "ft"]
@@ -83,9 +103,9 @@ struct Constants {
         // Fat-Free Mass Index (FFMI)
         struct FFMI {
             static let maleOptimalRange: ClosedRange<Double> = 20...23
-            static let maleIdealValue: Double = 23
-            static let femaleOptimalRange: ClosedRange<Double> = 16...19
-            static let femaleIdealValue: Double = 17.5
+            static let maleIdealValue: Double = 22
+            static let femaleOptimalRange: ClosedRange<Double> = 14...17
+            static let femaleIdealValue: Double = 15
         }
     }
 }

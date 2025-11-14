@@ -36,7 +36,7 @@ extension BackgroundPhotoUploadService {
                     let date = Date()
                     
                     // Check if metrics already exist for today
-                    let existingMetrics = CoreDataManager.shared.fetchBodyMetrics(for: userId)
+                    let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
                         .first { metrics in
                             guard let metricsDate = metrics.date else { return false }
                             return Calendar.current.isDate(metricsDate, inSameDayAs: date)

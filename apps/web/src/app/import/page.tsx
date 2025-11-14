@@ -28,8 +28,6 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { uploadToStorage } from '@/utils/storage-utils'
-import exifr from 'exifr'
-import * as XLSX from 'xlsx'
 
 type FileType = 'image' | 'pdf' | 'csv' | 'unknown'
 
@@ -115,11 +113,14 @@ export default function ImportPage() {
 
   const extractDateFromImage = async (file: File): Promise<string> => {
     try {
+      // Dynamically import exifr only when needed
+      const exifr = (await import('exifr')).default
+
       // Try to extract EXIF data
       const exifData = await exifr.parse(file, {
         pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate']
       })
-      
+
       if (exifData) {
         const date = exifData.DateTimeOriginal || exifData.CreateDate || exifData.ModifyDate
         if (date) {
@@ -129,7 +130,7 @@ export default function ImportPage() {
     } catch (error) {
       console.log('Could not extract EXIF data:', error)
     }
-    
+
     // Fallback to file last modified date
     return format(new Date(file.lastModified), 'yyyy-MM-dd')
   }
@@ -196,13 +197,16 @@ export default function ImportPage() {
   const parseSpreadsheet = async (file: File): Promise<ParsedData | null> => {
     try {
       let data: any[][] = []
-      
+
       if (file.name.endsWith('.csv')) {
         // Parse CSV
         const text = await file.text()
         const lines = text.split('\n').filter(line => line.trim())
         data = lines.map(line => line.split(',').map(v => v.trim()))
       } else {
+        // Dynamically import XLSX only when needed
+        const XLSX = await import('xlsx')
+
         // Parse Excel
         const buffer = await file.arrayBuffer()
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })

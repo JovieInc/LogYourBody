@@ -41,7 +41,7 @@ class WidgetDataManager: ObservableObject {
         let coreDataManager = CoreDataManager.shared
         
         // Get most recent body metrics
-        let recentMetrics = coreDataManager.fetchBodyMetrics(for: userId)
+        let recentMetrics = await coreDataManager.fetchBodyMetrics(for: userId)
             .max { ($0.date ?? Date.distantPast) < ($1.date ?? Date.distantPast) }
         
         var weight: Double?

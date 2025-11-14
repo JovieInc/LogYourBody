@@ -56,6 +56,7 @@ class AuthManager: NSObject, ObservableObject {
     @Published var clerkSession: Session?
     @Published var needsEmailVerification = false
     @Published var isClerkLoaded = false
+    @Published var clerkInitError: String?
     @Published var needsLegalConsent = false
     @Published var pendingAppleUserId: String?
     
@@ -83,29 +84,76 @@ class AuthManager: NSObject, ObservableObject {
     
     func initializeClerk() async {
         print("🔧 Initializing Clerk SDK")
-        print("🔧 Publishable Key: \(Constants.clerkPublishableKey.prefix(20))...")
+
+        let pubKey = Constants.clerkPublishableKey
+        print("🔧 Publishable Key Length: \(pubKey.count)")
+        print("🔧 Publishable Key: \(pubKey.isEmpty ? "EMPTY ❌" : String(pubKey.prefix(20)) + "...")")
+        print("🔧 Frontend API: \(Constants.clerkFrontendAPI)")
+        print("🔧 Is Configured: \(Constants.isClerkConfigured)")
+
+        // Clear any previous error
+        await MainActor.run {
+            self.clerkInitError = nil
+        }
+
+        // Validate publishable key before attempting to configure
+        guard !pubKey.isEmpty else {
+            let error = "Clerk publishable key is empty. Check Config.xcconfig and Xcode project configuration."
+            print("❌ \(error)")
+            await MainActor.run {
+                self.isClerkLoaded = false
+                self.clerkInitError = error
+            }
+            return
+        }
+
+        guard pubKey.hasPrefix("pk_") else {
+            let error = "Invalid Clerk key format (should start with 'pk_'). Current: '\(String(pubKey.prefix(10)))...'"
+            print("❌ \(error)")
+            await MainActor.run {
+                self.isClerkLoaded = false
+                self.clerkInitError = error
+            }
+            return
+        }
 
         // Configure Clerk with publishable key
-        clerk.configure(publishableKey: Constants.clerkPublishableKey)
+        print("🔧 Configuring Clerk with valid publishable key...")
+        clerk.configure(publishableKey: pubKey)
 
         // Load Clerk
         do {
             print("🔧 Attempting to load Clerk...")
+            let startTime = Date()
             try await clerk.load()
-            print("✅ Clerk SDK loaded successfully")
+            let duration = Date().timeIntervalSince(startTime)
+            print("✅ Clerk SDK loaded successfully in \(String(format: "%.2f", duration))s")
 
             await MainActor.run {
                 self.isClerkLoaded = true
+                self.clerkInitError = nil
                 self.observeSessionChanges()
             }
         } catch {
+            let errorMessage = error.localizedDescription
             print("❌ Failed to load Clerk: \(error)")
             print("❌ Error type: \(type(of: error))")
             print("❌ Error details: \(String(describing: error))")
-            // Don't set isClerkLoaded on error - let the timeout in LoadingManager handle it
+            print("❌ Localized: \(errorMessage)")
+
+            await MainActor.run {
+                self.isClerkLoaded = false
+                self.clerkInitError = "Failed to connect to authentication service: \(errorMessage)"
+            }
         }
     }
-    
+
+    /// Retry Clerk initialization after a failure
+    func retryClerkInitialization() async {
+        print("🔄 Retrying Clerk initialization...")
+        await initializeClerk()
+    }
+
     private func observeSessionChanges() {
         // Cancel any existing observation
         sessionObservationTask?.cancel()
@@ -122,9 +170,9 @@ class AuthManager: NSObject, ObservableObject {
                 }
             }
             
-            // Periodically check for session changes
-            // Since Clerk doesn't expose objectWillChange, we'll use a timer
-            Timer.publish(every: 1.0, on: .main, in: .common)
+            // Periodically check for session changes (reduced frequency for performance)
+            // Only check every 5 minutes to minimize background activity
+            Timer.publish(every: 300.0, on: .main, in: .common)
                 .autoconnect()
                 .sink { [weak self] _ in
                     self?.updateSessionState()
@@ -235,7 +283,8 @@ class AuthManager: NSObject, ObservableObject {
                 gender: nil,
                 activityLevel: nil,
                 goalWeight: nil,
-                goalWeightUnit: "kg"
+                goalWeightUnit: "kg",
+                onboardingCompleted: nil
             )
         )
         
@@ -275,7 +324,8 @@ class AuthManager: NSObject, ObservableObject {
                     gender: nil,
                     activityLevel: nil,
                     goalWeight: nil,
-                    goalWeightUnit: "kg"
+                    goalWeightUnit: "kg",
+                    onboardingCompleted: nil
                 )
             )
             
@@ -329,7 +379,8 @@ class AuthManager: NSObject, ObservableObject {
                     gender: nil,
                     activityLevel: nil,
                     goalWeight: nil,
-                    goalWeightUnit: "kg"
+                    goalWeightUnit: "kg",
+                    onboardingCompleted: nil
                 )
             )
             
@@ -437,7 +488,8 @@ class AuthManager: NSObject, ObservableObject {
                         gender: profile.gender,
                         activityLevel: profile.activityLevel,
                         goalWeight: profile.goalWeight,
-                        goalWeightUnit: profile.goalWeightUnit ?? "kg"
+                        goalWeightUnit: profile.goalWeightUnit ?? "kg",
+                        onboardingCompleted: profile.onboardingCompleted
                     )
                 )
                 
@@ -497,7 +549,8 @@ class AuthManager: NSObject, ObservableObject {
                         goalWeightUnit: nil,
                         avatarUrl: nil,
                         createdAt: Date(),
-                        updatedAt: Date()
+                        updatedAt: Date(),
+                        onboardingCompleted: nil
                     )
                     
                     try await supabase.insert(table: "profiles", data: profile, accessToken: token)
@@ -554,7 +607,8 @@ class AuthManager: NSObject, ObservableObject {
                     gender: nil,
                     activityLevel: nil,
                     goalWeight: nil,
-                    goalWeightUnit: "kg"
+                    goalWeightUnit: "kg",
+                    onboardingCompleted: nil
                 )
             )
 
@@ -909,7 +963,8 @@ class AuthManager: NSObject, ObservableObject {
             gender: nil,
             activityLevel: nil,
             goalWeight: nil,
-            goalWeightUnit: "kg"
+            goalWeightUnit: "kg",
+            onboardingCompleted: nil
         )
         
         // Update local user object
@@ -926,7 +981,8 @@ class AuthManager: NSObject, ObservableObject {
                 gender: updatedProfile.gender,
                 activityLevel: updatedProfile.activityLevel,
                 goalWeight: updatedProfile.goalWeight,
-                goalWeightUnit: updatedProfile.goalWeightUnit
+                goalWeightUnit: updatedProfile.goalWeightUnit,
+                onboardingCompleted: updatedProfile.onboardingCompleted
             )
         }
         
@@ -942,10 +998,11 @@ class AuthManager: NSObject, ObservableObject {
                 gender: updatedProfile.gender,
                 activityLevel: updatedProfile.activityLevel,
                 goalWeight: updatedProfile.goalWeight,
-                goalWeightUnit: updatedProfile.goalWeightUnit
+                goalWeightUnit: updatedProfile.goalWeightUnit,
+                onboardingCompleted: updatedProfile.onboardingCompleted
             )
         }
-        
+
         if let gender = updates["gender"] as? String {
             updatedProfile = UserProfile(
                 id: updatedProfile.id,
@@ -958,10 +1015,11 @@ class AuthManager: NSObject, ObservableObject {
                 gender: gender,
                 activityLevel: updatedProfile.activityLevel,
                 goalWeight: updatedProfile.goalWeight,
-                goalWeightUnit: updatedProfile.goalWeightUnit
+                goalWeightUnit: updatedProfile.goalWeightUnit,
+                onboardingCompleted: updatedProfile.onboardingCompleted
             )
         }
-        
+
         if let height = updates["height"] as? Double {
             updatedProfile = UserProfile(
                 id: updatedProfile.id,
@@ -974,10 +1032,11 @@ class AuthManager: NSObject, ObservableObject {
                 gender: updatedProfile.gender,
                 activityLevel: updatedProfile.activityLevel,
                 goalWeight: updatedProfile.goalWeight,
-                goalWeightUnit: updatedProfile.goalWeightUnit
+                goalWeightUnit: updatedProfile.goalWeightUnit,
+                onboardingCompleted: updatedProfile.onboardingCompleted
             )
         }
-        
+
         if let heightUnit = updates["heightUnit"] as? String {
             updatedProfile = UserProfile(
                 id: updatedProfile.id,
@@ -990,10 +1049,11 @@ class AuthManager: NSObject, ObservableObject {
                 gender: updatedProfile.gender,
                 activityLevel: updatedProfile.activityLevel,
                 goalWeight: updatedProfile.goalWeight,
-                goalWeightUnit: updatedProfile.goalWeightUnit
+                goalWeightUnit: updatedProfile.goalWeightUnit,
+                onboardingCompleted: updatedProfile.onboardingCompleted
             )
         }
-        
+
         if let activityLevel = updates["activityLevel"] as? String {
             updatedProfile = UserProfile(
                 id: updatedProfile.id,
@@ -1006,10 +1066,11 @@ class AuthManager: NSObject, ObservableObject {
                 gender: updatedProfile.gender,
                 activityLevel: activityLevel,
                 goalWeight: updatedProfile.goalWeight,
-                goalWeightUnit: updatedProfile.goalWeightUnit
+                goalWeightUnit: updatedProfile.goalWeightUnit,
+                onboardingCompleted: updatedProfile.onboardingCompleted
             )
         }
-        
+
         if let goalWeight = updates["goalWeight"] as? Double {
             updatedProfile = UserProfile(
                 id: updatedProfile.id,
@@ -1022,10 +1083,11 @@ class AuthManager: NSObject, ObservableObject {
                 gender: updatedProfile.gender,
                 activityLevel: updatedProfile.activityLevel,
                 goalWeight: goalWeight,
-                goalWeightUnit: updatedProfile.goalWeightUnit
+                goalWeightUnit: updatedProfile.goalWeightUnit,
+                onboardingCompleted: updatedProfile.onboardingCompleted
             )
         }
-        
+
         if let goalWeightUnit = updates["goalWeightUnit"] as? String {
             updatedProfile = UserProfile(
                 id: updatedProfile.id,
@@ -1038,23 +1100,27 @@ class AuthManager: NSObject, ObservableObject {
                 gender: updatedProfile.gender,
                 activityLevel: updatedProfile.activityLevel,
                 goalWeight: updatedProfile.goalWeight,
-                goalWeightUnit: goalWeightUnit
+                goalWeightUnit: goalWeightUnit,
+                onboardingCompleted: updatedProfile.onboardingCompleted
             )
         }
         
         // Update the user's profile
         user.profile = updatedProfile
-        
+
         if let onboardingCompleted = updates["onboardingCompleted"] as? Bool {
             user.onboardingCompleted = onboardingCompleted
+            // Sync onboarding status to UserDefaults
+            UserDefaults.standard.set(onboardingCompleted, forKey: Constants.hasCompletedOnboardingKey)
+            print("✅ AuthManager: Synced onboarding status to UserDefaults: \(onboardingCompleted)")
         }
-        
+
         // Save updated user locally
         self.currentUser = user
         if let encoded = try? JSONEncoder().encode(user) {
             userDefaults.set(encoded, forKey: userKey)
         }
-        
+
         // Sync to Supabase
         await createOrUpdateSupabaseProfile(user: user)
     }
@@ -1330,7 +1396,8 @@ class AuthManager: NSObject, ObservableObject {
                     gender: existingProfile.gender,
                     activityLevel: existingProfile.activityLevel,
                     goalWeight: existingProfile.goalWeight,
-                    goalWeightUnit: existingProfile.goalWeightUnit
+                    goalWeightUnit: existingProfile.goalWeightUnit,
+                    onboardingCompleted: existingProfile.onboardingCompleted
                 )
                 user.profile = updatedProfile
             }
@@ -1571,7 +1638,7 @@ private class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate, 
            let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
             return window
         }
-        
+
         // Fallback to any active window
         if let windowScene = UIApplication.shared.connectedScenes
                 .filter({ $0.activationState == .foregroundActive })
@@ -1579,7 +1646,16 @@ private class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate, 
            let window = windowScene.windows.first {
             return window
         }
-        
-        fatalError("No active window found")
+
+        // Last resort: create a new window for the first available scene
+        // This prevents crashes but may not show UI properly
+        print("⚠️ No active window found for Apple Sign In - creating fallback window")
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            return UIWindow(windowScene: windowScene)
+        }
+
+        // Absolute fallback: return a basic window (sign in won't work but won't crash)
+        print("❌ Critical: No window scene available - Apple Sign In will likely fail")
+        return UIWindow(frame: UIScreen.main.bounds)
     }
 }

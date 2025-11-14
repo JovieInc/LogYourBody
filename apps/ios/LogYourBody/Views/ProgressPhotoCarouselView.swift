@@ -47,8 +47,9 @@ struct ProgressPhotoCarouselView: View {
     let currentMetric: BodyMetrics?
     let historicalMetrics: [BodyMetrics]
     @Binding var selectedMetricsIndex: Int
-    @Binding var displayMode: BodyVisualizationMode
+    @Binding var displayMode: DashboardDisplayMode
     @State private var isDragging = false
+    @State private var preloadTask: Task<Void, Never>?
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var processingService = ImageProcessingService.shared
 
@@ -67,15 +68,11 @@ struct ProgressPhotoCarouselView: View {
                 EmptyDataState()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // TabView carousel - all metrics (photo or avatar)
+                // TabView carousel - photos only
                 TabView(selection: $selectedMetricsIndex) {
                     ForEach(Array(displayMetrics.enumerated()), id: \.element.id) { index, metric in
-                        VisualCard(
-                            metric: metric,
-                            displayMode: displayMode,
-                            gender: authManager.currentUser?.profile?.gender
-                        )
-                        .tag(index)
+                        PhotoCard(metric: metric)
+                            .tag(index)
                     }
 
                     // Processing placeholders
@@ -116,61 +113,28 @@ struct ProgressPhotoCarouselView: View {
     // MARK: - Photo Preloading for Smooth Experience
 
     private func preloadAdjacentPhotos() {
-        // Preload photos around current selection for smooth scrolling
-        let currentIndex = selectedMetricsIndex
-        let range = max(0, currentIndex - 2)...min(displayMetrics.count - 1, currentIndex + 2)
+        // Cancel previous preload task to prevent accumulation
+        preloadTask?.cancel()
 
-        let urlsToPreload = range.compactMap { index -> String? in
-            guard index < displayMetrics.count else { return nil }
-            return displayMetrics[index].photoUrl
-        }
+        // Debounce: Create new task with delay
+        preloadTask = Task {
+            // 500ms debounce to avoid excessive preloading on rapid scrolling
+            try? await Task.sleep(nanoseconds: 500_000_000)
 
-        // Preload in background without blocking UI
-        Task.detached(priority: .background) {
-            for urlString in urlsToPreload {
-                // Use ImageLoader cache to preload
-                _ = await ImageLoader.shared.loadImage(from: urlString)
-            }
-        }
-    }
-}
+            // Check if task was cancelled during sleep
+            guard !Task.isCancelled else { return }
 
-// MARK: - Visual Card (Photo or Avatar)
-struct VisualCard: View {
-    let metric: BodyMetrics
-    let displayMode: BodyVisualizationMode
-    let gender: String?
+            // Preload photos around current selection (±2 indices)
+            let currentIndex = selectedMetricsIndex
+            let range = max(0, currentIndex - 2)...min(displayMetrics.count - 1, currentIndex + 2)
 
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Background
-                Color.appBackground
+            let urlsToPreload = range.compactMap { index -> String? in
+                guard index < displayMetrics.count else { return nil }
+                return displayMetrics[index].photoUrl
+            }.filter { !$0.isEmpty }
 
-                // Display based on mode
-                switch displayMode {
-                case .photo:
-                    // Photo mode - show photo if available, otherwise avatar
-                    if let photoUrl = metric.photoUrl {
-                        PhotoCard(metric: metric)
-                    } else {
-                        // No photo - show avatar
-                        AvatarBodyRenderer(
-                            bodyFatPercentage: metric.bodyFatPercentage,
-                            gender: gender,
-                            height: geometry.size.height
-                        )
-                    }
-
-                case .avatar:
-                    // Avatar mode - always show avatar
-                    AvatarBodyRenderer(
-                        bodyFatPercentage: metric.bodyFatPercentage,
-                        gender: gender,
-                        height: geometry.size.height
-                    )
-                }
-            }
+            // Use centralized ImageCacheService for preloading
+            await ImageCacheService.shared.preloadImages(urlsToPreload)
         }
     }
 }
@@ -178,7 +142,6 @@ struct VisualCard: View {
 // MARK: - Photo Card with Face-Centered Crop
 struct PhotoCard: View {
     let metric: BodyMetrics
-    @State private var loadedImage: UIImage?
 
     var body: some View {
         GeometryReader { geometry in
@@ -188,35 +151,17 @@ struct PhotoCard: View {
 
                 // Photo content
                 if let photoUrl = metric.photoUrl {
-                    if let loadedImage = loadedImage {
-                        Image(uiImage: loadedImage)
+                    CachedAsyncImage(urlString: photoUrl) { image in
+                        image
                             .resizable()
-                            .aspectRatio(contentMode: .fit) // Show full image, centered
+                            .aspectRatio(contentMode: .fit)
                             .frame(width: geometry.size.width, height: geometry.size.height)
                             .clipped()
-                    } else {
-                        // Use the optimized photo view directly
-                        OptimizedProgressPhotoView(
-                            photoUrl: photoUrl,
-                            maxHeight: geometry.size.height
-                        )
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
-                        .onAppear {
-                            loadImage(from: photoUrl)
-                        }
+                    } placeholder: {
+                        ProgressView()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
                     }
-                }
-            }
-        }
-    }
-
-    private func loadImage(from urlString: String) {
-        Task.detached(priority: .userInitiated) {
-            // Load image on background thread to avoid UI blocking
-            if let image = await ImageLoader.shared.loadImage(from: urlString) {
-                await MainActor.run {
-                    self.loadedImage = image
+                    .id(photoUrl) // Stable ID prevents unnecessary reloads
                 }
             }
         }
@@ -280,40 +225,14 @@ struct ProcessingCard: View {
     }
 }
 
-// MARK: - Image Loader
-class ImageLoader {
-    static let shared = ImageLoader()
-    private let cache = NSCache<NSString, UIImage>()
-    
-    func loadImage(from urlString: String) async -> UIImage? {
-        // Check cache first
-        if let cached = cache.object(forKey: urlString as NSString) {
-            return cached
-        }
-        
-        // Download image
-        guard let url = URL(string: urlString) else { return nil }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            if let image = UIImage(data: data) {
-                cache.setObject(image, forKey: urlString as NSString)
-                return image
-            }
-        } catch {
-            // print("Failed to load image: \(error)")
-        }
-        
-        return nil
-    }
-}
+// ImageLoader removed - now using centralized ImageCacheService
 
 #Preview {
     ProgressPhotoCarouselView(
         currentMetric: nil,
         historicalMetrics: [],
         selectedMetricsIndex: .constant(0),
-        displayMode: .constant(.photo)
+        displayMode: .constant(DashboardDisplayMode.photo)
     )
     .environmentObject(AuthManager.shared)
     .frame(height: 400)

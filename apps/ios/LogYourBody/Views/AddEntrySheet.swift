@@ -38,9 +38,13 @@ struct AddEntrySheet: View {
     @State private var isProcessingPhotos = false
     @State private var photoProgress: Double = 0
     @State private var processedCount = 0
-    
+    @State private var photoIdentifiers: [String] = []  // Store PHAsset identifiers for deletion
+
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showDeletePhotosPrompt = false
+    @AppStorage(Constants.deletePhotosAfterImportKey) private var deletePhotosAfterImport = false
+    @AppStorage(Constants.hasPromptedDeletePhotosKey) private var hasPromptedDeletePhotos = false
     
     var body: some View {
         NavigationView {
@@ -122,6 +126,18 @@ struct AddEntrySheet: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage)
+            }
+            .alert("Delete Photos After Import?", isPresented: $showDeletePhotosPrompt) {
+                Button("Keep Photos", role: .cancel) {
+                    deletePhotosAfterImport = false
+                    hasPromptedDeletePhotos = true
+                }
+                Button("Delete After Import") {
+                    deletePhotosAfterImport = true
+                    hasPromptedDeletePhotos = true
+                }
+            } message: {
+                Text("Would you like to automatically delete photos from your camera roll after importing them into the app? You can change this later in Settings.")
             }
             .onAppear {
                 // Set default weight unit based on user preference
@@ -274,6 +290,11 @@ struct AddEntrySheet: View {
                             .cornerRadius(Constants.cornerRadius)
                     }
                     .padding(.horizontal)
+                    .onChange(of: selectedPhotos) { _, newPhotos in
+                        if !newPhotos.isEmpty && !hasPromptedDeletePhotos {
+                            showDeletePhotosPrompt = true
+                        }
+                    }
                 }
                 .padding(.top, 40)
             } else {
@@ -356,39 +377,41 @@ struct AddEntrySheet: View {
     
     private func saveWeight(userId: String) {
         guard let weightValue = Double(weight) else { return }
-        
+
         let weightInKg = weightUnit == "lbs" ? weightValue * 0.453592 : weightValue
-        
-        _ = PhotoMetadataService.shared.createOrUpdateMetrics(
-            for: selectedDate,
-            weight: weightInKg,
-            userId: userId
-        )
-        
-        // Update widget data
+
         Task {
+            _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
+                for: selectedDate,
+                weight: weightInKg,
+                userId: userId
+            )
+
+            // Update widget data
             await WidgetDataManager.shared.updateWidgetData()
+
+            SyncManager.shared.syncIfNeeded()
         }
-        
-        SyncManager.shared.syncIfNeeded()
+
         dismiss()
     }
-    
+
     private func saveBodyFat(userId: String) {
         guard let bodyFatValue = Double(bodyFat) else { return }
-        
-        _ = PhotoMetadataService.shared.createOrUpdateMetrics(
-            for: selectedDate,
-            bodyFatPercentage: bodyFatValue,
-            userId: userId
-        )
-        
-        // Update widget data
+
         Task {
+            _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
+                for: selectedDate,
+                bodyFatPercentage: bodyFatValue,
+                userId: userId
+            )
+
+            // Update widget data
             await WidgetDataManager.shared.updateWidgetData()
+
+            SyncManager.shared.syncIfNeeded()
         }
-        
-        SyncManager.shared.syncIfNeeded()
+
         dismiss()
     }
     
@@ -396,40 +419,68 @@ struct AddEntrySheet: View {
         isProcessingPhotos = true
         photoProgress = 0
         processedCount = 0
-        
+        photoIdentifiers.removeAll()
+
         for (index, item) in selectedPhotos.enumerated() {
             do {
+                // Extract PHAsset identifier if available
+                if let identifier = item.itemIdentifier {
+                    photoIdentifiers.append(identifier)
+                }
+
                 // Load the photo data
                 guard let data = try await item.loadTransferable(type: Data.self),
                       let image = UIImage(data: data) else {
                     continue
                 }
-                
+
                 // Extract date from metadata
                 let photoDate = PhotoMetadataService.shared.extractDate(from: data) ?? selectedDate
-                
+
                 // Create or get metrics for this date
-                let metrics = PhotoMetadataService.shared.createOrUpdateMetrics(
+                let metrics = await PhotoMetadataService.shared.createOrUpdateMetrics(
                     for: photoDate,
                     userId: userId
                 )
-                
+
                 // Upload the photo
                 _ = try await PhotoUploadManager.shared.uploadProgressPhoto(
                     for: metrics,
                     image: image
                 )
-                
+
                 processedCount = index + 1
                 photoProgress = Double(processedCount) / Double(selectedPhotos.count)
             } catch {
                 // print("Failed to process photo \(index): \(error)")
             }
         }
-        
+
+        // Delete photos from camera roll if enabled
+        if deletePhotosAfterImport && !photoIdentifiers.isEmpty {
+            await deletePhotosFromLibrary()
+        }
+
         isProcessingPhotos = false
         SyncManager.shared.syncIfNeeded()
         dismiss()
+    }
+
+    private func deletePhotosFromLibrary() async {
+        guard !photoIdentifiers.isEmpty else { return }
+
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: photoIdentifiers, options: nil)
+
+        guard fetchResult.count > 0 else { return }
+
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.deleteAssets(fetchResult)
+            }
+        } catch {
+            // Silently fail - don't interrupt the user flow if deletion fails
+            // print("Failed to delete photos: \(error)")
+        }
     }
 
     // MARK: - Validation Functions

@@ -5,48 +5,41 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @State private var selectedTab = AnimatedTabView.Tab.dashboard
     @ObservedObject private var healthKitManager = HealthKitManager.shared
     @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
-    @Namespace private var namespace
     @State private var showAddEntrySheet = false
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var syncManager: SyncManager
-    
-    init() {
-        // Hide default tab bar since we're using custom one
-        UITabBar.appearance().isHidden = true
-    }
-    
+
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Content with smooth transitions
-            Group {
-                switch selectedTab {
-                case .dashboard:
-                    DashboardViewLiquid()
-                case .log:
-                    // Don't show any content for log tab - it's action-only
-                    EmptyView()
+        ZStack {
+            // Main content
+            DashboardViewLiquid()
+
+            // Glass Floating Action Button (FAB)
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        showAddEntrySheet = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.title2.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(20)
+                    }
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(
+                        Circle()
+                            .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.3), radius: 16, x: 0, y: 8)
+                    .padding(.trailing, 24)
+                    .padding(.bottom, 34)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-            // Floating Tab Bar - centered with fixed width
-            AnimatedTabView(selectedTab: $selectedTab)
-                .frame(width: 200) // Fixed width for compact look
-                .padding(.bottom, 20) // Space from bottom edge
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedTab)
-        .onChange(of: selectedTab) { oldValue, newValue in
-            // Handle Log tab tap - show sheet and revert to previous tab
-            if newValue == .log {
-                showAddEntrySheet = true
-                // Revert to previous tab (or dashboard if no previous)
-                selectedTab = oldValue == .log ? .dashboard : oldValue
-            }
-        }
-        // Toast presenter removed - handle notifications at view level
         .sheet(isPresented: $showAddEntrySheet) {
             AddEntrySheet(isPresented: $showAddEntrySheet)
                 .environmentObject(authManager)
@@ -54,14 +47,14 @@ struct MainTabView: View {
         .onAppear {
             // Check HealthKit authorization status on app launch
             healthKitManager.checkAuthorizationStatus()
-            
+
             // If sync is enabled and we're authorized, start observers
             if healthKitSyncEnabled && healthKitManager.isAuthorized {
                 Task {
                     // Start observers for real-time updates
                     healthKitManager.observeWeightChanges()
                     healthKitManager.observeStepChanges()
-                    
+
                     // Enable background step delivery
                     try? await healthKitManager.setupStepCountBackgroundDelivery()
                 }

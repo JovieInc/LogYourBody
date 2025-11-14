@@ -6,7 +6,7 @@ import SwiftUI
 
 // MARK: - CoreMetricsRow Organism
 
-/// Displays the two primary metrics (Body Fat % and Weight)
+/// Displays the two primary metrics (Body Fat % and Weight) with interactive tap gestures
 struct CoreMetricsRow: View {
     let bodyFatPercentage: Double?
     let weight: Double?
@@ -14,40 +14,72 @@ struct CoreMetricsRow: View {
     let weightTrend: Double?
     let weightUnit: String
     let isEstimated: Bool
-    
+
+    @Binding var displayMode: DashboardDisplayMode
+
     var body: some View {
         HStack(spacing: 16) {
-            // Body Fat Card
-            if let bf = bodyFatPercentage {
-                DSMetricCard(
-                    value: String(format: "%.1f", bf),
-                    unit: "%",
-                    label: isEstimated ? "Est. Body Fat" : "Body Fat",
-                    trend: bodyFatTrend,
-                    trendType: .negative
-                )
-            } else {
-                DSEmptyMetricCard(
-                    label: "Body Fat",
-                    unit: "%"
-                )
+            // Body Fat Card - Tappable
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    displayMode = .bodyFatChart
+                }
+                // Haptic feedback
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
+            } label: {
+                if let bf = bodyFatPercentage {
+                    DSMetricCard(
+                        value: String(format: "%.1f", bf),
+                        unit: "%",
+                        label: isEstimated ? "Est. Body Fat" : "Body Fat",
+                        trend: bodyFatTrend,
+                        trendType: .negative
+                    )
+                    .scaleEffect(displayMode == .bodyFatChart ? 1.05 : 1.0)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(displayMode == .bodyFatChart ? Color.liquidAccent : Color.clear, lineWidth: 2)
+                    )
+                } else {
+                    DSEmptyMetricCard(
+                        label: "Body Fat",
+                        unit: "%"
+                    )
+                }
             }
-            
-            // Weight Card
-            if let w = weight {
-                DSMetricCard(
-                    value: formatWeight(w),
-                    unit: weightUnit,
-                    label: "Weight",
-                    trend: weightTrend,
-                    trendType: .neutral
-                )
-            } else {
-                DSEmptyMetricCard(
-                    label: "Weight",
-                    unit: weightUnit
-                )
+            .buttonStyle(PlainButtonStyle())
+
+            // Weight Card - Tappable
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    displayMode = .weightChart
+                }
+                // Haptic feedback
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
+            } label: {
+                if let w = weight {
+                    DSMetricCard(
+                        value: formatWeight(w),
+                        unit: weightUnit,
+                        label: "Weight",
+                        trend: weightTrend,
+                        trendType: .neutral
+                    )
+                    .scaleEffect(displayMode == .weightChart ? 1.05 : 1.0)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(displayMode == .weightChart ? Color.liquidAccent : Color.clear, lineWidth: 2)
+                    )
+                } else {
+                    DSEmptyMetricCard(
+                        label: "Weight",
+                        unit: weightUnit
+                    )
+                }
             }
+            .buttonStyle(PlainButtonStyle())
         }
         .padding(.horizontal, 20)
     }
@@ -72,19 +104,21 @@ struct CoreMetricsRow: View {
             bodyFatTrend: -0.8,
             weightTrend: -2.3,
             weightUnit: "lbs",
-            isEstimated: false
+            isEstimated: false,
+            displayMode: .constant(.photo)
         )
-        
-        // With estimated body fat
+
+        // With estimated body fat - Chart mode active
         CoreMetricsRow(
             bodyFatPercentage: 24.2,
             weight: 75.2,
             bodyFatTrend: nil,
             weightTrend: 0.5,
             weightUnit: "kg",
-            isEstimated: true
+            isEstimated: true,
+            displayMode: .constant(.bodyFatChart)
         )
-        
+
         // Empty state
         CoreMetricsRow(
             bodyFatPercentage: nil,
@@ -92,7 +126,8 @@ struct CoreMetricsRow: View {
             bodyFatTrend: nil,
             weightTrend: nil,
             weightUnit: "lbs",
-            isEstimated: false
+            isEstimated: false,
+            displayMode: .constant(.photo)
         )
     }
     .background(Color.appBackground)

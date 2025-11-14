@@ -294,8 +294,8 @@ class RealtimeSyncManager: ObservableObject {
     }
     
     private func syncLocalChanges(token: String) async throws {
-        let unsynced = coreDataManager.fetchUnsyncedEntries()
-        
+        let unsynced = await coreDataManager.fetchUnsyncedEntries()
+
         // Batch sync for efficiency
         if !unsynced.bodyMetrics.isEmpty {
             try await syncBodyMetricsBatch(unsynced.bodyMetrics, token: token)
@@ -494,11 +494,15 @@ class RealtimeSyncManager: ObservableObject {
     
     // MARK: - Helpers
     func updatePendingSyncCount() {
-        let unsynced = coreDataManager.fetchUnsyncedEntries()
-        pendingSyncCount = unsynced.bodyMetrics.count +
-                          unsynced.dailyMetrics.count +
-                          unsynced.profiles.count +
-                          pendingOperations.count
+        Task {
+            let unsynced = await coreDataManager.fetchUnsyncedEntries()
+            await MainActor.run {
+                pendingSyncCount = unsynced.bodyMetrics.count +
+                                  unsynced.dailyMetrics.count +
+                                  unsynced.profiles.count +
+                                  pendingOperations.count
+            }
+        }
     }
     
     private func shouldPullLatestData() -> Bool {

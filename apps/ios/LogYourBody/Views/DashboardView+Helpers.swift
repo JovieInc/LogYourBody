@@ -9,20 +9,49 @@ import PhotosUI
 extension DashboardView {
     // MARK: - Data Loading
 
-    func loadData() {
+    /// Async version - does NOT block the main thread
+    func loadData() async {
+        guard let userId = authManager.currentUser?.id else {
+            await MainActor.run {
+                hasLoadedInitialData = true
+            }
+            return
+        }
+
+        // Load body metrics from CoreData (async - won't block UI)
+        let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+        let metrics = fetchedMetrics
+            .compactMap { $0.toBodyMetrics() }
+            .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
+
+        // Load today's daily metrics (async - won't block UI)
+        let todayMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date())
+
+        // Update UI on main thread
+        await MainActor.run {
+            bodyMetrics = metrics
+            if let todayMetrics = todayMetrics {
+                dailyMetrics = todayMetrics.toDailyMetrics()
+            }
+            hasLoadedInitialData = true
+        }
+    }
+
+    /// Legacy synchronous version - blocks the main thread (use async version instead)
+    func loadDataSync() {
         guard let userId = authManager.currentUser?.id else {
             hasLoadedInitialData = true
             return
         }
 
         // Load body metrics from CoreData
-        let fetchedMetrics = CoreDataManager.shared.fetchBodyMetrics(for: userId)
+        let fetchedMetrics = CoreDataManager.shared.fetchBodyMetricsSync(for: userId)
         bodyMetrics = fetchedMetrics
             .compactMap { $0.toBodyMetrics() }
             .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
 
         // Load today's daily metrics
-        if let todayMetrics = CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date()) {
+        if let todayMetrics = CoreDataManager.shared.fetchDailyMetricsSync(for: userId, date: Date()) {
             dailyMetrics = todayMetrics.toDailyMetrics()
         }
 
@@ -30,20 +59,64 @@ extension DashboardView {
     }
 
     func refreshData() async {
-        // Sync steps from HealthKit if authorized
-        if healthKitManager.isAuthorized {
-            await syncStepsFromHealthKit()
+        // Debouncing: Skip refresh if last refresh was within 3 minutes
+        if let lastRefresh = lastRefreshDate {
+            let timeSinceLastRefresh = Date().timeIntervalSince(lastRefresh)
+            if timeSinceLastRefresh < 180 { // 3 minutes in seconds
+                // Just reload from cache for quick refresh (async - won't block UI)
+                await loadData()
+
+                // Subtle haptic for quick refresh
+                await MainActor.run {
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
+                }
+                return
+            }
         }
 
-        // Sync with remote
+        var hasErrors = false
+
+        // Sync from HealthKit if authorized
+        if healthKitManager.isAuthorized {
+            do {
+                // Sync weight and body fat data from HealthKit (last 30 days)
+                try await healthKitManager.syncWeightFromHealthKit()
+
+                // Sync today's steps
+                await syncStepsFromHealthKit()
+            } catch {
+                // Log error but continue with sync
+                print("HealthKit sync error during refresh: \(error)")
+                hasErrors = true
+            }
+        }
+
+        // Upload local changes to Supabase
         syncManager.syncAll()
 
-        // Wait a bit for sync
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        // Download remote changes from Supabase (cross-device sync)
+        await syncManager.downloadRemoteChanges()
 
-        // Reload from cache
+        // Wait for sync operations to complete
+        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+
+        // Reload from local cache (async - won't block UI)
+        await loadData()
+
+        // Update last refresh timestamp and provide haptic feedback
         await MainActor.run {
-            loadData()
+            lastRefreshDate = Date()
+
+            // Provide haptic feedback based on result
+            let generator = UINotificationFeedbackGenerator()
+            generator.prepare()
+
+            if hasErrors {
+                generator.notificationOccurred(.warning)
+            } else {
+                generator.notificationOccurred(.success)
+            }
         }
     }
 
@@ -63,7 +136,8 @@ extension DashboardView {
 
         let today = Date()
 
-        if let existingMetrics = CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today) {
+        // Fetch existing metrics (async - won't block UI)
+        if let existingMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today) {
             // Update existing metrics
             existingMetrics.steps = Int32(steps)
             existingMetrics.updatedAt = Date()
@@ -102,7 +176,8 @@ extension DashboardView {
     func loadBodyMetrics() async {
         guard let userId = authManager.currentUser?.id else { return }
 
-        let fetchedMetrics = CoreDataManager.shared.fetchBodyMetrics(for: userId)
+        // Fetch metrics (async - won't block UI)
+        let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
 
         await MainActor.run {
             bodyMetrics = fetchedMetrics

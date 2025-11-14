@@ -1,10 +1,15 @@
 import type { NextConfig } from "next";
 import { version } from "./package.json";
 
+// Bundle analyzer configuration
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
 const nextConfig: NextConfig = {
   // Enable static export for Capacitor when needed
   output: process.env.BUILD_TARGET === 'capacitor' ? 'export' : undefined,
-  
+
   // Disable image optimization for Capacitor builds
   images: {
     unoptimized: process.env.BUILD_TARGET === 'capacitor',
@@ -15,15 +20,23 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  
+
   // Add trailing slash for better Capacitor compatibility
   trailingSlash: false,
-  
+
   // Use relative paths for Capacitor
   assetPrefix: process.env.BUILD_TARGET === 'capacitor' ? './' : undefined,
-  
+
+  // Modularize imports to reduce bundle size
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
+    },
+  },
+
   // Experimental features
   experimental: {
+    optimizePackageImports: ['lucide-react', 'date-fns', '@radix-ui/react-icons'],
     serverActions: {
       bodySizeLimit: '2mb',
     },
@@ -85,4 +98,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

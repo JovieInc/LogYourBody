@@ -18,6 +18,7 @@ struct DashboardView: View {
     @State var bodyMetrics: [BodyMetrics] = []
     @State var selectedIndex: Int = 0
     @State var hasLoadedInitialData = false
+    @State var lastRefreshDate: Date?
 
     // UI state
     @State private var refreshID = UUID()
@@ -26,7 +27,8 @@ struct DashboardView: View {
     @State var showPhotoPicker = false
     @State var selectedPhoto: PhotosPickerItem?
     @State var isUploadingPhoto = false
-    @State var displayMode: BodyVisualizationMode = .photo
+    @State var displayMode: DashboardDisplayMode = .photo
+    @State var timelineMode: TimelineMode = .photo
 
     // Preferences
     @AppStorage(Constants.preferredMeasurementSystemKey)
@@ -106,117 +108,7 @@ struct DashboardView: View {
                             .padding(.top, 8)
 
                             // Latest Weight Card with Photo
-                            if let metric = currentMetric {
-                                VStack(spacing: 12) {
-                                    // Display mode toggle
-                                    HStack(spacing: 12) {
-                                        Button(action: { displayMode = .photo }) {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "camera.fill")
-                                                    .font(.caption)
-                                                Text("Photo")
-                                                    .font(.caption)
-                                                    .fontWeight(.medium)
-                                            }
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(
-                                                Capsule()
-                                                    .fill(displayMode == .photo ? Color.blue : Color.white.opacity(0.1))
-                                            )
-                                            .foregroundColor(displayMode == .photo ? .white : .white.opacity(0.6))
-                                        }
-
-                                        Button(action: { displayMode = .avatar }) {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "figure.stand")
-                                                    .font(.caption)
-                                                Text("Avatar")
-                                                    .font(.caption)
-                                                    .fontWeight(.medium)
-                                            }
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(
-                                                Capsule()
-                                                    .fill(displayMode == .avatar ? Color.blue : Color.white.opacity(0.1))
-                                            )
-                                            .foregroundColor(displayMode == .avatar ? .white : .white.opacity(0.6))
-                                        }
-
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal)
-
-                                    // Photo or Avatar
-                                    visualView(for: metric)
-
-                                    // Timeline navigation - moved directly under photo
-                                    if bodyMetrics.count > 1 {
-                                        PhotoAnchoredTimelineSlider(
-                                            metrics: bodyMetrics,
-                                            selectedIndex: $selectedIndex,
-                                            accentColor: .blue
-                                        )
-                                        .frame(height: 50)
-                                        .padding(.top, 8)
-                                    }
-
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("Current Weight")
-                                                .font(.subheadline)
-                                                .foregroundColor(.white.opacity(0.7))
-
-                                            if let weight = metric.weight {
-                                                Text(formatWeight(weight))
-                                                    .font(.system(size: 40, weight: .bold))
-                                                    .foregroundColor(.white)
-                                            }
-                                        }
-
-                                        Spacer()
-
-                                        // Weight trend indicator (if you have previous data)
-                                        if bodyMetrics.count > 1, let prevWeight = bodyMetrics[safe: 1]?.weight, let currWeight = metric.weight {
-                                            let change = currWeight - prevWeight
-                                            let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-                                            let convertedChange = convertWeight(abs(change), to: system) ?? abs(change)
-                                            let unit = system.weightUnit
-
-                                            VStack(alignment: .trailing, spacing: 4) {
-                                                Image(systemName: change < 0 ? "arrow.down.circle.fill" : change > 0 ? "arrow.up.circle.fill" : "minus.circle.fill")
-                                                    .font(.title2)
-                                                    .foregroundColor(change < 0 ? .green : change > 0 ? .red : .gray)
-
-                                                Text(String(format: "%.1f %@", convertedChange, unit))
-                                                    .font(.caption)
-                                                    .foregroundColor(.white.opacity(0.7))
-                                            }
-                                        }
-                                    }
-
-                                    HStack {
-                                        Text(metric.date ?? Date(), style: .date)
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.6))
-
-                                        Spacer()
-
-                                        if let bodyFat = metric.bodyFatPercentage {
-                                            Text("\(bodyFat, specifier: "%.1f")% body fat")
-                                                .font(.caption)
-                                                .foregroundColor(.white.opacity(0.6))
-                                        }
-                                    }
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(Color.white.opacity(0.1))
-                                )
-                                .padding(.horizontal)
-                            }
+                            metricCardSection
 
                             // Today's Steps (if available)
                             if let metrics = dailyMetrics, let steps = metrics.steps, steps > 0 {
@@ -342,7 +234,9 @@ struct DashboardView: View {
             }
             .navigationBarHidden(true)
             .onAppear {
-                loadData()
+                Task {
+                    await loadData()
+                }
             }
             .refreshable {
                 await refreshData()
@@ -390,19 +284,8 @@ struct DashboardView: View {
 
     @ViewBuilder
     func visualView(for metric: BodyMetrics) -> some View {
-        switch displayMode {
-        case .photo:
-            // Photo mode - show photo if available
-            photoView(for: metric)
-
-        case .avatar:
-            // Avatar mode - show wireframe body
-            AvatarBodyRenderer(
-                bodyFatPercentage: metric.bodyFatPercentage,
-                gender: authManager.currentUser?.profile?.gender,
-                height: 160
-            )
-        }
+        // Always show photo view (chart modes are handled by DashboardContent)
+        photoView(for: metric)
     }
 
     @ViewBuilder
@@ -423,37 +306,20 @@ struct DashboardView: View {
                     .fill(Color.white.opacity(0.1))
             )
         } else if let photoUrl = metric.photoUrl, !photoUrl.isEmpty {
-            AsyncImage(url: URL(string: photoUrl)) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(height: 160)
-                        .clipped()
-                        .cornerRadius(12)
-                case .failure(let error):
-                    VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 40))
-                            .foregroundColor(.red.opacity(0.7))
-                        Text("Failed to load photo")
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
-                        Text("\(error.localizedDescription)")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
-                    }
+            CachedAsyncImage(urlString: photoUrl) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 160)
+                    .clipped()
+                    .cornerRadius(12)
+            } placeholder: {
+                ProgressView()
                     .frame(height: 160)
                     .frame(maxWidth: .infinity)
                     .background(Color.white.opacity(0.05))
-                case .empty:
-                    ProgressView()
-                        .frame(height: 160)
-                @unknown default:
-                    placeholderPhotoView
-                }
             }
+            .id(photoUrl) // Stable ID prevents unnecessary reloads
         } else {
             Button(action: { showPhotoOptions = true }) {
                 VStack(spacing: 12) {

@@ -9,6 +9,10 @@ import CoreData
 
 class PhotoMetadataService {
     static let shared = PhotoMetadataService()
+
+    // Cache for body fat estimations to avoid repeated calculations
+    private var estimationCache: [String: (value: Double, isEstimated: Bool)] = [:]
+
     private init() {}
 
     /// Extract EXIF orientation from photo metadata
@@ -89,12 +93,12 @@ class PhotoMetadataService {
     }
     
     /// Create or update body metrics for a specific date
-    func createOrUpdateMetrics(for date: Date, photoUrl: String? = nil, weight: Double? = nil, bodyFatPercentage: Double? = nil, userId: String) -> BodyMetrics {
+    func createOrUpdateMetrics(for date: Date, photoUrl: String? = nil, weight: Double? = nil, bodyFatPercentage: Double? = nil, userId: String) async -> BodyMetrics {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
-        
+
         // Check if metrics already exist for this date
-        let existingMetrics = CoreDataManager.shared.fetchBodyMetrics(for: userId, from: startOfDay, to: calendar.date(byAdding: .day, value: 1, to: startOfDay))
+        let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId, from: startOfDay, to: calendar.date(byAdding: .day, value: 1, to: startOfDay))
             .first?.toBodyMetrics()
         
         if let existing = existingMetrics {
@@ -168,29 +172,49 @@ class PhotoMetadataService {
         return nil
     }
     
-    /// Estimate body fat percentage based on nearby entries
+    /// Estimate body fat percentage based on nearby entries (with caching for performance)
     func estimateBodyFat(for date: Date, metrics: [BodyMetrics]) -> (value: Double, isEstimated: Bool)? {
+        // Create cache key from date and metrics IDs
+        let cacheKey = "\(date.timeIntervalSince1970)-\(metrics.map { $0.id }.joined(separator: ","))"
+
+        // Check cache first
+        if let cached = estimationCache[cacheKey] {
+            return cached
+        }
+
         let sortedMetrics = metrics.filter { $0.bodyFatPercentage != nil }.sorted { $0.date < $1.date }
         guard !sortedMetrics.isEmpty else { return nil }
-        
+
         // Find metrics before and after the date
         let before = sortedMetrics.last { $0.date <= date }
         let after = sortedMetrics.first { $0.date > date }
-        
+
+        var result: (value: Double, isEstimated: Bool)?
+
         if let beforeMetric = before, let afterMetric = after,
            let beforeBF = beforeMetric.bodyFatPercentage, let afterBF = afterMetric.bodyFatPercentage {
             // Linear interpolation between two points
             let totalInterval = afterMetric.date.timeIntervalSince(beforeMetric.date)
             let progressInterval = date.timeIntervalSince(beforeMetric.date)
             let progress = progressInterval / totalInterval
-            
+
             let estimatedBF = beforeBF + (afterBF - beforeBF) * progress
-            return (round(estimatedBF * 10) / 10, true)
+            result = (round(estimatedBF * 10) / 10, true)
         } else if let closestMetric = before ?? after {
             // Use the closest available metric
-            return (closestMetric.bodyFatPercentage ?? 0, true)
+            result = (closestMetric.bodyFatPercentage ?? 0, true)
         }
-        
-        return nil
+
+        // Cache the result
+        if let result = result {
+            estimationCache[cacheKey] = result
+        }
+
+        return result
+    }
+
+    /// Clear estimation cache (call when metrics data changes)
+    func clearEstimationCache() {
+        estimationCache.removeAll()
     }
 }

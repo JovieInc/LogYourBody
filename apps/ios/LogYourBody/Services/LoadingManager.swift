@@ -72,10 +72,19 @@ class LoadingManager: ObservableObject {
         if !Constants.useMockAuth {
             // Wait for Clerk to be loaded with timeout
             let startTime = Date()
-            let maxWaitTime: TimeInterval = 3.0 // Allow 3 seconds for Clerk to initialize
+            let maxWaitTime: TimeInterval = 10.0 // Allow 10 seconds for Clerk to initialize (increased for slow networks)
 
-            while !authManager.isClerkLoaded && Date().timeIntervalSince(startTime) < maxWaitTime {
+            while !authManager.isClerkLoaded && authManager.clerkInitError == nil && Date().timeIntervalSince(startTime) < maxWaitTime {
                 try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s polling interval
+            }
+
+            // Log the result
+            if authManager.isClerkLoaded {
+                print("✅ LoadingManager: Clerk loaded successfully")
+            } else if let error = authManager.clerkInitError {
+                print("⚠️ LoadingManager: Clerk failed to load: \(error)")
+            } else {
+                print("⚠️ LoadingManager: Clerk loading timed out after \(maxWaitTime)s")
             }
         }
 
@@ -89,7 +98,7 @@ class LoadingManager: ObservableObject {
                 // print("📱 LoadingManager: Loading profile for user \(userId)")
                 
                 // Load profile from Core Data first
-                if let cachedProfile = coreDataManager.fetchProfile(for: userId) {
+                if let cachedProfile = await coreDataManager.fetchProfile(for: userId) {
                     let profile = cachedProfile.toUserProfile()
                     // Update auth manager with cached profile
                     if let currentUser = authManager.currentUser {
@@ -100,6 +109,12 @@ class LoadingManager: ObservableObject {
                             profile: profile
                         )
                         authManager.currentUser = updatedUser
+
+                        // Sync onboarding state to UserDefaults
+                        if let onboardingCompleted = profile.onboardingCompleted {
+                            UserDefaults.standard.set(onboardingCompleted, forKey: Constants.hasCompletedOnboardingKey)
+                            print("✅ LoadingManager: Synced onboarding status from profile: \(onboardingCompleted)")
+                        }
                     }
                 }
             } else {

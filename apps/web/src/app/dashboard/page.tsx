@@ -2,7 +2,8 @@
 
 import { useAuth } from '@/contexts/ClerkAuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, useMemo, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
@@ -44,88 +45,16 @@ import { useSync } from '@/hooks/use-sync'
 import { syncManager } from '@/lib/sync/sync-manager'
 import { indexedDB } from '@/lib/db/indexed-db'
 
-// Mock data removed - not being used
+// Lazy load heavy components for better performance
+const PhaseIndicator = dynamic(() => import('./components/PhaseIndicator').then(mod => ({ default: mod.PhaseIndicator })), {
+  loading: () => <div className="bg-linear-bg rounded-lg p-4 border border-linear-border h-24 animate-pulse" />
+})
 
-// Phase Indicator component
-const PhaseIndicator = ({ phaseData }: { phaseData: PhaseResult | null }) => {
-  if (!phaseData || phaseData.phase === 'insufficient-data') {
-    return (
-      <div className="bg-linear-bg rounded-lg p-4 border border-linear-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-linear-text-tertiary" />
-            <span className="text-xs text-linear-text-secondary">Current Phase</span>
-          </div>
-        </div>
-        <div className="mt-2">
-          <span className="text-lg font-semibold text-linear-text-tertiary">
-            Need more data
-          </span>
-          <p className="text-xs text-linear-text-tertiary mt-1">
-            Log weight for 3 weeks to see phase
-          </p>
-        </div>
-      </div>
-    );
-  }
+const TimelineSlider = dynamic(() => import('./components/TimelineSlider').then(mod => ({ default: mod.TimelineSlider })), {
+  loading: () => <div className="bg-linear-card border-t border-linear-border p-4 h-32 animate-pulse" />
+})
 
-  const getPhaseIcon = () => {
-    switch (phaseData.phase) {
-      case 'cutting':
-        return <TrendingDown className="h-4 w-4 text-red-400" />;
-      case 'bulking':
-        return <TrendingUp className="h-4 w-4 text-green-400" />;
-      case 'maintaining':
-        return <Minus className="h-4 w-4 text-blue-400" />;
-      default:
-        return <TrendingUp className="h-4 w-4 text-linear-text-tertiary" />;
-    }
-  };
-
-  const getPhaseColor = () => {
-    switch (phaseData.phase) {
-      case 'cutting':
-        return 'text-red-400';
-      case 'bulking':
-        return 'text-green-400';
-      case 'maintaining':
-        return 'text-blue-400';
-      default:
-        return 'text-linear-text-tertiary';
-    }
-  };
-
-  return (
-    <div className="bg-linear-bg rounded-lg p-4 border border-linear-border">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {getPhaseIcon()}
-          <span className="text-xs text-linear-text-secondary">Current Phase</span>
-        </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger>
-              <Badge variant="outline" className="text-xs capitalize">
-                {phaseData.confidence} confidence
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Based on {phaseData.confidence === 'high' ? '6+' : phaseData.confidence === 'medium' ? '4-5' : '3'} data points</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-      <div className="mt-2">
-        <span className={cn("text-2xl font-bold capitalize", getPhaseColor())}>
-          {phaseData.phase}
-        </span>
-        <p className="text-sm text-linear-text-secondary mt-1">
-          {phaseData.message}
-        </p>
-      </div>
-    </div>
-  );
-};
+// Components extracted to separate files for better code splitting
 
 // Avatar display component
 const AvatarDisplay = ({ 
@@ -211,9 +140,9 @@ const AvatarDisplay = ({
 }
 
 // Profile Panel component
-const ProfilePanel = ({ 
+const ProfilePanel = ({
   entry,
-  user, 
+  user,
   formattedHeight,
   phaseData,
   trends
@@ -224,21 +153,31 @@ const ProfilePanel = ({
   phaseData: PhaseResult | null
   trends: ReturnType<typeof getMetricsTrends>
 }) => {
-  const rawValues = entry ? getTimelineDisplayValues(entry) : null
-  
+  const rawValues = useMemo(() =>
+    entry ? getTimelineDisplayValues(entry) : null,
+    [entry]
+  )
+
   // Convert weight from kg (database storage) to user's preferred unit
-  const displayValues = rawValues ? {
-    ...rawValues,
-    weight: rawValues.weight && user?.settings?.units?.weight === 'lbs' 
-      ? convertWeight(rawValues.weight, 'kg', 'lbs')
-      : rawValues.weight
-  } : null
-  const bodyFatCategory = displayValues?.bodyFatPercentage && user?.gender
-    ? getBodyFatCategory(displayValues.bodyFatPercentage, user.gender as 'male' | 'female')
-    : null
+  const displayValues = useMemo(() => {
+    if (!rawValues) return null
+    return {
+      ...rawValues,
+      weight: rawValues.weight && user?.settings?.units?.weight === 'lbs'
+        ? convertWeight(rawValues.weight, 'kg', 'lbs')
+        : rawValues.weight
+    }
+  }, [rawValues, user?.settings?.units?.weight])
+
+  const bodyFatCategory = useMemo(() =>
+    displayValues?.bodyFatPercentage && user?.gender
+      ? getBodyFatCategory(displayValues.bodyFatPercentage, user.gender as 'male' | 'female')
+      : null,
+    [displayValues?.bodyFatPercentage, user?.gender]
+  )
 
   // Calculate age from date of birth
-  const calculateAge = () => {
+  const age = useMemo(() => {
     if (!user?.date_of_birth) return null
     try {
       const birthDate = new Date(user.date_of_birth)
@@ -252,9 +191,7 @@ const ProfilePanel = ({
     } catch {
       return null
     }
-  }
-
-  const age = calculateAge()
+  }, [user?.date_of_birth])
 
   return (
     <div className="h-full overflow-y-auto bg-linear-card p-6">
@@ -545,101 +482,7 @@ const ProfilePanel = ({
   )
 }
 
-// Timeline component
-const TimelineSlider = ({ 
-  timeline, 
-  selectedIndex, 
-  onIndexChange 
-}: {
-  timeline: TimelineEntry[]
-  selectedIndex: number
-  onIndexChange: (index: number) => void
-}) => {
-  if (timeline.length === 0) return null
-
-  return (
-    <div className="bg-linear-card border-t border-linear-border p-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-linear-text-secondary">Timeline</span>
-        <span className="text-xs text-linear-text-secondary">
-          {selectedIndex + 1} of {timeline.length}
-        </span>
-      </div>
-      <div className="relative">
-        <input
-          type="range"
-          min={0}
-          max={timeline.length - 1}
-          value={selectedIndex}
-          onChange={(e) => onIndexChange(parseInt(e.target.value))}
-          className="w-full h-2 bg-linear-border rounded-lg appearance-none cursor-pointer slider relative z-10 focus:outline-none"
-        />
-        {/* Photo indicators */}
-        <div className="absolute inset-0 flex items-center pointer-events-none">
-          {timeline.map((entry, index) => {
-            const position = timeline.length > 1 ? (index / (timeline.length - 1)) * 100 : 50
-            const hasPhoto = !!entry.photo
-            const hasMetrics = !!entry.metrics
-            const hasInferred = !!entry.inferredData
-            
-            if (!hasPhoto && !hasMetrics) return null
-            
-            return (
-              <div
-                key={index}
-                className={cn(
-                  "absolute w-2 h-2 rounded-full",
-                  hasPhoto && hasMetrics && "bg-green-500",
-                  hasPhoto && !hasMetrics && hasInferred && "bg-blue-500",
-                  hasPhoto && !hasMetrics && !hasInferred && "bg-purple-500",
-                  !hasPhoto && hasMetrics && "bg-gray-400"
-                )}
-                style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
-                title={
-                  hasPhoto && hasMetrics ? "Photo & data" :
-                  hasPhoto && hasInferred ? "Photo with interpolated data" :
-                  hasPhoto ? "Photo only" :
-                  "Data only"
-                }
-              />
-            )
-          })}
-        </div>
-      </div>
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-xs text-linear-text-secondary">
-          {format(new Date(timeline[0].date), 'MMM d')}
-        </span>
-        <span className="text-xs font-medium text-linear-text">
-          {format(new Date(timeline[selectedIndex].date), 'PPP')}
-        </span>
-        <span className="text-xs text-linear-text-secondary">
-          {format(new Date(timeline[timeline.length - 1].date), 'MMM d')}
-        </span>
-      </div>
-      
-      {/* Legend */}
-      <div className="flex items-center gap-4 mt-3 text-xs text-linear-text-secondary">
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-green-500 rounded-full" />
-          <span>Photo & Data</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-blue-500 rounded-full" />
-          <span>Photo (interpolated)</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-purple-500 rounded-full" />
-          <span>Photo only</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-gray-400 rounded-full" />
-          <span>Data only</span>
-        </div>
-      </div>
-    </div>
-  )
-}
+// TimelineSlider component moved to components/TimelineSlider.tsx
 
 export default function DashboardPage() {
   const { user, loading } = useAuth()
@@ -716,56 +559,55 @@ export default function DashboardPage() {
         setProfileLoading(false)
       })
 
-      // Load metrics data - first from local storage, then sync with server
-      const loadMetricsData = async () => {
+      // Load all data in parallel for better performance
+      const loadAllData = async () => {
         // Load from local storage first
         const localMetrics = await indexedDB.getBodyMetrics(user.id)
         if (localMetrics.length > 0) {
           setLatestMetrics(localMetrics[localMetrics.length - 1])
           setMetricsHistory(localMetrics)
         }
-        
-        // Then fetch from server
+
+        // Batch all server queries to run in parallel
         const supabase = createClient()
-        supabase
-          .from('body_metrics')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('date', { ascending: false })
-          .then(({ data, error }) => {
-            if (error) {
-              console.error('Error loading metrics:', error)
-            } else if (data && data.length > 0) {
-              setLatestMetrics(data[0])
-              setMetricsHistory(data.reverse()) // Reverse to have oldest first for timeline
-              
-              // Save to local storage
-              data.forEach(metric => {
-                indexedDB.saveBodyMetrics(metric, user.id)
-              })
-            }
+        const [metricsResult, photosResult] = await Promise.all([
+          supabase
+            .from('body_metrics')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('date', { ascending: false }),
+          supabase
+            .from('progress_photos')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('date', { ascending: false })
+        ])
+
+        // Process metrics data
+        if (metricsResult.error) {
+          console.error('Error loading metrics:', metricsResult.error)
+        } else if (metricsResult.data && metricsResult.data.length > 0) {
+          setLatestMetrics(metricsResult.data[0])
+          setMetricsHistory(metricsResult.data.reverse()) // Reverse to have oldest first for timeline
+
+          // Save to local storage
+          metricsResult.data.forEach(metric => {
+            indexedDB.saveBodyMetrics(metric, user.id)
           })
-        
+        }
+
+        // Process photos data
+        if (photosResult.error) {
+          console.error('Error loading photos:', photosResult.error)
+        } else if (photosResult.data) {
+          setPhotosHistory(photosResult.data.reverse()) // Reverse to have oldest first for timeline
+        }
+
         // Trigger sync to ensure we have latest data
         syncManager.syncIfNeeded()
       }
-      
-      loadMetricsData()
-      
-      // Load progress photos  
-      const supabase = createClient()
-      supabase
-        .from('progress_photos')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false })
-        .then(({ data, error }) => {
-          if (error) {
-            console.error('Error loading photos:', error)
-          } else if (data) {
-            setPhotosHistory(data.reverse()) // Reverse to have oldest first for timeline
-          }
-        })
+
+      loadAllData()
     }
   }, [user, router])
   
@@ -849,30 +691,40 @@ export default function DashboardPage() {
   }
 
   // Get current timeline entry based on selected date
-  const currentEntry = selectedDateIndex >= 0 && selectedDateIndex < timelineData.length 
-    ? timelineData[selectedDateIndex] 
-    : null
-  const rawValues = currentEntry ? getTimelineDisplayValues(currentEntry) : null
-  
+  const currentEntry = useMemo(() =>
+    selectedDateIndex >= 0 && selectedDateIndex < timelineData.length
+      ? timelineData[selectedDateIndex]
+      : null,
+    [selectedDateIndex, timelineData]
+  )
+
+  const rawValues = useMemo(() =>
+    currentEntry ? getTimelineDisplayValues(currentEntry) : null,
+    [currentEntry]
+  )
+
   // Convert weight from kg (database storage) to user's preferred unit
-  const displayValues = rawValues ? {
-    ...rawValues,
-    weight: rawValues.weight && profile?.settings?.units?.weight === 'lbs' 
-      ? convertWeight(rawValues.weight, 'kg', 'lbs')
-      : rawValues.weight
-  } : null
+  const displayValues = useMemo(() => {
+    if (!rawValues) return null
+    return {
+      ...rawValues,
+      weight: rawValues.weight && profile?.settings?.units?.weight === 'lbs'
+        ? convertWeight(rawValues.weight, 'kg', 'lbs')
+        : rawValues.weight
+    }
+  }, [rawValues, profile?.settings?.units?.weight])
 
   // Format helpers
-  const _getFormattedWeight = (weight?: number) => {
+  const _getFormattedWeight = useCallback((weight?: number) => {
     if (!weight) return '--'
     return `${weight.toFixed(1)} ${profile?.settings?.units?.weight || 'lbs'}`
-  }
+  }, [profile?.settings?.units?.weight])
 
-  const getFormattedHeight = (height?: number) => {
+  const getFormattedHeight = useCallback((height?: number) => {
     if (!height) return '--'
-    
+
     const unit = profile?.settings?.units?.height || 'ft'
-    
+
     if (unit === 'ft') {
       // Height is stored in inches when unit is 'ft'
       const feet = Math.floor(height / 12)
@@ -882,14 +734,18 @@ export default function DashboardPage() {
       // Height is in cm
       return `${height} cm`
     }
-  }
-  
+  }, [profile?.settings?.units?.height])
+
   // Get photo URL for current entry
-  const currentPhotoUrl = currentEntry?.photo?.photo_url 
-    ? ensurePublicUrl(currentEntry.photo.photo_url) 
-    : currentEntry?.metrics?.photo_url 
-    ? ensurePublicUrl(currentEntry.metrics.photo_url)
-    : undefined
+  const currentPhotoUrl = useMemo(() => {
+    if (currentEntry?.photo?.photo_url) {
+      return ensurePublicUrl(currentEntry.photo.photo_url)
+    }
+    if (currentEntry?.metrics?.photo_url) {
+      return ensurePublicUrl(currentEntry.metrics.photo_url)
+    }
+    return undefined
+  }, [currentEntry])
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-linear-bg text-linear-text">

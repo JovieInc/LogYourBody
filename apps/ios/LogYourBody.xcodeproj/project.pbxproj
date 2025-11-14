@@ -52,6 +52,10 @@
 		AD050C4D2EC135360082A313 /* ReceiptParser in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C4C2EC135360082A313 /* ReceiptParser */; };
 		AD050C4F2EC135360082A313 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C4E2EC135360082A313 /* RevenueCat */; };
 		AD050C512EC135360082A313 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C502EC135360082A313 /* RevenueCatUI */; };
+		AD0B7BF52EC552FA008B29E7 /* LogYourBody.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */; };
+		AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */; };
+		AD0B7BF92EC692FB008B29E7 /* MetricDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BF82EC692FB008B29E7 /* MetricDetailView.swift */; };
+		AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */; };
 		AD25A7822E17439500611A56 /* Clerk in Frameworks */ = {isa = PBXBuildFile; productRef = AD25A7812E17439500611A56 /* Clerk */; };
 		AD3E4F652E17A12300345678 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AD3E4F642E17A12300345678 /* HealthKit.framework */; };
 		AD723B152E15FA5D002376C6 /* delete_files.sh in Resources */ = {isa = PBXBuildFile; fileRef = AD722F0E2E15FA5A002376C6 /* delete_files.sh */; };
@@ -345,6 +349,10 @@
 		AD050C442EBFFEF60082A313 /* MetricChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MetricChartView.swift; path = Components/MetricChartView.swift; sourceTree = "<group>"; };
 		AD050C482EC12E390082A313 /* RevenueCatManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueCatManager.swift; sourceTree = "<group>"; };
 		AD050C4A2EC12E590082A313 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = LogYourBody.storekit; sourceTree = "<group>"; };
+		AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricChartDataHelper.swift; sourceTree = "<group>"; };
+		AD0B7BF82EC692FB008B29E7 /* MetricDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDetailView.swift; sourceTree = "<group>"; };
+		AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PeriodSelector.swift; path = Components/PeriodSelector.swift; sourceTree = "<group>"; };
 		AD1B2C3F2E15A00300123456 /* OnboardingContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingContainerView.swift; sourceTree = "<group>"; };
 		AD1B2C402E15A00400123456 /* WelcomeStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeStepView.swift; sourceTree = "<group>"; };
 		AD1B2C442E15A00800123456 /* NotificationsStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsStepView.swift; sourceTree = "<group>"; };
@@ -690,6 +698,7 @@
 		60C9D5106098C441A5EF3D53 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */,
 				AD050C442EBFFEF60082A313 /* MetricChartView.swift */,
 				ADE6D38B2E24A948001F82A8 /* AnimatedTabView.swift */,
 				AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */,
@@ -917,6 +926,7 @@
 		AD723B0A2E15FA5C002376C6 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				AD0B7BF82EC692FB008B29E7 /* MetricDetailView.swift */,
 				AD050C4A2EC12E590082A313 /* PaywallView.swift */,
 				AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */,
 				AD88723F2EB87EF80041C426 /* DashboardViewSimple.swift */,
@@ -1007,6 +1017,7 @@
 		AD7D30892E14907F0072AA5B = {
 			isa = PBXGroup;
 			children = (
+				AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */,
 				AD722F0E2E15FA5A002376C6 /* delete_files.sh */,
 				AD722F162E15FA5A002376C6 /* generate_app_icons.sh */,
 				AD722F102E15FA5A002376C6 /* icon-1024.png */,
@@ -1230,6 +1241,7 @@
 		ADE1464C2EBF0BDF00B64DA0 /* Helpers */ = {
 			isa = PBXGroup;
 			children = (
+				AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */,
 				ADE1464A2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift */,
 				ADE1464B2EBF0BDF00B64DA0 /* TimelineZoomLevel.swift */,
 			);
@@ -1391,6 +1403,7 @@
 				AD0054ED2E2197600029E0FF /* health-disclosure.md in Resources */,
 				ADDC486A2E2D8A4C003C97E7 /* ccpa-compliance.md in Resources */,
 				ADDC486B2E2D8A4C003C97E7 /* open-source-licenses.md in Resources */,
+				AD0B7BF52EC552FA008B29E7 /* LogYourBody.storekit in Resources */,
 				ADDC486C2E2D8A4C003C97E7 /* gdpr-compliance.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1530,6 +1543,7 @@
 				ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */,
 				AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */,
 				ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */,
+				AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */,
 				ADDC47ED2E2D89F3003C97E7 /* SettingsView.swift in Sources */,
 				ADDC47EE2E2D89F3003C97E7 /* SignUpView.swift in Sources */,
 				ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */,
@@ -1616,7 +1630,9 @@
 				AD050C432EBFFEE50082A313 /* DashboardDisplayMode.swift in Sources */,
 				AD8872CE2EB946BE0041C426 /* DSMetricValue.swift in Sources */,
 				AD8872CF2EB946BE0041C426 /* StandardHeader.swift in Sources */,
+				AD0B7BF92EC692FB008B29E7 /* MetricDetailView.swift in Sources */,
 				AD050C412EBFD8160082A313 /* HapticManager.swift in Sources */,
+				AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */,
 				AD8872D02EB946BE0041C426 /* MarkdownView.swift in Sources */,
 				AD8872D12EB946BE0041C426 /* StandardCard.swift in Sources */,
 				AD8872D22EB946BE0041C426 /* LiquidGlassCTAButton.swift in Sources */,

@@ -99,7 +99,7 @@ struct AppleSignInButton: UIViewRepresentable {
                 // print("🍎 Found key window")
                 return window
             }
-            
+
             // Fallback to any active window
             if let windowScene = UIApplication.shared.connectedScenes
                     .filter({ $0.activationState == .foregroundActive })
@@ -108,9 +108,17 @@ struct AppleSignInButton: UIViewRepresentable {
                 // print("🍎 Found active window (fallback)")
                 return window
             }
-            
-            // print("🍎 ERROR: No window found!")
-            fatalError("No active window found")
+
+            // Last resort: create a new window for the first available scene
+            // This prevents crashes but may not show UI properly
+            print("⚠️ No active window found for Apple Sign In - creating fallback window")
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                return UIWindow(windowScene: windowScene)
+            }
+
+            // Absolute fallback: return a basic window (sign in won't work but won't crash)
+            print("❌ Critical: No window scene available - Apple Sign In will likely fail")
+            return UIWindow(frame: UIScreen.main.bounds)
         }
         
         func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {

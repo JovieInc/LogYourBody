@@ -279,18 +279,22 @@ struct LogWeightView: View {
     }
     
     private func quickAdd() {
-        // Get last logged values for quick entry
-        let recentMetrics = syncManager.fetchLocalBodyMetrics(
-            from: Calendar.current.date(byAdding: .day, value: -30, to: Date())
-        ).sorted { $0.date > $1.date }
-        
-        if let latest = recentMetrics.first {
-            if weight.isEmpty, let latestWeight = latest.weight {
-                let displayWeight = currentSystem.weightUnit == "lbs" ? latestWeight * 2.20462 : latestWeight
-                weight = String(format: "%.1f", displayWeight)
-            }
-            if bodyFat.isEmpty, let latestBodyFat = latest.bodyFatPercentage {
-                bodyFat = String(format: "%.1f", latestBodyFat)
+        Task {
+            // Get last logged values for quick entry
+            let recentMetrics = await syncManager.fetchLocalBodyMetrics(
+                from: Calendar.current.date(byAdding: .day, value: -30, to: Date())
+            ).sorted { $0.date > $1.date }
+
+            if let latest = recentMetrics.first {
+                await MainActor.run {
+                    if weight.isEmpty, let latestWeight = latest.weight {
+                        let displayWeight = currentSystem.weightUnit == "lbs" ? latestWeight * 2.20462 : latestWeight
+                        weight = String(format: "%.1f", displayWeight)
+                    }
+                    if bodyFat.isEmpty, let latestBodyFat = latest.bodyFatPercentage {
+                        bodyFat = String(format: "%.1f", latestBodyFat)
+                    }
+                }
             }
         }
     }
@@ -358,7 +362,7 @@ struct LogWeightView: View {
                 // If only body fat is provided, try to get latest weight
                 var finalWeight = weightInKg
                 if weightInKg == nil && bodyFatValue != nil {
-                    let recentMetrics = syncManager.fetchLocalBodyMetrics(
+                    let recentMetrics = await syncManager.fetchLocalBodyMetrics(
                         from: Calendar.current.date(byAdding: .day, value: -7, to: Date())
                     ).sorted { $0.date > $1.date }
                     finalWeight = recentMetrics.first?.weight

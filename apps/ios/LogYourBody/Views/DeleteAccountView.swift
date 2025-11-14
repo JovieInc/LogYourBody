@@ -65,6 +65,14 @@ struct DeleteAccountView: View {
                                 title: "Health data",
                                 iconColor: .red
                             )
+
+                            Divider()
+
+                            DataInfoRow(
+                                icon: "creditcard.fill",
+                                title: "Active subscription (if any)",
+                                iconColor: .red
+                            )
                         }
                     }
                     
@@ -149,17 +157,22 @@ struct DeleteAccountView: View {
     
     private func performDeletion() {
         isDeleting = true
-        
+
         Task {
             do {
+                // Log out from RevenueCat (this will dissociate the user from their subscription)
+                // Note: The subscription itself will remain active until expiration
+                // RevenueCat webhooks will handle backend cleanup
+                await RevenueCatManager.shared.logoutUser()
+
                 // Delete from Clerk
                 try await deleteClerkAccount()
-                
+
                 // Clear local data
                 await MainActor.run {
                     // Clear Core Data
                     CoreDataManager.shared.deleteAllData()
-                    
+
                     // Clear UserDefaults
                     UserDefaults.standard.removeObject(forKey: Constants.currentUserKey)
                     UserDefaults.standard.removeObject(forKey: Constants.authTokenKey)
@@ -167,7 +180,7 @@ struct DeleteAccountView: View {
                     UserDefaults.standard.removeObject(forKey: Constants.preferredWeightUnitKey)
                     UserDefaults.standard.removeObject(forKey: Constants.preferredMeasurementSystemKey)
                     UserDefaults.standard.removeObject(forKey: "healthKitSyncEnabled")
-                    
+
                     // Sign out
                     Task {
                         await authManager.logout()

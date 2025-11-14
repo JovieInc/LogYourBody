@@ -172,7 +172,8 @@ private struct PreviewData {
             gender: "male",
             activityLevel: "moderate",
             goalWeight: 75,
-            goalWeightUnit: "kg"
+            goalWeightUnit: "kg",
+            onboardingCompleted: true
         )
     )
 }

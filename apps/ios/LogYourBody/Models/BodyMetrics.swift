@@ -4,12 +4,6 @@
 //
 import Foundation
 
-/// Display mode for visualization (photo or avatar)
-enum BodyVisualizationMode: String, Codable {
-    case photo
-    case avatar
-}
-
 struct BodyMetrics: Identifiable, Codable, Equatable {
     let id: String
     let userId: String

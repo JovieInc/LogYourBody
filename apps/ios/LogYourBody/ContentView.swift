@@ -6,6 +6,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var syncManager: SyncManager
+    @EnvironmentObject var revenueCatManager: RevenueCatManager
     @StateObject private var loadingManager: LoadingManager
     @State private var hasCompletedOnboarding = false
     @State private var isLoadingComplete = false
@@ -73,6 +74,13 @@ struct ContentView: View {
                                     // print("   Profile complete: \(isProfileComplete)")
                                     // print("   Onboarding completed: \(hasCompletedOnboarding)")
                                 }
+                        } else if !revenueCatManager.isSubscribed {
+                            PaywallView()
+                                .environmentObject(authManager)
+                                .environmentObject(revenueCatManager)
+                                .onAppear {
+                                    // print("💰 Showing PaywallView")
+                                }
                         } else {
                             MainTabView()
                                 .onAppear {
@@ -111,9 +119,19 @@ struct ContentView: View {
             .interactiveDismissDisabled(true) // Prevent dismissing without accepting
         }
         .onAppear {
-            // Initialize onboarding status
+            // Initialize onboarding status from UserDefaults
             hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Constants.hasCompletedOnboardingKey)
-            
+
+            // Fallback: Check profile if UserDefaults doesn't have it
+            if !hasCompletedOnboarding, let profile = authManager.currentUser?.profile {
+                if let profileOnboardingCompleted = profile.onboardingCompleted, profileOnboardingCompleted {
+                    // Sync from profile to UserDefaults
+                    hasCompletedOnboarding = true
+                    UserDefaults.standard.set(true, forKey: Constants.hasCompletedOnboardingKey)
+                    print("✅ ContentView: Synced onboarding status from profile to UserDefaults")
+                }
+            }
+
             // Start loading process
             Task {
                 await loadingManager.startLoading()
@@ -137,6 +155,14 @@ struct ContentView: View {
             // print("🔄 isLoadingComplete: \(isLoadingComplete)")
             // print("🔄 Current user: \(authManager.currentUser?.email ?? "nil")")
             // print("🔄 Clerk session: \(authManager.clerkSession?.id ?? "nil")")
+        }
+        .onChange(of: authManager.currentUser?.profile?.onboardingCompleted) { _, newValue in
+            // Sync onboarding status from profile when it changes
+            if let profileOnboardingCompleted = newValue, profileOnboardingCompleted, !hasCompletedOnboarding {
+                hasCompletedOnboarding = true
+                UserDefaults.standard.set(true, forKey: Constants.hasCompletedOnboardingKey)
+                print("✅ ContentView: Synced onboarding status from profile update")
+            }
         }
         .onChange(of: hasCompletedOnboarding) { _, newValue in
             if newValue && isLoadingComplete {

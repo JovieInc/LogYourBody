@@ -14,9 +14,13 @@ struct DashboardContent: View {
     let selectedDateMetrics: DailyMetrics?
     let currentSystem: MeasurementSystem
     let userAge: Int?
+    let userHeight: Double?
+    let userHeightUnit: String?
     let onPhotoAction: () -> Void
     @Binding var selectedMetricsIndex: Int
-    @State private var displayMode: BodyVisualizationMode = .photo
+    @State private var displayMode: DashboardDisplayMode = .photo
+    @State private var timelineMode: TimelineMode = .photo
+    @State private var selectedChartDate: Date?
     
     // Computed properties for current metric
     private var currentMetric: BodyMetrics? {
@@ -29,17 +33,17 @@ struct DashboardContent: View {
             DashboardEmptyState()
         } else {
             VStack(spacing: 0) {
-                // Progress Photo - will expand to fill available space
-                progressPhotoSection
+                // Main Content Area - Photo or Chart
+                mainContentSection
                     .frame(maxHeight: .infinity)
-                
+
                 // Fixed height content at bottom
                 VStack(spacing: 16) {
                     // Timeline Slider
                     if bodyMetrics.count > 1 {
                         timelineSection
                     }
-                    
+
                     // Core Metrics
                     CoreMetricsRow(
                         bodyFatPercentage: getBodyFatValue(),
@@ -47,9 +51,10 @@ struct DashboardContent: View {
                         bodyFatTrend: calculateBodyFatTrend(),
                         weightTrend: calculateWeightTrend(),
                         weightUnit: currentSystem.weightUnit,
-                        isEstimated: currentMetric?.bodyFatPercentage == nil && getBodyFatValue() != nil
+                        isEstimated: currentMetric?.bodyFatPercentage == nil && getBodyFatValue() != nil,
+                        displayMode: $displayMode
                     )
-                    
+
                     // Secondary Metrics
                     SecondaryMetricsRow(
                         steps: selectedDateMetrics?.steps,
@@ -58,39 +63,107 @@ struct DashboardContent: View {
                         stepsTrend: calculateStepsTrend(),
                         ffmiTrend: calculateFFMITrend(),
                         leanMassTrend: calculateLeanMassTrend(),
-                        weightUnit: currentSystem.weightUnit
+                        weightUnit: currentSystem.weightUnit,
+                        displayMode: $displayMode
                     )
                     
                     // Bottom padding for floating tab bar
                     Color.clear.frame(height: 90)
                 }
             }
-        }
-    }
-    
-    // MARK: - Subviews
-    
-    private var progressPhotoSection: some View {
-        ZStack {
-            // Photo carousel
-            ProgressPhotoCarouselView(
-                currentMetric: currentMetric,
-                historicalMetrics: bodyMetrics,
-                selectedMetricsIndex: $selectedMetricsIndex,
-                displayMode: $displayMode
-            )
-            
-            // Camera button overlay
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    
-                    photoActionButton
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 12)
+            .onChange(of: displayMode) { _, newMode in
+                // When switching to chart mode, sync date with current index
+                if newMode.isChartMode && selectedIndex < bodyMetrics.count {
+                    selectedChartDate = bodyMetrics[selectedIndex].date
                 }
             }
+        }
+    }
+
+    // MARK: - Subviews
+
+    private var mainContentSection: some View {
+        ZStack {
+            // Content based on display mode
+            if displayMode == .photo {
+                progressPhotoSection
+            } else {
+                chartSection
+            }
+
+            // Photo button overlay (top-right corner)
+            VStack {
+                HStack {
+                    Spacer()
+
+                    photoModeButton
+                        .padding(.trailing, 20)
+                        .padding(.top, 20)
+                }
+                Spacer()
+            }
+
+            // Camera button overlay (bottom-right, only in photo mode)
+            if displayMode == .photo {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+
+                        photoActionButton
+                            .padding(.trailing, 20)
+                            .padding(.bottom, 12)
+                    }
+                }
+            }
+        }
+    }
+
+    private var progressPhotoSection: some View {
+        ProgressPhotoCarouselView(
+            currentMetric: currentMetric,
+            historicalMetrics: bodyMetrics,
+            selectedMetricsIndex: $selectedMetricsIndex,
+            displayMode: $displayMode
+        )
+    }
+
+    private var chartSection: some View {
+        MetricChartView(
+            bodyMetrics: bodyMetrics,
+            displayMode: displayMode,
+            selectedDate: $selectedChartDate
+        )
+        .padding(.top, 60) // Space for photo button
+        .onChange(of: selectedMetricsIndex) { _, newIndex in
+            // Sync chart date with timeline
+            if newIndex < bodyMetrics.count {
+                selectedChartDate = bodyMetrics[newIndex].date
+            }
+        }
+    }
+
+    private var photoModeButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                displayMode = .photo
+            }
+            // Haptic feedback
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+        } label: {
+            Image(systemName: "photo.fill")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(displayMode == .photo ? .white : .white.opacity(0.4))
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(displayMode == .photo ? Color.appPrimary : Color.black.opacity(0.3))
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(displayMode == .photo ? Color.liquidAccent : Color.clear, lineWidth: 2)
+                )
         }
     }
     
@@ -122,11 +195,12 @@ struct DashboardContent: View {
     
     private var timelineSection: some View {
         VStack(spacing: 0) {
-            PhotoAnchoredTimelineSlider(
-                metrics: bodyMetrics,
+            ProgressTimelineView(
+                bodyMetrics: bodyMetrics,
                 selectedIndex: $selectedMetricsIndex,
-                accentColor: .appPrimary
+                mode: $timelineMode
             )
+            .frame(height: 80)
             .padding(.horizontal, 20)
         }
         .padding(.vertical, 12)
@@ -161,11 +235,19 @@ struct DashboardContent: View {
     
     private func calculateFFMI() -> Double? {
         guard let weight = currentMetric?.weight,
-              let height = userAge != nil ? 180.0 : nil, // TODO: Get from user profile
+              let userHeightValue = userHeight,
               let bf = getBodyFatValue() else { return nil }
-        
+
+        // Convert height to cm if stored in inches
+        let heightInCm: Double
+        if userHeightUnit == "in" {
+            heightInCm = userHeightValue * 2.54
+        } else {
+            heightInCm = userHeightValue
+        }
+
         let leanMass = weight * (1 - bf / 100)
-        let heightInMeters = height / 100
+        let heightInMeters = heightInCm / 100
         return leanMass / (heightInMeters * heightInMeters)
     }
     

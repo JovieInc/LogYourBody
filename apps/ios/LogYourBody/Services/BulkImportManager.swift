@@ -134,7 +134,7 @@ class BulkImportManager: ObservableObject {
             let startOfDay = calendar.startOfDay(for: photo.date)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
             
-            let existingMetrics = CoreDataManager.shared.fetchBodyMetrics(
+            let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(
                 for: userId,
                 from: startOfDay,
                 to: endOfDay

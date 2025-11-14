@@ -2,9 +2,8 @@
 
 import { useAuth } from '@/contexts/ClerkAuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { debounce } from 'lodash'
 import { getProfile, updateProfile } from '@/lib/supabase/profile'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,8 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from '@/hooks/use-toast'
-import { 
-  Loader2, 
+import {
+  Loader2,
   ArrowLeft,
   Camera,
   Calendar,
@@ -25,12 +24,13 @@ import { UserProfile } from '@/types/body-metrics'
 import { HeightWheelPicker, DateWheelPicker } from '@/components/ui/wheel-picker'
 import { format, parseISO } from 'date-fns'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { getProfileAvatarUrl, getRandomAvatarUrl } from '@/utils/pravatar-utils'
 
 export default function ProfileSettingsPage() {
-  const { user, loading } = useAuth()
+  const { user, loading, uploadProfileImage, deleteProfileImage } = useAuth()
   const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [showHeightModal, setShowHeightModal] = useState(false)
   const [showDOBModal, setShowDOBModal] = useState(false)
@@ -73,13 +73,26 @@ export default function ProfileSettingsPage() {
     }
   }, [user])
 
-  // Debounced auto-save  
-  const debouncedSave = useCallback(
-    debounce((profileData: Partial<UserProfile>) => {
+  // Debounced auto-save (custom implementation to avoid lodash)
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
+
+  const debouncedSave = useCallback((profileData: Partial<UserProfile>) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    timeoutRef.current = setTimeout(() => {
       saveProfile(profileData)
-    }, 1000),
-    [saveProfile]
-  )
+    }, 1000)
+  }, [saveProfile])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -139,6 +152,43 @@ export default function ProfileSettingsPage() {
     setProfile(newProfile)
     debouncedSave(newProfile)
   }, [profile, debouncedSave])
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setIsUploadingAvatar(true)
+
+    try {
+      const { imageUrl, error } = await uploadProfileImage(file)
+
+      if (error) {
+        throw error
+      }
+
+      if (imageUrl) {
+        // Update Supabase profile with new Clerk imageUrl
+        await updateLocalProfile({ avatar_url: imageUrl })
+
+        toast({
+          title: "Success",
+          description: "Profile picture updated successfully",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to upload profile picture",
+        variant: "destructive"
+      })
+    } finally {
+      setIsUploadingAvatar(false)
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
 
   if (loading) {
     return (
@@ -245,21 +295,31 @@ export default function ProfileSettingsPage() {
             <div className="flex items-start gap-6">
               <div className="relative group">
                 <Avatar className="h-20 w-20">
-                  <AvatarImage src={profile.avatar_url || getProfileAvatarUrl(profile.username || user.id, 300)} />
+                  <AvatarImage src={user.imageUrl || profile.avatar_url} />
                   <AvatarFallback className="bg-linear-border text-linear-text-secondary text-lg">
                     {getInitials(profile.full_name || user.email || 'U')}
                   </AvatarFallback>
                 </Avatar>
                 <button
-                  className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-linear-card border border-linear-border opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-linear-bg"
-                  onClick={() => {
-                    // Generate a new random avatar
-                    const newAvatarUrl = getRandomAvatarUrl(300)
-                    updateLocalProfile({ avatar_url: newAvatarUrl })
-                  }}
+                  type="button"
+                  disabled={isUploadingAvatar}
+                  className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-linear-card border border-linear-border opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-linear-bg disabled:opacity-50"
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  <Camera className="h-4 w-4 text-linear-text-secondary" />
+                  {isUploadingAvatar ? (
+                    <Loader2 className="h-4 w-4 text-linear-text-secondary animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4 text-linear-text-secondary" />
+                  )}
                 </button>
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
               </div>
               
               <div className="flex-1 space-y-4">
@@ -407,14 +467,22 @@ export default function ProfileSettingsPage() {
 
             <div className="pt-2">
               <button
-                className="w-full px-4 py-2 border border-linear-border rounded-md text-linear-text-secondary hover:text-linear-text hover:border-linear-text-tertiary transition-colors flex items-center justify-center"
-                onClick={() => {
-                  const newAvatarUrl = getRandomAvatarUrl(300)
-                  updateLocalProfile({ avatar_url: newAvatarUrl })
-                }}
+                type="button"
+                disabled={isUploadingAvatar}
+                className="w-full px-4 py-2 border border-linear-border rounded-md text-linear-text-secondary hover:text-linear-text hover:border-linear-text-tertiary transition-colors flex items-center justify-center disabled:opacity-50"
+                onClick={() => fileInputRef.current?.click()}
               >
-                <Camera className="h-4 w-4 mr-2" />
-                Change Profile Photo
+                {isUploadingAvatar ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4 mr-2" />
+                    Change Profile Photo
+                  </>
+                )}
               </button>
             </div>
           </CardContent>

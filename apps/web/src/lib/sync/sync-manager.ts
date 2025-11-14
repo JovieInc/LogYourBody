@@ -73,12 +73,12 @@ class SyncManager {
 
   // Periodic sync
   private startPeriodicSync() {
-    // Sync every 5 minutes when online
+    // Sync every 15 minutes when online (reduced from 5 for better battery life)
     this.syncInterval = setInterval(() => {
       if (this.isOnline) {
         this.syncIfNeeded();
       }
-    }, 5 * 60 * 1000);
+    }, 15 * 60 * 1000);
   }
 
   async syncIfNeeded() {
@@ -300,11 +300,14 @@ class SyncManager {
   destroy() {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
+      this.syncInterval = null;
     }
-    
-    window.removeEventListener('online', this.handleOnline);
-    window.removeEventListener('offline', this.handleOffline);
-    
+
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.handleOnline);
+      window.removeEventListener('offline', this.handleOffline);
+    }
+
     this.listeners.clear();
   }
 

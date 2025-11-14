@@ -18,7 +18,14 @@ class HealthKitManager: ObservableObject {
     @Published var todayStepCount: Int = 0
     @Published var latestStepCount: Int?
     @Published var latestStepCountDate: Date?
-    
+
+    // Import progress tracking
+    @Published var isImporting = false
+    @Published var importProgress: Double = 0.0  // 0.0 to 1.0
+    @Published var importStatus: String = ""
+    @Published var importedCount: Int = 0
+    @Published var totalToImport: Int = 0
+
     // Health types - using computed properties to avoid crashes if HealthKit types fail to initialize
     private var weightType: HKQuantityType {
         return HKQuantityType.quantityType(forIdentifier: .bodyMass)!
@@ -598,9 +605,12 @@ class HealthKitManager: ObservableObject {
         
         // Only trigger full historical sync if this is truly the first time and we have very little data
         let hasPerformedFullSync = UserDefaults.standard.bool(forKey: "hasPerformedFullHealthKitSync")
-        let totalCachedEntries = await MainActor.run {
-            guard let userId = AuthManager.shared.currentUser?.id else { return 0 }
-            return CoreDataManager.shared.fetchBodyMetrics(for: userId).count
+        let totalCachedEntries: Int
+        let userId = await MainActor.run { AuthManager.shared.currentUser?.id }
+        if let userId = userId {
+            totalCachedEntries = await CoreDataManager.shared.fetchBodyMetrics(for: userId).count
+        } else {
+            totalCachedEntries = 0
         }
         
         if !hasPerformedFullSync {
@@ -671,10 +681,8 @@ class HealthKitManager: ObservableObject {
         
         for (weight, date) in weightHistory {
             // Check if this entry already exists (by date)
-            let exists = await MainActor.run {
-                SyncManager.shared.weightEntryExists(for: date)
-            }
-            
+            let exists = await SyncManager.shared.weightEntryExists(for: date)
+
             if !exists {
                 newEntriesCount += 1
                 // Check if we have body fat data for the same day
@@ -714,10 +722,8 @@ class HealthKitManager: ObservableObject {
             }
             
             if !alreadyProcessed {
-                let exists = await MainActor.run {
-                    SyncManager.shared.dailyMetricsExists(for: date)
-                }
-                
+                let exists = await SyncManager.shared.dailyMetricsExists(for: date)
+
                 if !exists {
                     // Create body metrics with just body fat
                     let metrics = BodyMetrics(
@@ -745,55 +751,98 @@ class HealthKitManager: ObservableObject {
     
     // Sync ALL historical HealthKit data efficiently
     func syncAllHistoricalHealthKitData() async {
-        // print("📊 Starting full historical HealthKit sync...")
-        
+        await MainActor.run {
+            isImporting = true
+            importProgress = 0.0
+            importStatus = "Starting import..."
+            importedCount = 0
+            totalToImport = 0
+        }
+
         do {
             // Get the earliest available weight data date
             let earliestDate = try await getEarliestWeightDate() ?? Date().addingTimeInterval(-10 * 365 * 24 * 60 * 60) // Default to 10 years ago
             let endDate = Date()
-            
-            // print("📅 Syncing data from \(earliestDate) to \(endDate)")
-            
+
+            // Calculate total months to process
+            let calendar = Calendar.current
+            let components = calendar.dateComponents([.month], from: earliestDate, to: endDate)
+            let totalMonths = Double(components.month ?? 0)
+
+            await MainActor.run {
+                importStatus = "Preparing to import \(Int(totalMonths)) months of data..."
+            }
+
             // Process in larger batches (3 months at a time) for faster sync
             var currentDate = earliestDate
             var totalImported = 0
             var totalSkipped = 0
+            var processedMonths = 0.0
             let batchSizeMonths = 3  // Process 3 months at a time
-            
+
             while currentDate < endDate {
-                let batchEndDate = Calendar.current.date(byAdding: .month, value: batchSizeMonths, to: currentDate) ?? endDate
+                let batchEndDate = calendar.date(byAdding: .month, value: batchSizeMonths, to: currentDate) ?? endDate
                 let actualBatchEndDate = min(batchEndDate, endDate)
-                
-                // print("📦 Processing batch: \(currentDate) to \(actualBatchEndDate)")
-                
+
+                // Update status
+                let year = calendar.component(.year, from: currentDate)
+                let month = calendar.component(.month, from: currentDate)
+                await MainActor.run {
+                    importStatus = "Importing \(year)/\(month)..."
+                }
+
                 // Fetch weight and body fat data for this batch
                 let weightBatch = try await fetchWeightHistoryInRange(startDate: currentDate, endDate: actualBatchEndDate)
                 let bodyFatBatch = try await fetchBodyFatHistory(startDate: currentDate)
                     .filter { $0.date < actualBatchEndDate }
-                
-                // print("  📊 Batch contains \(weightBatch.count) weight entries and \(bodyFatBatch.count) body fat entries")
-                
+
                 // Process this batch
                 let (imported, skipped) = await processBatchHealthKitData(
                     weightHistory: weightBatch,
                     bodyFatHistory: bodyFatBatch
                 )
-                
+
                 totalImported += imported
                 totalSkipped += skipped
-                
-                // print("  ✅ Batch complete: \(imported) imported, \(skipped) skipped (Total: \(totalImported) imported)")
-                
+
+                // Update progress
+                processedMonths += Double(batchSizeMonths)
+                let progress = totalMonths > 0 ? min(processedMonths / totalMonths, 1.0) : 1.0
+                await MainActor.run {
+                    importProgress = progress
+                    importedCount = totalImported
+                    if totalMonths > 0 {
+                        let remaining = max(0, Int(totalMonths - processedMonths))
+                        importStatus = remaining > 0 ? "Importing... \(remaining) months remaining" : "Finalizing..."
+                    }
+                }
+
                 // Move to next batch
                 currentDate = actualBatchEndDate
-                
+
                 // Very small delay to avoid overwhelming the system
                 try? await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
             }
-            
-            // print("✅ Historical sync completed: \(totalImported) imported, \(totalSkipped) skipped")
+
+            // Complete
+            await MainActor.run {
+                importProgress = 1.0
+                importStatus = "Import complete! Imported \(totalImported) entries"
+                // Reset after a delay
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                    await MainActor.run {
+                        isImporting = false
+                        importStatus = ""
+                    }
+                }
+            }
         } catch {
-            // print("❌ Historical sync error: \(error)")
+            await MainActor.run {
+                importProgress = 0.0
+                importStatus = "Import failed: \(error.localizedDescription)"
+                isImporting = false
+            }
         }
     }
     
@@ -847,10 +896,8 @@ class HealthKitManager: ObservableObject {
         let dateRange = weightHistory.map { $0.date } + bodyFatHistory.map { $0.date }
         let minDate = dateRange.min() ?? Date()
         let maxDate = dateRange.max() ?? Date()
-        
-        let existingMetrics = await MainActor.run {
-            CoreDataManager.shared.fetchBodyMetrics(for: userId, from: minDate, to: maxDate)
-        }
+
+        let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId, from: minDate, to: maxDate)
         
         // Create a set of existing entries by date and hour for efficient lookup
         var existingEntriesByHour = Set<String>()
@@ -947,9 +994,7 @@ class HealthKitManager: ObservableObject {
         for (stepCount, date) in stepHistory {
             // Only sync if steps > 0 and entry doesn't exist
             if stepCount > 0 {
-                let exists = await MainActor.run {
-                    SyncManager.shared.dailyMetricsExists(for: date)
-                }
+                let exists = await SyncManager.shared.dailyMetricsExists(for: date)
                 if !exists {
                     try await SyncManager.shared.saveDailyMetrics(steps: stepCount, date: date)
                 }
@@ -1115,7 +1160,7 @@ class HealthKitManager: ObservableObject {
         // Get or create today's daily metrics
         let today = Date()
         var metrics = await Task.detached {
-            CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today)?.toDailyMetrics()
+            await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today)?.toDailyMetrics()
         }.value
         
         if metrics == nil {
@@ -1178,7 +1223,7 @@ class HealthKitManager: ObservableObject {
             
             // Check if we already have data for this date
             var metrics = await Task.detached {
-                CoreDataManager.shared.fetchDailyMetrics(for: userId, date: date)?.toDailyMetrics()
+                await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: date)?.toDailyMetrics()
             }.value
             
             if metrics == nil {

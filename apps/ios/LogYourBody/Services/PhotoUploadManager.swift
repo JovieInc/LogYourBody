@@ -369,7 +369,7 @@ class PhotoUploadManager: ObservableObject {
     private func updateMetricsWithPhoto(metricsId: String, originalUrl: String, processedUrl: String) async throws {
         // Update local CoreData
         guard let userId = authManager.currentUser?.id else { return }
-        if let cachedMetrics = coreDataManager.fetchBodyMetrics(for: userId)
+        if let cachedMetrics = await coreDataManager.fetchBodyMetrics(for: userId)
             .first(where: { $0.id == metricsId }) {
             cachedMetrics.photoUrl = processedUrl
             cachedMetrics.originalPhotoUrl = originalUrl

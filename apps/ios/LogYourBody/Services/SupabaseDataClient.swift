@@ -169,7 +169,8 @@ struct Profile: Codable {
     let avatarUrl: String?
     let createdAt: Date?
     let updatedAt: Date?
-    
+    let onboardingCompleted: Bool?
+
     enum CodingKeys: String, CodingKey {
         case id, email, username
         case fullName = "full_name"
@@ -183,5 +184,6 @@ struct Profile: Codable {
         case avatarUrl = "avatar_url"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case onboardingCompleted = "onboarding_completed"
     }
 }

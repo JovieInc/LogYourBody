@@ -412,8 +412,8 @@ struct ExportDataView: View {
             exportProgress = 0.1
             
             // Fetch all data from Core Data
-            let bodyMetrics = CoreDataManager.shared.fetchAllBodyMetrics(for: user.id)
-            let dailyLogs = CoreDataManager.shared.fetchAllDailyLogs(for: user.id)
+            let bodyMetrics = await CoreDataManager.shared.fetchAllBodyMetrics(for: user.id)
+            let dailyLogs = await CoreDataManager.shared.fetchAllDailyLogs(for: user.id)
             
             // Progress: 30%
             exportProgress = 0.3
