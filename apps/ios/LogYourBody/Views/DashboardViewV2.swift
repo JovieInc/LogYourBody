@@ -8,7 +8,7 @@ import PhotosUI
 
 struct DashboardViewV2: View {
     @EnvironmentObject var authManager: AuthManager
-    @EnvironmentObject var syncManager: SyncManager
+    @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     @StateObject private var healthKitManager = HealthKitManager.shared
     @State private var dailyMetrics: DailyMetrics?
     @State private var selectedDateMetrics: DailyMetrics?
@@ -211,12 +211,12 @@ struct DashboardViewV2: View {
             Spacer()
             
             // Sync indicator
-            if syncManager.isSyncing {
+            if realtimeSyncManager.isSyncing {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.appBody)
                     .foregroundColor(.white.opacity(0.7))
-                    .rotationEffect(.degrees(syncManager.isSyncing ? 360 : 0))
-                    .animation(Animation.linear(duration: 1).repeatForever(autoreverses: false), value: syncManager.isSyncing)
+                    .rotationEffect(.degrees(realtimeSyncManager.isSyncing ? 360 : 0))
+                    .animation(Animation.linear(duration: 1).repeatForever(autoreverses: false), value: realtimeSyncManager.isSyncing)
                     .accessibilityLabel("Syncing in progress")
             }
         }
@@ -771,6 +771,6 @@ struct EnhancedPhotoCarousel: View {
 #Preview {
     DashboardViewV2()
         .environmentObject(AuthManager.shared)
-        .environmentObject(SyncManager.shared)
+        .environmentObject(RealtimeSyncManager.shared)
         .preferredColorScheme(.dark)
 }

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 // import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group' // Not used
 import { useOnboarding } from '@/contexts/OnboardingContext'
+import { useAuth } from '@/contexts/ClerkAuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DateWheelPicker, HeightWheelPicker } from '@/components/ui/wheel-picker'
 import { format } from 'date-fns'
@@ -21,11 +22,21 @@ const PROFILE_STEPS: ProfileStep[] = ['name', 'dob', 'height', 'gender']
 
 export function ProfileSetupStepV2() {
   const { data, updateData, nextStep, previousStep } = useOnboarding()
+  const { user } = useAuth()
   const isMobile = useMediaQuery('(max-width: 768px)')
-  
+
   const [currentProfileStep, setCurrentProfileStep] = useState<ProfileStep>('name')
+
+  const initialFullName = data.fullName || ''
+  const initialFirstNameFromFull = initialFullName.trim().split(/\s+/)[0] || ''
+  const initialLastNameFromFull = initialFullName.trim().split(/\s+/).slice(1).join(' ')
+
+  const clerkFirstName = (user as { firstName?: string } | null)?.firstName || ''
+  const clerkLastName = (user as { lastName?: string } | null)?.lastName || ''
+
   const [formData, setFormData] = useState({
-    fullName: data.fullName || '',
+    firstName: initialFullName ? initialFirstNameFromFull : clerkFirstName,
+    lastName: initialFullName ? initialLastNameFromFull : clerkLastName,
     dateOfBirth: data.dateOfBirth || '',
     dateOfBirthDate: data.dateOfBirth ? new Date(data.dateOfBirth) : new Date(1990, 0, 1),
     height: data.height || 71, // Default 5'11" in inches
@@ -44,7 +55,7 @@ export function ProfileSetupStepV2() {
     } else {
       // Save data and go to next onboarding step
       updateData({
-        fullName: formData.fullName,
+        fullName: `${formData.firstName} ${formData.lastName}`.trim(),
         dateOfBirth: formData.dateOfBirth,
         height: formData.height,
         gender: formData.gender as 'male' | 'female'
@@ -65,7 +76,7 @@ export function ProfileSetupStepV2() {
   const isCurrentStepValid = () => {
     switch (currentProfileStep) {
       case 'name':
-        return formData.fullName.trim().length > 0
+        return formData.firstName.trim().length > 0 && formData.lastName.trim().length > 0
       case 'dob':
         return formData.dateOfBirth.length > 0
       case 'height':
@@ -132,13 +143,13 @@ export function ProfileSetupStepV2() {
           </span>
         </div>
         <div className="w-full bg-linear-border rounded-full h-2">
-          <div 
+          <div
             className="bg-linear-purple h-2 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
       </CardHeader>
-      
+
       <CardContent className="flex-1 overflow-y-auto">
         <AnimatePresence mode="wait">
           <motion.div
@@ -152,22 +163,52 @@ export function ProfileSetupStepV2() {
             {/* Name Step */}
             {currentProfileStep === 'name' && (
               <div className="space-y-4 py-8">
-                <Input
-                  id="fullName"
-                  value={formData.fullName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
-                  className={cn(
-                    "bg-linear-bg border-linear-border text-linear-text text-center",
-                    isMobile ? "text-xl h-14" : "text-2xl h-16"
-                  )}
-                  placeholder="Enter your name"
-                  autoFocus
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && isCurrentStepValid()) {
-                      handleProfileNext()
-                    }
-                  }}
-                />
+                <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-linear-text-secondary text-sm">
+                      First name
+                    </Label>
+                    <Input
+                      id="firstName"
+                      value={formData.firstName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                      className={cn(
+                        "bg-linear-bg border-linear-border text-linear-text",
+                        isMobile ? "text-base h-12" : "text-lg h-12"
+                      )}
+                      placeholder="First name"
+                      autoFocus
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && isCurrentStepValid()) {
+                          handleProfileNext()
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-linear-text-secondary text-sm">
+                      Last name
+                    </Label>
+                    <Input
+                      id="lastName"
+                      value={formData.lastName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                      className={cn(
+                        "bg-linear-bg border-linear-border text-linear-text",
+                        isMobile ? "text-base h-12" : "text-lg h-12"
+                      )}
+                      placeholder="Last name"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && isCurrentStepValid()) {
+                          handleProfileNext()
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
                 <p className="text-center text-sm text-linear-text-tertiary">
                   {isMobile ? "Tap Next to continue" : "Press Enter or click Next to continue"}
                 </p>
@@ -217,7 +258,7 @@ export function ProfileSetupStepV2() {
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label className="text-linear-text">Day</Label>
                       <Select
@@ -244,7 +285,7 @@ export function ProfileSetupStepV2() {
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label className="text-linear-text">Year</Label>
                       <Select
@@ -273,7 +314,7 @@ export function ProfileSetupStepV2() {
                     </div>
                   </div>
                 )}
-                
+
                 <div className="text-center pt-4">
                   <p className="text-sm text-linear-text-secondary">
                     You are {new Date().getFullYear() - formData.dateOfBirthDate.getFullYear()} years old
@@ -328,7 +369,7 @@ export function ProfileSetupStepV2() {
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label className="text-linear-text text-center">Inches</Label>
                       <Select
@@ -357,7 +398,7 @@ export function ProfileSetupStepV2() {
                     </div>
                   </div>
                 )}
-                
+
                 <div className="text-center pt-4">
                   <p className="text-sm text-linear-text-secondary">
                     {formData.heightFeet}'{formData.heightInches}" = {Math.round(formData.height * 2.54)} cm
@@ -385,7 +426,7 @@ export function ProfileSetupStepV2() {
                       <p className="font-medium text-linear-text">Male</p>
                     </div>
                   </button>
-                  
+
                   <button
                     onClick={() => setFormData(prev => ({ ...prev, gender: 'female' }))}
                     className={cn(
@@ -402,7 +443,7 @@ export function ProfileSetupStepV2() {
                     </div>
                   </button>
                 </div>
-                
+
                 <p className="text-center text-xs text-linear-text-tertiary px-4">
                   This information is used for accurate body composition calculations
                 </p>
@@ -421,7 +462,7 @@ export function ProfileSetupStepV2() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          
+
           <Button
             onClick={handleProfileNext}
             disabled={!isCurrentStepValid()}

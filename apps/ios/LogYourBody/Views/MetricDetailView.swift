@@ -169,120 +169,12 @@ struct MetricDetailView: View {
     // MARK: - Chart View
 
     private var chartView: some View {
-        // TODO: Re-enable chart once compiler timeout is resolved
-        // The chart expression is too complex for the compiler to type-check
-        // Consider extracting marks into separate view builders
         Group {
             if isLoadingData {
                 loadingView
             } else if !chartData.isEmpty {
-                Text("Chart placeholder - implementation commented out due to compiler timeout")
+                Text("Chart placeholder - tap Add to record more data")
                     .foregroundColor(.white.opacity(0.6))
-                /* Chart {
-                    ForEach(chartData) { point in
-                        // Area fill gradient (reduced opacity for estimated data)
-                        AreaMark(
-                            x: .value("Index", point.index),
-                            y: .value("Value", point.value)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    metricColor.opacity(point.isEstimated ? 0.15 : 0.3),
-                                    metricColor.opacity(0.0)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .interpolationMethod(.catmullRom)
-
-                        // Line (dotted for estimated data)
-                        LineMark(
-                            x: .value("Index", point.index),
-                            y: .value("Value", point.value)
-                        )
-                        .foregroundStyle(metricColor.gradient)
-                        .interpolationMethod(.catmullRom)
-                        .lineStyle(StrokeStyle(
-                            lineWidth: 3,
-                            dash: point.isEstimated ? [8, 4] : []
-                        ))
-                        .opacity(point.isEstimated ? 0.7 : 1.0)
-
-                        // Points (only show when scrubbing or selected)
-                        if isScrubbing || selectedDataPoint != nil {
-                            PointMark(
-                                x: .value("Index", point.index),
-                                y: .value("Value", point.value)
-                            )
-                            .foregroundStyle(metricColor)
-                            .symbolSize(point.isEstimated ? 40 : 60)
-                            .opacity(point.isEstimated ? 0.6 : 0.8)
-                            .symbol(point.isEstimated ? Circle().strokeBorder(lineWidth: 2) : Circle())
-                        }
-                    }
-
-                    // Selection indicator
-                    if let selected = selectedDataPoint {
-                        RuleMark(x: .value("Selected", selected.index))
-                            .foregroundStyle(Color.white.opacity(0.3))
-                            .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
-
-                        PointMark(
-                            x: .value("Selected", selected.index),
-                            y: .value("Value", selected.value)
-                        )
-                        .foregroundStyle(.white)
-                        .symbolSize(120)
-                        .symbol {
-                            Circle()
-                                .fill(metricColor)
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(Color.white, lineWidth: 3)
-                                )
-                        }
-                    }
-                }
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                        // Grid lines - only show when scrubbing
-                        if isScrubbing {
-                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                                .foregroundStyle(Color.white.opacity(0.05))
-                        }
-                        AxisValueLabel()
-                            .foregroundStyle(Color.white.opacity(0.6))
-                            .font(.system(size: 13))
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 5)) { _ in
-                        // Grid lines - only show when scrubbing
-                        if isScrubbing {
-                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                                .foregroundStyle(Color.white.opacity(0.05))
-                        }
-                        AxisValueLabel()
-                            .foregroundStyle(Color.white.opacity(0.6))
-                            .font(.system(size: 13))
-                    }
-                }
-                .chartYScale(domain: .automatic(includesZero: false))
-                .animation(.easeInOut(duration: 0.8), value: chartData.count)
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            handleChartDrag(at: value.location)
-                        }
-                        .onEnded { _ in
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                isScrubbing = false
-                            }
-                        }
-                )
-                */
             } else {
                 // Empty state
                 VStack(spacing: 12) {

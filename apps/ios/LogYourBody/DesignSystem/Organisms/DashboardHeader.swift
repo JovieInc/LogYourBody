@@ -24,7 +24,7 @@ struct DashboardHeader: View {
             HStack(spacing: 12) {
                 DSAvatar(
                     url: user?.avatarUrl,
-                    name: user?.profile?.fullName,
+                    name: fullNameForDisplay,
                     size: 32
                 )
                 .onTapGesture {
@@ -32,7 +32,7 @@ struct DashboardHeader: View {
                 }
                 
                 UserGreeting(
-                    fullName: user?.profile?.fullName,
+                    fullName: fullNameForDisplay,
                     showEmoji: showGreetingEmoji
                 )
             }
@@ -69,6 +69,21 @@ struct DashboardHeader: View {
         .padding(.vertical, 12)
         .background(headerBackground)
         .overlay(headerBorder, alignment: .bottom)
+    }
+
+    private var fullNameForDisplay: String? {
+        guard let user = user else { return nil }
+
+        if let profileFullName = user.profile?.fullName, !profileFullName.isEmpty {
+            return profileFullName
+        }
+
+        if let name = user.name, !name.isEmpty {
+            return name
+        }
+
+        let emailLocalPart = user.email.components(separatedBy: "@").first ?? ""
+        return emailLocalPart.isEmpty ? nil : emailLocalPart
     }
     
     @ViewBuilder

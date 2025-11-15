@@ -6,7 +6,6 @@ import SwiftUI
 
 struct LogWeightView: View {
     @EnvironmentObject var authManager: AuthManager
-    @EnvironmentObject var syncManager: SyncManager
     @StateObject private var healthKitManager = HealthKitManager.shared
     @State private var weight: String = ""
     @State private var bodyFat: String = ""
@@ -281,9 +280,10 @@ struct LogWeightView: View {
     private func quickAdd() {
         Task {
             // Get last logged values for quick entry
-            let recentMetrics = await syncManager.fetchLocalBodyMetrics(
-                from: Calendar.current.date(byAdding: .day, value: -30, to: Date())
-            ).sorted { $0.date > $1.date }
+            guard let userId = authManager.currentUser?.id else { return }
+            let fromDate = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+            let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId, from: fromDate, to: Date())
+            let recentMetrics = cachedMetrics.compactMap { $0.toBodyMetrics() }.sorted { $0.date > $1.date }
 
             if let latest = recentMetrics.first {
                 await MainActor.run {
@@ -361,10 +361,10 @@ struct LogWeightView: View {
                 
                 // If only body fat is provided, try to get latest weight
                 var finalWeight = weightInKg
-                if weightInKg == nil && bodyFatValue != nil {
-                    let recentMetrics = await syncManager.fetchLocalBodyMetrics(
-                        from: Calendar.current.date(byAdding: .day, value: -7, to: Date())
-                    ).sorted { $0.date > $1.date }
+                if weightInKg == nil && bodyFatValue != nil, let userId = authManager.currentUser?.id {
+                    let fromDate = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+                    let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId, from: fromDate, to: Date())
+                    let recentMetrics = cachedMetrics.compactMap { $0.toBodyMetrics() }.sorted { $0.date > $1.date }
                     finalWeight = recentMetrics.first?.weight
                 }
                 
@@ -387,7 +387,12 @@ struct LogWeightView: View {
                 )
                 
                 // Save to local storage and sync
-                syncManager.logBodyMetrics(metrics)
+                if let userId = authManager.currentUser?.id {
+                    await MainActor.run {
+                        CoreDataManager.shared.saveBodyMetrics(metrics, userId: userId, markAsSynced: false)
+                    }
+                    RealtimeSyncManager.shared.syncIfNeeded()
+                }
                 
                 await MainActor.run {
                     isLoading = false
@@ -415,7 +420,7 @@ struct LogWeightView_Previews: PreviewProvider {
     static var previews: some View {
         LogWeightView()
             .environmentObject(AuthManager.shared)
-            .environmentObject(SyncManager.shared)
+            .environmentObject(RealtimeSyncManager.shared)
             .preferredColorScheme(.dark)
     }
 }

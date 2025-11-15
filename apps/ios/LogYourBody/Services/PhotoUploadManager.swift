@@ -379,7 +379,7 @@ class PhotoUploadManager: ObservableObject {
         }
         
         // Trigger sync to update remote
-        SyncManager.shared.syncIfNeeded()
+        RealtimeSyncManager.shared.syncIfNeeded()
     }
     
     private func updateUploadStatus(_ status: UploadStatus, progress: Double) {

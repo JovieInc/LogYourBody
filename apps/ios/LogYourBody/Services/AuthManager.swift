@@ -203,6 +203,13 @@ class AuthManager: NSObject, ObservableObject {
                 self.currentSignUp = nil
                 self.pendingSignUpCredentials = nil
                 self.needsEmailVerification = false
+                
+                // Notify RevenueCat of authenticated user for correct entitlement handling
+                if let localUserId = self.currentUser?.id {
+                    Task {
+                        await RevenueCatManager.shared.identifyUser(userId: localUserId)
+                    }
+                }
             } else {
                 // No valid session or user
                 // print("🔄 Clerk session state: signed out")
@@ -387,7 +394,6 @@ class AuthManager: NSObject, ObservableObject {
             await MainActor.run {
                 self.currentUser = mockUser
                 self.isAuthenticated = true
-                // Clear onboarding status for new users
                 UserDefaults.standard.set(false, forKey: Constants.hasCompletedOnboardingKey)
             }
             return
@@ -442,6 +448,9 @@ class AuthManager: NSObject, ObservableObject {
             self.pendingSignUpCredentials = nil
             self.needsEmailVerification = false
         }
+        
+        // Also clear RevenueCat state so subscriptions are reset correctly on sign out
+        await RevenueCatManager.shared.logoutUser()
         
         // Clear all stored user data
         userDefaults.removeObject(forKey: userKey)

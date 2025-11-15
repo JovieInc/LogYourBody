@@ -34,7 +34,11 @@ export default function ProfileSettingsPage() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [showHeightModal, setShowHeightModal] = useState(false)
   const [showDOBModal, setShowDOBModal] = useState(false)
-  
+  const [nameFields, setNameFields] = useState<{ firstName: string; lastName: string }>({
+    firstName: '',
+    lastName: ''
+  })
+
   const [profile, setProfile] = useState<Partial<UserProfile>>({
     email: '',
     full_name: '',
@@ -54,12 +58,12 @@ export default function ProfileSettingsPage() {
   // Auto-save function
   const saveProfile = useCallback(async (profileData: Partial<UserProfile>) => {
     if (!user) return
-    
+
     setIsSaving(true)
     try {
       await updateProfile(user.id, profileData)
       setLastSaved(new Date())
-      
+
       // Show subtle feedback instead of toast for auto-save
       // Only show toast for errors
     } catch {
@@ -121,6 +125,33 @@ export default function ProfileSettingsPage() {
       })
     }
   }, [user])
+
+  // Initialize first/last name fields from profile full_name, Clerk user, or email
+  useEffect(() => {
+    if (!user) return
+
+    const clerkUser = user as { firstName?: string; lastName?: string; email?: string } | null
+
+    const existingFullName = (profile.full_name || '').trim()
+    const clerkFirstName = (clerkUser?.firstName || '').trim()
+    const clerkLastName = (clerkUser?.lastName || '').trim()
+
+    let sourceFullName = existingFullName
+    if (!sourceFullName && (clerkFirstName || clerkLastName)) {
+      sourceFullName = `${clerkFirstName} ${clerkLastName}`.trim()
+    }
+
+    if (!sourceFullName) {
+      const emailSource = (profile.email || clerkUser?.email || '').split('@')[0] || ''
+      sourceFullName = emailSource
+    }
+
+    const parts = sourceFullName.trim().split(/\s+/)
+    const firstName = parts[0] || ''
+    const lastName = parts.slice(1).join(' ')
+
+    setNameFields({ firstName, lastName })
+  }, [profile.full_name, profile.email, user])
 
   // Initialize height in cm from profile
   useEffect(() => {
@@ -213,7 +244,7 @@ export default function ProfileSettingsPage() {
 
   const formatHeight = () => {
     if (!profile.height) return 'Not set'
-    
+
     if (profile.height_unit === 'cm') {
       return `${profile.height} cm`
     } else {
@@ -297,7 +328,11 @@ export default function ProfileSettingsPage() {
                 <Avatar className="h-20 w-20">
                   <AvatarImage src={user.imageUrl || profile.avatar_url} />
                   <AvatarFallback className="bg-linear-border text-linear-text-secondary text-lg">
-                    {getInitials(profile.full_name || user.email || 'U')}
+                    {getInitials(
+                      (nameFields.firstName || nameFields.lastName)
+                        ? `${nameFields.firstName} ${nameFields.lastName}`
+                        : profile.full_name || user.email || 'U'
+                    )}
                   </AvatarFallback>
                 </Avatar>
                 <button
@@ -321,17 +356,39 @@ export default function ProfileSettingsPage() {
                   onChange={handleAvatarUpload}
                 />
               </div>
-              
+
               <div className="flex-1 space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-linear-text-secondary text-sm">Full Name</Label>
-                  <Input
-                    id="fullName"
-                    value={profile.full_name || ''}
-                    onChange={(e) => updateLocalProfile({ full_name: e.target.value })}
-                    className="bg-linear-bg border-linear-border text-linear-text focus:border-linear-text-tertiary"
-                    placeholder="John Doe"
-                  />
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName" className="text-linear-text-secondary text-sm">First Name</Label>
+                      <Input
+                        id="firstName"
+                        value={nameFields.firstName}
+                        onChange={(e) => {
+                          const updated = { ...nameFields, firstName: e.target.value }
+                          setNameFields(updated)
+                          updateLocalProfile({ full_name: `${updated.firstName} ${updated.lastName}`.trim() })
+                        }}
+                        className="bg-linear-bg border-linear-border text-linear-text focus:border-linear-text-tertiary"
+                        placeholder="John"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName" className="text-linear-text-secondary text-sm">Last Name</Label>
+                      <Input
+                        id="lastName"
+                        value={nameFields.lastName}
+                        onChange={(e) => {
+                          const updated = { ...nameFields, lastName: e.target.value }
+                          setNameFields(updated)
+                          updateLocalProfile({ full_name: `${updated.firstName} ${updated.lastName}`.trim() })
+                        }}
+                        className="bg-linear-bg border-linear-border text-linear-text focus:border-linear-text-tertiary"
+                        placeholder="Doe"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -352,21 +409,19 @@ export default function ProfileSettingsPage() {
               <div className="inline-flex bg-linear-bg rounded-md p-0.5">
                 <button
                   onClick={() => updateLocalProfile({ gender: 'male' })}
-                  className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${
-                    profile.gender === 'male'
+                  className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${profile.gender === 'male'
                       ? 'bg-linear-card text-linear-text shadow-sm'
                       : 'text-linear-text-tertiary hover:text-linear-text-secondary'
-                  }`}
+                    }`}
                 >
                   Male
                 </button>
                 <button
                   onClick={() => updateLocalProfile({ gender: 'female' })}
-                  className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${
-                    profile.gender === 'female'
+                  className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${profile.gender === 'female'
                       ? 'bg-linear-card text-linear-text shadow-sm'
                       : 'text-linear-text-tertiary hover:text-linear-text-secondary'
-                  }`}
+                    }`}
                 >
                   Female
                 </button>
@@ -414,8 +469,8 @@ export default function ProfileSettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="activityLevel" className="text-linear-text-secondary text-sm">Activity Level</Label>
-              <Select 
-                value={profile.activity_level || ''} 
+              <Select
+                value={profile.activity_level || ''}
                 onValueChange={(value) => updateLocalProfile({ activity_level: value as UserProfile['activity_level'] })}
               >
                 <SelectTrigger className="bg-linear-bg border-linear-border text-linear-text hover:border-linear-text-tertiary">
@@ -530,10 +585,10 @@ export default function ProfileSettingsPage() {
             </button>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Height Modal */}
-      <Dialog open={showHeightModal} onOpenChange={setShowHeightModal}>
+      < Dialog open={showHeightModal} onOpenChange={setShowHeightModal} >
         <DialogContent className="bg-linear-card border-linear-border max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-linear-text text-center">Set Height</DialogTitle>
@@ -551,11 +606,10 @@ export default function ProfileSettingsPage() {
                       updateLocalProfile({ height_unit: newUnit })
                     }
                   }}
-                  className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${
-                    profile.height_unit === 'cm'
-                      ? 'bg-white/10 text-linear-text'
-                      : 'text-linear-text-tertiary hover:text-linear-text-secondary'
-                  }`}
+                  className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${profile.height_unit === 'cm'
+                    ? 'bg-white/10 text-linear-text'
+                    : 'text-linear-text-tertiary hover:text-linear-text-secondary'
+                    }`}
                 >
                   Metric (cm)
                 </button>
@@ -569,11 +623,10 @@ export default function ProfileSettingsPage() {
                       updateLocalProfile({ height_unit: newUnit })
                     }
                   }}
-                  className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${
-                    profile.height_unit === 'ft'
-                      ? 'bg-white/10 text-linear-text'
-                      : 'text-linear-text-tertiary hover:text-linear-text-secondary'
-                  }`}
+                  className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${profile.height_unit === 'ft'
+                    ? 'bg-white/10 text-linear-text'
+                    : 'text-linear-text-tertiary hover:text-linear-text-secondary'
+                    }`}
                 >
                   Imperial (ft/in)
                 </button>
@@ -586,7 +639,7 @@ export default function ProfileSettingsPage() {
                 {formatHeight()}
               </div>
               <div className="text-sm text-linear-text-tertiary">
-                {profile.height_unit === 'cm' 
+                {profile.height_unit === 'cm'
                   ? `${Math.floor(heightInCm / 30.48)}'${Math.round((heightInCm % 30.48) / 2.54)}" in imperial`
                   : `${heightInCm} cm in metric`
                 }
@@ -627,7 +680,7 @@ export default function ProfileSettingsPage() {
             </button>
           </div>
         </DialogContent>
-      </Dialog>
-    </div>
+      </Dialog >
+    </div >
   )
 }

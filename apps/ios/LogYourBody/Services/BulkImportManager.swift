@@ -188,7 +188,7 @@ class BulkImportManager: ObservableObject {
             
             // Trigger sync
             await MainActor.run {
-                SyncManager.shared.syncIfNeeded()
+                RealtimeSyncManager.shared.syncIfNeeded()
             }
         } catch {
             // print("❌ Failed to import photo: \(error)")

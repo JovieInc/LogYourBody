@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Loader2, 
-  User, 
+import {
+  Loader2,
+  User,
   Camera,
   Plus,
   Settings,
@@ -57,14 +57,14 @@ const TimelineSlider = dynamic(() => import('./components/TimelineSlider').then(
 // Components extracted to separate files for better code splitting
 
 // Avatar display component
-const AvatarDisplay = ({ 
-  gender, 
-  bodyFatPercentage, 
-  showPhoto, 
+const AvatarDisplay = ({
+  gender,
+  bodyFatPercentage,
+  showPhoto,
   profileImage,
   className,
-  onAddPhoto 
-}: { 
+  onAddPhoto
+}: {
   gender?: string
   bodyFatPercentage?: number
   showPhoto?: boolean
@@ -73,14 +73,14 @@ const AvatarDisplay = ({
   onAddPhoto?: () => void
 }) => {
   const [imageError, setImageError] = useState(false)
-  
+
   if (showPhoto) {
     if (profileImage) {
       return (
         <div className={cn("relative flex items-center justify-center bg-linear-bg", className)}>
-          <Image 
-            src={profileImage} 
-            alt="Profile" 
+          <Image
+            src={profileImage}
+            alt="Profile"
             fill
             className="object-cover"
           />
@@ -93,8 +93,8 @@ const AvatarDisplay = ({
           <div className="text-center">
             <Camera className="h-24 w-24 mx-auto mb-4 text-linear-text-tertiary" />
             <p className="text-linear-text-secondary mb-4">No photo yet</p>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="border-linear-border"
               onClick={onAddPhoto}
             >
@@ -125,8 +125,8 @@ const AvatarDisplay = ({
           <User className="h-24 w-24 mx-auto mb-4 text-linear-text-tertiary" />
           <p className="text-white mb-2">No body model yet</p>
           <p className="text-sm text-linear-text-secondary mb-4">Add your measurements to generate one</p>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             className="border-linear-purple text-linear-purple hover:bg-linear-purple/10"
             onClick={onAddPhoto}
@@ -157,6 +157,21 @@ const ProfilePanel = ({
     entry ? getTimelineDisplayValues(entry) : null,
     [entry]
   )
+
+  const getDisplayName = () => {
+    if (!user) return 'User'
+
+    const fullName = (user.full_name || '').trim()
+    if (fullName.length > 0) {
+      return fullName.split(/\s+/)[0]
+    }
+
+    if (user.email) {
+      return user.email.split('@')[0]
+    }
+
+    return 'User'
+  }
 
   // Convert weight from kg (database storage) to user's preferred unit
   const displayValues = useMemo(() => {
@@ -201,11 +216,11 @@ const ProfilePanel = ({
           {/* Left side - Name and email */}
           <div>
             <h2 className="text-2xl font-bold text-linear-text mb-1">
-              {user?.full_name || user?.email?.split('@')[0] || 'User'}
+              {getDisplayName()}
             </h2>
             <p className="text-sm text-linear-text-secondary">{user?.email}</p>
           </div>
-          
+
           {/* Right side - Metrics */}
           <div className="text-right">
             <div className="text-sm text-linear-text-secondary">
@@ -221,7 +236,7 @@ const ProfilePanel = ({
         {/* Current Stats */}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-linear-text uppercase tracking-wider">Current Stats</h3>
-          
+
           {/* Stats Grid - Mobile optimized with horizontal scroll */}
           <div className="flex md:grid md:grid-cols-2 gap-3 overflow-x-auto md:overflow-visible -mx-6 px-6 md:mx-0 md:px-0 pb-2 md:pb-0">
             {/* Weight */}
@@ -360,11 +375,11 @@ const ProfilePanel = ({
                           // displayValues.weight is already in user's preferred unit
                           // rawValues.weight is in kg (database storage)
                           const weightInKg = rawValues?.weight || 0
-                          
+
                           const heightInCm = user?.settings?.units?.height === 'ft'
                             ? user.height * 2.54
                             : user.height
-                          
+
                           return calculateFFMI(weightInKg, heightInCm, displayValues.bodyFatPercentage).normalized_ffmi.toFixed(1)
                         })()}
                       </span>
@@ -374,14 +389,14 @@ const ProfilePanel = ({
                         // displayValues.weight is already in user's preferred unit
                         // rawValues.weight is in kg (database storage)
                         const weightInKg = rawValues?.weight || 0
-                        
+
                         const heightInCm = user?.settings?.units?.height === 'ft'
                           ? user.height * 2.54
                           : user.height
-                        
+
                         const interpretation = calculateFFMI(weightInKg, heightInCm, displayValues.bodyFatPercentage).interpretation
                         // Convert snake_case to Title Case
-                        return interpretation.split('_').map(word => 
+                        return interpretation.split('_').map(word =>
                           word.charAt(0).toUpperCase() + word.slice(1)
                         ).join(' ')
                       })()}
@@ -418,7 +433,7 @@ const ProfilePanel = ({
         {/* Goals Progress */}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-linear-text uppercase tracking-wider">Goals Progress</h3>
-          
+
           <div className="space-y-4">
             {/* FFMI Goal */}
             <div>
@@ -431,11 +446,11 @@ const ProfilePanel = ({
                         // displayValues.weight is already in user's preferred unit
                         // rawValues.weight is in kg (database storage)
                         const weightInKg = rawValues?.weight || 0
-                        
+
                         const heightInCm = user?.settings?.units?.height === 'ft'
                           ? user.height * 2.54
                           : user.height
-                        
+
                         return calculateFFMI(weightInKg, heightInCm, displayValues.bodyFatPercentage).normalized_ffmi.toFixed(1)
                       })()} / 22
                     </>
@@ -444,33 +459,33 @@ const ProfilePanel = ({
                   )}
                 </span>
               </div>
-              <Progress 
+              <Progress
                 value={
                   displayValues?.weight && displayValues?.bodyFatPercentage && user?.height
                     ? (() => {
-                        // displayValues.weight is already in user's preferred unit
-                        // rawValues.weight is in kg (database storage)
-                        const weightInKg = rawValues?.weight || 0
-                        
-                        const heightInCm = user?.settings?.units?.height === 'ft'
-                          ? user.height * 2.54
-                          : user.height
-                        
-                        const ffmi = calculateFFMI(weightInKg, heightInCm, displayValues.bodyFatPercentage)
-                        return Math.min(100, (ffmi.normalized_ffmi / 22) * 100)
-                      })()
+                      // displayValues.weight is already in user's preferred unit
+                      // rawValues.weight is in kg (database storage)
+                      const weightInKg = rawValues?.weight || 0
+
+                      const heightInCm = user?.settings?.units?.height === 'ft'
+                        ? user.height * 2.54
+                        : user.height
+
+                      const ffmi = calculateFFMI(weightInKg, heightInCm, displayValues.bodyFatPercentage)
+                      return Math.min(100, (ffmi.normalized_ffmi / 22) * 100)
+                    })()
                     : 0
-                } 
-                className="h-2" 
+                }
+                className="h-2"
               />
             </div>
-            
+
             {/* Body Fat Goal */}
             <div>
               <div className="mb-2">
                 <span className="text-sm text-linear-text">Body Fat Goal</span>
               </div>
-              <BodyFatScale 
+              <BodyFatScale
                 currentBF={displayValues?.bodyFatPercentage}
                 gender={user?.gender as 'male' | 'female' | undefined}
               />
@@ -509,11 +524,11 @@ export default function DashboardPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (timelineData.length === 0 || selectedDateIndex < 0) return
-      
+
       // Don't handle if user is typing in an input
       const target = e.target as HTMLElement
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
-      
+
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
         e.stopPropagation()
@@ -610,13 +625,13 @@ export default function DashboardPage() {
       loadAllData()
     }
   }, [user, router])
-  
+
   // Create timeline data when metrics or photos change
   useEffect(() => {
     if (metricsHistory.length > 0 || photosHistory.length > 0) {
       const timeline = createTimelineData(metricsHistory, photosHistory, profile?.height)
       setTimelineData(timeline)
-      
+
       // Set selected index to the most recent entry
       if (timeline.length > 0) {
         setSelectedDateIndex(timeline.length - 1)
@@ -636,11 +651,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (selectedDateIndex >= 0 && timelineData.length > 0) {
       const currentData = timelineData[selectedDateIndex];
-      
+
       // Find the previous entry with metrics data
       let previousIndex = selectedDateIndex - 1;
       let previousData = null;
-      
+
       while (previousIndex >= 0) {
         const entry = timelineData[previousIndex];
         if (entry.metrics || entry.inferredData) {
@@ -649,7 +664,7 @@ export default function DashboardPage() {
         }
         previousIndex--;
       }
-      
+
       // Calculate trends
       const trends = getMetricsTrends(
         currentData.metrics || (currentData.inferredData ? {
@@ -673,7 +688,7 @@ export default function DashboardPage() {
           weight_unit: 'lbs' as const
         } : null)
       );
-      
+
       setMetricsTrends(trends);
     }
   }, [selectedDateIndex, timelineData])
@@ -800,13 +815,13 @@ export default function DashboardPage() {
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Avatar/Photo Section with Tabs - 2/3 on desktop */}
         <div className="relative min-h-0 flex-[1.5] md:w-2/3 md:flex-1">
-          <Tabs 
-            value={activeTabIndex.toString()} 
-            onValueChange={(v) => setActiveTabIndex(parseInt(v))} 
+          <Tabs
+            value={activeTabIndex.toString()}
+            onValueChange={(v) => setActiveTabIndex(parseInt(v))}
             className="h-full flex flex-col"
             orientation="horizontal"
           >
-            <TabsList 
+            <TabsList
               className="grid w-full grid-cols-2 bg-linear-card border-b border-linear-border rounded-none"
               onKeyDown={(e) => {
                 // Disable arrow key navigation for tabs
@@ -819,7 +834,7 @@ export default function DashboardPage() {
               <TabsTrigger value="0" className="data-[state=active]:bg-linear-border/50">Body Model</TabsTrigger>
               <TabsTrigger value="1" className="data-[state=active]:bg-linear-border/50">Photo</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="0" className="flex-1 m-0">
               <Suspense fallback={
                 <div className="flex h-full items-center justify-center bg-linear-bg">
@@ -835,7 +850,7 @@ export default function DashboardPage() {
                 />
               </Suspense>
             </TabsContent>
-            
+
             <TabsContent value="1" className="flex-1 m-0">
               <Suspense fallback={
                 <div className="flex h-full items-center justify-center bg-linear-bg">
@@ -852,7 +867,7 @@ export default function DashboardPage() {
                 />
               </Suspense>
             </TabsContent>
-            
+
           </Tabs>
         </div>
 

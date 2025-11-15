@@ -32,11 +32,11 @@ struct SettingsView: View {
                         VStack(spacing: 20) {
                             profileSection
                             preferencesSection
-                            integrationsSection
                             securitySection
                             dataPrivacySection
-                            legalSection
+                            integrationsSection
                             aboutSection
+                            legalSection
                             
                             // Molecule: Logout Button
                             LogoutButton {
@@ -281,7 +281,7 @@ struct DeveloperMenuView: View {
                 title: "Force Sync Now",
                 description: nil,
                 action: {
-                    SyncManager.shared.syncAll()
+                    RealtimeSyncManager.shared.syncAll()
                 }
             ),
             .init(
@@ -315,7 +315,7 @@ struct DeveloperMenuView: View {
         )
         
         CoreDataManager.shared.saveBodyMetrics(testMetric, userId: testMetric.userId, markAsSynced: false)
-        SyncManager.shared.syncIfNeeded()
+        RealtimeSyncManager.shared.syncIfNeeded()
     }
     #endif
 }

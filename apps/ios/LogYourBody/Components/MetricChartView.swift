@@ -19,6 +19,13 @@ struct MetricChartView: View {
     @State private var trendDirection: TrendDirection = .neutral
     @State private var isLoadingData: Bool = false
 
+    @State private var highlightScale: CGFloat = 0.8
+    @State private var haloScale: CGFloat = 1.0
+    @State private var highlightHaloOpacity: Double = 0.0
+    @State private var isHighlightVisible: Bool = false
+
+    private let highlightSymbolSize: CGFloat = 40
+
     private let interpolationService = MetricsInterpolationService.shared
 
     var body: some View {
@@ -30,6 +37,9 @@ struct MetricChartView: View {
             chartView
                 .frame(height: 280)
                 .padding(.horizontal, 16)
+                .onChange(of: selectedDate) { _, _ in
+                    updateHighlightState()
+                }
 
             // Trend Indicator
             trendIndicator
@@ -97,20 +107,6 @@ struct MetricChartView: View {
         } else {
             Chart {
                     ForEach(chartData) { point in
-                        // Area fill gradient (render first, below the line)
-                        AreaMark(
-                            x: .value("Date", point.date),
-                            y: .value("Value", point.value)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color.liquidAccent.opacity(0.3), Color.liquidAccent.opacity(0.0)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .interpolationMethod(.catmullRom)
-
                         // Line
                         LineMark(
                             x: .value("Date", point.date),
@@ -127,8 +123,8 @@ struct MetricChartView: View {
                                 y: .value("Value", point.value)
                             )
                             .foregroundStyle(Color.liquidAccent)
-                            .symbolSize(point.isEstimated ? 30 : 60)
-                            .opacity(point.isEstimated ? 0.6 : 0.8)
+                            .symbolSize(point.isEstimated ? 18 : 24)
+                            .opacity(point.isEstimated ? 0.5 : 0.8)
                         }
                     }
 
@@ -139,20 +135,26 @@ struct MetricChartView: View {
                             .foregroundStyle(Color.white.opacity(0.3))
                             .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
 
-                        // Highlight selected point
+                        // Highlight selected point (animated with halo)
                         PointMark(
                             x: .value("Date", selectedPoint.date),
                             y: .value("Value", selectedPoint.value)
                         )
-                        .foregroundStyle(Color.white)
-                        .symbolSize(120)
+                        .symbolSize(highlightSymbolSize)
                         .symbol {
-                            Circle()
-                                .fill(Color.liquidAccent)
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(Color.white, lineWidth: 3)
-                                )
+                            ZStack {
+                                Circle()
+                                    .fill(Color.liquidAccent.opacity(highlightHaloOpacity))
+                                    .scaleEffect(haloScale)
+
+                                Circle()
+                                    .fill(Color.liquidAccent)
+                                    .overlay(
+                                        Circle()
+                                            .strokeBorder(Color.white, lineWidth: 3)
+                                    )
+                                    .scaleEffect(highlightScale)
+                            }
                         }
                     }
                 }
@@ -178,6 +180,7 @@ struct MetricChartView: View {
                         .background(Color.clear)
                 }
                 .animation(.easeInOut(duration: 0.8), value: chartData.count)
+                .animation(.easeInOut(duration: 0.25), value: selectedDate)
         }
     }
 
@@ -300,6 +303,37 @@ struct MetricChartView: View {
         guard !chartData.isEmpty else { return nil }
 
         return chartData.min { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) }
+    }
+
+    private func updateHighlightState() {
+        guard selectedDate != nil else {
+            withAnimation(.easeOut(duration: 0.2)) {
+                isHighlightVisible = false
+                highlightScale = 0.8
+                haloScale = 1.0
+                highlightHaloOpacity = 0.0
+            }
+            return
+        }
+
+        isHighlightVisible = true
+        highlightScale = 0.9
+        haloScale = 1.0
+        highlightHaloOpacity = 0.0
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.7, blendDuration: 0.1)) {
+            highlightScale = 1.0
+            haloScale = 1.3
+            highlightHaloOpacity = 0.35
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            guard isHighlightVisible else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                haloScale = 1.0
+                highlightHaloOpacity = 0.0
+            }
+        }
     }
 
     private func formatValue(_ value: Double) -> String {

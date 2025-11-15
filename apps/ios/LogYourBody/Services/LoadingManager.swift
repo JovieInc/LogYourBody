@@ -13,7 +13,7 @@ class LoadingManager: ObservableObject {
     private let authManager: AuthManager
     private let healthKitManager = HealthKitManager.shared
     private let coreDataManager = CoreDataManager.shared
-    private let syncManager = SyncManager.shared
+    private let syncManager = RealtimeSyncManager.shared
     
     // Loading steps with their weights
     private enum LoadingStep {

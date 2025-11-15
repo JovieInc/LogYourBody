@@ -1116,7 +1116,7 @@ private struct BirthdayEditSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 20) {
                 DatePicker(
                     "Date of Birth",
@@ -1194,7 +1194,7 @@ private struct HeightEditSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 30) {
                 if preferredSystem == .imperial {
                     // Feet and inches pickers
@@ -1289,7 +1289,7 @@ private struct HeightEditSheet: View {
 // Custom label styles removed - use default SwiftUI label styles
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         PreferencesView()
             .environmentObject(AuthManager.shared)
     }

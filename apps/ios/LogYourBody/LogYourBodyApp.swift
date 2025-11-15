@@ -10,7 +10,7 @@ struct LogYourBodyApp: App {
     @StateObject private var authManager = AuthManager.shared
     @StateObject private var revenueCatManager = RevenueCatManager.shared
     @StateObject private var healthKitManager = HealthKitManager.shared
-    @StateObject private var syncManager = SyncManager.shared
+    @StateObject private var realtimeSyncManager = RealtimeSyncManager.shared
     @StateObject private var widgetDataManager = WidgetDataManager.shared
     @State private var clerk = Clerk.shared
     @State private var showAddEntrySheet = false
@@ -23,7 +23,7 @@ struct LogYourBodyApp: App {
             ContentView()
                 .environment(\.managedObjectContext, persistenceController.viewContext)
                 .environmentObject(authManager)
-                .environmentObject(syncManager)
+                .environmentObject(realtimeSyncManager)
                 .environmentObject(revenueCatManager)
                 .environment(clerk)
                 .sheet(isPresented: $showAddEntrySheet) {
@@ -108,7 +108,7 @@ struct LogYourBodyApp: App {
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                     // App entering background - ensure sync is complete
-                    syncManager.syncIfNeeded()
+                    realtimeSyncManager.syncIfNeeded()
                     
                     // Update widget data
                     Task {

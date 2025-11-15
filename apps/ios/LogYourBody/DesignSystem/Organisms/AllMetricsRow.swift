@@ -64,22 +64,35 @@ struct AllMetricsRow: View {
     private var stepsCard: some View {
         Group {
             if let steps = steps {
-                DSMetricCard(
-                    value: formatSteps(steps),
-                    unit: "steps",
-                    label: "Steps",
-                    icon: "figure.walk",
-                    iconColor: .orange,
-                    timestamp: formatTimestamp(),
-                    chartData: MetricChartDataHelper.generateStepsChartData(for: userId),
-                    showChevron: true,
-                    isInteractive: true,
-                    onTap: {
-                        selectedMetric = .steps
-                    }
-                )
+                Button {
+                    selectedMetric = .steps
+                } label: {
+                    MetricSummaryCard(
+                        icon: "figure.walk",
+                        accentColor: .orange,
+                        state: .data(MetricSummaryCard.Content(
+                            title: "Steps",
+                            value: formatSteps(steps),
+                            unit: "steps",
+                            timestamp: formatTimestamp(),
+                            dataPoints: MetricChartDataHelper.generateStepsChartData(for: userId).map {
+                                MetricSummaryCard.DataPoint(index: $0.index, value: $0.value)
+                            },
+                            chartAccessibilityLabel: "Steps trend for the past week",
+                            chartAccessibilityValue: "Latest value \(formatSteps(steps)) steps",
+                            trend: nil,
+                            footnote: nil
+                        )),
+                        isButtonContext: true
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             } else {
-                DSEmptyMetricCard(label: "Steps", unit: "steps")
+                MetricSummaryCard(
+                    icon: "figure.walk",
+                    accentColor: .orange,
+                    state: .empty(message: "No steps data", action: nil)
+                )
             }
         }
     }
@@ -90,24 +103,34 @@ struct AllMetricsRow: View {
                 let displayWeight = useMetricUnits ? weight : weight * 2.20462
                 let unit = useMetricUnits ? "kg" : "lbs"
 
-                DSMetricCard(
-                    value: formatWeight(displayWeight, useMetric: useMetricUnits),
-                    unit: unit,
-                    label: "Weight",
-                    icon: "figure.stand",
-                    iconColor: .purple,
-                    timestamp: formatTimestamp(),
-                    chartData: MetricChartDataHelper.generateWeightChartData(for: userId, useMetric: useMetricUnits),
-                    showChevron: true,
-                    isInteractive: true,
-                    onTap: {
-                        selectedMetric = .weight
-                    }
-                )
+                Button {
+                    selectedMetric = .weight
+                } label: {
+                    MetricSummaryCard(
+                        icon: "figure.stand",
+                        accentColor: .purple,
+                        state: .data(MetricSummaryCard.Content(
+                            title: "Weight",
+                            value: formatWeight(displayWeight, useMetric: useMetricUnits),
+                            unit: unit,
+                            timestamp: formatTimestamp(),
+                            dataPoints: MetricChartDataHelper.generateWeightChartData(for: userId, useMetric: useMetricUnits).map {
+                                MetricSummaryCard.DataPoint(index: $0.index, value: $0.value)
+                            },
+                            chartAccessibilityLabel: "Weight trend for the past week",
+                            chartAccessibilityValue: "Latest value \(formatWeight(displayWeight, useMetric: useMetricUnits)) \(unit)",
+                            trend: nil,
+                            footnote: nil
+                        )),
+                        isButtonContext: true
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             } else {
-                DSEmptyMetricCard(
-                    label: "Weight",
-                    unit: useMetricUnits ? "kg" : "lbs"
+                MetricSummaryCard(
+                    icon: "figure.stand",
+                    accentColor: .purple,
+                    state: .empty(message: "No weight data", action: nil)
                 )
             }
         }
@@ -116,22 +139,35 @@ struct AllMetricsRow: View {
     private var bodyFatCard: some View {
         Group {
             if let bodyFat = bodyFat {
-                DSMetricCard(
-                    value: String(format: "%.1f", bodyFat),
-                    unit: "%",
-                    label: "Body Fat Percentage",
-                    icon: "percent",
-                    iconColor: .purple,
-                    timestamp: formatTimestamp(),
-                    chartData: MetricChartDataHelper.generateBodyFatChartData(for: userId),
-                    showChevron: true,
-                    isInteractive: true,
-                    onTap: {
-                        selectedMetric = .bodyFat
-                    }
-                )
+                Button {
+                    selectedMetric = .bodyFat
+                } label: {
+                    MetricSummaryCard(
+                        icon: "percent",
+                        accentColor: .purple,
+                        state: .data(MetricSummaryCard.Content(
+                            title: "Body Fat Percentage",
+                            value: String(format: "%.1f", bodyFat),
+                            unit: "%",
+                            timestamp: formatTimestamp(),
+                            dataPoints: MetricChartDataHelper.generateBodyFatChartData(for: userId).map {
+                                MetricSummaryCard.DataPoint(index: $0.index, value: $0.value)
+                            },
+                            chartAccessibilityLabel: "Body fat percentage trend for the past week",
+                            chartAccessibilityValue: "Latest value \(String(format: "%.1f", bodyFat))%",
+                            trend: nil,
+                            footnote: nil
+                        )),
+                        isButtonContext: true
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             } else {
-                DSEmptyMetricCard(label: "Body Fat", unit: "%")
+                MetricSummaryCard(
+                    icon: "percent",
+                    accentColor: .purple,
+                    state: .empty(message: "No body fat data", action: nil)
+                )
             }
         }
     }
@@ -139,22 +175,35 @@ struct AllMetricsRow: View {
     private var ffmiCard: some View {
         Group {
             if let ffmi = ffmi {
-                DSMetricCard(
-                    value: String(format: "%.1f", ffmi),
-                    unit: "",
-                    label: "Fat Free Mass Index",
-                    icon: "figure.arms.open",
-                    iconColor: .purple,
-                    timestamp: formatTimestamp(),
-                    chartData: MetricChartDataHelper.generateFFMIChartData(for: userId),
-                    showChevron: true,
-                    isInteractive: true,
-                    onTap: {
-                        selectedMetric = .ffmi
-                    }
-                )
+                Button {
+                    selectedMetric = .ffmi
+                } label: {
+                    MetricSummaryCard(
+                        icon: "figure.arms.open",
+                        accentColor: .purple,
+                        state: .data(MetricSummaryCard.Content(
+                            title: "Fat Free Mass Index",
+                            value: String(format: "%.1f", ffmi),
+                            unit: "",
+                            timestamp: formatTimestamp(),
+                            dataPoints: MetricChartDataHelper.generateFFMIChartData(for: userId).map {
+                                MetricSummaryCard.DataPoint(index: $0.index, value: $0.value)
+                            },
+                            chartAccessibilityLabel: "FFMI trend for the past week",
+                            chartAccessibilityValue: "Latest value \(String(format: "%.1f", ffmi))",
+                            trend: nil,
+                            footnote: nil
+                        )),
+                        isButtonContext: true
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             } else {
-                DSEmptyMetricCard(label: "FFMI", unit: "")
+                MetricSummaryCard(
+                    icon: "figure.arms.open",
+                    accentColor: .purple,
+                    state: .empty(message: "No FFMI data", action: nil)
+                )
             }
         }
     }
@@ -165,24 +214,34 @@ struct AllMetricsRow: View {
                 let displayWaist = useMetricUnits ? waist : waist / 2.54
                 let unit = useMetricUnits ? "cm" : "in"
 
-                DSMetricCard(
-                    value: formatWaist(displayWaist, useMetric: useMetricUnits),
-                    unit: unit,
-                    label: "Waist",
-                    icon: "ruler",
-                    iconColor: .blue,
-                    timestamp: formatTimestamp(),
-                    chartData: MetricChartDataHelper.generateWaistChartData(for: userId, useMetric: useMetricUnits),
-                    showChevron: true,
-                    isInteractive: true,
-                    onTap: {
-                        selectedMetric = .waist
-                    }
-                )
+                Button {
+                    selectedMetric = .waist
+                } label: {
+                    MetricSummaryCard(
+                        icon: "ruler",
+                        accentColor: .blue,
+                        state: .data(MetricSummaryCard.Content(
+                            title: "Waist",
+                            value: formatWaist(displayWaist, useMetric: useMetricUnits),
+                            unit: unit,
+                            timestamp: formatTimestamp(),
+                            dataPoints: MetricChartDataHelper.generateWaistChartData(for: userId, useMetric: useMetricUnits).map {
+                                MetricSummaryCard.DataPoint(index: $0.index, value: $0.value)
+                            },
+                            chartAccessibilityLabel: "Waist measurement trend for the past week",
+                            chartAccessibilityValue: "Latest value \(formatWaist(displayWaist, useMetric: useMetricUnits)) \(unit)",
+                            trend: nil,
+                            footnote: nil
+                        )),
+                        isButtonContext: true
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             } else {
-                DSEmptyMetricCard(
-                    label: "Waist",
-                    unit: useMetricUnits ? "cm" : "in"
+                MetricSummaryCard(
+                    icon: "ruler",
+                    accentColor: .blue,
+                    state: .empty(message: "No waist data", action: nil)
                 )
             }
         }

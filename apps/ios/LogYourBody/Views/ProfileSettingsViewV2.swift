@@ -14,6 +14,8 @@ struct ProfileSettingsViewV2: View {
     
     // Editable fields
     @State private var editableName: String = ""
+    @State private var editableFirstName: String = ""
+    @State private var editableLastName: String = ""
     @State private var editableDateOfBirth = Date()
     @State private var editableHeightCm: Int = 170
     @State private var editableGender: OnboardingData.Gender = .male
@@ -132,19 +134,49 @@ struct ProfileSettingsViewV2: View {
             sectionHeader("Basic Information")
             
             VStack(spacing: 0) {
-                // Name Field
+                // First Name Field
                 settingsRow(
-                    label: "Full Name",
-                    value: editableName.isEmpty ? "Not set" : editableName,
+                    label: "First Name",
+                    value: editableFirstName.isEmpty ? "Not set" : editableFirstName,
                     showDisclosure: false
                 ) {
                     AnyView(
-                        TextField("Your name", text: $editableName)
+                        TextField("First name", text: $editableFirstName)
                             .multilineTextAlignment(.trailing)
-                            .onChange(of: editableName) { _, _ in hasChanges = true }
+                            .onChange(of: editableFirstName) { _, _ in
+                                hasChanges = true
+                                let first = editableFirstName.trimmingCharacters(in: .whitespaces)
+                                let last = editableLastName.trimmingCharacters(in: .whitespaces)
+                                editableName = [first, last]
+                                    .filter { !$0.isEmpty }
+                                    .joined(separator: " ")
+                            }
                     )
                 }
-                
+
+                Divider()
+                    .padding(.leading, 16)
+
+                // Last Name Field
+                settingsRow(
+                    label: "Last Name",
+                    value: editableLastName.isEmpty ? "Not set" : editableLastName,
+                    showDisclosure: false
+                ) {
+                    AnyView(
+                        TextField("Last name", text: $editableLastName)
+                            .multilineTextAlignment(.trailing)
+                            .onChange(of: editableLastName) { _, _ in
+                                hasChanges = true
+                                let first = editableFirstName.trimmingCharacters(in: .whitespaces)
+                                let last = editableLastName.trimmingCharacters(in: .whitespaces)
+                                editableName = [first, last]
+                                    .filter { !$0.isEmpty }
+                                    .joined(separator: " ")
+                            }
+                    )
+                }
+
                 Divider()
                     .padding(.leading, 16)
                 
@@ -468,7 +500,12 @@ struct ProfileSettingsViewV2: View {
     // MARK: - Computed Properties
     
     private var profileInitials: String {
-        let name = authManager.currentUser?.name ?? authManager.currentUser?.email ?? ""
+        let name: String
+        if !editableName.isEmpty {
+            name = editableName
+        } else {
+            name = authManager.currentUser?.name ?? authManager.currentUser?.email ?? ""
+        }
         let components = name.components(separatedBy: " ")
         if components.count >= 2 {
             return String(components[0].prefix(1) + components[1].prefix(1)).uppercased()
@@ -498,7 +535,16 @@ struct ProfileSettingsViewV2: View {
     private func loadCurrentProfile() {
         guard let user = authManager.currentUser else { return }
         
-        editableName = user.name ?? ""
+        editableName = user.name ?? user.profile?.fullName ?? ""
+        let baseName: String
+        if !editableName.isEmpty {
+            baseName = editableName
+        } else {
+            baseName = user.email.components(separatedBy: "@").first ?? ""
+        }
+        let parts = baseName.split(separator: " ")
+        editableFirstName = parts.first.map { String($0) } ?? ""
+        editableLastName = parts.count > 1 ? parts.dropFirst().joined(separator: " ") : ""
         editableDateOfBirth = user.profile?.dateOfBirth ?? Date()
         
         if let height = user.profile?.height {

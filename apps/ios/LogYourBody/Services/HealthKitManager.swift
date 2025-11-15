@@ -178,7 +178,9 @@ class HealthKitManager: ObservableObject {
         }
         
         let endDate = Date()
-        let startDate = Calendar.current.date(byAdding: .day, value: -days, to: endDate)!
+        guard let startDate = Calendar.current.date(byAdding: .day, value: -days, to: endDate) else {
+            return []
+        }
         
         return try await fetchWeightHistoryInRange(startDate: startDate, endDate: endDate)
     }
@@ -330,7 +332,9 @@ class HealthKitManager: ObservableObject {
     
     // Sync weight data with backend
     func syncWeightWithBackend(weight: Double, date: Date) async throws {
-        let url = URL(string: "\(Constants.baseURL)/api/weight")!
+        guard let url = URL(string: "\(Constants.baseURL)/api/weight") else {
+            throw HealthKitError.syncFailed
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -681,7 +685,7 @@ class HealthKitManager: ObservableObject {
         
         for (weight, date) in weightHistory {
             // Check if this entry already exists (by date)
-            let exists = await SyncManager.shared.weightEntryExists(for: date)
+            let exists = await weightEntryExists(for: date)
 
             if !exists {
                 newEntriesCount += 1
@@ -722,7 +726,7 @@ class HealthKitManager: ObservableObject {
             }
             
             if !alreadyProcessed {
-                let exists = await SyncManager.shared.dailyMetricsExists(for: date)
+                let exists = await dailyMetricsExists(for: date)
 
                 if !exists {
                     // Create body metrics with just body fat
@@ -979,12 +983,11 @@ class HealthKitManager: ObservableObject {
             updatedAt: metrics.updatedAt
         )
         
-        // Save to CoreData and let SyncManager handle syncing to Supabase
+        // Save to CoreData and trigger realtime sync to Supabase
         await MainActor.run {
             CoreDataManager.shared.saveBodyMetrics(metricsWithUserId, userId: userId, markAsSynced: false)
-            // Trigger sync to upload to Supabase
-            SyncManager.shared.syncIfNeeded()
         }
+        await RealtimeSyncManager.shared.syncIfNeeded()
     }
     
     // Sync step count data from HealthKit to app
@@ -994,9 +997,9 @@ class HealthKitManager: ObservableObject {
         for (stepCount, date) in stepHistory {
             // Only sync if steps > 0 and entry doesn't exist
             if stepCount > 0 {
-                let exists = await SyncManager.shared.dailyMetricsExists(for: date)
+                let exists = await dailyMetricsExists(for: date)
                 if !exists {
-                    try await SyncManager.shared.saveDailyMetrics(steps: stepCount, date: date)
+                    try await saveDailySteps(steps: stepCount, date: date)
                 }
             }
         }
@@ -1193,9 +1196,7 @@ class HealthKitManager: ObservableObject {
             
             // Trigger sync to remote
             Task.detached {
-                await MainActor.run {
-                    SyncManager.shared.syncIfNeeded()
-                }
+                await RealtimeSyncManager.shared.syncIfNeeded()
             }
         }
     }
@@ -1261,10 +1262,50 @@ class HealthKitManager: ObservableObject {
         
         // Sync all historical data to remote
         Task.detached {
-            await MainActor.run {
-                SyncManager.shared.syncAll()
-            }
+            await RealtimeSyncManager.shared.syncAll()
         }
+    }
+
+    // MARK: - Local existence helpers
+
+    func weightEntryExists(for date: Date) async -> Bool {
+        guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else { return false }
+
+        let calendar = Calendar.current
+        let hourBefore = calendar.date(byAdding: .hour, value: -1, to: date) ?? date
+        let hourAfter = calendar.date(byAdding: .hour, value: 1, to: date) ?? date
+
+        let metrics = await CoreDataManager.shared.fetchBodyMetrics(
+            for: userId,
+            from: hourBefore,
+            to: hourAfter
+        )
+        return !metrics.isEmpty
+    }
+
+    func dailyMetricsExists(for date: Date) async -> Bool {
+        guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else { return false }
+
+        return await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: date) != nil
+    }
+
+    func saveDailySteps(steps: Int, date: Date) async throws {
+        guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else {
+            throw HealthKitError.notAuthorized
+        }
+
+        let metrics = DailyMetrics(
+            id: UUID().uuidString,
+            userId: userId,
+            date: date,
+            steps: steps,
+            notes: "Imported from HealthKit",
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+
+        await CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
+        await RealtimeSyncManager.shared.syncIfNeeded()
     }
 }
 

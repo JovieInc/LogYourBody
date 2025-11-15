@@ -7,8 +7,20 @@ import Charts
 
 // MARK: - MetricCard Molecule
 
-/// A card displaying a metric value with label and optional trend
-/// Supports both legacy vertical layout and Apple Health-style horizontal layout with sparkline
+/// **DEPRECATED**: Use `MetricSummaryCard` from `DesignSystem/Organisms/MetricSummaryCard.swift` instead.
+///
+/// This component has been replaced with a fully polished Apple Health-style component with:
+/// - Material backgrounds (glassmorphism)
+/// - Proper state management (loading, empty, error, data)
+/// - Better accessibility support
+/// - Larger, more visible charts
+/// - Consistent spacing and typography
+///
+/// Migration guide:
+/// - Replace `DSMetricCard` with `MetricSummaryCard`
+/// - Use the `.data(Content(...))` state with proper data binding
+/// - Set `isButtonContext: true` if used inside a Button
+@available(*, deprecated, message: "Use MetricSummaryCard from DesignSystem/Organisms/MetricSummaryCard.swift instead")
 struct DSMetricCard: View {
     let value: String
     let unit: String?

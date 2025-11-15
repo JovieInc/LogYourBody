@@ -9,12 +9,13 @@ struct MainTabView: View {
     @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
     @State private var showAddEntrySheet = false
     @EnvironmentObject var authManager: AuthManager
-    @EnvironmentObject var syncManager: SyncManager
 
     var body: some View {
         ZStack {
             // Main content
-            DashboardViewLiquid()
+            NavigationStack {
+                DashboardViewLiquid()
+            }
 
             // Glass Floating Action Button (FAB)
             VStack {
@@ -64,7 +65,8 @@ struct MainTabView: View {
 }
 
 #Preview {
-    MainTabView()
-        .environmentObject(AuthManager())
-        .environmentObject(SyncManager.shared)
+    NavigationStack {
+        MainTabView()
+            .environmentObject(AuthManager())
+    }
 }

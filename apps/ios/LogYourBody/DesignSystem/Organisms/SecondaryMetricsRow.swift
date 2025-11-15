@@ -21,12 +21,25 @@ struct SecondaryMetricsRow: View {
     var body: some View {
         HStack(spacing: 12) {
             // Steps
-            DSCompactMetricCard(
+            MetricSummaryCard(
                 icon: "figure.walk",
-                value: formatSteps(steps),
-                label: "Steps",
-                trend: stepsTrend.map { Double($0) },
-                trendType: .positive
+                accentColor: .orange,
+                state: steps != nil ? .data(MetricSummaryCard.Content(
+                    title: "Steps",
+                    value: formatSteps(steps),
+                    unit: "",
+                    timestamp: nil,
+                    dataPoints: [],
+                    chartAccessibilityLabel: nil,
+                    chartAccessibilityValue: nil,
+                    trend: stepsTrend.map { trend in
+                        MetricSummaryCard.Trend(
+                            direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
+                            valueText: String(format: "%d", abs(trend))
+                        )
+                    },
+                    footnote: nil
+                )) : .empty(message: "No data", action: nil)
             )
 
             // FFMI - Tappable
@@ -38,28 +51,55 @@ struct SecondaryMetricsRow: View {
                 let impact = UIImpactFeedbackGenerator(style: .medium)
                 impact.impactOccurred()
             } label: {
-                DSCompactMetricCard(
+                MetricSummaryCard(
                     icon: "figure.arms.open",
-                    value: ffmi != nil ? String(format: "%.1f", ffmi!) : "––",
-                    label: "FFMI",
-                    trend: ffmiTrend,
-                    trendType: .positive
+                    accentColor: .purple,
+                    state: ffmi != nil ? .data(MetricSummaryCard.Content(
+                        title: "FFMI",
+                        value: String(format: "%.1f", ffmi!),
+                        unit: "",
+                        timestamp: nil,
+                        dataPoints: [],
+                        chartAccessibilityLabel: nil,
+                        chartAccessibilityValue: nil,
+                        trend: ffmiTrend.map { trend in
+                            MetricSummaryCard.Trend(
+                                direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
+                                valueText: String(format: "%.1f", abs(trend))
+                            )
+                        },
+                        footnote: nil
+                    )) : .empty(message: "No data", action: nil),
+                    isButtonContext: true
                 )
                 .scaleEffect(displayMode == .ffmiChart ? 1.05 : 1.0)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 18)
                         .stroke(displayMode == .ffmiChart ? Color.liquidAccent : Color.clear, lineWidth: 2)
                 )
             }
             .buttonStyle(PlainButtonStyle())
 
             // Lean Mass
-            DSCompactMetricCard(
+            MetricSummaryCard(
                 icon: "figure.arms.open",
-                value: leanMass != nil ? "\(Int(leanMass!))" : "––",
-                label: "Lean \(weightUnit)",
-                trend: leanMassTrend,
-                trendType: .positive
+                accentColor: .blue,
+                state: leanMass != nil ? .data(MetricSummaryCard.Content(
+                    title: "Lean \(weightUnit)",
+                    value: "\(Int(leanMass!))",
+                    unit: "",
+                    timestamp: nil,
+                    dataPoints: [],
+                    chartAccessibilityLabel: nil,
+                    chartAccessibilityValue: nil,
+                    trend: leanMassTrend.map { trend in
+                        MetricSummaryCard.Trend(
+                            direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
+                            valueText: String(format: "%.1f", abs(trend))
+                        )
+                    },
+                    footnote: nil
+                )) : .empty(message: "No data", action: nil)
             )
         }
         .padding(.horizontal, 20)

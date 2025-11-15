@@ -390,7 +390,7 @@ struct AddEntrySheet: View {
             // Update widget data
             await WidgetDataManager.shared.updateWidgetData()
 
-            SyncManager.shared.syncIfNeeded()
+            RealtimeSyncManager.shared.syncIfNeeded()
         }
 
         dismiss()
@@ -409,7 +409,7 @@ struct AddEntrySheet: View {
             // Update widget data
             await WidgetDataManager.shared.updateWidgetData()
 
-            SyncManager.shared.syncIfNeeded()
+            RealtimeSyncManager.shared.syncIfNeeded()
         }
 
         dismiss()
@@ -462,7 +462,7 @@ struct AddEntrySheet: View {
         }
 
         isProcessingPhotos = false
-        SyncManager.shared.syncIfNeeded()
+        RealtimeSyncManager.shared.syncIfNeeded()
         dismiss()
     }
 

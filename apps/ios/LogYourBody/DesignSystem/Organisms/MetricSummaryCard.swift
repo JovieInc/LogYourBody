@@ -11,53 +11,88 @@ import Charts
 // MARK: - MetricSummaryCard Organism
 
 /// Apple Health-style metric card with inline chart, states, and accessibility support.
-struct MetricSummaryCard: View {
-    struct DataPoint: Identifiable {
-        let id = UUID()
-        let index: Int
-        let value: Double
+public struct MetricSummaryCard: View {
+    public struct DataPoint: Identifiable {
+        public let id = UUID()
+        public let index: Int
+        public let value: Double
+
+        public init(index: Int, value: Double) {
+            self.index = index
+            self.value = value
+        }
     }
 
-    struct Trend {
-        let direction: Direction
-        let valueText: String
-        let caption: String?
+    public struct Trend {
+        public let direction: Direction
+        public let valueText: String
+        public let caption: String?
 
-        enum Direction {
+        public enum Direction {
             case up
             case down
             case flat
         }
+
+        public init(direction: Direction, valueText: String, caption: String? = nil) {
+            self.direction = direction
+            self.valueText = valueText
+            self.caption = caption
+        }
     }
 
-    struct Content {
-        let title: String
-        let value: String
-        let unit: String
-        let timestamp: String?
-        let dataPoints: [DataPoint]
-        let chartAccessibilityLabel: String?
-        let chartAccessibilityValue: String?
-        let trend: Trend?
-        let footnote: String?
+    public struct Content {
+        public let title: String
+        public let value: String
+        public let unit: String
+        public let timestamp: String?
+        public let dataPoints: [DataPoint]
+        public let chartAccessibilityLabel: String?
+        public let chartAccessibilityValue: String?
+        public let trend: Trend?
+        public let footnote: String?
+
+        public init(title: String, value: String, unit: String, timestamp: String?, dataPoints: [DataPoint], chartAccessibilityLabel: String?, chartAccessibilityValue: String?, trend: Trend?, footnote: String?) {
+            self.title = title
+            self.value = value
+            self.unit = unit
+            self.timestamp = timestamp
+            self.dataPoints = dataPoints
+            self.chartAccessibilityLabel = chartAccessibilityLabel
+            self.chartAccessibilityValue = chartAccessibilityValue
+            self.trend = trend
+            self.footnote = footnote
+        }
     }
 
-    struct CardAction {
-        let title: String
-        let handler: () -> Void
+    public struct CardAction {
+        public let title: String
+        public let handler: () -> Void
+
+        public init(title: String, handler: @escaping () -> Void) {
+            self.title = title
+            self.handler = handler
+        }
     }
 
-    enum State {
+    public enum State {
         case loading
         case empty(message: String, action: CardAction?)
         case error(message: String, action: CardAction?)
         case data(Content)
     }
 
-    let icon: String
-    let accentColor: Color
-    let state: State
-    var isButtonContext: Bool = false
+    public let icon: String
+    public let accentColor: Color
+    public let state: State
+    public var isButtonContext: Bool = false
+
+    public init(icon: String, accentColor: Color, state: State, isButtonContext: Bool = false) {
+        self.icon = icon
+        self.accentColor = accentColor
+        self.state = state
+        self.isButtonContext = isButtonContext
+    }
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -65,21 +100,35 @@ struct MetricSummaryCard: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     @ScaledMetric(relativeTo: .largeTitle) private var valueFontSize: CGFloat = 44
-    @ScaledMetric(relativeTo: .title3) private var unitFontSize: CGFloat = 20
-    @ScaledMetric(relativeTo: .body) private var chartHeight: CGFloat = 52
+    @ScaledMetric(relativeTo: .title3) private var unitFontSize: CGFloat = 18
+    @ScaledMetric(relativeTo: .body) private var chartHeight: CGFloat = 60
     @ScaledMetric(relativeTo: .body) private var headerIconSize: CGFloat = 18
 
-    private let horizontalPadding: CGFloat = 20
-    private let verticalPadding: CGFloat = 18
+    private let horizontalPadding: CGFloat = 16
+    private let verticalPadding: CGFloat = 16
 
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+    private var isAccessibilityCategory: Bool {
+        dynamicTypeSize >= .accessibility1
+    }
+
+    public var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
         return ZStack {
+            // Solid background layer
             shape
-                .fill(backgroundMaterial)
-                .overlay(borderOverlay)
-                .shadow(color: shadowColor, radius: 18, x: 0, y: 12)
+                .fill(Color.linearCard)
+
+            // Optional material overlay for subtle softness (reduced for flatter look)
+            if !reduceTransparency {
+                shape
+                    .fill(.ultraThinMaterial.opacity(0.35))
+            }
+
+            // Border and soft shadow (Apple Health-style, low contrast)
+            shape
+                .strokeBorder(borderColor, lineWidth: 1)
+                .shadow(color: shadowColor, radius: 6, x: 0, y: 4)
 
             VStack(alignment: .leading, spacing: 0) {
                 header
@@ -95,34 +144,34 @@ struct MetricSummaryCard: View {
         .contentShape(shape)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint(accessibilityHint)
+        .accessibilityHint(accessibilityHint ?? "")
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(accentColor.opacity(colorScheme == .dark ? 0.22 : 0.14))
-                    .frame(width: 34, height: 34)
-
+        HStack(spacing: 8) {
+            // Small icon + title in accent color (Apple Health-style label)
+            HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: headerIconSize, weight: .semibold))
                     .foregroundStyle(accentColor)
-            }
 
-            Text(titleText)
-                .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(primaryTextColor)
-                .lineLimit(1)
+                Text(titleText)
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
+                    .foregroundStyle(accentColor)
+                    .lineLimit(1)
+            }
 
             Spacer()
 
-            timestampText
+            // Date (from timestamp) + chevron on the right
+            HStack(spacing: 4) {
+                timestampText
 
-            if isButtonContext && hasActionableState {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(secondaryTextColor.opacity(0.55))
+                if isButtonContext && hasActionableState {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(secondaryTextColor.opacity(0.7))
+                }
             }
         }
     }
@@ -130,7 +179,7 @@ struct MetricSummaryCard: View {
     private var stateView: some View {
         switch state {
         case .loading:
-            return AnyView(loadingView)
+            return AnyView(loadingView())
         case .empty(let message, let action):
             return AnyView(messageView(message: message, action: action, iconName: "plus") )
         case .error(let message, let action):
@@ -156,7 +205,7 @@ struct MetricSummaryCard: View {
                 if let time = content.timestamp {
                     Text(time)
                         .font(.system(.footnote, design: .rounded))
-                        .foregroundStyle(secondaryTextColor)
+                        .foregroundStyle(secondaryTextColor.opacity(0.8))
                         .transition(.opacity)
                 }
             default:
@@ -166,15 +215,17 @@ struct MetricSummaryCard: View {
     }
 
     private func dataView(_ content: Content) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 valueBlock(for: content)
+                    .layoutPriority(2) // Ensure the large value gets horizontal space first
 
                 Spacer(minLength: 12)
 
                 if shouldShowChart(for: content) {
                     chart(for: content)
                         .frame(width: chartWidth, height: chartHeight)
+                        .layoutPriority(0)
                 }
             }
 
@@ -189,17 +240,30 @@ struct MetricSummaryCard: View {
     private func valueBlock(for content: Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(content.value)
-                    .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
-                    .foregroundStyle(primaryTextColor)
-                    .monospacedDigit()
-                    .minimumScaleFactor(0.8)
-
-                if !content.unit.isEmpty {
-                    Text(content.unit)
-                        .font(.system(size: unitFontSize, weight: .medium, design: .rounded))
-                        .foregroundStyle(secondaryTextColor)
-                        .padding(.bottom, 4)
+                if content.unit.isEmpty {
+                    Text(content.value)
+                        .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
+                        .foregroundStyle(primaryTextColor)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.55)
+                        .layoutPriority(2)
+                } else {
+                    // Render value + unit as a single Text so they stay on one line
+                    // and scale together, preventing vertical stacking of the unit.
+                    (
+                        Text(content.value)
+                            .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
+                            .foregroundStyle(primaryTextColor)
+                            .monospacedDigit()
+                        +
+                        Text(" \(content.unit)")
+                            .font(.system(size: unitFontSize, weight: .medium, design: .rounded))
+                            .foregroundStyle(secondaryTextColor)
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+                    .layoutPriority(2)
                 }
             }
 
@@ -231,23 +295,37 @@ struct MetricSummaryCard: View {
     }
 
     private func chart(for content: Content) -> some View {
-        Chart {
+        let lineColor = colorScheme == .dark ? Color.white.opacity(0.35) : Color.black.opacity(0.35)
+
+        return Chart {
+            // Subtle grey line
             ForEach(content.dataPoints) { point in
                 LineMark(
                     x: .value("Index", point.index),
                     y: .value("Value", point.value)
                 )
-                .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                .foregroundStyle(Gradient(colors: [accentColor.opacity(0.35), accentColor]))
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                .foregroundStyle(lineColor)
                 .interpolationMethod(.catmullRom)
             }
 
+            // Grey dots for all points
+            ForEach(content.dataPoints) { point in
+                PointMark(
+                    x: .value("Index", point.index),
+                    y: .value("Value", point.value)
+                )
+                .symbolSize(12)
+                .foregroundStyle(lineColor)
+            }
+
+            // Accent-colored last point
             if let last = content.dataPoints.last {
                 PointMark(
                     x: .value("Index", last.index),
                     y: .value("Value", last.value)
                 )
-                .symbolSize(36)
+                .symbolSize(18)
                 .foregroundStyle(accentColor)
             }
         }
@@ -255,9 +333,10 @@ struct MetricSummaryCard: View {
         .chartYAxis(.hidden)
         .chartLegend(.hidden)
         .chartYScale(domain: .automatic(includesZero: false))
+        .padding(.vertical, 4)
         .accessibilityLabel(content.chartAccessibilityLabel ?? "Trend chart")
         .accessibilityValue(content.chartAccessibilityValue ?? "Latest value \(content.value) \(content.unit)")
-        .accessibilityHidden(dynamicTypeSize.isAccessibilityCategory)
+        .accessibilityHidden(isAccessibilityCategory)
         .transaction { if reduceMotion { $0.animation = nil } }
     }
 
@@ -279,8 +358,6 @@ struct MetricSummaryCard: View {
                 .shimmer()
         }
     }
-
-    private var loadingView: some View { loadingView() }
 
     private func messageView(message: String, action: CardAction?, iconName: String, isError: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -324,38 +401,27 @@ struct MetricSummaryCard: View {
 
     private func shouldShowChart(for content: Content) -> Bool {
         guard !content.dataPoints.isEmpty else { return false }
-        return !dynamicTypeSize.isAccessibilityCategory
+        return !isAccessibilityCategory
     }
 
     private var chartWidth: CGFloat {
         switch dynamicTypeSize {
-        case .xSmall, .small, .medium: return 200
-        case .large: return 190
-        case .xLarge: return 180
-        case .xxLarge: return 170
-        case .xxxLarge: return 150
+        case .xSmall, .small, .medium: return 150
+        case .large: return 140
+        case .xLarge: return 130
+        case .xxLarge: return 120
+        case .xxxLarge: return 110
         default: return 0 // hidden when in accessibility sizes
         }
     }
 
-    private var backgroundMaterial: some ShapeStyle {
-        if reduceTransparency {
-            return AnyShapeStyle(Color.appCard)
-        }
-        return AnyShapeStyle(.ultraThinMaterial)
-    }
-
-    private var borderOverlay: some View {
-        RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .strokeBorder(borderColor, lineWidth: 1)
-    }
-
     private var borderColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
+        // Increased opacity for better card definition
+        colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10)
     }
 
     private var shadowColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.55) : Color.black.opacity(0.12)
+        colorScheme == .dark ? Color.black.opacity(0.45) : Color.black.opacity(0.12)
     }
 
     private var primaryTextColor: Color {
@@ -452,17 +518,6 @@ struct MetricSummaryCard: View {
     }
 }
 
-// MARK: - MetricSummaryCard Button Style
-
-struct MetricSummaryCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .opacity(configuration.isPressed ? 0.88 : 1.0)
-            .animation(.spring(response: 0.36, dampingFraction: 0.82), value: configuration.isPressed)
-    }
-}
-
 // MARK: - Preview
 
 #Preview("Metric Summary Card States") {
@@ -490,7 +545,6 @@ struct MetricSummaryCardButtonStyle: ButtonStyle {
                     isButtonContext: true
                 )
             }
-            .buttonStyle(MetricSummaryCardButtonStyle())
 
             MetricSummaryCard(
                 icon: "figure.stand",

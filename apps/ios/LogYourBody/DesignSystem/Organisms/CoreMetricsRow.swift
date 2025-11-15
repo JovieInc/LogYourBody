@@ -29,22 +29,37 @@ struct CoreMetricsRow: View {
                 impact.impactOccurred()
             } label: {
                 if let bf = bodyFatPercentage {
-                    DSMetricCard(
-                        value: String(format: "%.1f", bf),
-                        unit: "%",
-                        label: isEstimated ? "Est. Body Fat" : "Body Fat",
-                        trend: bodyFatTrend,
-                        trendType: .negative
+                    MetricSummaryCard(
+                        icon: "percent",
+                        accentColor: .purple,
+                        state: .data(MetricSummaryCard.Content(
+                            title: isEstimated ? "Est. Body Fat" : "Body Fat",
+                            value: String(format: "%.1f", bf),
+                            unit: "%",
+                            timestamp: nil,
+                            dataPoints: [],
+                            chartAccessibilityLabel: nil,
+                            chartAccessibilityValue: nil,
+                            trend: bodyFatTrend.map { trend in
+                                MetricSummaryCard.Trend(
+                                    direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
+                                    valueText: String(format: "%.1f", abs(trend))
+                                )
+                            },
+                            footnote: nil
+                        )),
+                        isButtonContext: true
                     )
                     .scaleEffect(displayMode == .bodyFatChart ? 1.05 : 1.0)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 18)
                             .stroke(displayMode == .bodyFatChart ? Color.liquidAccent : Color.clear, lineWidth: 2)
                     )
                 } else {
-                    DSEmptyMetricCard(
-                        label: "Body Fat",
-                        unit: "%"
+                    MetricSummaryCard(
+                        icon: "percent",
+                        accentColor: .purple,
+                        state: .empty(message: "No body fat data", action: nil)
                     )
                 }
             }
@@ -60,22 +75,37 @@ struct CoreMetricsRow: View {
                 impact.impactOccurred()
             } label: {
                 if let w = weight {
-                    DSMetricCard(
-                        value: formatWeight(w),
-                        unit: weightUnit,
-                        label: "Weight",
-                        trend: weightTrend,
-                        trendType: .neutral
+                    MetricSummaryCard(
+                        icon: "figure.stand",
+                        accentColor: .purple,
+                        state: .data(MetricSummaryCard.Content(
+                            title: "Weight",
+                            value: formatWeight(w),
+                            unit: weightUnit,
+                            timestamp: nil,
+                            dataPoints: [],
+                            chartAccessibilityLabel: nil,
+                            chartAccessibilityValue: nil,
+                            trend: weightTrend.map { trend in
+                                MetricSummaryCard.Trend(
+                                    direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
+                                    valueText: String(format: "%.1f", abs(trend))
+                                )
+                            },
+                            footnote: nil
+                        )),
+                        isButtonContext: true
                     )
                     .scaleEffect(displayMode == .weightChart ? 1.05 : 1.0)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 18)
                             .stroke(displayMode == .weightChart ? Color.liquidAccent : Color.clear, lineWidth: 2)
                     )
                 } else {
-                    DSEmptyMetricCard(
-                        label: "Weight",
-                        unit: weightUnit
+                    MetricSummaryCard(
+                        icon: "figure.stand",
+                        accentColor: .purple,
+                        state: .empty(message: "No weight data", action: nil)
                     )
                 }
             }

@@ -5,7 +5,7 @@
 import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthManager
-    @EnvironmentObject var syncManager: SyncManager
+    @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     @EnvironmentObject var revenueCatManager: RevenueCatManager
     @StateObject private var loadingManager: LoadingManager
     @State private var hasCompletedOnboarding = false
@@ -88,14 +88,14 @@ struct ContentView: View {
                                 }
                         }
                     } else if authManager.needsEmailVerification {
-                        NavigationView {
+                        NavigationStack {
                             EmailVerificationView()
                         }
                         .onAppear {
                             // print("📧 Showing EmailVerificationView")
                         }
                     } else {
-                        NavigationView {
+                        NavigationStack {
                             LoginView()
                         }
                         .onAppear {
@@ -185,5 +185,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environmentObject(AuthManager.shared)
-        .environmentObject(SyncManager.shared)
+        .environmentObject(RealtimeSyncManager.shared)
 }

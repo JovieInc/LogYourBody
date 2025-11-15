@@ -6,7 +6,8 @@ import SwiftUI
 
 struct NameInputView: View {
     @EnvironmentObject var viewModel: OnboardingViewModel
-    @FocusState private var isNameFieldFocused: Bool
+    @FocusState private var isFirstNameFieldFocused: Bool
+    @FocusState private var isLastNameFieldFocused: Bool
     @State private var animateTitle = false
     @State private var animateField = false
     
@@ -61,25 +62,47 @@ struct NameInputView: View {
                     // Name input with Liquid Glass styling
                     VStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Full Name")
+                            Text("First Name")
                                 .font(.system(size: 14, weight: .regular))
                                 .foregroundColor(.appTextSecondary)
                             
-                            TextField("Enter your name", text: $viewModel.data.name)
+                            TextField("First name", text: $viewModel.data.firstName)
                                 .font(.system(size: 17, weight: .regular))
                                 .foregroundColor(.appText)
-                                .focused($isNameFieldFocused)
+                                .focused($isFirstNameFieldFocused)
+                                .textInputAutocapitalization(.words)
+                                .autocorrectionDisabled()
+                                .submitLabel(.next)
+                                .onSubmit {
+                                    isLastNameFieldFocused = true
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 16)
+                                .modifier(NameInputLiquidGlassFieldModifier(isFocused: isFirstNameFieldFocused))
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Last Name")
+                                .font(.system(size: 14, weight: .regular))
+                                .foregroundColor(.appTextSecondary)
+                            
+                            TextField("Last name", text: $viewModel.data.lastName)
+                                .font(.system(size: 17, weight: .regular))
+                                .foregroundColor(.appText)
+                                .focused($isLastNameFieldFocused)
                                 .textInputAutocapitalization(.words)
                                 .autocorrectionDisabled()
                                 .submitLabel(.done)
                                 .onSubmit {
-                                    if !viewModel.data.name.isEmpty {
+                                    let first = viewModel.data.firstName.trimmingCharacters(in: .whitespaces)
+                                    let last = viewModel.data.lastName.trimmingCharacters(in: .whitespaces)
+                                    if !first.isEmpty && !last.isEmpty {
                                         viewModel.nextStep()
                                     }
                                 }
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 16)
-                                .modifier(NameInputLiquidGlassFieldModifier(isFocused: isNameFieldFocused))
+                                .modifier(NameInputLiquidGlassFieldModifier(isFocused: isLastNameFieldFocused))
                         }
                     }
                     .padding(.horizontal, 24)
@@ -90,7 +113,8 @@ struct NameInputView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .onTapGesture {
-                isNameFieldFocused = false
+                isFirstNameFieldFocused = false
+                isLastNameFieldFocused = false
             }
             
             Spacer()
@@ -103,9 +127,20 @@ struct NameInputView: View {
                     action: {
                         viewModel.nextStep()
                     },
-                    isEnabled: !viewModel.data.name.isEmpty
+                    isEnabled: {
+                        let first = viewModel.data.firstName.trimmingCharacters(in: .whitespaces)
+                        let last = viewModel.data.lastName.trimmingCharacters(in: .whitespaces)
+                        return !first.isEmpty && !last.isEmpty
+                    }()
                 )
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: !viewModel.data.name.isEmpty)
+                .animation(
+                    .spring(response: 0.3, dampingFraction: 0.8),
+                    value: {
+                        let first = viewModel.data.firstName.trimmingCharacters(in: .whitespaces)
+                        let last = viewModel.data.lastName.trimmingCharacters(in: .whitespaces)
+                        return !first.isEmpty && !last.isEmpty
+                    }()
+                )
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 50)
@@ -117,7 +152,7 @@ struct NameInputView: View {
             
             // Auto-focus the text field after animations
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                isNameFieldFocused = true
+                isFirstNameFieldFocused = true
             }
         }
     }

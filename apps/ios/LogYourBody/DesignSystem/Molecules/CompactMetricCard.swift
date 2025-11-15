@@ -6,7 +6,16 @@ import SwiftUI
 
 // MARK: - CompactMetricCard Molecule
 
-/// A compact card for secondary metrics with icon
+/// **DEPRECATED**: Use `MetricSummaryCard` from `DesignSystem/Organisms/MetricSummaryCard.swift` instead.
+///
+/// This component has been replaced with a unified, fully polished Apple Health-style component.
+/// MetricSummaryCard automatically adapts sizing and can be used for both primary and secondary metrics.
+///
+/// Migration guide:
+/// - Replace `DSCompactMetricCard` with `MetricSummaryCard`
+/// - Use the `.data(Content(...))` state with proper data binding
+/// - The new component provides better accessibility, state management, and visual polish
+@available(*, deprecated, message: "Use MetricSummaryCard from DesignSystem/Organisms/MetricSummaryCard.swift instead")
 struct DSCompactMetricCard: View {
     let icon: String
     let value: String
