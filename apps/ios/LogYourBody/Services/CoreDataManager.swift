@@ -162,7 +162,34 @@ class CoreDataManager: ObservableObject {
             }
         }
     }
-    
+
+    func markBodyMetricAsDeleted(id: String) {
+        let context = viewContext
+
+        context.perform {
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", id)
+            fetchRequest.fetchLimit = 1
+
+            do {
+                if let metric = try context.fetch(fetchRequest).first {
+                    metric.isMarkedDeleted = true
+                    metric.lastModified = Date()
+                    metric.isSynced = false
+                    metric.syncStatus = "pending"
+
+                    if context.hasChanges {
+                        try context.save()
+                    }
+                }
+            } catch {
+#if DEBUG
+                print("Failed to mark body metric as deleted: \(error)")
+#endif
+            }
+        }
+    }
+
     // MARK: - Async Fetch Methods (Recommended for UI)
 
     /// Async version - does NOT block the main thread
