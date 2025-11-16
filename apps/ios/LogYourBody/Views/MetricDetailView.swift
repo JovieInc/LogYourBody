@@ -33,6 +33,7 @@ struct MetricDetailView: View {
     @State private var isScrubbing: Bool = false
     @State private var lastHapticIndex: Int? = nil
     @State private var isLoadingData: Bool = false
+    @AppStorage(Constants.preferredTimeFormatKey) private var timeFormatPreference = TimeFormatPreference.defaultValue
 
     var body: some View {
         ZStack {
@@ -327,10 +328,8 @@ struct MetricDetailView: View {
     // MARK: - Formatting Helpers
 
     private func formatTimestamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        let preference = TimeFormatPreference(rawValue: timeFormatPreference) ?? .twelveHour
+        return preference.formattedString(for: date, includeDate: true)
     }
 
     private func formatStatValue(_ value: Double?) -> String {

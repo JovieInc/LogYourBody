@@ -29,6 +29,7 @@ struct AllMetricsRow: View {
 
     // Placeholder for navigation
     @State private var selectedMetric: DashboardMetric?
+    @AppStorage(Constants.preferredTimeFormatKey) private var timeFormatPreference = TimeFormatPreference.defaultValue
 
     var body: some View {
         VStack(spacing: 16) {
@@ -276,14 +277,16 @@ struct AllMetricsRow: View {
 
         let calendar = Calendar.current
         if calendar.isDateInToday(lastUpdate) {
-            let formatter = DateFormatter()
-            formatter.timeStyle = .short
-            return formatter.string(from: lastUpdate)
+            return selectedTimeFormat.formattedString(for: lastUpdate)
         } else {
             let formatter = DateFormatter()
             formatter.dateStyle = .short
             return formatter.string(from: lastUpdate)
         }
+    }
+
+    private var selectedTimeFormat: TimeFormatPreference {
+        TimeFormatPreference(rawValue: timeFormatPreference) ?? .twelveHour
     }
 }
 

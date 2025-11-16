@@ -179,6 +179,7 @@ struct DeleteAccountView: View {
                     UserDefaults.standard.removeObject(forKey: Constants.hasCompletedOnboardingKey)
                     UserDefaults.standard.removeObject(forKey: Constants.preferredWeightUnitKey)
                     UserDefaults.standard.removeObject(forKey: Constants.preferredMeasurementSystemKey)
+                    UserDefaults.standard.removeObject(forKey: Constants.preferredTimeFormatKey)
                     UserDefaults.standard.removeObject(forKey: "healthKitSyncEnabled")
 
                     // Sign out

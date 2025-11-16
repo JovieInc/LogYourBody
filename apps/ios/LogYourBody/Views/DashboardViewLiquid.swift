@@ -65,6 +65,12 @@ struct DashboardViewLiquid: View {
     // Preferences
     @AppStorage(Constants.preferredMeasurementSystemKey)
     var measurementSystem = PreferencesView.defaultMeasurementSystem
+    @AppStorage(Constants.preferredTimeFormatKey)
+    private var timeFormatPreference = TimeFormatPreference.defaultValue
+
+    private var selectedTimeFormat: TimeFormatPreference {
+        TimeFormatPreference(rawValue: timeFormatPreference) ?? .twelveHour
+    }
 
     // Timeline mode
     @State private var timelineMode: TimelineMode = .photo
@@ -1905,9 +1911,7 @@ extension DashboardViewLiquid {
 
     private func formatTime(_ date: Date?) -> String? {
         guard let date = date else { return nil }
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        return selectedTimeFormat.formattedString(for: date)
     }
 
     private func formatDate(_ date: Date) -> String {
@@ -2184,6 +2188,7 @@ private struct FullMetricChartView: View {
     @State private var selectedDate: Date?
     @State private var selectedPoint: MetricChartDataPoint?
     @State private var isLoadingData: Bool = false
+    @AppStorage(Constants.preferredTimeFormatKey) private var timeFormatPreference = TimeFormatPreference.defaultValue
 
     var body: some View {
         ZStack {
@@ -2314,12 +2319,13 @@ private struct FullMetricChartView: View {
 
     private var displayDate: String {
         if let point = selectedPoint {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            return formatter.string(from: point.date)
+            return chartTimeFormat.formattedString(for: point.date, includeDate: true)
         }
         return currentDate
+    }
+
+    private var chartTimeFormat: TimeFormatPreference {
+        TimeFormatPreference(rawValue: timeFormatPreference) ?? .twelveHour
     }
 
     private var chartView: some View {

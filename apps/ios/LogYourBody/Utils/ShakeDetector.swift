@@ -123,6 +123,7 @@ class DebugResetManager {
         let keysToRemove = [
             Constants.hasCompletedOnboardingKey,
             Constants.preferredMeasurementSystemKey,
+            Constants.preferredTimeFormatKey,
             "healthKitSyncEnabled",
             "biometricLockEnabled",
             "appleSignInName",

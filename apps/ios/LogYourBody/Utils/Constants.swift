@@ -56,6 +56,7 @@ struct Constants {
     static let currentUserKey = "currentUser"
     static let preferredWeightUnitKey = "preferredWeightUnit"
     static let preferredMeasurementSystemKey = "preferredMeasurementSystem"
+    static let preferredTimeFormatKey = "preferredTimeFormat"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
 
     // Goal Keys

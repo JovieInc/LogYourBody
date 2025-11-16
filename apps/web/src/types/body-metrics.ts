@@ -70,6 +70,7 @@ export interface UserSettings {
     weight?: 'kg' | 'lbs'
     height?: 'cm' | 'ft'
     measurements?: 'cm' | 'in'
+    timeFormat?: '12h' | '24h'
   }
   notifications?: {
     daily_reminder?: boolean

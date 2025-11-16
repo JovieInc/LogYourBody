@@ -34,10 +34,74 @@ enum MeasurementSystem: String, CaseIterable {
     }
 }
 
+enum TimeFormatPreference: String, CaseIterable, Identifiable {
+    case twelveHour = "12-hour"
+    case twentyFourHour = "24-hour"
+
+    static let defaultValue = TimeFormatPreference.twelveHour.rawValue
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .twelveHour:
+            return "12-Hour"
+        case .twentyFourHour:
+            return "24-Hour"
+        }
+    }
+
+    var descriptiveLabel: String {
+        switch self {
+        case .twelveHour:
+            return "12-hour clock (6:30 PM)"
+        case .twentyFourHour:
+            return "24-hour clock (18:30)"
+        }
+    }
+
+    var exampleDisplay: String {
+        switch self {
+        case .twelveHour:
+            return "6:30 PM"
+        case .twentyFourHour:
+            return "18:30"
+        }
+    }
+
+    func formattedString(for date: Date, includeDate: Bool = false) -> String {
+        let formatter = DateFormatter()
+        let template = formatTemplate(includeDate: includeDate)
+
+        if let localizedFormat = DateFormatter.dateFormat(fromTemplate: template, options: 0, locale: Locale.current) {
+            formatter.dateFormat = localizedFormat
+        } else {
+            formatter.dateStyle = includeDate ? .medium : .none
+            formatter.timeStyle = .short
+        }
+
+        return formatter.string(from: date)
+    }
+
+    private func formatTemplate(includeDate: Bool) -> String {
+        switch (self, includeDate) {
+        case (.twentyFourHour, true):
+            return "yMMMd HHmm"
+        case (.twentyFourHour, false):
+            return "HHmm"
+        case (.twelveHour, true):
+            return "yMMMd hmma"
+        case (.twelveHour, false):
+            return "hmma"
+        }
+    }
+}
+
 struct PreferencesView: View {
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var revenueCatManager = RevenueCatManager.shared
     @AppStorage(Constants.preferredMeasurementSystemKey) private var measurementSystem = PreferencesView.defaultMeasurementSystem
+    @AppStorage(Constants.preferredTimeFormatKey) private var timeFormatPreference = TimeFormatPreference.defaultValue
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
     @AppStorage(Constants.deletePhotosAfterImportKey) private var deletePhotosAfterImport = false
@@ -83,6 +147,10 @@ struct PreferencesView: View {
 
     var currentSystem: MeasurementSystem {
         MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+    }
+
+    private var currentTimeFormat: TimeFormatPreference {
+        TimeFormatPreference(rawValue: timeFormatPreference) ?? .twelveHour
     }
     
     private func checkBiometricAvailability() {
@@ -594,9 +662,36 @@ struct PreferencesView: View {
                         }
                         .padding(.horizontal, SettingsDesign.horizontalPadding)
                         .padding(.vertical, SettingsDesign.verticalPadding)
-                        
+
                         Divider()
-                        
+
+                        // Time Format Picker
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Time Format")
+                                    .font(SettingsDesign.titleFont)
+
+                                Spacer()
+
+                                Picker("", selection: $timeFormatPreference) {
+                                    Text(TimeFormatPreference.twelveHour.title)
+                                        .tag(TimeFormatPreference.twelveHour.rawValue)
+                                    Text(TimeFormatPreference.twentyFourHour.title)
+                                        .tag(TimeFormatPreference.twentyFourHour.rawValue)
+                                }
+                                .pickerStyle(SegmentedPickerStyle())
+                                .fixedSize()
+                            }
+
+                            Text(currentTimeFormat.descriptiveLabel)
+                                .font(.system(size: 13))
+                                .foregroundColor(.appTextSecondary)
+                        }
+                        .padding(.horizontal, SettingsDesign.horizontalPadding)
+                        .padding(.vertical, SettingsDesign.verticalPadding)
+
+                        Divider()
+
                         // Weight Unit Display
                         DataInfoRow(
                             icon: "scalemass",

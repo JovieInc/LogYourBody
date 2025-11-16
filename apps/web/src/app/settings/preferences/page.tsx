@@ -29,10 +29,12 @@ export default function PreferencesSettingsPage() {
     units: {
       weight: 'lbs',
       height: 'ft',
-      measurements: 'in'
+      measurements: 'in',
+      timeFormat: '12h'
     }
   })
   const [measurementSystem, setMeasurementSystem] = useState<'imperial' | 'metric'>('imperial')
+  const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>('12h')
   const [faceBlurring, setFaceBlurring] = useState(false)
 
   useEffect(() => {
@@ -61,7 +63,8 @@ export default function PreferencesSettingsPage() {
         units: {
           weight: 'lbs',
           height: 'ft',
-          measurements: 'in'
+          measurements: 'in',
+          timeFormat: prev.units?.timeFormat ?? timeFormat
         }
       }))
     } else {
@@ -70,10 +73,23 @@ export default function PreferencesSettingsPage() {
         units: {
           weight: 'kg',
           height: 'cm',
-          measurements: 'cm'
+          measurements: 'cm',
+          timeFormat: prev.units?.timeFormat ?? timeFormat
         }
       }))
     }
+    setHasChanges(true)
+  }
+
+  const handleTimeFormatChange = (format: '12h' | '24h') => {
+    setTimeFormat(format)
+    setSettings(prev => ({
+      ...prev,
+      units: {
+        ...(prev.units ?? {}),
+        timeFormat: format
+      }
+    }))
     setHasChanges(true)
   }
 
@@ -136,7 +152,7 @@ export default function PreferencesSettingsPage() {
           <CardHeader>
             <CardTitle className="text-linear-text">Units & Measurements</CardTitle>
             <CardDescription className="text-linear-text-secondary">
-              Choose your measurement system
+              Choose your measurement system and preferred clock style
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -172,6 +188,32 @@ export default function PreferencesSettingsPage() {
                     <p>• Measurements: Centimeters (cm)</p>
                   </>
                 )}
+                <p>
+                  • Time: {timeFormat === '24h' ? '24-hour clock (18:30)' : '12-hour clock (6:30 PM)'}
+                </p>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <Label className="text-linear-text">Time Format</Label>
+                <Tabs value={timeFormat} onValueChange={(value) => handleTimeFormatChange(value as '12h' | '24h')}>
+                  <TabsList className="grid w-full grid-cols-2 bg-linear-bg">
+                    <TabsTrigger
+                      value="12h"
+                      className="data-[state=active]:bg-linear-purple data-[state=active]:text-white"
+                    >
+                      12-hour
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="24h"
+                      className="data-[state=active]:bg-linear-purple data-[state=active]:text-white"
+                    >
+                      24-hour
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <p className="text-sm text-linear-text-secondary">
+                  Example: {timeFormat === '24h' ? '18:30' : '6:30 PM'}
+                </p>
               </div>
             </div>
           </CardContent>
