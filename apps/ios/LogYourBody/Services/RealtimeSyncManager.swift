@@ -381,9 +381,10 @@ class RealtimeSyncManager: ObservableObject {
                 "height_unit": profile.heightUnit as Any,
                 "gender": profile.gender as Any,
                 "date_of_birth": profile.dateOfBirth != nil ? ISO8601DateFormatter().string(from: profile.dateOfBirth!) : NSNull(),
-                "activity_level": profile.activityLevel as Any
+                "activity_level": profile.activityLevel as Any,
+                "onboarding_completed": profile.onboardingCompleted
             ]
-            
+
             try await supabaseManager.updateProfile(profileData, token: token)
             
             profile.syncStatus = "synced"

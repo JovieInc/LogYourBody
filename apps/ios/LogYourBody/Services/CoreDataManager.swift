@@ -394,6 +394,9 @@ class CoreDataManager: ObservableObject {
                 cached.activityLevel = profile.activityLevel
                 cached.goalWeight = profile.goalWeight ?? 0
                 cached.goalWeightUnit = profile.goalWeightUnit
+                if let onboardingCompleted = profile.onboardingCompleted {
+                    cached.onboardingCompleted = onboardingCompleted
+                }
                 cached.updatedAt = Date()
                 cached.lastModified = Date()
                 cached.isSynced = false
@@ -758,6 +761,11 @@ class CoreDataManager: ObservableObject {
                 profile.heightUnit = data["height_unit"] as? String
                 profile.gender = data["gender"] as? String
                 profile.activityLevel = data["activity_level"] as? String
+                if let onboardingCompleted = data["onboarding_completed"] as? Bool {
+                    profile.onboardingCompleted = onboardingCompleted
+                } else if let onboardingCompletedInt = data["onboarding_completed"] as? Int {
+                    profile.onboardingCompleted = onboardingCompletedInt != 0
+                }
 
                 if let dateString = data["date_of_birth"] as? String {
                     profile.dateOfBirth = ISO8601DateFormatter().date(from: dateString)
@@ -1148,7 +1156,7 @@ extension CachedProfile {
             activityLevel: activityLevel,
             goalWeight: goalWeight > 0 ? goalWeight : nil,
             goalWeightUnit: goalWeightUnit,
-            onboardingCompleted: nil  // Core Data entity doesn't have this field yet
+            onboardingCompleted: onboardingCompleted
         )
     }
 }
