@@ -153,7 +153,7 @@ struct DashboardView: View {
                                     )
 
                                     // Debug logging
-                                    let _ = print("🔍 FFMI Debug - Weight: \(weight)kg, BF%: \(String(describing: bodyFatResult?.value)) (estimated: \(bodyFatResult?.isEstimated ?? false)), Height: \(String(describing: heightInches))in")
+                                    // print("🔍 FFMI Debug - Weight: \(weight)kg, BF%: \(String(describing: bodyFatResult?.value)) (estimated: \(bodyFatResult?.isEstimated ?? false)), Height: \(String(describing: heightInches))in")
 
                                     if let bodyFat = bodyFatResult?.value,
                                        let ffmi = calculateFFMI(
@@ -161,7 +161,7 @@ struct DashboardView: View {
                                            bodyFat: bodyFat,
                                            heightInches: heightInches
                                        ) {
-                                        let _ = print("✅ FFMI calculated: \(ffmi)")
+                                        // print("✅ FFMI calculated: \(ffmi)")
                                         let isEstimated = bodyFatResult?.isEstimated ?? false
 
                                         VStack(spacing: 4) {
@@ -178,7 +178,7 @@ struct DashboardView: View {
                                         }
                                         .frame(maxWidth: .infinity)
                                     } else {
-                                        let _ = print("❌ FFMI calculation returned nil")
+                                        // print("❌ FFMI calculation returned nil")
                                     }
                                 }
 

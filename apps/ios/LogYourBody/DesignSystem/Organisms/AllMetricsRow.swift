@@ -293,7 +293,7 @@ struct AllMetricsRow: View {
     ScrollView {
         AllMetricsRow(
             userId: "preview-user",
-            steps: 8432,
+            steps: 8_432,
             weight: 75.0,  // kg
             bodyFat: 18.2,
             ffmi: 21.4,

@@ -8,7 +8,8 @@ struct ContentView: View {
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     @EnvironmentObject var revenueCatManager: RevenueCatManager
     @StateObject private var loadingManager: LoadingManager
-    @State private var hasCompletedOnboarding = false
+    private let onboardingStateManager = OnboardingStateManager.shared
+    @State private var hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion
     @State private var isLoadingComplete = false
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
@@ -38,10 +39,7 @@ struct ContentView: View {
     }
     
     private var shouldShowOnboarding: Bool {
-        // Show onboarding if:
-        // 1. User hasn't completed onboarding OR
-        // 2. User profile is incomplete
-        return !hasCompletedOnboarding || !isProfileComplete
+        return !hasCompletedOnboarding
     }
     
     var body: some View {
@@ -69,11 +67,6 @@ struct ContentView: View {
                     if authManager.isAuthenticated {
                         if shouldShowOnboarding {
                             OnboardingContainerView()
-                                .onAppear {
-                                    // print("🎯 Showing OnboardingContainerView")
-                                    // print("   Profile complete: \(isProfileComplete)")
-                                    // print("   Onboarding completed: \(hasCompletedOnboarding)")
-                                }
                         } else if !revenueCatManager.isSubscribed {
                             PaywallView()
                                 .environmentObject(authManager)
@@ -108,7 +101,7 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         // Toast presenter removed - handle notifications at view level
-        .sheet(isPresented: $showLegalConsent) {
+        .fullScreenCover(isPresented: $showLegalConsent) {
             LegalConsentView(
                 isPresented: $showLegalConsent,
                 userId: authManager.pendingAppleUserId ?? "",
@@ -119,17 +112,16 @@ struct ContentView: View {
             .interactiveDismissDisabled(true) // Prevent dismissing without accepting
         }
         .onAppear {
-            // Initialize onboarding status from UserDefaults
-            hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Constants.hasCompletedOnboardingKey)
+            // Initialize onboarding status
+            hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
 
             // Fallback: Check profile if UserDefaults doesn't have it
-            if !hasCompletedOnboarding, let profile = authManager.currentUser?.profile {
-                if let profileOnboardingCompleted = profile.onboardingCompleted, profileOnboardingCompleted {
-                    // Sync from profile to UserDefaults
-                    hasCompletedOnboarding = true
-                    UserDefaults.standard.set(true, forKey: Constants.hasCompletedOnboardingKey)
-                    print("✅ ContentView: Synced onboarding status from profile to UserDefaults")
-                }
+            if !hasCompletedOnboarding,
+               let profileOnboardingCompleted = authManager.currentUser?.profile?.onboardingCompleted,
+               profileOnboardingCompleted {
+                onboardingStateManager.markCompleted()
+                hasCompletedOnboarding = true
+        // print("✅ ContentView: Synced onboarding status from profile to onboarding manager")
             }
 
             // Start loading process
@@ -143,14 +135,12 @@ struct ContentView: View {
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
-            // Update onboarding status when UserDefaults changes
-            hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Constants.hasCompletedOnboardingKey)
+        .onReceive(NotificationCenter.default.publisher(for: OnboardingStateManager.onboardingStateDidChange)) { _ in
+            hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
         }
         .onChange(of: authManager.isAuthenticated) { _, _ in
             // print("🔄 Authentication state changed to: \(newValue)")
             // print("🔄 Should show onboarding: \(shouldShowOnboarding)")
-            // print("🔄 Profile complete: \(isProfileComplete)")
             // print("🔄 Onboarding completed: \(hasCompletedOnboarding)")
             // print("🔄 isLoadingComplete: \(isLoadingComplete)")
             // print("🔄 Current user: \(authManager.currentUser?.email ?? "nil")")
@@ -158,10 +148,12 @@ struct ContentView: View {
         }
         .onChange(of: authManager.currentUser?.profile?.onboardingCompleted) { _, newValue in
             // Sync onboarding status from profile when it changes
-            if let profileOnboardingCompleted = newValue, profileOnboardingCompleted, !hasCompletedOnboarding {
-                hasCompletedOnboarding = true
-                UserDefaults.standard.set(true, forKey: Constants.hasCompletedOnboardingKey)
-                print("✅ ContentView: Synced onboarding status from profile update")
+            if let profileOnboardingCompleted = newValue {
+                onboardingStateManager.updateCompletionStatus(profileOnboardingCompleted)
+                hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
+                if profileOnboardingCompleted {
+        // print("✅ ContentView: Synced onboarding status from profile update")
+                }
             }
         }
         .onChange(of: hasCompletedOnboarding) { _, newValue in

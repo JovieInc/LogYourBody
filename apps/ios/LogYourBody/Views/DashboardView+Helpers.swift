@@ -87,7 +87,7 @@ extension DashboardView {
                 await syncStepsFromHealthKit()
             } catch {
                 // Log error but continue with sync
-                print("HealthKit sync error during refresh: \(error)")
+        // print("HealthKit sync error during refresh: \(error)")
                 hasErrors = true
             }
         }

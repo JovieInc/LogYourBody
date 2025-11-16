@@ -127,10 +127,10 @@ struct DashboardHeader: View {
             dailySteps: 8_421,
             isSyncing: true,
             onAvatarTap: {
-                print("Avatar tapped")
+        // print("Avatar tapped")
             },
             onStepsTap: {
-                print("Steps tapped")
+        // print("Steps tapped")
             }
         )
         

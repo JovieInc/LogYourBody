@@ -50,6 +50,7 @@
 		AD050C4F2EC135360082A313 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C4E2EC135360082A313 /* RevenueCat */; };
 		AD050C512EC135360082A313 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C502EC135360082A313 /* RevenueCatUI */; };
 		AD0B7BF52EC552FA008B29E7 /* LogYourBody.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */; };
+		ADFC6A2D2E188FD5004FCE40 /* HKRawSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */; };
 		AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */; };
 		AD0B7BF92EC692FB008B29E7 /* MetricDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BF82EC692FB008B29E7 /* MetricDetailView.swift */; };
 		AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */; };
@@ -60,6 +61,7 @@
 		AD723B172E15FA5D002376C6 /* icon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = AD722F102E15FA5A002376C6 /* icon-1024.png */; };
 		AD723B1C2E15FA5D002376C6 /* generate_app_icons.sh in Resources */ = {isa = PBXBuildFile; fileRef = AD722F162E15FA5A002376C6 /* generate_app_icons.sh */; };
 		AD7243242E15FA5D002376C6 /* setup-local-testing.sh in Resources */ = {isa = PBXBuildFile; fileRef = AD723ACC2E15FA5C002376C6 /* setup-local-testing.sh */; };
+		AD72432A2F01234500ABCDEF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AD7D30992E1490810072AA5B /* Assets.xcassets */; };
 		AD7243322E15FA5D002376C6 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AD723ADD2E15FA5C002376C6 /* Preview Assets.xcassets */; };
 		AD7243332E15FA5D002376C6 /* app-icon-180.png in Resources */ = {isa = PBXBuildFile; fileRef = AD723AE12E15FA5C002376C6 /* app-icon-180.png */; };
 		AD7243592E15FA5E002376C6 /* Config.xcconfig.example in Resources */ = {isa = PBXBuildFile; fileRef = AD723B0D2E15FA5C002376C6 /* Config.xcconfig.example */; };
@@ -165,6 +167,7 @@
 		ADDC47C32E2D89F3003C97E7 /* BackgroundPhotoUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF5C1B52E1CF89E00E3FB4D /* BackgroundPhotoUploadService.swift */; };
 		ADDC47C42E2D89F3003C97E7 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AE72E15FA5C002376C6 /* HealthKitManager.swift */; };
 		ADDC47C52E2D89F3003C97E7 /* LoadingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AE82E15FA5C002376C6 /* LoadingManager.swift */; };
+		ADF0A8B12FFD0A0E007C0A5C /* OnboardingStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF0A8B02FFD0A0E007C0A5C /* OnboardingStateManager.swift */; };
 		ADDC47C62E2D89F3003C97E7 /* SupabaseDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */; };
 		ADDC47C72E2D89F3003C97E7 /* SyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AEC2E15FA5C002376C6 /* SyncManager.swift */; };
 		ADDC47C82E2D89F3003C97E7 /* LiquidGlassComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D39B2E24AD30001F82A8 /* LiquidGlassComponents.swift */; };
@@ -334,7 +337,7 @@
 		AD0054F32E2228F70029E0FF /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
 		AD050C402EBFD8160082A313 /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HapticManager.swift; path = LogYourBody/Utilities/HapticManager.swift; sourceTree = SOURCE_ROOT; };
 		AD050C422EBFFEE50082A313 /* DashboardDisplayMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardDisplayMode.swift; sourceTree = "<group>"; };
-		AD050C442EBFFEF60082A313 /* MetricChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MetricChartView.swift; path = Components/MetricChartView.swift; sourceTree = "<group>"; };
+		AD050C442EBFFEF60082A313 /* MetricChartView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricChartView.swift; path = Components/MetricChartView.swift; sourceTree = "<group>"; };
 		AD050C482EC12E390082A313 /* RevenueCatManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueCatManager.swift; sourceTree = "<group>"; };
 		AD050C4A2EC12E590082A313 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = LogYourBody.storekit; sourceTree = "<group>"; };
@@ -377,6 +380,7 @@
 		AD723AE62E15FA5C002376C6 /* CoreDataManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CoreDataManager.swift; sourceTree = "<group>"; };
 		AD723AE72E15FA5C002376C6 /* HealthKitManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
 		AD723AE82E15FA5C002376C6 /* LoadingManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingManager.swift; sourceTree = "<group>"; };
+		ADF0A8B02FFD0A0E007C0A5C /* OnboardingStateManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OnboardingStateManager.swift; sourceTree = "<group>"; };
 		AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseDataClient.swift; sourceTree = "<group>"; };
 		AD723AEC2E15FA5C002376C6 /* SyncManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SyncManager.swift; sourceTree = "<group>"; };
 		AD723AEE2E15FA5C002376C6 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
@@ -438,7 +442,7 @@
 		AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskMonitor.swift; sourceTree = "<group>"; };
 		AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskDetailsSheet.swift; sourceTree = "<group>"; };
 		AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewLiquid.swift; sourceTree = "<group>"; };
-		AD88723F2EB87EF80041C426 /* DashboardViewSimple.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewSimple.swift; sourceTree = "<group>"; };
+		ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HKRawSample.swift; sourceTree = "<group>"; };
 		AD8872422EB87F290041C426 /* ProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProgressRing.swift; path = Components/ProgressRing.swift; sourceTree = "<group>"; };
 		AD8872442EB87F480041C426 /* LiquidGlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LiquidGlassCard.swift; path = DesignSystem/Atoms/LiquidGlassCard.swift; sourceTree = "<group>"; };
 		AD8872462EB9461D0041C426 /* MetricsInterpolationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsInterpolationService.swift; sourceTree = "<group>"; };
@@ -798,6 +802,7 @@
 				ADDC48642E2D8A33003C97E7 /* LogYourBody.xcdatamodeld */,
 				AD85525F2E19DC44003552EE /* Changelog.swift */,
 				AD723AD52E15FA5C002376C6 /* BodyMetrics.swift */,
+				ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */,
 				ADE146432EBF05E000B64DA0 /* TimelineMode.swift */,
 				AD723AD62E15FA5C002376C6 /* DailyLog.swift */,
 				AD723AD72E15FA5C002376C6 /* DailyMetrics.swift */,
@@ -853,6 +858,7 @@
 				ADF5C1B52E1CF89E00E3FB4D /* BackgroundPhotoUploadService.swift */,
 				AD723AE72E15FA5C002376C6 /* HealthKitManager.swift */,
 				AD723AE82E15FA5C002376C6 /* LoadingManager.swift */,
+				ADF0A8B02FFD0A0E007C0A5C /* OnboardingStateManager.swift */,
 				AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */,
 				AD723AEC2E15FA5C002376C6 /* SyncManager.swift */,
 			);
@@ -1360,6 +1366,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AD72432A2F01234500ABCDEF /* Assets.xcassets in Resources */,
 				AD72435C2E15FA5E002376C6 /* LaunchScreen.storyboard in Resources */,
 				AD7243322E15FA5D002376C6 /* Preview Assets.xcassets in Resources */,
 				AD723B172E15FA5D002376C6 /* icon-1024.png in Resources */,
@@ -1428,6 +1435,7 @@
 				ADDC48942E2D8A73003C97E7 /* NameInputView.swift in Sources */,
 				ADDC47A72E2D89F3003C97E7 /* Changelog.swift in Sources */,
 				ADDC47A82E2D89F3003C97E7 /* BodyMetrics.swift in Sources */,
+				ADFC6A2D2E188FD5004FCE40 /* HKRawSample.swift in Sources */,
 				ADDC47A92E2D89F3003C97E7 /* DailyLog.swift in Sources */,
 				ADDC47AA2E2D89F3003C97E7 /* DailyMetrics.swift in Sources */,
 				ADDC47AB2E2D89F3003C97E7 /* LogYourBody.xcdatamodeld in Sources */,
@@ -1470,6 +1478,7 @@
 				ADDC47C32E2D89F3003C97E7 /* BackgroundPhotoUploadService.swift in Sources */,
 				ADDC47C42E2D89F3003C97E7 /* HealthKitManager.swift in Sources */,
 				ADDC47C52E2D89F3003C97E7 /* LoadingManager.swift in Sources */,
+				ADF0A8B12FFD0A0E007C0A5C /* OnboardingStateManager.swift in Sources */,
 				ADDC47C62E2D89F3003C97E7 /* SupabaseDataClient.swift in Sources */,
 				ADDC47C72E2D89F3003C97E7 /* SyncManager.swift in Sources */,
 				ADDC47C82E2D89F3003C97E7 /* LiquidGlassComponents.swift in Sources */,
@@ -1792,6 +1801,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = LogYourBody/LogYourBody.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 20251104164617;
@@ -1827,6 +1837,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = LogYourBody/LogYourBody.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 20251104164617;

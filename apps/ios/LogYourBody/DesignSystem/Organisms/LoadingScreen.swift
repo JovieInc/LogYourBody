@@ -127,7 +127,7 @@ struct CompactLoadingScreen: View {
             progress: .constant(0.6),
             loadingStatus: .constant("Loading user data..."),
             onComplete: {
-                print("Loading complete")
+        // print("Loading complete")
             }
         )
     }

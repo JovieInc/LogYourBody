@@ -57,6 +57,7 @@ struct Constants {
     static let preferredWeightUnitKey = "preferredWeightUnit"
     static let preferredMeasurementSystemKey = "preferredMeasurementSystem"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
+    static let onboardingCompletedVersionKey = "onboardingCompletedVersion"
 
     // Goal Keys
     static let goalBodyFatPercentageKey = "goalBodyFatPercentage"

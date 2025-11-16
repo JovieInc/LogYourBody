@@ -130,7 +130,7 @@ class ImageCacheService: ObservableObject {
             return optimizedImage
 
         } catch {
-            print("[ImageCacheService] Failed to load image from \(urlString): \(error)")
+        // print("[ImageCacheService] Failed to load image from \(urlString): \(error)")
             return nil
         }
     }

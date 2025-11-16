@@ -86,6 +86,67 @@ class HealthKitManager: ObservableObject {
             }
         }
     }
+
+    private func persistHealthKitSamples(_ samples: [HKQuantitySample], unit: HKUnit) {
+        guard !samples.isEmpty else { return }
+
+        Task.detached(priority: .background) { [weak self] in
+            guard let self = self else { return }
+            guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else { return }
+
+            for sample in samples {
+                let metadata = self.metadataDictionary(from: sample.metadata)
+                let hkSample = HKRawSample(
+                    id: UUID().uuidString,
+                    userId: userId,
+                    hkUUID: sample.uuid.uuidString,
+                    quantityType: sample.quantityType.identifier,
+                    value: sample.quantity.doubleValue(for: unit),
+                    unit: unit.unitString,
+                    startDate: sample.startDate,
+                    endDate: sample.endDate,
+                    sourceName: sample.sourceRevision.source.name,
+                    sourceBundleId: sample.sourceRevision.source.bundleIdentifier,
+                    deviceManufacturer: sample.device?.manufacturer,
+                    deviceModel: sample.device?.model,
+                    deviceHardwareVersion: sample.device?.hardwareVersion,
+                    deviceFirmwareVersion: sample.device?.firmwareVersion,
+                    deviceSoftwareVersion: sample.device?.softwareVersion,
+                    deviceLocalIdentifier: sample.device?.localIdentifier,
+                    deviceUDI: sample.device?.udiDeviceIdentifier,
+                    metadata: metadata,
+                    createdAt: Date(),
+                    updatedAt: Date()
+                )
+
+                await CoreDataManager.shared.saveHKSample(hkSample)
+            }
+        }
+    }
+
+    private func metadataDictionary(from metadata: [String: Any]?) -> [String: String]? {
+        guard let metadata = metadata else { return nil }
+        var result: [String: String] = [:]
+
+        let formatter = ISO8601DateFormatter()
+
+        for (key, value) in metadata {
+            switch value {
+            case let string as String:
+                result[key] = string
+            case let number as NSNumber:
+                result[key] = number.stringValue
+            case let date as Date:
+                result[key] = formatter.string(from: date)
+            case let bool as Bool:
+                result[key] = bool ? "true" : "false"
+            default:
+                result[key] = "\(value)"
+            }
+        }
+
+        return result.isEmpty ? nil : result
+    }
     
     // Request authorization
     func requestAuthorization() async -> Bool {
@@ -211,7 +272,10 @@ class HealthKitManager: ObservableObject {
                     return
                 }
                 
-                let results = (samples as? [HKQuantitySample] ?? []).map { sample in
+                let hkSamples = samples as? [HKQuantitySample] ?? []
+                persistHealthKitSamples(hkSamples, unit: HKUnit.gramUnit(with: .kilo))
+
+                let results = hkSamples.map { sample in
                     let weightInKg = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
                     return (weight: weightInKg, date: sample.startDate)  // Return in kg
                 }
@@ -244,6 +308,7 @@ class HealthKitManager: ObservableObject {
                 }
                 
                 if let sample = samples?.first as? HKQuantitySample {
+                    persistHealthKitSamples([sample], unit: HKUnit.percent())
                     let percentage = sample.quantity.doubleValue(for: HKUnit.percent()) * 100 // Convert to percentage
                     continuation.resume(returning: (percentage, sample.startDate))
                 } else {
@@ -281,7 +346,10 @@ class HealthKitManager: ObservableObject {
                     return
                 }
                 
-                let results = (samples as? [HKQuantitySample] ?? []).map { sample in
+                let hkSamples = samples as? [HKQuantitySample] ?? []
+                persistHealthKitSamples(hkSamples, unit: HKUnit.percent())
+
+                let results = hkSamples.map { sample in
                     let percentage = sample.quantity.doubleValue(for: HKUnit.percent()) * 100
                     return (percentage: percentage, date: sample.startDate)
                 }
@@ -539,6 +607,8 @@ class HealthKitManager: ObservableObject {
                 var weightEntries: [WeightEntry] = []
                 
                 if let samples = samples as? [HKQuantitySample] {
+                    persistHealthKitSamples(samples, unit: unit)
+
                     for sample in samples {
                         // Get weight in the user's preferred unit
                         let unit = UserDefaults.standard.string(forKey: Constants.preferredWeightUnitKey) == "kg" ? HKUnit.gramUnit(with: .kilo) : HKUnit.pound()

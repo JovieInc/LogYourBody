@@ -10,6 +10,105 @@ import SwiftUI
 import PhotosUI
 import Charts
 
+private struct SyncBannerState {
+    enum Style {
+        case success
+        case error
+    }
+
+    let style: Style
+    let detail: String?
+}
+
+private struct MetricRangeStats {
+    let startValue: Double
+    let endValue: Double
+    let delta: Double
+    let average: Double
+    let percentageChange: Double
+}
+
+private func computeRangeStats(
+    metrics: [BodyMetrics],
+    valueProvider: (BodyMetrics) -> Double?
+) -> MetricRangeStats? {
+    let sortedMetrics = metrics.sorted { $0.date < $1.date }
+    let dataPoints: [(date: Date, value: Double)] = sortedMetrics.compactMap { metric in
+        guard let value = valueProvider(metric) else { return nil }
+        return (metric.date, value)
+    }
+
+    guard let first = dataPoints.first, let last = dataPoints.last, !dataPoints.isEmpty else {
+        return nil
+    }
+
+    let total = dataPoints.reduce(0) { partialResult, point in
+        partialResult + point.value
+    }
+
+    let average = total / Double(dataPoints.count)
+    let delta = last.value - first.value
+    let percentageChange: Double
+
+    if abs(first.value) < .leastNormalMagnitude {
+        percentageChange = 0
+    } else {
+        percentageChange = (delta / first.value) * 100
+    }
+
+    return MetricRangeStats(
+        startValue: first.value,
+        endValue: last.value,
+        delta: delta,
+        average: average,
+        percentageChange: percentageChange
+    )
+}
+
+private struct MetricSeriesStats {
+    let average: Double
+    let delta: Double
+    let percentageChange: Double
+}
+
+private func makeTrend(delta: Double, unit: String, range: TimeRange) -> MetricSummaryCard.Trend? {
+    guard abs(delta) > 0.001 else {
+        return MetricSummaryCard.Trend(direction: .flat, valueText: "No change", caption: range.rawValue)
+    }
+
+    let direction: MetricSummaryCard.Trend.Direction = delta > 0 ? .up : .down
+    let formattedDelta = formatDelta(delta: delta, unit: unit)
+    let caption = "vs \(range.rawValue)"
+    return MetricSummaryCard.Trend(direction: direction, valueText: formattedDelta, caption: caption)
+}
+
+private func formatDelta(delta: Double, unit: String) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    formatter.maximumFractionDigits = unit == "%" ? 1 : 1
+    formatter.minimumFractionDigits = 0
+
+    let value = formatter.string(from: NSNumber(value: abs(delta))) ?? String(format: "%.1f", abs(delta))
+    let prefix = delta > 0 ? "+" : "–"
+    if unit.isEmpty {
+        return "\(prefix)\(value)"
+    }
+    return "\(prefix)\(value)\(unit == "%" ? unit : " \(unit)")"
+}
+
+private func formatAverageFootnote(value: Double, unit: String) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    formatter.maximumFractionDigits = unit == "%" ? 1 : 1
+    formatter.minimumFractionDigits = 0
+
+    let formatted = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.1f", value)
+    if unit.isEmpty {
+        return "\(formatted) average"
+    }
+    return "\(formatted) \(unit) average"
+}
+
 enum DisplayMode: String, CaseIterable, Identifiable {
     case photo
     case metrics
@@ -49,7 +148,11 @@ struct DashboardViewLiquid: View {
     @State private var isUploadingPhoto = false
     @State private var animatingPlaceholder = false
     @State private var showAddEntrySheet = false
+    @State private var selectedRange: TimeRange = .month1
     @State private var showSyncDetails = false
+    @State private var syncBannerState: SyncBannerState?
+    @State private var syncBannerDismissTask: Task<Void, Never>?
+    @State private var previousSyncStatus: RealtimeSyncManager.SyncStatus = .idle
 
     // Animated metric values for tweening
     @State private var animatedWeight: Double = 0
@@ -57,7 +160,7 @@ struct DashboardViewLiquid: View {
     @State private var animatedFFMI: Double = 0
 
     // Goals - Optional values, nil means use gender-based default
-    @AppStorage("stepGoal") var stepGoal: Int = 10000
+    @AppStorage("stepGoal") var stepGoal: Int = 10_000
     @AppStorage(Constants.goalFFMIKey) var customFFMIGoal: Double?
     @AppStorage(Constants.goalBodyFatPercentageKey) var customBodyFatGoal: Double?
     @AppStorage(Constants.goalWeightKey) var customWeightGoal: Double?
@@ -172,42 +275,20 @@ struct DashboardViewLiquid: View {
                 // Empty state
                 emptyState
             } else {
-                // Main content: Home (photo dashboard) vs Metric (metrics stack)
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        // 1. Compact header (user info + status)
-                        compactHeader
-                            .padding(.horizontal, 20)
-
-                        if case .error = realtimeSyncManager.syncStatus {
-                            syncErrorBanner
-                                .padding(.horizontal, 20)
+                TabView(selection: $displayMode) {
+                    tabContent(for: .photo)
+                        .tag(DisplayMode.photo)
+                        .tabItem {
+                            Label("Home", systemImage: "house.fill")
                         }
 
-                        if displayMode == .photo {
-                            if let metric = currentMetric {
-                                heroCard(metric: metric)
-                                    .padding(.horizontal, 20)
-                            }
-
-                            timelineScrubber
-                                .padding(.top, 4)
-                                .padding(.horizontal, 20)
-
-                            metricsRow
-                                .padding(.horizontal, 20)
-                        } else {
-                            // Metric mode: metrics stack
-                            metricsView
+                    tabContent(for: .metrics)
+                        .tag(DisplayMode.metrics)
+                        .tabItem {
+                            Label("Metric", systemImage: "chart.bar.fill")
                         }
-
-                        Spacer(minLength: 80) // Bottom controls clearance
-                    }
-                    .padding(.top, 8)
                 }
-                .refreshable {
-                    await refreshData()
-                }
+                .tint(Color(hex: "#6EE7F0"))
             }
         }
         .onAppear {
@@ -221,6 +302,16 @@ struct DashboardViewLiquid: View {
             Task {
                 await refreshData()
             }
+
+            previousSyncStatus = realtimeSyncManager.syncStatus
+            handleSyncStatusChange(from: realtimeSyncManager.syncStatus, to: realtimeSyncManager.syncStatus)
+        }
+        .onDisappear {
+            syncBannerDismissTask?.cancel()
+        }
+        .onChange(of: realtimeSyncManager.syncStatus) { oldStatus, newStatus in
+            previousSyncStatus = oldStatus
+            handleSyncStatusChange(from: oldStatus, to: newStatus)
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)) { _ in
             // Only reload if NOT currently syncing (prevents constant UI updates)
@@ -266,27 +357,39 @@ struct DashboardViewLiquid: View {
         .fullScreenCover(isPresented: $showFullMetricChart) {
             fullMetricChartView
         }
-        .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 16) {
-                displayModeToggle
-                    .frame(maxWidth: 220)
+    }
 
-                Spacer()
+    private func tabContent(for mode: DisplayMode) -> some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 16) {
+                compactHeader
+                    .padding(.horizontal, 20)
 
-                Button(action: {
-                    showAddEntrySheet = true
-                }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .semibold))
-                        .padding(14)
+                syncStatusBanner
+                    .padding(.horizontal, 20)
+
+                if mode == .photo {
+                    if let metric = currentMetric {
+                        heroCard(metric: metric)
+                            .padding(.horizontal, 20)
+                    }
+
+                    timelineScrubber
+                        .padding(.top, 4)
+                        .padding(.horizontal, 20)
+
+                    metricsRow
+                        .padding(.horizontal, 20)
+                } else {
+                    metricsView
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.circle)
-                .tint(Color(hex: "#6EE7F0"))
+
+                Spacer(minLength: 120)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
+            .padding(.top, 8)
+        }
+        .refreshable {
+            await refreshData()
         }
     }
 
@@ -464,7 +567,7 @@ struct DashboardViewLiquid: View {
     }
 
     private var syncStatusTitle: String {
-        if realtimeSyncManager.isSyncing {
+        if realtimeSyncManager.isSyncing || realtimeSyncManager.syncStatus == .syncing {
             return "Syncing…"
         }
 
@@ -472,30 +575,25 @@ struct DashboardViewLiquid: View {
         case .offline:
             return "Offline"
         case .error:
-            return "Sync issue"
-        case .success:
+            // Keep header copy neutral; red banner handles the explicit error messaging
+            return "Sync"
+        case .success, .idle:
             return "Synced"
         case .syncing:
             return "Syncing…"
-        case .idle:
-            return "Synced"
         }
     }
 
     private var syncStatusDetail: String? {
-        if !realtimeSyncManager.isOnline {
-            return "Changes will sync when online"
+        // Offline messaging stays inline, since the banner is reserved for hard errors
+        if !realtimeSyncManager.isOnline || realtimeSyncManager.syncStatus == .offline {
+            return "Offline · changes queued"
         }
 
-        if let error = realtimeSyncManager.error, !error.isEmpty {
-            return "Tap to retry"
-        }
-
-        if let last = realtimeSyncManager.lastSyncDate {
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .short
-            let relative = formatter.localizedString(for: last, relativeTo: Date())
-            return "Last sync: \(relative)"
+        // For healthy states, show explicit last-sync time (time-of-day) if available
+        if let timeString = lastSyncClockText(),
+           realtimeSyncManager.syncStatus == .success || realtimeSyncManager.syncStatus == .idle {
+            return "Last synced: \(timeString)"
         }
 
         return nil
@@ -521,40 +619,43 @@ struct DashboardViewLiquid: View {
     }
 
     @ViewBuilder
-    private var syncErrorBanner: some View {
-        if case .error = realtimeSyncManager.syncStatus {
-            Button {
-                realtimeSyncManager.syncAll()
-            } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Sync failed. Tap to retry.")
+    private var syncStatusBanner: some View {
+        if let banner = syncBannerState {
+            let content = VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: banner.style == .error ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text(banner.style == .error ? "Sync failed. Tap to retry." : "Back in sync")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
-
-                    if let last = realtimeSyncManager.lastSyncDate {
-                        Text("Last successful sync: \(relativeLastSyncText(from: last))")
-                            .font(.system(size: 11, weight: .regular))
-                            .foregroundColor(Color.white.opacity(0.9))
-                    }
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    LinearGradient(
-                        colors: [Color.red.opacity(0.85), Color.red.opacity(0.7)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.25), lineWidth: 0.5)
-                )
+                .foregroundColor(.white)
+
+                if let detail = banner.detail {
+                    Text(detail)
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundColor(Color.white.opacity(0.9))
+                }
             }
-            .buttonStyle(PlainButtonStyle())
-        } else {
-            EmptyView()
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(bannerBackground(for: banner.style))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+            )
+            .cornerRadius(12)
+            .transition(.move(edge: .top).combined(with: .opacity))
+
+            if banner.style == .error {
+                Button {
+                    realtimeSyncManager.syncAll()
+                } label: {
+                    content
+                }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                content
+            }
         }
     }
 
@@ -564,12 +665,76 @@ struct DashboardViewLiquid: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 
+    private func handleSyncStatusChange(from oldStatus: RealtimeSyncManager.SyncStatus, to newStatus: RealtimeSyncManager.SyncStatus) {
+        syncBannerDismissTask?.cancel()
+
+        if newStatus == .error {
+            let detail: String?
+            if let message = realtimeSyncManager.error, !message.isEmpty {
+                detail = message
+            } else if let last = lastSyncClockText() {
+                detail = "Last successful sync: \(last)"
+            } else {
+                detail = nil
+            }
+
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                syncBannerState = SyncBannerState(style: .error, detail: detail)
+            }
+        } else if oldStatus == .error && (newStatus == .success || newStatus == .idle) {
+            let detail = lastSyncClockText().map { "Synced at \($0)" }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                syncBannerState = SyncBannerState(style: .success, detail: detail)
+            }
+
+            syncBannerDismissTask = Task { [weak syncBannerState] in
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                await MainActor.run {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        if self.syncBannerState?.style == .success {
+                            self.syncBannerState = nil
+                        }
+                    }
+                }
+            }
+        } else {
+            withAnimation(.easeOut(duration: 0.2)) {
+                syncBannerState = nil
+            }
+        }
+    }
+
+    private func lastSyncClockText() -> String? {
+        guard let last = realtimeSyncManager.lastSyncDate else { return nil }
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+        return formatter.string(from: last)
+    }
+
     @ViewBuilder
     private var syncDetailsSheet: some View {
         SyncDetailsSheet(
             isPresented: $showSyncDetails,
             syncManager: realtimeSyncManager
         )
+    }
+
+    private func bannerBackground(for style: SyncBannerState.Style) -> LinearGradient {
+        switch style {
+        case .error:
+            return LinearGradient(
+                colors: [Color.red.opacity(0.9), Color.red.opacity(0.7)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        case .success:
+            return LinearGradient(
+                colors: [Color.green.opacity(0.85), Color.green.opacity(0.7)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
     }
 
     private func retrySync() {
@@ -654,50 +819,6 @@ struct DashboardViewLiquid: View {
         }
     }
 
-    // MARK: - Display Mode Toggle
-
-    private var displayModeToggle: some View {
-        HStack(spacing: 8) {
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    displayMode = .photo
-                }
-                let impact = UIImpactFeedbackGenerator(style: .medium)
-                impact.impactOccurred()
-            } label: {
-                Image(systemName: "house.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(displayMode == .photo ? .black : .white.opacity(0.7))
-                    .frame(width: 40, height: 40)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(displayMode == .photo ? Color.white : Color.white.opacity(0.08))
-                    )
-            }
-            .buttonStyle(PlainButtonStyle())
-
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    displayMode = .metrics
-                }
-                let impact = UIImpactFeedbackGenerator(style: .medium)
-                impact.impactOccurred()
-            } label: {
-                Image(systemName: "chart.bar.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(displayMode == .metrics ? .black : .white.opacity(0.7))
-                    .frame(width: 40, height: 40)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(displayMode == .metrics ? Color.white : Color.white.opacity(0.08))
-                    )
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .padding(4)
-        .background(.ultraThinMaterial, in: Capsule())
-    }
-
     // MARK: - Hero Card
 
     private var noPhotoPlaceholder: some View {
@@ -737,7 +858,7 @@ struct DashboardViewLiquid: View {
                             .clipped()
                     case .failure(let error):
                         // Log error and show placeholder
-                        let _ = print("[Dashboard] Image load failed: \(error.localizedDescription), URL: \(photoUrl)")
+                        _ = // print("[Dashboard] Image load failed: \(error.localizedDescription), URL: \(photoUrl)")
                         noPhotoPlaceholder
                     case .empty:
                         // Show loading state
@@ -850,6 +971,7 @@ struct DashboardViewLiquid: View {
 
         case .weight:
             if let currentMetric = currentMetric {
+                let stats = weightRangeStats()
                 Button {
                     selectedMetricType = .weight
                     showFullMetricChart = true
@@ -867,8 +989,8 @@ struct DashboardViewLiquid: View {
                             },
                             chartAccessibilityLabel: "Weight trend for the past week",
                             chartAccessibilityValue: "Latest value \(formatWeightValue(currentMetric.weight)) \(weightUnit)",
-                            trend: nil,
-                            footnote: nil
+                            trend: stats.flatMap { makeTrend(delta: $0.delta, unit: weightUnit, range: selectedRange) },
+                            footnote: stats.map { formatAverageFootnote(value: $0.average, unit: weightUnit) }
                         )),
                         isButtonContext: true
                     )
@@ -878,6 +1000,7 @@ struct DashboardViewLiquid: View {
 
         case .bodyFat:
             if let currentMetric = currentMetric {
+                let stats = bodyFatRangeStats()
                 Button {
                     selectedMetricType = .bodyFat
                     showFullMetricChart = true
@@ -895,8 +1018,8 @@ struct DashboardViewLiquid: View {
                             },
                             chartAccessibilityLabel: "Body fat percentage trend for the past week",
                             chartAccessibilityValue: "Latest value \(formatBodyFatValue(currentMetric.bodyFatPercentage))%",
-                            trend: nil,
-                            footnote: nil
+                            trend: stats.flatMap { makeTrend(delta: $0.delta, unit: "%", range: selectedRange) },
+                            footnote: stats.map { formatAverageFootnote(value: $0.average, unit: "%") }
                         )),
                         isButtonContext: true
                     )
@@ -906,6 +1029,7 @@ struct DashboardViewLiquid: View {
 
         case .ffmi:
             if let currentMetric = currentMetric {
+                let stats = ffmiRangeStats()
                 Button {
                     selectedMetricType = .ffmi
                     showFullMetricChart = true
@@ -923,8 +1047,8 @@ struct DashboardViewLiquid: View {
                             },
                             chartAccessibilityLabel: "FFMI trend for the past week",
                             chartAccessibilityValue: "Latest value \(formatFFMIValue(currentMetric))",
-                            trend: nil,
-                            footnote: nil
+                            trend: stats.flatMap { makeTrend(delta: $0.delta, unit: "", range: selectedRange) },
+                            footnote: stats.map { formatAverageFootnote(value: $0.average, unit: "") }
                         )),
                         isButtonContext: true
                     )
@@ -951,7 +1075,9 @@ struct DashboardViewLiquid: View {
                 onAdd: {
                     showFullMetricChart = false
                     showAddEntrySheet = true
-                }
+                },
+                metricEntries: nil,
+                selectedTimeRange: $selectedRange
             )
 
         case .weight:
@@ -966,7 +1092,9 @@ struct DashboardViewLiquid: View {
                 onAdd: {
                     showFullMetricChart = false
                     showAddEntrySheet = true
-                }
+                },
+                metricEntries: metricEntriesPayload(for: .weight),
+                selectedTimeRange: $selectedRange
             )
 
         case .bodyFat:
@@ -981,7 +1109,9 @@ struct DashboardViewLiquid: View {
                 onAdd: {
                     showFullMetricChart = false
                     showAddEntrySheet = true
-                }
+                },
+                metricEntries: metricEntriesPayload(for: .bodyFat),
+                selectedTimeRange: $selectedRange
             )
 
         case .ffmi:
@@ -996,7 +1126,9 @@ struct DashboardViewLiquid: View {
                 onAdd: {
                     showFullMetricChart = false
                     showAddEntrySheet = true
-                }
+                },
+                metricEntries: metricEntriesPayload(for: .ffmi),
+                selectedTimeRange: $selectedRange
             )
         }
     }
@@ -1730,7 +1862,7 @@ extension DashboardViewLiquid {
                 await syncStepsFromHealthKit()
             } catch {
                 // Log error but continue with sync
-                print("HealthKit sync error during refresh: \(error)")
+        // print("HealthKit sync error during refresh: \(error)")
                 hasErrors = true
             }
         }
@@ -1903,6 +2035,151 @@ extension DashboardViewLiquid {
         return "–"
     }
 
+    // MARK: - Metric Entries Helpers
+
+    private func metricEntriesPayload(for metricType: MetricType) -> MetricEntriesPayload? {
+        switch metricType {
+        case .weight:
+            return weightEntriesPayload()
+        case .bodyFat:
+            return bodyFatEntriesPayload()
+        case .ffmi:
+            return ffmiEntriesPayload()
+        case .steps:
+            return nil
+        }
+    }
+
+    private func weightEntriesPayload() -> MetricEntriesPayload? {
+        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        let primaryFormatter = makeMetricFormatter(minFractionDigits: 0, maxFractionDigits: 1)
+        let secondaryFormatter = makeMetricFormatter(minFractionDigits: 0, maxFractionDigits: 1)
+
+        let entries = bodyMetrics
+            .sorted { $0.date > $1.date }
+            .compactMap { metric -> MetricHistoryEntry? in
+                guard let rawWeight = metric.weight else { return nil }
+                let convertedWeight = convertWeight(rawWeight, to: system) ?? rawWeight
+                return MetricHistoryEntry(
+                    id: metric.id,
+                    date: metric.date,
+                    primaryValue: convertedWeight,
+                    secondaryValue: metric.bodyFatPercentage,
+                    source: metricEntrySourceType(from: metric.dataSource)
+                )
+            }
+
+        guard !entries.isEmpty else { return nil }
+
+        let config = MetricEntriesConfiguration(
+            metricType: .weight,
+            unitLabel: system.weightUnit,
+            secondaryUnitLabel: "%",
+            primaryFormatter: primaryFormatter,
+            secondaryFormatter: secondaryFormatter
+        )
+
+        return MetricEntriesPayload(config: config, entries: entries)
+    }
+
+    private func bodyFatEntriesPayload() -> MetricEntriesPayload? {
+        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        let primaryFormatter = makeMetricFormatter(minFractionDigits: 1, maxFractionDigits: 1)
+        let secondaryFormatter = makeMetricFormatter(minFractionDigits: 0, maxFractionDigits: 1)
+
+        let entries = bodyMetrics
+            .sorted { $0.date > $1.date }
+            .compactMap { metric -> MetricHistoryEntry? in
+                let primaryValue = metric.bodyFatPercentage
+                    ?? MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)?.value
+                guard let bodyFatValue = primaryValue else { return nil }
+
+                let secondaryValue: Double?
+                if let weight = metric.weight {
+                    secondaryValue = convertWeight(weight, to: system) ?? weight
+                } else {
+                    secondaryValue = nil
+                }
+
+                return MetricHistoryEntry(
+                    id: metric.id,
+                    date: metric.date,
+                    primaryValue: bodyFatValue,
+                    secondaryValue: secondaryValue,
+                    source: metricEntrySourceType(from: metric.dataSource)
+                )
+            }
+
+        guard !entries.isEmpty else { return nil }
+
+        let config = MetricEntriesConfiguration(
+            metricType: .bodyFat,
+            unitLabel: "%",
+            secondaryUnitLabel: system.weightUnit,
+            primaryFormatter: primaryFormatter,
+            secondaryFormatter: secondaryFormatter
+        )
+
+        return MetricEntriesPayload(config: config, entries: entries)
+    }
+
+    private func ffmiEntriesPayload() -> MetricEntriesPayload? {
+        let heightInches = convertHeightToInches(
+            height: authManager.currentUser?.profile?.height,
+            heightUnit: authManager.currentUser?.profile?.heightUnit
+        )
+
+        guard let heightInches else { return nil }
+
+        let formatter = makeMetricFormatter(minFractionDigits: 1, maxFractionDigits: 1)
+
+        let entries = bodyMetrics
+            .sorted { $0.date > $1.date }
+            .compactMap { metric -> MetricHistoryEntry? in
+                guard let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
+                    for: metric.date,
+                    metrics: bodyMetrics,
+                    heightInches: heightInches
+                ) else {
+                    return nil
+                }
+
+                return MetricHistoryEntry(
+                    id: metric.id,
+                    date: metric.date,
+                    primaryValue: ffmiResult.value,
+                    secondaryValue: nil,
+                    source: metricEntrySourceType(from: metric.dataSource)
+                )
+            }
+
+        guard !entries.isEmpty else { return nil }
+
+        let config = MetricEntriesConfiguration(
+            metricType: .ffmi,
+            unitLabel: "",
+            secondaryUnitLabel: nil,
+            primaryFormatter: formatter,
+            secondaryFormatter: nil
+        )
+
+        return MetricEntriesPayload(config: config, entries: entries)
+    }
+
+    private func metricEntrySourceType(from dataSource: String?) -> MetricEntrySourceType {
+        let normalized = dataSource?.lowercased() ?? ""
+
+        if normalized.contains("healthkit") || normalized.contains("health") {
+            return .healthKit
+        }
+
+        if normalized.isEmpty || normalized == "manual" {
+            return .manual
+        }
+
+        return .integration(id: dataSource)
+    }
+
     private func formatTime(_ date: Date?) -> String? {
         guard let date = date else { return nil }
         let formatter = DateFormatter()
@@ -2007,20 +2284,16 @@ extension DashboardViewLiquid {
     }
 
     private func generateWeightChartData() -> [MetricDataPoint] {
-        // Get last 6-7 weight entries
-        let recentMetrics = bodyMetrics.prefix(7)
-        return recentMetrics.enumerated().compactMap { index, metric in
+        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        return filteredBodyMetrics(for: selectedRange).enumerated().compactMap { index, metric in
             guard let weight = metric.weight else { return nil }
-            let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
             let converted = convertWeight(weight, to: system) ?? weight
             return MetricDataPoint(index: index, value: converted)
         }
     }
 
     private func generateBodyFatChartData() -> [MetricDataPoint] {
-        // Get last 6-7 body fat entries
-        let recentMetrics = bodyMetrics.prefix(7)
-        return recentMetrics.enumerated().compactMap { index, metric in
+        filteredBodyMetrics(for: selectedRange).enumerated().compactMap { index, metric in
             if let bf = metric.bodyFatPercentage {
                 return MetricDataPoint(index: index, value: bf)
             } else if let estimated = MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics) {
@@ -2036,8 +2309,7 @@ extension DashboardViewLiquid {
             heightUnit: authManager.currentUser?.profile?.heightUnit
         )
 
-        let recentMetrics = bodyMetrics.prefix(7)
-        return recentMetrics.enumerated().compactMap { index, metric in
+        return filteredBodyMetrics(for: selectedRange).enumerated().compactMap { index, metric in
             if let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
                 for: metric.date,
                 metrics: bodyMetrics,
@@ -2046,6 +2318,51 @@ extension DashboardViewLiquid {
                 return MetricDataPoint(index: index, value: ffmiResult.value)
             }
             return nil
+        }
+    }
+
+    private func filteredBodyMetrics(for range: TimeRange) -> [BodyMetrics] {
+        let sortedMetrics = bodyMetrics.sorted { $0.date < $1.date }
+
+        guard let days = range.days else {
+            return sortedMetrics
+        }
+
+        let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        return sortedMetrics.filter { $0.date >= cutoffDate }
+    }
+
+    private func weightRangeStats() -> MetricRangeStats? {
+        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        return computeRangeStats(metrics: filteredBodyMetrics(for: selectedRange)) { metric in
+            guard let weight = metric.weight else { return nil }
+            return convertWeight(weight, to: system) ?? weight
+        }
+    }
+
+    private func bodyFatRangeStats() -> MetricRangeStats? {
+        computeRangeStats(metrics: filteredBodyMetrics(for: selectedRange)) { metric in
+            if let value = metric.bodyFatPercentage {
+                return value
+            }
+            return MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)?.value
+        }
+    }
+
+    private func ffmiRangeStats() -> MetricRangeStats? {
+        let heightInches = convertHeightToInches(
+            height: authManager.currentUser?.profile?.height,
+            heightUnit: authManager.currentUser?.profile?.heightUnit
+        )
+
+        guard let heightInches else { return nil }
+
+        return computeRangeStats(metrics: filteredBodyMetrics(for: selectedRange)) { metric in
+            MetricsInterpolationService.shared.estimateFFMI(
+                for: metric.date,
+                metrics: bodyMetrics,
+                heightInches: heightInches
+            )?.value
         }
     }
 
@@ -2161,11 +2478,176 @@ private enum TimeRange: String, CaseIterable {
     }
 }
 
-private struct MetricChartDataPoint: Identifiable {
+private struct MetricChartDataPoint: Identifiable, Sendable {
     let id = UUID()
     let date: Date
     let value: Double
     var isEstimated: Bool = false
+}
+
+private struct ChartSeriesPreprocessor {
+    let referenceDate: Date
+    private let calendar = Calendar.current
+
+    func seriesByRange(from points: [MetricChartDataPoint]) -> [TimeRange: [MetricChartDataPoint]] {
+        guard !points.isEmpty else { return [:] }
+
+        let sorted = points.sorted { $0.date < $1.date }
+        var result: [TimeRange: [MetricChartDataPoint]] = [:]
+
+        for range in TimeRange.allCases {
+            let filtered = filter(sorted, for: range)
+            result[range] = downsampleIfNeeded(filtered, limit: maxPointCount(for: range))
+        }
+
+        return result
+    }
+
+    private func filter(_ points: [MetricChartDataPoint], for range: TimeRange) -> [MetricChartDataPoint] {
+        guard let days = range.days else {
+            return points
+        }
+
+        let cutoff = calendar.date(byAdding: .day, value: -days, to: referenceDate) ?? referenceDate
+        return points.filter { $0.date >= cutoff }
+    }
+
+    private func maxPointCount(for range: TimeRange) -> Int {
+        switch range {
+        case .week1:
+            return 140
+        case .month1:
+            return 180
+        case .month3:
+            return 210
+        case .month6:
+            return 240
+        case .year1:
+            return 260
+        case .all:
+            return 320
+        }
+    }
+
+    private func downsampleIfNeeded(_ points: [MetricChartDataPoint], limit: Int) -> [MetricChartDataPoint] {
+        guard points.count > limit, limit >= 3 else { return points }
+        return largestTriangleThreeBuckets(points: points, threshold: limit)
+    }
+
+    private func largestTriangleThreeBuckets(points: [MetricChartDataPoint], threshold: Int) -> [MetricChartDataPoint] {
+        guard threshold < points.count else { return points }
+
+        let dataCount = points.count
+        let bucketSize = Double(dataCount - 2) / Double(threshold - 2)
+
+        var sampled: [MetricChartDataPoint] = [points[0]]
+        var aIndex = 0
+
+        for bucket in 0..<(threshold - 2) {
+            let rangeStart = Int(floor(Double(bucket) * bucketSize)) + 1
+            var rangeEnd = Int(floor(Double(bucket + 1) * bucketSize)) + 1
+            rangeEnd = min(rangeEnd, dataCount - 1)
+
+            let avgRangeStart = Int(floor(Double(bucket + 1) * bucketSize)) + 1
+            var avgRangeEnd = Int(floor(Double(bucket + 2) * bucketSize)) + 1
+            avgRangeEnd = min(avgRangeEnd, dataCount)
+
+            let average = averagedPoint(points, start: avgRangeStart, end: avgRangeEnd)
+
+            if rangeStart >= rangeEnd {
+                continue
+            }
+
+            let ax = timeValue(points[aIndex])
+            let ay = points[aIndex].value
+
+            var maxArea: Double = -1
+            var selectedIndex = rangeStart
+
+            for index in rangeStart..<rangeEnd {
+                let bx = timeValue(points[index])
+                let by = points[index].value
+                let cx = average.x
+                let cy = average.y
+
+                let area = abs((ax * (by - cy) + bx * (cy - ay) + cx * (ay - by)) * 0.5)
+
+                if area > maxArea {
+                    maxArea = area
+                    selectedIndex = index
+                }
+            }
+
+            sampled.append(points[selectedIndex])
+            aIndex = selectedIndex
+        }
+
+        sampled.append(points.last!)
+        return sampled
+    }
+
+    private func averagedPoint(_ points: [MetricChartDataPoint], start: Int, end: Int) -> (x: Double, y: Double) {
+        guard !points.isEmpty else { return (0, 0) }
+
+        let safeStart = min(max(start, 0), points.count - 1)
+        let safeEndExclusive = max(min(end, points.count), safeStart + 1)
+
+        if safeStart >= safeEndExclusive {
+            let point = points[safeStart]
+            return (timeValue(point), point.value)
+        }
+
+        var sumX: Double = 0
+        var sumY: Double = 0
+        let count = safeEndExclusive - safeStart
+
+        for index in safeStart..<safeEndExclusive {
+            let point = points[index]
+            sumX += timeValue(point)
+            sumY += point.value
+        }
+
+        return (sumX / Double(count), sumY / Double(count))
+    }
+
+    private func timeValue(_ point: MetricChartDataPoint) -> Double {
+        point.date.timeIntervalSince1970
+    }
+}
+
+private enum MetricEntrySourceType: Equatable {
+    case manual
+    case healthKit
+    case integration(id: String?)
+}
+
+private struct MetricHistoryEntry: Identifiable {
+    let id: String
+    let date: Date
+    let primaryValue: Double
+    let secondaryValue: Double?
+    let source: MetricEntrySourceType
+}
+
+private struct MetricEntriesConfiguration {
+    let metricType: DashboardViewLiquid.MetricType
+    let unitLabel: String
+    let secondaryUnitLabel: String?
+    let primaryFormatter: NumberFormatter
+    let secondaryFormatter: NumberFormatter?
+}
+
+private struct MetricEntriesPayload {
+    let config: MetricEntriesConfiguration
+    let entries: [MetricHistoryEntry]
+}
+
+private func makeMetricFormatter(minFractionDigits: Int = 0, maxFractionDigits: Int = 1) -> NumberFormatter {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    formatter.minimumFractionDigits = minFractionDigits
+    formatter.maximumFractionDigits = maxFractionDigits
+    return formatter
 }
 
 private struct FullMetricChartView: View {
@@ -2179,405 +2661,73 @@ private struct FullMetricChartView: View {
     let currentDate: String
     let chartData: [MetricChartDataPoint]
     let onAdd: () -> Void
+    let metricEntries: MetricEntriesPayload?
 
-    @State private var selectedTimeRange: TimeRange = .month1
+    @Binding var selectedTimeRange: TimeRange
     @State private var selectedDate: Date?
     @State private var selectedPoint: MetricChartDataPoint?
     @State private var isLoadingData: Bool = false
+    @State private var edgeDragOffset: CGFloat = 0
+    @State private var cachedSeries: [TimeRange: [MetricChartDataPoint]] = [:]
+    @State private var preprocessingTask: Task<[TimeRange: [MetricChartDataPoint]], Never>?
 
     var body: some View {
         ZStack {
             // Background
             Color.black
-                .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // Navigation bar
-                navigationBar
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 16)
-
-                // Time range selector
-                timeRangeSelector
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
-
-                // Current value display
-                currentValueDisplay
-                    .padding(.bottom, 24)
-
-                // Chart
-                chartView
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
-
-                Spacer()
-            }
+            // ...
         }
-        .navigationBarHidden(true)
-        .onChange(of: selectedTimeRange) { _ in
-            // When switching time ranges, clear any active scrub selection
-            // with a gentle animation to avoid glitches.
-            withAnimation(.easeInOut(duration: 0.25)) {
-                selectedDate = nil
-                selectedPoint = nil
-            }
-        }
-    }
-
-    private var navigationBar: some View {
-        HStack {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .background(Color.white.opacity(0.1), in: Circle())
-            }
-
-            Spacer()
-
-            Text(title)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(.white)
-
-            Spacer()
-
-            Button {
-                onAdd()
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .background(Color.white.opacity(0.1), in: Circle())
-            }
-        }
-    }
-
-    private var timeRangeSelector: some View {
-        Picker("", selection: $selectedTimeRange) {
-            Text("1W").tag(TimeRange.week1)
-            Text("1M").tag(TimeRange.month1)
-            Text("3M").tag(TimeRange.month3)
-            Text("6M").tag(TimeRange.month6)
-            Text("1Y").tag(TimeRange.year1)
-            Text("All").tag(TimeRange.all)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-    }
-
-    private var currentValueDisplay: some View {
-        VStack(spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(displayValue)
-                    .font(.system(size: 68, weight: .bold))
-                    .foregroundColor(.white)
-
-                Text(unit)
-                    .font(.system(size: 26, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
-            }
-
-            HStack(spacing: 8) {
-                Text(displayDate)
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundColor(.white.opacity(0.5))
-
-                // Show "Estimated" badge when displaying estimated data
-                if let point = selectedPoint, point.isEstimated {
-                    Text("Estimated")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.15))
-                        )
-                }
-            }
-        }
-    }
-
-    // Computed properties for display value and date (selected or current)
-    private var displayValue: String {
-        if let point = selectedPoint {
-            return String(format: "%.1f", point.value)
-        }
-        return currentValue
-    }
-
-    private var displayDate: String {
-        if let point = selectedPoint {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            return formatter.string(from: point.date)
-        }
-        return currentDate
-    }
-
-    private var chartView: some View {
-        VStack {
-            if isLoadingData {
-                loadingState
-            } else if filteredChartData.isEmpty {
-                emptyState
-            } else {
-                Chart {
-                    ForEach(filteredChartData) { point in
-                        // Line (dotted for estimated data)
-                        LineMark(
-                            x: .value("Date", point.date),
-                            y: .value("Value", point.value)
-                        )
-                        .foregroundStyle(iconColor.gradient)
-                        .interpolationMethod(.monotone)
-                        .lineStyle(StrokeStyle(
-                            lineWidth: 3,
-                            dash: point.isEstimated ? [8, 4] : []
-                        ))
-                        .opacity(point.isEstimated ? 0.7 : 1.0)
-
-                        // Points (smaller, subtle, only show when scrubbing)
-                        if selectedDate != nil {
-                            PointMark(
-                                x: .value("Date", point.date),
-                                y: .value("Value", point.value)
-                            )
-                            .foregroundStyle(iconColor)
-                            .symbolSize(20)
-                            .opacity(0.6)
-                        }
-                    }
-
-                    // Vertical scrubber line
-                    if let selectedDate = selectedDate,
-                       let selectedPoint = selectedPoint {
-                        RuleMark(x: .value("Selected", selectedDate))
-                            .foregroundStyle(Color.white.opacity(0.3))
-                            .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
-
-                        // Highlight selected point (tiny default dot)
-                        PointMark(
-                            x: .value("Date", selectedPoint.date),
-                            y: .value("Value", selectedPoint.value)
-                        )
-                        .symbolSize(8)
-                    }
-                }
-                .chartYScale(domain: .automatic(includesZero: false))
-                .chartXAxis {
-                    AxisMarks(preset: .aligned, values: .automatic(desiredCount: xAxisTickCount)) { value in
-                        // Grid lines hidden by default (Apple Health style)
-                        if let date = value.as(Date.self) {
-                            AxisValueLabel {
-                                Text(formatAxisDate(date))
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.4))
-                            }
-                        }
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(preset: .aligned, position: .trailing, values: .automatic(desiredCount: 5)) { value in
-                        // Grid lines hidden by default (Apple Health style)
-                        AxisValueLabel {
-                            if let doubleValue = value.as(Double.self) {
-                                Text(formatAxisValue(doubleValue))
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.4))
-                            }
-                        }
-                    }
-                }
-                .chartPlotStyle { plotArea in
-                    plotArea
-                        .background(Color.clear)
-                }
-                .frame(height: 360)
-                // Keep the chart firmly inside its container during animations
-                .clipped()
-                // Use a controlled animation when the time range changes so the
-                // line morphs smoothly without "escaping" the frame.
-                .animation(.easeInOut(duration: 0.28), value: selectedTimeRange)
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            // Find nearest point to drag location
-                            if let point = findNearestPoint(to: value.location) {
-                                selectedDate = point.date
-                                selectedPoint = point
-
-                                // Haptic feedback
-                                let impact = UIImpactFeedbackGenerator(style: .light)
-                                impact.impactOccurred()
-                            }
-                        }
-                        .onEnded { _ in
-                            // Clear selection after a delay
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                withAnimation {
-                                    selectedDate = nil
-                                    selectedPoint = nil
-                                }
-                            }
-                        }
-                )
-            }
-        }
-    }
-
-    private var loadingState: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(.white)
-
-            Text("Loading chart data...")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.5))
-        }
-        .frame(height: 360)
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 60))
-                .foregroundColor(.white.opacity(0.3))
-
-            Text("No data for this period")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white.opacity(0.6))
-        }
-        .frame(height: 360)
-    }
-
-    private var filteredChartData: [MetricChartDataPoint] {
-        // When showing "All", use the full history; otherwise, filter by range.
-        if let days = selectedTimeRange.days {
-            let cutoffDate = Calendar.current.date(
-                byAdding: .day,
-                value: -days,
-                to: Date()
-            ) ?? Date()
-
-            return chartData
-                .filter { $0.date >= cutoffDate }
-                .sorted { $0.date < $1.date }
-        }
-
-        return chartData.sorted { $0.date < $1.date }
-    }
-
-    private var xAxisTickCount: Int {
-        switch selectedTimeRange {
-        case .week1:
-            return 7
-        case .month1:
-            return 8
-        case .month3:
-            return 8
-        case .month6:
-            return 6
-        case .year1:
-            return 6
-        case .all:
-            return 6
-        }
-    }
-
-    private var trendDelta: Double? {
-        let data = filteredChartData
-        guard data.count >= 2 else { return nil }
-
-        guard let first = data.first?.value,
-              let last = data.last?.value else {
-            return nil
-        }
-
-        let delta = last - first
-        guard delta != 0 else { return nil }
-        return delta
-    }
-
-    private var trendSummaryText: String? {
-        guard let delta = trendDelta else { return nil }
-
-        // Include metric unit when available (e.g. "kg", "%").
-        let unitSuffix = unit.isEmpty ? "" : " \(unit)"
-        let formattedDelta = String(format: delta > 0 ? "+%.1f%@" : "%.1f%@", delta, unitSuffix)
-
-        let rangeLabel: String
-        switch selectedTimeRange {
-        case .week1:
-            rangeLabel = "last week"
-        case .month1:
-            rangeLabel = "last month"
-        case .month3:
-            rangeLabel = "last 3 months"
-        case .month6:
-            rangeLabel = "last 6 months"
-        case .year1:
-            rangeLabel = "last year"
-        case .all:
-            rangeLabel = "all time"
-        }
-
-        return "\(formattedDelta) over \(rangeLabel)"
-    }
-
-    private var trendColor: Color {
-        guard let delta = trendDelta else {
-            return .white.opacity(0.7)
-        }
-
-        // Match GlassChip semantics for weight: down = green, up = red.
-        // For other metrics this is still a clear directional cue.
-        return delta > 0
-            ? Color.red.opacity(0.85)
-            : Color.green.opacity(0.85)
-    }
-
-    private func formatAxisDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        switch selectedTimeRange {
-        case .week1:
-            formatter.dateFormat = "EEE"
-        case .month1, .month3:
-            formatter.dateFormat = "d"
-        case .month6, .year1, .all:
-            formatter.dateFormat = "MMM"
-        }
-        return formatter.string(from: date)
-    }
-
-    private func formatAxisValue(_ value: Double) -> String {
-        return String(format: "%.0f", value)
-    }
-
-    private func findNearestPoint(to location: CGPoint) -> MetricChartDataPoint? {
-        guard !filteredChartData.isEmpty else { return nil }
-
-        // Simple implementation: find point closest in time based on X position
-        // The chart width corresponds to the time range
-        let chartWidth: CGFloat = UIScreen.main.bounds.width - 40 // accounting for padding
-
-        guard chartWidth > 0 else { return nil }
-
-        let xPosition = location.x
-        let percentage = max(0, min(1, xPosition / chartWidth))
-
+        // ...
         let index = Int(percentage * CGFloat(filteredChartData.count - 1))
         let clampedIndex = max(0, min(filteredChartData.count - 1, index))
 
         return filteredChartData[clampedIndex]
+    }
+
+    private var chartDataFingerprint: String {
+        guard let first = chartData.first, let last = chartData.last else {
+            return "empty-\(chartData.count)"
+        }
+
+        return "\(chartData.count)-\(first.date.timeIntervalSince1970)-\(last.date.timeIntervalSince1970)-\(first.value)-\(last.value)"
+    }
+
+    private func preprocessChartData() async {
+        guard !chartData.isEmpty else {
+            await MainActor.run {
+                cachedSeries = [:]
+                isLoadingData = false
+            }
+            return
+        }
+
+        await MainActor.run {
+            isLoadingData = true
+            cachedSeries = [:]
+        }
+
+        preprocessingTask?.cancel()
+
+        let sourceData = chartData
+        let referenceDate = Date()
+
+        let task = Task<[TimeRange: [MetricChartDataPoint]], Never>.detached(priority: .userInitiated) {
+            let preprocessor = ChartSeriesPreprocessor(referenceDate: referenceDate)
+            return preprocessor.seriesByRange(from: sourceData)
+        }
+
+        preprocessingTask = task
+
+        let series = await task.value
+
+        guard !task.isCancelled else { return }
+
+        await MainActor.run {
+            cachedSeries = series
+            isLoadingData = false
+            selectedDate = nil
+            selectedPoint = nil
+        }
     }
 }
 
@@ -2585,14 +2735,14 @@ private struct FullMetricChartView: View {
 
 extension DashboardViewLiquid {
     func loadMetricsOrder() {
-        guard !metricsOrderData.isEmpty else { return }
+        // ...
 
         do {
             let decoder = JSONDecoder()
             let loadedOrder = try decoder.decode([MetricIdentifier].self, from: metricsOrderData)
             metricsOrder = loadedOrder
         } catch {
-            print("Failed to load metrics order: \(error)")
+        // print("Failed to load metrics order: \(error)")
             // Keep default order
         }
     }
@@ -2606,7 +2756,7 @@ extension DashboardViewLiquid {
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()
         } catch {
-            print("Failed to save metrics order: \(error)")
+        // print("Failed to save metrics order: \(error)")
         }
     }
 }

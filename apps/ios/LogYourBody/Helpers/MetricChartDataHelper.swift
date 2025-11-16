@@ -15,6 +15,7 @@ struct MetricChartDataHelper {
 
     /// Cache for chart data to avoid redundant computations
     private static var chartDataCache: [String: CachedChartData] = [:]
+    private static let cacheQueue = DispatchQueue(label: "com.logyourbody.metric-chart-cache", qos: .userInitiated)
 
     /// Setup Core Data change notifications for automatic cache invalidation
     static func setupCacheInvalidation() {
@@ -67,17 +68,23 @@ struct MetricChartDataHelper {
 
     /// Clear expired cache entries
     static func clearExpiredCache() {
-        chartDataCache = chartDataCache.filter { !$0.value.isExpired }
+        cacheQueue.sync {
+            chartDataCache = chartDataCache.filter { !$0.value.isExpired }
+        }
     }
 
     /// Clear all cache (call when data changes)
     static func clearCache() {
-        chartDataCache.removeAll()
+        cacheQueue.sync {
+            chartDataCache.removeAll()
+        }
     }
 
     /// Clear cache for specific user
     static func clearCache(for userId: String) {
-        chartDataCache = chartDataCache.filter { !$0.key.hasPrefix(userId) }
+        cacheQueue.sync {
+            chartDataCache = chartDataCache.filter { !$0.key.hasPrefix(userId) }
+        }
     }
 
     // MARK: - Steps Chart Data
@@ -87,7 +94,7 @@ struct MetricChartDataHelper {
         let key = cacheKey(userId: userId, days: 7, metricType: "steps", useMetric: false)
 
         // Check cache first
-        if let cached = chartDataCache[key], !cached.isExpired {
+        if let cached = cacheQueue.sync(execute: { chartDataCache[key] }), !cached.isExpired {
             return cached.data
         }
 
@@ -112,7 +119,9 @@ struct MetricChartDataHelper {
         let data = Array(rawData.reversed())
 
         // Cache the result
-        chartDataCache[key] = CachedChartData(data: data, timestamp: Date())
+        cacheQueue.sync {
+            chartDataCache[key] = CachedChartData(data: data, timestamp: Date())
+        }
 
         return data
     }
@@ -120,6 +129,22 @@ struct MetricChartDataHelper {
     // MARK: - Weight Chart Data
 
     // Old 7-day sparkline helpers have been removed in favor of generateChartData().
+
+    static func generateWeightChartData(for userId: String, useMetric: Bool, profile: UserProfile? = nil) -> [SparklineDataPoint] {
+        generateChartData(for: userId, days: 7, metricType: .weight, useMetric: useMetric, profile: profile)
+    }
+
+    static func generateBodyFatChartData(for userId: String, profile: UserProfile? = nil) -> [SparklineDataPoint] {
+        generateChartData(for: userId, days: 7, metricType: .bodyFat, useMetric: true, profile: profile)
+    }
+
+    static func generateFFMIChartData(for userId: String, profile: UserProfile?) -> [SparklineDataPoint] {
+        generateChartData(for: userId, days: 7, metricType: .ffmi, useMetric: true, profile: profile)
+    }
+
+    static func generateWaistChartData(for userId: String, useMetric: Bool, profile: UserProfile? = nil) -> [SparklineDataPoint] {
+        generateChartData(for: userId, days: 7, metricType: .waist, useMetric: useMetric, profile: profile)
+    }
 
     // MARK: - FFMI Calculation
 
@@ -166,80 +191,110 @@ struct MetricChartDataHelper {
     ///   - useMetric: Whether to use metric units (for weight/waist)
     static func generateChartData(
         for userId: String,
-        days: Int,
+        days: Int?,
         metricType: DashboardViewLiquid.DashboardMetricKind,
-        useMetric: Bool = false
+        useMetric: Bool = false,
+        profile: UserProfile? = nil
     ) -> [SparklineDataPoint] {
-        // Temporary stub - return empty data
-        return []
-        /*
-        let metricTypeString = String(describing: metricType)
-        let key = cacheKey(userId: userId, days: days, metricType: metricTypeString, useMetric: useMetric)
 
-        // Check cache first
-        if let cached = chartDataCache[key], !cached.isExpired {
+        let metricTypeString = String(describing: metricType)
+        let cacheKeyValue = cacheKey(userId: userId, days: days ?? -1, metricType: metricTypeString, useMetric: useMetric)
+
+        if let cached = cacheQueue.sync(execute: { chartDataCache[cacheKeyValue] }), !cached.isExpired {
             return cached.data
         }
 
-        // Generate chart data
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
+        let startDate: Date?
 
-        let rawData = (0..<days).compactMap { daysAgo -> SparklineDataPoint? in
-            guard let date = calendar.date(byAdding: .day, value: -daysAgo, to: today) else {
-                return nil
-            }
-
-            guard let dailyData = CoreDataManager.shared.fetchDailyMetricsSync(for: userId, date: date) else {
-                return nil
-            }
-
-            let value: Double?
-
-            switch metricType {
-            case .steps:
-                let steps = dailyData.steps
-                value = steps > 0 ? Double(steps) : nil
-            case .weight:
-                let weightKg = dailyData.weight
-                if weightKg > 0 {
-                    value = useMetric ? weightKg : weightKg * 2.20462
-                } else {
-                    value = nil
-                }
-            case .bodyFat:
-                let bodyFat = dailyData.bodyFatPercentage
-                value = bodyFat > 0 ? bodyFat : nil
-            case .ffmi:
-                let weightKg = dailyData.weight
-                let bodyFat = dailyData.bodyFatPercentage
-                let heightCm = dailyData.height
-                if weightKg > 0 && bodyFat > 0 && heightCm > 0 {
-                    value = calculateFFMI(weightKg: weightKg, bodyFatPercentage: bodyFat, heightCm: heightCm)
-                } else {
-                    value = nil
-                }
-            case .waist:
-                // Waist measurement not currently stored in Core Data
-                value = nil
-            }
-
-            if let value = value, value > 0 {
-                return SparklineDataPoint(index: days - 1 - daysAgo, value: value)
-            }
-            return nil
+        if let days = days {
+            startDate = calendar.date(byAdding: .day, value: -(days - 1), to: today)
+        } else {
+            startDate = nil
         }
 
-        let data = Array(rawData.reversed())
+        let metrics: [BodyMetrics]
 
-        // Apply downsampling for large datasets (>90 days)
-        let finalData = days > 90 ? downsampleData(data) : data
+        if let cached = cacheQueue.sync(execute: { chartDataCache[cacheKeyValue] }), !cached.isExpired {
+            return cached.data
+        }
 
-        // Cache the result
-        chartDataCache[key] = CachedChartData(data: finalData, timestamp: Date())
+        let coreDataMetrics = CoreDataManager.shared.fetchBodyMetricsSync(for: userId, from: startDate, to: today)
+        metrics = coreDataMetrics.compactMap { $0.toBodyMetrics() }
+
+        guard !metrics.isEmpty else { return [] }
+
+        let filteredMetrics: [BodyMetrics]
+        if let startDate = startDate {
+            filteredMetrics = metrics.filter { $0.date >= startDate }
+        } else {
+            filteredMetrics = metrics
+        }
+
+        guard !filteredMetrics.isEmpty else { return [] }
+
+        let dataPoints = filteredMetrics.enumerated().compactMap { index, metric -> SparklineDataPoint? in
+            switch metricType {
+            case .steps:
+                guard let steps = CoreDataManager.shared.fetchDailyMetricsSync(for: userId, date: metric.date)?.steps, steps > 0 else { return nil }
+                return SparklineDataPoint(index: index, value: Double(steps))
+            case .weight:
+                guard let weight = metric.weight else { return nil }
+                let targetSystem: MeasurementSystem = useMetric ? .metric : .imperial
+                let converted = convertWeight(weight, to: targetSystem)
+                return SparklineDataPoint(index: index, value: converted)
+            case .bodyFat:
+                if let value = metric.bodyFatPercentage {
+                    return SparklineDataPoint(index: index, value: value)
+                }
+                return MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: metrics).map {
+                    SparklineDataPoint(index: index, value: $0.value, isEstimated: $0.isInterpolated)
+                }
+            case .ffmi:
+                let heightInches = convertHeightToInches(height: profile?.height, heightUnit: profile?.heightUnit)
+                guard let ffmi = MetricsInterpolationService.shared.estimateFFMI(for: metric.date, metrics: metrics, heightInches: heightInches) else {
+                    return nil
+                }
+                return SparklineDataPoint(index: index, value: ffmi.value, isEstimated: ffmi.isInterpolated)
+            case .waist:
+                return nil
+            }
+        }
+
+        guard !dataPoints.isEmpty else { return [] }
+
+        let finalData: [SparklineDataPoint]
+        if let days = days, days > 90 {
+            finalData = downsampleData(dataPoints)
+        } else {
+            finalData = dataPoints
+        }
+
+        cacheQueue.sync {
+            chartDataCache[cacheKeyValue] = CachedChartData(data: finalData, timestamp: Date())
+        }
 
         return finalData
-        */
+    }
+
+    // MARK: - Conversion Helpers
+
+    private static func convertWeight(_ weight: Double, to system: MeasurementSystem) -> Double {
+        switch system {
+        case .metric:
+            return weight
+        case .imperial:
+            return weight * 2.20462
+        }
+    }
+
+    private static func convertHeightToInches(height: Double?, heightUnit: String?) -> Double? {
+        guard let height else { return nil }
+        if heightUnit?.lowercased() == "cm" {
+            return height / 2.54
+        }
+        return height
     }
 
     // MARK: - Async Chart Data Generation
@@ -248,23 +303,6 @@ struct MetricChartDataHelper {
     /*
     /// Generate chart data asynchronously for better performance
     /// - Parameters:
-    ///   - userId: User ID to fetch data for
-    ///   - days: Number of days to fetch (7, 30, 90, 180, 365)
-    ///   - metricType: Type of metric to fetch
-    ///   - useMetric: Whether to use metric units (for weight/waist)
-    @MainActor
-    static func generateChartDataAsync(
-        for userId: String,
-        days: Int,
-        metricType: DashboardViewLiquid.DashboardMetricKind,
-        useMetric: Bool = false
-    ) async -> [SparklineDataPoint] {
-        let metricTypeString = String(describing: metricType)
-        let key = cacheKey(userId: userId, days: days, metricType: metricTypeString, useMetric: useMetric)
-
-        // Check cache first
-        if let cached = chartDataCache[key], !cached.isExpired {
-            return cached.data
         }
 
         // Generate chart data asynchronously using batch fetch

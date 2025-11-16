@@ -167,7 +167,7 @@ struct MetricChartView: View {
                     }
                 }
                 .chartYAxis {
-                    AxisMarks(preset: .aligned, position: .trailing, values: .automatic(desiredCount: 6)) { value in
+                    AxisMarks(preset: .aligned, position: .trailing, values: .automatic(desiredCount: 6)) { _ in
                         // Hide grid lines by default (only show during interaction)
                         AxisValueLabel()
                             .foregroundStyle(Color.appTextSecondary)

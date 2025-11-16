@@ -10,6 +10,7 @@
 //
 import Foundation
 import CoreData
+import HealthKit
 
 class CoreDataManager: ObservableObject {
     static let shared = CoreDataManager()
@@ -23,8 +24,8 @@ class CoreDataManager: ObservableObject {
         container.loadPersistentStores { description, error in
             if let error = error {
                 // Log the error but don't crash - fallback to in-memory store
-                print("⚠️ CoreData Error: Unable to load persistent stores: \(error)")
-                print("⚠️ Falling back to in-memory store. Data will not persist.")
+        // print("⚠️ CoreData Error: Unable to load persistent stores: \(error)")
+        // print("⚠️ Falling back to in-memory store. Data will not persist.")
 
                 // Create an in-memory store as fallback
                 let inMemoryDescription = NSPersistentStoreDescription()
@@ -34,7 +35,7 @@ class CoreDataManager: ObservableObject {
                 // Attempt to load in-memory store
                 container.loadPersistentStores { _, inMemoryError in
                     if let inMemoryError = inMemoryError {
-                        print("❌ CoreData Critical: Even in-memory store failed: \(inMemoryError)")
+        // print("❌ CoreData Critical: Even in-memory store failed: \(inMemoryError)")
                     }
                 }
             }
@@ -86,6 +87,195 @@ class CoreDataManager: ObservableObject {
                 }
                 completion?()
             }
+        }
+    }
+
+    func fetchDailyMetricsSync(
+        for userId: String,
+        date: Date
+    ) -> CachedDailyMetrics? {
+        let context = viewContext
+        var result: CachedDailyMetrics?
+
+        context.performAndWait {
+            let request: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+            let startOfDay = Calendar.current.startOfDay(for: date)
+            let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+
+            request.predicate = NSPredicate(
+                format: "userId == %@ AND date >= %@ AND date < %@ AND isMarkedDeleted == %@",
+                userId,
+                startOfDay as NSDate,
+                endOfDay as NSDate,
+                NSNumber(value: false)
+            )
+            request.fetchLimit = 1
+
+            result = try? context.fetch(request).first
+        }
+
+        return result
+    }
+
+    func fetchDailyMetricsSync(
+        for userId: String,
+        from startDate: Date? = nil,
+        to endDate: Date? = nil
+    ) -> [CachedDailyMetrics] {
+        let context = viewContext
+        var result: [CachedDailyMetrics] = []
+
+        context.performAndWait {
+            let request: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+            var predicates: [NSPredicate] = [
+                NSPredicate(format: "userId == %@", userId),
+                NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false))
+            ]
+
+            if let startDate {
+                predicates.append(NSPredicate(format: "date >= %@", startDate as NSDate))
+            }
+
+            if let endDate {
+                predicates.append(NSPredicate(format: "date <= %@", endDate as NSDate))
+            }
+
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+            request.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+
+            result = (try? context.fetch(request)) ?? []
+        }
+
+        return result
+    }
+
+    // MARK: - Daily Metrics Fetch Helpers
+
+    func fetchDailyMetrics(
+        for userId: String,
+        date: Date
+    ) async -> CachedDailyMetrics? {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+            let startOfDay = Calendar.current.startOfDay(for: date)
+            let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+
+            request.predicate = NSPredicate(
+                format: "userId == %@ AND date >= %@ AND date < %@ AND isMarkedDeleted == %@",
+                userId,
+                startOfDay as NSDate,
+                endOfDay as NSDate,
+                NSNumber(value: false)
+            )
+            request.fetchLimit = 1
+
+            return try? context.fetch(request).first
+        }
+    }
+
+    func fetchDailyMetrics(
+        for userId: String,
+        from startDate: Date? = nil,
+        to endDate: Date? = nil
+    ) async -> [CachedDailyMetrics] {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+            var predicates: [NSPredicate] = [
+                NSPredicate(format: "userId == %@", userId),
+                NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false))
+            ]
+
+            if let startDate {
+                predicates.append(NSPredicate(format: "date >= %@", startDate as NSDate))
+            }
+
+            if let endDate {
+                predicates.append(NSPredicate(format: "date <= %@", endDate as NSDate))
+            }
+
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+            request.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+
+            do {
+                return try context.fetch(request)
+            } catch {
+                #if DEBUG
+                // print("Failed to fetch daily metrics: \(error)")
+                #endif
+                return []
+            }
+        }
+    }
+
+    func upsertDevice(withId id: String, update: @escaping (CachedDevice) -> Void) async -> CachedDevice? {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedDevice> = CachedDevice.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            request.fetchLimit = 1
+
+            let device: CachedDevice
+            if let existing = try? context.fetch(request).first {
+                device = existing
+            } else {
+                device = CachedDevice(context: context)
+                device.id = id
+                device.createdAt = Date()
+            }
+
+            update(device)
+            device.updatedAt = Date()
+
+            do {
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                #if DEBUG
+                // print("Failed to upsert device: \(error)")
+                #endif
+            }
+
+            return device
+        }
+    }
+
+    func upsertUserDevice(withId id: String, update: @escaping (CachedUserDevice) -> Void) async -> CachedUserDevice? {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedUserDevice> = CachedUserDevice.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            request.fetchLimit = 1
+
+            let userDevice: CachedUserDevice
+            if let existing = try? context.fetch(request).first {
+                userDevice = existing
+            } else {
+                userDevice = CachedUserDevice(context: context)
+                userDevice.id = id
+                userDevice.createdAt = Date()
+            }
+
+            update(userDevice)
+            userDevice.updatedAt = Date()
+
+            do {
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                #if DEBUG
+                // print("Failed to upsert user device: \(error)")
+                #endif
+            }
+
+            return userDevice
         }
     }
     
@@ -157,7 +347,7 @@ class CoreDataManager: ObservableObject {
             } catch {
                 // Use OSLog for production-safe logging
                 #if DEBUG
-                print("Failed to save body metrics: \(error)")
+        // print("Failed to save body metrics: \(error)")
                 #endif
             }
         }
@@ -194,9 +384,85 @@ class CoreDataManager: ObservableObject {
                 return try context.fetch(fetchRequest)
             } catch {
                 #if DEBUG
-                print("Failed to fetch body metrics: \(error)")
+        // print("Failed to fetch body metrics: \(error)")
                 #endif
                 return []
+            }
+        }
+    }
+
+    // MARK: - HealthKit Raw Sample Operations
+
+    func hkSampleExists(hkUUID: String) async -> Bool {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedHKSample> = CachedHKSample.fetchRequest()
+            request.predicate = NSPredicate(format: "hkUUID == %@", hkUUID)
+            request.fetchLimit = 1
+
+            do {
+                return try context.fetch(request).isEmpty == false
+            } catch {
+                #if DEBUG
+                // print("Failed to check HK sample existence: \(error)")
+                #endif
+                return false
+            }
+        }
+    }
+
+    func saveHKSample(_ sample: HKRawSample) async {
+        let context = viewContext
+
+        await context.perform {
+            let request: NSFetchRequest<CachedHKSample> = CachedHKSample.fetchRequest()
+            request.predicate = NSPredicate(format: "hkUUID == %@", sample.hkUUID)
+            request.fetchLimit = 1
+
+            let cached: CachedHKSample
+
+            if let existing = try? context.fetch(request).first {
+                cached = existing
+            } else {
+                cached = CachedHKSample(context: context)
+                cached.id = sample.id
+                cached.hkUUID = sample.hkUUID
+                cached.createdAt = sample.createdAt
+            }
+
+            cached.userId = sample.userId
+            cached.quantityType = sample.quantityType
+            cached.value = sample.value
+            cached.unit = sample.unit
+            cached.startDate = sample.startDate
+            cached.endDate = sample.endDate
+            cached.sourceName = sample.sourceName
+            cached.sourceBundleId = sample.sourceBundleId
+            cached.deviceManufacturer = sample.deviceManufacturer
+            cached.deviceModel = sample.deviceModel
+            cached.deviceHardwareVersion = sample.deviceHardwareVersion
+            cached.deviceFirmwareVersion = sample.deviceFirmwareVersion
+            cached.deviceSoftwareVersion = sample.deviceSoftwareVersion
+            cached.deviceLocalIdentifier = sample.deviceLocalIdentifier
+            cached.deviceUDI = sample.deviceUDI
+            cached.updatedAt = sample.updatedAt
+
+            if let metadata = sample.metadata,
+               let data = try? JSONEncoder().encode(metadata) {
+                cached.metadataJSON = data
+            } else {
+                cached.metadataJSON = nil
+            }
+
+            do {
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                #if DEBUG
+                // print("Failed to save HK sample: \(error)")
+                #endif
             }
         }
     }
@@ -232,139 +498,100 @@ class CoreDataManager: ObservableObject {
                 result = try context.fetch(fetchRequest)
             } catch {
                 #if DEBUG
-                print("Failed to fetch body metrics: \(error)")
+                // print("Failed to fetch body metrics: \(error)")
                 #endif
             }
         }
 
         return result
     }
-    
-    // MARK: - Daily Metrics Operations
-    func saveDailyMetrics(_ metrics: DailyMetrics, userId: String) {
-        let context = viewContext
 
-        // Ensure all Core Data operations happen on the context's queue
-        context.perform {
-            let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "id == %@ OR (userId == %@ AND date == %@)",
-                                               metrics.id, userId, metrics.date as NSDate)
+    // MARK: - Body Metrics Update/Delete Helpers
 
-            do {
-                let results = try context.fetch(fetchRequest)
-                let cached: CachedDailyMetrics
-
-                if let existing = results.first {
-                    cached = existing
-                } else {
-                    cached = CachedDailyMetrics(context: context)
-                    cached.id = metrics.id
-                    cached.createdAt = metrics.createdAt
-                }
-
-                cached.userId = userId
-                cached.date = metrics.date
-                cached.steps = Int32(metrics.steps ?? 0)
-                cached.notes = metrics.notes
-                cached.updatedAt = Date()
-                cached.lastModified = Date()
-                cached.isSynced = false
-                cached.syncStatus = "pending"
-                cached.isMarkedDeleted = false
-
-                // Save immediately within the perform block
-                if context.hasChanges {
-                    try context.save()
-                }
-            } catch {
-                #if DEBUG
-                print("Failed to save daily metrics: \(error)")
-                #endif
-            }
-        }
-    }
-    
-    /// Async version - does NOT block the main thread
-    func fetchDailyMetrics(for userId: String, date: Date) async -> CachedDailyMetrics? {
+    @discardableResult
+    func updateBodyMetric(
+        id: String,
+        date: Date,
+        weight: Double?,
+        bodyFatPercentage: Double?
+    ) async -> BodyMetrics? {
         let context = viewContext
 
         return await context.perform {
-            let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
-
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-
-            fetchRequest.predicate = NSPredicate(format: "userId == %@ AND date >= %@ AND date < %@ AND isMarkedDeleted == %@",
-                                               userId, startOfDay as NSDate, endOfDay as NSDate, NSNumber(value: false))
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", id)
             fetchRequest.fetchLimit = 1
 
+            guard let cachedMetric = try? context.fetch(fetchRequest).first else {
+                return nil
+            }
+
+            let normalizedDate = Calendar.current.startOfDay(for: date)
+            cachedMetric.date = normalizedDate
+
+            if let weight {
+                cachedMetric.weight = weight
+            }
+
+            if let bodyFatPercentage {
+                cachedMetric.bodyFatPercentage = bodyFatPercentage
+            }
+
+            let now = Date()
+            cachedMetric.updatedAt = now
+            cachedMetric.lastModified = now
+            cachedMetric.isMarkedDeleted = false
+            cachedMetric.isSynced = false
+            cachedMetric.syncStatus = "pending"
+
             do {
-                return try context.fetch(fetchRequest).first
+                if context.hasChanges {
+                    try context.save()
+                }
+                return cachedMetric.toBodyMetrics()
             } catch {
                 #if DEBUG
-                print("Failed to fetch daily metrics: \(error)")
+                // print("Failed to update body metric: \(error)")
                 #endif
                 return nil
             }
         }
     }
 
-    /// Batch fetch daily metrics for a date range (async, optimized for large datasets)
-    func fetchDailyMetricsBatch(for userId: String, startDate: Date, endDate: Date) async -> [CachedDailyMetrics] {
+    func markBodyMetricDeleted(id: String) async -> Bool {
         let context = viewContext
 
         return await context.perform {
-            let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
-
-            let calendar = Calendar.current
-            let start = calendar.startOfDay(for: startDate)
-            let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: endDate))!
-
-            fetchRequest.predicate = NSPredicate(
-                format: "userId == %@ AND date >= %@ AND date < %@ AND isMarkedDeleted == %@",
-                userId, start as NSDate, end as NSDate, NSNumber(value: false)
-            )
-            fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: true)]
-
-            do {
-                return try context.fetch(fetchRequest)
-            } catch {
-                #if DEBUG
-                print("Failed to batch fetch daily metrics: \(error)")
-                #endif
-                return []
-            }
-        }
-    }
-
-    /// Legacy synchronous version - blocks the calling thread (use async version instead)
-    func fetchDailyMetricsSync(for userId: String, date: Date) -> CachedDailyMetrics? {
-        let context = viewContext
-        var result: CachedDailyMetrics?
-
-        context.performAndWait {
-            let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
-
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-
-            fetchRequest.predicate = NSPredicate(format: "userId == %@ AND date >= %@ AND date < %@ AND isMarkedDeleted == %@",
-                                               userId, startOfDay as NSDate, endOfDay as NSDate, NSNumber(value: false))
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", id)
             fetchRequest.fetchLimit = 1
 
+            guard let cachedMetric = try? context.fetch(fetchRequest).first else {
+                return false
+            }
+
+            let now = Date()
+            cachedMetric.isMarkedDeleted = true
+            cachedMetric.updatedAt = now
+            cachedMetric.lastModified = now
+            cachedMetric.isSynced = false
+            cachedMetric.syncStatus = "pending"
+
             do {
-                result = try context.fetch(fetchRequest).first
+                if context.hasChanges {
+                    try context.save()
+                }
+                return true
             } catch {
-                // print("Failed to fetch daily metrics: \(error)")
+                #if DEBUG
+                // print("Failed to delete body metric: \(error)")
+                #endif
+                return false
             }
         }
-
-        return result
     }
-    
-    // MARK: - Profile Operations
+
+    // MARK: - Daily Metrics Operations
     func saveProfile(_ profile: UserProfile, userId: String, email: String) {
         let context = viewContext
 
@@ -420,7 +647,7 @@ class CoreDataManager: ObservableObject {
                 return try context.fetch(fetchRequest).first
             } catch {
                 #if DEBUG
-                print("Failed to fetch profile: \(error)")
+        // print("Failed to fetch profile: \(error)")
                 #endif
                 return nil
             }
@@ -471,7 +698,7 @@ class CoreDataManager: ObservableObject {
                 return (bodyMetrics, dailyMetrics, profiles)
             } catch {
                 #if DEBUG
-                print("Failed to fetch unsynced entries: \(error)")
+        // print("Failed to fetch unsynced entries: \(error)")
                 #endif
                 return ([], [], [])
             }
@@ -790,7 +1017,7 @@ class CoreDataManager: ObservableObject {
                 return cachedMetrics.compactMap { $0.toBodyMetrics() }
             } catch {
                 #if DEBUG
-                print("Error fetching all body metrics: \(error)")
+        // print("Error fetching all body metrics: \(error)")
                 #endif
                 return []
             }
@@ -852,7 +1079,7 @@ class CoreDataManager: ObservableObject {
                 }
             } catch {
                 #if DEBUG
-                print("Error fetching all daily logs: \(error)")
+        // print("Error fetching all daily logs: \(error)")
                 #endif
                 return []
             }

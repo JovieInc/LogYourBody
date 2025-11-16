@@ -62,4 +62,57 @@
         <attribute name="lastSyncSuccess" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="syncRetryCount" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
     </entity>
+    <entity name="CachedHKSample" representedClassName="CachedHKSample" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceFirmwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="deviceHardwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="deviceLocalIdentifier" optional="YES" attributeType="String"/>
+        <attribute name="deviceManufacturer" optional="YES" attributeType="String"/>
+        <attribute name="deviceModel" optional="YES" attributeType="String"/>
+        <attribute name="deviceSoftwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="deviceUDI" optional="YES" attributeType="String"/>
+        <attribute name="endDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="hkUUID" attributeType="String"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="metadataJSON" optional="YES" attributeType="Binary"/>
+        <attribute name="quantityType" attributeType="String"/>
+        <attribute name="sourceBundleId" optional="YES" attributeType="String"/>
+        <attribute name="sourceName" optional="YES" attributeType="String"/>
+        <attribute name="startDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="unit" attributeType="String"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="userId" attributeType="String"/>
+        <attribute name="value" attributeType="Double" usesScalarValueType="YES"/>
+    </entity>
+    <entity name="CachedDevice" representedClassName="CachedDevice" syncable="YES" codeGenerationType="class">
+        <attribute name="confidence" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceFirmwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="deviceHardwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="deviceLocalIdentifier" optional="YES" attributeType="String"/>
+        <attribute name="deviceManufacturer" optional="YES" attributeType="String"/>
+        <attribute name="deviceModel" optional="YES" attributeType="String"/>
+        <attribute name="deviceSoftwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="firmwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="hardwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="inferredMethod" optional="YES" attributeType="String"/>
+        <attribute name="manufacturer" optional="YES" attributeType="String"/>
+        <attribute name="model" optional="YES" attributeType="String"/>
+        <attribute name="softwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="sourceBundleId" optional="YES" attributeType="String"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
+    <entity name="CachedUserDevice" representedClassName="CachedUserDevice" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceId" attributeType="String"/>
+        <attribute name="firstSeenAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="inferredMethod" optional="YES" attributeType="String"/>
+        <attribute name="isPrimary" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="lastSeenAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="nickname" optional="YES" attributeType="String"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="userId" attributeType="String"/>
+    </entity>
 </model>

@@ -247,17 +247,17 @@ struct DSEmptyMetricCard: View {
                 iconColor: .orange,
                 timestamp: "6:15 PM",
                 chartData: [
-                    SparklineDataPoint(index: 0, value: 5200),
-                    SparklineDataPoint(index: 1, value: 7800),
-                    SparklineDataPoint(index: 2, value: 6400),
-                    SparklineDataPoint(index: 3, value: 9100),
-                    SparklineDataPoint(index: 4, value: 7200),
-                    SparklineDataPoint(index: 5, value: 8900),
-                    SparklineDataPoint(index: 6, value: 8432)
+                    SparklineDataPoint(index: 0, value: 5_200),
+                    SparklineDataPoint(index: 1, value: 7_800),
+                    SparklineDataPoint(index: 2, value: 6_400),
+                    SparklineDataPoint(index: 3, value: 9_100),
+                    SparklineDataPoint(index: 4, value: 7_200),
+                    SparklineDataPoint(index: 5, value: 8_900),
+                    SparklineDataPoint(index: 6, value: 8_432)
                 ],
                 showChevron: true,
                 isInteractive: true,
-                onTap: { print("Steps tapped") }
+                onTap: { }
             )
 
             // Weight card with sparkline
@@ -278,7 +278,7 @@ struct DSEmptyMetricCard: View {
                 ],
                 showChevron: true,
                 isInteractive: true,
-                onTap: { print("Weight tapped") }
+                onTap: { }
             )
 
             // Body Fat card with sparkline
@@ -299,7 +299,7 @@ struct DSEmptyMetricCard: View {
                 ],
                 showChevron: true,
                 isInteractive: true,
-                onTap: { print("Body Fat tapped") }
+                onTap: { }
             )
 
             // FFMI card with sparkline
@@ -320,7 +320,7 @@ struct DSEmptyMetricCard: View {
                 ],
                 showChevron: true,
                 isInteractive: true,
-                onTap: { print("FFMI tapped") }
+                onTap: { }
             )
         }
         .padding(20)

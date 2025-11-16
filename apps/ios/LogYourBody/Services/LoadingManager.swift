@@ -80,11 +80,11 @@ class LoadingManager: ObservableObject {
 
             // Log the result
             if authManager.isClerkLoaded {
-                print("✅ LoadingManager: Clerk loaded successfully")
+        // print("✅ LoadingManager: Clerk loaded successfully")
             } else if let error = authManager.clerkInitError {
-                print("⚠️ LoadingManager: Clerk failed to load: \(error)")
+        // print("⚠️ LoadingManager: Clerk failed to load: \(error)")
             } else {
-                print("⚠️ LoadingManager: Clerk loading timed out after \(maxWaitTime)s")
+        // print("⚠️ LoadingManager: Clerk loading timed out after \(maxWaitTime)s")
             }
         }
 
@@ -113,7 +113,7 @@ class LoadingManager: ObservableObject {
                         // Sync onboarding state to UserDefaults
                         if let onboardingCompleted = profile.onboardingCompleted {
                             UserDefaults.standard.set(onboardingCompleted, forKey: Constants.hasCompletedOnboardingKey)
-                            print("✅ LoadingManager: Synced onboarding status from profile: \(onboardingCompleted)")
+        // print("✅ LoadingManager: Synced onboarding status from profile: \(onboardingCompleted)")
                         }
                     }
                 }

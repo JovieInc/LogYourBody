@@ -98,7 +98,7 @@ struct PaywallView: View {
             // Use cached offerings if available, otherwise fetch
             if revenueCatManager.currentOffering != nil {
                 isLoading = false
-                print("💰 Using cached offerings")
+        // print("💰 Using cached offerings")
             } else {
                 Task {
                     await loadOfferings()
@@ -336,7 +336,7 @@ struct PaywallView: View {
         isLoading = false
 
         if revenueCatManager.currentOffering == nil {
-            print("⚠️ No offerings available")
+        // print("⚠️ No offerings available")
         }
     }
 }

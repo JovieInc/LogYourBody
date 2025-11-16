@@ -83,13 +83,13 @@ class AuthManager: NSObject, ObservableObject {
     }
     
     func initializeClerk() async {
-        print("🔧 Initializing Clerk SDK")
+        // print("🔧 Initializing Clerk SDK")
 
         let pubKey = Constants.clerkPublishableKey
-        print("🔧 Publishable Key Length: \(pubKey.count)")
-        print("🔧 Publishable Key: \(pubKey.isEmpty ? "EMPTY ❌" : String(pubKey.prefix(20)) + "...")")
-        print("🔧 Frontend API: \(Constants.clerkFrontendAPI)")
-        print("🔧 Is Configured: \(Constants.isClerkConfigured)")
+        // print("🔧 Publishable Key Length: \(pubKey.count)")
+        // print("🔧 Publishable Key: \(pubKey.isEmpty ? "EMPTY ❌" : String(pubKey.prefix(20)) + "...")")
+        // print("🔧 Frontend API: \(Constants.clerkFrontendAPI)")
+        // print("🔧 Is Configured: \(Constants.isClerkConfigured)")
 
         // Clear any previous error
         await MainActor.run {
@@ -99,7 +99,7 @@ class AuthManager: NSObject, ObservableObject {
         // Validate publishable key before attempting to configure
         guard !pubKey.isEmpty else {
             let error = "Clerk publishable key is empty. Check Config.xcconfig and Xcode project configuration."
-            print("❌ \(error)")
+        // print("❌ \(error)")
             await MainActor.run {
                 self.isClerkLoaded = false
                 self.clerkInitError = error
@@ -109,7 +109,7 @@ class AuthManager: NSObject, ObservableObject {
 
         guard pubKey.hasPrefix("pk_") else {
             let error = "Invalid Clerk key format (should start with 'pk_'). Current: '\(String(pubKey.prefix(10)))...'"
-            print("❌ \(error)")
+        // print("❌ \(error)")
             await MainActor.run {
                 self.isClerkLoaded = false
                 self.clerkInitError = error
@@ -118,16 +118,16 @@ class AuthManager: NSObject, ObservableObject {
         }
 
         // Configure Clerk with publishable key
-        print("🔧 Configuring Clerk with valid publishable key...")
+        // print("🔧 Configuring Clerk with valid publishable key...")
         clerk.configure(publishableKey: pubKey)
 
         // Load Clerk
         do {
-            print("🔧 Attempting to load Clerk...")
+        // print("🔧 Attempting to load Clerk...")
             let startTime = Date()
             try await clerk.load()
             let duration = Date().timeIntervalSince(startTime)
-            print("✅ Clerk SDK loaded successfully in \(String(format: "%.2f", duration))s")
+        // print("✅ Clerk SDK loaded successfully in \(String(format: "%.2f", duration))s")
 
             await MainActor.run {
                 self.isClerkLoaded = true
@@ -136,10 +136,10 @@ class AuthManager: NSObject, ObservableObject {
             }
         } catch {
             let errorMessage = error.localizedDescription
-            print("❌ Failed to load Clerk: \(error)")
-            print("❌ Error type: \(type(of: error))")
-            print("❌ Error details: \(String(describing: error))")
-            print("❌ Localized: \(errorMessage)")
+        // print("❌ Failed to load Clerk: \(error)")
+        // print("❌ Error type: \(type(of: error))")
+        // print("❌ Error details: \(String(describing: error))")
+        // print("❌ Localized: \(errorMessage)")
 
             await MainActor.run {
                 self.isClerkLoaded = false
@@ -150,7 +150,7 @@ class AuthManager: NSObject, ObservableObject {
 
     /// Retry Clerk initialization after a failure
     func retryClerkInitialization() async {
-        print("🔄 Retrying Clerk initialization...")
+        // print("🔄 Retrying Clerk initialization...")
         await initializeClerk()
     }
 
@@ -1121,7 +1121,7 @@ class AuthManager: NSObject, ObservableObject {
             user.onboardingCompleted = onboardingCompleted
             // Sync onboarding status to UserDefaults
             UserDefaults.standard.set(onboardingCompleted, forKey: Constants.hasCompletedOnboardingKey)
-            print("✅ AuthManager: Synced onboarding status to UserDefaults: \(onboardingCompleted)")
+        // print("✅ AuthManager: Synced onboarding status to UserDefaults: \(onboardingCompleted)")
         }
 
         // Save updated user locally
@@ -1658,13 +1658,13 @@ private class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate, 
 
         // Last resort: create a new window for the first available scene
         // This prevents crashes but may not show UI properly
-        print("⚠️ No active window found for Apple Sign In - creating fallback window")
+        // print("⚠️ No active window found for Apple Sign In - creating fallback window")
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
             return UIWindow(windowScene: windowScene)
         }
 
         // Absolute fallback: return a basic window (sign in won't work but won't crash)
-        print("❌ Critical: No window scene available - Apple Sign In will likely fail")
+        // print("❌ Critical: No window scene available - Apple Sign In will likely fail")
         return UIWindow(frame: UIScreen.main.bounds)
     }
 }

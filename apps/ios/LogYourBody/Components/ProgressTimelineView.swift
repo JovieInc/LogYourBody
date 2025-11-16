@@ -124,7 +124,7 @@ struct ProgressTimelineView: View {
                 // Photo thumbnail (circular)
                 if let photoUrl = anchor.bodyMetrics.photoUrl, !photoUrl.isEmpty {
                     // Debug logging
-                    let _ = print("[Timeline] Loading photo for anchor: \(anchor.id), URL: \(photoUrl)")
+                    _ = // print("[Timeline] Loading photo for anchor: \(anchor.id), URL: \(photoUrl)")
 
                     // Validate URL before attempting to load
                     if URL(string: photoUrl) != nil {
@@ -139,7 +139,7 @@ struct ProgressTimelineView: View {
                                 .stroke(Color.white.opacity(0.5), lineWidth: 2)
                         )
                     } else {
-                        let _ = print("[Timeline] Invalid URL format: \(photoUrl)")
+                        _ = // print("[Timeline] Invalid URL format: \(photoUrl)")
                         photoPlaceholder
                     }
                 } else {

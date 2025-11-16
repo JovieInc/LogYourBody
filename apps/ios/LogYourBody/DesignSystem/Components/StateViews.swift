@@ -199,9 +199,9 @@ struct EmptyStateView: View {
             
             // Action button
             if let actionTitle = actionTitle, let action = action {
-                StandardButton(
+                BaseButton(
                     actionTitle,
-                    style: .primary,
+                    configuration: ButtonConfiguration(style: .primary),
                     action: action
                 )
                 .padding(.top, 12)
@@ -241,10 +241,12 @@ struct ErrorView: View {
             
             // Retry button
             if let retryAction = retryAction {
-                StandardButton(
+                BaseButton(
                     "Try Again",
-                    icon: "arrow.clockwise",
-                    style: .primary,
+                    configuration: ButtonConfiguration(
+                        style: .primary,
+                        icon: "arrow.clockwise"
+                    ),
                     action: retryAction
                 )
                 .padding(.top, 12)
@@ -306,9 +308,9 @@ struct SuccessView: View {
             
             // Action button
             if let actionTitle = actionTitle, let action = action {
-                StandardButton(
+                BaseButton(
                     actionTitle,
-                    style: .primary,
+                    configuration: ButtonConfiguration(style: .primary),
                     action: action
                 )
                 .padding(.top, 12)

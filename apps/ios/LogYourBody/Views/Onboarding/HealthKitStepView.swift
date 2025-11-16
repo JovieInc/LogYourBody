@@ -94,6 +94,37 @@ struct HealthKitStepView: View {
                     )
                 }
                 .padding(.horizontal, 40)
+
+                if let bodyFat = viewModel.data.bodyFatPercentage {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "percent")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(.appPrimary)
+                            Text("Body Fat")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.appTextSecondary)
+                        }
+                        Text("\(bodyFat, specifier: "%.1f")% body fat")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(.appText)
+                        Text("Preset from Apple Health")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.appTextTertiary)
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal, 24)
+                    .transition(.opacity.combined(with: .scale))
+                }
             }
             
             Spacer()
@@ -133,6 +164,9 @@ struct HealthKitStepView: View {
             .padding(.bottom, 50)
             }
         }
+        .task {
+            await refreshBodyFatPrefillIfNeeded()
+        }
     }
     
     private func connectHealthKit() {
@@ -148,37 +182,57 @@ struct HealthKitStepView: View {
                 // If authorized, try to fetch data from HealthKit
                 if authorized {
                     Task {
-                        // Fetch all available data from HealthKit
-                        
-                        // Fetch date of birth
-                        if let dateOfBirth = healthKitManager.fetchDateOfBirth() {
-                            await MainActor.run {
-                                viewModel.data.dateOfBirth = dateOfBirth
-                            }
-                        }
-                        
-                        // Fetch biological sex
-                        if let biologicalSex = healthKitManager.fetchBiologicalSex() {
-                            await MainActor.run {
-                                viewModel.data.gender = OnboardingData.Gender(rawValue: biologicalSex)
-                            }
-                        }
-                        
-                        // Fetch height
-                        if let heightInInches = try? await healthKitManager.fetchHeight() {
-                            await MainActor.run {
-                                let feet = Int(heightInInches) / 12
-                                let inches = Int(heightInInches) % 12
-                                viewModel.data.heightFeet = feet
-                                viewModel.data.heightInches = inches
-                            }
-                        }
+                        await fetchHealthKitProfileData()
                     }
                 }
                 
                 // Move to next step
                 viewModel.nextStep()
             }
+        }
+    }
+    
+    private func refreshBodyFatPrefillIfNeeded() async {
+        guard healthKitManager.isAuthorized else { return }
+        await fetchBodyFatPrefill()
+    }
+
+    private func fetchHealthKitProfileData() async {
+        // Fetch all available data from HealthKit
+        if let dateOfBirth = healthKitManager.fetchDateOfBirth() {
+            await MainActor.run {
+                viewModel.data.dateOfBirth = dateOfBirth
+            }
+        }
+        
+        if let biologicalSex = healthKitManager.fetchBiologicalSex() {
+            await MainActor.run {
+                viewModel.data.gender = OnboardingData.Gender(rawValue: biologicalSex)
+            }
+        }
+        
+        if let heightInInches = try? await healthKitManager.fetchHeight() {
+            await MainActor.run {
+                let feet = Int(heightInInches) / 12
+                let inches = Int(heightInInches) % 12
+                viewModel.data.heightFeet = feet
+                viewModel.data.heightInches = inches
+            }
+        }
+        
+        await fetchBodyFatPrefill()
+    }
+    
+    private func fetchBodyFatPrefill() async {
+        do {
+            let result = try await healthKitManager.fetchLatestBodyFatPercentage()
+            if let percentage = result.percentage {
+                await MainActor.run {
+                    viewModel.data.bodyFatPercentage = (percentage * 10).rounded() / 10
+                }
+            }
+        } catch {
+            // Ignore errors silently for onboarding prefill
         }
     }
 }

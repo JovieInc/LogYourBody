@@ -52,13 +52,13 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     // MARK: - Initialization
 
-    private override init() {
+    override private init() {
         super.init()
-        print("💰 RevenueCatManager initialized")
+        // print("💰 RevenueCatManager initialized")
 
         // Load cached subscription status for instant UI update
         self.isSubscribed = cachedIsSubscribed
-        print("💰 Loaded cached subscription status: \(cachedIsSubscribed)")
+        // print("💰 Loaded cached subscription status: \(cachedIsSubscribed)")
     }
 
     // MARK: - Configuration
@@ -66,7 +66,7 @@ class RevenueCatManager: NSObject, ObservableObject {
     /// Configure RevenueCat SDK - call this on app launch
     /// Note: Does NOT fetch customer info immediately to avoid blocking UI
     nonisolated func configure(apiKey: String) {
-        print("💰 Configuring RevenueCat SDK")
+        // print("💰 Configuring RevenueCat SDK")
 
         // Configure SDK
         Purchases.logLevel = .debug
@@ -75,32 +75,32 @@ class RevenueCatManager: NSObject, ObservableObject {
         // Set up delegate to listen for customer info updates
         Purchases.shared.delegate = self
 
-        print("💰 RevenueCat SDK configured successfully")
+        // print("💰 RevenueCat SDK configured successfully")
     }
 
     /// Mark SDK as configured after delegate setup completes
     func markAsConfigured() {
         isConfigured = true
-        print("✅ SDK marked as configured")
+        // print("✅ SDK marked as configured")
     }
 
     /// Identify the user with their Clerk user ID
     func identifyUser(userId: String) async {
         guard isConfigured else {
-            print("⚠️ SDK not configured yet, skipping identifyUser()")
+        // print("⚠️ SDK not configured yet, skipping identifyUser()")
             return
         }
 
-        print("💰 Identifying user: \(userId)")
+        // print("💰 Identifying user: \(userId)")
 
         do {
             let (customerInfo, _) = try await Purchases.shared.logIn(userId)
             await MainActor.run {
                 self.updateSubscriptionStatus(customerInfo: customerInfo)
             }
-            print("💰 User identified successfully")
+        // print("💰 User identified successfully")
         } catch {
-            print("❌ Failed to identify user: \(error.localizedDescription)")
+        // print("❌ Failed to identify user: \(error.localizedDescription)")
             await MainActor.run {
                 self.errorMessage = "Failed to link account: \(error.localizedDescription)"
             }
@@ -109,7 +109,7 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     /// Log out the current user (call this on sign out)
     func logoutUser() async {
-        print("💰 Logging out user")
+        // print("💰 Logging out user")
 
         do {
             _ = try await Purchases.shared.logOut()
@@ -120,7 +120,7 @@ class RevenueCatManager: NSObject, ObservableObject {
                 self.currentOffering = nil
             }
         } catch {
-            print("❌ Failed to log out user: \(error.localizedDescription)")
+        // print("❌ Failed to log out user: \(error.localizedDescription)")
         }
     }
 
@@ -129,20 +129,20 @@ class RevenueCatManager: NSObject, ObservableObject {
     /// Refresh customer info and subscription status
     func refreshCustomerInfo() async {
         guard isConfigured else {
-            print("⚠️ SDK not configured yet, skipping refreshCustomerInfo()")
+        // print("⚠️ SDK not configured yet, skipping refreshCustomerInfo()")
             return
         }
 
-        print("💰 Refreshing customer info")
+        // print("💰 Refreshing customer info")
 
         do {
             let customerInfo = try await Purchases.shared.customerInfo()
             await MainActor.run {
                 self.updateSubscriptionStatus(customerInfo: customerInfo)
-                print("💰 Subscription status: \(self.isSubscribed ? "Active" : "Inactive")")
+        // print("💰 Subscription status: \(self.isSubscribed ? "Active" : "Inactive")")
             }
         } catch {
-            print("❌ Failed to refresh customer info: \(error.localizedDescription)")
+        // print("❌ Failed to refresh customer info: \(error.localizedDescription)")
             await MainActor.run {
                 self.isSubscribed = false
             }
@@ -171,42 +171,42 @@ class RevenueCatManager: NSObject, ObservableObject {
         // Wait for SDK to be configured (with timeout)
         var retries = 0
         while !isConfigured && retries < 50 {
-            print("⚠️ SDK not configured yet, waiting... (retry \(retries + 1)/50)")
+        // print("⚠️ SDK not configured yet, waiting... (retry \(retries + 1)/50)")
             try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
             retries += 1
         }
 
         guard isConfigured else {
-            print("❌ SDK not configured after timeout, cannot fetch offerings")
+        // print("❌ SDK not configured after timeout, cannot fetch offerings")
             await MainActor.run {
                 self.errorMessage = "Service not ready. Please try again."
             }
             return
         }
 
-        print("💰 Fetching offerings")
+        // print("💰 Fetching offerings")
 
         do {
             let offerings = try await Purchases.shared.offerings()
             await MainActor.run {
                 self.currentOffering = offerings.current
-                print("💰 Fetched \(offerings.all.count) offerings")
+        // print("💰 Fetched \(offerings.all.count) offerings")
 
                 // Debug: Print details about current offering
                 if let current = offerings.current {
-                    print("💰 Current offering: \(current.identifier)")
-                    print("💰 Available packages: \(current.availablePackages.count)")
+        // print("💰 Current offering: \(current.identifier)")
+        // print("💰 Available packages: \(current.availablePackages.count)")
                     for package in current.availablePackages {
-                        print("  📦 Package: \(package.identifier)")
-                        print("     Price: \(package.localizedPriceString)")
-                        print("     Product: \(package.storeProduct.productIdentifier)")
+        // print("  📦 Package: \(package.identifier)")
+        // print("     Price: \(package.localizedPriceString)")
+        // print("     Product: \(package.storeProduct.productIdentifier)")
                     }
                 } else {
-                    print("⚠️ No current offering available")
+        // print("⚠️ No current offering available")
                 }
             }
         } catch {
-            print("❌ Failed to fetch offerings: \(error.localizedDescription)")
+        // print("❌ Failed to fetch offerings: \(error.localizedDescription)")
             await MainActor.run {
                 self.errorMessage = "Failed to load subscription options"
             }
@@ -215,7 +215,7 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     /// Purchase a package
     func purchase(package: Package) async -> Bool {
-        print("💰 Attempting purchase: \(package.identifier)")
+        // print("💰 Attempting purchase: \(package.identifier)")
 
         await MainActor.run {
             self.isPurchasing = true
@@ -230,7 +230,7 @@ class RevenueCatManager: NSObject, ObservableObject {
                 self.isPurchasing = false
             }
 
-            print("💰 Purchase successful!")
+        // print("💰 Purchase successful!")
             return true
 
         } catch let error as ErrorCode {
@@ -239,8 +239,9 @@ class RevenueCatManager: NSObject, ObservableObject {
 
                 switch error {
                 case .purchaseCancelledError:
-                    print("💰 Purchase cancelled by user")
+        // print("💰 Purchase cancelled by user")
                     // Don't show error for user cancellation
+                    break
                 case .storeProblemError:
                     self.errorMessage = "There was a problem with the App Store. Please try again."
                 case .purchaseNotAllowedError:
@@ -251,7 +252,7 @@ class RevenueCatManager: NSObject, ObservableObject {
                     self.errorMessage = "Purchase failed: \(error.localizedDescription)"
                 }
 
-                print("❌ Purchase failed: \(error.localizedDescription)")
+        // print("❌ Purchase failed: \(error.localizedDescription)")
             }
             return false
         } catch {
@@ -259,14 +260,14 @@ class RevenueCatManager: NSObject, ObservableObject {
                 self.isPurchasing = false
                 self.errorMessage = "An unexpected error occurred"
             }
-            print("❌ Unexpected purchase error: \(error.localizedDescription)")
+        // print("❌ Unexpected purchase error: \(error.localizedDescription)")
             return false
         }
     }
 
     /// Restore previous purchases
     func restorePurchases() async -> Bool {
-        print("💰 Restoring purchases")
+        // print("💰 Restoring purchases")
 
         await MainActor.run {
             self.isPurchasing = true
@@ -282,7 +283,7 @@ class RevenueCatManager: NSObject, ObservableObject {
             }
 
             if isSubscribed {
-                print("💰 Purchases restored successfully")
+        // print("💰 Purchases restored successfully")
                 return true
             } else {
                 await MainActor.run {
@@ -296,7 +297,7 @@ class RevenueCatManager: NSObject, ObservableObject {
                 self.isPurchasing = false
                 self.errorMessage = "Failed to restore purchases"
             }
-            print("❌ Failed to restore purchases: \(error.localizedDescription)")
+        // print("❌ Failed to restore purchases: \(error.localizedDescription)")
             return false
         }
     }
@@ -336,7 +337,7 @@ class RevenueCatManager: NSObject, ObservableObject {
         self.isSubscribed = isActive
         self.cachedIsSubscribed = isActive
         self.lastFetchTimestamp = Date().timeIntervalSince1970
-        print("💰 Updated subscription status: \(isActive) (cached)")
+        // print("💰 Updated subscription status: \(isActive) (cached)")
     }
 
     /// Check if cache is expired (older than 24 hours)
@@ -351,7 +352,7 @@ class RevenueCatManager: NSObject, ObservableObject {
 extension RevenueCatManager: PurchasesDelegate {
     nonisolated func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
         Task { @MainActor in
-            print("💰 Received updated customer info")
+        // print("💰 Received updated customer info")
             self.updateSubscriptionStatus(customerInfo: customerInfo)
         }
     }

@@ -274,7 +274,7 @@ struct FrostedTabItem: View {
             }
 
             GlassPillButton(icon: "plus.circle.fill", title: "Log Weight") {
-                print("Tapped")
+        // print("Tapped")
             }
 
             GlassChip(icon: "flame.fill", text: "12.1% BF", color: .orange)

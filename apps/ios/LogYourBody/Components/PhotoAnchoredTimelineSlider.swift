@@ -263,8 +263,8 @@ struct PhotoAnchoredTimelineSlider: View {
         guard !timelinePoints.isEmpty else { return [] }
 
         var milestones: [TimelineDataPoint] = []
-        var lastYear: Int? = nil
-        var lastMonth: Int? = nil
+        var lastYear: Int?
+        var lastMonth: Int?
 
         let calendar = Calendar.current
 
@@ -298,9 +298,9 @@ struct PhotoAnchoredTimelineSlider: View {
         guard !timelinePoints.isEmpty else { return [] }
 
         var notches: [TimelineDataPoint] = []
-        var lastYear: Int? = nil
-        var lastMonth: Int? = nil
-        var lastWeek: Int? = nil
+        var lastYear: Int?
+        var lastMonth: Int?
+        var lastWeek: Int?
 
         let calendar = Calendar.current
 

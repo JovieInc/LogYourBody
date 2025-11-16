@@ -8,6 +8,7 @@
 
 import SwiftUI
 import Charts
+import Foundation
 
 // MARK: - Metric Detail View
 
@@ -33,55 +34,113 @@ struct MetricDetailView: View {
     @State private var isScrubbing: Bool = false
     @State private var lastHapticIndex: Int? = nil
     @State private var isLoadingData: Bool = false
+    @State private var entrySections: [EntrySection] = []
+    @State private var isLoadingEntries: Bool = false
+    @State private var editingEntry: MetricEntry?
+    @State private var entryPendingDeletion: MetricEntry?
+    @State private var showingDeleteConfirmation: Bool = false
 
     var body: some View {
         ZStack {
-            // Background
             Color.black
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Navigation bar
+            List {
+                Section {
                     navigationBar
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
-                        .padding(.bottom, 16)
+                        .padding(.bottom, 12)
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
-                    // Period selector
+                Section {
                     PeriodSelector(selectedPeriod: $selectedPeriod)
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 24)
+                        .padding(.vertical, 8)
                         .onChange(of: selectedPeriod) { _ in
                             Task {
                                 await loadChartData()
                             }
                         }
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
-                    // Current value display
+                Section {
                     currentValueDisplay
-                        .padding(.bottom, 24)
+                        .padding(.vertical, 12)
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
-                    // Chart
+                Section {
                     chartView
                         .frame(height: 360)
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 32)
+                        .padding(.vertical, 12)
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
-                    // Statistics
-                    statisticsView
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 32)
+                if hasStatistics {
+                    Section {
+                        statisticsView
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+
+                if supportsEntryManagement {
+                    entriesSectionContent
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
             .refreshable {
                 await refreshData()
             }
         }
         .navigationBarHidden(true)
+        .sheet(item: $editingEntry) { entry in
+            EditEntrySheet(
+                entry: entry,
+                metricType: metricType,
+                useMetricUnits: useMetricUnits,
+                onComplete: {
+                    await refreshAfterEntryMutation()
+                }
+            )
+        }
+        .alert("Delete Entry?", isPresented: $showingDeleteConfirmation, presenting: entryPendingDeletion) { entry in
+            Button("Delete", role: .destructive) {
+                Task {
+                    await deleteEntry(entry)
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                entryPendingDeletion = nil
+            }
+        } message: { _ in
+            Text("This will remove the entry and update your charts.")
+        }
         .onAppear {
             Task {
                 await loadChartData()
+                if supportsEntryManagement {
+                    await loadEntries()
+                } else {
+                    entrySections = []
+                }
             }
         }
     }
@@ -195,6 +254,70 @@ struct MetricDetailView: View {
         }
     }
 
+    // MARK: - Entry Management Views
+
+    @ViewBuilder
+    private var entriesSectionContent: some View {
+        if isLoadingEntries {
+            Section {
+                entryLoadingView
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+        } else if entrySections.isEmpty {
+            Section {
+                entriesEmptyState
+                    .padding(.vertical, 32)
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+        } else {
+            ForEach(entrySections) { section in
+                Section {
+                    ForEach(section.entries) { entry in
+                        MetricEntryRow(
+                            entry: entry,
+                            metricType: metricType,
+                            measurementSystem: measurementSystem
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            guard entry.isEditable else { return }
+                            editingEntry = entry
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            if entry.isEditable {
+                                Button(role: .destructive) {
+                                    entryPendingDeletion = entry
+                                    showingDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                    }
+                } header: {
+                    HStack {
+                        Text(section.title)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+
+                        Spacer()
+
+                        Text(section.entries.count == 1 ? "1 entry" : "\(section.entries.count) entries")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+                }
+            }
+        }
+    }
+
     // MARK: - Statistics View
 
     private var statisticsView: some View {
@@ -245,6 +368,40 @@ struct MetricDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var entryLoadingView: some View {
+        HStack(spacing: 12) {
+            ProgressView()
+                .tint(.white)
+            Text("Loading entries…")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding()
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 20)
+    }
+
+    private var entriesEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 32, weight: .semibold))
+                .foregroundColor(.white.opacity(0.35))
+
+            Text("No entries yet")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.white)
+
+            Text("Add your first entry to start building a history.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.6))
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 20)
+    }
+
     // MARK: - Helper Properties
 
     private var metricTitle: String {
@@ -277,8 +434,26 @@ struct MetricDetailView: View {
         }
     }
 
+    private var measurementSystem: MeasurementSystem {
+        useMetricUnits ? .metric : .imperial
+    }
+
+    private var supportsEntryManagement: Bool {
+        switch metricType {
+        case .weight, .bodyFat:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var hasStatistics: Bool {
+        !chartData.isEmpty && !isLoadingData
+    }
+
     // MARK: - Data Loading
 
+    @MainActor
     private func loadChartData() async {
         isLoadingData = true
 
@@ -288,25 +463,18 @@ struct MetricDetailView: View {
             metricType: metricType,
             useMetric: useMetricUnits
         )
-
         isLoadingData = false
     }
 
+    @MainActor
     private func refreshData() async {
-        // Clear cache and reload data
-        MetricChartDataHelper.clearCache()
+        MetricChartDataHelper.clearCache(for: userId)
         await loadChartData()
+        if supportsEntryManagement {
+            await loadEntries()
+        }
 
-        // Small delay for better UX
-        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
-    }
-
-    // MARK: - Statistics Calculations
-
-    private func calculateAverage() -> Double? {
-        guard !chartData.isEmpty else { return nil }
-        let sum = chartData.reduce(0.0) { $0 + $1.value }
-        return sum / Double(chartData.count)
+        try? await Task.sleep(nanoseconds: 300_000_000)
     }
 
     private func calculateMin() -> Double? {
@@ -422,6 +590,147 @@ struct MetricDetailView: View {
         }
         return point.isEstimated
     }
+
+    // MARK: - Entry Helpers
+
+    @MainActor
+    private func loadEntries() async {
+        guard supportsEntryManagement else {
+            entrySections = []
+            return
+        }
+
+        isLoadingEntries = true
+        defer { isLoadingEntries = false }
+
+        let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+        let bodyMetrics = cachedMetrics
+            .compactMap { $0.toBodyMetrics() }
+            .filter { metric in
+                switch metricType {
+                case .weight:
+                    return metric.weight != nil
+                case .bodyFat:
+                    return metric.bodyFatPercentage != nil
+                default:
+                    return false
+                }
+            }
+            .sorted { $0.date > $1.date }
+
+        let entries = bodyMetrics.compactMap(makeEntry(from:))
+        entrySections = buildSections(from: entries)
+    }
+
+    @MainActor
+    private func refreshAfterEntryMutation() async {
+        await loadEntries()
+        await loadChartData()
+    }
+
+    @MainActor
+    private func deleteEntry(_ entry: MetricEntry) async {
+        defer {
+            entryPendingDeletion = nil
+            showingDeleteConfirmation = false
+        }
+
+        let success = await CoreDataManager.shared.markBodyMetricDeleted(id: entry.id)
+        if success {
+            await refreshAfterEntryMutation()
+        }
+    }
+
+    private func makeEntry(from metric: BodyMetrics) -> MetricEntry? {
+        let primaryValue: Double?
+        let unit: String
+        var secondaryValue: Double?
+        var secondaryUnit: String?
+
+        switch metricType {
+        case .weight:
+            guard let weightKg = metric.weight else { return nil }
+            primaryValue = convertWeightForDisplay(weightKg)
+            unit = measurementSystem.weightUnit
+            if let bodyFat = metric.bodyFatPercentage {
+                secondaryValue = bodyFat
+                secondaryUnit = "%"
+            }
+        case .bodyFat:
+            guard let bodyFat = metric.bodyFatPercentage else { return nil }
+            primaryValue = bodyFat
+            unit = "%"
+            if let weightKg = metric.weight {
+                secondaryValue = convertWeightForDisplay(weightKg)
+                secondaryUnit = measurementSystem.weightUnit
+            }
+        default:
+            return nil
+        }
+
+        guard let value = primaryValue else { return nil }
+
+        return MetricEntry(
+            id: metric.id,
+            date: metric.date,
+            primaryValue: value,
+            primaryUnit: unit,
+            secondaryValue: secondaryValue,
+            secondaryUnit: secondaryUnit,
+            notes: metric.notes,
+            source: sourceType(for: metric.dataSource),
+            isEditable: isEditableSource(metric.dataSource)
+        )
+    }
+
+    private func buildSections(from entries: [MetricEntry]) -> [EntrySection] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+
+        let grouped = Dictionary(grouping: entries) { entry -> DateComponents in
+            Calendar.current.dateComponents([.year, .month], from: entry.date)
+        }
+
+        let sortedKeys = grouped.keys.sorted { lhs, rhs in
+            let lhsDate = Calendar.current.date(from: lhs) ?? Date.distantPast
+            let rhsDate = Calendar.current.date(from: rhs) ?? Date.distantPast
+            return lhsDate > rhsDate
+        }
+
+        return sortedKeys.compactMap { components in
+            guard let date = Calendar.current.date(from: components),
+                  let entries = grouped[components] else { return nil }
+
+            let title = formatter.string(from: date)
+            let sortedEntries = entries.sorted { $0.date > $1.date }
+            return EntrySection(id: UUID().uuidString, title: title, entries: sortedEntries)
+        }
+    }
+
+    private func convertWeightForDisplay(_ weightKg: Double) -> Double {
+        switch measurementSystem {
+        case .metric:
+            return weightKg
+        case .imperial:
+            return weightKg * 2.20462
+        }
+    }
+
+    private func sourceType(for dataSource: String?) -> EntrySource {
+        let normalized = dataSource?.lowercased() ?? ""
+        if normalized.contains("health") {
+            return .healthKit
+        } else if normalized.isEmpty || normalized == "manual" {
+            return .manual
+        } else {
+            return .integration(name: dataSource)
+        }
+    }
+
+    private func isEditableSource(_ dataSource: String?) -> Bool {
+        guard let source = dataSource else { return true }
+        return source.lowercased().contains("manual") || source.lowercased().isEmpty
+    }
 }
 
 // MARK: - Stat Card Component
@@ -474,6 +783,147 @@ struct DetailChartDataPoint: Equatable {
     let value: Double
 }
 
+// MARK: - Entry Row & Models
+
+private struct MetricEntryRow: View {
+    let entry: MetricEntry
+    let metricType: DashboardViewLiquid.DashboardMetricKind
+    let measurementSystem: MeasurementSystem
+
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            sourceBadge
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(primaryValueText)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    if let secondary = secondaryValueText {
+                        Text(secondary)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Text(dateFormatter.string(from: entry.date))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+
+                    if let notes = entry.notes, !notes.isEmpty {
+                        Circle()
+                            .fill(Color.white.opacity(0.4))
+                            .frame(width: 3, height: 3)
+
+                        Text(notes)
+                            .font(.system(size: 13))
+                            .lineLimit(1)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+            }
+
+            Spacer()
+
+            if entry.isEditable {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var primaryValueText: String {
+        switch metricType {
+        case .weight:
+            return String(format: "%.1f %@", entry.primaryValue, entry.primaryUnit)
+        case .bodyFat:
+            return String(format: "%.1f%@", entry.primaryValue, entry.primaryUnit)
+        default:
+            return "--"
+        }
+    }
+
+    private var secondaryValueText: String? {
+        guard let value = entry.secondaryValue,
+              let unit = entry.secondaryUnit else { return nil }
+
+        if unit == "%" {
+            return String(format: "%.1f%@", value, unit)
+        }
+
+        return String(format: "%.1f %@", value, unit)
+    }
+
+    private var sourceBadge: some View {
+        let configuration = entry.source.configuration
+
+        return ZStack {
+            Circle()
+                .fill(configuration.background)
+                .frame(width: 36, height: 36)
+            Image(systemName: configuration.icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(configuration.iconColor)
+        }
+        .overlay(
+            Circle()
+                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+        )
+    }
+}
+
+private struct EntrySection: Identifiable {
+    let id: String
+    let title: String
+    let entries: [MetricEntry]
+}
+
+struct MetricEntry: Identifiable, Equatable {
+    let id: String
+    let date: Date
+    let primaryValue: Double
+    let primaryUnit: String
+    let secondaryValue: Double?
+    let secondaryUnit: String?
+    let notes: String?
+    let source: EntrySource
+    let isEditable: Bool
+}
+
+enum EntrySource: Equatable {
+    case manual
+    case healthKit
+    case integration(name: String?)
+
+    struct Configuration {
+        let icon: String
+        let iconColor: Color
+        let background: Color
+    }
+
+    var configuration: Configuration {
+        switch self {
+        case .manual:
+            return Configuration(icon: "pencil", iconColor: .white, background: Color.white.opacity(0.15))
+        case .healthKit:
+            return Configuration(icon: "heart.fill", iconColor: .red, background: Color.red.opacity(0.2))
+        case .integration:
+            return Configuration(icon: "bolt.horizontal", iconColor: .blue, background: Color.blue.opacity(0.2))
+        }
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -486,7 +936,7 @@ struct DetailChartDataPoint: Equatable {
             unit: "lbs",
             timestamp: Date(),
             onAdd: {
-                print("Add tapped")
+        // print("Add tapped")
             }
         )
     }
