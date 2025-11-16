@@ -2184,6 +2184,8 @@ private struct FullMetricChartView: View {
     @State private var selectedDate: Date?
     @State private var selectedPoint: MetricChartDataPoint?
     @State private var isLoadingData: Bool = false
+    @State private var filteredDataCache: [TimeRange: [MetricChartDataPoint]] = [:]
+    @State private var sortedChartData: [MetricChartDataPoint] = []
 
     var body: some View {
         ZStack {
@@ -2223,6 +2225,9 @@ private struct FullMetricChartView: View {
                 selectedDate = nil
                 selectedPoint = nil
             }
+        }
+        .task(id: chartDataCacheToken) {
+            await buildChartDataCache()
         }
     }
 
@@ -2460,20 +2465,26 @@ private struct FullMetricChartView: View {
     }
 
     private var filteredChartData: [MetricChartDataPoint] {
-        // When showing "All", use the full history; otherwise, filter by range.
-        if let days = selectedTimeRange.days {
-            let cutoffDate = Calendar.current.date(
-                byAdding: .day,
-                value: -days,
-                to: Date()
-            ) ?? Date()
-
-            return chartData
-                .filter { $0.date >= cutoffDate }
-                .sorted { $0.date < $1.date }
+        if let cached = filteredDataCache[selectedTimeRange] {
+            return cached
         }
 
-        return chartData.sorted { $0.date < $1.date }
+        let baseData = sortedChartData.isEmpty
+            ? chartData.sorted { $0.date < $1.date }
+            : sortedChartData
+
+        return Self.filterData(baseData, for: selectedTimeRange, referenceDate: Date())
+    }
+
+    private var chartDataCacheToken: Int {
+        var hasher = Hasher()
+        hasher.combine(chartData.count)
+        for point in chartData {
+            hasher.combine(point.date.timeIntervalSince1970)
+            hasher.combine(point.value)
+            hasher.combine(point.isEstimated)
+        }
+        return hasher.finalize()
     }
 
     private var xAxisTickCount: Int {
@@ -2560,6 +2571,60 @@ private struct FullMetricChartView: View {
 
     private func formatAxisValue(_ value: Double) -> String {
         return String(format: "%.0f", value)
+    }
+
+    private func buildChartDataCache() async {
+        await MainActor.run {
+            isLoadingData = true
+        }
+
+        let sourceData = chartData
+        let referenceDate = Date()
+
+        let result = await Task.detached(priority: .userInitiated) {
+            () -> ([MetricChartDataPoint], [TimeRange: [MetricChartDataPoint]]) in
+            let sorted = sourceData.sorted { $0.date < $1.date }
+            var cache: [TimeRange: [MetricChartDataPoint]] = [:]
+
+            for range in TimeRange.allCases {
+                cache[range] = Self.filterData(sorted, for: range, referenceDate: referenceDate)
+            }
+
+            return (sorted, cache)
+        }.value
+
+        if Task.isCancelled {
+            await MainActor.run {
+                isLoadingData = false
+            }
+            return
+        }
+
+        await MainActor.run {
+            sortedChartData = result.0
+            filteredDataCache = result.1
+            isLoadingData = false
+        }
+    }
+
+    private static func filterData(
+        _ data: [MetricChartDataPoint],
+        for range: TimeRange,
+        referenceDate: Date
+    ) -> [MetricChartDataPoint] {
+        guard let days = range.days else {
+            return data
+        }
+
+        let cutoffDate = Calendar.current.date(
+            byAdding: .day,
+            value: -days,
+            to: referenceDate
+        ) ?? referenceDate
+
+        return data
+            .filter { $0.date >= cutoffDate }
+            .sorted { $0.date < $1.date }
     }
 
     private func findNearestPoint(to location: CGPoint) -> MetricChartDataPoint? {
