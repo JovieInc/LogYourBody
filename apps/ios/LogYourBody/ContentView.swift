@@ -38,10 +38,6 @@ struct ContentView: View {
         return hasName && hasDOB && hasHeight && hasGender
     }
     
-    private var shouldShowOnboarding: Bool {
-        return !hasCompletedOnboarding
-    }
-    
     var body: some View {
         ZStack {
             Color.appBackground
@@ -64,36 +60,22 @@ struct ContentView: View {
                     .transition(AnyTransition.opacity)
             } else {
                 Group {
-                    if authManager.isAuthenticated {
-                        if shouldShowOnboarding {
-                            OnboardingContainerView()
-                        } else if !revenueCatManager.isSubscribed {
+                    if !hasCompletedOnboarding {
+                        OnboardingFlowView()
+                            .environmentObject(authManager)
+                            .environmentObject(revenueCatManager)
+                    } else if authManager.isAuthenticated {
+                        if !revenueCatManager.isSubscribed {
                             PaywallView()
                                 .environmentObject(authManager)
                                 .environmentObject(revenueCatManager)
-                                .onAppear {
-                                    // print("💰 Showing PaywallView")
-                                }
                         } else {
                             MainTabView()
-                                .onAppear {
-                                    // print("🏠 Showing MainTabView (Dashboard)")
-                                }
                         }
                     } else if authManager.needsEmailVerification {
-                        NavigationStack {
-                            EmailVerificationView()
-                        }
-                        .onAppear {
-                            // print("📧 Showing EmailVerificationView")
-                        }
+                        NavigationStack { EmailVerificationView() }
                     } else {
-                        NavigationStack {
-                            LoginView()
-                        }
-                        .onAppear {
-                            // print("🔐 Showing LoginView")
-                        }
+                        NavigationStack { LoginView() }
                     }
                 }
                 .transition(.opacity)
@@ -140,7 +122,6 @@ struct ContentView: View {
         }
         .onChange(of: authManager.isAuthenticated) { _, _ in
             // print("🔄 Authentication state changed to: \(newValue)")
-            // print("🔄 Should show onboarding: \(shouldShowOnboarding)")
             // print("🔄 Onboarding completed: \(hasCompletedOnboarding)")
             // print("🔄 isLoadingComplete: \(isLoadingComplete)")
             // print("🔄 Current user: \(authManager.currentUser?.email ?? "nil")")
@@ -161,10 +142,7 @@ struct ContentView: View {
                 // print("🎯 Onboarding completed, transitioning to main app...")
                 // Add a small delay to ensure smooth transition
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    // Force a view refresh if needed
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        // The view should automatically update based on shouldShowOnboarding
-                    }
+                    withAnimation(.easeInOut(duration: 0.3)) {}
                 }
             }
         }

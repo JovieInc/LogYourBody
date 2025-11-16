@@ -127,8 +127,7 @@ struct PaywallView: View {
 
     private var header: some View {
         VStack(spacing: 16) {
-            // App icon/logo
-            Image(systemName: "chart.line.uptrend.xyaxis.circle.fill")
+            Image(systemName: "hud")
                 .font(.system(size: 72))
                 .foregroundStyle(
                     LinearGradient(
@@ -139,46 +138,47 @@ struct PaywallView: View {
                 )
                 .shadow(color: Color(hex: "#6EE7F0").opacity(0.3), radius: 20, x: 0, y: 10)
 
-            Text("LogYourBody Pro")
+            Text("Unlock your Body HUD")
                 .font(.system(size: 32, weight: .bold))
                 .foregroundColor(.white)
 
-            Text("Track your transformation")
+            Text("Start your free 3-day trial. Annual plan. Cancel anytime.")
                 .font(.system(size: 17, weight: .medium))
                 .foregroundColor(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
         }
     }
 
     private var featuresSection: some View {
         VStack(alignment: .leading, spacing: 20) {
             PaywallFeatureRow(
-                icon: "camera.fill",
-                title: "Progress Photos",
-                description: "Visual timeline of your transformation"
+                icon: "bolt.heart",
+                title: "Live Body Score",
+                description: "Instant recalculations with every weigh-in and scan"
             )
 
             PaywallFeatureRow(
                 icon: "chart.xyaxis.line",
-                title: "Advanced Analytics",
-                description: "Track weight, body fat, and FFMI trends"
+                title: "30-day projections",
+                description: "See deficit, surplus, or maintenance trajectories"
             )
 
             PaywallFeatureRow(
-                icon: "heart.fill",
-                title: "HealthKit Sync",
-                description: "Seamless integration with Apple Health"
+                icon: "triangle.fill",
+                title: "Aesthetic metrics",
+                description: "FFMI, body fat %, waist ratio, and frame adjustments"
             )
 
             PaywallFeatureRow(
-                icon: "icloud.fill",
-                title: "Cloud Backup",
-                description: "Your data safely synced across devices"
+                icon: "camera.fill",
+                title: "Progress photos + DEXA",
+                description: "Seamless photo timelines and scan integrations"
             )
 
             PaywallFeatureRow(
-                icon: "sparkles",
-                title: "Premium Features",
-                description: "Unlock all current and future features"
+                icon: "display",
+                title: "Wall display mode",
+                description: "Optional full-screen HUD for your gym or office"
             )
         }
         .padding(.horizontal, 8)
@@ -261,6 +261,15 @@ struct PaywallView: View {
         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
     }
 
+    private func perMonthCopy(for package: Package) -> String {
+        let formatter = package.storeProduct.priceFormatter
+        let symbol = formatter.currencySymbol ?? package.storeProduct.priceLocale.currencySymbol ?? "$"
+        let yearly = NSDecimalNumber(decimal: package.storeProduct.price)
+        let monthlyValue = yearly.doubleValue / 12.0
+        let monthlyString = String(format: "%@%.2f", symbol, monthlyValue)
+        return "Equivalent to \(monthlyString)/month, billed annually"
+    }
+
     private func purchaseButton(package: Package) -> some View {
         Button {
             Task {
@@ -276,7 +285,7 @@ struct PaywallView: View {
                         .font(.system(size: 20, weight: .semibold))
                 }
 
-                Text(revenueCatManager.isPurchasing ? "Processing..." : "Start Free Trial")
+                Text(revenueCatManager.isPurchasing ? "Processing..." : "Start free 3-day trial")
                     .font(.system(size: 18, weight: .semibold))
             }
             .foregroundColor(.white)

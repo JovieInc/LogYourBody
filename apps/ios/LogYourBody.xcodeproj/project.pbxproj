@@ -7,7 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		02FF59428632FBC25F9456AA /* DSCircularProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEFB36F814C3D7E8AE709B4 /* DSCircularProgress.swift */; };
+02FF59428632FBC25F9456AA /* DSCircularProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEFB36F814C3D7E8AE709B4 /* DSCircularProgress.swift */; };
+ADFF10102F50000100AB0001 /* BodyScoreCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF10002F50000100AB0001 /* BodyScoreCalculator.swift */; };
+ADFF10112F50000100AB0001 /* OnboardingFlowViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF10012F50000100AB0001 /* OnboardingFlowViewModel.swift */; };
+ADFF10122F50000100AB0001 /* OnboardingTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF10022F50000100AB0001 /* OnboardingTypography.swift */; };
+ADFF10132F50000100AB0001 /* OnboardingButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF10032F50000100AB0001 /* OnboardingButtons.swift */; };
+ADFF10142F50000100AB0001 /* OnboardingMolecules.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF10042F50000100AB0001 /* OnboardingMolecules.swift */; };
+ADFF10152F50000100AB0001 /* OnboardingOrganisms.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF10052F50000100AB0001 /* OnboardingOrganisms.swift */; };
+ADFF10162F50000100AB0001 /* OnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF10062F50000100AB0001 /* OnboardingFlowView.swift */; };
 		0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A5D6BAAD9FB2F7B8AFACB /* BaseButton.swift */; };
 		0DAECF9694453077367DCB0E /* Font+Custom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CA7B3D87EC0BFA00AC6A9F /* Font+Custom.swift */; };
 		11129CEC79A594A3564C81AE /* CompactMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 524C903734E2308C8A35B5B7 /* CompactMetricCard.swift */; };
@@ -518,7 +525,14 @@
 		ADA922F02E22E7D500B82C49 /* SecuritySessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySessionsView.swift; sourceTree = "<group>"; };
 		ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonComponents.swift; sourceTree = "<group>"; };
 		ADA922F72E22EE9D00B82C49 /* OnboardingComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingComponents.swift; sourceTree = "<group>"; };
-		ADA922F82E22EE9D00B82C49 /* ProcessingImagePlaceholder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingImagePlaceholder.swift; sourceTree = "<group>"; };
+ADA922F82E22EE9D00B82C49 /* ProcessingImagePlaceholder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingImagePlaceholder.swift; sourceTree = "<group>"; };
+ADFF10002F50000100AB0001 /* BodyScoreCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreCalculator.swift; sourceTree = "<group>"; };
+ADFF10012F50000100AB0001 /* OnboardingFlowViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowViewModel.swift; sourceTree = "<group>"; };
+ADFF10022F50000100AB0001 /* OnboardingTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTypography.swift; sourceTree = "<group>"; };
+ADFF10032F50000100AB0001 /* OnboardingButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingButtons.swift; sourceTree = "<group>"; };
+ADFF10042F50000100AB0001 /* OnboardingMolecules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingMolecules.swift; sourceTree = "<group>"; };
+ADFF10052F50000100AB0001 /* OnboardingOrganisms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingOrganisms.swift; sourceTree = "<group>"; };
+ADFF10062F50000100AB0001 /* OnboardingFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowView.swift; sourceTree = "<group>"; };
 		ADA923002E22EF4600B82C49 /* UIComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIComponents.swift; sourceTree = "<group>"; };
 		ADBD692C2E14A7B900921A30 /* DashboardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		ADBD692D2E14A7B900921A30 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
@@ -956,14 +970,15 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
-		AD723B132E15FA5C002376C6 /* LogYourBody */ = {
-			isa = PBXGroup;
-			children = (
-				AD8872922EB946BE0041C426 /* DesignSystem */,
-				ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */,
-				ADA922F72E22EE9D00B82C49 /* OnboardingComponents.swift */,
-				ADA922F82E22EE9D00B82C49 /* ProcessingImagePlaceholder.swift */,
-				AD0054F32E2228F70029E0FF /* SettingsComponents.swift */,
+AD723B132E15FA5C002376C6 /* LogYourBody */ = {
+isa = PBXGroup;
+children = (
+AD8872922EB946BE0041C426 /* DesignSystem */,
+ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */,
+ADA922F72E22EE9D00B82C49 /* OnboardingComponents.swift */,
+ADFF10202F50000100AB0001 /* OnboardingFlow */,
+ADA922F82E22EE9D00B82C49 /* ProcessingImagePlaceholder.swift */,
+AD0054F32E2228F70029E0FF /* SettingsComponents.swift */,
 				ADE1464C2EBF0BDF00B64DA0 /* Helpers */,
 				AD723AD42E15FA5C002376C6 /* Extensions */,
 				AD723ADC2E15FA5C002376C6 /* Models */,
@@ -1028,14 +1043,60 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		AD7D309B2E1490810072AA5B /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				AD7D309C2E1490810072AA5B /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
-			sourceTree = "<group>";
-		};
+AD7D309B2E1490810072AA5B /* Preview Content */ = {
+isa = PBXGroup;
+children = (
+AD7D309C2E1490810072AA5B /* Preview Assets.xcassets */,
+);
+path = "Preview Content";
+sourceTree = "<group>";
+};
+ADFF10202F50000100AB0001 /* OnboardingFlow */ = {
+isa = PBXGroup;
+children = (
+ADFF10212F50000100AB0001 /* Atoms */,
+ADFF10222F50000100AB0001 /* Molecules */,
+ADFF10232F50000100AB0001 /* Organisms */,
+ADFF10242F50000100AB0001 /* Pages */,
+ADFF10002F50000100AB0001 /* BodyScoreCalculator.swift */,
+ADFF10012F50000100AB0001 /* OnboardingFlowViewModel.swift */,
+);
+path = OnboardingFlow;
+sourceTree = "<group>";
+};
+ADFF10212F50000100AB0001 /* Atoms */ = {
+isa = PBXGroup;
+children = (
+ADFF10022F50000100AB0001 /* OnboardingTypography.swift */,
+ADFF10032F50000100AB0001 /* OnboardingButtons.swift */,
+);
+path = Atoms;
+sourceTree = "<group>";
+};
+ADFF10222F50000100AB0001 /* Molecules */ = {
+isa = PBXGroup;
+children = (
+ADFF10042F50000100AB0001 /* OnboardingMolecules.swift */,
+);
+path = Molecules;
+sourceTree = "<group>";
+};
+ADFF10232F50000100AB0001 /* Organisms */ = {
+isa = PBXGroup;
+children = (
+ADFF10052F50000100AB0001 /* OnboardingOrganisms.swift */,
+);
+path = Organisms;
+sourceTree = "<group>";
+};
+ADFF10242F50000100AB0001 /* Pages */ = {
+isa = PBXGroup;
+children = (
+ADFF10062F50000100AB0001 /* OnboardingFlowView.swift */,
+);
+path = Pages;
+sourceTree = "<group>";
+};
 		AD7D30A52E1490810072AA5B /* LogYourBodyTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -1486,8 +1547,15 @@
 				ADDC47CA2E2D89F3003C97E7 /* AppVersion.swift in Sources */,
 				ADDC47CC2E2D89F3003C97E7 /* VersionInfo.swift in Sources */,
 				ADDC47CD2E2D89F3003C97E7 /* Configuration.swift in Sources */,
-				ADDC47CE2E2D89F3003C97E7 /* Constants.swift in Sources */,
-				ADDC47CF2E2D89F3003C97E7 /* OnboardingViewModel.swift in Sources */,
+ADDC47CE2E2D89F3003C97E7 /* Constants.swift in Sources */,
+ADFF10102F50000100AB0001 /* BodyScoreCalculator.swift in Sources */,
+ADFF10112F50000100AB0001 /* OnboardingFlowViewModel.swift in Sources */,
+ADFF10122F50000100AB0001 /* OnboardingTypography.swift in Sources */,
+ADFF10132F50000100AB0001 /* OnboardingButtons.swift in Sources */,
+ADFF10142F50000100AB0001 /* OnboardingMolecules.swift in Sources */,
+ADFF10152F50000100AB0001 /* OnboardingOrganisms.swift in Sources */,
+ADFF10162F50000100AB0001 /* OnboardingFlowView.swift in Sources */,
+ADDC47CF2E2D89F3003C97E7 /* OnboardingViewModel.swift in Sources */,
 				ADDC47D02E2D89F3003C97E7 /* SecuritySessionsView.swift in Sources */,
 				ADDC47D12E2D89F3003C97E7 /* ProfileSettingsViewV2.swift in Sources */,
 				ADDC47D22E2D89F3003C97E7 /* CompletionStepView.swift in Sources */,
