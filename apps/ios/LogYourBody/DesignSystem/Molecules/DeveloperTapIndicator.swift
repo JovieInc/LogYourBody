@@ -9,16 +9,16 @@ import SwiftUI
 struct DeveloperTapIndicator: View {
     let remainingTaps: Int
     let totalTaps: Int
-    
+
     init(remainingTaps: Int, totalTaps: Int = 7) {
         self.remainingTaps = remainingTaps
         self.totalTaps = totalTaps
     }
-    
+
     private var progress: Double {
         Double(totalTaps - remainingTaps) / Double(totalTaps)
     }
-    
+
     var body: some View {
         if remainingTaps > 0 && remainingTaps < totalTaps {
             HStack(spacing: 4) {
@@ -34,7 +34,7 @@ struct DeveloperTapIndicator: View {
                             .frame(width: 4, height: 4)
                     }
                 }
-                
+
                 // Remaining count
                 Text("\(remainingTaps)")
                     .font(.system(size: 11, weight: .medium))

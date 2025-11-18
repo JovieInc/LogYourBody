@@ -32,9 +32,10 @@ struct MetricDetailView: View {
     @State private var chartData: [SparklineDataPoint] = []
     @State private var selectedDataPoint: DetailChartDataPoint?
     @State private var isScrubbing: Bool = false
-    @State private var lastHapticIndex: Int? = nil
+    @State private var lastHapticIndex: Int?
     @State private var isLoadingData: Bool = false
     @State private var entrySections: [EntrySection] = []
+    @State private var hiddenEntrySections: [EntrySection] = []
     @State private var isLoadingEntries: Bool = false
     @State private var editingEntry: MetricEntry?
     @State private var entryPendingDeletion: MetricEntry?
@@ -264,7 +265,7 @@ struct MetricDetailView: View {
             }
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
-        } else if entrySections.isEmpty {
+        } else if entrySections.isEmpty && hiddenEntrySections.isEmpty {
             Section {
                 entriesEmptyState
                     .padding(.vertical, 32)
@@ -272,50 +273,116 @@ struct MetricDetailView: View {
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
         } else {
-            ForEach(entrySections) { section in
+            entrySectionList(entrySections)
+
+            if !hiddenEntrySections.isEmpty {
                 Section {
-                    ForEach(section.entries) { entry in
-                        MetricEntryRow(
-                            entry: entry,
-                            metricType: metricType,
-                            measurementSystem: measurementSystem
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            guard entry.isEditable else { return }
-                            editingEntry = entry
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            if entry.isEditable {
-                                Button(role: .destructive) {
-                                    entryPendingDeletion = entry
-                                    showingDeleteConfirmation = true
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                    ForEach(hiddenEntrySections) { section in
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(section.entries) { entry in
+                                entryRow(for: entry)
                             }
                         }
-                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
                     }
                 } header: {
                     HStack {
-                        Text(section.title)
+                        Text("Hidden Entries")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
 
                         Spacer()
 
-                        Text(section.entries.count == 1 ? "1 entry" : "\(section.entries.count) entries")
+                        Text(hiddenEntrySections.reduce(0) { $0 + $1.entries.count } == 1 ? "1 entry" : "\(hiddenEntrySections.reduce(0) { $0 + $1.entries.count }) entries")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white.opacity(0.6))
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 24)
+                } footer: {
+                    Text("Hidden Health entries stay in History for quick reference and can be unhidden anytime.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
                 }
             }
         }
+    }
+
+    private func entrySectionList(_ sections: [EntrySection]) -> some View {
+        ForEach(sections) { section in
+            Section {
+                ForEach(section.entries) { entry in
+                    entryRow(for: entry)
+                }
+            } header: {
+                HStack {
+                    Text(section.title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    Spacer()
+
+                    Text(section.entries.count == 1 ? "1 entry" : "\(section.entries.count) entries")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 24)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func entryRow(for entry: MetricEntry) -> some View {
+        MetricEntryRow(
+            entry: entry,
+            metricType: metricType,
+            measurementSystem: measurementSystem
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard entry.isEditable, !entry.isHidden else { return }
+            editingEntry = entry
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if entry.isHidden {
+                Button {
+                    Task { await unhideEntry(entry) }
+                } label: {
+                    Label("Unhide", systemImage: "eye")
+                }
+                .tint(.blue)
+            } else {
+                if entry.source == .healthKit {
+                    Button {
+                        Task { await hideEntry(entry) }
+                    } label: {
+                        Label("Hide", systemImage: "eye.slash")
+                    }
+                    .tint(.orange)
+                }
+
+                if entry.isEditable {
+                    Button {
+                        editingEntry = entry
+                    } label: {
+                        Label("Edit", systemImage: "square.and.pencil")
+                    }
+                    .tint(.gray)
+
+                    Button(role: .destructive) {
+                        entryPendingDeletion = entry
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
 
     // MARK: - Statistics View
@@ -492,6 +559,12 @@ struct MetricDetailView: View {
         return last - first
     }
 
+    private func calculateAverage() -> Double? {
+        guard !chartData.isEmpty else { return nil }
+        let total = chartData.reduce(0) { $0 + $1.value }
+        return total / Double(chartData.count)
+    }
+
     // MARK: - Formatting Helpers
 
     private func formatTimestamp(_ date: Date) -> String {
@@ -603,23 +676,16 @@ struct MetricDetailView: View {
         isLoadingEntries = true
         defer { isLoadingEntries = false }
 
-        let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
-        let bodyMetrics = cachedMetrics
-            .compactMap { $0.toBodyMetrics() }
-            .filter { metric in
-                switch metricType {
-                case .weight:
-                    return metric.weight != nil
-                case .bodyFat:
-                    return metric.bodyFatPercentage != nil
-                default:
-                    return false
-                }
-            }
-            .sorted { $0.date > $1.date }
+        let displayable = await CoreDataManager.shared.fetchDisplayableBodyMetrics(for: userId)
 
-        let entries = bodyMetrics.compactMap(makeEntry(from:))
-        entrySections = buildSections(from: entries)
+        let visibleMetrics = filteredMetrics(for: metricType, metrics: displayable.visible)
+        let hiddenMetrics = filteredMetrics(for: metricType, metrics: displayable.hidden)
+
+        let visibleEntries = visibleMetrics.compactMap { makeEntry(from: $0, isHidden: false) }
+        let hiddenEntries = hiddenMetrics.compactMap { makeEntry(from: $0, isHidden: true) }
+
+        entrySections = buildSections(from: visibleEntries)
+        hiddenEntrySections = buildSections(from: hiddenEntries)
     }
 
     @MainActor
@@ -641,7 +707,36 @@ struct MetricDetailView: View {
         }
     }
 
-    private func makeEntry(from metric: BodyMetrics) -> MetricEntry? {
+    @MainActor
+    private func hideEntry(_ entry: MetricEntry) async {
+        guard !entry.isHidden else { return }
+        EntryVisibilityManager.shared.hide(entryId: entry.id, userId: userId)
+        await refreshAfterEntryMutation()
+    }
+
+    @MainActor
+    private func unhideEntry(_ entry: MetricEntry) async {
+        guard entry.isHidden else { return }
+        EntryVisibilityManager.shared.unhide(entryId: entry.id, userId: userId)
+        await refreshAfterEntryMutation()
+    }
+
+    private func filteredMetrics(for metricType: DashboardViewLiquid.DashboardMetricKind, metrics: [BodyMetrics]) -> [BodyMetrics] {
+        metrics
+            .filter { metric in
+                switch metricType {
+                case .weight:
+                    return metric.weight != nil
+                case .bodyFat:
+                    return metric.bodyFatPercentage != nil
+                default:
+                    return false
+                }
+            }
+            .sorted { $0.date > $1.date }
+    }
+
+    private func makeEntry(from metric: BodyMetrics, isHidden: Bool) -> MetricEntry? {
         let primaryValue: Double?
         let unit: String
         var secondaryValue: Double?
@@ -679,7 +774,8 @@ struct MetricDetailView: View {
             secondaryUnit: secondaryUnit,
             notes: metric.notes,
             source: sourceType(for: metric.dataSource),
-            isEditable: isEditableSource(metric.dataSource)
+            isEditable: isEditableSource(metric.dataSource),
+            isHidden: isHidden
         )
     }
 
@@ -899,6 +995,7 @@ struct MetricEntry: Identifiable, Equatable {
     let notes: String?
     let source: EntrySource
     let isEditable: Bool
+    let isHidden: Bool
 }
 
 enum EntrySource: Equatable {
@@ -922,6 +1019,17 @@ enum EntrySource: Equatable {
             return Configuration(icon: "bolt.horizontal", iconColor: .blue, background: Color.blue.opacity(0.2))
         }
     }
+
+    var labelText: String {
+        switch self {
+        case .manual:
+            return "Manual"
+        case .healthKit:
+            return "Health"
+        case .integration(let name):
+            return name ?? "Integration"
+        }
+    }
 }
 
 // MARK: - Preview
@@ -936,7 +1044,7 @@ enum EntrySource: Equatable {
             unit: "lbs",
             timestamp: Date(),
             onAdd: {
-        // print("Add tapped")
+                // print("Add tapped")
             }
         )
     }

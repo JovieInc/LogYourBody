@@ -9,20 +9,20 @@ struct OTPInputView: View {
     @Binding var otpCode: String
     var numberOfDigits: Int = 6
     var onComplete: (() -> Void)?
-    
+
     @State private var digits: [String] = []
     @FocusState private var focusedIndex: Int?
     @State private var cancellables = Set<AnyCancellable>()
-    
+
     init(otpCode: Binding<String>, numberOfDigits: Int = 6, onComplete: (() -> Void)? = nil) {
         self._otpCode = otpCode
         self.numberOfDigits = numberOfDigits
         self.onComplete = onComplete
-        
+
         // Initialize digits array
         _digits = State(initialValue: Array(repeating: "", count: numberOfDigits))
     }
-    
+
     var body: some View {
         HStack(spacing: 12) {
             ForEach(0..<numberOfDigits, id: \.self) { index in
@@ -44,12 +44,12 @@ struct OTPInputView: View {
             if digits.count != numberOfDigits {
                 digits = Array(repeating: "", count: numberOfDigits)
             }
-            
+
             // Focus first field
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 focusedIndex = 0
             }
-            
+
             // Set up paste handling
             NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)
                 .sink { _ in
@@ -60,7 +60,7 @@ struct OTPInputView: View {
         .onChange(of: digits) { _ in
             // Update the bound otpCode
             otpCode = digits.joined()
-            
+
             // Check if all digits are filled
             if digits.count == numberOfDigits && digits.allSatisfy({ !$0.isEmpty }) {
                 // Dismiss keyboard
@@ -78,7 +78,7 @@ struct OTPInputView: View {
             }
         }
     }
-    
+
     private func handleTextChange(at index: Int, newValue: String) {
         // Handle deletion
         if newValue.isEmpty {
@@ -89,17 +89,17 @@ struct OTPInputView: View {
             }
             return
         }
-        
+
         // Handle multi-character paste
         if newValue.count > 1 {
             handlePastedCode(newValue)
             return
         }
-        
+
         // Handle single digit
         if newValue.count == 1 && newValue.last!.isNumber {
             digits[index] = String(newValue.last!)
-            
+
             // Move to next field
             if index < numberOfDigits - 1 {
                 focusedIndex = index + 1
@@ -109,21 +109,21 @@ struct OTPInputView: View {
             }
         }
     }
-    
+
     private func handlePaste() {
         guard let pastedString = UIPasteboard.general.string else { return }
         handlePastedCode(pastedString)
     }
-    
+
     private func handlePastedCode(_ code: String) {
         // Extract only numbers from the pasted string
         let numbers = code.filter { $0.isNumber }
-        
+
         // Fill in the digits
         for (index, char) in numbers.prefix(numberOfDigits).enumerated() {
             digits[index] = String(char)
         }
-        
+
         // Focus the next empty field or dismiss keyboard if all filled
         if let firstEmptyIndex = digits.firstIndex(where: { $0.isEmpty }) {
             focusedIndex = firstEmptyIndex
@@ -137,7 +137,7 @@ struct SingleDigitInput: View {
     @Binding var digit: String
     let isFocused: Bool
     let onTextChange: (String) -> Void
-    
+
     var body: some View {
         ZStack {
             // Background
@@ -148,7 +148,7 @@ struct SingleDigitInput: View {
                         .stroke(isFocused ? Color.accentColor : Color.appBorder, lineWidth: 2)
                 )
                 .animation(.easeInOut(duration: 0.2), value: isFocused)
-            
+
             // Hidden TextField for input
             TextField("", text: Binding(
                 get: { digit },
@@ -165,7 +165,7 @@ struct SingleDigitInput: View {
             .foregroundColor(.clear)
             .accentColor(.clear)
             .background(Color.clear)
-            
+
             // Visible digit
             Text(digit)
                 .font(.system(size: 24, weight: .semibold, design: .monospaced))

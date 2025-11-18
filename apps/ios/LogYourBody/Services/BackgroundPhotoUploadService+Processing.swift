@@ -10,7 +10,7 @@ extension BackgroundPhotoUploadService {
     func processAndUploadPhotos(_ items: [PhotosPickerItem]) async {
         // Convert PhotosPickerItems to UIImages
         var imagesToProcess: [(image: UIImage, id: String)] = []
-        
+
         for item in items {
             if let data = try? await item.loadTransferable(type: Data.self),
                let image = UIImage(data: data) {
@@ -18,12 +18,12 @@ extension BackgroundPhotoUploadService {
                 imagesToProcess.append((image, imageId))
             }
         }
-        
+
         // Processing notification handled elsewhere
-        
+
         // Process images in background
         await ImageProcessingService.shared.processBatchImages(imagesToProcess)
-        
+
         // Upload processed images
         for (index, (_, imageId)) in imagesToProcess.enumerated() {
             // Get processed image from service
@@ -34,14 +34,14 @@ extension BackgroundPhotoUploadService {
                     // Create body metrics for today
                     let userId = AuthManager.shared.currentUser?.id ?? ""
                     let date = Date()
-                    
+
                     // Check if metrics already exist for today
                     let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
                         .first { metrics in
                             guard let metricsDate = metrics.date else { return false }
                             return Calendar.current.isDate(metricsDate, inSameDayAs: date)
                         }
-                    
+
                     let metrics: BodyMetrics
                     if let existing = existingMetrics {
                         // Convert existing metrics
@@ -80,20 +80,20 @@ extension BackgroundPhotoUploadService {
                             updatedAt: date
                         )
                     }
-                    
+
                     // Upload photo with metrics
                     let photoUrl = try await PhotoUploadManager.shared.uploadProgressPhoto(
                         for: metrics,
                         image: processedImage
                     )
-                    
+
                     // Progress tracking handled by the processing service
                 } catch {
                     // print("Failed to upload processed image: \(error)")
                 }
             }
         }
-        
+
         // Completion notification handled by the processing service
     }
 }

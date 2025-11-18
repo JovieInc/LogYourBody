@@ -106,81 +106,81 @@ struct MetricChartView: View {
             emptyStateView
         } else {
             Chart {
-                    ForEach(chartData) { point in
-                        // Line
-                        LineMark(
+                ForEach(chartData) { point in
+                    // Line
+                    LineMark(
+                        x: .value("Date", point.date),
+                        y: .value("Value", point.value)
+                    )
+                    .foregroundStyle(Color.liquidAccent.gradient)
+                    .interpolationMethod(.catmullRom)
+                    .lineStyle(StrokeStyle(lineWidth: 3))
+
+                    // Points (hidden by default to reduce clutter)
+                    if selectedDate != nil {
+                        PointMark(
                             x: .value("Date", point.date),
                             y: .value("Value", point.value)
                         )
-                        .foregroundStyle(Color.liquidAccent.gradient)
-                        .interpolationMethod(.catmullRom)
-                        .lineStyle(StrokeStyle(lineWidth: 3))
-
-                        // Points (hidden by default to reduce clutter)
-                        if selectedDate != nil {
-                            PointMark(
-                                x: .value("Date", point.date),
-                                y: .value("Value", point.value)
-                            )
-                            .foregroundStyle(Color.liquidAccent)
-                            .symbolSize(point.isEstimated ? 18 : 24)
-                            .opacity(point.isEstimated ? 0.5 : 0.8)
-                        }
+                        .foregroundStyle(Color.liquidAccent)
+                        .symbolSize(point.isEstimated ? 18 : 24)
+                        .opacity(point.isEstimated ? 0.5 : 0.8)
                     }
+                }
 
-                    // Vertical scrubber line
-                    if let selectedDate = selectedDate,
-                       let selectedPoint = findNearestPoint(to: selectedDate) {
-                        RuleMark(x: .value("Selected", selectedDate))
-                            .foregroundStyle(Color.white.opacity(0.3))
-                            .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
+                // Vertical scrubber line
+                if let selectedDate = selectedDate,
+                   let selectedPoint = findNearestPoint(to: selectedDate) {
+                    RuleMark(x: .value("Selected", selectedDate))
+                        .foregroundStyle(Color.white.opacity(0.3))
+                        .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
 
-                        // Highlight selected point (animated with halo)
-                        PointMark(
-                            x: .value("Date", selectedPoint.date),
-                            y: .value("Value", selectedPoint.value)
-                        )
-                        .symbolSize(highlightSymbolSize)
-                        .symbol {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.liquidAccent.opacity(highlightHaloOpacity))
-                                    .scaleEffect(haloScale)
+                    // Highlight selected point (animated with halo)
+                    PointMark(
+                        x: .value("Date", selectedPoint.date),
+                        y: .value("Value", selectedPoint.value)
+                    )
+                    .symbolSize(highlightSymbolSize)
+                    .symbol {
+                        ZStack {
+                            Circle()
+                                .fill(Color.liquidAccent.opacity(highlightHaloOpacity))
+                                .scaleEffect(haloScale)
 
-                                Circle()
-                                    .fill(Color.liquidAccent)
-                                    .overlay(
-                                        Circle()
-                                            .strokeBorder(Color.white, lineWidth: 3)
-                                    )
-                                    .scaleEffect(highlightScale)
-                            }
+                            Circle()
+                                .fill(Color.liquidAccent)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.white, lineWidth: 3)
+                                )
+                                .scaleEffect(highlightScale)
                         }
                     }
                 }
-                .chartXAxis {
-                    AxisMarks(preset: .aligned, values: .automatic(desiredCount: 5)) { _ in
-                        // Hide grid lines by default (only show during interaction)
-                        AxisValueLabel()
-                            .foregroundStyle(Color.appTextSecondary)
-                            .font(.system(size: 12, weight: .medium))
-                    }
+            }
+            .chartXAxis {
+                AxisMarks(preset: .aligned, values: .automatic(desiredCount: 5)) { _ in
+                    // Hide grid lines by default (only show during interaction)
+                    AxisValueLabel()
+                        .foregroundStyle(Color.appTextSecondary)
+                        .font(.system(size: 12, weight: .medium))
                 }
-                .chartYAxis {
-                    AxisMarks(preset: .aligned, position: .trailing, values: .automatic(desiredCount: 6)) { _ in
-                        // Hide grid lines by default (only show during interaction)
-                        AxisValueLabel()
-                            .foregroundStyle(Color.appTextSecondary)
-                            .font(.system(size: 13, weight: .medium))
-                    }
+            }
+            .chartYAxis {
+                AxisMarks(preset: .aligned, position: .trailing, values: .automatic(desiredCount: 6)) { _ in
+                    // Hide grid lines by default (only show during interaction)
+                    AxisValueLabel()
+                        .foregroundStyle(Color.appTextSecondary)
+                        .font(.system(size: 13, weight: .medium))
                 }
-                .chartYScale(domain: .automatic(includesZero: false))
-                .chartPlotStyle { plotArea in
-                    plotArea
-                        .background(Color.clear)
-                }
-                .animation(.easeInOut(duration: 0.8), value: chartData.count)
-                .animation(.easeInOut(duration: 0.25), value: selectedDate)
+            }
+            .chartYScale(domain: .automatic(includesZero: false))
+            .chartPlotStyle { plotArea in
+                plotArea
+                    .background(Color.clear)
+            }
+            .animation(.easeInOut(duration: 0.8), value: chartData.count)
+            .animation(.easeInOut(duration: 0.25), value: selectedDate)
         }
     }
 

@@ -7,7 +7,6 @@
 //
 
 import SwiftUI
-import PhotosUI
 import Charts
 
 private struct SyncBannerState {
@@ -109,13 +108,6 @@ private func formatAverageFootnote(value: Double, unit: String) -> String {
     return "\(formatted) \(unit) average"
 }
 
-enum DisplayMode: String, CaseIterable, Identifiable {
-    case photo
-    case metrics
-
-    var id: String { rawValue }
-}
-
 struct MetricDataPoint: Identifiable {
     let id = UUID()
     let index: Int
@@ -127,9 +119,10 @@ struct DashboardViewLiquid: View {
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     let healthKitManager = HealthKitManager.shared
 
-    // Core data state
+    // Core data
     @State var dailyMetrics: DailyMetrics?
     @State var bodyMetrics: [BodyMetrics] = []
+    @State private var recentDailyMetrics: [DailyMetrics] = []
     @State var selectedIndex: Int = 0
     @State var hasLoadedInitialData = false
     @State var lastRefreshDate: Date?
@@ -175,8 +168,8 @@ struct DashboardViewLiquid: View {
     // Display mode (photo vs wireframe)
     @State private var displayMode: DisplayMode = .photo
 
-    // Full metric chart view state
-    @State private var showFullMetricChart = false
+    // Full metric chart navigation state
+    @State private var isMetricDetailActive = false
     @State private var selectedMetricType: MetricType = .weight
 
     enum MetricType {
@@ -296,7 +289,7 @@ struct DashboardViewLiquid: View {
             loadMetricsOrder()
 
             // Load ONLY newest metric immediately for instant display
-            loadData(loadOnlyNewest: true)
+            Task { await loadData(loadOnlyNewest: true) }
 
             // Then refresh async (loads all data in background)
             Task {
@@ -354,9 +347,18 @@ struct DashboardViewLiquid: View {
         .sheet(isPresented: $showSyncDetails) {
             syncDetailsSheet
         }
-        .fullScreenCover(isPresented: $showFullMetricChart) {
-            fullMetricChartView
-        }
+        .background(
+            NavigationLink(
+                isActive: $isMetricDetailActive,
+                destination: {
+                    fullMetricChartView
+                },
+                label: {
+                    EmptyView()
+                }
+            )
+            .hidden()
+        )
     }
 
     private func tabContent(for mode: DisplayMode) -> some View {
@@ -668,7 +670,7 @@ struct DashboardViewLiquid: View {
     private func handleSyncStatusChange(from oldStatus: RealtimeSyncManager.SyncStatus, to newStatus: RealtimeSyncManager.SyncStatus) {
         syncBannerDismissTask?.cancel()
 
-        if newStatus == .error {
+        if case .error = newStatus {
             let detail: String?
             if let message = realtimeSyncManager.error, !message.isEmpty {
                 detail = message
@@ -681,18 +683,19 @@ struct DashboardViewLiquid: View {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 syncBannerState = SyncBannerState(style: .error, detail: detail)
             }
-        } else if oldStatus == .error && (newStatus == .success || newStatus == .idle) {
+        } else if case .error = oldStatus,
+                  (newStatus == .success || newStatus == .idle) {
             let detail = lastSyncClockText().map { "Synced at \($0)" }
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 syncBannerState = SyncBannerState(style: .success, detail: detail)
             }
 
-            syncBannerDismissTask = Task { [weak syncBannerState] in
+            syncBannerDismissTask = Task {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 await MainActor.run {
                     withAnimation(.easeOut(duration: 0.3)) {
-                        if self.syncBannerState?.style == .success {
-                            self.syncBannerState = nil
+                        if syncBannerState?.style == .success {
+                            syncBannerState = nil
                         }
                     }
                 }
@@ -847,8 +850,9 @@ struct DashboardViewLiquid: View {
 
     private func photoContent(for metric: BodyMetrics) -> some View {
         Group {
-            if let photoUrl = metric.photoUrl, !photoUrl.isEmpty {
-                AsyncImage(url: URL(string: photoUrl)) { phase in
+            if let photoUrl = metric.photoUrl, !photoUrl.isEmpty,
+               let url = URL(string: photoUrl) {
+                AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -857,11 +861,8 @@ struct DashboardViewLiquid: View {
                             .frame(height: 280)
                             .clipped()
                     case .failure(let error):
-                        // Log error and show placeholder
-                        _ = // print("[Dashboard] Image load failed: \(error.localizedDescription), URL: \(photoUrl)")
-                        noPhotoPlaceholder
+                        photoFailurePlaceholder(url: photoUrl, error: error)
                     case .empty:
-                        // Show loading state
                         ProgressView()
                             .frame(height: 280)
                             .frame(maxWidth: .infinity)
@@ -873,6 +874,13 @@ struct DashboardViewLiquid: View {
                 noPhotoPlaceholder
             }
         }
+    }
+
+    private func photoFailurePlaceholder(url: String, error: Error) -> some View {
+        #if DEBUG
+        print("[Dashboard] Image load failed: \(error.localizedDescription), URL: \(url)")
+        #endif
+        return noPhotoPlaceholder
     }
 
     private func heroCard(metric: BodyMetrics) -> some View {
@@ -944,7 +952,7 @@ struct DashboardViewLiquid: View {
         case .steps:
             Button {
                 selectedMetricType = .steps
-                showFullMetricChart = true
+                isMetricDetailActive = true
             } label: {
                 let latestSteps = latestStepsSnapshot()
 
@@ -974,7 +982,7 @@ struct DashboardViewLiquid: View {
                 let stats = weightRangeStats()
                 Button {
                     selectedMetricType = .weight
-                    showFullMetricChart = true
+                    isMetricDetailActive = true
                 } label: {
                     MetricSummaryCard(
                         icon: "figure.stand",
@@ -1003,7 +1011,7 @@ struct DashboardViewLiquid: View {
                 let stats = bodyFatRangeStats()
                 Button {
                     selectedMetricType = .bodyFat
-                    showFullMetricChart = true
+                    isMetricDetailActive = true
                 } label: {
                     MetricSummaryCard(
                         icon: "percent",
@@ -1032,7 +1040,7 @@ struct DashboardViewLiquid: View {
                 let stats = ffmiRangeStats()
                 Button {
                     selectedMetricType = .ffmi
-                    showFullMetricChart = true
+                    isMetricDetailActive = true
                 } label: {
                     MetricSummaryCard(
                         icon: "figure.arms.open",
@@ -1073,7 +1081,6 @@ struct DashboardViewLiquid: View {
                 currentDate: formatDate(dailyMetrics?.updatedAt ?? Date()),
                 chartData: [], // Steps chart data would need daily metrics history
                 onAdd: {
-                    showFullMetricChart = false
                     showAddEntrySheet = true
                 },
                 metricEntries: nil,
@@ -1090,7 +1097,6 @@ struct DashboardViewLiquid: View {
                 currentDate: formatDate(currentMetric?.date ?? Date()),
                 chartData: generateFullScreenWeightChartData(),
                 onAdd: {
-                    showFullMetricChart = false
                     showAddEntrySheet = true
                 },
                 metricEntries: metricEntriesPayload(for: .weight),
@@ -1107,7 +1113,6 @@ struct DashboardViewLiquid: View {
                 currentDate: formatDate(currentMetric?.date ?? Date()),
                 chartData: generateFullScreenBodyFatChartData(),
                 onAdd: {
-                    showFullMetricChart = false
                     showAddEntrySheet = true
                 },
                 metricEntries: metricEntriesPayload(for: .bodyFat),
@@ -1124,7 +1129,6 @@ struct DashboardViewLiquid: View {
                 currentDate: formatDate(currentMetric?.date ?? Date()),
                 chartData: generateFullScreenFFMIChartData(),
                 onAdd: {
-                    showFullMetricChart = false
                     showAddEntrySheet = true
                 },
                 metricEntries: metricEntriesPayload(for: .ffmi),
@@ -1775,56 +1779,48 @@ extension DashboardViewLiquid {
         return leanMassKg / (heightMeters * heightMeters)
     }
 
-    func loadData(loadOnlyNewest: Bool = false) {
+    func loadData(loadOnlyNewest: Bool = false) async {
         guard let userId = authManager.currentUser?.id else {
-            hasLoadedInitialData = true
+            await MainActor.run { hasLoadedInitialData = true }
             return
         }
 
-        // Load body metrics from CoreData (using sync version for compatibility)
-        let fetchedMetrics = CoreDataManager.shared.fetchBodyMetricsSync(for: userId)
+        let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
         let allMetrics = fetchedMetrics
             .compactMap { $0.toBodyMetrics() }
             .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
 
-        if loadOnlyNewest {
-            // Load only the newest metric for immediate display
-            if let newest = allMetrics.first {
-                bodyMetrics = [newest]
-                updateAnimatedValues(for: 0)
-                hasLoadedInitialData = true
+        let todayMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date())
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let recentDailyCached = await CoreDataManager.shared.fetchDailyMetrics(for: userId, from: thirtyDaysAgo, to: nil)
+        let recentDaily = recentDailyCached.map { $0.toDailyMetrics() }
 
-                // Load remaining data in background WITHOUT updating UI
-                Task.detached { [allMetrics] in
-                    // Wait a moment to ensure UI is displayed
-                    try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        await MainActor.run {
+            if loadOnlyNewest {
+                if let newest = allMetrics.first {
+                    bodyMetrics = [newest]
+                    updateAnimatedValues(for: 0)
+                    hasLoadedInitialData = true
 
-                    // Store remaining data silently (will be available on next manual refresh)
-                    await MainActor.run {
-                        // Only update if we still have just the single newest metric
-                        if self.bodyMetrics.count == 1 {
-                            self.bodyMetrics = allMetrics
+                    Task { @MainActor [allMetrics] in
+                        if bodyMetrics.count == 1 {
+                            bodyMetrics = allMetrics
                         }
                     }
                 }
+            } else {
+                bodyMetrics = allMetrics
+                if !bodyMetrics.isEmpty {
+                    updateAnimatedValues(for: selectedIndex)
+                }
+                hasLoadedInitialData = true
             }
-        } else {
-            // Load all metrics (for manual refresh)
-            bodyMetrics = allMetrics
 
-            // Initialize animated values (without animation on first load)
-            if !bodyMetrics.isEmpty {
-                updateAnimatedValues(for: selectedIndex)
+            if let todayMetrics {
+                dailyMetrics = todayMetrics.toDailyMetrics()
             }
-        }
 
-        // Load today's daily metrics (using sync version for compatibility)
-        if let todayMetrics = CoreDataManager.shared.fetchDailyMetricsSync(for: userId, date: Date()) {
-            dailyMetrics = todayMetrics.toDailyMetrics()
-        }
-
-        if !loadOnlyNewest {
-            hasLoadedInitialData = true
+            recentDailyMetrics = recentDaily
         }
     }
 
@@ -2056,7 +2052,7 @@ extension DashboardViewLiquid {
         let secondaryFormatter = makeMetricFormatter(minFractionDigits: 0, maxFractionDigits: 1)
 
         let entries = bodyMetrics
-            .sorted { $0.date > $1.date }
+            .sorted { $0.date < $1.date }
             .compactMap { metric -> MetricHistoryEntry? in
                 guard let rawWeight = metric.weight else { return nil }
                 let convertedWeight = convertWeight(rawWeight, to: system) ?? rawWeight
@@ -2088,7 +2084,7 @@ extension DashboardViewLiquid {
         let secondaryFormatter = makeMetricFormatter(minFractionDigits: 0, maxFractionDigits: 1)
 
         let entries = bodyMetrics
-            .sorted { $0.date > $1.date }
+            .sorted { $0.date < $1.date }
             .compactMap { metric -> MetricHistoryEntry? in
                 let primaryValue = metric.bodyFatPercentage
                     ?? MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)?.value
@@ -2134,7 +2130,7 @@ extension DashboardViewLiquid {
         let formatter = makeMetricFormatter(minFractionDigits: 1, maxFractionDigits: 1)
 
         let entries = bodyMetrics
-            .sorted { $0.date > $1.date }
+            .sorted { $0.date < $1.date }
             .compactMap { metric -> MetricHistoryEntry? in
                 guard let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
                     for: metric.date,
@@ -2233,25 +2229,20 @@ extension DashboardViewLiquid {
     }
 
     private func generateStepsChartData() -> [MetricDataPoint] {
-        guard let userId = authManager.currentUser?.id else { return [] }
-
-        // Get last 7 days of step data
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
+        let lookup = dailyMetricsLookup()
+
+        guard !lookup.isEmpty else { return [] }
 
         var chartData: [MetricDataPoint] = []
 
         for offset in stride(from: 6, through: 0, by: -1) {
-            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else {
-                continue
-            }
-
-            if let dailyData = CoreDataManager.shared.fetchDailyMetricsSync(for: userId, date: date) {
-                let steps = Int(dailyData.steps)
-                chartData.append(MetricDataPoint(index: 6 - offset, value: Double(max(steps, 0))))
-            } else {
-                chartData.append(MetricDataPoint(index: 6 - offset, value: 0))
-            }
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
+            let stepsValue = lookup[date]?.steps ?? 0
+            chartData.append(
+                MetricDataPoint(index: 6 - offset, value: Double(max(stepsValue ?? 0, 0)))
+            )
         }
 
         return chartData
@@ -2265,22 +2256,39 @@ extension DashboardViewLiquid {
 
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
+        let lookup = dailyMetricsLookup()
 
         // Look back up to 30 days for the latest non-zero steps entry
         for offset in 0..<30 {
             guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
-            if let dailyData = CoreDataManager.shared.fetchDailyMetricsSync(for: userId, date: date),
-               dailyData.steps > 0 {
-                return (Int(dailyData.steps), date)
+            if let entry = lookup[date], let steps = entry.steps, steps > 0 {
+                return (steps, entry.date)
             }
         }
 
-        // Fallback to in-memory dailyMetrics if we didn't find anything
         if let metrics = dailyMetrics {
             return (metrics.steps, metrics.date)
         }
 
         return (nil, nil)
+    }
+
+    private func dailyMetricsLookup() -> [Date: DailyMetrics] {
+        var lookup: [Date: DailyMetrics] = [:]
+        let calendar = Calendar.current
+
+        for metric in recentDailyMetrics {
+            let key = calendar.startOfDay(for: metric.date)
+            if let existing = lookup[key] {
+                if metric.updatedAt > existing.updatedAt {
+                    lookup[key] = metric
+                }
+            } else {
+                lookup[key] = metric
+            }
+        }
+
+        return lookup
     }
 
     private func generateWeightChartData() -> [MetricDataPoint] {
@@ -2664,32 +2672,254 @@ private struct FullMetricChartView: View {
     let metricEntries: MetricEntriesPayload?
 
     @Binding var selectedTimeRange: TimeRange
-    @State private var selectedDate: Date?
-    @State private var selectedPoint: MetricChartDataPoint?
-    @State private var isLoadingData: Bool = false
-    @State private var edgeDragOffset: CGFloat = 0
     @State private var cachedSeries: [TimeRange: [MetricChartDataPoint]] = [:]
-    @State private var preprocessingTask: Task<[TimeRange: [MetricChartDataPoint]], Never>?
+    @State private var isLoadingData = false
+    @State private var lastFingerprint: String = ""
 
     var body: some View {
-        ZStack {
-            // Background
-            Color.black
-            // ...
-        }
-        // ...
-        let index = Int(percentage * CGFloat(filteredChartData.count - 1))
-        let clampedIndex = max(0, min(filteredChartData.count - 1, index))
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    header
+                    chartCard
+                    timeRangePicker
+                    if let payload = metricEntries, !payload.entries.isEmpty {
+                        historySection(payload)
+                    } else {
+                        emptyHistoryState
+                    }
 
-        return filteredChartData[clampedIndex]
+                    Button(action: onAdd) {
+                        Label("Add Entry", systemImage: "plus")
+                            .font(.system(size: 17, weight: .semibold))
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.white.opacity(0.12))
+                            .cornerRadius(16)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(20)
+            }
+            .background(Color.black.ignoresSafeArea())
+        }
+        .task(id: chartDataFingerprint) {
+            await preprocessChartDataIfNeeded()
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(iconColor.opacity(0.15))
+                    .frame(width: 56, height: 56)
+                Image(systemName: icon)
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundColor(iconColor)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+
+                HStack(spacing: 6) {
+                    Text(currentValue)
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundColor(.white)
+                    if !unit.isEmpty {
+                        Text(unit)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+
+                Text(currentDate)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            Spacer()
+        }
+    }
+
+    private var chartCard: some View {
+        LiquidGlassCard(padding: 20) {
+            VStack(alignment: .leading, spacing: 12) {
+                if isLoadingData {
+                    ProgressView()
+                        .tint(.white)
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                } else if displayedSeries.isEmpty {
+                    Text("No data available for this range.")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                        .frame(maxWidth: .infinity, minHeight: 200, alignment: .center)
+                } else {
+                    Chart {
+                        ForEach(displayedSeries) { point in
+                            LineMark(
+                                x: .value("Date", point.date),
+                                y: .value("Value", point.value)
+                            )
+                            .interpolationMethod(.catmullRom)
+                            .foregroundStyle(Gradient(colors: [iconColor, iconColor.opacity(0.3)]))
+
+                            AreaMark(
+                                x: .value("Date", point.date),
+                                yStart: .value("Min", 0),
+                                yEnd: .value("Value", point.value)
+                            )
+                            .interpolationMethod(.catmullRom)
+                            .foregroundStyle(iconColor.opacity(0.15))
+                        }
+                    }
+                    .chartXAxis {
+                        AxisMarks(values: .automatic(desiredCount: 4))
+                    }
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                    }
+                    .frame(height: 260)
+                    .chartForegroundStyleScale(["Value": iconColor])
+                }
+
+                if let latest = displayedSeries.last {
+                    Text("Latest: \(formattedValue(latest.value)) on \(latest.date.formatted(.dateTime.month().day()))")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+        }
+    }
+
+    private var timeRangePicker: some View {
+        HStack(spacing: 8) {
+            ForEach(TimeRange.allCases, id: \.self) { range in
+                Button {
+                    selectedTimeRange = range
+                } label: {
+                    Text(range.rawValue)
+                        .font(.system(size: 14, weight: .semibold))
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 14)
+                        .background(selectedTimeRange == range ? Color.white.opacity(0.2) : Color.white.opacity(0.08))
+                        .cornerRadius(12)
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func historySection(_ payload: MetricEntriesPayload) -> some View {
+        let sections = historySections(from: payload.entries)
+
+        return VStack(alignment: .leading, spacing: 16) {
+            Text("History")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.white)
+
+            ForEach(sections) { section in
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text(section.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.8))
+
+                        Spacer()
+
+                        Text(section.entries.count == 1 ? "1 entry" : "\(section.entries.count) entries")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+
+                    VStack(spacing: 10) {
+                        ForEach(section.entries) { entry in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(historyPrimaryText(for: entry, config: payload.config))
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+
+                                Text(entry.date.formatted(.dateTime.month().day().year()))
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(Color.white.opacity(0.05))
+                            .cornerRadius(14)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var emptyHistoryState: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("History")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.white)
+            Text("No entries yet. Add your first log to see history here.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.6))
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(14)
+        }
+    }
+
+    private var displayedSeries: [MetricChartDataPoint] {
+        cachedSeries[selectedTimeRange] ?? chartData
     }
 
     private var chartDataFingerprint: String {
         guard let first = chartData.first, let last = chartData.last else {
             return "empty-\(chartData.count)"
         }
-
         return "\(chartData.count)-\(first.date.timeIntervalSince1970)-\(last.date.timeIntervalSince1970)-\(first.value)-\(last.value)"
+    }
+
+    private struct HistorySection: Identifiable {
+        let id: String
+        let title: String
+        let entries: [MetricHistoryEntry]
+    }
+
+    private func historySections(from entries: [MetricHistoryEntry]) -> [HistorySection] {
+        guard !entries.isEmpty else { return [] }
+
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+
+        let grouped = Dictionary(grouping: entries) { entry -> DateComponents in
+            calendar.dateComponents([.year, .month], from: entry.date)
+        }
+
+        let sortedKeys = grouped.keys.sorted { lhs, rhs in
+            let lhsDate = calendar.date(from: lhs) ?? .distantPast
+            let rhsDate = calendar.date(from: rhs) ?? .distantPast
+            return lhsDate > rhsDate
+        }
+
+        return sortedKeys.compactMap { components in
+            guard let date = calendar.date(from: components),
+                  let entries = grouped[components] else { return nil }
+
+            let title = formatter.string(from: date)
+            let sortedEntries = entries.sorted { $0.date > $1.date }
+            return HistorySection(id: UUID().uuidString, title: title, entries: sortedEntries)
+        }
+    }
+
+    private func preprocessChartDataIfNeeded() async {
+        guard chartDataFingerprint != lastFingerprint else { return }
+        lastFingerprint = chartDataFingerprint
+        await preprocessChartData()
     }
 
     private func preprocessChartData() async {
@@ -2703,31 +2933,46 @@ private struct FullMetricChartView: View {
 
         await MainActor.run {
             isLoadingData = true
-            cachedSeries = [:]
         }
-
-        preprocessingTask?.cancel()
 
         let sourceData = chartData
         let referenceDate = Date()
 
-        let task = Task<[TimeRange: [MetricChartDataPoint]], Never>.detached(priority: .userInitiated) {
+        let series = await Task(priority: .userInitiated) { () -> [TimeRange: [MetricChartDataPoint]] in
             let preprocessor = ChartSeriesPreprocessor(referenceDate: referenceDate)
             return preprocessor.seriesByRange(from: sourceData)
-        }
-
-        preprocessingTask = task
-
-        let series = await task.value
-
-        guard !task.isCancelled else { return }
+        }.value
 
         await MainActor.run {
             cachedSeries = series
             isLoadingData = false
-            selectedDate = nil
-            selectedPoint = nil
         }
+    }
+
+    private func historyPrimaryText(for entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> String {
+        var components: [String] = []
+        let formatter = config.primaryFormatter
+        let primary = formatter.string(from: NSNumber(value: entry.primaryValue)) ?? formattedValue(entry.primaryValue)
+        components.append(config.unitLabel.isEmpty ? primary : "\(primary) \(config.unitLabel)")
+
+        if let secondaryValue = entry.secondaryValue,
+           let secondaryFormatter = config.secondaryFormatter,
+           let secondaryText = secondaryFormatter.string(from: NSNumber(value: secondaryValue)) {
+            if let secondaryUnit = config.secondaryUnitLabel, !secondaryUnit.isEmpty {
+                components.append("\(secondaryText) \(secondaryUnit)")
+            } else {
+                components.append(secondaryText)
+            }
+        }
+
+        return components.joined(separator: " · ")
+    }
+
+    private func formattedValue(_ value: Double) -> String {
+        if value.isFinite {
+            return String(format: value < 10 ? "%.2f" : "%.1f", value)
+        }
+        return "—"
     }
 }
 

@@ -11,12 +11,12 @@ struct IntegrationsView: View {
     @State private var showHealthKitConnect = false
     @Environment(\.dismiss)
 
-    var dismiss    
+    var dismiss
     var body: some View {
         ZStack {
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: 20) {
                     // Health & Fitness Section
@@ -32,12 +32,12 @@ struct IntegrationsView: View {
                                         .foregroundColor(.red)
                                         .font(.system(size: SettingsDesign.iconSize))
                                         .frame(width: SettingsDesign.iconFrame)
-                                    
+
                                     Text("Apple Health")
                                         .font(SettingsDesign.titleFont)
-                                    
+
                                     Spacer()
-                                    
+
                                     if healthKitManager.isAuthorized {
                                         Label("Connected", systemImage: "checkmark.circle.fill")
                                             .font(SettingsDesign.valueFont)
@@ -58,10 +58,10 @@ struct IntegrationsView: View {
                                 }
                                 .padding(.horizontal, SettingsDesign.horizontalPadding)
                                 .padding(.vertical, SettingsDesign.verticalPadding)
-                                
+
                                 if healthKitManager.isAuthorized {
                                     Divider()
-                                    
+
                                     // Enable Sync Toggle
                                     SettingsToggleRow(
                                         icon: "arrow.triangle.2.circlepath",
@@ -86,9 +86,9 @@ struct IntegrationsView: View {
                                             }
                                         }
                                     }
-                                    
+
                                     Divider()
-                                    
+
                                     // Manual Sync Button
                                     SettingsButtonRow(
                                         icon: "arrow.triangle.2.circlepath",
@@ -109,21 +109,21 @@ struct IntegrationsView: View {
                                     iconColor: .orange
                                 )
                             }
-                            
+
                             Divider()
-                            
+
                             // Google Fit (Coming Soon)
                             HStack {
                                 Image(systemName: "figure.run")
                                     .foregroundColor(.green)
                                     .font(.system(size: SettingsDesign.iconSize))
                                     .frame(width: SettingsDesign.iconFrame)
-                                
+
                                 Text("Google Fit")
                                     .font(SettingsDesign.titleFont)
-                                
+
                                 Spacer()
-                                
+
                                 Text("Coming Soon")
                                     .font(SettingsDesign.valueFont)
                                     .foregroundColor(.appTextSecondary)
@@ -131,21 +131,21 @@ struct IntegrationsView: View {
                             .padding(.horizontal, SettingsDesign.horizontalPadding)
                             .padding(.vertical, SettingsDesign.verticalPadding)
                             .opacity(0.6)
-                            
+
                             Divider()
-                            
+
                             // BodySpec (Coming Soon)
                             HStack {
                                 Image(systemName: "waveform.path.ecg")
                                     .foregroundColor(.blue)
                                     .font(.system(size: SettingsDesign.iconSize))
                                     .frame(width: SettingsDesign.iconFrame)
-                                
+
                                 Text("BodySpec")
                                     .font(SettingsDesign.titleFont)
-                                
+
                                 Spacer()
-                                
+
                                 Text("Coming Soon")
                                     .font(SettingsDesign.valueFont)
                                     .foregroundColor(.appTextSecondary)
@@ -155,7 +155,7 @@ struct IntegrationsView: View {
                             .opacity(0.6)
                         }
                     }
-                    
+
                     // Photo Import Section
                     SettingsSection(
                         header: "Photo Import",
@@ -170,7 +170,7 @@ struct IntegrationsView: View {
                             )
                         }
                     }
-                    
+
                     // Data Export Section
                     SettingsSection(
                         header: "Data Export",
@@ -185,21 +185,21 @@ struct IntegrationsView: View {
                                     showChevron: true
                                 )
                             }
-                            
+
                             Divider()
-                            
+
                             // JSON Export (Coming Soon)
                             HStack {
                                 Image(systemName: "doc.badge.gearshape")
                                     .foregroundColor(.appTextSecondary)
                                     .font(.system(size: SettingsDesign.iconSize))
                                     .frame(width: SettingsDesign.iconFrame)
-                                
+
                                 Text("Export as JSON")
                                     .font(SettingsDesign.titleFont)
-                                
+
                                 Spacer()
-                                
+
                                 Text("Coming Soon")
                                     .font(SettingsDesign.valueFont)
                                     .foregroundColor(.appTextSecondary)
@@ -209,7 +209,7 @@ struct IntegrationsView: View {
                             .opacity(0.6)
                         }
                     }
-                    
+
                     // API Access Section (Future)
                     SettingsSection(
                         header: "Developer Access",
@@ -220,12 +220,12 @@ struct IntegrationsView: View {
                                 .foregroundColor(.appTextSecondary)
                                 .font(.system(size: SettingsDesign.iconSize))
                                 .frame(width: SettingsDesign.iconFrame)
-                            
+
                             Text("API Access")
                                 .font(SettingsDesign.titleFont)
-                            
+
                             Spacer()
-                            
+
                             Text("Coming Soon")
                                 .font(SettingsDesign.valueFont)
                                 .foregroundColor(.appTextSecondary)

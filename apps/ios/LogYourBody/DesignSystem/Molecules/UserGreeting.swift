@@ -12,12 +12,12 @@ struct UserGreeting: View {
     var showEmoji: Bool = false
     var compactMode: Bool = false
     var customGreeting: String?
-    
+
     private var greeting: String {
         if let custom = customGreeting {
             return custom
         }
-        
+
         let hour = Calendar.current.component(.hour, from: Date())
         let baseGreeting: String
         switch hour {
@@ -25,7 +25,7 @@ struct UserGreeting: View {
         case 12..<17: baseGreeting = "Good afternoon"
         default: baseGreeting = "Good evening"
         }
-        
+
         if showEmoji {
             let emoji: String
             switch hour {
@@ -36,17 +36,17 @@ struct UserGreeting: View {
             }
             return "\(baseGreeting) \(emoji)"
         }
-        
+
         return baseGreeting
     }
-    
+
     private var firstName: String {
         guard let fullName = fullName, !fullName.isEmpty else { return "there" }
         let trimmedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
         let components = trimmedName.components(separatedBy: " ").filter { !$0.isEmpty }
         return components.first ?? "there"
     }
-    
+
     var body: some View {
         if compactMode {
             HStack(spacing: 4) {
@@ -62,7 +62,7 @@ struct UserGreeting: View {
                 Text(greeting)
                     .font(.system(size: 12))
                     .foregroundColor(.appTextSecondary)
-                
+
                 Text(firstName)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.appText)
@@ -83,9 +83,9 @@ struct UserGreeting: View {
             UserGreeting(fullName: nil)
             UserGreeting(fullName: "   ") // Empty spaces
         }
-        
+
         Divider()
-        
+
         // With emojis
         VStack(alignment: .leading, spacing: 16) {
             Text("With Emojis").font(.headline).foregroundColor(.appText)
@@ -93,9 +93,9 @@ struct UserGreeting: View {
             UserGreeting(fullName: "Bob Smith", showEmoji: true)
             UserGreeting(fullName: nil, showEmoji: true)
         }
-        
+
         Divider()
-        
+
         // Compact mode
         VStack(alignment: .leading, spacing: 16) {
             Text("Compact Mode").font(.headline).foregroundColor(.appText)
@@ -103,9 +103,9 @@ struct UserGreeting: View {
             UserGreeting(fullName: "Diana Prince", showEmoji: true, compactMode: true)
             UserGreeting(fullName: nil, compactMode: true)
         }
-        
+
         Divider()
-        
+
         // Custom greetings
         VStack(alignment: .leading, spacing: 16) {
             Text("Custom Greetings").font(.headline).foregroundColor(.appText)

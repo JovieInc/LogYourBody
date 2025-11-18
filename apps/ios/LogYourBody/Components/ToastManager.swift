@@ -13,13 +13,13 @@ struct Toast: Identifiable, Equatable {
     let type: ToastType
     let duration: TimeInterval
     let hapticFeedback: Bool
-    
+
     enum ToastType {
         case info
         case success
         case error
         case warning
-        
+
         var icon: String {
             switch self {
             case .info: return "info.circle.fill"
@@ -28,7 +28,7 @@ struct Toast: Identifiable, Equatable {
             case .warning: return "exclamationmark.triangle.fill"
             }
         }
-        
+
         var color: Color {
             switch self {
             case .info: return .appPrimary
@@ -38,7 +38,7 @@ struct Toast: Identifiable, Equatable {
             }
         }
     }
-    
+
     init(message: String, type: ToastType = .info, duration: TimeInterval = 3.0, hapticFeedback: Bool = true) {
         self.message = message
         self.type = type
@@ -50,13 +50,13 @@ struct Toast: Identifiable, Equatable {
 // MARK: - Toast Manager
 class ToastManager: ObservableObject {
     static let shared = ToastManager()
-    
+
     @Published private(set) var toasts: [Toast] = []
     @Published private(set) var currentToast: Toast?
-    
+
     private var cancellables = Set<AnyCancellable>()
     private var toastTimer: Timer?
-    
+
     private init() {
         // Process queue when toasts are added
         $toasts
@@ -68,11 +68,11 @@ class ToastManager: ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
+
     func show(_ message: String, type: Toast.ToastType = .info, duration: TimeInterval = 3.0) {
         let toast = Toast(message: message, type: type, duration: duration)
         toasts.append(toast)
-        
+
         // Haptic feedback
         if toast.hapticFeedback {
             switch type {
@@ -91,19 +91,19 @@ class ToastManager: ObservableObject {
             }
         }
     }
-    
+
     private func showNextToast() {
         guard !toasts.isEmpty else { return }
-        
+
         let toast = toasts.removeFirst()
-        
+
         // Use async animation to not block UI
         Task { @MainActor in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 currentToast = toast
             }
         }
-        
+
         // Auto dismiss using async Task instead of Timer
         toastTimer?.invalidate()
         Task { @MainActor in
@@ -111,14 +111,14 @@ class ToastManager: ObservableObject {
             dismissCurrentToast()
         }
     }
-    
+
     func dismissCurrentToast() {
         toastTimer?.invalidate()
-        
+
         withAnimation(.spring(response: 0.3, dampingFraction: 1.0)) {
             currentToast = nil
         }
-        
+
         // Show next toast after a brief delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.showNextToast()
@@ -131,20 +131,20 @@ struct ToastView: View {
     let toast: Toast
     @Namespace private var namespace
     @State private var isShowing = false
-    
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: toast.type.icon)
                 .font(.system(size: 20))
                 .foregroundColor(toast.type.color)
                 .matchedGeometryEffect(id: "icon", in: namespace)
-            
+
             Text(toast.message)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.appText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
-            
+
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
@@ -172,7 +172,7 @@ struct ToastView: View {
 struct ToastContainerView: View {
     @ObservedObject private var toastManager = ToastManager.shared
     @Namespace private var namespace
-    
+
     var body: some View {
         GeometryReader { _ in
             if let toast = toastManager.currentToast {
@@ -189,7 +189,7 @@ struct ToastContainerView: View {
                         .onTapGesture {
                             toastManager.dismissCurrentToast()
                         }
-                    
+
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -14,7 +14,7 @@ struct DailyLog: Identifiable, Codable {
     let notes: String?
     let createdAt: Date
     let updatedAt: Date
-    
+
     init(
         id: String = UUID().uuidString,
         userId: String,
@@ -36,21 +36,21 @@ struct DailyLog: Identifiable, Codable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
-    
+
     var formattedWeight: String? {
         guard let weight = weight else { return nil }
         return String(format: "%.1f", weight)
     }
-    
+
     var formattedSteps: String? {
         guard let stepCount = stepCount else { return nil }
         return NumberFormatter.localizedString(from: NSNumber(value: stepCount), number: .decimal)
     }
-    
+
     var displayWeightUnit: String {
         weightUnit ?? "kg"
     }
-    
+
     var hasData: Bool {
         weight != nil || stepCount != nil
     }
@@ -67,11 +67,11 @@ extension DailyLog {
             notes: "Morning weight and good walking day"
         )
     }
-    
+
     static var mockArray: [DailyLog] {
         let calendar = Calendar.current
         let today = Date()
-        
+
         return [
             DailyLog(
                 id: "1",

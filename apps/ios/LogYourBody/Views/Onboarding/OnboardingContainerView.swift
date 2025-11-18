@@ -9,7 +9,7 @@ struct OnboardingContainerView: View {
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var healthKitManager = HealthKitManager.shared
     @State private var backgroundOffset: CGFloat = 0
-    
+
     // Dynamic liquid glass properties based on current step
     private var liquidGlassOpacity: Double {
         switch viewModel.currentStep {
@@ -21,7 +21,7 @@ struct OnboardingContainerView: View {
             return 0.3
         }
     }
-    
+
     private var liquidGlassGradient: [Color] {
         switch viewModel.currentStep {
         case .welcome:
@@ -44,7 +44,7 @@ struct OnboardingContainerView: View {
             ]
         }
     }
-    
+
     var body: some View {
         ZStack {
             // Adaptive glass background
@@ -55,14 +55,14 @@ struct OnboardingContainerView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                
+
                 // Glass overlay
                 Rectangle()
                     .fill(.ultraThinMaterial)
                     .opacity(liquidGlassOpacity)
             }
             .ignoresSafeArea()
-            
+
             VStack(spacing: 0) {
                 // Modern progress indicator
                 if viewModel.currentStep != .welcome && viewModel.currentStep != .profilePreparation {
@@ -81,7 +81,7 @@ struct OnboardingContainerView: View {
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("Onboarding progress")
                         .accessibilityValue("Step \(viewModel.currentStep.rawValue) of \(OnboardingViewModel.OnboardingStep.allCases.filter { $0 != .welcome && $0 != .profilePreparation }.count)")
-                        
+
                         // Subtle separator
                         Rectangle()
                             .fill(Color.appBorder.opacity(0.2))
@@ -89,7 +89,7 @@ struct OnboardingContainerView: View {
                     }
                     .background(Color.appBackground)
                 }
-                
+
                 // Content with animation
                 ZStack {
                     switch viewModel.currentStep {
@@ -155,8 +155,8 @@ struct StepIndicator: View {
         Circle()
             .fill(
                 isCompleted ? Color.appPrimary :
-                isActive ? Color.appPrimary :
-                Color.appBorder
+                    isActive ? Color.appPrimary :
+                    Color.appBorder
             )
             .frame(width: isActive ? 8 : 6, height: isActive ? 8 : 6)
             .opacity(isCompleted ? 1 : isActive ? 1 : 0.5)

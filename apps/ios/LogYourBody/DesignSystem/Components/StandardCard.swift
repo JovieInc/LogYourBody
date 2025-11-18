@@ -19,7 +19,7 @@ struct StandardCard<Content: View>: View {
     let style: CardStyle
     let padding: CGFloat?
     @ViewBuilder let content: () -> Content
-    
+
     init(
         style: CardStyle = .standard,
         padding: CGFloat? = nil,
@@ -29,7 +29,7 @@ struct StandardCard<Content: View>: View {
         self.padding = padding
         self.content = content
     }
-    
+
     var body: some View {
         content()
             .padding(padding ?? 16)
@@ -43,9 +43,9 @@ struct StandardCard<Content: View>: View {
                 y: shadowY
             )
     }
-    
+
     // MARK: - Computed Properties
-    
+
     @ViewBuilder private var backgroundView: some View {
         switch style {
         case .standard:
@@ -58,7 +58,7 @@ struct StandardCard<Content: View>: View {
             GlassBackground()
         }
     }
-    
+
     @ViewBuilder private var overlayView: some View {
         switch style {
         case .outlined:
@@ -71,7 +71,7 @@ struct StandardCard<Content: View>: View {
             EmptyView()
         }
     }
-    
+
     private var shadowColor: Color {
         switch style {
         case .elevated:
@@ -82,7 +82,7 @@ struct StandardCard<Content: View>: View {
             return Color.clear
         }
     }
-    
+
     private var shadowRadius: CGFloat {
         switch style {
         case .elevated:
@@ -93,7 +93,7 @@ struct StandardCard<Content: View>: View {
             return 0
         }
     }
-    
+
     private var shadowY: CGFloat {
         switch style {
         case .elevated:
@@ -112,7 +112,7 @@ struct GlassBackground: View {
     var body: some View {
         ZStack {
             Color.appCard.opacity(0.8)
-            
+
             VisualEffectBlur(blurStyle: .systemUltraThinMaterialDark)
                 .opacity(0.5)
         }
@@ -123,11 +123,11 @@ struct GlassBackground: View {
 
 struct VisualEffectBlur: UIViewRepresentable {
     var blurStyle: UIBlurEffect.Style
-    
+
     func makeUIView(context: Context) -> UIVisualEffectView {
         UIVisualEffectView(effect: UIBlurEffect(style: blurStyle))
     }
-    
+
     func updateUIView(_ uiView: UIVisualEffectView, context: Context) {
         uiView.effect = UIBlurEffect(style: blurStyle)
     }
@@ -141,12 +141,12 @@ struct MetricCard: View {
     let icon: String?
     let trend: Trend?
     let isEstimated: Bool
-    
+
     enum Trend {
         case up(Double)
         case down(Double)
         case neutral
-        
+
         var icon: String {
             switch self {
             case .up: return "arrow.up.right"
@@ -154,7 +154,7 @@ struct MetricCard: View {
             case .neutral: return "minus"
             }
         }
-        
+
         var color: Color {
             switch self {
             case .up: return Color(hex: "#4CAF50")
@@ -163,7 +163,7 @@ struct MetricCard: View {
             }
         }
     }
-    
+
     init(
         value: String,
         label: String,
@@ -177,7 +177,7 @@ struct MetricCard: View {
         self.trend = trend
         self.isEstimated = isEstimated
     }
-    
+
     var body: some View {
         StandardCard(style: .standard, padding: 8) {
             VStack(alignment: .leading, spacing: 4) {
@@ -188,9 +188,9 @@ struct MetricCard: View {
                             .font(.system(size: 16))
                             .foregroundColor(.secondary)
                     }
-                    
+
                     Spacer()
-                    
+
                     if let trend = trend {
                         HStack(spacing: 2) {
                             Image(systemName: trend.icon)
@@ -205,21 +205,21 @@ struct MetricCard: View {
                         }
                         .foregroundColor(trend.color)
                     }
-                    
+
                     if isEstimated {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 12))
                             .foregroundColor(.orange)
                     }
                 }
-                
+
                 // Value
                 Text(value)
                     .font(.largeTitle)
                     .foregroundColor(.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                
+
                 // Label
                 Text(label)
                     .font(.caption)
@@ -237,7 +237,7 @@ struct InfoCard: View {
     let iconColor: Color?
     let title: String
     let description: String
-    
+
     init(
         icon: String,
         iconColor: Color? = nil,
@@ -249,7 +249,7 @@ struct InfoCard: View {
         self.title = title
         self.description = description
     }
-    
+
     var body: some View {
         StandardCard(style: .outlined) {
             HStack(alignment: .top, spacing: 12) {
@@ -258,19 +258,19 @@ struct InfoCard: View {
                     .font(.system(size: 24))
                     .foregroundColor(iconColor ?? .appPrimary)
                     .frame(width: 32, height: 32)
-                
+
                 // Content
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.callout)
                         .foregroundColor(.primary)
-                    
+
                     Text(description)
                         .font(.footnote)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                
+
                 Spacer(minLength: 0)
             }
         }
@@ -284,9 +284,9 @@ struct ActionCard<Destination: View>: View {
     let title: String
     let subtitle: String?
     let destination: () -> Destination
-    
+
     @State private var isPressed = false
-    
+
     init(
         icon: String,
         title: String,
@@ -298,7 +298,7 @@ struct ActionCard<Destination: View>: View {
         self.subtitle = subtitle
         self.destination = destination
     }
-    
+
     var body: some View {
         NavigationLink(destination: destination) {
             StandardCard(style: .standard) {
@@ -312,22 +312,22 @@ struct ActionCard<Destination: View>: View {
                             Circle()
                                 .fill(Color.appPrimary.opacity(0.1))
                         )
-                    
+
                     // Content
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
                             .font(.callout)
                             .foregroundColor(.primary)
-                        
+
                         if let subtitle = subtitle {
                             Text(subtitle)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     // Chevron
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
@@ -357,22 +357,22 @@ struct StandardCard_Previews: PreviewProvider {
                         Text("Standard Card")
                             .foregroundColor(.white)
                     }
-                    
+
                     StandardCard(style: .elevated) {
                         Text("Elevated Card")
                             .foregroundColor(.white)
                     }
-                    
+
                     StandardCard(style: .outlined) {
                         Text("Outlined Card")
                             .foregroundColor(.white)
                     }
-                    
+
                     StandardCard(style: .glass) {
                         Text("Glass Card")
                             .foregroundColor(.white)
                     }
-                    
+
                     // Metric cards
                     HStack(spacing: 12) {
                         MetricCard(
@@ -381,7 +381,7 @@ struct StandardCard_Previews: PreviewProvider {
                             icon: "scalemass",
                             trend: .down(2.3)
                         )
-                        
+
                         MetricCard(
                             value: "15.2%",
                             label: "Body Fat",
@@ -390,7 +390,7 @@ struct StandardCard_Previews: PreviewProvider {
                             isEstimated: true
                         )
                     }
-                    
+
                     // Info card
                     InfoCard(
                         icon: "lightbulb.fill",
@@ -398,7 +398,7 @@ struct StandardCard_Previews: PreviewProvider {
                         title: "Pro Tip",
                         description: "Track your measurements at the same time each day for more consistent results."
                     )
-                    
+
                     // Action card
                     ActionCard(
                         icon: "camera.fill",

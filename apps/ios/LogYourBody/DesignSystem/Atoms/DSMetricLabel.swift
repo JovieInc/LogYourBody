@@ -12,7 +12,7 @@ struct DSMetricLabel: View {
     var size: Font = .system(size: 14)
     var weight: Font.Weight = .regular
     var color: Color = .appTextSecondary
-    
+
     var body: some View {
         Text(text)
             .font(size.weight(weight))
@@ -25,18 +25,18 @@ struct DSMetricLabel: View {
 #Preview {
     VStack(spacing: 12) {
         DSMetricLabel(text: "Weight")
-        
+
         DSMetricLabel(
             text: "Body Fat",
             weight: .medium
         )
-        
+
         DSMetricLabel(
             text: "FFMI",
             size: .system(size: 12),
             color: .appTextTertiary
         )
-        
+
         DSMetricLabel(
             text: "Steps",
             size: .system(size: 16),

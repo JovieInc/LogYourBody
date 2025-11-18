@@ -17,7 +17,7 @@ struct LegacyMetricCard: View {
     let icon: String
     let trend: Trend
     let isEstimated: Bool
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -35,11 +35,11 @@ struct LegacyMetricCard: View {
                         .cornerRadius(4)
                 }
             }
-            
+
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(.title2.bold())
-                
+
                 switch trend {
                 case .up(let change):
                     HStack(spacing: 2) {
@@ -61,7 +61,7 @@ struct LegacyMetricCard: View {
                     EmptyView()
                 }
             }
-            
+
             Text(label)
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -82,13 +82,13 @@ struct GlassCard<Content: View>: View {
     let content: Content
     var cornerRadius: CGFloat = 16
     var padding: CGFloat = 16
-    
+
     init(cornerRadius: CGFloat = 16, padding: CGFloat = 16, @ViewBuilder content: () -> Content) {
         self.cornerRadius = cornerRadius
         self.padding = padding
         self.content = content()
     }
-    
+
     var body: some View {
         content
             .padding(padding)
@@ -120,7 +120,7 @@ struct HeaderBar<Leading: View, Trailing: View>: View {
     let leading: Leading
     let trailing: Trailing
     var showLiquidGlass: Bool = true
-    
+
     init(
         title: String = "",
         showLiquidGlass: Bool = true,
@@ -132,21 +132,21 @@ struct HeaderBar<Leading: View, Trailing: View>: View {
         self.leading = leading()
         self.trailing = trailing()
     }
-    
+
     var body: some View {
         HStack {
             leading
-            
+
             Spacer()
-            
+
             if !title.isEmpty {
                 Text(title)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.appText)
             }
-            
+
             Spacer()
-            
+
             trailing
         }
         .padding(.horizontal, 16)
@@ -185,11 +185,11 @@ struct MetricGauge: View {
     let unit: String
     let color: Color
     var size = CGSize(width: 140, height: 140)
-    
+
     private var normalizedValue: Double {
         min(1.0, max(0.0, value / maxValue))
     }
-    
+
     private var displayValue: String {
         if value >= 1_000 {
             return String(format: "%.1fK", value / 1_000)
@@ -197,14 +197,14 @@ struct MetricGauge: View {
             return String(format: "%.0f", value)
         }
     }
-    
+
     var body: some View {
         ZStack {
             // Background circle
             Circle()
                 .stroke(Color.appBorder, lineWidth: 2)
                 .frame(width: size.width, height: size.height)
-            
+
             // Progress arc
             Circle()
                 .trim(from: 0, to: normalizedValue)
@@ -218,17 +218,17 @@ struct MetricGauge: View {
                 .frame(width: size.width - 16, height: size.height - 16)
                 .rotationEffect(.degrees(-90))
                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: normalizedValue)
-            
+
             // Content
             VStack(spacing: 4) {
                 Text(displayValue)
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(.appText)
-                
+
                 Text(unit)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.appTextSecondary)
-                
+
                 Text(label)
                     .font(.system(size: 12, weight: .regular))
                     .foregroundColor(.appTextTertiary)
@@ -241,14 +241,14 @@ struct MetricGauge: View {
 struct BottomNavGlass: View {
     let selectedTab: String
     let onTabSelected: (String) -> Void
-    
+
     private let tabs = [
         ("house.fill", "Home"),
         ("calendar", "Timeline"),
         ("camera.fill", "Photos"),
         ("person.fill", "Profile")
     ]
-    
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(tabs, id: \.1) { icon, title in
@@ -263,14 +263,14 @@ struct BottomNavGlass: View {
                             Image(systemName: icon)
                                 .font(.system(size: 22))
                                 .foregroundColor(isSelected ? .appPrimary : .appTextSecondary)
-                            
+
                             Text(title)
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(isSelected ? .appPrimary : .appTextSecondary)
                         }
-                    .frame(maxWidth: .infinity)
-                }
-        )
+                        .frame(maxWidth: .infinity)
+                    }
+                )
             }
         }
         .padding(.top, 8)
@@ -306,13 +306,13 @@ struct CircularProgress: View {
     let lineWidth: CGFloat = 4
     let size: CGFloat = 100
     let color: Color = .appPrimary
-    
+
     var body: some View {
         ZStack {
             Circle()
                 .stroke(Color.appBorder, lineWidth: lineWidth)
                 .frame(width: size, height: size)
-            
+
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(
@@ -336,25 +336,25 @@ struct UIEmptyStateView: View {
     let message: String
     var action: (() -> Void)?
     var actionTitle: String = "Get Started"
-    
+
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: icon)
                 .font(.system(size: 64, weight: .light))
                 .foregroundColor(.appTextSecondary)
-            
+
             VStack(spacing: 12) {
                 Text(title)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.appText)
-                
+
                 Text(message)
                     .font(.system(size: 16))
                     .foregroundColor(.appTextSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            
+
             if let action = action {
                 Button(action: action) {
                     Text(actionTitle)
@@ -375,17 +375,17 @@ struct UIEmptyStateView: View {
 // MARK: - Loading Overlay
 struct UILoadingOverlay: View {
     let message: String
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.5)
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 20) {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     .scaleEffect(1.5)
-                
+
                 Text(message)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white)
@@ -406,7 +406,7 @@ struct UIMetricCard: View {
     let unit: String
     let trend: Double? // Positive for up, negative for down
     let icon: String
-    
+
     var body: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -414,13 +414,13 @@ struct UIMetricCard: View {
                     Image(systemName: icon)
                         .font(.system(size: 20))
                         .foregroundColor(.appPrimary)
-                    
+
                     Text(title)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.appTextSecondary)
-                    
+
                     Spacer()
-                    
+
                     if let trend = trend {
                         HStack(spacing: 4) {
                             Image(systemName: trend > 0 ? "arrow.up.right" : "arrow.down.right")
@@ -431,12 +431,12 @@ struct UIMetricCard: View {
                         .foregroundColor(trend > 0 ? .green : .red)
                     }
                 }
-                
+
                 HStack(alignment: .lastTextBaseline, spacing: 4) {
                     Text(value)
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundColor(.appText)
-                    
+
                     Text(unit)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.appTextSecondary)
@@ -453,7 +453,7 @@ struct UIComponents_Previews: PreviewProvider {
         ZStack {
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 20) {
                 // Glass Card
                 GlassCard {
@@ -461,26 +461,26 @@ struct UIComponents_Previews: PreviewProvider {
                         .foregroundColor(.appText)
                 }
                 .padding()
-                
+
                 // Header Bar
                 HeaderBar(title: "Dashboard") {
                     Button(
-            action: {},
-            label: {
-                        Image(systemName: "gear")
-                            .foregroundColor(.appText)
-                    }
-        )
+                        action: {},
+                        label: {
+                            Image(systemName: "gear")
+                                .foregroundColor(.appText)
+                        }
+                    )
                 } trailing: {
                     Button(
-            action: {},
-            label: {
-                        Image(systemName: "plus")
-                            .foregroundColor(.appText)
-                    }
-        )
+                        action: {},
+                        label: {
+                            Image(systemName: "plus")
+                                .foregroundColor(.appText)
+                        }
+                    )
                 }
-                
+
                 // Metric Gauge
                 MetricGauge(
                     value: 15.5,
@@ -489,7 +489,7 @@ struct UIComponents_Previews: PreviewProvider {
                     unit: "%BF",
                     color: .green
                 )
-                
+
                 // Metric Card
                 MetricCard(
                     value: "180.5",
@@ -499,7 +499,7 @@ struct UIComponents_Previews: PreviewProvider {
                     isEstimated: false
                 )
                 .padding()
-                
+
                 Spacer()
             }
         }

@@ -10,13 +10,13 @@ struct DSIcon: View {
     let name: String
     let size: IconSize
     let color: Color
-    
+
     enum IconSize {
         case small
         case medium
         case large
         case xlarge
-        
+
         var fontSize: Font {
             switch self {
             case .small: return .caption
@@ -26,7 +26,7 @@ struct DSIcon: View {
             }
         }
     }
-    
+
     init(
         name: String,
         size: IconSize = .medium,
@@ -36,7 +36,7 @@ struct DSIcon: View {
         self.size = size
         self.color = color
     }
-    
+
     var body: some View {
         Image(systemName: name)
             .font(size.fontSize)

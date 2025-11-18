@@ -10,7 +10,7 @@ struct LegalSection<Destination: View>: View {
     let header: String
     let footer: String?
     let items: [LegalSectionItem<Destination>]
-    
+
     init(
         header: String,
         footer: String? = nil,
@@ -20,7 +20,7 @@ struct LegalSection<Destination: View>: View {
         self.footer = footer
         self.items = items
     }
-    
+
     var body: some View {
         SettingsSection(header: header, footer: footer) {
             VStack(spacing: 0) {
@@ -50,7 +50,7 @@ struct LegalSection<Destination: View>: View {
                             subtitle: items[index].subtitle
                         )
                     }
-                    
+
                     if index < items.count - 1 {
                         DSDivider().insetted(16)
                     }
@@ -68,7 +68,7 @@ struct LegalSectionItem<Destination: View> {
     let subtitle: String?
     let destination: Destination?
     let externalURL: URL?
-    
+
     init(
         icon: String,
         title: String,
@@ -121,7 +121,7 @@ extension LegalSectionItem where Destination == EmptyView {
                     )
                 ]
             )
-            
+
             LegalSection<EmptyView>(
                 header: "Legal Contact",
                 items: [

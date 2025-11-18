@@ -16,7 +16,7 @@ enum TextFieldStyle {
 
 struct StandardTextField: View {
     @FocusState private var isFocused: Bool
-    
+
     @Binding var text: String
     let placeholder: String
     let label: String?
@@ -29,13 +29,13 @@ struct StandardTextField: View {
     let characterLimit: Int?
     let onEditingChanged: ((Bool) -> Void)?
     let onCommit: (() -> Void)?
-    
+
     @State private var showPassword = false
-    
+
     private var isSecureField: Bool {
         textContentType == .password || textContentType == .newPassword
     }
-    
+
     init(
         text: Binding<String>,
         placeholder: String = "",
@@ -63,7 +63,7 @@ struct StandardTextField: View {
         self.onEditingChanged = onEditingChanged
         self.onCommit = onCommit
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             // Label
@@ -72,7 +72,7 @@ struct StandardTextField: View {
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }
-            
+
             // Text Field Container
             HStack(spacing: 8) {
                 // Leading icon
@@ -82,7 +82,7 @@ struct StandardTextField: View {
                         .foregroundColor(iconColor)
                         .transition(.opacity)
                 }
-                
+
                 // Text Field
                 Group {
                     if isSecureField && !showPassword {
@@ -104,7 +104,7 @@ struct StandardTextField: View {
                 .font(.body)
                 .foregroundColor(.primary)
                 .focused($isFocused)
-                
+
                 // Trailing elements
                 HStack(spacing: 4) {
                     // Character count
@@ -115,7 +115,7 @@ struct StandardTextField: View {
                                 text.count > limit ? .red : Color.secondary.opacity(0.6)
                             )
                     }
-                    
+
                     // Password toggle
                     if isSecureField {
                         Button(
@@ -127,7 +127,7 @@ struct StandardTextField: View {
                             }
                         )
                     }
-                    
+
                     // Clear button
                     if !text.isEmpty && isFocused {
                         Button(
@@ -149,7 +149,7 @@ struct StandardTextField: View {
             .overlay(overlayView)
             .animation(.easeOut(duration: 0.2), value: isFocused)
             .animation(.easeOut(duration: 0.2), value: errorMessage != nil)
-            
+
             // Helper/Error text
             if let error = errorMessage {
                 HStack(spacing: 2) {
@@ -167,9 +167,9 @@ struct StandardTextField: View {
             }
         }
     }
-    
+
     // MARK: - Computed Properties
-    
+
     @ViewBuilder private var backgroundView: some View {
         switch style {
         case .standard:
@@ -180,12 +180,12 @@ struct StandardTextField: View {
             Color.clear
         }
     }
-    
+
     @ViewBuilder private var overlayView: some View {
         RoundedRectangle(cornerRadius: 6)
             .stroke(borderColor, lineWidth: borderWidth)
     }
-    
+
     private var borderColor: Color {
         if errorMessage != nil {
             return .red
@@ -200,7 +200,7 @@ struct StandardTextField: View {
             }
         }
     }
-    
+
     private var borderWidth: CGFloat {
         if isFocused || errorMessage != nil {
             return 2
@@ -208,7 +208,7 @@ struct StandardTextField: View {
             return style == .outlined ? 1 : 0
         }
     }
-    
+
     private var iconColor: Color {
         if errorMessage != nil {
             return .red
@@ -224,11 +224,11 @@ struct StandardTextField: View {
 
 struct SearchField: View {
     @FocusState private var isFocused: Bool
-    
+
     @Binding var text: String
     let placeholder: String
     let onSearch: (() -> Void)?
-    
+
     init(
         text: Binding<String>,
         placeholder: String = "Search",
@@ -238,20 +238,20 @@ struct SearchField: View {
         self.placeholder = placeholder
         self.onSearch = onSearch
     }
-    
+
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 16))
                 .foregroundColor(.secondary)
-            
+
             TextField(placeholder, text: $text) {
                 onSearch?()
             }
             .font(.body)
             .foregroundColor(.primary)
             .focused($isFocused)
-            
+
             if !text.isEmpty {
                 Button(
                     action: { text = "" },
@@ -280,7 +280,7 @@ struct SearchField: View {
 
 struct TextArea: View {
     @FocusState private var isFocused: Bool
-    
+
     @Binding var text: String
     let placeholder: String
     let label: String?
@@ -288,7 +288,7 @@ struct TextArea: View {
     let maxHeight: CGFloat
     let characterLimit: Int?
     let errorMessage: String?
-    
+
     init(
         text: Binding<String>,
         placeholder: String = "",
@@ -306,7 +306,7 @@ struct TextArea: View {
         self.characterLimit = characterLimit
         self.errorMessage = errorMessage
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             // Label
@@ -315,7 +315,7 @@ struct TextArea: View {
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }
-            
+
             // Text Editor
             ZStack(alignment: .topLeading) {
                 // Placeholder
@@ -326,7 +326,7 @@ struct TextArea: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                 }
-                
+
                 // Text Editor
                 TextEditor(text: $text)
                     .font(.body)
@@ -343,7 +343,7 @@ struct TextArea: View {
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(borderColor, lineWidth: borderWidth)
             )
-            
+
             // Footer
             HStack {
                 // Error message
@@ -356,9 +356,9 @@ struct TextArea: View {
                     }
                     .foregroundColor(.red)
                 }
-                
+
                 Spacer()
-                
+
                 // Character count
                 if let limit = characterLimit {
                     Text("\(text.count)/\(limit)")
@@ -370,7 +370,7 @@ struct TextArea: View {
             }
         }
     }
-    
+
     private var borderColor: Color {
         if errorMessage != nil {
             return .red
@@ -380,7 +380,7 @@ struct TextArea: View {
             return Color.appBorder
         }
     }
-    
+
     private var borderWidth: CGFloat {
         isFocused || errorMessage != nil ? 2 : 1
     }
@@ -400,7 +400,7 @@ struct StandardTextField_Previews: PreviewProvider {
                         label: "Name",
                         icon: "person"
                     )
-                    
+
                     StandardTextField(
                         text: .constant("john@example.com"),
                         placeholder: "Enter your email",
@@ -409,7 +409,7 @@ struct StandardTextField_Previews: PreviewProvider {
                         keyboardType: .emailAddress,
                         textContentType: .emailAddress
                     )
-                    
+
                     // Password field
                     StandardTextField(
                         text: .constant("password123"),
@@ -418,7 +418,7 @@ struct StandardTextField_Previews: PreviewProvider {
                         icon: "lock",
                         textContentType: .password
                     )
-                    
+
                     // With error
                     StandardTextField(
                         text: .constant("invalid"),
@@ -426,7 +426,7 @@ struct StandardTextField_Previews: PreviewProvider {
                         label: "Field with Error",
                         errorMessage: "This field is required"
                     )
-                    
+
                     // With helper text
                     StandardTextField(
                         text: .constant(""),
@@ -434,7 +434,7 @@ struct StandardTextField_Previews: PreviewProvider {
                         label: "Username",
                         helperText: "Choose a unique username"
                     )
-                    
+
                     // With character limit
                     StandardTextField(
                         text: .constant("Hello"),
@@ -442,10 +442,10 @@ struct StandardTextField_Previews: PreviewProvider {
                         label: "Short Bio",
                         characterLimit: 50
                     )
-                    
+
                     // Search field
                     SearchField(text: .constant(""))
-                    
+
                     // Text area
                     TextArea(
                         text: .constant(""),

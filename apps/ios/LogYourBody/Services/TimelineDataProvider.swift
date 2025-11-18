@@ -184,7 +184,7 @@ class TimelineDataProvider: ObservableObject {
         }
 
         // Convert to anchors with time-weighted positions
-        return sampledMetrics.enumerated().map { index, metric in
+        return sampledMetrics.map { metric in
             let position = calculateTimeWeightedPosition(
                 for: metric.date,
                 from: firstDate,

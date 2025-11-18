@@ -26,7 +26,7 @@ struct DSCompactMetricCard: View {
     private var isEmptyState: Bool {
         value == "––"
     }
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Icon
@@ -76,7 +76,7 @@ struct DSCompactMetricCard: View {
             trend: 2_500,
             trendType: .positive
         )
-        
+
         // FFMI with negative trend
         DSCompactMetricCard(
             icon: "figure.arms.open",
@@ -85,21 +85,21 @@ struct DSCompactMetricCard: View {
             trend: -0.3,
             trendType: .positive
         )
-        
+
         // Lean mass with no data
         DSCompactMetricCard(
             icon: "figure.arms.open",
             value: "––",
             label: "Lean kg"
         )
-        
+
         HStack(spacing: 12) {
             DSCompactMetricCard(
                 icon: "figure.walk",
                 value: "8,421",
                 label: "Steps"
             )
-            
+
             DSCompactMetricCard(
                 icon: "flame.fill",
                 value: "2,150",

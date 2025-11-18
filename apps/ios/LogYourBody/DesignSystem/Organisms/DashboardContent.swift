@@ -21,13 +21,13 @@ struct DashboardContent: View {
     @State private var displayMode: DashboardDisplayMode = .photo
     @State private var timelineMode: TimelineMode = .photo
     @State private var selectedChartDate: Date?
-    
+
     // Computed properties for current metric
     private var currentMetric: BodyMetrics? {
         guard !bodyMetrics.isEmpty && selectedIndex >= 0 && selectedIndex < bodyMetrics.count else { return nil }
         return bodyMetrics[selectedIndex]
     }
-    
+
     var body: some View {
         if bodyMetrics.isEmpty {
             DashboardEmptyState()
@@ -66,7 +66,7 @@ struct DashboardContent: View {
                         weightUnit: currentSystem.weightUnit,
                         displayMode: $displayMode
                     )
-                    
+
                     // Bottom padding for floating tab bar
                     Color.clear.frame(height: 90)
                 }
@@ -166,7 +166,7 @@ struct DashboardContent: View {
                 )
         }
     }
-    
+
     private var photoActionButton: some View {
         Button(action: onPhotoAction) {
             if currentMetric?.photoUrl == nil || currentMetric?.photoUrl?.isEmpty == true {
@@ -192,7 +192,7 @@ struct DashboardContent: View {
             }
         }
     }
-    
+
     private var timelineSection: some View {
         VStack(spacing: 0) {
             ProgressTimelineView(
@@ -206,9 +206,9 @@ struct DashboardContent: View {
         .padding(.vertical, 12)
         .background(Color.appCard.opacity(0.5))
     }
-    
+
     // MARK: - Calculations
-    
+
     private func getBodyFatValue() -> Double? {
         if let bf = currentMetric?.bodyFatPercentage {
             return bf
@@ -220,19 +220,19 @@ struct DashboardContent: View {
         }
         return nil
     }
-    
+
     private func getWeightValue() -> Double? {
         guard let weight = currentMetric?.weight else { return nil }
         return convertWeight(weight, from: "kg", to: currentSystem.weightUnit)
     }
-    
+
     private func getLeanMassValue() -> Double? {
         guard let weight = currentMetric?.weight,
               let bf = getBodyFatValue() else { return nil }
         let leanMass = weight * (1 - bf / 100)
         return convertWeight(leanMass, from: "kg", to: currentSystem.weightUnit)
     }
-    
+
     private func calculateFFMI() -> Double? {
         guard let weight = currentMetric?.weight,
               let userHeightValue = userHeight,
@@ -250,14 +250,14 @@ struct DashboardContent: View {
         let heightInMeters = heightInCm / 100
         return leanMass / (heightInMeters * heightInMeters)
     }
-    
+
     // Stub calculation methods - implement based on your logic
     private func calculateBodyFatTrend() -> Double? { nil }
     private func calculateWeightTrend() -> Double? { nil }
     private func calculateStepsTrend() -> Int? { nil }
     private func calculateFFMITrend() -> Double? { nil }
     private func calculateLeanMassTrend() -> Double? { nil }
-    
+
     private func convertWeight(_ weight: Double, from: String, to: String) -> Double {
         if from == to { return weight }
         if from == "kg" && to == "lbs" {
@@ -277,12 +277,12 @@ private struct DashboardEmptyState: View {
             Image(systemName: "chart.line.downtrend.xyaxis")
                 .font(.system(size: 64, weight: .light))
                 .foregroundColor(.appTextSecondary)
-            
+
             VStack(spacing: 12) {
                 Text("No data yet")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.appText)
-                
+
                 Text("Log your first measurement to get started")
                     .font(.system(size: 16))
                     .foregroundColor(.appTextSecondary)

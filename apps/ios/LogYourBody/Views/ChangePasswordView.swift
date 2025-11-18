@@ -16,35 +16,35 @@ struct ChangePasswordView: View {
     @State private var errorMessage = ""
     @State private var showSuccess = false
     @FocusState private var focusedField: Field?
-    
+
     enum Field {
         case current, new, confirm
     }
-    
+
     private var isValidForm: Bool {
         !currentPassword.isEmpty &&
-        newPassword.count >= 8 &&
-        newPassword == confirmPassword &&
-        hasUpperAndLower &&
-        hasNumberOrSymbol
+            newPassword.count >= 8 &&
+            newPassword == confirmPassword &&
+            hasUpperAndLower &&
+            hasNumberOrSymbol
     }
-    
+
     private var hasUpperAndLower: Bool {
         let hasUpper = newPassword.rangeOfCharacter(from: .uppercaseLetters) != nil
         let hasLower = newPassword.rangeOfCharacter(from: .lowercaseLetters) != nil
         return hasUpper && hasLower
     }
-    
+
     private var hasNumberOrSymbol: Bool {
         let hasNumber = newPassword.rangeOfCharacter(from: .decimalDigits) != nil
         let hasSymbol = newPassword.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil
         return hasNumber || hasSymbol
     }
-    
+
     private var passwordsMatch: Bool {
         !newPassword.isEmpty && newPassword == confirmPassword
     }
-    
+
     var body: some View {
         ZStack {
             ScrollView {
@@ -55,17 +55,17 @@ struct ChangePasswordView: View {
                             Circle()
                                 .fill(Color.appPrimary.opacity(0.1))
                                 .frame(width: 80, height: 80)
-                            
+
                             Image(systemName: "lock.shield")
                                 .font(.system(size: 36, weight: .medium))
                                 .foregroundColor(.appPrimary)
                         }
                         .padding(.top, 20)
-                        
+
                         Text("Change Password")
                             .font(.title2)
                             .fontWeight(.bold)
-                        
+
                         Text("Create a strong password to protect your account")
                             .font(.body)
                             .foregroundColor(.secondary)
@@ -73,7 +73,7 @@ struct ChangePasswordView: View {
                             .padding(.horizontal, 40)
                     }
                     .padding(.bottom, 20)
-                    
+
                     // Form Fields
                     SettingsSection(header: "Current Password") {
                         SecureField("Enter current password", text: $currentPassword)
@@ -86,7 +86,7 @@ struct ChangePasswordView: View {
                             .padding(.horizontal, SettingsDesign.horizontalPadding)
                             .padding(.vertical, 8)
                     }
-                    
+
                     SettingsSection(
                         header: "New Password",
                         footer: "Password must meet all requirements below"
@@ -101,19 +101,19 @@ struct ChangePasswordView: View {
                                 }
                                 .padding(.horizontal, SettingsDesign.horizontalPadding)
                                 .padding(.top, 8)
-                            
+
                             // Password Requirements
                             VStack(alignment: .leading, spacing: 8) {
                                 PasswordRequirement(
                                     text: "At least 8 characters",
                                     isMet: newPassword.count >= 8
                                 )
-                                
+
                                 PasswordRequirement(
                                     text: "Mix of uppercase and lowercase",
                                     isMet: hasUpperAndLower
                                 )
-                                
+
                                 PasswordRequirement(
                                     text: "At least one number or symbol",
                                     isMet: hasNumberOrSymbol
@@ -123,7 +123,7 @@ struct ChangePasswordView: View {
                             .padding(.bottom, 8)
                         }
                     }
-                    
+
                     SettingsSection(
                         header: "Confirm New Password",
                         footer: !confirmPassword.isEmpty && !passwordsMatch ? "Passwords don't match" : nil
@@ -140,7 +140,7 @@ struct ChangePasswordView: View {
                             .padding(.horizontal, SettingsDesign.horizontalPadding)
                             .padding(.vertical, 8)
                     }
-                    
+
                     // Submit Button
                     BaseButton(
                         "Update Password",
@@ -155,13 +155,13 @@ struct ChangePasswordView: View {
                     .animation(.easeInOut(duration: 0.2), value: isValidForm)
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
-                    
+
                     Spacer(minLength: 40)
                 }
                 .padding(.vertical)
             }
             .settingsBackground()
-            
+
             // Loading overlay
             if isLoading {
                 LoadingOverlay(message: "Updating password...")
@@ -193,31 +193,31 @@ struct ChangePasswordView: View {
             focusedField = nil
         }
     }
-    
+
     private func changePassword() {
         guard isValidForm else { return }
-        
+
         focusedField = nil
         isLoading = true
-        
+
         Task { @MainActor in
             do {
                 guard let user = Clerk.shared.user else {
                     throw PasswordError.notAuthenticated
                 }
-                
+
                 // Update password using Clerk
                 try await user.updatePassword(.init(
                     newPassword: newPassword,
                     currentPassword: currentPassword,
                     signOutOfOtherSessions: true
                 ))
-                
+
                 isLoading = false
                 showSuccess = true
             } catch {
                 isLoading = false
-                
+
                 // Handle specific Clerk errors
                 if let clerkError = error as? ClerkAPIError {
                     switch clerkError.code {
@@ -231,7 +231,7 @@ struct ChangePasswordView: View {
                 } else {
                     errorMessage = error.localizedDescription
                 }
-                
+
                 showError = true
             }
         }
@@ -241,13 +241,13 @@ struct ChangePasswordView: View {
 struct PasswordRequirement: View {
     let text: String
     let isMet: Bool
-    
+
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: isMet ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 14))
                 .foregroundColor(isMet ? .green : .secondary)
-            
+
             Text(text)
                 .font(SettingsDesign.valueFont)
                 .foregroundColor(isMet ? .primary : .secondary)
@@ -257,7 +257,7 @@ struct PasswordRequirement: View {
 
 enum PasswordError: LocalizedError {
     case notAuthenticated
-    
+
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:

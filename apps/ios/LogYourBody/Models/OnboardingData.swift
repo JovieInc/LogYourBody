@@ -14,11 +14,11 @@ struct OnboardingData {
     var notificationsEnabled: Bool = false
     var healthKitEnabled: Bool = false
     var hasUploadedPhotos: Bool = false
-    
+
     enum Gender: String, CaseIterable {
         case male = "Male"
         case female = "Female"
-        
+
         var icon: String {
             switch self {
             case .male: return "♂"
@@ -26,11 +26,11 @@ struct OnboardingData {
             }
         }
     }
-    
+
     var totalHeightInInches: Int {
         return (heightFeet * 12) + heightInches
     }
-    
+
     var isProfileComplete: Bool {
         return !name.isEmpty && dateOfBirth != nil && gender != nil
     }

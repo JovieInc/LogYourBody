@@ -9,13 +9,13 @@ import UIKit
 
 struct InteractiveScale: ViewModifier {
     @State private var isPressed = false
-    
+
     let scale: CGFloat
-    
+
     init(scale: CGFloat = 0.97) {
         self.scale = scale
     }
-    
+
     func body(content: Content) -> some View {
         content
             .scaleEffect(isPressed ? scale : 1.0)
@@ -32,7 +32,7 @@ struct InteractiveScale: ViewModifier {
 struct Shake: ViewModifier {
     @State private var shakeOffset: CGFloat = 0
     let trigger: Bool
-    
+
     func body(content: Content) -> some View {
         content
             .offset(x: shakeOffset)
@@ -42,7 +42,7 @@ struct Shake: ViewModifier {
                 }
             }
     }
-    
+
     private func performShake() {
         withAnimation(.default) {
             shakeOffset = -10
@@ -70,7 +70,7 @@ struct Shake: ViewModifier {
 struct Glow: ViewModifier {
     let color: Color
     let radius: CGFloat
-    
+
     func body(content: Content) -> some View {
         content
             .shadow(color: color.opacity(0.6), radius: radius / 2)
@@ -84,13 +84,13 @@ struct Glow: ViewModifier {
 struct DesignLoadingOverlay: ViewModifier {
     let isLoading: Bool
     let message: String?
-    
+
     func body(content: Content) -> some View {
         ZStack {
             content
                 .disabled(isLoading)
                 .blur(radius: isLoading ? 3 : 0)
-            
+
             if isLoading {
                 DesignLoadingView(
                     message: message,
@@ -107,7 +107,7 @@ struct DesignLoadingOverlay: ViewModifier {
 
 struct ErrorBanner: ViewModifier {
     @Binding var error: String?
-    
+
     func body(content: Content) -> some View {
         VStack(spacing: 0) {
             // Error banner
@@ -115,13 +115,13 @@ struct ErrorBanner: ViewModifier {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.circle.fill")
                         .font(.system(size: 16))
-                    
+
                     Text(error)
                         .font(.system(size: 14))
                         .lineLimit(2)
-                    
+
                     Spacer()
-                    
+
                     Button(
                         action: { self.error = nil },
                         label: {
@@ -135,7 +135,7 @@ struct ErrorBanner: ViewModifier {
                 .background(Color.red)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
-            
+
             // Main content
             content
         }
@@ -148,7 +148,7 @@ struct ErrorBanner: ViewModifier {
 struct ParallaxScroll: ViewModifier {
     let multiplier: CGFloat
     @State private var scrollOffset: CGFloat = 0
-    
+
     func body(content: Content) -> some View {
         content
             .offset(y: scrollOffset * multiplier)
@@ -173,7 +173,7 @@ struct ConditionalModifier<TrueModifier: ViewModifier, FalseModifier: ViewModifi
     let condition: Bool
     let trueModifier: TrueModifier
     let falseModifier: FalseModifier
-    
+
     func body(content: Content) -> some View {
         if condition {
             content.modifier(trueModifier)
@@ -187,9 +187,9 @@ struct ConditionalModifier<TrueModifier: ViewModifier, FalseModifier: ViewModifi
 // NOTE: Using ViewModifier instead of ButtonStyle due to compilation issues
 
 struct DesignPrimaryButtonModifier: ViewModifier {
-    @Environment(\.isEnabled) 
+    @Environment(\.isEnabled)
     var isEnabled
-    
+
     func body(content: Content) -> some View {
         content
             .font(.system(size: 16, weight: .medium))
@@ -205,9 +205,9 @@ struct DesignPrimaryButtonModifier: ViewModifier {
 }
 
 struct DesignSecondaryButtonModifier: ViewModifier {
-    @Environment(\.isEnabled) 
+    @Environment(\.isEnabled)
     var isEnabled
-    
+
     func body(content: Content) -> some View {
         content
             .font(.system(size: 16, weight: .medium))
@@ -241,28 +241,28 @@ extension View {
     func interactiveScale(_ scale: CGFloat = 0.97) -> some View {
         modifier(InteractiveScale(scale: scale))
     }
-    
+
     func shake(trigger: Bool) -> some View {
         modifier(Shake(trigger: trigger))
     }
-    
+
     func glow(color: Color, radius: CGFloat = 10) -> some View {
         modifier(Glow(color: color, radius: radius))
     }
-    
+
     // State modifiers
     func loadingOverlay(isLoading: Bool, message: String? = nil) -> some View {
         modifier(DesignLoadingOverlay(isLoading: isLoading, message: message))
     }
-    
+
     func errorBanner(_ error: Binding<String?>) -> some View {
         modifier(ErrorBanner(error: error))
     }
-    
+
     func parallaxScroll(multiplier: CGFloat = 0.5) -> some View {
         modifier(ParallaxScroll(multiplier: multiplier))
     }
-    
+
     // Conditional modifier
     func conditional<TM: ViewModifier, FM: ViewModifier>(
         _ condition: Bool,
@@ -275,7 +275,7 @@ extension View {
             falseModifier: falseModifier
         ))
     }
-    
+
     // Common animations
     func fadeIn(delay: Double = 0) -> some View {
         opacity(0)
@@ -285,7 +285,7 @@ extension View {
                 }
             }
     }
-    
+
     func slideIn(from edge: Edge = .bottom, delay: Double = 0) -> some View {
         transition(.move(edge: edge).combined(with: .opacity))
             .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(delay), value: true)
@@ -297,7 +297,7 @@ extension View {
 struct RoundedCorner: Shape {
     var radius: CGFloat = .infinity
     var corners: UIRectCorner = .allCorners
-    
+
     func path(in rect: CGRect) -> Path {
         let path = UIBezierPath(
             roundedRect: rect,
@@ -319,7 +319,7 @@ extension View {
 struct LayoutReader<Content: View>: View {
     @Binding var size: CGSize
     let content: () -> Content
-    
+
     var body: some View {
         content()
             .background(
@@ -338,7 +338,7 @@ extension View {
     var safeAreaTop: CGFloat {
         UIApplication.shared.windows.first?.safeAreaInsets.top ?? 0
     }
-    
+
     var safeAreaBottom: CGFloat {
         UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
     }

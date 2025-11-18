@@ -13,7 +13,7 @@ class OnboardingViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var showError = false
     @Published var errorMessage = ""
-    
+
     enum OnboardingStep: Int, CaseIterable {
         case welcome = 0
         case healthKit = 1
@@ -24,7 +24,7 @@ class OnboardingViewModel: ObservableObject {
         case progressPhotos = 6
         case notifications = 7
         case profilePreparation = 8
-        
+
         var title: String {
             switch self {
             case .welcome: return "Welcome"
@@ -38,40 +38,40 @@ class OnboardingViewModel: ObservableObject {
             case .profilePreparation: return "Preparing Profile"
             }
         }
-        
+
         var progress: Double {
             return Double(self.rawValue + 1) / Double(OnboardingStep.allCases.count)
         }
     }
-    
-    
+
+
     init() {
         // Use single source of truth for name
         let displayName = AuthManager.shared.getUserDisplayName()
-        
+
         // Only use the name if it's not the email fallback
         if !displayName.contains("@") && displayName != "User" {
             data.name = displayName
         }
     }
-    
+
     func nextStep() {
         withAnimation(.easeInOut(duration: 0.3)) {
             if currentStep.rawValue < OnboardingStep.allCases.count - 1 {
                 var nextStepValue = currentStep.rawValue + 1
-                
+
                 // Keep incrementing until we find a step that needs to be shown
                 while nextStepValue < OnboardingStep.allCases.count {
                     let potentialStep = OnboardingStep(rawValue: nextStepValue)!
-                    
+
                     if shouldShowStep(potentialStep) {
                         currentStep = potentialStep
                         break
                     }
-                    
+
                     nextStepValue += 1
                 }
-                
+
                 // If we've skipped all steps, go to profile preparation
                 if nextStepValue >= OnboardingStep.allCases.count {
                     currentStep = .profilePreparation
@@ -79,7 +79,7 @@ class OnboardingViewModel: ObservableObject {
             }
         }
     }
-    
+
     private func shouldShowStep(_ step: OnboardingStep) -> Bool {
         switch step {
         case .welcome, .healthKit, .progressPhotos, .notifications, .profilePreparation:
@@ -94,24 +94,24 @@ class OnboardingViewModel: ObservableObject {
             return true
         }
     }
-    
+
     func previousStep() {
         withAnimation(.easeInOut(duration: 0.3)) {
             if currentStep.rawValue > 0 {
                 var previousStepValue = currentStep.rawValue - 1
-                
+
                 // Keep decrementing until we find a step that should be shown
                 while previousStepValue >= 0 {
                     let potentialStep = OnboardingStep(rawValue: previousStepValue)!
-                    
+
                     if shouldShowStep(potentialStep) {
                         currentStep = potentialStep
                         break
                     }
-                    
+
                     previousStepValue -= 1
                 }
-                
+
                 // If we couldn't find a previous step, stay on current
                 if previousStepValue < 0 {
                     currentStep = OnboardingStep(rawValue: 0)!
@@ -119,8 +119,8 @@ class OnboardingViewModel: ObservableObject {
             }
         }
     }
-    
-    
+
+
     func completeOnboarding(authManager: AuthManager) async {
         // Validate required fields before completing
         guard !data.name.isEmpty,
@@ -180,11 +180,8 @@ class OnboardingViewModel: ObservableObject {
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
         await MainActor.run {
-            // Mark onboarding as completed AFTER profile is saved
-            UserDefaults.standard.set(true, forKey: Constants.hasCompletedOnboardingKey)
-
-            // Force notification to ensure UI updates
-            NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: nil)
+            // Mark onboarding as completed AFTER profile is saved using centralized manager
+            OnboardingStateManager.shared.markCompleted()
         }
 
         await MainActor.run {

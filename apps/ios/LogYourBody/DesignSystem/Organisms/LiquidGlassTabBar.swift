@@ -14,7 +14,7 @@ struct LiquidGlassTabBar: View {
     @State private var isDragging = false
     @State private var dragOffset: CGFloat = 0
     @State private var springVelocity: CGFloat = 0
-    
+
     var body: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
@@ -82,12 +82,12 @@ struct LiquidTabButton: View {
     let namespace: Namespace.ID
     let containerGeometry: GeometryProxy
     let onTap: (CGRect) -> Void
-    
+
     @State private var isPressed = false
     @State private var buttonRect: CGRect = .zero
     @State private var rippleScale: CGFloat = 0
     @State private var rippleOpacity: Double = 0
-    
+
     var body: some View {
         GeometryReader { geometry in
             Button(
@@ -95,47 +95,47 @@ struct LiquidTabButton: View {
                     // Get button position for liquid animation
                     let frame = geometry.frame(in: .named("tabBar"))
                     onTap(frame)
-                    
+
                     // Trigger ripple effect
                     withAnimation(.easeOut(duration: 0.6)) {
                         rippleScale = 2
                         rippleOpacity = 0
                     }
-                    
+
                     // Reset ripple
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         rippleScale = 0
                         rippleOpacity = 0.3
                     }
                 }, label: {
-                VStack(spacing: 4) {
-                    ZStack {
-                        // Ripple effect
-                        Circle()
-                            .fill(Color.white.opacity(rippleOpacity))
-                            .scaleEffect(rippleScale)
-                            .frame(width: 40, height: 40)
-                            .allowsHitTesting(false)
-                        
-                        // Icon with liquid animation
-                        Image(systemName: tab.icon)
-                            .font(.system(size: 24, weight: isSelected ? .medium : .regular))
-                            .foregroundColor(isSelected ? .white : Color.white.opacity(0.5))
-                            .scaleEffect(isSelected ? 1.15 : 1.0)
-                            .rotationEffect(.degrees(isSelected ? 360 : 0))
-                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isSelected)
+                    VStack(spacing: 4) {
+                        ZStack {
+                            // Ripple effect
+                            Circle()
+                                .fill(Color.white.opacity(rippleOpacity))
+                                .scaleEffect(rippleScale)
+                                .frame(width: 40, height: 40)
+                                .allowsHitTesting(false)
+
+                            // Icon with liquid animation
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 24, weight: isSelected ? .medium : .regular))
+                                .foregroundColor(isSelected ? .white : Color.white.opacity(0.5))
+                                .scaleEffect(isSelected ? 1.15 : 1.0)
+                                .rotationEffect(.degrees(isSelected ? 360 : 0))
+                                .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isSelected)
+                        }
+                        .frame(width: 44, height: 44)
                     }
-                    .frame(width: 44, height: 44)
-                }
-                .frame(maxWidth: .infinity)
-                .scaleEffect(isPressed ? 0.85 : 1.0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
-            })
-            .buttonStyle(PlainButtonStyle())
-            .coordinateSpace(name: "tabBar")
-            .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-                isPressed = pressing
-            }, perform: {})
+                    .frame(maxWidth: .infinity)
+                    .scaleEffect(isPressed ? 0.85 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+                })
+                .buttonStyle(PlainButtonStyle())
+                .coordinateSpace(name: "tabBar")
+                .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+                    isPressed = pressing
+                }, perform: {})
         }
         .accessibilityLabel(tab.accessibilityLabel)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
@@ -147,15 +147,15 @@ struct LiquidGlassBackground: View {
     let isDragging: Bool
     let dragOffset: CGFloat
     let namespace: Namespace.ID
-    
+
     @State private var phase: CGFloat = 0
     @State private var waveAmplitude: CGFloat = 0
-    
+
     var body: some View {
         Canvas { context, size in
             // Create liquid glass path
             let path = createLiquidPath(in: size)
-            
+
             // Main glass fill
             context.fill(
                 path,
@@ -168,7 +168,7 @@ struct LiquidGlassBackground: View {
                     endPoint: CGPoint(x: size.width / 2, y: size.height)
                 )
             )
-            
+
             // Animated highlight
             let highlightPath = createHighlightPath(in: size)
             context.fill(
@@ -195,25 +195,25 @@ struct LiquidGlassBackground: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
                 waveAmplitude = 5
             }
-            
+
             withAnimation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.3)) {
                 waveAmplitude = 0
             }
         }
     }
-    
+
     private func createLiquidPath(in size: CGSize) -> Path {
         var path = Path()
-        
+
         let minX = selectedRect.minX
         let maxX = selectedRect.maxX
         let midX = selectedRect.midX
         let width = selectedRect.width
-        
+
         // Start from left
         path.move(to: CGPoint(x: 0, y: size.height))
         path.addLine(to: CGPoint(x: 0, y: 20))
-        
+
         // Liquid curve to selection
         if selectedRect != .zero {
             // Left approach curve
@@ -222,19 +222,19 @@ struct LiquidGlassBackground: View {
                 control1: CGPoint(x: minX - 30, y: 20),
                 control2: CGPoint(x: minX - 20, y: 15)
             )
-            
+
             // Selection bubble with wave
             let waveOffset = sin(phase) * waveAmplitude
             path.addQuadCurve(
                 to: CGPoint(x: midX, y: 5 + waveOffset),
                 control: CGPoint(x: minX + width * 0.25, y: 0)
             )
-            
+
             path.addQuadCurve(
                 to: CGPoint(x: maxX + 10, y: 10),
                 control: CGPoint(x: maxX - width * 0.25, y: 0)
             )
-            
+
             // Right departure curve
             path.addCurve(
                 to: CGPoint(x: size.width, y: 20),
@@ -245,20 +245,20 @@ struct LiquidGlassBackground: View {
             // Flat line when no selection
             path.addLine(to: CGPoint(x: size.width, y: 20))
         }
-        
+
         path.addLine(to: CGPoint(x: size.width, y: size.height))
         path.closeSubpath()
-        
+
         return path
     }
-    
+
     private func createHighlightPath(in size: CGSize) -> Path {
         var path = Path()
-        
+
         if selectedRect != .zero {
             let center = CGPoint(x: selectedRect.midX, y: 15)
             let radius = selectedRect.width * 0.6
-            
+
             path.addEllipse(in: CGRect(
                 x: center.x - radius,
                 y: center.y - radius * 0.5,
@@ -266,7 +266,7 @@ struct LiquidGlassBackground: View {
                 height: radius
             ))
         }
-        
+
         return path
     }
 }
@@ -276,14 +276,14 @@ struct LiquidGlassBackground: View {
 #Preview {
     struct PreviewContainer: View {
         @State private var selectedTab = AnimatedTabView.Tab.dashboard
-        
+
         var body: some View {
             ZStack {
                 Color.black.ignoresSafeArea()
-                
+
                 VStack {
                     Spacer()
-                    
+
                     LiquidGlassTabBar(selectedTab: $selectedTab)
                         .padding(.horizontal)
                         .padding(.bottom, 20)
@@ -291,6 +291,6 @@ struct LiquidGlassBackground: View {
             }
         }
     }
-    
+
     return PreviewContainer()
 }

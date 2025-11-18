@@ -12,7 +12,7 @@ struct ErrorStateView: View {
     let message: String?
     let buttonTitle: String
     let buttonAction: () -> Void
-    
+
     init(
         icon: String = "exclamationmark.triangle",
         title: String,
@@ -26,19 +26,19 @@ struct ErrorStateView: View {
         self.buttonTitle = buttonTitle
         self.buttonAction = buttonAction
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             // Icon
             Image(systemName: icon)
                 .font(.system(size: 50))
                 .foregroundColor(.appTextSecondary)
-            
+
             // Title
             Text(title)
                 .font(.headline)
                 .foregroundColor(.appText)
-            
+
             // Message (if provided)
             if let message = message {
                 Text(message)
@@ -46,7 +46,7 @@ struct ErrorStateView: View {
                     .foregroundColor(.appTextSecondary)
                     .multilineTextAlignment(.center)
             }
-            
+
             // Action Button
             BaseButton(
                 buttonTitle,
@@ -71,7 +71,7 @@ struct ErrorStateView: View {
                 // Retry action
             }
         )
-        
+
         ErrorStateView(
             icon: "wifi.slash",
             title: "No Internet Connection",

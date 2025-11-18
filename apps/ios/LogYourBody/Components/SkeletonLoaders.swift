@@ -7,7 +7,7 @@ import SwiftUI
 struct ShimmerEffect: ViewModifier {
     @State private var phase: CGFloat = 0
     let animation = Animation.linear(duration: 1.5).repeatForever(autoreverses: false)
-    
+
     func body(content: Content) -> some View {
         content
             .overlay(
@@ -52,7 +52,7 @@ struct ProgressPhotoSkeleton: View {
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
                 .shimmer()
-            
+
             // Placeholder icon
             Image(systemName: "photo")
                 .font(.system(size: 48))
@@ -72,23 +72,23 @@ struct TimelineSliderSkeleton: View {
                     .fill(Color.white.opacity(0.1))
                     .frame(width: 80, height: 16)
                     .shimmer()
-                
+
                 Spacer()
-                
+
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color.white.opacity(0.1))
                     .frame(width: 80, height: 16)
                     .shimmer()
             }
             .padding(.bottom, 12)
-            
+
             // Slider track
             ZStack(alignment: .leading) {
                 // Track
                 Capsule()
                     .fill(Color.white.opacity(0.1))
                     .frame(height: 4)
-                
+
                 // Thumb
                 Circle()
                     .fill(Color.white.opacity(0.2))
@@ -113,7 +113,7 @@ struct CoreMetricsRowSkeleton: View {
                 icon: "scalemass",
                 title: "Weight"
             )
-            
+
             // Body fat metric skeleton
             metricCardSkeleton(
                 icon: "percent",
@@ -122,7 +122,7 @@ struct CoreMetricsRowSkeleton: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
     private func metricCardSkeleton(icon: String, title: String) -> some View {
         VStack(spacing: 0) {
             // Value placeholder
@@ -131,37 +131,37 @@ struct CoreMetricsRowSkeleton: View {
                     .fill(Color.white.opacity(0.1))
                     .frame(width: 80, height: 36)
                     .shimmer()
-                
+
                 Text("lbs")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white.opacity(0.3))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            
+
             Spacer()
                 .frame(height: 8)
-            
+
             // Title and icon
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.3))
-                
+
                 Text(title)
                     .font(.system(size: 14))
                     .foregroundColor(.white.opacity(0.5))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            
+
             Spacer()
                 .frame(height: 8)
-            
+
             // Trend placeholder
             HStack(spacing: 4) {
                 Image(systemName: "minus")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white.opacity(0.2))
-                
+
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color.white.opacity(0.1))
                     .frame(width: 40, height: 12)
@@ -192,13 +192,13 @@ struct SecondaryMetricsRowSkeleton: View {
                 label: "Steps",
                 size: CGSize(width: 100, height: 100)
             )
-            
+
             // Compact metrics
             VStack(spacing: 12) {
                 compactMetricSkeleton(icon: "ruler", label: "BMI")
                 compactMetricSkeleton(icon: "figure.stand", label: "Muscle")
             }
-            
+
             VStack(spacing: 12) {
                 compactMetricSkeleton(icon: "drop.fill", label: "Water")
                 compactMetricSkeleton(icon: "bone", label: "Bone")
@@ -206,20 +206,20 @@ struct SecondaryMetricsRowSkeleton: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
     private func gaugeSkeleton(icon: String, label: String, size: CGSize) -> some View {
         VStack(spacing: 8) {
             ZStack {
                 Circle()
                     .stroke(Color.white.opacity(0.1), lineWidth: 3)
                     .frame(width: size.width, height: size.height)
-                
+
                 VStack(spacing: 4) {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color.white.opacity(0.1))
                         .frame(width: 50, height: 24)
                         .shimmer()
-                    
+
                     Text(label)
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.3))
@@ -228,25 +228,25 @@ struct SecondaryMetricsRowSkeleton: View {
         }
         .frame(width: size.width, height: size.height + 24)
     }
-    
+
     private func compactMetricSkeleton(icon: String, label: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 16))
                 .foregroundColor(.white.opacity(0.2))
                 .frame(width: 20, height: 20)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color.white.opacity(0.1))
                     .frame(width: 40, height: 14)
                     .shimmer()
-                
+
                 Text(label)
                     .font(.caption2)
                     .foregroundColor(.white.opacity(0.3))
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -267,18 +267,18 @@ struct DashboardSkeleton: View {
             ProgressPhotoSkeleton()
                 .frame(maxHeight: .infinity)
                 .padding(.horizontal, 20)
-            
+
             // Fixed height bottom content
             VStack(spacing: 16) {
                 // Timeline slider skeleton (only show if would have data)
                 TimelineSliderSkeleton()
-                
+
                 // Core metrics row
                 CoreMetricsRowSkeleton()
-                
+
                 // Secondary metrics row
                 SecondaryMetricsRowSkeleton()
-                
+
                 // Bottom padding for tab bar
                 Color.clear.frame(height: 90)
             }

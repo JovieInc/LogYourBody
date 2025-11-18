@@ -14,13 +14,13 @@ struct DSProgressBar: View {
     var foregroundColor: Color = .white
     var cornerRadius: CGFloat = 4
     var animationDuration: Double = 0.4
-    
+
     @State private var animatedProgress: Double = 0
-    
+
     private var normalizedProgress: Double {
         min(1.0, max(0.0, progress))
     }
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
@@ -28,7 +28,7 @@ struct DSProgressBar: View {
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(backgroundColor)
                     .frame(height: height)
-                
+
                 // Progress
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(foregroundColor)
@@ -57,30 +57,30 @@ struct DSProgressBar: View {
             Text("Different Progress Values")
                 .font(.headline)
                 .foregroundColor(.appText)
-            
+
             DSProgressBar(progress: 0.1)
             DSProgressBar(progress: 0.3)
             DSProgressBar(progress: 0.5)
             DSProgressBar(progress: 0.75)
             DSProgressBar(progress: 1.0)
         }
-        
+
         VStack(spacing: 16) {
             Text("Different Heights")
                 .font(.headline)
                 .foregroundColor(.appText)
-            
+
             DSProgressBar(progress: 0.6, height: 4)
             DSProgressBar(progress: 0.6, height: 8)
             DSProgressBar(progress: 0.6, height: 12)
             DSProgressBar(progress: 0.6, height: 16)
         }
-        
+
         VStack(spacing: 16) {
             Text("Different Colors")
                 .font(.headline)
                 .foregroundColor(.appText)
-            
+
             DSProgressBar(
                 progress: 0.7,
                 backgroundColor: .appBorder,

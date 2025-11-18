@@ -113,7 +113,7 @@ struct CoreMetricsRow: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
     private func formatWeight(_ weight: Double) -> String {
         if weightUnit == "lbs" {
             return String(format: "%.1f", weight)

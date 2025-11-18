@@ -169,6 +169,14 @@ pnpm build
 - **Refactoring**: Ensure tests pass before and after, refactor in small steps
 - **Performance**: Profile before optimizing, focus on user-perceived performance
 
+### Swift Missing-File Rule
+If the compiler reports that a referenced Swift file or type cannot be found, assume the reference is correct and the project setup needs to be updated. Follow these steps in order:
+1. Ask the user to create the missing file and provide its complete contents.
+2. If the file already exists, instruct the user to add it to the correct Xcode target/group.
+3. As a last resort, resolve import, module, or path configuration issues.
+
+Never “fix” this by swapping to legacy classes (for example `DashboardOld.swift`), commenting out the new feature, or reverting without explicit user approval. If you genuinely believe reverting is the only option, ask the user first.
+
 ## Security Considerations
 
 ### Secrets Management

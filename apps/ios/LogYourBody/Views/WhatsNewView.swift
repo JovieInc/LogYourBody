@@ -8,25 +8,25 @@ struct FeatureRow: View {
     let icon: String
     let title: String
     let description: String
-    
+
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 24))
                 .foregroundColor(.appPrimary)
                 .frame(width: 32)
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.appText)
-                
+
                 Text(description)
                     .font(.system(size: 14))
                     .foregroundColor(.appTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            
+
             Spacer()
         }
         .padding(.vertical, 8)
@@ -37,9 +37,9 @@ struct WhatsNewView: View {
     @Environment(\.dismiss)
     private var dismiss
     @State private var selectedVersion: String?
-    
+
     private let changelogManager = ChangelogManager.shared
-    
+
     var body: some View {
         NavigationView {
             List {
@@ -55,9 +55,9 @@ struct WhatsNewView: View {
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
-                                
+
                                 Spacer()
-                                
+
                                 if entry.version == AppVersionManager.shared.currentVersion {
                                     Text("Current")
                                         .font(.caption)
@@ -68,7 +68,7 @@ struct WhatsNewView: View {
                                         .cornerRadius(12)
                                 }
                             }
-                            
+
                             // Changes
                             VStack(alignment: .leading, spacing: 8) {
                                 ForEach(Array(entry.changes.enumerated()), id: \.offset) { _, change in
@@ -77,12 +77,12 @@ struct WhatsNewView: View {
                                             .font(.system(size: 14))
                                             .foregroundColor(Color(change.type.color))
                                             .frame(width: 20)
-                                        
+
                                         Text(change.description)
                                             .font(.system(size: 14))
                                             .foregroundColor(.primary)
                                             .fixedSize(horizontal: false, vertical: true)
-                                        
+
                                         Spacer()
                                     }
                                 }

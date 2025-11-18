@@ -16,16 +16,16 @@ enum HeaderStyle {
 struct StandardHeader: View {
     @Environment(\.dismiss)
     var dismiss
-    
+
     let title: String
     let subtitle: String?
     let style: HeaderStyle
     let showBackButton: Bool
     let backAction: (() -> Void)?
     let trailingItems: [HeaderAction]
-    
+
     @State private var scrollOffset: CGFloat = 0
-    
+
     init(
         title: String,
         subtitle: String? = nil,
@@ -41,12 +41,12 @@ struct StandardHeader: View {
         self.backAction = backAction
         self.trailingItems = trailingItems
     }
-    
+
     var body: some View {
         ZStack {
             // Background
             backgroundView
-            
+
             // Content
             switch style {
             case .standard, .transparent:
@@ -59,23 +59,23 @@ struct StandardHeader: View {
         }
         .frame(height: headerHeight)
     }
-    
+
     // MARK: - Header Variants
-    
+
     private var standardHeader: some View {
         HStack(spacing: 12) {
             // Leading items
             if showBackButton {
                 BackButton(action: backAction ?? { dismiss() })
             }
-            
+
             // Title
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline)
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                
+
                 if let subtitle = subtitle {
                     Text(subtitle)
                         .font(.caption)
@@ -83,9 +83,9 @@ struct StandardHeader: View {
                         .lineLimit(1)
                 }
             }
-            
+
             Spacer()
-            
+
             // Trailing items
             HStack(spacing: 8) {
                 ForEach(trailingItems) { action in
@@ -97,7 +97,7 @@ struct StandardHeader: View {
         .padding(.top, safeAreaTop)
         .padding(.bottom, 8)
     }
-    
+
     private var largeHeader: some View {
         VStack(alignment: .leading, spacing: 4) {
             // Top bar
@@ -105,23 +105,23 @@ struct StandardHeader: View {
                 if showBackButton {
                     BackButton(action: backAction ?? { dismiss() })
                 }
-                
+
                 Spacer()
-                
+
                 HStack(spacing: 8) {
                     ForEach(trailingItems) { action in
                         HeaderActionButton(action: action)
                     }
                 }
             }
-            
+
             // Large title
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.largeTitle)
                     .foregroundColor(.primary)
                     .lineLimit(2)
-                
+
                 if let subtitle = subtitle {
                     Text(subtitle)
                         .font(.body)
@@ -135,21 +135,21 @@ struct StandardHeader: View {
         .padding(.top, safeAreaTop)
         .padding(.bottom, 12)
     }
-    
+
     private var minimalHeader: some View {
         HStack {
             if showBackButton {
                 BackButton(action: backAction ?? { dismiss() })
             }
-            
+
             Spacer()
-            
+
             Text(title)
                 .font(.callout)
                 .foregroundColor(.primary)
-            
+
             Spacer()
-            
+
             // Balance the layout
             if showBackButton {
                 Color.clear
@@ -160,9 +160,9 @@ struct StandardHeader: View {
         .padding(.top, safeAreaTop)
         .padding(.bottom, 4)
     }
-    
+
     // MARK: - Computed Properties
-    
+
     @ViewBuilder private var backgroundView: some View {
         switch style {
         case .transparent:
@@ -178,7 +178,7 @@ struct StandardHeader: View {
                 )
         }
     }
-    
+
     private var headerHeight: CGFloat {
         switch style {
         case .large:
@@ -189,7 +189,7 @@ struct StandardHeader: View {
             return 56 + safeAreaTop
         }
     }
-    
+
     private var safeAreaTop: CGFloat {
         UIApplication.shared.windows.first?.safeAreaInsets.top ?? 0
     }
@@ -202,7 +202,7 @@ struct HeaderAction: Identifiable {
     let icon: String
     let badge: Int?
     let action: () -> Void
-    
+
     init(icon: String, badge: Int? = nil, action: @escaping () -> Void) {
         self.icon = icon
         self.badge = badge
@@ -215,7 +215,7 @@ struct HeaderAction: Identifiable {
 struct HeaderActionButton: View {
     let action: HeaderAction
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(
             action: {
@@ -224,28 +224,28 @@ struct HeaderActionButton: View {
             },
             label: {
                 ZStack(alignment: .topTrailing) {
-                Image(systemName: action.icon)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(.primary)
-                    .frame(width: 44, height: 44)
-                    .background(
-                        Circle()
-                            .fill(Color.appCard)
-                    )
-                
-                // Badge
-                if let badge = action.badge, badge > 0 {
-                    Text("\(badge)")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(minWidth: 16, minHeight: 16)
-                        .padding(.horizontal, 4)
+                    Image(systemName: action.icon)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(.primary)
+                        .frame(width: 44, height: 44)
                         .background(
-                            Capsule()
-                                .fill(.red)
+                            Circle()
+                                .fill(Color.appCard)
                         )
-                        .offset(x: 6, y: -6)
-                }
+
+                    // Badge
+                    if let badge = action.badge, badge > 0 {
+                        Text("\(badge)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(minWidth: 16, minHeight: 16)
+                            .padding(.horizontal, 4)
+                            .background(
+                                Capsule()
+                                    .fill(.red)
+                            )
+                            .offset(x: 6, y: -6)
+                    }
                 }
                 .scaleEffect(isPressed ? 0.9 : 1.0)
             }
@@ -264,7 +264,7 @@ struct HeaderActionButton: View {
 struct BackButton: View {
     let action: () -> Void
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(
             action: {
@@ -273,10 +273,10 @@ struct BackButton: View {
             },
             label: {
                 HStack(spacing: 4) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("Back")
-                    .font(.footnote)
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Back")
+                        .font(.footnote)
                 }
                 .foregroundColor(.appPrimary)
                 .padding(.horizontal, 12)
@@ -304,7 +304,7 @@ struct ProgressHeader: View {
     let progress: Double
     let showBackButton: Bool
     let backAction: (() -> Void)?
-    
+
     var body: some View {
         VStack(spacing: 0) {
             StandardHeader(
@@ -313,7 +313,7 @@ struct ProgressHeader: View {
                 showBackButton: showBackButton,
                 backAction: backAction
             )
-            
+
             // Progress bar
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
@@ -321,7 +321,7 @@ struct ProgressHeader: View {
                     Rectangle()
                         .fill(Color.appCard.opacity(0.5))
                         .frame(height: 3)
-                    
+
                     // Progress
                     Rectangle()
                         .fill(Color.appPrimary)
@@ -339,9 +339,9 @@ struct ProgressHeader: View {
 struct ScrollableHeaderView<Content: View>: View {
     let header: StandardHeader
     @ViewBuilder let content: () -> Content
-    
+
     @State private var scrollOffset: CGFloat = 0
-    
+
     var body: some View {
         ZStack(alignment: .top) {
             // Scrollable content
@@ -350,7 +350,7 @@ struct ScrollableHeaderView<Content: View>: View {
                     // Spacer for header
                     Color.clear
                         .frame(height: headerHeight)
-                    
+
                     // Content
                     content()
                 }
@@ -368,7 +368,7 @@ struct ScrollableHeaderView<Content: View>: View {
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                 scrollOffset = value
             }
-            
+
             // Fixed header
             header
                 .background(
@@ -378,7 +378,7 @@ struct ScrollableHeaderView<Content: View>: View {
                 )
         }
     }
-    
+
     private var headerHeight: CGFloat {
         switch header.style {
         case .large:
@@ -389,7 +389,7 @@ struct ScrollableHeaderView<Content: View>: View {
             return 56 + safeAreaTop
         }
     }
-    
+
     private var safeAreaTop: CGFloat {
         UIApplication.shared.windows.first?.safeAreaInsets.top ?? 0
     }
@@ -399,7 +399,7 @@ struct ScrollableHeaderView<Content: View>: View {
 
 struct ScrollOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
-    
+
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
@@ -420,9 +420,9 @@ struct StandardHeader_Previews: PreviewProvider {
                         HeaderAction(icon: "gear") { }
                     ]
                 )
-                
+
                 Spacer().frame(height: 40)
-                
+
                 // Large header
                 StandardHeader(
                     title: "Dashboard",
@@ -432,17 +432,17 @@ struct StandardHeader_Previews: PreviewProvider {
                         HeaderAction(icon: "plus") { }
                     ]
                 )
-                
+
                 Spacer().frame(height: 40)
-                
+
                 // Minimal header
                 StandardHeader(
                     title: "Settings",
                     style: .minimal
                 )
-                
+
                 Spacer().frame(height: 40)
-                
+
                 // Progress header
                 ProgressHeader(
                     title: "Complete Profile",
@@ -450,7 +450,7 @@ struct StandardHeader_Previews: PreviewProvider {
                     showBackButton: true,
                     backAction: { }
                 )
-                
+
                 Spacer()
             }
             .background(Color.black)

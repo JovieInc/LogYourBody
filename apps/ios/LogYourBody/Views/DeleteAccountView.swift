@@ -15,9 +15,9 @@ struct DeleteAccountView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @FocusState private var isTextFieldFocused: Bool
-    
+
     private let confirmationPhrase = "DELETE"
-    
+
     var body: some View {
         ZStack {
             ScrollView {
@@ -28,11 +28,11 @@ struct DeleteAccountView: View {
                             .font(.system(size: 50))
                             .foregroundColor(.red)
                             .padding(.top, 20)
-                        
+
                         Text("Delete Account")
                             .font(.title2)
                             .fontWeight(.bold)
-                        
+
                         Text("This action cannot be undone. All your data will be permanently deleted.")
                             .font(.body)
                             .foregroundColor(.secondary)
@@ -40,7 +40,7 @@ struct DeleteAccountView: View {
                             .padding(.horizontal, 40)
                     }
                     .padding(.bottom, 20)
-                    
+
                     // What will be deleted section
                     SettingsSection(header: "What will be deleted") {
                         VStack(spacing: 0) {
@@ -49,17 +49,17 @@ struct DeleteAccountView: View {
                                 title: "All weight entries",
                                 iconColor: .red
                             )
-                            
+
                             Divider()
-                            
+
                             DataInfoRow(
                                 icon: "person.circle",
                                 title: "Your profile information",
                                 iconColor: .red
                             )
-                            
+
                             Divider()
-                            
+
                             DataInfoRow(
                                 icon: "heart.fill",
                                 title: "Health data",
@@ -75,7 +75,7 @@ struct DeleteAccountView: View {
                             )
                         }
                     }
-                    
+
                     // Confirm deletion section
                     SettingsSection(
                         header: "Confirm deletion",
@@ -95,7 +95,7 @@ struct DeleteAccountView: View {
                                 .padding(.vertical, 8)
                         }
                     }
-                    
+
                     // Delete Button
                     BaseButton(
                         "Delete My Account",
@@ -111,7 +111,7 @@ struct DeleteAccountView: View {
                         }
                     )
                     .padding(.horizontal, 20)
-                    
+
                     // Bottom padding
                     Color.clear
                         .frame(height: 100)
@@ -120,7 +120,7 @@ struct DeleteAccountView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .settingsBackground()
-            
+
             // Loading overlay
             if isDeleting {
                 LoadingOverlay(message: "Deleting your account...")
@@ -149,12 +149,12 @@ struct DeleteAccountView: View {
             )
         )
     }
-    
+
     private func deleteAccount() {
         guard confirmationText == confirmationPhrase else { return }
         showConfirmation = true
     }
-    
+
     private func performDeletion() {
         isDeleting = true
 
@@ -195,13 +195,13 @@ struct DeleteAccountView: View {
             }
         }
     }
-    
+
     private func deleteClerkAccount() async throws {
         // Use Clerk SDK to delete the user account
         guard let user = Clerk.shared.user else {
             throw NSError(domain: "DeleteAccount", code: 1, userInfo: [NSLocalizedDescriptionKey: "No user found"])
         }
-        
+
         // Delete the user through Clerk
         try await user.delete()
     }

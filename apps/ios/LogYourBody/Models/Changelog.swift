@@ -9,14 +9,14 @@ struct ChangelogEntry {
     let version: String
     let date: Date
     let changes: [Change]
-    
+
     struct Change {
         enum ChangeType {
             case feature
             case improvement
             case bugfix
             case performance
-            
+
             var icon: String {
                 switch self {
                 case .feature: return "sparkles"
@@ -25,7 +25,7 @@ struct ChangelogEntry {
                 case .performance: return "speedometer"
                 }
             }
-            
+
             var color: String {
                 switch self {
                 case .feature: return "blue"
@@ -35,7 +35,7 @@ struct ChangelogEntry {
                 }
             }
         }
-        
+
         let type: ChangeType
         let description: String
     }
@@ -43,9 +43,9 @@ struct ChangelogEntry {
 
 class ChangelogManager {
     static let shared = ChangelogManager()
-    
+
     private init() {}
-    
+
     // Add new versions at the top
     private let hardcodedEntries: [ChangelogEntry] = [
         ChangelogEntry(
@@ -112,19 +112,19 @@ class ChangelogManager {
             ]
         )
     ]
-    
+
     /// Get all entries, ensuring the current app version is included
     var entries: [ChangelogEntry] {
         let currentVersion = AppVersion.current
-        
+
         // Check if current version already exists in hardcoded entries
         if hardcodedEntries.first?.version == currentVersion {
             return hardcodedEntries
         }
-        
+
         // If current version is newer, add a placeholder entry
         var allEntries = hardcodedEntries
-        
+
         // Only add if current version is newer than the latest hardcoded version
         if let latestVersion = hardcodedEntries.first?.version,
            currentVersion.compare(latestVersion, options: NSString.CompareOptions.numeric) == .orderedDescending {
@@ -137,10 +137,10 @@ class ChangelogManager {
             )
             allEntries.insert(placeholderEntry, at: 0)
         }
-        
+
         return allEntries
     }
-    
+
     /// Get changelog entries since a specific version
     func entriesSince(version: String) -> [ChangelogEntry] {
         guard let index = entries.firstIndex(where: { $0.version == version }) else {
@@ -148,13 +148,13 @@ class ChangelogManager {
         }
         return Array(entries.prefix(index))
     }
-    
+
     /// Check if there are new updates since last viewed version
     func hasNewUpdates() -> Bool {
         let lastViewedVersion = UserDefaults.standard.string(forKey: "lastViewedChangelogVersion") ?? "0.0.0"
         return entries.first?.version != lastViewedVersion
     }
-    
+
     /// Mark changelog as viewed
     func markAsViewed() {
         if let latestVersion = entries.first?.version {

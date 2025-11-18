@@ -10,21 +10,21 @@ struct LoginForm: View {
     @Binding var email: String
     @Binding var password: String
     @Binding var isLoading: Bool
-    
+
     let onLogin: () -> Void
     let onForgotPassword: () -> Void
     let onAppleSignIn: () -> Void
-    
+
     @FocusState private var focusedField: Field?
-    
+
     enum Field {
         case email, password
     }
-    
+
     private var isFormValid: Bool {
         !email.isEmpty && !password.isEmpty
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             // Email Field
@@ -38,7 +38,7 @@ struct LoginForm: View {
             .onSubmit {
                 focusedField = .password
             }
-            
+
             // Password Field
             VStack(alignment: .leading, spacing: 8) {
                 AuthFormField(
@@ -52,14 +52,14 @@ struct LoginForm: View {
                         onLogin()
                     }
                 }
-                
+
                 // Forgot Password Link
                 HStack {
                     Spacer()
                     DSAuthLink(title: "Forgot password?", action: onForgotPassword)
                 }
             }
-            
+
             // Login Button
             BaseButton(
                 "Sign in",
@@ -71,10 +71,10 @@ struct LoginForm: View {
                 ),
                 action: onLogin
             )
-            
+
             // Divider
             DSAuthDivider()
-            
+
             // Apple Sign In
             SocialLoginButton(
                 provider: .apple,
@@ -94,7 +94,7 @@ struct LoginForm: View {
                 subtitle: "Track your fitness journey"
             )
             .padding(.top, 80)
-            
+
             LoginForm(
                 email: .constant(""),
                 password: .constant(""),

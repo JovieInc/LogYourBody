@@ -26,6 +26,7 @@ struct TimelineDataPoint: Identifiable {
 
 /// Calculates smart time-weighted positions for timeline entries
 class TimelineCalculator {
+    private static let timelineCache = LRUCache<TimelineCacheKey, [TimelineDataPoint]>(capacity: 50)
 
     /// Calculate weighted timeline positions for body metrics
     /// - Parameter metrics: Array of BodyMetrics sorted by date (newest first)
@@ -35,8 +36,13 @@ class TimelineCalculator {
 
         // Sort metrics oldest to newest for easier calculation
         let sortedMetrics = metrics.sorted { $0.date < $1.date }
-        guard let oldestDate = sortedMetrics.first?.date,
-              let newestDate = sortedMetrics.last?.date else {
+        let cacheKey = makeCacheKey(for: sortedMetrics)
+
+        if let key = cacheKey, let cachedPoints = timelineCache.value(for: key) {
+            return cachedPoints
+        }
+
+        guard let newestDate = sortedMetrics.last?.date else {
             return []
         }
 
@@ -79,6 +85,10 @@ class TimelineCalculator {
 
         // Calculate weighted positions
         timelinePoints = calculateWeightedPositions(points: timelinePoints, newestDate: newestDate)
+
+        if let key = cacheKey {
+            timelineCache.setValue(timelinePoints, for: key)
+        }
 
         return timelinePoints
     }
@@ -170,5 +180,39 @@ class TimelineCalculator {
     /// Get index for a specific position
     static func index(for position: Double, in points: [TimelineDataPoint]) -> Int? {
         findNearestPoint(to: position, in: points)?.index
+    }
+
+    // MARK: - Cache Helpers
+
+    private static func makeCacheKey(for metrics: [BodyMetrics]) -> TimelineCacheKey? {
+        guard !metrics.isEmpty else { return nil }
+
+        var hasher = Hasher()
+        hasher.combine(metrics.count)
+
+        for metric in metrics {
+            hasher.combine(metric.userId)
+            hasher.combine(metric.id)
+            hasher.combine(metric.date.timeIntervalSinceReferenceDate)
+            hasher.combine(metric.updatedAt.timeIntervalSinceReferenceDate)
+
+            hasher.combine(metric.weight != nil)
+            if let weight = metric.weight {
+                hasher.combine(weight)
+            }
+
+            hasher.combine(metric.bodyFatPercentage != nil)
+            if let bodyFat = metric.bodyFatPercentage {
+                hasher.combine(bodyFat)
+            }
+
+            hasher.combine(metric.photoUrl ?? "")
+        }
+
+        return TimelineCacheKey(fingerprint: hasher.finalize())
+    }
+
+    private struct TimelineCacheKey: Hashable {
+        let fingerprint: Int
     }
 }

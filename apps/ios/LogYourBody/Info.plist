@@ -65,7 +65,7 @@
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>LSApplicationCategoryType</key>
-	<string></string>
+	<string>public.app-category.healthcare-fitness</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationLandscapeLeft</string>

@@ -9,7 +9,7 @@ struct LoadingView: View {
     @Binding var progress: Double
     @Binding var loadingStatus: String
     let onComplete: () -> Void
-    
+
     var body: some View {
         LoadingScreen(
             progress: $progress,

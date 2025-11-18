@@ -202,7 +202,7 @@ struct DSEmptyMetricCard: View {
     let label: String
     let unit: String
     var height: CGFloat = 120 // Increased to match metric card
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Empty value placeholder
@@ -216,7 +216,7 @@ struct DSEmptyMetricCard: View {
                 )
             }
             .frame(maxHeight: .infinity)
-            
+
             // Bottom label
             DSMetricLabel(
                 text: label,

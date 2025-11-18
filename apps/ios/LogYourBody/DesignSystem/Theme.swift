@@ -18,39 +18,39 @@ protocol Theme {
 
 struct ColorTheme {
     // MARK: - Semantic Colors
-    
+
     // Background
     let background: Color
     let backgroundSecondary: Color
     let backgroundTertiary: Color
-    
+
     // Surface
     let surface: Color
     let surfaceSecondary: Color
     let surfaceTertiary: Color
-    
+
     // Primary
     let primary: Color
     let primaryMuted: Color
     let primarySubtle: Color
-    
+
     // Text
     let text: Color
     let textSecondary: Color
     let textTertiary: Color
     let textQuaternary: Color
-    
+
     // Borders
     let border: Color
     let borderSecondary: Color
     let borderFocused: Color
-    
+
     // States
     let success: Color
     let warning: Color
     let error: Color
     let info: Color
-    
+
     // Interactive
     let interactive: Color
     let interactiveHover: Color
@@ -65,27 +65,27 @@ struct TypographyTheme {
     let displayLarge: Font
     let displayMedium: Font
     let displaySmall: Font
-    
+
     // Headline
     let headlineLarge: Font
     let headlineMedium: Font
     let headlineSmall: Font
-    
+
     // Body
     let bodyLarge: Font
     let bodyMedium: Font
     let bodySmall: Font
-    
+
     // Label
     let labelLarge: Font
     let labelMedium: Font
     let labelSmall: Font
-    
+
     // Caption
     let captionLarge: Font
     let captionMedium: Font
     let captionSmall: Font
-    
+
     // Special
     let monospace: Font
     let monospaceLarge: Font
@@ -103,7 +103,7 @@ struct SpacingTheme {
     let xl: CGFloat = 32
     let xxl: CGFloat = 48
     let xxxl: CGFloat = 64
-    
+
     // Semantic spacing
     let elementSpacing: CGFloat = 8
     let sectionSpacing: CGFloat = 24
@@ -123,7 +123,7 @@ struct RadiusTheme {
     let xl: CGFloat = 16
     let xxl: CGFloat = 24
     let full: CGFloat = 9_999
-    
+
     // Semantic radius
     let button: CGFloat = 12
     let card: CGFloat = 12
@@ -139,11 +139,11 @@ struct AnimationTheme {
     let fast: Animation = .easeInOut(duration: 0.2)
     let medium: Animation = .easeInOut(duration: 0.3)
     let slow: Animation = .easeInOut(duration: 0.5)
-    
+
     let spring: Animation = .spring(response: 0.4, dampingFraction: 0.8)
     let springBouncy: Animation = .spring(response: 0.5, dampingFraction: 0.7)
     let springSmooth: Animation = .spring(response: 0.6, dampingFraction: 0.9)
-    
+
     let interactive: Animation = .spring(response: 0.3, dampingFraction: 0.8)
 }
 
@@ -155,13 +155,13 @@ struct HapticsTheme {
         generator.prepare()
         generator.impactOccurred()
     }
-    
+
     func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
         let generator = UINotificationFeedbackGenerator()
         generator.prepare()
         generator.notificationOccurred(type)
     }
-    
+
     func selection() {
         let generator = UISelectionFeedbackGenerator()
         generator.prepare()
@@ -177,72 +177,72 @@ struct DefaultTheme: Theme {
         background: Color(hex: "#111111"),
         backgroundSecondary: Color(hex: "#0A0A0A"),
         backgroundTertiary: Color(hex: "#050505"),
-        
+
         // Surface
         surface: Color(hex: "#1A1A1A"),
         surfaceSecondary: Color(hex: "#222222"),
         surfaceTertiary: Color(hex: "#2A2A2A"),
-        
+
         // Primary
         primary: Color(hex: "#5B63D3"),
         primaryMuted: Color(hex: "#5B63D3").opacity(0.8),
         primarySubtle: Color(hex: "#5B63D3").opacity(0.3),
-        
+
         // Text
         text: Color(hex: "#F7F8F8"),
         textSecondary: Color(hex: "#9CA0A8"),
         textTertiary: Color(hex: "#6E7178"),
         textQuaternary: Color(hex: "#4A4D52"),
-        
+
         // Borders
         border: Color(hex: "#2A2A2A"),
         borderSecondary: Color(hex: "#222222"),
         borderFocused: Color(hex: "#5B63D3"),
-        
+
         // States
         success: Color(hex: "#4CAF50"),
         warning: Color(hex: "#FF9800"),
         error: Color(hex: "#F44336"),
         info: Color(hex: "#2196F3"),
-        
+
         // Interactive
         interactive: Color(hex: "#5B63D3"),
         interactiveHover: Color(hex: "#6B73E3"),
         interactivePressed: Color(hex: "#4B53C3"),
         interactiveDisabled: Color(hex: "#5B63D3").opacity(0.4)
     )
-    
+
     let typography = TypographyTheme(
         // Display
         displayLarge: .system(size: 48, weight: .bold, design: .rounded),
         displayMedium: .system(size: 36, weight: .bold, design: .rounded),
         displaySmall: .system(size: 32, weight: .semibold, design: .rounded),
-        
+
         // Headline
         headlineLarge: .system(size: 28, weight: .semibold, design: .rounded),
         headlineMedium: .system(size: 24, weight: .semibold, design: .rounded),
         headlineSmall: .system(size: 20, weight: .semibold, design: .rounded),
-        
+
         // Body
         bodyLarge: .system(size: 18, weight: .regular, design: .rounded),
         bodyMedium: .system(size: 16, weight: .regular, design: .rounded),
         bodySmall: .system(size: 14, weight: .regular, design: .rounded),
-        
+
         // Label
         labelLarge: .system(size: 16, weight: .medium, design: .rounded),
         labelMedium: .system(size: 14, weight: .medium, design: .rounded),
         labelSmall: .system(size: 12, weight: .medium, design: .rounded),
-        
+
         // Caption
         captionLarge: .system(size: 13, weight: .regular, design: .rounded),
         captionMedium: .system(size: 12, weight: .regular, design: .rounded),
         captionSmall: .system(size: 11, weight: .regular, design: .rounded),
-        
+
         // Special
         monospace: .system(size: 16, weight: .regular, design: .monospaced),
         monospaceLarge: .system(size: 24, weight: .semibold, design: .monospaced)
     )
-    
+
     let spacing = SpacingTheme()
     let radius = RadiusTheme()
     let animation = AnimationTheme()
@@ -276,7 +276,7 @@ extension View {
     func cardStyle() -> some View {
         self.modifier(CardStyleModifier())
     }
-    
+
     func surfaceStyle() -> some View {
         self.modifier(SurfaceStyleModifier())
     }
@@ -285,9 +285,9 @@ extension View {
 // MARK: - Common View Modifiers
 
 struct CardStyleModifier: ViewModifier {
-    @Environment(\.theme) 
+    @Environment(\.theme)
     var theme
-    
+
     func body(content: Content) -> some View {
         content
             .background(theme.colors.surface)
@@ -300,9 +300,9 @@ struct CardStyleModifier: ViewModifier {
 }
 
 struct SurfaceStyleModifier: ViewModifier {
-    @Environment(\.theme) 
+    @Environment(\.theme)
     var theme
-    
+
     func body(content: Content) -> some View {
         content
             .background(theme.colors.surface)
@@ -314,7 +314,7 @@ struct SurfaceStyleModifier: ViewModifier {
 
 struct ThemePreview<Content: View>: View {
     @ViewBuilder let content: () -> Content
-    
+
     var body: some View {
         content()
             .theme(DefaultTheme())

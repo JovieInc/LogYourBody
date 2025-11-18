@@ -20,7 +20,7 @@ enum ButtonSize {
     case small
     case medium
     case large
-    
+
     var height: CGFloat {
         switch self {
         case .small: return 36
@@ -28,7 +28,7 @@ enum ButtonSize {
         case .large: return 56
         }
     }
-    
+
     var horizontalPadding: CGFloat {
         switch self {
         case .small: return 16
@@ -36,7 +36,7 @@ enum ButtonSize {
         case .large: return 24
         }
     }
-    
+
     var fontSize: CGFloat {
         switch self {
         case .small: return 14
@@ -57,7 +57,7 @@ struct StandardButton: View {
     let isLoading: Bool
     let fullWidth: Bool
     let action: () -> Void
-    
+
     init(
         _ title: String,
         icon: String? = nil,
@@ -75,7 +75,7 @@ struct StandardButton: View {
         self.fullWidth = fullWidth
         self.action = action
     }
-    
+
     var body: some View {
         BaseButton(
             title,
@@ -124,7 +124,7 @@ struct IconButton: View {
     let icon: String
     let size: CGFloat
     let action: () -> Void
-    
+
     init(
         icon: String,
         size: CGFloat = 24,
@@ -134,7 +134,7 @@ struct IconButton: View {
         self.size = size
         self.action = action
     }
-    
+
     var body: some View {
         BaseIconButton(
             icon: icon,
@@ -152,7 +152,7 @@ struct TextButton: View {
     let title: String
     let color: Color?
     let action: () -> Void
-    
+
     init(
         _ title: String,
         color: Color? = nil,
@@ -162,7 +162,7 @@ struct TextButton: View {
         self.color = color
         self.action = action
     }
-    
+
     var body: some View {
         BaseButton(
             title,
@@ -186,9 +186,9 @@ struct TextButton: View {
 struct FloatingActionButton: View {
     let icon: String
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: {
             let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -236,38 +236,38 @@ struct StandardButton_Previews: PreviewProvider {
                 StandardButton("Get Started", style: .primary) {}
                 StandardButton("Continue", icon: "arrow.right", style: .primary) {}
                 StandardButton("Loading", style: .primary, isLoading: true) {}
-                
+
                 // Secondary buttons
                 StandardButton("Learn More", style: .secondary) {}
                 StandardButton("Upload", icon: "arrow.up", style: .secondary) {}
-                
+
                 // Tertiary buttons
                 StandardButton("Cancel", style: .tertiary) {}
-                
+
                 // Destructive button
                 StandardButton("Delete", icon: "trash", style: .destructive) {}
-                
+
                 // Ghost button
                 StandardButton("Skip", style: .ghost) {}
-                
+
                 // Size variations
                 StandardButton("Small", size: .small) {}
                 StandardButton("Medium", size: .medium) {}
                 StandardButton("Large", size: .large) {}
-                
+
                 // Full width
                 StandardButton("Full Width", style: .primary, fullWidth: true) {}
-                
+
                 // Icon buttons
                 HStack {
                     IconButton(icon: "plus") {}
                     IconButton(icon: "camera") {}
                     IconButton(icon: "gear") {}
                 }
-                
+
                 // Text button
                 TextButton("Forgot password?") {}
-                
+
                 // Floating action button
                 FloatingActionButton(icon: "plus") {}
             }

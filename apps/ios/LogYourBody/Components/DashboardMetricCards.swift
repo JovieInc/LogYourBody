@@ -8,19 +8,19 @@ import SwiftUI
 
 struct EmptyMetricCard: View {
     let label: String
-    
+
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
                 Circle()
                     .stroke(Color.appBorder, lineWidth: 8)
                     .frame(width: 120, height: 120)
-                
+
                 Text("--")
                     .font(.system(size: 32, weight: .bold))
                     .foregroundColor(.appTextTertiary)
             }
-            
+
             Text(label)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.appTextSecondary)
@@ -40,7 +40,7 @@ struct WeightMetricCard: View {
     let trend: Double?
     let trendUnit: String
     let isInHealthyRange: Bool
-    
+
     private func formatWeightValue(_ value: Double) -> String {
         // If the value is a whole number, don't show decimal places
         if value.truncatingRemainder(dividingBy: 1) == 0 {
@@ -50,7 +50,7 @@ struct WeightMetricCard: View {
             return String(format: "%.1f", value)
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 4) {
             ZStack(alignment: .topTrailing) {
@@ -60,16 +60,16 @@ struct WeightMetricCard: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.trailing, 12)
                     .padding(.top, 12)
-                
+
                 VStack(spacing: 8) {
                     Text(formatWeightValue(value))
                         .font(.system(size: 48, weight: .bold))
                         .foregroundColor(.white)
-                    
+
                     Text(unit)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.6))
-                    
+
                     if let trend = trend {
                         HStack(spacing: 4) {
                             Image(systemName: trend > 0 ? "arrow.up" : "arrow.down")
@@ -98,7 +98,7 @@ struct PhotoOptionsSheet: View {
     @Binding var showPhotoPicker: Bool
     @Environment(\.dismiss)
     var dismiss
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Handle
@@ -107,28 +107,28 @@ struct PhotoOptionsSheet: View {
                 .frame(width: 36, height: 5)
                 .padding(.top, 8)
                 .padding(.bottom, 16)
-            
+
             VStack(spacing: 12) {
                 ZStack {
                     Circle()
                         .fill(Color.appPrimary.opacity(0.1))
                         .frame(width: 56, height: 56)
-                    
+
                     Image(systemName: "camera.aperture")
                         .font(.system(size: 28))
                         .foregroundColor(.appPrimary)
                 }
-                
+
                 Text("Add Progress Photo")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.appText)
-                
+
                 Text("Capture your transformation")
                     .font(.system(size: 14))
                     .foregroundColor(.appTextSecondary)
             }
             .padding(.vertical, 16)
-            
+
             VStack(spacing: 0) {
                 // Take Photo
                 Button(
@@ -147,24 +147,24 @@ struct PhotoOptionsSheet: View {
                                 Circle()
                                     .fill(Color.blue.opacity(0.1))
                                     .frame(width: 44, height: 44)
-                                
+
                                 Image(systemName: "camera.fill")
                                     .font(.system(size: 20))
                                     .foregroundColor(.blue)
                             }
-                            
+
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Take Photo")
                                     .font(.system(size: 17, weight: .medium))
                                     .foregroundColor(.appText)
-                                
+
                                 Text("Use camera for best results")
                                     .font(.system(size: 13))
                                     .foregroundColor(.appTextSecondary)
                             }
-                            
+
                             Spacer()
-                            
+
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.appTextTertiary)
@@ -173,10 +173,10 @@ struct PhotoOptionsSheet: View {
                         .padding(.vertical, 12)
                     }
                 )
-                
+
                 Divider()
                     .padding(.leading, 80)
-                
+
                 // Choose from Library
                 Button(
                     action: {
@@ -194,24 +194,24 @@ struct PhotoOptionsSheet: View {
                                 Circle()
                                     .fill(Color.green.opacity(0.1))
                                     .frame(width: 44, height: 44)
-                                
+
                                 Image(systemName: "photo.fill")
                                     .font(.system(size: 20))
                                     .foregroundColor(.green)
                             }
-                            
+
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Choose from Library")
                                     .font(.system(size: 17, weight: .medium))
                                     .foregroundColor(.appText)
-                                
+
                                 Text("Select existing photo")
                                     .font(.system(size: 13))
                                     .foregroundColor(.appTextSecondary)
                             }
-                            
+
                             Spacer()
-                            
+
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.appTextTertiary)
@@ -221,7 +221,7 @@ struct PhotoOptionsSheet: View {
                     }
                 )
             }
-            
+
             Button(
                 action: { dismiss() },
                 label: {
@@ -234,7 +234,7 @@ struct PhotoOptionsSheet: View {
             )
             .padding(.top, 16)
             .padding(.horizontal, 20)
-            
+
             Spacer()
                 .frame(height: 20)
         }
@@ -252,15 +252,15 @@ struct MetricValueDisplay: View {
     let label: String
     let trend: Double?
     let trendType: TrendType
-    
+
     enum TrendType {
         case positive // Higher is better (steps, muscle mass)
         case negative // Lower is better (body fat)
         case neutral  // No good/bad direction (weight)
     }
-    
+
     @State private var animatedValue: Double = 0
-    
+
     private func formatValue(_ value: Double) -> String {
         // If the value is a whole number, don't show decimal places
         if value.truncatingRemainder(dividingBy: 1) == 0 {
@@ -270,7 +270,7 @@ struct MetricValueDisplay: View {
             return String(format: "%.1f", value)
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Value and trend
@@ -278,16 +278,16 @@ struct MetricValueDisplay: View {
                 Text(formatValue(value))
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                
+
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.system(size: 20, weight: .medium))
                         .foregroundColor(.white.opacity(0.6))
                         .padding(.bottom, 6)
                 }
-                
+
                 Spacer()
-                
+
                 if let trend = trend, abs(trend) > 0.01 {
                     HStack(spacing: 2) {
                         Image(systemName: trend > 0 ? "arrow.up" : "arrow.down")
@@ -300,7 +300,7 @@ struct MetricValueDisplay: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            
+
             // Progress bar with enhanced visibility
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
@@ -335,7 +335,7 @@ struct MetricValueDisplay: View {
             .frame(height: 6)
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
-            
+
             // Label
             Text(label)
                 .font(.system(size: 14))
@@ -349,7 +349,7 @@ struct MetricValueDisplay: View {
             animatedValue = newValue
         }
     }
-    
+
     private var normalizedValue: Double {
         // Normalize based on expected ranges
         switch label.lowercased() {
@@ -361,7 +361,7 @@ struct MetricValueDisplay: View {
             return 0.5
         }
     }
-    
+
     private var isInTargetZone: Bool {
         // Define target zones
         switch label.lowercased() {
@@ -373,7 +373,7 @@ struct MetricValueDisplay: View {
             return true
         }
     }
-    
+
     private func trendColor(for trend: Double) -> Color {
         switch trendType {
         case .positive:
@@ -391,7 +391,7 @@ struct MetricValueDisplay: View {
 struct EmptyMetricPlaceholder: View {
     let label: String
     let unit: String
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Value placeholder
@@ -399,25 +399,25 @@ struct EmptyMetricPlaceholder: View {
                 Text("––")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundColor(.white.opacity(0.2))
-                
+
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.system(size: 20, weight: .medium))
                         .foregroundColor(.white.opacity(0.15))
                         .padding(.bottom, 6)
                 }
-                
+
                 Spacer()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            
+
             // Empty progress bar
             RoundedRectangle(cornerRadius: 3)
                 .fill(Color.white.opacity(0.1))
                 .frame(height: 6)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
-            
+
             // Label
             Text(label)
                 .font(.system(size: 14))
@@ -436,7 +436,7 @@ struct CompactMetricCard: View {
     let trend: Double?
     let trendType: MetricValueDisplay.TrendType
     var isPlaceholder: Bool = false
-    
+
     private var accessibilityLabel: String {
         if isPlaceholder {
             return "\(label): No data available"
@@ -449,7 +449,7 @@ struct CompactMetricCard: View {
             return result
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 8) {
             // Icon
@@ -457,20 +457,20 @@ struct CompactMetricCard: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(isPlaceholder ? .appTextTertiary : .appTextSecondary)
                 .frame(height: 20)
-            
+
             // Value with trend
             HStack(spacing: 4) {
                 Text(value)
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundColor(isPlaceholder ? .appTextTertiary : .white)
-                
+
                 if let trend = trend, !isPlaceholder {
                     Image(systemName: trend > 0 ? "arrow.up" : "arrow.down")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(trendColor(for: trend))
                 }
             }
-            
+
             // Label
             Text(label)
                 .font(.system(size: 11))
@@ -486,7 +486,7 @@ struct CompactMetricCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
     }
-    
+
     private func trendColor(for trend: Double) -> Color {
         switch trendType {
         case .positive:

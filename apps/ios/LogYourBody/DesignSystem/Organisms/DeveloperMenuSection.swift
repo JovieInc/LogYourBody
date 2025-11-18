@@ -9,7 +9,7 @@ import SwiftUI
 struct DeveloperMenuSection: View {
     let isVisible: Bool
     let onNavigate: () -> Void
-    
+
     var body: some View {
         if isVisible {
             VStack(spacing: DesignSystem.spacing.xs) {
@@ -17,7 +17,7 @@ struct DeveloperMenuSection: View {
                     HStack(spacing: DesignSystem.spacing.xs) {
                         Image(systemName: "hammer")
                             .font(DesignSystem.typography.captionSmall)
-                        
+
                         Text("Developer Options")
                             .font(DesignSystem.typography.captionSmall)
                     }
@@ -40,11 +40,11 @@ struct DeveloperMenuSection: View {
 struct DeveloperTapHandler<Content: View>: View {
     @State private var tapCount = 0
     @State private var resetTask: Task<Void, Never>?
-    
+
     let requiredTaps: Int
     let onUnlock: () -> Void
     @ViewBuilder let content: (Int) -> Content
-    
+
     init(
         requiredTaps: Int = 7,
         onUnlock: @escaping () -> Void,
@@ -54,17 +54,17 @@ struct DeveloperTapHandler<Content: View>: View {
         self.onUnlock = onUnlock
         self.content = content
     }
-    
+
     var body: some View {
         Button(action: handleTap) {
             content(tapCount)
         }
         .buttonStyle(PlainButtonStyle())
     }
-    
+
     private func handleTap() {
         tapCount += 1
-        
+
         if tapCount >= requiredTaps {
             withAnimation(DesignSystem.animation.spring) {
                 onUnlock()
@@ -73,7 +73,7 @@ struct DeveloperTapHandler<Content: View>: View {
         } else {
             // Cancel previous reset task
             resetTask?.cancel()
-            
+
             // Reset tap count after 3 seconds
             resetTask = Task {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -91,7 +91,7 @@ struct DeveloperTapHandler<Content: View>: View {
 
 struct DeveloperToolsList: View {
     let tools: [DeveloperTool]
-    
+
     struct DeveloperTool {
         let id = UUID()
         let icon: String
@@ -99,14 +99,14 @@ struct DeveloperToolsList: View {
         let description: String?
         let action: () -> Void
     }
-    
+
     var body: some View {
         SettingsSection(header: "Debug Tools") {
             ForEach(Array(tools.enumerated()), id: \.element.id) { index, tool in
                 if index > 0 {
                     DSDivider().insetted(16)
                 }
-                
+
                 SettingsActionRow(
                     icon: tool.icon,
                     title: tool.title,
@@ -157,9 +157,9 @@ extension DeveloperToolsList {
             isVisible: true,
             onNavigate: { /* Navigate to developer menu */ }
         )
-        
+
         Divider()
-        
+
         // Developer tools list
         #if DEBUG
         DeveloperToolsList(tools: DeveloperToolsList.defaultTools)

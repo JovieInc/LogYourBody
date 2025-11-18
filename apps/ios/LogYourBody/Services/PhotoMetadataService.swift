@@ -57,13 +57,13 @@ class PhotoMetadataService {
 
         return nil
     }
-    
+
     /// Extract date from PHAsset
     func extractDate(from asset: PHAsset) -> Date {
         // PHAsset.creationDate is when the photo was taken
         return asset.creationDate ?? Date()
     }
-    
+
     /// Parse EXIF date string format: "yyyy:MM:dd HH:mm:ss"
     private func parseExifDate(_ dateString: String) -> Date? {
         let formatter = DateFormatter()
@@ -71,27 +71,27 @@ class PhotoMetadataService {
         formatter.timeZone = TimeZone.current
         return formatter.date(from: dateString)
     }
-    
+
     /// Find closest body metrics entry for a given date
     func findClosestMetrics(for date: Date, in metrics: [BodyMetrics], maxDaysDifference: Int = 7) -> BodyMetrics? {
         guard !metrics.isEmpty else { return nil }
-        
+
         let calendar = Calendar.current
         let targetStartOfDay = calendar.startOfDay(for: date)
-        
+
         // Find metrics within the max days difference
         let closeMetrics = metrics.filter { metric in
             let metricStartOfDay = calendar.startOfDay(for: metric.date)
             let daysDifference = abs(calendar.dateComponents([.day], from: targetStartOfDay, to: metricStartOfDay).day ?? Int.max)
             return daysDifference <= maxDaysDifference
         }
-        
+
         // Return the closest one
         return closeMetrics.min { metric1, metric2 in
             abs(metric1.date.timeIntervalSince(date)) < abs(metric2.date.timeIntervalSince(date))
         }
     }
-    
+
     /// Create or update body metrics for a specific date
     func createOrUpdateMetrics(for date: Date, photoUrl: String? = nil, weight: Double? = nil, bodyFatPercentage: Double? = nil, userId: String) async -> BodyMetrics {
         let calendar = Calendar.current
@@ -100,7 +100,7 @@ class PhotoMetadataService {
         // Check if metrics already exist for this date
         let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId, from: startOfDay, to: calendar.date(byAdding: .day, value: 1, to: startOfDay))
             .first?.toBodyMetrics()
-        
+
         if let existing = existingMetrics {
             // Update existing metrics
             let updated = BodyMetrics(
@@ -119,7 +119,7 @@ class PhotoMetadataService {
                 createdAt: existing.createdAt,
                 updatedAt: Date()
             )
-            
+
             CoreDataManager.shared.saveBodyMetrics(updated, userId: userId)
             return updated
         } else {
@@ -140,38 +140,38 @@ class PhotoMetadataService {
                 createdAt: Date(),
                 updatedAt: Date()
             )
-            
+
             CoreDataManager.shared.saveBodyMetrics(new, userId: userId)
             return new
         }
     }
-    
+
     /// Estimate weight based on nearby entries
     func estimateWeight(for date: Date, metrics: [BodyMetrics]) -> (value: Double, isEstimated: Bool)? {
         let sortedMetrics = metrics.filter { $0.weight != nil }.sorted { $0.date < $1.date }
         guard !sortedMetrics.isEmpty else { return nil }
-        
+
         // Find metrics before and after the date
         let before = sortedMetrics.last { $0.date <= date }
         let after = sortedMetrics.first { $0.date > date }
-        
+
         if let beforeMetric = before, let afterMetric = after,
            let beforeWeight = beforeMetric.weight, let afterWeight = afterMetric.weight {
             // Linear interpolation between two points
             let totalInterval = afterMetric.date.timeIntervalSince(beforeMetric.date)
             let progressInterval = date.timeIntervalSince(beforeMetric.date)
             let progress = progressInterval / totalInterval
-            
+
             let estimatedWeight = beforeWeight + (afterWeight - beforeWeight) * progress
             return (round(estimatedWeight * 10) / 10, true)
         } else if let closestMetric = before ?? after {
             // Use the closest available metric
             return (closestMetric.weight ?? 0, true)
         }
-        
+
         return nil
     }
-    
+
     /// Estimate body fat percentage based on nearby entries (with caching for performance)
     func estimateBodyFat(for date: Date, metrics: [BodyMetrics]) -> (value: Double, isEstimated: Bool)? {
         // Create cache key from date and metrics IDs

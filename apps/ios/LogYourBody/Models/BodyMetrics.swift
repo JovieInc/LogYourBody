@@ -19,7 +19,7 @@ struct BodyMetrics: Identifiable, Codable, Equatable {
     let dataSource: String?
     let createdAt: Date
     let updatedAt: Date
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"

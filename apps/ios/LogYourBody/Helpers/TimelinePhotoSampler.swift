@@ -9,7 +9,6 @@ import Foundation
 
 /// Samples photos from dense periods using milestone-based prioritization
 class TimelinePhotoSampler {
-
     /// Select the best representative photo from a bucket of candidates
     /// Priority: milestones > complete metrics > most recent
     static func selectRepresentative(from bucket: TimelineBucket, previousMetric: BodyMetrics?) -> BodyMetrics? {

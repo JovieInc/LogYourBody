@@ -196,9 +196,7 @@ class BackgroundTaskMonitor: ObservableObject {
         isAnyTaskActive = !activeTasks.isEmpty
 
         // Get highest priority task
-        primaryTask = activeTasks
-            .sorted { $0.type.priority > $1.type.priority }
-            .first
+        primaryTask = activeTasks.max { $0.type.priority < $1.type.priority }
 
         additionalTaskCount = max(0, activeTasks.count - 1)
     }

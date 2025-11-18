@@ -17,18 +17,18 @@ final class DSCircularProgressTests: XCTestCase {
             (1.5, 1.0),
             (100.0, 1.0)
         ]
-        
+
         for testCase in testCases {
             let progress = DSCircularProgress(progress: testCase.input)
             let normalizedValue = min(1.0, max(0.0, testCase.input))
-            XCTAssertEqual(normalizedValue, testCase.expected, 
-                          "Progress \(testCase.input) should normalize to \(testCase.expected)")
+            XCTAssertEqual(normalizedValue, testCase.expected,
+                           "Progress \(testCase.input) should normalize to \(testCase.expected)")
         }
     }
-    
+
     func testDefaultValues() {
         let progress = DSCircularProgress(progress: 0.5)
-        
+
         // Test default property values through the initializer
         XCTAssertEqual(progress.progress, 0.5)
         XCTAssertEqual(progress.size, 100)
@@ -39,7 +39,7 @@ final class DSCircularProgressTests: XCTestCase {
         XCTAssertFalse(progress.showPercentage)
         XCTAssertEqual(progress.percentageFontSize, 14)
     }
-    
+
     func testCustomValues() {
         let progress = DSCircularProgress(
             progress: 0.75,
@@ -51,7 +51,7 @@ final class DSCircularProgressTests: XCTestCase {
             showPercentage: true,
             percentageFontSize: 18
         )
-        
+
         XCTAssertEqual(progress.progress, 0.75)
         XCTAssertEqual(progress.size, 120)
         XCTAssertEqual(progress.lineWidth, 5)
@@ -61,7 +61,7 @@ final class DSCircularProgressTests: XCTestCase {
         XCTAssertTrue(progress.showPercentage)
         XCTAssertEqual(progress.percentageFontSize, 18)
     }
-    
+
     func testPercentageCalculation() {
         let testCases: [(progress: Double, expectedPercentage: Int)] = [
             (0.0, 0),
@@ -72,12 +72,12 @@ final class DSCircularProgressTests: XCTestCase {
             (1.5, 100), // Should cap at 100%
             (-0.5, 0)   // Should floor at 0%
         ]
-        
+
         for testCase in testCases {
             let normalizedProgress = min(1.0, max(0.0, testCase.progress))
             let percentage = Int(normalizedProgress * 100)
             XCTAssertEqual(percentage, testCase.expectedPercentage,
-                          "Progress \(testCase.progress) should show \(testCase.expectedPercentage)%")
+                           "Progress \(testCase.progress) should show \(testCase.expectedPercentage)%")
         }
     }
 }

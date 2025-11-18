@@ -8,7 +8,7 @@ import SwiftUI
 
 struct DeveloperToolsList: View {
     let tools: [DeveloperTool]
-    
+
     var body: some View {
         SettingsSection(header: "Debug Tools") {
             VStack(spacing: 0) {
@@ -22,7 +22,7 @@ struct DeveloperToolsList: View {
                         )
                     }
                     .buttonStyle(PlainButtonStyle())
-                    
+
                     if index < tools.count - 1 {
                         DSDivider().insetted(16)
                     }
@@ -30,9 +30,9 @@ struct DeveloperToolsList: View {
             }
         }
     }
-    
+
     // MARK: - Developer Tool Model
-    
+
     struct DeveloperTool {
         let icon: String
         let title: String

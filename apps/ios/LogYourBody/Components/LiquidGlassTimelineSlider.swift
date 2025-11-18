@@ -11,7 +11,7 @@ struct LiquidGlassTimelineSlider: View {
     let onChange: (Int) -> Void
     let onJumpToNext: () -> Void
     let onJumpToPrevious: () -> Void
-    
+
     @State private var isDragging = false
     @State private var thumbScale: CGFloat = 1.0
     @State private var liquidPhase: CGFloat = 0
@@ -19,20 +19,20 @@ struct LiquidGlassTimelineSlider: View {
     @State private var glassDistortion: CGFloat = 0
     @State private var currentVelocity: CGFloat = 0
     @State private var magneticPull: CGFloat = 0
-    
+
     private var progress: Double {
         guard metrics.count > 1 else { return 0 }
         return Double(selectedIndex) / Double(metrics.count - 1)
     }
-    
+
     private var photoMetrics: [BodyMetrics] {
         metrics.filter { $0.photoUrl != nil }
     }
-    
+
     private var hasPhotos: Bool {
         !photoMetrics.isEmpty
     }
-    
+
     var body: some View {
         VStack(spacing: 16) {
             // Photo navigation with glass effect
@@ -44,9 +44,9 @@ struct LiquidGlassTimelineSlider: View {
                         secondaryIcon: "photo.fill",
                         action: onJumpToPrevious
                     )
-                    
+
                     Spacer()
-                    
+
                     // Photo indicator with glass badge
                     ZStack {
                         // Glass background
@@ -60,12 +60,12 @@ struct LiquidGlassTimelineSlider: View {
                                 Capsule()
                                     .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
                             )
-                        
+
                         HStack(spacing: 6) {
                             Image(systemName: "camera.fill")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.appPrimary)
-                            
+
                             Text("\(getCurrentPhotoPosition())/\(photoMetrics.count)")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.white)
@@ -74,9 +74,9 @@ struct LiquidGlassTimelineSlider: View {
                         .padding(.vertical, 6)
                     }
                     .fixedSize()
-                    
+
                     Spacer()
-                    
+
                     // Next photo button
                     GlassNavigationButton(
                         icon: "chevron.right",
@@ -86,7 +86,7 @@ struct LiquidGlassTimelineSlider: View {
                     )
                 }
             }
-            
+
             // Liquid Glass Timeline
             GeometryReader { geometry in
                 ZStack(alignment: .center) {
@@ -98,12 +98,12 @@ struct LiquidGlassTimelineSlider: View {
                         rippleAmplitude: rippleAmplitude,
                         glassDistortion: glassDistortion
                     )
-                    
+
                     // Photo thumbnails with glass effect
                     ForEach(ticks.filter({ $0.isPhotoAnchor }), id: \.index) { tick in
                         let tickProgress = Double(tick.index) / Double(metrics.count - 1)
                         let xPosition = geometry.size.width * CGFloat(tickProgress)
-                        
+
                         if let photoUrl = tick.photoUrl {
                             LiquidPhotoAnchor(
                                 photoUrl: photoUrl,
@@ -114,7 +114,7 @@ struct LiquidGlassTimelineSlider: View {
                             .zIndex(tick.index == selectedIndex ? 2 : 1)
                         }
                     }
-                    
+
                     // Liquid glass thumb
                     LiquidGlassThumb(
                         scale: thumbScale,
@@ -145,33 +145,33 @@ struct LiquidGlassTimelineSlider: View {
             startLiquidAnimation()
         }
     }
-    
+
     // MARK: - Gesture Handling
-    
+
     private func handleDragChanged(_ value: DragGesture.Value, in geometry: GeometryProxy) {
         if !isDragging {
             isDragging = true
             thumbScale = 1.15
-            
+
             // Start glass distortion
             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                 glassDistortion = 1.0
             }
-            
+
             // HapticManager.shared.buttonTap()
         }
-        
+
         // Calculate velocity for liquid effect
         currentVelocity = value.velocity.width / 1_000
-        
+
         // Update position with magnetic anchoring
         let rawProgress = value.location.x / geometry.size.width
         let newIndex = calculateMagneticIndex(for: rawProgress)
-        
+
         if newIndex != selectedIndex {
             selectedIndex = newIndex
             onChange(newIndex)
-            
+
             // Enhanced haptics for photo anchors
             if ticks.first(where: { $0.index == newIndex })?.isPhotoAnchor == true {
                 // Trigger ripple effect
@@ -182,71 +182,71 @@ struct LiquidGlassTimelineSlider: View {
             }
         }
     }
-    
+
     private func handleDragEnded(_ value: DragGesture.Value, in geometry: GeometryProxy) {
         isDragging = false
         currentVelocity = 0
-        
+
         // Animate back to rest state
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             thumbScale = 1.0
             glassDistortion = 0
         }
-        
+
         // Add momentum snap to nearest photo
         let velocity = value.predictedEndLocation.x - value.location.x
         snapToNearestPhoto(with: velocity, in: geometry)
-        
+
         // HapticManager.shared.impact(style: .light)
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func startLiquidAnimation() {
         // Continuous liquid phase animation
         withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
             liquidPhase = .pi * 2
         }
     }
-    
+
     private func triggerRipple() {
         rippleAmplitude = 8
-        
+
         withAnimation(.spring(response: 0.6, dampingFraction: 0.5)) {
             rippleAmplitude = 0
         }
     }
-    
+
     private func calculateMagneticIndex(for progress: CGFloat) -> Int {
         let targetIndex = Int(round(progress * Double(metrics.count - 1)))
-        
+
         // Find nearby photo anchors
         let magneticRange = 5 // indices
         let nearbyPhotos = ticks.filter { tick in
             tick.isPhotoAnchor &&
-            abs(tick.index - targetIndex) <= magneticRange
+                abs(tick.index - targetIndex) <= magneticRange
         }
-        
+
         // Apply magnetic effect to closest photo
         if let closestPhoto = nearbyPhotos.min(by: {
             abs($0.index - targetIndex) < abs($1.index - targetIndex)
         }) {
             let distance = abs(closestPhoto.index - targetIndex)
             let magneticStrength = 1.0 - (Double(distance) / Double(magneticRange))
-            
+
             // Only snap if within magnetic threshold
             if magneticStrength > 0.3 {
                 return closestPhoto.index
             }
         }
-        
+
         return targetIndex
     }
-    
+
     private func calculateMagneticPull(for index: Int) -> CGFloat {
         let distance = abs(index - selectedIndex)
         let maxDistance: CGFloat = 5
-        
+
         if distance == 0 {
             return isDragging ? 1.0 : 0.8
         } else if CGFloat(distance) < maxDistance {
@@ -254,18 +254,18 @@ struct LiquidGlassTimelineSlider: View {
         }
         return 0
     }
-    
+
     private func snapToNearestPhoto(with velocity: CGFloat, in geometry: GeometryProxy) {
         // Find photo in direction of velocity
         let currentProgress = Double(selectedIndex) / Double(metrics.count - 1)
         let searchDirection = velocity > 0 ? 1 : -1
-        
+
         let nearbyPhotos = ticks.filter { tick in
             tick.isPhotoAnchor &&
-            ((searchDirection > 0 && tick.index > selectedIndex) ||
-             (searchDirection < 0 && tick.index < selectedIndex))
+                ((searchDirection > 0 && tick.index > selectedIndex) ||
+                    (searchDirection < 0 && tick.index < selectedIndex))
         }
-        
+
         if let targetPhoto = nearbyPhotos.first {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 selectedIndex = targetPhoto.index
@@ -273,7 +273,7 @@ struct LiquidGlassTimelineSlider: View {
             }
         }
     }
-    
+
     private func getCurrentPhotoPosition() -> Int {
         guard selectedIndex < metrics.count,
               let photoIndex = photoMetrics.firstIndex(where: { $0.id == metrics[selectedIndex].id }) else {
@@ -291,7 +291,7 @@ struct LiquidGlassTrack: View {
     let liquidPhase: CGFloat
     let rippleAmplitude: CGFloat
     let glassDistortion: CGFloat
-    
+
     var body: some View {
         ZStack {
             // Base glass layer
@@ -301,11 +301,11 @@ struct LiquidGlassTrack: View {
                     RoundedRectangle(cornerRadius: 20)
                         .fill(Color.white.opacity(0.03))
                 )
-            
+
             // Liquid wave overlay
             Canvas { context, size in
                 let path = createLiquidPath(in: size)
-                
+
                 context.fill(
                     path,
                     with: .linearGradient(
@@ -318,7 +318,7 @@ struct LiquidGlassTrack: View {
                     )
                 )
             }
-            
+
             // Progress fill with glass effect
             GeometryReader { geometry in
                 RoundedRectangle(cornerRadius: 20)
@@ -336,7 +336,7 @@ struct LiquidGlassTrack: View {
                     .blur(radius: isDragging ? 2 : 0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: progress)
             }
-            
+
             // Glass border
             RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
@@ -345,28 +345,28 @@ struct LiquidGlassTrack: View {
         .scaleEffect(y: 1 + glassDistortion * 0.1)
         .animation(.spring(response: 0.4, dampingFraction: 0.6), value: glassDistortion)
     }
-    
+
     private func createLiquidPath(in size: CGSize) -> Path {
         var path = Path()
         let waveHeight = rippleAmplitude
         let progressPoint = size.width * progress
-        
+
         path.move(to: CGPoint(x: 0, y: size.height / 2))
-        
+
         // Create liquid wave around progress point
         for x in stride(from: 0, through: size.width, by: 1) {
             let relativeX = x - progressPoint
             let waveOffset = sin(relativeX * 0.02 + liquidPhase) * waveHeight
             let dampening = exp(-pow(relativeX / 100, 2))
             let y = size.height / 2 + waveOffset * dampening
-            
+
             path.addLine(to: CGPoint(x: x, y: y))
         }
-        
+
         path.addLine(to: CGPoint(x: size.width, y: size.height))
         path.addLine(to: CGPoint(x: 0, y: size.height))
         path.closeSubpath()
-        
+
         return path
     }
 }
@@ -377,9 +377,9 @@ struct LiquidGlassThumb: View {
     let scale: CGFloat
     let isDragging: Bool
     let velocity: CGFloat
-    
+
     @State private var glowAnimation = false
-    
+
     var body: some View {
         ZStack {
             // Outer glow
@@ -398,7 +398,7 @@ struct LiquidGlassThumb: View {
                 .frame(width: 40, height: 40)
                 .blur(radius: isDragging ? 6 : 3)
                 .scaleEffect(glowAnimation ? 1.2 : 1.0)
-            
+
             // Glass sphere
             Circle()
                 .fill(.ultraThinMaterial)
@@ -425,7 +425,7 @@ struct LiquidGlassThumb: View {
                     .degrees(velocity * 30),
                     axis: (x: 0, y: 1, z: 0)
                 )
-            
+
             // Inner light
             Circle()
                 .fill(Color.white.opacity(0.8))
@@ -447,10 +447,10 @@ struct LiquidPhotoAnchor: View {
     let photoUrl: String
     let isSelected: Bool
     let magneticPull: CGFloat
-    
+
     @State private var imageLoaded = false
     @State private var pulseAnimation = false
-    
+
     var body: some View {
         ZStack {
             // Magnetic field visualization
@@ -470,7 +470,7 @@ struct LiquidPhotoAnchor: View {
                     .frame(width: 60, height: 60)
                     .blur(radius: 4)
             }
-            
+
             // Glass container
             Circle()
                 .fill(.ultraThinMaterial)
@@ -517,9 +517,9 @@ struct GlassNavigationButton: View {
     let secondaryIcon: String
     var isLeading: Bool = true
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {

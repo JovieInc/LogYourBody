@@ -10,13 +10,13 @@ struct LegalDocumentRow: View {
     let icon: String
     let title: String
     let subtitle: String?
-    
+
     init(icon: String, title: String, subtitle: String? = nil) {
         self.icon = icon
         self.title = title
         self.subtitle = subtitle
     }
-    
+
     var body: some View {
         SettingsRow(
             icon: icon,
@@ -36,9 +36,9 @@ struct LegalDocumentRow: View {
             title: "GDPR Compliance",
             subtitle: "EU"
         )
-        
+
         DSDivider().insetted(16)
-        
+
         LegalDocumentRow(
             icon: "doc.text",
             title: "Terms of Service"

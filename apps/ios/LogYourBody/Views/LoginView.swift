@@ -38,7 +38,7 @@ struct LoginView: View {
                     )
                     .padding(.top, authManager.isClerkLoaded ? 80 : 20)
                     .padding(.bottom, 50)
-                    
+
                     // Organism: Login Form
                     LoginForm(
                         email: $email,
@@ -55,20 +55,20 @@ struct LoginView: View {
                         }
                     )
                     .padding(.horizontal, 24)
-                    
+
                     // Molecule: Sign Up Link
                     HStack(spacing: 4) {
                         Text("Don't have an account?")
                             .font(.system(size: 15))
                             .foregroundColor(.appTextSecondary)
-                        
+
                         DSAuthNavigationLink(
                             title: "Sign up",
                             destination: SignUpView()
                         )
                     }
                     .padding(.top, 20)
-                    
+
                     Spacer(minLength: 40)
                 }
             }
@@ -81,7 +81,7 @@ struct LoginView: View {
             Text(errorMessage)
         }
     }
-    
+
     // Clerk status banner
     private var clerkStatusBanner: some View {
         VStack(spacing: 12) {

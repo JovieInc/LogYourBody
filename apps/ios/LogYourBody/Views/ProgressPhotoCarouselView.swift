@@ -11,13 +11,13 @@ struct ProgressPhotoGlassCard<Content: View>: View {
     let content: Content
     var cornerRadius: CGFloat = 16
     var padding: CGFloat = 16
-    
+
     init(cornerRadius: CGFloat = 16, padding: CGFloat = 16, @ViewBuilder content: () -> Content) {
         self.cornerRadius = cornerRadius
         self.padding = padding
         self.content = content()
     }
-    
+
     var body: some View {
         content
             .padding(padding)
@@ -57,7 +57,7 @@ struct ProgressPhotoCarouselView: View {
     private var displayMetrics: [BodyMetrics] {
         historicalMetrics
     }
-    
+
     var body: some View {
         ZStack {
             // Background - edge to edge
@@ -86,7 +86,7 @@ struct ProgressPhotoCarouselView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onChange(of: selectedMetricsIndex) { _, newIndex in
+                .onChange(of: selectedMetricsIndex) { _, _ in
                     if !isDragging {
                         // HapticManager.shared.selection()
                     }
@@ -109,7 +109,7 @@ struct ProgressPhotoCarouselView: View {
             preloadAdjacentPhotos()
         }
     }
-    
+
     // MARK: - Photo Preloading for Smooth Experience
 
     private func preloadAdjacentPhotos() {
@@ -192,14 +192,14 @@ struct EmptyDataState: View {
 // MARK: - Processing Card
 struct ProcessingCard: View {
     @State private var isAnimating = false
-    
+
     var body: some View {
         VStack(spacing: 20) {
             ZStack {
                 Circle()
                     .stroke(Color.white.opacity(0.2), lineWidth: 3)
                     .frame(width: 60, height: 60)
-                
+
                 Circle()
                     .trim(from: 0, to: 0.7)
                     .stroke(Color.appPrimary, lineWidth: 3)
@@ -207,12 +207,12 @@ struct ProcessingCard: View {
                     .rotationEffect(.degrees(isAnimating ? 360 : 0))
                     .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isAnimating)
             }
-            
+
             VStack(spacing: 8) {
                 Text("Processing...")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white)
-                
+
                 Text("AI background removal in progress")
                     .font(.system(size: 14))
                     .foregroundColor(.white.opacity(0.6))

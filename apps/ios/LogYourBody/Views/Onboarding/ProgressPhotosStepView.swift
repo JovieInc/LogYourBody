@@ -16,39 +16,39 @@ struct ProgressPhotosStepView: View {
     @StateObject private var uploadService = BackgroundPhotoUploadService.shared
     @StateObject private var processingService = ImageProcessingService.shared
     @EnvironmentObject var authManager: AuthManager
-    
+
     var body: some View {
         ZStack {
             // Edge-to-edge background
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 0) {
                 // Header with Liquid Glass effect
                 HStack {
                     Button(
-            action: {
-                        viewModel.previousStep()
-                        // HapticManager.shared.buttonTap()
-                    },
-            label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundColor(.appTextSecondary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-        )
+                        action: {
+                            viewModel.previousStep()
+                            HapticManager.shared.buttonTap()
+                        },
+                        label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .regular))
+                                .foregroundColor(.appTextSecondary)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                    )
                     .background(
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.white.opacity(0.1))
                     )
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
-                
+
                 // Content
                 ScrollView {
                     VStack(spacing: 48) {
@@ -60,7 +60,7 @@ struct ProgressPhotosStepView: View {
                                 .opacity(animateTitle ? 1 : 0)
                                 .scaleEffect(animateTitle ? 1 : 0.8)
                                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: animateTitle)
-                            
+
                             Text("Add Progress Photos")
                                 .font(.system(size: 28, weight: .semibold))
                                 .foregroundColor(.appText)
@@ -68,7 +68,7 @@ struct ProgressPhotosStepView: View {
                                 .opacity(animateTitle ? 1 : 0)
                                 .offset(y: animateTitle ? 0 : 20)
                                 .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1), value: animateTitle)
-                            
+
                             Text("Track your transformation with visual progress")
                                 .font(.system(size: 17, weight: .regular))
                                 .foregroundColor(.appTextSecondary)
@@ -79,7 +79,7 @@ struct ProgressPhotosStepView: View {
                                 .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.2), value: animateTitle)
                         }
                         .padding(.top, 40)
-                        
+
                         // Photo selection area
                         VStack(spacing: 24) {
                             if selectedPhotos.isEmpty {
@@ -94,16 +94,16 @@ struct ProgressPhotosStepView: View {
                                             Circle()
                                                 .fill(Color.white.opacity(0.1))
                                                 .frame(width: 80, height: 80)
-                                            
+
                                             Image(systemName: "photo.badge.plus")
                                                 .font(.system(size: 36))
                                                 .foregroundColor(.white)
                                         }
-                                        
+
                                         Text("Select Photos")
                                             .font(.system(size: 17, weight: .medium))
                                             .foregroundColor(.white)
-                                        
+
                                         Text("Choose multiple photos at once")
                                             .font(.system(size: 14, weight: .regular))
                                             .foregroundColor(.appTextSecondary)
@@ -122,17 +122,17 @@ struct ProgressPhotosStepView: View {
                                         Image(systemName: "checkmark.circle.fill")
                                             .font(.system(size: 28))
                                             .foregroundColor(.green)
-                                        
+
                                         Text("\(selectedPhotos.count) photos queued")
                                             .font(.system(size: 20, weight: .semibold))
                                             .foregroundColor(.appText)
                                     }
-                                    
+
                                     Text("Photos will upload in the background")
                                         .font(.system(size: 15, weight: .regular))
                                         .foregroundColor(.appTextSecondary)
                                         .multilineTextAlignment(.center)
-                                    
+
                                     PhotosPicker(
                                         selection: $selectedPhotos,
                                         maxSelectionCount: 50,
@@ -156,16 +156,16 @@ struct ProgressPhotosStepView: View {
                                         Image(systemName: "photo.stack.fill")
                                             .font(.system(size: 28))
                                             .foregroundColor(.appPrimary)
-                                        
+
                                         Text("\(selectedPhotos.count) photos selected")
                                             .font(.system(size: 20, weight: .semibold))
                                             .foregroundColor(.appText)
                                     }
-                                    
+
                                     Text("Photos will be dated automatically")
                                         .font(.system(size: 15, weight: .regular))
                                         .foregroundColor(.appTextSecondary)
-                                    
+
                                     PhotosPicker(
                                         selection: $selectedPhotos,
                                         maxSelectionCount: 50,
@@ -187,15 +187,15 @@ struct ProgressPhotosStepView: View {
                         .padding(.horizontal, 24)
                         .onChange(of: selectedPhotos) { _, newValue in
                             if !newValue.isEmpty {
-                                // HapticManager.shared.successAction()
+                                HapticManager.shared.successAction()
                             }
                         }
                     }
                 }
                 .scrollDismissesKeyboard(.interactively)
-                
+
                 Spacer()
-                
+
                 // Bottom buttons with Liquid Glass
                 VStack(spacing: 20) {
                     if selectedPhotos.isEmpty {
@@ -217,7 +217,7 @@ struct ProgressPhotosStepView: View {
                         .offset(y: animateButton ? 0 : 20)
                         .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.4), value: animateButton)
                     }
-                    
+
                     if selectedPhotos.isEmpty {
                         Text("You can add photos anytime from the dashboard")
                             .font(.system(size: 13, weight: .regular))
@@ -242,10 +242,10 @@ struct ProgressPhotosStepView: View {
             animateButton = true
         }
     }
-    
+
     private func handleContinue() {
-        // HapticManager.shared.buttonTap()
-        
+        HapticManager.shared.buttonTap()
+
         if !selectedPhotos.isEmpty {
             // Queue photos for background upload
             Task {
@@ -253,7 +253,7 @@ struct ProgressPhotosStepView: View {
                 viewModel.data.hasUploadedPhotos = true
             }
         }
-        
+
         viewModel.nextStep()
     }
 }

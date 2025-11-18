@@ -8,7 +8,7 @@ struct AnimatedTabView: View {
     @Binding var selectedTab: Tab
     @Namespace private var namespace
     @State private var bounceAnimation = false
-    
+
     enum Tab: Int, CaseIterable {
         case dashboard = 0
         case log = 1
@@ -34,7 +34,7 @@ struct AnimatedTabView: View {
             }
         }
     }
-    
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(Tab.allCases, id: \.self) { tab in
@@ -94,7 +94,7 @@ struct TabButton: View {
     let namespace: Namespace.ID
     let action: () -> Void
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
@@ -107,7 +107,7 @@ struct TabButton: View {
                                 .fill(Color.white.opacity(0.08))
                                 .frame(width: 44, height: 44)
                                 .blur(radius: 8)
-                            
+
                             // Inner glow
                             Circle()
                                 .fill(
@@ -125,7 +125,7 @@ struct TabButton: View {
                         }
                         .matchedGeometryEffect(id: "selection", in: namespace)
                     }
-                    
+
                     Image(systemName: tab.icon)
                         .font(.system(size: 24, weight: isSelected ? .medium : .regular))
                         .foregroundColor(isSelected ? .white : Color.white.opacity(0.5))
@@ -154,7 +154,7 @@ struct AnimatedCard<Content: View>: View {
     let id: String
     let namespace: Namespace.ID
     @ViewBuilder let content: () -> Content
-    
+
     var body: some View {
         content()
             .matchedGeometryEffect(id: id, in: namespace)
@@ -171,14 +171,14 @@ struct AnimatedProgressRing: View {
     let size: CGFloat
     let lineWidth: CGFloat
     @State private var animatedProgress: Double = 0
-    
+
     var body: some View {
         ZStack {
             // Background ring
             Circle()
                 .stroke(Color.appBorder, lineWidth: lineWidth)
                 .frame(width: size, height: size)
-            
+
             // Progress ring
             Circle()
                 .trim(from: 0, to: animatedProgress)
@@ -215,7 +215,7 @@ struct SmoothStateContainer<Content: View>: View {
     @Namespace private var namespace
     let id: AnyHashable
     @ViewBuilder let content: () -> Content
-    
+
     var body: some View {
         content()
             .matchedGeometryEffect(id: id, in: namespace)

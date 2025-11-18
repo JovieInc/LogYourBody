@@ -10,7 +10,7 @@ struct DocumentHeader: View {
     let icon: String
     let title: String
     let iconColor: Color
-    
+
     init(
         icon: String,
         title: String,
@@ -20,7 +20,7 @@ struct DocumentHeader: View {
         self.title = title
         self.iconColor = iconColor
     }
-    
+
     var body: some View {
         HStack(spacing: 16) {
             // Icon
@@ -29,7 +29,7 @@ struct DocumentHeader: View {
                 size: .large,
                 color: iconColor
             )
-            
+
             // Title
             DSText(
                 title,
@@ -37,7 +37,7 @@ struct DocumentHeader: View {
                 weight: .bold,
                 color: .appText
             )
-            
+
             Spacer()
         }
     }
@@ -51,7 +51,7 @@ struct DocumentHeader: View {
             icon: "doc.text",
             title: "Terms of Service"
         )
-        
+
         DocumentHeader(
             icon: "shield.lefthalf.filled",
             title: "GDPR Compliance",

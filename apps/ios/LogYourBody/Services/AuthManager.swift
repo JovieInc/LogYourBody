@@ -18,7 +18,7 @@ enum AuthError: LocalizedError {
     case nameUpdateFailed(String)
     case networkError
     case syncError(String)
-    
+
     var errorDescription: String? {
         switch self {
         case .clerkNotInitialized:
@@ -35,6 +35,35 @@ enum AuthError: LocalizedError {
     }
 }
 
+// MARK: - AsyncGate Helper
+
+actor AsyncGate {
+    private var isLocked = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if !isLocked {
+            isLocked = true
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func signal() {
+        if let next = waiters.first {
+            waiters.removeFirst()
+            next.resume()
+        } else {
+            isLocked = false
+        }
+    }
+}
+
+// MARK: - Session Information
+
 // Session information for active sessions management
 struct SessionInfo: Identifiable {
     let id: String
@@ -50,7 +79,7 @@ struct SessionInfo: Identifiable {
 @MainActor
 class AuthManager: NSObject, ObservableObject {
     static let shared = AuthManager()
-    
+
     @Published var isAuthenticated = false
     @Published var currentUser: LocalUser?
     @Published var clerkSession: Session?
@@ -59,29 +88,33 @@ class AuthManager: NSObject, ObservableObject {
     @Published var clerkInitError: String?
     @Published var needsLegalConsent = false
     @Published var pendingAppleUserId: String?
-    
+
     private var currentSignUp: SignUp?
     private var pendingSignUpCredentials: (email: String, password: String)?
+    var pendingVerificationEmail: String? {
+        pendingSignUpCredentials?.email
+    }
     private let clerk = Clerk.shared
     private let supabase = SupabaseClient.shared  // Keep for data operations
     private let userDefaults = UserDefaults.standard
     private let userKey = Constants.currentUserKey
     private var cancellables = Set<AnyCancellable>()
     private var sessionObservationTask: Task<Void, Never>?
-    
+    private let legalConsentGate = AsyncGate()
+
     override init() {
         super.init()
         // print("🔐 AuthManager initialized")
-        
+
         // Always start with no authentication until Clerk confirms session
         self.isAuthenticated = false
         self.currentUser = nil
         self.clerkSession = nil
-        
+
         // Clear any stale user data
         userDefaults.removeObject(forKey: userKey)
     }
-    
+
     func initializeClerk() async {
         // print("🔧 Initializing Clerk SDK")
 
@@ -99,7 +132,7 @@ class AuthManager: NSObject, ObservableObject {
         // Validate publishable key before attempting to configure
         guard !pubKey.isEmpty else {
             let error = "Clerk publishable key is empty. Check Config.xcconfig and Xcode project configuration."
-        // print("❌ \(error)")
+            // print("❌ \(error)")
             await MainActor.run {
                 self.isClerkLoaded = false
                 self.clerkInitError = error
@@ -109,7 +142,7 @@ class AuthManager: NSObject, ObservableObject {
 
         guard pubKey.hasPrefix("pk_") else {
             let error = "Invalid Clerk key format (should start with 'pk_'). Current: '\(String(pubKey.prefix(10)))...'"
-        // print("❌ \(error)")
+            // print("❌ \(error)")
             await MainActor.run {
                 self.isClerkLoaded = false
                 self.clerkInitError = error
@@ -123,11 +156,11 @@ class AuthManager: NSObject, ObservableObject {
 
         // Load Clerk
         do {
-        // print("🔧 Attempting to load Clerk...")
+            // print("🔧 Attempting to load Clerk...")
             let startTime = Date()
             try await clerk.load()
             let duration = Date().timeIntervalSince(startTime)
-        // print("✅ Clerk SDK loaded successfully in \(String(format: "%.2f", duration))s")
+            // print("✅ Clerk SDK loaded successfully in \(String(format: "%.2f", duration))s")
 
             await MainActor.run {
                 self.isClerkLoaded = true
@@ -136,10 +169,10 @@ class AuthManager: NSObject, ObservableObject {
             }
         } catch {
             let errorMessage = error.localizedDescription
-        // print("❌ Failed to load Clerk: \(error)")
-        // print("❌ Error type: \(type(of: error))")
-        // print("❌ Error details: \(String(describing: error))")
-        // print("❌ Localized: \(errorMessage)")
+            // print("❌ Failed to load Clerk: \(error)")
+            // print("❌ Error type: \(type(of: error))")
+            // print("❌ Error details: \(String(describing: error))")
+            // print("❌ Localized: \(errorMessage)")
 
             await MainActor.run {
                 self.isClerkLoaded = false
@@ -157,19 +190,19 @@ class AuthManager: NSObject, ObservableObject {
     private func observeSessionChanges() {
         // Cancel any existing observation
         sessionObservationTask?.cancel()
-        
+
         // Observe Clerk instance for changes
         sessionObservationTask = Task { @MainActor in
             // Initial check
             self.updateSessionState()
-            
+
             // Check for pending name updates when session is established
             if self.clerkSession != nil {
                 Task {
                     await self.resolvePendingNameUpdates()
                 }
             }
-            
+
             // Periodically check for session changes (reduced frequency for performance)
             // Only check every 5 minutes to minimize background activity
             Timer.publish(every: 300.0, on: .main, in: .common)
@@ -180,30 +213,30 @@ class AuthManager: NSObject, ObservableObject {
                 .store(in: &cancellables)
         }
     }
-    
+
     @MainActor
     private func updateSessionState() {
         _ = clerk.session != nil
         let previousSessionId = self.clerkSession?.id
         let currentSessionId = clerk.session?.id
-        
+
         // Only update if session actually changed
         if previousSessionId != currentSessionId {
             // print("🔄 Session change detected: \(previousSessionId ?? "nil") -> \(currentSessionId ?? "nil")")
-            
+
             self.clerkSession = clerk.session
-            
+
             if let _ = clerk.session, let user = clerk.user {
                 // Only authenticate if we have both a valid session AND user
                 // print("🔄 Clerk session state: signed in with user \(user.id)")
                 self.updateLocalUser(clerkUser: user)
                 // isAuthenticated will be set by updateLocalUser if successful
-                
+
                 // Clear any remaining sign up state
                 self.currentSignUp = nil
                 self.pendingSignUpCredentials = nil
                 self.needsEmailVerification = false
-                
+
                 // Notify RevenueCat of authenticated user for correct entitlement handling
                 if let localUserId = self.currentUser?.id {
                     Task {
@@ -219,11 +252,11 @@ class AuthManager: NSObject, ObservableObject {
             }
         }
     }
-    
+
     private func updateLocalUser(clerkUser: Any) {
         // Use Mirror to access properties dynamically due to type naming conflict
         let mirror = Mirror(reflecting: clerkUser)
-        
+
         // Extract properties using Mirror
         var userId = ""
         var emailAddresses: [Any] = []
@@ -231,7 +264,7 @@ class AuthManager: NSObject, ObservableObject {
         var lastName: String?
         var username: String?
         var imageUrl: String?
-        
+
         for child in mirror.children {
             switch child.label {
             case "id":
@@ -250,7 +283,7 @@ class AuthManager: NSObject, ObservableObject {
                 break
             }
         }
-        
+
         // Extract email from first email address
         var email = ""
         if let firstEmailAddress = emailAddresses.first {
@@ -262,17 +295,17 @@ class AuthManager: NSObject, ObservableObject {
                 }
             }
         }
-        
+
         // Use single source of truth for display name
         let displayName = getUserDisplayName()
-        
+
         // Don't proceed if we don't have a valid email
         guard !email.isEmpty else {
             self.currentUser = nil
             self.isAuthenticated = false
             return
         }
-        
+
         // Create user object with Clerk data
         let localUser = LocalUser(
             id: userId,
@@ -294,26 +327,26 @@ class AuthManager: NSObject, ObservableObject {
                 onboardingCompleted: nil
             )
         )
-        
+
         self.currentUser = localUser
         self.isAuthenticated = true  // Set authenticated only after successful user creation
-        
+
         // Store user data
         if let encoded = try? JSONEncoder().encode(localUser) {
             userDefaults.set(encoded, forKey: userKey)
         }
-        
+
         // Create or update profile in Supabase
         Task {
             await self.createOrUpdateSupabaseProfile(user: localUser)
         }
     }
-    
+
     func login(email: String, password: String) async throws {
         // Mock authentication for development
         if Constants.useMockAuth {
             // print("🧪 Using mock authentication for development")
-            
+
             // Create mock user
             let mockUser = LocalUser(
                 id: "mock_user_123",
@@ -335,7 +368,7 @@ class AuthManager: NSObject, ObservableObject {
                     onboardingCompleted: nil
                 )
             )
-            
+
             await MainActor.run {
                 self.currentUser = mockUser
                 self.isAuthenticated = true
@@ -343,18 +376,18 @@ class AuthManager: NSObject, ObservableObject {
             }
             return
         }
-        
+
         // Real authentication using Clerk SDK
         guard isClerkLoaded else {
             throw AuthError.clerkNotInitialized
         }
-        
+
         do {
             // Create a sign in with email and password
             _ = try await SignIn.create(
                 strategy: .identifier(email, password: password)
             )
-            
+
             // print("✅ Sign in successful")
             // The session observer will automatically update isAuthenticated
         } catch {
@@ -362,13 +395,13 @@ class AuthManager: NSObject, ObservableObject {
             throw error
         }
     }
-    
+
     func signUp(email: String, password: String, name: String) async throws {
         // Mock authentication for development
         if Constants.useMockAuth {
             // Simulate the sign up process
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
-            
+
             // Create mock user
             let mockUser = LocalUser(
                 id: "mock_user_123",
@@ -390,7 +423,7 @@ class AuthManager: NSObject, ObservableObject {
                     onboardingCompleted: nil
                 )
             )
-            
+
             await MainActor.run {
                 self.currentUser = mockUser
                 self.isAuthenticated = true
@@ -398,15 +431,15 @@ class AuthManager: NSObject, ObservableObject {
             }
             return
         }
-        
+
         // Real sign up using Clerk SDK
         guard isClerkLoaded else {
             throw AuthError.clerkNotInitialized
         }
-        
+
         do {
             // Create sign up with email and password
-            // Note: If your Clerk instance requires legal acceptance, 
+            // Note: If your Clerk instance requires legal acceptance,
             // you may need to pass additional parameters here
             let signUp = try await SignUp.create(
                 strategy: .standard(
@@ -414,14 +447,14 @@ class AuthManager: NSObject, ObservableObject {
                     password: password
                 )
             )
-            
+
             // Store the sign up instance and credentials for verification
             self.currentSignUp = signUp
             self.pendingSignUpCredentials = (email: email, password: password)
-            
+
             // Prepare email verification
             try await signUp.prepareVerification(strategy: .emailCode)
-            
+
             await MainActor.run {
                 self.needsEmailVerification = true
                 // Clear onboarding status for new users
@@ -431,7 +464,7 @@ class AuthManager: NSObject, ObservableObject {
             throw error
         }
     }
-    
+
     func logout() async {
         do {
             try await clerk.signOut()
@@ -439,7 +472,7 @@ class AuthManager: NSObject, ObservableObject {
         } catch {
             // print("❌ Logout error: \(error)")
         }
-        
+
         await MainActor.run {
             self.clerkSession = nil
             self.currentUser = nil
@@ -448,38 +481,38 @@ class AuthManager: NSObject, ObservableObject {
             self.pendingSignUpCredentials = nil
             self.needsEmailVerification = false
         }
-        
+
         // Also clear RevenueCat state so subscriptions are reset correctly on sign out
         await RevenueCatManager.shared.logoutUser()
-        
+
         // Clear all stored user data
         userDefaults.removeObject(forKey: userKey)
         userDefaults.removeObject(forKey: Constants.currentUserKey)
         userDefaults.removeObject(forKey: Constants.authTokenKey)
-        
+
         // Clear any cached step history flags
         UserDefaults.standard.removeObject(forKey: "HasSyncedHistoricalSteps")
-        
+
         // Clear last sync dates to force fresh sync on next login
         UserDefaults.standard.removeObject(forKey: "lastSupabaseSyncDate")
         UserDefaults.standard.removeObject(forKey: "lastHealthKitWeightSyncDate")
-        
+
         // print("🧹 Cleared all user data from UserDefaults")
     }
-    
+
     private func loadUserProfile(userId: String) async {
         guard let token = await getSupabaseToken() else {
             // print("❌ No Supabase token available")
             return
         }
-        
+
         do {
             let profiles: [Profile] = try await supabase.query(
                 table: "profiles",
                 accessToken: token,
                 filter: "id=eq.\(userId)"
             )
-            
+
             if let profile = profiles.first {
                 let user = LocalUser(
                     id: profile.id,
@@ -501,11 +534,11 @@ class AuthManager: NSObject, ObservableObject {
                         onboardingCompleted: profile.onboardingCompleted
                     )
                 )
-                
+
                 await MainActor.run {
                     self.currentUser = user
                 }
-                
+
                 // Store user data
                 if let encoded = try? JSONEncoder().encode(user) {
                     userDefaults.set(encoded, forKey: userKey)
@@ -541,9 +574,9 @@ class AuthManager: NSObject, ObservableObject {
                             break
                         }
                     }
-                    
+
                     let fullName = [firstName, lastName].compactMap { $0 }.joined(separator: " ")
-                    
+
                     let profile = Profile(
                         id: userId,
                         email: email,
@@ -561,7 +594,7 @@ class AuthManager: NSObject, ObservableObject {
                         updatedAt: Date(),
                         onboardingCompleted: nil
                     )
-                    
+
                     try await supabase.insert(table: "profiles", data: profile, accessToken: token)
                     await loadUserProfile(userId: userId)  // Reload after creating
                 }
@@ -570,14 +603,14 @@ class AuthManager: NSObject, ObservableObject {
             // print("❌ Failed to load user profile: \(error)")
         }
     }
-    
+
     // MARK: - Apple Sign In
-    
+
     func startAppleSignIn() {
         guard isClerkLoaded else {
             return
         }
-        
+
         Task {
             do {
                 // Use Clerk SDK for Apple Sign In
@@ -588,7 +621,7 @@ class AuthManager: NSObject, ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Unified Apple Sign In Handler
     @MainActor
     func handleAppleSignIn() async {
@@ -628,28 +661,28 @@ class AuthManager: NSObject, ObservableObject {
             }
             return
         }
-        
+
         do {
             // Create the Apple ID provider and request
             let appleIDProvider = ASAuthorizationAppleIDProvider()
             let request = appleIDProvider.createRequest()
             request.requestedScopes = [.fullName, .email]
-            
+
             // Create and configure the authorization controller
             let authorizationController = ASAuthorizationController(authorizationRequests: [request])
-            
+
             // Use a continuation to handle the delegate callbacks
             let appleIDCredential = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) in
                 let delegate = AppleSignInDelegate(continuation: continuation)
                 authorizationController.delegate = delegate
                 authorizationController.presentationContextProvider = delegate
-                
+
                 // Keep a strong reference to the delegate
                 objc_setAssociatedObject(authorizationController, "delegate", delegate, .OBJC_ASSOCIATION_RETAIN)
-                
+
                 authorizationController.performRequests()
             }
-            
+
             // Process the credentials
             try await signInWithAppleCredentials(appleIDCredential)
         } catch {
@@ -675,22 +708,22 @@ class AuthManager: NSObject, ObservableObject {
             }
         }
     }
-    
+
     func signInWithAppleCredentials(_ appleIDCredential: ASAuthorizationAppleIDCredential) async throws {
         guard isClerkLoaded else {
             throw AuthError.clerkNotInitialized
         }
-        
+
         // Extract the identity token
         guard let identityToken = appleIDCredential.identityToken,
               let idTokenString = String(data: identityToken, encoding: .utf8) else {
             throw AuthError.invalidCredentials
         }
-        
+
         do {
             // Use Clerk's ID token authentication
             let result = try await SignIn.authenticateWithIdToken(provider: .apple, idToken: idTokenString)
-            
+
             // Handle the transfer flow result
             switch result {
             case .signIn(let signIn):
@@ -698,15 +731,15 @@ class AuthManager: NSObject, ObservableObject {
                 if let sessionId = signIn.createdSessionId {
                     try await clerk.setActive(sessionId: sessionId)
                 }
-                
+
                 // Now get the actual user ID from the clerk user
                 guard let userId = clerk.user?.id else {
                     throw AuthError.invalidCredentials
                 }
-                
+
                 // Check if this user has already accepted legal terms
                 let hasAcceptedLegal = await checkLegalConsent(userId: userId)
-                
+
                 if !hasAcceptedLegal {
                     // Store the user ID for the consent flow
                     self.pendingAppleUserId = userId
@@ -714,19 +747,19 @@ class AuthManager: NSObject, ObservableObject {
                     // Don't update auth state yet - wait for consent
                     return
                 }
-                
+
                 // The session observer will handle updating the auth state
-                
+
                 // Store the user's name if this is their first sign in
                 if let fullName = appleIDCredential.fullName {
                     let name = [fullName.givenName, fullName.familyName]
                         .compactMap { $0 }
                         .joined(separator: " ")
-                    
+
                     if !name.isEmpty {
                         // Temporarily store for immediate use
                         UserDefaults.standard.set(name, forKey: "appleSignInName")
-                        
+
                         // Update name using consolidated method
                         do {
                             try await consolidateNameUpdate(name)
@@ -736,33 +769,33 @@ class AuthManager: NSObject, ObservableObject {
                         }
                     }
                 }
-                
+
             case .signUp(let signUp):
                 // For sign up, activate the session to get user ID
                 if let sessionId = signUp.createdSessionId {
                     try await clerk.setActive(sessionId: sessionId)
                 }
-                
+
                 // Get the actual user ID
                 guard let userId = clerk.user?.id else {
                     throw AuthError.invalidCredentials
                 }
-                
+
                 // For new users, always show consent screen
                 self.pendingAppleUserId = userId
                 self.needsLegalConsent = true
-                
+
                 // Store the user's name for onboarding
                 if let fullName = appleIDCredential.fullName {
                     let name = [fullName.givenName, fullName.familyName]
                         .compactMap { $0 }
                         .joined(separator: " ")
-                    
+
                     if !name.isEmpty {
                         // Temporarily store for immediate use in onboarding
                         UserDefaults.standard.set(name, forKey: "appleSignInName")
-                        
-                        // Note: We don't update Clerk here because the user hasn't 
+
+                        // Note: We don't update Clerk here because the user hasn't
                         // accepted legal terms yet. The name will be synced during
                         // onboarding completion via consolidateNameUpdate
                     }
@@ -776,14 +809,14 @@ class AuthManager: NSObject, ObservableObject {
             } else {
                 showAuthError("Sign in failed. Please try again.")
             }
-            
+
             throw error
         }
     }
-    
-    
+
+
     // MARK: - Helper Methods
-    
+
     private func showAuthError(_ message: String) {
         DispatchQueue.main.async {
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -794,24 +827,24 @@ class AuthManager: NSObject, ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Email Verification
-    
+
     func verifyEmail(code: String) async throws {
         guard let signUp = currentSignUp else {
             throw AuthError.clerkNotInitialized
         }
-        
+
         do {
             let result = try await signUp.attemptVerification(strategy: .emailCode(code: code))
-            
+
             // Check verification status
             switch result.status {
             case .complete:
                 if let createdSessionId = result.createdSessionId {
                     // Set the session as active to complete the sign up flow
                     try await clerk.setActive(sessionId: createdSessionId)
-                    
+
                     // Force an immediate session state update
                     await MainActor.run {
                         self.updateSessionState()
@@ -822,7 +855,7 @@ class AuthManager: NSObject, ObservableObject {
                         try await login(email: credentials.email, password: credentials.password)
                     }
                 }
-                
+
             case .missingRequirements:
                 // For now, show an error to the user about missing requirements
                 // In a production app, you would handle legal acceptance properly
@@ -836,11 +869,11 @@ class AuthManager: NSObject, ObservableObject {
                     userInfo: [NSLocalizedDescriptionKey: errorMessage]
                 )
                 throw error
-                
+
             default:
                 break
             }
-            
+
             // Clear email verification flag only when we're actually done
             // Don't clear it if we're still in the sign up process
             await MainActor.run {
@@ -850,7 +883,7 @@ class AuthManager: NSObject, ObservableObject {
                     self.pendingSignUpCredentials = nil
                 }
             }
-            
+
             // The session observer will now detect the active session and update isAuthenticated
         } catch {
             // Don't clear the verification state on error
@@ -858,36 +891,36 @@ class AuthManager: NSObject, ObservableObject {
             throw error
         }
     }
-    
+
     func resendVerificationEmail() async throws {
         guard let signUp = currentSignUp else {
             throw AuthError.clerkNotInitialized
         }
-        
+
         do {
             try await signUp.prepareVerification(strategy: .emailCode)
         } catch {
             throw error
         }
     }
-    
+
     // MARK: - Supabase Integration
-    
+
     private func getSupabaseToken() async -> String? {
         // For now, we'll use the Supabase anon key
         // In production, you'd want to exchange the Clerk token for a Supabase token
         // through your backend API
         return Constants.supabaseAnonKey
     }
-    
+
     // MARK: - Token Management
-    
+
     func getAccessToken() async -> String? {
         guard let session = clerk.session else {
             // print("❌ No active Clerk session")
             return nil
         }
-        
+
         do {
             // Get JWT token from Clerk
             let tokenResource = try await session.getToken()
@@ -897,15 +930,15 @@ class AuthManager: NSObject, ObservableObject {
             return nil
         }
     }
-    
+
     // MARK: - Supabase Profile Sync
-    
+
     private func createOrUpdateSupabaseProfile(user: LocalUser) async {
         guard let session = clerkSession else {
             // print("❌ No Clerk session available for profile sync")
             return
         }
-        
+
         do {
             // Get JWT token from Clerk
             let tokenResource = try await session.getToken()
@@ -913,7 +946,7 @@ class AuthManager: NSObject, ObservableObject {
                 // print("❌ Failed to get JWT token for profile sync")
                 return
             }
-            
+
             // Prepare profile data
             let profileData: [String: Any] = [
                 "id": user.id,
@@ -930,7 +963,7 @@ class AuthManager: NSObject, ObservableObject {
                 "onboarding_completed": user.onboardingCompleted,
                 "updated_at": ISO8601DateFormatter().string(from: Date())
             ]
-            
+
             // Create/update profile in Supabase
             let url = URL(string: "\(Constants.supabaseURL)/rest/v1/profiles")!
             var request = URLRequest(url: url)
@@ -939,12 +972,12 @@ class AuthManager: NSObject, ObservableObject {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-            
+
             let jsonData = try JSONSerialization.data(withJSONObject: [profileData])
             request.httpBody = jsonData
-            
+
             let (_, response) = try await URLSession.shared.data(for: request)
-            
+
             if let httpResponse = response as? HTTPURLResponse {
                 if (200...299).contains(httpResponse.statusCode) {
                     // print("✅ Profile synced to Supabase")
@@ -956,10 +989,10 @@ class AuthManager: NSObject, ObservableObject {
             // print("❌ Profile sync error: \(error)")
         }
     }
-    
+
     func updateProfile(_ updates: [String: Any]) async {
         guard var user = currentUser else { return }
-        
+
         // Create a mutable copy of the profile or create a new one if it doesn't exist
         var updatedProfile = user.profile ?? UserProfile(
             id: user.id,
@@ -975,7 +1008,7 @@ class AuthManager: NSObject, ObservableObject {
             goalWeightUnit: "kg",
             onboardingCompleted: nil
         )
-        
+
         // Update local user object
         if let name = updates["name"] as? String {
             user.name = name
@@ -994,7 +1027,7 @@ class AuthManager: NSObject, ObservableObject {
                 onboardingCompleted: updatedProfile.onboardingCompleted
             )
         }
-        
+
         if let dateOfBirth = updates["dateOfBirth"] as? Date {
             updatedProfile = UserProfile(
                 id: updatedProfile.id,
@@ -1113,7 +1146,7 @@ class AuthManager: NSObject, ObservableObject {
                 onboardingCompleted: updatedProfile.onboardingCompleted
             )
         }
-        
+
         // Update the user's profile
         user.profile = updatedProfile
 
@@ -1121,7 +1154,7 @@ class AuthManager: NSObject, ObservableObject {
             user.onboardingCompleted = onboardingCompleted
             // Sync onboarding status to UserDefaults
             UserDefaults.standard.set(onboardingCompleted, forKey: Constants.hasCompletedOnboardingKey)
-        // print("✅ AuthManager: Synced onboarding status to UserDefaults: \(onboardingCompleted)")
+            // print("✅ AuthManager: Synced onboarding status to UserDefaults: \(onboardingCompleted)")
         }
 
         // Save updated user locally
@@ -1133,28 +1166,28 @@ class AuthManager: NSObject, ObservableObject {
         // Sync to Supabase
         await createOrUpdateSupabaseProfile(user: user)
     }
-    
+
     // MARK: - Session Management
-    
+
     func fetchActiveSessions() async throws -> [SessionInfo] {
         guard let clerkUser = clerk.user else {
             throw AuthError.clerkNotInitialized
         }
-        
+
         do {
             // Get all sessions from Clerk
             let sessions = try await clerkUser.getSessions()
-            
+
             // Map Clerk sessions to our SessionInfo model
             return sessions.compactMap { clerkSession in
                 // Use Mirror to access session properties
                 let mirror = Mirror(reflecting: clerkSession)
-                
+
                 var sessionId = ""
                 var lastActiveAt = Date()
                 var createdAt = Date()
                 var status = ""
-                
+
                 for child in mirror.children {
                     switch child.label {
                     case "id":
@@ -1173,13 +1206,13 @@ class AuthManager: NSObject, ObservableObject {
                         break
                     }
                 }
-                
+
                 // Only include active sessions
                 guard status == "active" else { return nil }
-                
+
                 // Parse user agent and location (this is simplified - in production you'd parse the actual data)
                 let deviceInfo = parseDeviceInfo(from: clerkSession)
-                
+
                 return SessionInfo(
                     id: sessionId,
                     deviceName: deviceInfo.deviceName,
@@ -1196,7 +1229,7 @@ class AuthManager: NSObject, ObservableObject {
             throw error
         }
     }
-    
+
     func revokeSession(sessionId: String) async throws {
         // Don't allow revoking current session
         guard sessionId != clerkSession?.id else {
@@ -1206,15 +1239,15 @@ class AuthManager: NSObject, ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: "Cannot revoke current session"]
             )
         }
-        
+
         guard let clerkUser = clerk.user else {
             throw AuthError.clerkNotInitialized
         }
-        
+
         do {
             // Get all sessions and find the one to revoke
             let sessions = try await clerkUser.getSessions()
-            
+
             // Find the session to revoke
             guard let sessionToRevoke = sessions.first(where: { session in
                 let mirror = Mirror(reflecting: session)
@@ -1231,7 +1264,7 @@ class AuthManager: NSObject, ObservableObject {
                     userInfo: [NSLocalizedDescriptionKey: "Session not found"]
                 )
             }
-            
+
             // Use the session's revoke method
             try await sessionToRevoke.revoke()
             // print("✅ Session \(sessionId) revoked successfully")
@@ -1240,14 +1273,14 @@ class AuthManager: NSObject, ObservableObject {
             throw error
         }
     }
-    
+
     private func parseDeviceInfo(from session: Any) -> (deviceName: String, deviceType: String, location: String, ipAddress: String) {
         // In a real implementation, you would parse the session's client info
         // For now, we'll use placeholder data based on the session
-        
+
         let mirror = Mirror(reflecting: session)
         var clientInfo: [String: Any] = [:]
-        
+
         for child in mirror.children {
             if child.label == "latestActivity" {
                 // Parse activity data for location and device info
@@ -1272,7 +1305,7 @@ class AuthManager: NSObject, ObservableObject {
                 }
             }
         }
-        
+
         // Determine device type
         let deviceTypeString = clientInfo["deviceType"] as? String ?? ""
         let deviceType: String = {
@@ -1284,19 +1317,19 @@ class AuthManager: NSObject, ObservableObject {
             default: return "Unknown"
             }
         }()
-        
+
         // Format device name
         let browser = clientInfo["browser"] as? String ?? "Unknown Browser"
         let deviceName = deviceType == "Web" ? browser : deviceType
-        
+
         // Format location
         let city = clientInfo["city"] as? String ?? ""
         let country = clientInfo["country"] as? String ?? ""
         let location = [city, country].filter { !$0.isEmpty }.joined(separator: ", ")
-        
+
         // Get IP address
         let ipAddress = clientInfo["ipAddress"] as? String ?? "Unknown"
-        
+
         return (
             deviceName: deviceName.isEmpty ? "Unknown Device" : deviceName,
             deviceType: deviceType,
@@ -1304,38 +1337,38 @@ class AuthManager: NSObject, ObservableObject {
             ipAddress: ipAddress
         )
     }
-    
+
     // MARK: - Profile Picture Upload
-    
+
     func uploadProfilePicture(_ image: UIImage) async throws -> String? {
         guard let clerkUser = clerk.user else {
             throw AuthError.clerkNotInitialized
         }
-        
+
         // Resize image to reasonable size (max 1000x1000)
         let maxSize: CGFloat = 1_000
         let scale = min(maxSize / image.size.width, maxSize / image.size.height)
         let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        
+
         UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
         image.draw(in: CGRect(origin: .zero, size: newSize))
         let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
-        
+
         guard let imageData = resizedImage?.jpegData(compressionQuality: 0.8) else {
             return nil
         }
-        
+
         // Update Clerk user profile with image
         do {
             // Use Clerk's setProfileImage method
             let imageResource = try await clerkUser.setProfileImage(imageData: imageData)
-            
+
             // print("✅ Profile image uploaded: \(imageResource.id)")
-            
+
             // Get updated user object
             let updatedClerkUser = clerk.user
-            
+
             // Update local user with new image URL
             if var user = currentUser, let updatedClerkUser = updatedClerkUser {
                 // Use Mirror to get imageUrl from Clerk user
@@ -1345,15 +1378,15 @@ class AuthManager: NSObject, ObservableObject {
                         if let newImageUrl = child.value as? String {
                             user.avatarUrl = newImageUrl
                             self.currentUser = user
-                            
+
                             // Save locally
                             if let encoded = try? JSONEncoder().encode(user) {
                                 userDefaults.set(encoded, forKey: userKey)
                             }
-                            
+
                             // Sync to Supabase
                             await createOrUpdateSupabaseProfile(user: user)
-                            
+
                             return newImageUrl
                         }
                         break
@@ -1364,34 +1397,34 @@ class AuthManager: NSObject, ObservableObject {
             // print("❌ Failed to upload profile picture: \(error)")
             throw error
         }
-        
+
         return nil
     }
-    
+
     // MARK: - Clerk User Updates
-    
+
     func updateClerkUserName(_ fullName: String, retryCount: Int = 3) async throws {
         guard let _ = clerk.user else {
             throw AuthError.clerkNotInitialized
         }
-        
+
         // Validate input
         let trimmedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             throw AuthError.nameUpdateFailed("Name cannot be empty")
         }
-        
+
         // Store the name temporarily in case update fails
         UserDefaults.standard.set(trimmedName, forKey: "pendingNameUpdate")
-        
+
         // Since Clerk iOS SDK update method is unclear, we'll update our local state
         // and sync to Supabase. The name will be synced with Clerk on next sign in.
         // print("ℹ️ Updating name locally and in Supabase")
-        
+
         // Update local user immediately
         if var user = currentUser {
             user.name = trimmedName
-            
+
             // Create new profile with updated name
             if let existingProfile = user.profile {
                 let updatedProfile = UserProfile(
@@ -1410,26 +1443,26 @@ class AuthManager: NSObject, ObservableObject {
                 )
                 user.profile = updatedProfile
             }
-            
+
             self.currentUser = user
-            
+
             // Persist to UserDefaults
             if let encoded = try? JSONEncoder().encode(user) {
                 userDefaults.set(encoded, forKey: userKey)
             }
-            
+
             // Sync to Supabase
             await createOrUpdateSupabaseProfile(user: user)
-            
+
             // Clear the pending update after successful local update
             UserDefaults.standard.removeObject(forKey: "pendingNameUpdate")
-            
+
             // print("✅ Updated user name locally and in Supabase: \(trimmedName)")
         } else {
             throw AuthError.nameUpdateFailed("No current user found")
         }
     }
-    
+
     // MARK: - Apple Sign In with OAuth
     @MainActor
     func signInWithAppleOAuth() async {
@@ -1437,17 +1470,17 @@ class AuthManager: NSObject, ObservableObject {
             showAuthError("Please wait for app to initialize and try again")
             return
         }
-        
+
         do {
             // Create OAuth sign in
             let signIn = try await SignIn.create(strategy: .oauth(provider: .apple))
-            
+
             // Open Safari for authentication
             try await signIn.authenticateWithRedirect()
         } catch {
             // Handle specific error cases
             let errorString = String(describing: error)
-            
+
             if errorString.contains("oauth_provider_not_enabled") {
                 showAuthError("Apple Sign In is not configured. Please contact support.")
             } else if errorString.contains("network") || errorString.contains("connection") {
@@ -1457,9 +1490,9 @@ class AuthManager: NSObject, ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Name Management (Single Source of Truth)
-    
+
     /// Single source of truth for getting the user's display name
     /// Priority: 1. Clerk user name, 2. Pending update, 3. Apple Sign In name, 4. Email prefix
     func getUserDisplayName() -> String {
@@ -1471,30 +1504,30 @@ class AuthManager: NSObject, ObservableObject {
                 .compactMap { $0 }
                 .joined(separator: " ")
                 .trimmingCharacters(in: .whitespaces)
-            
+
             if !clerkName.isEmpty {
                 return clerkName
             }
         }
-        
+
         // Check for pending name update (in case Clerk update failed)
         if let pendingName = UserDefaults.standard.string(forKey: "pendingNameUpdate"),
            !pendingName.isEmpty {
             return pendingName
         }
-        
+
         // Check for Apple Sign In name (temporary storage during onboarding)
         if let appleSignInName = UserDefaults.standard.string(forKey: "appleSignInName"),
            !appleSignInName.isEmpty {
             return appleSignInName
         }
-        
+
         // Fall back to email prefix (but not for private relay emails)
         if let email = currentUser?.email ?? clerk.user?.emailAddresses.first?.emailAddress {
             // Don't use email prefix for Apple private relay or other privacy-focused emails
             if email.contains("@privaterelay.appleid.com") ||
-               email.contains("@icloud.com") ||
-               email.hasPrefix("no-reply") {
+                email.contains("@icloud.com") ||
+                email.hasPrefix("no-reply") {
                 return "User"
             }
             return email.components(separatedBy: "@").first ?? "User"
@@ -1502,38 +1535,38 @@ class AuthManager: NSObject, ObservableObject {
 
         return "User"
     }
-    
+
     /// Consolidates name updates across all systems
     func consolidateNameUpdate(_ fullName: String) async throws {
         let trimmedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             throw AuthError.nameUpdateFailed("Name cannot be empty")
         }
-        
+
         // Update using our method (which handles local, Supabase, and Core Data)
         try await updateClerkUserName(trimmedName)
-        
+
         // Clean up temporary storage after successful update
         UserDefaults.standard.removeObject(forKey: "appleSignInName")
-        
+
         // Sync to Core Data (if not already done in updateClerkUserName)
         if let userId = currentUser?.id,
            let email = currentUser?.email,
            let profile = currentUser?.profile {
             CoreDataManager.shared.saveProfile(profile, userId: userId, email: email)
         }
-        
+
         // Post notification for UI updates
         NotificationCenter.default.post(name: .profileUpdated, object: nil)
     }
-    
+
     /// Check and resolve any pending name updates on app launch
     func resolvePendingNameUpdates() async {
         guard let pendingName = UserDefaults.standard.string(forKey: "pendingNameUpdate"),
               !pendingName.isEmpty else {
             return
         }
-        
+
         do {
             // print("📝 Resolving pending name update: \(pendingName)")
             try await consolidateNameUpdate(pendingName)
@@ -1543,24 +1576,27 @@ class AuthManager: NSObject, ObservableObject {
             // Keep the pending update for next attempt
         }
     }
-    
+
     // MARK: - Legal Consent Management
-    
+
     func checkLegalConsent(userId: String) async -> Bool {
+        await legalConsentGate.wait()
+        defer { Task { await legalConsentGate.signal() } }
+
         // Check if user has accepted legal terms in backend
         guard let token = await getSupabaseToken() else {
             return false
         }
-        
+
         do {
             // Query the profiles table for legal consent status
             let url = URL(string: "\(Constants.supabaseURL)/rest/v1/profiles?id=eq.\(userId)&select=legal_accepted_at")!
             var request = URLRequest(url: url)
             request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            
+
             let (data, _) = try await URLSession.shared.data(for: request)
-            
+
             if let json = try JSONSerialization.jsonObject(with: data) as? [[String: Any]],
                let profile = json.first,
                let _ = profile["legal_accepted_at"] as? String {
@@ -1569,16 +1605,19 @@ class AuthManager: NSObject, ObservableObject {
         } catch {
             // print("❌ Failed to check legal consent: \(error)")
         }
-        
+
         return false
     }
-    
+
     func acceptLegalConsent(userId: String) async {
+        await legalConsentGate.wait()
+        defer { Task { await legalConsentGate.signal() } }
+
         // Save legal consent to backend
         guard let token = await getSupabaseToken() else {
             return
         }
-        
+
         do {
             let consentData: [String: Any] = [
                 "id": userId,
@@ -1586,7 +1625,7 @@ class AuthManager: NSObject, ObservableObject {
                 "terms_accepted": true,
                 "privacy_accepted": true
             ]
-            
+
             let url = URL(string: "\(Constants.supabaseURL)/rest/v1/profiles")!
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
@@ -1594,20 +1633,20 @@ class AuthManager: NSObject, ObservableObject {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-            
+
             let jsonData = try JSONSerialization.data(withJSONObject: [consentData])
             request.httpBody = jsonData
-            
+
             let (_, response) = try await URLSession.shared.data(for: request)
-            
+
             if let httpResponse = response as? HTTPURLResponse {
                 if (200...299).contains(httpResponse.statusCode) {
                     // print("✅ Legal consent saved")
-                    
+
                     // Now complete the sign in process
                     self.needsLegalConsent = false
                     self.pendingAppleUserId = nil
-                    
+
                     // Force session update to complete authentication
                     self.updateSessionState()
                 } else {
@@ -1623,12 +1662,12 @@ class AuthManager: NSObject, ObservableObject {
 // MARK: - Apple Sign In Delegate
 private class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     let continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>
-    
+
     init(continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) {
         self.continuation = continuation
         super.init()
     }
-    
+
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
             continuation.resume(returning: appleIDCredential)
@@ -1636,11 +1675,11 @@ private class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate, 
             continuation.resume(throwing: ASAuthorizationError(.invalidResponse))
         }
     }
-    
+
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         continuation.resume(throwing: error)
     }
-    
+
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         // Get the key window
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -1650,8 +1689,8 @@ private class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate, 
 
         // Fallback to any active window
         if let windowScene = UIApplication.shared.connectedScenes
-                .filter({ $0.activationState == .foregroundActive })
-                .first as? UIWindowScene,
+            .filter({ $0.activationState == .foregroundActive })
+            .first as? UIWindowScene,
            let window = windowScene.windows.first {
             return window
         }

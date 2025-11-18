@@ -8,13 +8,13 @@ import SwiftUI
 
 struct LegalView: View {
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         ZStack {
             // Atom: Background
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: 20) {
                     // Organisms: Legal Sections
@@ -22,7 +22,7 @@ struct LegalView: View {
                     complianceSection
                     openSourceSection
                     contactSection
-                    
+
                     // Atom: Footer Text
                     lastUpdatedFooter
                 }
@@ -60,7 +60,7 @@ extension LegalView {
             ]
         )
     }
-    
+
     private var complianceSection: some View {
         LegalSection(
             header: "Compliance",
@@ -80,7 +80,7 @@ extension LegalView {
             ]
         )
     }
-    
+
     private var openSourceSection: some View {
         LegalSection(
             header: "Open Source",
@@ -94,7 +94,7 @@ extension LegalView {
             ]
         )
     }
-    
+
     private var contactSection: some View {
         SettingsSection(header: "Legal Contact") {
             VStack(spacing: 0) {
@@ -108,9 +108,9 @@ extension LegalView {
                         isExternal: true
                     )
                 }
-                
+
                 DSDivider().insetted(16)
-                
+
                 // Mailing Address
                 SettingsRow(
                     icon: "location",
@@ -121,7 +121,7 @@ extension LegalView {
             }
         }
     }
-    
+
     private var lastUpdatedFooter: some View {
         DSText(
             "Last updated: \(Date().formatted(date: .abbreviated, time: .omitted))",

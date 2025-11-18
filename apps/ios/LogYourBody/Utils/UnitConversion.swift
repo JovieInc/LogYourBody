@@ -11,7 +11,6 @@ import Foundation
 // MARK: - Unit Conversion Helper
 
 struct UnitConversion {
-
     // MARK: - Weight Conversions
 
     /// Convert weight from kg to lbs

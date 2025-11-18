@@ -6,7 +6,7 @@ import SwiftUI
 
 struct CutoutProcessingImagePlaceholder: View {
     @State private var pulseAnimation = false
-    
+
     var body: some View {
         ZStack {
             // Background
@@ -16,7 +16,7 @@ struct CutoutProcessingImagePlaceholder: View {
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(Color.appBorder, lineWidth: 1)
                 )
-            
+
             // Processing indicator
             VStack(spacing: 16) {
                 // Animated icon
@@ -26,17 +26,17 @@ struct CutoutProcessingImagePlaceholder: View {
                         .frame(width: 60, height: 60)
                         .scaleEffect(pulseAnimation ? 1.2 : 1.0)
                         .opacity(pulseAnimation ? 0.6 : 1.0)
-                    
+
                     Image(systemName: "photo")
                         .font(.system(size: 28))
                         .foregroundColor(.appPrimary)
                 }
-                
+
                 VStack(spacing: 4) {
                     Text("Processing...")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.appText)
-                    
+
                     Text("AI background removal")
                         .font(.system(size: 13))
                         .foregroundColor(.appTextSecondary)
@@ -61,49 +61,49 @@ struct ProgressPhotoCutoutView: View {
     @State private var isDragging = false
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var processingService = ImageProcessingService.shared
-    
+
     // Computed properties
     private var displayMetrics: [BodyMetrics] {
         historicalMetrics.filter { $0.photoUrl != nil }
     }
-    
+
     private var currentBodyFat: Double {
         currentMetric?.bodyFatPercentage ?? 20.0
     }
-    
+
     // Map photo index to metrics index
     private func metricsIndex(for photoIndex: Int) -> Int? {
         guard photoIndex < displayMetrics.count else { return nil }
         let photoMetric = displayMetrics[photoIndex]
         return historicalMetrics.firstIndex { $0.id == photoMetric.id }
     }
-    
+
     // Map metrics index to photo index
     private func photoIndex(for metricsIndex: Int) -> Int? {
         guard metricsIndex < historicalMetrics.count else { return nil }
         let metric = historicalMetrics[metricsIndex]
         return displayMetrics.firstIndex { $0.id == metric.id }
     }
-    
+
     // Accessibility label for photos
     private func accessibilityLabel(for metric: BodyMetrics) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .long
         let dateString = formatter.string(from: metric.date)
-        
+
         var label = "Progress photo, \(dateString)"
-        
+
         if let bodyFat = metric.bodyFatPercentage {
             label += ", body fat \(String(format: "%.1f", bodyFat)) percent"
         }
-        
+
         if let weight = metric.weight {
             label += ", weight \(Int(weight)) kilograms"
         }
-        
+
         return label
     }
-    
+
     private var spotlightGradient: LinearGradient {
         // Dynamic gradient based on body fat percentage
         // Green (low) -> Yellow (medium) -> Orange/Red (high)
@@ -120,7 +120,7 @@ struct ProgressPhotoCutoutView: View {
                 return 0 // Red
             }
         }()
-        
+
         return LinearGradient(
             gradient: Gradient(colors: [
                 Color(hue: hue / 360, saturation: 0.6, brightness: 0.8).opacity(0.3),
@@ -131,13 +131,13 @@ struct ProgressPhotoCutoutView: View {
             endPoint: .top
         )
     }
-    
+
     var body: some View {
         ZStack {
             // Unified background that covers Dynamic Island
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             GeometryReader { geometry in
                 ZStack {
                     // Dynamic gradient spotlight
@@ -147,7 +147,7 @@ struct ProgressPhotoCutoutView: View {
                         .blur(radius: 40)
                         .offset(y: geometry.size.height * 0.3)
                         .animation(.easeInOut(duration: 1.0), value: currentBodyFat)
-                    
+
                     if displayMetrics.isEmpty {
                         // Placeholder when no photos
                         PlaceholderSilhouetteView(gender: authManager.currentUser?.profile?.gender ?? "male")
@@ -165,7 +165,7 @@ struct ProgressPhotoCutoutView: View {
                                 .accessibilityLabel(accessibilityLabel(for: metric))
                                 .accessibilityHint("Swipe left or right to view other photos")
                             }
-                            
+
                             // Show processing placeholders
                             ForEach(processingService.processingTasks.filter { task in
                                 task.status != .completed && task.status != .failed
@@ -222,7 +222,7 @@ struct CutoutPhotoView: View {
     var blur: Double = 0
     var tintColor: Color?
     var showShadow: Bool = true
-    
+
     var body: some View {
         GeometryReader { geometry in
             OptimizedProgressPhotoView(
@@ -251,7 +251,7 @@ struct AnimatedPhotoContainer: View {
     let metric: BodyMetrics
     let isVisible: Bool
     @State private var photoOpacity: Double = 0
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -289,7 +289,7 @@ struct AnimatedPhotoContainer: View {
 
 struct PlaceholderSilhouetteView: View {
     let gender: String
-    
+
     var body: some View {
         ZStack {
             // Background glow for better contrast
@@ -297,7 +297,7 @@ struct PlaceholderSilhouetteView: View {
                 .font(.system(size: 200, weight: .ultraLight))
                 .foregroundColor(Color.white.opacity(0.05))
                 .blur(radius: 20)
-            
+
             // Main silhouette with better contrast
             Image(systemName: gender.lowercased() == "male" ? "figure.stand" : "figure.stand.dress")
                 .font(.system(size: 200, weight: .ultraLight))
@@ -323,7 +323,7 @@ struct PlaceholderSilhouetteView: View {
 
 struct MetricsOverlayView: View {
     let metric: BodyMetrics
-    
+
     var body: some View {
         HStack(spacing: 20) {
             MetricPill(
@@ -331,7 +331,7 @@ struct MetricsOverlayView: View {
                 value: String(format: "%.1f%%", metric.bodyFatPercentage ?? 0),
                 color: colorForBodyFat(metric.bodyFatPercentage ?? 20)
             )
-            
+
             if let weight = metric.weight {
                 MetricPill(
                     label: "Weight",
@@ -342,7 +342,7 @@ struct MetricsOverlayView: View {
         }
         .padding(.horizontal)
     }
-    
+
     func colorForBodyFat(_ percentage: Double) -> Color {
         if percentage < 10 {
             return .green
@@ -360,7 +360,7 @@ struct MetricPill: View {
     let label: String
     let value: String
     let color: Color
-    
+
     var body: some View {
         VStack(spacing: 4) {
             Text(label)

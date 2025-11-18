@@ -21,14 +21,14 @@ class ImageCacheService: ObservableObject {
     // MARK: - Configuration
 
     private let maxCacheSizeMB = 100
-    private let maxImageDimension: CGFloat = 1200
+    private let maxImageDimension: CGFloat = 1_200
     private let compressionQuality: CGFloat = 0.8
 
     // MARK: - Initialization
 
     private init() {
         // Configure cache limits
-        cache.totalCostLimit = maxCacheSizeMB * 1024 * 1024
+        cache.totalCostLimit = maxCacheSizeMB * 1_024 * 1_024
         cache.countLimit = 100
 
         // Handle memory pressure
@@ -128,9 +128,8 @@ class ImageCacheService: ObservableObject {
             cache.setObject(optimizedImage, forKey: cacheKey, cost: cost)
 
             return optimizedImage
-
         } catch {
-        // print("[ImageCacheService] Failed to load image from \(urlString): \(error)")
+            // print("[ImageCacheService] Failed to load image from \(urlString): \(error)")
             return nil
         }
     }
@@ -157,7 +156,7 @@ class ImageCacheService: ObservableObject {
         format.opaque = true
 
         let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
-        let resizedImage = renderer.image { context in
+        let resizedImage = renderer.image { _ in
             image.draw(in: CGRect(origin: .zero, size: newSize))
         }
 

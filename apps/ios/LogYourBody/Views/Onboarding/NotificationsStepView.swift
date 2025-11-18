@@ -11,48 +11,49 @@ struct NotificationsStepView: View {
     @State private var animateTitle = false
     @State private var animateBenefits = false
     @State private var animateButton = false
-    
+
     var body: some View {
         ZStack {
             // Edge-to-edge background
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 0) {
                 // Header with Liquid Glass effect
                 HStack {
                     Button(
-            action: {
-                        viewModel.previousStep()
-                        // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
-                    },
-            label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundColor(.appTextSecondary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-        )
+                        action: {
+                            viewModel.previousStep()
+                            HapticManager.shared.buttonTap()
+                        },
+                        label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .regular))
+                                .foregroundColor(.appTextSecondary)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                    )
                     .background(
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.white.opacity(0.1))
                     )
-                    
+
                     Spacer()
-                    
+
                     LiquidGlassSecondaryCTAButton(
                         text: "Skip",
                         action: {
                             viewModel.nextStep()
+                            HapticManager.shared.buttonTap()
                         }
                     )
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
-                
+
                 Spacer()
-                
+
                 VStack(spacing: 48) {
                     // Icon with subtle animation
                     ZStack {
@@ -60,7 +61,7 @@ struct NotificationsStepView: View {
                             .fill(Color.white.opacity(0.1))
                             .frame(width: 100, height: 100)
                             .blur(radius: 20)
-                        
+
                         Image(systemName: "bell.badge")
                             .font(.system(size: 56, weight: .light))
                             .foregroundColor(.white)
@@ -68,7 +69,7 @@ struct NotificationsStepView: View {
                             .scaleEffect(animateTitle ? 1 : 0.8)
                             .animation(.spring(response: 0.5, dampingFraction: 0.8), value: animateTitle)
                     }
-                    
+
                     // Title and subtitle
                     VStack(spacing: 12) {
                         Text("Stay on Track")
@@ -77,7 +78,7 @@ struct NotificationsStepView: View {
                             .opacity(animateTitle ? 1 : 0)
                             .offset(y: animateTitle ? 0 : 20)
                             .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1), value: animateTitle)
-                        
+
                         Text("Get gentle reminders to log your progress")
                             .font(.system(size: 17, weight: .regular))
                             .foregroundColor(.appTextSecondary)
@@ -87,7 +88,7 @@ struct NotificationsStepView: View {
                             .offset(y: animateTitle ? 0 : 20)
                             .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.2), value: animateTitle)
                     }
-                    
+
                     // Benefits with Liquid Glass cards
                     VStack(spacing: 12) {
                         NotificationBenefitCard(
@@ -99,7 +100,7 @@ struct NotificationsStepView: View {
                         .opacity(animateBenefits ? 1 : 0)
                         .offset(y: animateBenefits ? 0 : 20)
                         .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.3), value: animateBenefits)
-                        
+
                         NotificationBenefitCard(
                             icon: "chart.line.uptrend.xyaxis",
                             title: "Weekly Insights",
@@ -109,7 +110,7 @@ struct NotificationsStepView: View {
                         .opacity(animateBenefits ? 1 : 0)
                         .offset(y: animateBenefits ? 0 : 20)
                         .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.4), value: animateBenefits)
-                        
+
                         NotificationBenefitCard(
                             icon: "trophy",
                             title: "Milestone Celebrations",
@@ -122,9 +123,9 @@ struct NotificationsStepView: View {
                     }
                     .padding(.horizontal, 24)
                 }
-                
+
                 Spacer()
-                
+
                 // Bottom buttons with Liquid Glass
                 VStack(spacing: 20) {
                     LiquidGlassCTAButton(
@@ -136,7 +137,7 @@ struct NotificationsStepView: View {
                     .opacity(animateButton ? 1 : 0)
                     .offset(y: animateButton ? 0 : 20)
                     .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.6), value: animateButton)
-                    
+
                     Text("You can change this anytime in Settings")
                         .font(.system(size: 13, weight: .regular))
                         .foregroundColor(.appTextTertiary)
@@ -154,7 +155,7 @@ struct NotificationsStepView: View {
             animateButton = true
         }
     }
-    
+
     private func checkNotificationStatus() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             DispatchQueue.main.async {
@@ -162,15 +163,15 @@ struct NotificationsStepView: View {
             }
         }
     }
-    
+
     private func requestNotificationPermission() {
-        // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
-        
+        HapticManager.shared.buttonTap()
+
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
             DispatchQueue.main.async {
                 viewModel.data.notificationsEnabled = granted
                 if granted {
-                    // HapticManager.shared.successAction() // TODO: Add HapticManager to Xcode project
+                    HapticManager.shared.successAction()
                 }
                 viewModel.nextStep()
             }
@@ -183,7 +184,7 @@ struct NotificationBenefitCard: View {
     let title: String
     let description: String
     let delay: Double
-    
+
     var body: some View {
         HStack(spacing: 16) {
             // Icon with glass background
@@ -199,24 +200,24 @@ struct NotificationBenefitCard: View {
                     Circle()
                         .fill(Color.white.opacity(0.1))
                 }
-                
+
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .light))
                     .foregroundColor(.white.opacity(0.9))
             }
             .frame(width: 48, height: 48)
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.appText)
-                
+
                 Text(description)
                     .font(.system(size: 13, weight: .regular))
                     .foregroundColor(.appTextSecondary)
                     .lineLimit(2)
             }
-            
+
             Spacer()
         }
         .padding(16)

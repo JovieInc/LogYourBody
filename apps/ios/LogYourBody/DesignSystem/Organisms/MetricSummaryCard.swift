@@ -256,8 +256,8 @@ public struct MetricSummaryCard: View {
                             .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
                             .foregroundStyle(primaryTextColor)
                             .monospacedDigit()
-                        +
-                        Text(" \(content.unit)")
+                            +
+                            Text(" \(content.unit)")
                             .font(.system(size: unitFontSize, weight: .medium, design: .rounded))
                             .foregroundStyle(secondaryTextColor)
                     )
@@ -534,7 +534,7 @@ public struct MetricSummaryCard: View {
                             unit: "steps",
                             timestamp: "6:15 PM",
                             dataPoints: stride(from: 0, through: 6, by: 1).map { index in
-                                MetricSummaryCard.DataPoint(index: index, value: Double(arc4random_uniform(2000) + 4000))
+                                MetricSummaryCard.DataPoint(index: index, value: Double.random(in: 4_000...6_000))
                             },
                             chartAccessibilityLabel: "Steps trend for the last week",
                             chartAccessibilityValue: "Latest value 7,842 steps",

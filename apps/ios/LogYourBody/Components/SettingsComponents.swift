@@ -9,19 +9,19 @@ struct SettingsDesign {
     static let rowSpacing: CGFloat = 0
     static let horizontalPadding: CGFloat = 16
     static let verticalPadding: CGFloat = 12
-    
+
     // Sizing
     static let rowHeight: CGFloat = 48
     static let iconSize: CGFloat = 20
     static let iconFrame: CGFloat = 24
     static let chevronSize: Font = .caption2
     static let cornerRadius: CGFloat = 12
-    
+
     // Typography
     static let titleFont: Font = .system(size: 16)
     static let valueFont: Font = .caption
     static let sectionHeaderFont: Font = .system(size: 13, weight: .medium)
-    
+
     // Animation
     static let animation: Animation = .spring(response: 0.3, dampingFraction: 0.8)
 }
@@ -32,7 +32,7 @@ struct SettingsSection<Content: View>: View {
     let header: String?
     let footer: String?
     @ViewBuilder let content: Content
-    
+
     init(
         header: String? = nil,
         footer: String? = nil,
@@ -42,7 +42,7 @@ struct SettingsSection<Content: View>: View {
         self.footer = footer
         self.content = content()
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Section Header
@@ -58,14 +58,14 @@ struct SettingsSection<Content: View>: View {
                 .padding(.horizontal, SettingsDesign.horizontalPadding)
                 .padding(.bottom, 8)
             }
-            
+
             // Section Content
             VStack(spacing: SettingsDesign.rowSpacing) {
                 content
             }
             .background(Color.appCard)
             .cornerRadius(SettingsDesign.cornerRadius)
-            
+
             // Section Footer
             if let footer = footer {
                 Text(footer)
@@ -87,7 +87,7 @@ struct SettingsRow: View {
     var showChevron: Bool
     var isExternal: Bool
     var tintColor: Color
-    
+
     init(
         icon: String? = nil,
         title: String,
@@ -103,7 +103,7 @@ struct SettingsRow: View {
         self.isExternal = isExternal
         self.tintColor = tintColor
     }
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Icon
@@ -113,14 +113,14 @@ struct SettingsRow: View {
                     .foregroundColor(tintColor)
                     .frame(width: SettingsDesign.iconFrame)
             }
-            
+
             // Title
             Text(title)
                 .font(SettingsDesign.titleFont)
                 .foregroundColor(tintColor)
-            
+
             Spacer()
-            
+
             // Value
             if let value = value {
                 Text(value)
@@ -128,7 +128,7 @@ struct SettingsRow: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
-            
+
             // Chevron or External Link
             if showChevron {
                 Image(systemName: isExternal ? "arrow.up.right.square" : "chevron.right")
@@ -150,7 +150,7 @@ struct SettingsNavigationLink<Destination: View>: View {
     let value: String?
     let destination: Destination
     var tintColor: Color
-    
+
     init(
         icon: String? = nil,
         title: String,
@@ -164,7 +164,7 @@ struct SettingsNavigationLink<Destination: View>: View {
         self.tintColor = tintColor
         self.destination = destination()
     }
-    
+
     var body: some View {
         NavigationLink(destination: destination) {
             SettingsRow(
@@ -185,7 +185,7 @@ struct SettingsToggleRow: View {
     let title: String
     @Binding var isOn: Bool
     var tintColor: Color
-    
+
     init(
         icon: String? = nil,
         title: String,
@@ -197,7 +197,7 @@ struct SettingsToggleRow: View {
         self._isOn = isOn
         self.tintColor = tintColor
     }
-    
+
     var body: some View {
         HStack(spacing: 12) {
             if let icon = icon {
@@ -206,13 +206,13 @@ struct SettingsToggleRow: View {
                     .foregroundColor(tintColor)
                     .frame(width: SettingsDesign.iconFrame)
             }
-            
+
             Text(title)
                 .font(SettingsDesign.titleFont)
                 .foregroundColor(tintColor)
-            
+
             Spacer()
-            
+
             Toggle("", isOn: $isOn)
                 .labelsHidden()
                 .tint(.appPrimary)
@@ -229,7 +229,7 @@ struct SettingsButtonRow: View {
     let title: String
     let role: ButtonRole?
     let action: () -> Void
-    
+
     init(
         icon: String? = nil,
         title: String,
@@ -241,7 +241,7 @@ struct SettingsButtonRow: View {
         self.role = role
         self.action = action
     }
-    
+
     var body: some View {
         Button(role: role, action: action) {
             SettingsRow(
@@ -261,7 +261,7 @@ struct SettingsPickerRow<SelectionValue: Hashable>: View {
     let title: String
     @Binding var selection: SelectionValue
     let options: [(value: SelectionValue, label: String)]
-    
+
     var body: some View {
         Picker(selection: $selection) {
             ForEach(options, id: \.value) { option in
@@ -275,7 +275,7 @@ struct SettingsPickerRow<SelectionValue: Hashable>: View {
                         .foregroundColor(.primary)
                         .frame(width: SettingsDesign.iconFrame)
                 }
-                
+
                 Text(title)
                     .font(SettingsDesign.titleFont)
                     .foregroundColor(.primary)
@@ -294,7 +294,7 @@ struct SuccessOverlay: View {
     let message: String
     let icon: String
     let autoDismissDelay: TimeInterval
-    
+
     init(
         isShowing: Binding<Bool>,
         message: String,
@@ -306,14 +306,14 @@ struct SuccessOverlay: View {
         self.icon = icon
         self.autoDismissDelay = autoDismissDelay
     }
-    
+
     var body: some View {
         if isShowing {
             VStack(spacing: 16) {
                 Image(systemName: icon)
                     .font(.system(size: 60))
                     .foregroundColor(.green)
-                
+
                 Text(message)
                     .font(.headline)
                     .multilineTextAlignment(.center)
@@ -341,17 +341,17 @@ struct SuccessOverlay: View {
 struct LoadingOverlay: View {
     let message: String
     let progress: Double?
-    
+
     init(message: String, progress: Double? = nil) {
         self.message = message
         self.progress = progress
     }
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.5)
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 20) {
                 if let progress = progress {
                     ProgressView(value: progress)
@@ -362,7 +362,7 @@ struct LoadingOverlay: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .appPrimary))
                         .scaleEffect(1.5)
                 }
-                
+
                 Text(message)
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -383,7 +383,7 @@ struct SettingsEmptyState: View {
     let title: String
     let message: String
     let iconColor: Color
-    
+
     init(
         icon: String,
         title: String,
@@ -395,17 +395,17 @@ struct SettingsEmptyState: View {
         self.message = message
         self.iconColor = iconColor
     }
-    
+
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 48))
                 .foregroundColor(iconColor)
-            
+
             Text(title)
                 .font(.headline)
                 .foregroundColor(.primary)
-            
+
             Text(message)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
@@ -423,7 +423,7 @@ struct DataInfoRow: View {
     let title: String
     let description: String?
     let iconColor: Color
-    
+
     init(
         icon: String,
         title: String,
@@ -435,19 +435,19 @@ struct DataInfoRow: View {
         self.description = description
         self.iconColor = iconColor
     }
-    
+
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 24))
                 .foregroundColor(iconColor)
                 .frame(width: 32)
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.primary)
-                
+
                 if let description = description {
                     Text(description)
                         .font(.caption)
@@ -455,7 +455,7 @@ struct DataInfoRow: View {
                         .lineLimit(2)
                 }
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, SettingsDesign.horizontalPadding)
@@ -471,18 +471,18 @@ extension View {
             .frame(minHeight: SettingsDesign.rowHeight)
             .contentShape(Rectangle())
     }
-    
+
     func settingsCardStyle() -> some View {
         self
             .background(Color.appCard)
             .cornerRadius(SettingsDesign.cornerRadius)
     }
-    
+
     func settingsSectionStyle() -> some View {
         self
             .padding(.horizontal, 20)
     }
-    
+
     func settingsBackground() -> some View {
         self
             .background(Color.appBackground.ignoresSafeArea())

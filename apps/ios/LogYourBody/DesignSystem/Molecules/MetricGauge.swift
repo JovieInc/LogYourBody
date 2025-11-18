@@ -14,11 +14,11 @@ struct DSMetricGauge: View {
     let unit: String?
     var size = CGSize(width: 100, height: 100)
     var lineWidth: CGFloat = 3
-    
+
     private var normalizedValue: Double {
         min(1.0, max(0.0, value / maxValue))
     }
-    
+
     private var displayValue: String {
         if value >= 1_000 {
             return String(format: "%.1fK", value / 1_000)
@@ -26,7 +26,7 @@ struct DSMetricGauge: View {
             return String(format: "%.0f", value)
         }
     }
-    
+
     var body: some View {
         ZStack {
             // Progress ring
@@ -37,7 +37,7 @@ struct DSMetricGauge: View {
                 backgroundColor: .white.opacity(0.2),
                 foregroundColor: .white
             )
-            
+
             // Content
             VStack(spacing: 2) {
                 DSMetricValue(
@@ -48,7 +48,7 @@ struct DSMetricGauge: View {
                     unitSize: .system(size: 12, weight: .regular),
                     spacing: 0
                 )
-                
+
                 DSMetricLabel(
                     text: label,
                     size: .system(size: 12),
@@ -71,14 +71,14 @@ struct DSMetricGauge: View {
                 label: "Steps",
                 unit: nil
             )
-            
+
             DSMetricGauge(
                 value: 2_150,
                 maxValue: 3_000,
                 label: "Calories",
                 unit: "cal"
             )
-            
+
             DSMetricGauge(
                 value: 45,
                 maxValue: 60,
@@ -86,7 +86,7 @@ struct DSMetricGauge: View {
                 unit: "min"
             )
         }
-        
+
         // Different sizes
         HStack(spacing: 20) {
             DSMetricGauge(
@@ -97,7 +97,7 @@ struct DSMetricGauge: View {
                 size: CGSize(width: 60, height: 60),
                 lineWidth: 2
             )
-            
+
             DSMetricGauge(
                 value: 12_500,
                 maxValue: 15_000,

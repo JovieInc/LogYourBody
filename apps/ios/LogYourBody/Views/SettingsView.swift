@@ -11,14 +11,14 @@ struct SettingsView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var showDeveloperMenu = false
     @State private var refreshID = UUID()
-    
+
     var body: some View {
         NavigationView {
             ZStack {
                 // Atom: Background Color
                 Color.appBackground
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 0) {
                         // Organism: User Header
@@ -27,7 +27,7 @@ struct SettingsView: View {
                             email: authManager.currentUser?.email
                         )
                         .padding(.bottom, 30)
-                        
+
                         // Organisms: Settings Sections
                         VStack(spacing: 20) {
                             profileSection
@@ -37,7 +37,7 @@ struct SettingsView: View {
                             integrationsSection
                             aboutSection
                             legalSection
-                            
+
                             // Molecule: Logout Button
                             LogoutButton {
                                 Task {
@@ -45,7 +45,7 @@ struct SettingsView: View {
                                 }
                             }
                             .padding(.top, 12)
-                            
+
                             // Developer Footer
                             if showDeveloperMenu {
                                 VStack(spacing: 8) {
@@ -92,9 +92,9 @@ extension SettingsView {
                 value: authManager.currentUser?.email ?? "",
                 showChevron: false
             )
-            
+
             DSDivider().insetted(16)
-            
+
             NavigationLink(destination: ProfileSettingsViewV2().environmentObject(authManager)) {
                 SettingsRow(
                     icon: "person.circle",
@@ -104,7 +104,7 @@ extension SettingsView {
             }
         }
     }
-    
+
     private var preferencesSection: some View {
         SettingsSection(header: "Preferences") {
             NavigationLink(destination: PreferencesView().environmentObject(authManager)) {
@@ -116,7 +116,7 @@ extension SettingsView {
             }
         }
     }
-    
+
     private var integrationsSection: some View {
         SettingsSection(header: "Integrations") {
             NavigationLink(destination: IntegrationsView().environmentObject(authManager)) {
@@ -129,7 +129,7 @@ extension SettingsView {
             }
         }
     }
-    
+
     private var securitySection: some View {
         SettingsSection(header: "Security & Devices") {
             NavigationLink(destination: SecuritySessionsView()) {
@@ -139,9 +139,9 @@ extension SettingsView {
                     showChevron: true
                 )
             }
-            
+
             DSDivider().insetted(16)
-            
+
             NavigationLink(destination: ChangePasswordView()) {
                 SettingsRow(
                     icon: "lock.rotation",
@@ -151,7 +151,7 @@ extension SettingsView {
             }
         }
     }
-    
+
     private var dataPrivacySection: some View {
         SettingsSection(header: "Data & Privacy") {
             NavigationLink(destination: ExportDataView()) {
@@ -161,9 +161,9 @@ extension SettingsView {
                     showChevron: true
                 )
             }
-            
+
             DSDivider().insetted(16)
-            
+
             NavigationLink(destination: DeleteAccountView()) {
                 SettingsRow(
                     icon: "trash",
@@ -174,7 +174,7 @@ extension SettingsView {
             }
         }
     }
-    
+
     private var legalSection: some View {
         SettingsSection(header: "Legal") {
             NavigationLink(destination: LegalView()) {
@@ -186,7 +186,7 @@ extension SettingsView {
             }
         }
     }
-    
+
     private var aboutSection: some View {
         SettingsSection(header: "About") {
             // Developer tap handler with version row
@@ -197,26 +197,26 @@ extension SettingsView {
                     }
                 },
                 content: { tapCount in
-                HStack {
-                    VersionRow()
-                    
-                    if tapCount > 0 && tapCount < 7 {
-                        Spacer()
-                        DeveloperTapIndicator(
-                            remainingTaps: 7 - tapCount
-                        )
-                        .padding(.trailing, 16)
+                    HStack {
+                        VersionRow()
+
+                        if tapCount > 0 && tapCount < 7 {
+                            Spacer()
+                            DeveloperTapIndicator(
+                                remainingTaps: 7 - tapCount
+                            )
+                            .padding(.trailing, 16)
+                        }
                     }
                 }
-                }
             )
-            
+
             DSDivider().insetted(16)
-            
+
             WhatsNewRow()
-            
+
             DSDivider().insetted(16)
-            
+
             Link(destination: URL(string: "https://logyourbody.com/support")!) {
                 SettingsRow(
                     icon: "questionmark.circle",
@@ -233,12 +233,12 @@ extension SettingsView {
 
 struct DeveloperMenuView: View {
     @EnvironmentObject var authManager: AuthManager
-    
+
     var body: some View {
         ZStack {
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: 20) {
                     #if DEBUG
@@ -254,7 +254,7 @@ struct DeveloperMenuView: View {
         .navigationTitle("Developer Options")
         .navigationBarTitleDisplayMode(.inline)
     }
-    
+
     #if DEBUG
     private var developerTools: [DeveloperToolsList.DeveloperTool] {
         [
@@ -294,7 +294,7 @@ struct DeveloperMenuView: View {
             )
         ]
     }
-    
+
     @MainActor
     func testBodyMetricsSync() async {
         let testMetric = BodyMetrics(
@@ -313,7 +313,7 @@ struct DeveloperMenuView: View {
             createdAt: Date(),
             updatedAt: Date()
         )
-        
+
         CoreDataManager.shared.saveBodyMetrics(testMetric, userId: testMetric.userId, markAsSynced: false)
         RealtimeSyncManager.shared.syncIfNeeded()
     }

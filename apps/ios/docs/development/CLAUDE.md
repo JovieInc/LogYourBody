@@ -26,3 +26,13 @@ This is the LogYourBody iOS app, a fitness tracking application that helps users
 When making code changes, always run the following lint and typecheck commands:
 - Check for available scripts in package.json or similar configuration files
 - Run appropriate linting commands for Swift/iOS development
+
+## Swift Missing-File Rule
+
+If the compiler reports that a referenced Swift file or type cannot be found, assume the reference is correct and the project setup needs to be updated. Follow these steps in order:
+
+1. Ask the user to create the missing file and provide its complete contents.
+2. If the file already exists, instruct the user to add it to the correct Xcode target/group.
+3. Only as a last resort, resolve import, module, or path configuration issues.
+
+Never “fix” this by swapping to legacy classes (for example `DashboardOld.swift`), commenting out or removing the new feature, or reverting without explicit user approval. If reverting truly seems like the only option, check with the user first.

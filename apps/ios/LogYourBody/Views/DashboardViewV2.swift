@@ -23,29 +23,29 @@ struct DashboardViewV2: View {
     @State private var showingModal = false
     @Namespace private var namespace
     @AppStorage(Constants.preferredMeasurementSystemKey) private var measurementSystem = PreferencesView.defaultMeasurementSystem
-    
+
     var currentSystem: MeasurementSystem {
         MeasurementSystem(rawValue: measurementSystem) ?? .imperial
     }
-    
+
     var currentMetric: BodyMetrics? {
         guard !bodyMetrics.isEmpty && selectedIndex >= 0 && selectedIndex < bodyMetrics.count else { return nil }
         return bodyMetrics[selectedIndex]
     }
-    
+
     var userAge: Int? {
         guard let dateOfBirth = authManager.currentUser?.profile?.dateOfBirth else { return nil }
         let calendar = Calendar.current
         let ageComponents = calendar.dateComponents([.year], from: dateOfBirth, to: Date())
         return ageComponents.year
     }
-    
+
     var body: some View {
         ZStack {
             // Background
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             if isLoading && bodyMetrics.isEmpty {
                 loadingView
             } else if bodyMetrics.isEmpty {
@@ -57,23 +57,23 @@ struct DashboardViewV2: View {
                     unifiedHeaderView
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
-                    
+
                     // Main scrollable content
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 24) {
                             // Enhanced carousel with floating FAB
                             carouselSection
-                            
+
                             // Premium slider with date label
                             if bodyMetrics.count > 1 {
                                 enhancedTimelineSlider
                                     .padding(.horizontal, 24)
                             }
-                            
+
                             // Clean metric gauges
                             metricsSection
                                 .padding(.horizontal, 24)
-                            
+
                             // Bottom padding for tab bar
                             Color.clear.frame(height: 100)
                         }
@@ -83,7 +83,7 @@ struct DashboardViewV2: View {
                         await refreshData()
                     }
                 }
-                
+
                 // Floating metrics strip at bottom
                 VStack {
                     Spacer()
@@ -135,11 +135,11 @@ struct DashboardViewV2: View {
             }
         }
     }
-    
+
     // MARK: - Unified Glass Header
-    
+
     @ViewBuilder
-    
+
     private var unifiedHeaderView: some View {
         HStack(spacing: 16) {
             // Avatar
@@ -171,7 +171,7 @@ struct DashboardViewV2: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Profile avatar")
-            
+
             // User info
             VStack(alignment: .leading, spacing: 4) {
                 if let name = authManager.currentUser?.profile?.fullName {
@@ -207,9 +207,9 @@ struct DashboardViewV2: View {
                 }
             }
             .accessibilityElement(children: .combine)
-            
+
             Spacer()
-            
+
             // Sync indicator
             if realtimeSyncManager.isSyncing {
                 Image(systemName: "arrow.triangle.2.circlepath")
@@ -241,11 +241,11 @@ struct DashboardViewV2: View {
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
     }
-    
+
     // MARK: - Enhanced Carousel Section
-    
+
     @ViewBuilder
-    
+
     private var carouselSection: some View {
         ZStack(alignment: .bottomTrailing) {
             // Enhanced carousel with face detection
@@ -255,42 +255,42 @@ struct DashboardViewV2: View {
                 selectedMetricsIndex: $selectedIndex
             )
             .padding(.horizontal, 16)
-            
+
             // Floating FAB for adding photos
             if currentMetric?.photoUrl == nil {
                 Button(
-            action: {
-                    showPhotoOptions = true
-                    // HapticManager.shared.buttonTap()
-                },
-            label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.appPrimary)
-                            .frame(width: 56, height: 56)
-                        
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.white)
+                    action: {
+                        showPhotoOptions = true
+                        // HapticManager.shared.buttonTap()
+                    },
+                    label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color.appPrimary)
+                                .frame(width: 56, height: 56)
+
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(.white)
+                        }
                     }
-                }
-        )
+                )
                 .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
                 .padding(.trailing, 24)
                 .padding(.bottom, 16)
             }
         }
     }
-    
+
     // MARK: - Enhanced Timeline Slider
-    
+
     private var sliderProgress: CGFloat {
         let maxIndex = CGFloat(max(1, bodyMetrics.count - 1))
         return CGFloat(selectedIndex) / maxIndex
     }
-    
+
     @ViewBuilder
-    
+
     private var enhancedTimelineSlider: some View {
         VStack(spacing: 8) {
             // Floating date label above thumb
@@ -307,18 +307,18 @@ struct DashboardViewV2: View {
                     .scaleEffect(isDraggingSlider ? 1.1 : 1.0)
                     .animation(.spring(response: 0.3), value: isDraggingSlider)
             }
-            
+
             // Enhanced slider
             GeometryReader { geometry in
                 let sliderWidth = geometry.size.width
                 let thumbOffset = sliderWidth * sliderProgress - 12
-                
+
                 ZStack(alignment: .leading) {
                     // Track - 20% white, thicker
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.white.opacity(0.2))
                         .frame(height: 4)
-                    
+
                     // Active portion
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.white)
@@ -327,13 +327,13 @@ struct DashboardViewV2: View {
                             height: 4
                         )
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedIndex)
-                    
+
                     // Enhanced thumb - 24pt
                     timelineThumbView(sliderWidth: sliderWidth, thumbOffset: thumbOffset)
                 }
             }
             .frame(height: 24)
-            
+
             // Only show "Today" at the right
             HStack {
                 Spacer()
@@ -343,7 +343,7 @@ struct DashboardViewV2: View {
             }
         }
     }
-    
+
     @State private var isDraggingSlider = false
 
     // MARK: - Timeline Thumb Helper
@@ -404,16 +404,16 @@ struct DashboardViewV2: View {
     }
 
     // MARK: - Clean Metrics Section
-    
+
     @ViewBuilder
-    
+
     private var metricsSection: some View {
         HStack(spacing: 24) { // Equal 24pt padding
             // Weight gauge
             let weightValue = currentMetric?.weight ?? 0
             let weightInCurrentUnit = currentSystem == .imperial ?
                 weightValue * 2.20462 : weightValue
-            
+
             CleanMetricGauge(
                 value: weightInCurrentUnit,
                 maxValue: currentSystem == .imperial ? 300 : 150,
@@ -441,11 +441,11 @@ struct DashboardViewV2: View {
             .accessibilityValue("\(String(format: "%.1f", bodyFatValue)) percent\(currentMetric?.bodyFatPercentage == nil && estimatedBF != nil ? ", estimated" : "")")
         }
     }
-    
+
     // MARK: - Floating Metrics Strip
-    
+
     @ViewBuilder
-    
+
     private var floatingMetricsStrip: some View {
         HStack(spacing: 32) { // Increased spacing to 32pt
             // BMI
@@ -466,7 +466,7 @@ struct DashboardViewV2: View {
                     unit: "BMI"
                 )
             }
-            
+
             // FFMI
             if let ffmi = calculateFFMI() {
                 MetricStripItem(
@@ -481,7 +481,7 @@ struct DashboardViewV2: View {
                     unit: "FFMI"
                 )
             }
-            
+
             // Steps
             if let steps = selectedDateMetrics?.steps {
                 MetricStripItem(
@@ -521,11 +521,11 @@ struct DashboardViewV2: View {
             alignment: .top
         )
     }
-    
+
     // MARK: - Helper Views
-    
+
     @ViewBuilder
-    
+
     private var loadingView: some View {
         DashboardEmptyStateView(
             icon: "arrow.triangle.2.circlepath",
@@ -533,9 +533,9 @@ struct DashboardViewV2: View {
             message: "Fetching your data..."
         )
     }
-    
+
     @ViewBuilder
-    
+
     private var emptyStateView: some View {
         DashboardEmptyStateView(
             icon: "chart.line.downtrend.xyaxis",
@@ -543,13 +543,13 @@ struct DashboardViewV2: View {
             message: "Log your first measurement to get started"
         )
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func formatDateForSlider(_ date: Date) -> String {
         let calendar = Calendar.current
         let now = Date()
-        
+
         if calendar.isDateInToday(date) {
             return "Today"
         } else if calendar.isDateInYesterday(date) {
@@ -565,49 +565,49 @@ struct DashboardViewV2: View {
             }
         }
     }
-    
+
     private func formatDateShort(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
         return formatter.string(from: date)
     }
-    
+
     private func formatHeightToFeetInches(_ inches: Double) -> String {
         let feet = Int(inches) / 12
         let remainingInches = Int(inches) % 12
         return "\(feet)'\(remainingInches)\""
     }
-    
+
     private func formatNumber(_ number: Int) -> String {
         if number >= 1_000 {
             return String(format: "%.1fK", Double(number) / 1_000.0)
         }
         return "\(number)"
     }
-    
+
     private func calculateFFMI() -> Double? {
         guard let weight = currentMetric?.weight,
               let bodyFat = currentMetric?.bodyFatPercentage ?? PhotoMetadataService.shared.estimateBodyFat(for: currentMetric?.date ?? Date(), metrics: bodyMetrics)?.value,
               let height = authManager.currentUser?.profile?.height,
               height > 0 else { return nil }
-        
+
         let heightInMeters = height * 0.0254
         let leanMass = weight * (1 - bodyFat / 100)
         let ffmi = leanMass / (heightInMeters * heightInMeters)
-        
+
         return ffmi
     }
-    
+
     // MARK: - Data Loading
-    
+
     private func loadData() async {
         isLoading = true
-        
+
         guard let userId = authManager.currentUser?.id else {
             isLoading = false
             return
         }
-        
+
         // Load body metrics
         let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
         bodyMetrics = cachedMetrics.compactMap { $0.toBodyMetrics() }
@@ -620,10 +620,10 @@ struct DashboardViewV2: View {
 
         // Load daily metrics
         dailyMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date())?.toDailyMetrics()
-        
+
         isLoading = false
     }
-    
+
     private func loadMetricsForSelectedDate() {
         guard let metric = currentMetric,
               let userId = authManager.currentUser?.id else { return }
@@ -638,22 +638,22 @@ struct DashboardViewV2: View {
             )?.toDailyMetrics()
         }
     }
-    
+
     private func refreshData() async {
         refreshID = UUID()
         await loadData()
     }
-    
+
     private func saveProgressPhoto(_ image: UIImage) async {
         guard let userId = authManager.currentUser?.id,
               let metric = currentMetric else { return }
-        
+
         do {
             let photoUrl = try await PhotoUploadManager.shared.uploadProgressPhoto(
                 for: metric,
                 image: image
             )
-            
+
             // Update metric with photo URL
             let updatedMetric = BodyMetrics(
                 id: metric.id,
@@ -672,7 +672,7 @@ struct DashboardViewV2: View {
                 updatedAt: Date()
             )
             CoreDataManager.shared.saveBodyMetrics(updatedMetric, userId: userId)
-            
+
             await refreshData()
         } catch {
             // print("Failed to upload photo: \(error)")
@@ -688,18 +688,18 @@ struct CleanMetricGauge: View {
     let label: String
     let unit: String
     var isEstimated: Bool = false
-    
+
     private var normalizedValue: Double {
         min(1.0, max(0.0, value / maxValue))
     }
-    
+
     var body: some View {
         ZStack {
             // Background circle - 1pt gray
             Circle()
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                 .frame(width: 100, height: 100)
-            
+
             // Progress arc - 3pt white
             Circle()
                 .trim(from: 0, to: normalizedValue)
@@ -713,13 +713,13 @@ struct CleanMetricGauge: View {
                 .frame(width: 100, height: 100)
                 .rotationEffect(.degrees(-90))
                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: normalizedValue)
-            
+
             // Content
             VStack(spacing: 2) {
                 Text(String(format: "%.1f", value))
                     .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.white)
-                
+
                 Text(label)
                     .font(.system(size: 12, weight: .regular))
                     .foregroundColor(.gray)
@@ -732,17 +732,17 @@ struct MetricStripItem: View {
     let icon: String
     let value: String
     let unit: String
-    
+
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 20))
                 .foregroundColor(.white.opacity(0.8))
-            
+
             Text(value)
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(.white)
-            
+
             Text(unit)
                 .font(.system(size: 12, weight: .regular))
                 .foregroundColor(.gray)

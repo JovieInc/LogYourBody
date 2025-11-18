@@ -14,14 +14,14 @@ struct ScannedPhoto: Identifiable {
     let date: Date
     let confidence: Float
     let metadata: PhotoMetadata
-    
+
     struct PhotoMetadata {
         let location: CLLocation?
         let cameraType: CameraType?
         let isScreenshot: Bool
         let hasBeenEdited: Bool
     }
-    
+
     enum CameraType {
         case front
         case back
@@ -35,7 +35,7 @@ struct PhotoGroup {
     let date: Date
     let photos: [ScannedPhoto]
     let averageConfidence: Float
-    
+
     var suggestedPrimary: ScannedPhoto? {
         photos.max(by: { $0.confidence < $1.confidence })
     }
@@ -47,18 +47,18 @@ struct PhotoScanCriteria {
     // Time-based filters
     let dateRange: DateInterval?
     let minimumDaysBetween: Int = 3
-    
+
     // Technical filters
     let minimumResolution = CGSize(width: 1_000, height: 1_000)
     let preferredCameraType: ScannedPhoto.CameraType? = nil // No preference - mirror selfies use back camera
     let preferPortraitOrientation: Bool = true
-    
+
     // Content filters
     let minimumConfidence: Float = 0.7
     let excludeScreenshots: Bool = true
     let excludeEdited: Bool = false
     let excludeLandscape: Bool = true // Most progress photos are portrait
-    
+
     // Default: last 2 years
     static var `default`: PhotoScanCriteria {
         let endDate = Date()
@@ -73,26 +73,26 @@ struct PhotoScanCriteria {
 
 class PhotoLibraryScanner: ObservableObject {
     static let shared = PhotoLibraryScanner()
-    
+
     @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
     @Published var isScanning = false
     @Published var scanProgress: Double = 0
     @Published var scannedPhotos: [ScannedPhoto] = []
     @Published var photoGroups: [PhotoGroup] = []
-    
+
     private let imageManager = PHCachingImageManager()
     private var scanTask: Task<Void, Never>?
-    
+
     private init() {
         checkAuthorizationStatus()
     }
-    
+
     // MARK: - Authorization
-    
+
     func checkAuthorizationStatus() {
         authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     }
-    
+
     func requestAuthorization() async -> Bool {
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         await MainActor.run {
@@ -100,39 +100,39 @@ class PhotoLibraryScanner: ObservableObject {
         }
         return status == .authorized || status == .limited
     }
-    
+
     // MARK: - Scanning
-    
+
     func scanPhotoLibrary(with criteria: PhotoScanCriteria = .default) async {
         guard authorizationStatus == .authorized || authorizationStatus == .limited else {
             // print("❌ Photo library access not authorized")
             return
         }
-        
+
         // Prevent multiple concurrent scans
         guard await MainActor.run(body: { !isScanning }) else {
             // print("⚠️ Scan already in progress")
             return
         }
-        
+
         await MainActor.run {
             isScanning = true
             scanProgress = 0
             scannedPhotos = []
             photoGroups = []
         }
-        
+
         scanTask = Task {
             do {
                 // Fetch photos matching initial criteria
                 let photos = try await fetchPhotos(matching: criteria)
-                
+
                 // Analyze photos for progress photo likelihood
                 let analyzed = await analyzePhotos(photos, criteria: criteria)
-                
+
                 // Group photos by date
                 let grouped = groupPhotosByDate(analyzed, minimumDaysBetween: criteria.minimumDaysBetween)
-                
+
                 await MainActor.run {
                     self.scannedPhotos = analyzed
                     self.photoGroups = grouped
@@ -148,60 +148,60 @@ class PhotoLibraryScanner: ObservableObject {
             }
         }
     }
-    
+
     func cancelScan() {
         scanTask?.cancel()
         scanTask = nil
         isScanning = false
         scanProgress = 0
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func fetchPhotos(matching criteria: PhotoScanCriteria) async throws -> [PHAsset] {
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        
+
         // Build predicate
         var predicates: [NSPredicate] = [
             NSPredicate(format: "mediaType = %d", PHAssetMediaType.image.rawValue)
         ]
-        
+
         if let dateRange = criteria.dateRange {
             predicates.append(NSPredicate(format: "creationDate >= %@ AND creationDate <= %@",
-                                        dateRange.start as NSDate,
-                                        dateRange.end as NSDate))
+                                          dateRange.start as NSDate,
+                                          dateRange.end as NSDate))
         }
-        
+
         fetchOptions.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
-        
+
         let results = PHAsset.fetchAssets(with: fetchOptions)
         var assets: [PHAsset] = []
-        
+
         results.enumerateObjects { asset, _, _ in
             assets.append(asset)
         }
-        
+
         return assets
     }
-    
+
     private func analyzePhotos(_ assets: [PHAsset], criteria: PhotoScanCriteria) async -> [ScannedPhoto] {
         var analyzed: [ScannedPhoto] = []
         let totalCount = assets.count
-        
+
         // Process in batches to avoid memory issues
         let batchSize = 20
         for (index, asset) in assets.enumerated() {
             if Task.isCancelled { break }
-            
+
             // Update progress
             await MainActor.run {
                 self.scanProgress = Double(index) / Double(totalCount)
             }
-            
+
             // Get metadata
             let metadata = extractMetadata(from: asset)
-            
+
             // Skip if doesn't meet basic criteria
             if criteria.excludeScreenshots && metadata.isScreenshot { continue }
             if criteria.excludeEdited && metadata.hasBeenEdited { continue }
@@ -209,13 +209,13 @@ class PhotoLibraryScanner: ObservableObject {
             if asset.pixelWidth < Int(minSize.width) || asset.pixelHeight < Int(minSize.height) {
                 continue
             }
-            
+
             // Skip landscape photos if preferred
             if criteria.excludeLandscape && criteria.preferPortraitOrientation {
                 let isLandscape = asset.pixelWidth > asset.pixelHeight
                 if isLandscape { continue }
             }
-            
+
             // Analyze image content
             if let confidence = await analyzeImageContent(asset: asset) {
                 if confidence >= criteria.minimumConfidence {
@@ -228,29 +228,29 @@ class PhotoLibraryScanner: ObservableObject {
                     analyzed.append(scannedPhoto)
                 }
             }
-            
+
             // Yield to prevent blocking
             if index.isMultiple(of: batchSize) {
                 await Task.yield()
             }
         }
-        
+
         return analyzed
     }
-    
+
     private func extractMetadata(from asset: PHAsset) -> ScannedPhoto.PhotoMetadata {
         // Check if screenshot
         let isScreenshot = asset.mediaSubtypes.contains(.photoScreenshot)
-        
+
         // Check if edited
         let hasBeenEdited = asset.mediaSubtypes.contains(.photoLive) ||
-                           asset.hasAdjustments
-        
+            asset.hasAdjustments
+
         // Try to determine camera type
         // Note: Most mirror selfies are taken with the back camera
         // We can't reliably detect mirror selfies from metadata alone
         var cameraType: ScannedPhoto.CameraType = .unknown
-        
+
         // Check EXIF data if available
         let resources = PHAssetResource.assetResources(for: asset)
         for resource in resources {
@@ -266,7 +266,7 @@ class PhotoLibraryScanner: ObservableObject {
                 break
             }
         }
-        
+
         return ScannedPhoto.PhotoMetadata(
             location: asset.location,
             cameraType: cameraType,
@@ -274,12 +274,12 @@ class PhotoLibraryScanner: ObservableObject {
             hasBeenEdited: hasBeenEdited
         )
     }
-    
+
     private func analyzeImageContent(asset: PHAsset) async -> Float? {
         let options = PHImageRequestOptions()
         options.isSynchronous = true
         options.deliveryMode = .fastFormat
-        
+
         return await withCheckedContinuation { continuation in
             imageManager.requestImage(
                 for: asset,
@@ -291,18 +291,18 @@ class PhotoLibraryScanner: ObservableObject {
                     continuation.resume(returning: nil)
                     return
                 }
-                
+
                 // For now, return a mock confidence based on heuristics
                 // TODO: Integrate actual CoreML model for progress photo detection
-                
+
                 // Calculate mock confidence based on typical progress photo characteristics
                 var confidence: Float = 0.5
-                
+
                 // Portrait orientation photos get higher score
                 if image.size.height > image.size.width {
                     confidence += 0.2
                 }
-                
+
                 // Photos taken in the morning or evening (typical workout times) get higher score
                 if let creationDate = asset.creationDate {
                     let hour = Calendar.current.component(.hour, from: creationDate)
@@ -310,31 +310,31 @@ class PhotoLibraryScanner: ObservableObject {
                         confidence += 0.1
                     }
                 }
-                
+
                 // Indoor photos (no location) often indicate gym or home photos
                 if asset.location == nil {
                     confidence += 0.1
                 }
-                
+
                 // Add some randomness for demo purposes
                 confidence += Float.random(in: -0.1...0.1)
                 confidence = max(0.0, min(1.0, confidence))
-                
+
                 continuation.resume(returning: confidence)
             }
         }
     }
-    
+
     private func groupPhotosByDate(_ photos: [ScannedPhoto], minimumDaysBetween: Int) -> [PhotoGroup] {
         guard !photos.isEmpty else { return [] }
-        
+
         // Sort by date
         let sorted = photos.sorted { $0.date < $1.date }
-        
+
         var groups: [PhotoGroup] = []
         var currentGroup: [ScannedPhoto] = []
         var currentGroupDate: Date?
-        
+
         for photo in sorted {
             if let groupDate = currentGroupDate,
                let daysDiff = Calendar.current.dateComponents([.day], from: groupDate, to: photo.date).day,
@@ -355,7 +355,7 @@ class PhotoLibraryScanner: ObservableObject {
                 currentGroupDate = photo.date
             }
         }
-        
+
         // Add final group
         if !currentGroup.isEmpty, let groupDate = currentGroupDate {
             let avgConfidence = currentGroup.reduce(0) { $0 + $1.confidence } / Float(currentGroup.count)
@@ -365,18 +365,18 @@ class PhotoLibraryScanner: ObservableObject {
                 averageConfidence: avgConfidence
             ))
         }
-        
+
         return groups.reversed() // Most recent first
     }
-    
+
     // MARK: - Image Loading
-    
+
     func loadThumbnail(for asset: PHAsset, size: CGSize = CGSize(width: 400, height: 400)) async -> UIImage? {
         let options = PHImageRequestOptions()
         options.isSynchronous = false
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = true
-        
+
         return await withCheckedContinuation { continuation in
             imageManager.requestImage(
                 for: asset,
@@ -392,13 +392,13 @@ class PhotoLibraryScanner: ObservableObject {
             }
         }
     }
-    
+
     func loadFullImage(for asset: PHAsset) async -> UIImage? {
         let options = PHImageRequestOptions()
         options.isSynchronous = false
         options.deliveryMode = .highQualityFormat
         options.isNetworkAccessAllowed = true
-        
+
         return await withCheckedContinuation { continuation in
             imageManager.requestImage(
                 for: asset,

@@ -211,7 +211,7 @@ struct PhotoAnchoredTimelineSlider: View {
         guard metrics.count > 1 else { return 0 }
         return Double(selectedIndex) / Double(metrics.count - 1)
     }
-    
+
     private func calculateSmartTicks() -> [TimelineTick] {
         guard !timelinePoints.isEmpty else { return [] }
 
@@ -410,24 +410,24 @@ struct PhotoAnchoredTimelineSlider: View {
                             )
                     }
                     .disabled(!hasPreviousPhoto)
-                    
+
                     Spacer()
-                    
+
                     // Current date display
                     if let date = metrics[safe: selectedIndex]?.date {
                         VStack(spacing: 2) {
                             Text(date, format: .dateTime.month(.abbreviated).day())
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
-                            
+
                             Text(date, format: .dateTime.year())
                                 .font(.system(size: 12))
                                 .foregroundColor(.white.opacity(0.6))
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     // Next photo button
                     Button(action: navigateToNextPhoto) {
                         Image(systemName: "chevron.right")
@@ -443,7 +443,7 @@ struct PhotoAnchoredTimelineSlider: View {
                 }
                 .padding(.horizontal, 4)
             }
-            
+
             // Timeline slider with enhanced polish
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
@@ -555,28 +555,28 @@ struct PhotoAnchoredTimelineSlider: View {
     private func calculateTimelinePoints() {
         timelinePoints = TimelineCalculator.calculateTimelinePoints(from: metrics)
     }
-    
+
     // MARK: - Helper Properties
-    
+
     private var hasPhotos: Bool {
         metrics.contains { $0.photoUrl != nil }
     }
-    
+
     private var hasPreviousPhoto: Bool {
         guard selectedIndex > 0 else { return false }
         return metrics[0..<selectedIndex].contains { $0.photoUrl != nil }
     }
-    
+
     private var hasNextPhoto: Bool {
         guard selectedIndex < metrics.count - 1 else { return false }
         return metrics[(selectedIndex + 1)...].contains { $0.photoUrl != nil }
     }
-    
+
     // MARK: - Navigation Methods
-    
+
     private func navigateToPreviousPhoto() {
         guard selectedIndex > 0 else { return }
-        
+
         for i in stride(from: selectedIndex - 1, through: 0, by: -1) {
             if metrics[i].photoUrl != nil {
                 selectedIndex = i
@@ -585,10 +585,10 @@ struct PhotoAnchoredTimelineSlider: View {
             }
         }
     }
-    
+
     private func navigateToNextPhoto() {
         guard selectedIndex < metrics.count - 1 else { return }
-        
+
         for i in (selectedIndex + 1)..<metrics.count {
             if metrics[i].photoUrl != nil {
                 selectedIndex = i
@@ -605,7 +605,7 @@ struct PhotoThumbnailTick: View {
     let photoUrl: String?
     let isSelected: Bool
     @State private var image: UIImage?
-    
+
     var body: some View {
         ZStack {
             // Thumbnail container with enhanced size
@@ -639,14 +639,14 @@ struct PhotoThumbnailTick: View {
             loadThumbnail()
         }
     }
-    
+
     private func loadThumbnail() {
         Task.detached(priority: .userInitiated) {
             guard let url = photoUrl, let thumbnail = await ImageLoader.shared.loadImage(from: url) else { return }
-            
+
             let thumbnailSize = CGSize(width: 28, height: 28)
             let thumbnailImage = thumbnail.resized(to: thumbnailSize)
-            
+
             await MainActor.run {
                 self.image = thumbnailImage
             }

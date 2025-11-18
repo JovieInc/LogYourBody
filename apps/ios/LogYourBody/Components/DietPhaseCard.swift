@@ -14,12 +14,12 @@ struct DietPhaseCard: View {
     let startBodyFat: Double?
     let endBodyFat: Double?
     let weightUnit: String
-    
+
     enum PhaseType: String, CaseIterable {
         case bulk = "Bulk"
         case cut = "Cut"
         case maintenance = "Maintenance"
-        
+
         var icon: String {
             switch self {
             case .bulk: return "arrow.up.circle.fill"
@@ -27,7 +27,7 @@ struct DietPhaseCard: View {
             case .maintenance: return "equal.circle.fill"
             }
         }
-        
+
         var color: Color {
             switch self {
             case .bulk: return Color.blue
@@ -36,41 +36,41 @@ struct DietPhaseCard: View {
             }
         }
     }
-    
+
     // Computed properties
     private var duration: Int {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.weekOfYear], from: startDate, to: endDate)
         return max(1, components.weekOfYear ?? 1)
     }
-    
+
     private var weightChange: Double {
         endWeight - startWeight
     }
-    
+
     private var weightChangeFormatted: String {
         let change = weightChange
         let sign = change >= 0 ? "+" : ""
         return "\(sign)\(String(format: "%.1f", change)) \(weightUnit)"
     }
-    
+
     private var bodyFatChange: Double? {
         guard let start = startBodyFat, let end = endBodyFat else { return nil }
         return end - start
     }
-    
+
     private var bodyFatChangeFormatted: String? {
         guard let change = bodyFatChange else { return nil }
         let sign = change >= 0 ? "+" : ""
         return "\(sign)\(String(format: "%.1f", change))%"
     }
-    
+
     private var dateRangeFormatted: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
         return "\(formatter.string(from: startDate)) - \(formatter.string(from: endDate))"
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header with phase type and duration
@@ -89,9 +89,9 @@ struct DietPhaseCard: View {
                     Capsule()
                         .fill(phaseType.color.opacity(0.15))
                 )
-                
+
                 Spacer()
-                
+
                 // Duration
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(duration)")
@@ -105,19 +105,19 @@ struct DietPhaseCard: View {
             .padding(.horizontal, 16)
             .padding(.top, 16)
             .padding(.bottom, 12)
-            
+
             // Date range
             Text(dateRangeFormatted)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.appTextSecondary)
                 .padding(.bottom, 16)
-            
+
             // Divider
             Rectangle()
                 .fill(Color.appBorder.opacity(0.3))
                 .frame(height: 1)
                 .padding(.horizontal, 16)
-            
+
             // Metrics grid
             HStack(spacing: 0) {
                 // Weight column
@@ -129,7 +129,7 @@ struct DietPhaseCard: View {
                         unit: weightUnit,
                         icon: "scalemass"
                     )
-                    
+
                     // Ending weight
                     MetricItem(
                         label: "End",
@@ -139,13 +139,13 @@ struct DietPhaseCard: View {
                     )
                 }
                 .frame(maxWidth: .infinity)
-                
+
                 // Vertical divider
                 Rectangle()
                     .fill(Color.appBorder.opacity(0.3))
                     .frame(width: 1)
                     .padding(.vertical, 16)
-                
+
                 // Changes column
                 VStack(spacing: 12) {
                     // Weight change
@@ -154,7 +154,7 @@ struct DietPhaseCard: View {
                         value: weightChangeFormatted,
                         isPositive: phaseType == .bulk ? weightChange > 0 : weightChange < 0
                     )
-                    
+
                     // Body fat change
                     if let bfChange = bodyFatChangeFormatted {
                         ChangeItem(
@@ -190,22 +190,22 @@ private struct MetricItem: View {
     let value: String
     let unit: String
     let icon: String
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.appTextTertiary)
-            
+
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.appTextSecondary)
-                
+
                 Text(value)
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
                     .foregroundColor(.appText)
-                
+
                 Text(unit)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.appTextSecondary)
@@ -220,30 +220,30 @@ private struct ChangeItem: View {
     let label: String
     let value: String
     let isPositive: Bool?
-    
+
     private var changeColor: Color {
         guard let isPositive = isPositive else { return .appTextSecondary }
         return isPositive ? .green : .red
     }
-    
+
     private var changeIcon: String {
         guard let isPositive = isPositive else { return "" }
         return isPositive ? "arrow.up.circle.fill" : "arrow.down.circle.fill"
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.appTextTertiary)
-            
+
             HStack(spacing: 4) {
                 if isPositive != nil {
                     Image(systemName: changeIcon)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(changeColor.opacity(0.8))
                 }
-                
+
                 Text(value)
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
                     .foregroundColor(isPositive != nil ? changeColor : .appTextSecondary)
@@ -270,7 +270,7 @@ struct DietPhaseCard_Previews: PreviewProvider {
                 endBodyFat: 16.5,
                 weightUnit: "lbs"
             )
-            
+
             // Cut phase example
             DietPhaseCard(
                 phaseType: .cut,
@@ -282,7 +282,7 @@ struct DietPhaseCard_Previews: PreviewProvider {
                 endBodyFat: 15.0,
                 weightUnit: "lbs"
             )
-            
+
             // Maintenance phase example (no BF data)
             DietPhaseCard(
                 phaseType: .maintenance,

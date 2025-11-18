@@ -10,8 +10,8 @@ struct ProfileSettingsViewV2: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss)
     var dismiss
-    // @StateObject private var syncManager = RealtimeSyncManager.shared // TODO: Add RealtimeSyncManager to Xcode project
-    
+    @StateObject private var syncManager = RealtimeSyncManager.shared
+
     // Editable fields
     @State private var editableName: String = ""
     @State private var editableFirstName: String = ""
@@ -20,51 +20,48 @@ struct ProfileSettingsViewV2: View {
     @State private var editableHeightCm: Int = 170
     @State private var editableGender: OnboardingData.Gender = .male
     @State private var useMetricHeight: Bool = false
-    
+
     // UI State
     @State private var showingHeightPicker = false
     @State private var showingDatePicker = false
     @State private var hasChanges = false
     @State private var isSaving = false
     @State private var showingSaveSuccess = false
-    
+
     // Photo picker
     @State private var showingPhotoPicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var isUploadingPhoto = false
     @State private var profileImageURL: String?
-    
+
     var body: some View {
         ZStack {
             // Background
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: 24) {
                     // Profile Header
                     profileHeader
                         .padding(.top)
-                    
+
                     // Basic Information Card
                     basicInformationCard
-                    
+
                     // Physical Information Card
                     physicalInformationCard
-                    
-                    // Sync Status
-                    // TODO: Uncomment when RealtimeSyncManager is added to project
-                    // if syncManager.pendingSyncCount > 0 || syncManager.error != nil {
+
+                    // Sync Status - removed for MVP
                     // HStack {
-                    // SyncStatusView()
-                    // Spacer()
+                    //     SyncStatusView()
+                    //     Spacer()
                     // }
                     // .padding(.horizontal)
-                    // }
-                    
+
                     // Security Section
                     securitySection
-                    
+
                     // Additional Actions
                     additionalActionsSection
                 }
@@ -126,13 +123,13 @@ struct ProfileSettingsViewV2: View {
             }
         )
     }
-    
+
     // MARK: - View Components
-    
+
     private var basicInformationCard: some View {
         VStack(spacing: 0) {
             sectionHeader("Basic Information")
-            
+
             VStack(spacing: 0) {
                 // First Name Field
                 settingsRow(
@@ -179,7 +176,7 @@ struct ProfileSettingsViewV2: View {
 
                 Divider()
                     .padding(.leading, 16)
-                
+
                 // Email (read-only)
                 settingsRow(
                     label: "Email",
@@ -187,10 +184,10 @@ struct ProfileSettingsViewV2: View {
                     showDisclosure: false,
                     isDisabled: true
                 )
-                
+
                 Divider()
                     .padding(.leading, 16)
-                
+
                 // Gender Selector with modern segmented control
                 genderSelector
             }
@@ -198,15 +195,15 @@ struct ProfileSettingsViewV2: View {
             .cornerRadius(12)
         }
     }
-    
+
     private var genderSelector: some View {
         HStack {
             Text("Biological Sex")
                 .foregroundColor(.primary)
                 .font(.system(size: 16))
-            
+
             Spacer()
-            
+
             Picker("Biological Sex", selection: $editableGender) {
                 ForEach(OnboardingData.Gender.allCases, id: \.self) { gender in
                     Text(gender.rawValue).tag(gender)
@@ -222,11 +219,11 @@ struct ProfileSettingsViewV2: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
     }
-    
+
     private var physicalInformationCard: some View {
         VStack(spacing: 0) {
             sectionHeader("Physical Information")
-            
+
             VStack(spacing: 0) {
                 // Height
                 Button {
@@ -251,10 +248,10 @@ struct ProfileSettingsViewV2: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
-                
+
                 Divider()
                     .padding(.leading, 16)
-                
+
                 // Age/Date of Birth
                 Button {
                     showingDatePicker = true
@@ -283,11 +280,11 @@ struct ProfileSettingsViewV2: View {
             .cornerRadius(12)
         }
     }
-    
+
     private var securitySection: some View {
         VStack(spacing: 0) {
             sectionHeader("Security")
-            
+
             VStack(spacing: 0) {
                 NavigationLink(destination: SecuritySessionsView()) {
                     HStack {
@@ -301,10 +298,10 @@ struct ProfileSettingsViewV2: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
-                
+
                 Divider()
                     .padding(.leading, 16)
-                
+
                 NavigationLink(destination: ChangePasswordView()) {
                     HStack {
                         Label("Change Password", systemImage: "lock.rotation")
@@ -322,7 +319,7 @@ struct ProfileSettingsViewV2: View {
             .cornerRadius(12)
         }
     }
-    
+
     private var additionalActionsSection: some View {
         VStack(spacing: 12) {
             NavigationLink(destination: ExportDataView()) {
@@ -338,7 +335,7 @@ struct ProfileSettingsViewV2: View {
                 .background(Color(.systemBackground))
                 .cornerRadius(10)
             }
-            
+
             NavigationLink(destination: DeleteAccountView()) {
                 HStack {
                     Label("Delete Account", systemImage: "trash")
@@ -355,7 +352,7 @@ struct ProfileSettingsViewV2: View {
         }
         .padding(.top, 10)
     }
-    
+
     private var profileHeader: some View {
         VStack(spacing: 16) {
             // Avatar
@@ -381,12 +378,12 @@ struct ProfileSettingsViewV2: View {
                     Circle()
                         .fill(Color(.systemGray5))
                         .frame(width: 80, height: 80)
-                    
+
                     Text(profileInitials)
                         .font(.system(size: 32, weight: .semibold))
                         .foregroundColor(.secondary)
                 }
-                
+
                 if isUploadingPhoto {
                     Circle()
                         .fill(Color.black.opacity(0.5))
@@ -414,19 +411,19 @@ struct ProfileSettingsViewV2: View {
                 .offset(x: 28, y: 28)
                 .disabled(isUploadingPhoto)
             )
-            
+
             // Name and email
             VStack(spacing: 4) {
                 Text(authManager.currentUser?.displayName ?? authManager.currentUser?.name ?? "User")
                     .font(.headline)
-                
+
                 Text(authManager.currentUser?.email ?? "")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
         }
     }
-    
+
     private func sectionHeader(_ title: String) -> some View {
         HStack {
             Text(title)
@@ -440,7 +437,7 @@ struct ProfileSettingsViewV2: View {
         .padding(.bottom, 8)
         .padding(.top, 4)
     }
-    
+
     @ViewBuilder
     private func settingsRow(
         label: String,
@@ -452,16 +449,16 @@ struct ProfileSettingsViewV2: View {
         HStack {
             Text(label)
                 .foregroundColor(isDisabled ? .secondary : .primary)
-            
+
             Spacer()
-            
+
             if let customContent = customContent {
                 customContent()
             } else {
                 Text(value)
                     .foregroundColor(isDisabled ? Color(.tertiaryLabel) : .secondary)
             }
-            
+
             if showDisclosure && !isDisabled {
                 Image(systemName: "chevron.right")
                     .font(.caption2)
@@ -471,7 +468,7 @@ struct ProfileSettingsViewV2: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
-    
+
     private var successOverlay: some View {
         VStack {
             Spacer()
@@ -496,9 +493,9 @@ struct ProfileSettingsViewV2: View {
             }
         }
     }
-    
+
     // MARK: - Computed Properties
-    
+
     private var profileInitials: String {
         let name: String
         if !editableName.isEmpty {
@@ -513,7 +510,7 @@ struct ProfileSettingsViewV2: View {
             return String(name.prefix(2)).uppercased()
         }
     }
-    
+
     private var formattedHeight: String {
         if useMetricHeight {
             return "\(editableHeightCm) cm"
@@ -524,17 +521,17 @@ struct ProfileSettingsViewV2: View {
             return "\(feet)'\(inches)\""
         }
     }
-    
+
     private var formattedAge: String {
         let age = Calendar.current.dateComponents([.year], from: editableDateOfBirth, to: Date()).year ?? 0
         return age > 0 ? "\(age) years" : "Not set"
     }
-    
+
     // MARK: - Methods
-    
+
     private func loadCurrentProfile() {
         guard let user = authManager.currentUser else { return }
-        
+
         editableName = user.name ?? user.profile?.fullName ?? ""
         let baseName: String
         if !editableName.isEmpty {
@@ -546,36 +543,36 @@ struct ProfileSettingsViewV2: View {
         editableFirstName = parts.first.map { String($0) } ?? ""
         editableLastName = parts.count > 1 ? parts.dropFirst().joined(separator: " ") : ""
         editableDateOfBirth = user.profile?.dateOfBirth ?? Date()
-        
+
         if let height = user.profile?.height {
             // Height is stored in inches, convert to cm
             editableHeightCm = Int(height * 2.54)
             useMetricHeight = user.profile?.heightUnit == "cm"
         }
-        
+
         if let genderString = user.profile?.gender {
             editableGender = OnboardingData.Gender(rawValue: genderString) ?? .male
         }
-        
+
         hasChanges = false
     }
-    
+
     private func saveProfile() {
         guard let currentUser = authManager.currentUser else { return }
-        
+
         isSaving = true
         hasChanges = false
-        
+
         Task {
             do {
                 // Update name using consolidated method if changed
                 if editableName != currentUser.name {
                     try await authManager.consolidateNameUpdate(editableName)
                 }
-                
+
                 // Calculate height in inches for storage (editableHeightCm is always in cm)
                 let heightInInches = Double(editableHeightCm) / 2.54
-                
+
                 // Create updated profile
                 let updatedProfile = UserProfile(
                     id: currentUser.id,
@@ -591,10 +588,10 @@ struct ProfileSettingsViewV2: View {
                     goalWeightUnit: currentUser.profile?.goalWeightUnit,
                     onboardingCompleted: currentUser.profile?.onboardingCompleted
                 )
-                
+
                 // Save to Core Data
                 CoreDataManager.shared.saveProfile(updatedProfile, userId: currentUser.id, email: currentUser.email)
-                
+
                 // Update auth manager with proper sync
                 let updates: [String: Any] = [
                     "name": editableName.isEmpty ? "" : editableName,
@@ -604,15 +601,15 @@ struct ProfileSettingsViewV2: View {
                     "gender": editableGender.rawValue,
                     "onboardingCompleted": true
                 ]
-                
+
                 await authManager.updateProfile(updates)
-                
+
                 await MainActor.run {
                     isSaving = false
                     withAnimation {
                         showingSaveSuccess = true
                     }
-                    
+
                     // Force UI refresh
                     NotificationCenter.default.post(name: .profileUpdated, object: nil)
                 }
@@ -625,10 +622,10 @@ struct ProfileSettingsViewV2: View {
             }
         }
     }
-    
+
     private func handlePhotoSelection(_ item: PhotosPickerItem) async {
         isUploadingPhoto = true
-        
+
         do {
             // Load the image data
             if let data = try await item.loadTransferable(type: Data.self),
@@ -638,12 +635,12 @@ struct ProfileSettingsViewV2: View {
                     await MainActor.run {
                         profileImageURL = newImageURL
                         isUploadingPhoto = false
-                        
+
                         // Show success feedback
                         withAnimation {
                             showingSaveSuccess = true
                         }
-                        
+
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                             withAnimation {
                                 showingSaveSuccess = false
@@ -666,7 +663,7 @@ struct ProfileSettingsViewV2: View {
                 isUploadingPhoto = false
             }
         }
-        
+
         // Clear selection
         await MainActor.run {
             selectedPhotoItem = nil
@@ -681,7 +678,7 @@ struct ProfileHeightPickerSheet: View {
     @Binding var useMetric: Bool
     @Binding var hasChanges: Bool
     @Environment(\.dismiss)
-    var dismiss    
+    var dismiss
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -707,7 +704,7 @@ struct ProfileHeightPickerSheet: View {
             }
         }
     }
-    
+
     private var unitSelector: some View {
         Picker("Unit", selection: $useMetric) {
             Text("Imperial (ft/in)").tag(false)
@@ -716,19 +713,19 @@ struct ProfileHeightPickerSheet: View {
         .pickerStyle(SegmentedPickerStyle())
         .padding()
     }
-    
+
     private var heightDisplay: some View {
         VStack(spacing: 8) {
             Text(formattedHeight)
                 .font(.system(size: 36, weight: .semibold))
-            
+
             Text(alternateHeight)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
         .padding()
     }
-    
+
     private var heightPicker: some View {
         Group {
             if useMetric {
@@ -744,12 +741,12 @@ struct ProfileHeightPickerSheet: View {
             }
         }
     }
-    
+
     private var imperialHeightPicker: some View {
         let totalInches = Double(heightCm) / 2.54
         let feet = Int(totalInches / 12)
         let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
-        
+
         let feetBinding = Binding<Int>(
             get: { feet },
             set: { newFeet in
@@ -757,7 +754,7 @@ struct ProfileHeightPickerSheet: View {
                 heightCm = Int(newHeightCm)
             }
         )
-        
+
         let inchesBinding = Binding<Int>(
             get: { inches },
             set: { newInches in
@@ -765,7 +762,7 @@ struct ProfileHeightPickerSheet: View {
                 heightCm = Int(newHeightCm)
             }
         )
-        
+
         return HStack {
             Picker("Feet", selection: feetBinding) {
                 ForEach(3...8, id: \.self) { feet in
@@ -774,7 +771,7 @@ struct ProfileHeightPickerSheet: View {
             }
             .pickerStyle(WheelPickerStyle())
             .frame(width: 100)
-            
+
             Picker("Inches", selection: inchesBinding) {
                 ForEach(0...11, id: \.self) { inches in
                     Text("\(inches) in").tag(inches)
@@ -784,7 +781,7 @@ struct ProfileHeightPickerSheet: View {
             .frame(width: 100)
         }
     }
-    
+
     private var formattedHeight: String {
         if useMetric {
             return "\(heightCm) cm"
@@ -795,7 +792,7 @@ struct ProfileHeightPickerSheet: View {
             return "\(feet)'\(inches)\""
         }
     }
-    
+
     private var alternateHeight: String {
         if useMetric {
             let totalInches = Int(Double(heightCm) / 2.54)
@@ -814,7 +811,7 @@ struct DatePickerSheet: View {
     @Binding var date: Date
     @Binding var hasChanges: Bool
     @Environment(\.dismiss)
-    var dismiss    
+    var dismiss
     var body: some View {
         NavigationView {
             VStack {
@@ -825,7 +822,7 @@ struct DatePickerSheet: View {
                 )
                 .datePickerStyle(WheelDatePickerStyle())
                 .labelsHidden()
-                
+
                 Spacer()
             }
             .navigationTitle("Date of Birth")

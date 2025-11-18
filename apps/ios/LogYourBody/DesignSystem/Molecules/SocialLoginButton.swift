@@ -11,7 +11,7 @@ struct SocialLoginButton: View {
         case apple
         case google
         case facebook
-        
+
         var title: String {
             switch self {
             case .apple:
@@ -22,7 +22,7 @@ struct SocialLoginButton: View {
                 return "Continue with Facebook"
             }
         }
-        
+
         var icon: String {
             switch self {
             case .apple:
@@ -33,7 +33,7 @@ struct SocialLoginButton: View {
                 return "f.circle.fill"
             }
         }
-        
+
         var backgroundColor: Color {
             switch self {
             case .apple:
@@ -44,7 +44,7 @@ struct SocialLoginButton: View {
                 return Color(red: 0.258, green: 0.406, blue: 0.697)
             }
         }
-        
+
         var foregroundColor: Color {
             switch self {
             case .apple, .google:
@@ -54,11 +54,11 @@ struct SocialLoginButton: View {
             }
         }
     }
-    
+
     let provider: Provider
     let isLoading: Bool
     let action: () -> Void
-    
+
     init(
         provider: Provider,
         isLoading: Bool = false,
@@ -68,7 +68,7 @@ struct SocialLoginButton: View {
         self.isLoading = isLoading
         self.action = action
     }
-    
+
     var body: some View {
         BaseButton(
             provider.title,
@@ -103,15 +103,15 @@ struct SocialLoginButton: View {
         SocialLoginButton(provider: .apple) {
             // Action
         }
-        
+
         SocialLoginButton(provider: .google) {
             // Action
         }
-        
+
         SocialLoginButton(provider: .facebook) {
             // Action
         }
-        
+
         SocialLoginButton(provider: .apple, isLoading: true) {
             // Action
         }

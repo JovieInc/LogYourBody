@@ -12,25 +12,25 @@ struct DashboardEmptyStateView: View {
     let message: String
     var action: (() -> Void)?
     var actionTitle: String = "Get Started"
-    
+
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: icon)
                 .font(.system(size: 64, weight: .light))
                 .foregroundColor(.appTextSecondary)
-            
+
             VStack(spacing: 12) {
                 Text(title)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.appText)
-                
+
                 Text(message)
                     .font(.system(size: 16))
                     .foregroundColor(.appTextSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            
+
             if let action = action {
                 Button(action: action) {
                     Text(actionTitle)
@@ -57,11 +57,11 @@ struct DashboardMetricGauge: View {
     let unit: String
     let color: Color
     var size = CGSize(width: 100, height: 100)
-    
+
     private var normalizedValue: Double {
         min(1.0, max(0.0, value / maxValue))
     }
-    
+
     private var displayValue: String {
         if value >= 1_000 {
             return String(format: "%.1fK", value / 1_000)
@@ -69,14 +69,14 @@ struct DashboardMetricGauge: View {
             return String(format: "%.0f", value)
         }
     }
-    
+
     var body: some View {
         ZStack {
             // Background circle - 1pt gray remainder
             Circle()
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                 .frame(width: size.width, height: size.height)
-            
+
             // Progress arc - 3pt white ring (monochrome)
             Circle()
                 .trim(from: 0, to: normalizedValue)
@@ -90,13 +90,13 @@ struct DashboardMetricGauge: View {
                 .frame(width: size.width, height: size.height)
                 .rotationEffect(.degrees(-90))
                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: normalizedValue)
-            
+
             // Content
             VStack(spacing: 2) {
                 Text(displayValue)
                     .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.white)
-                
+
                 Text(label)
                     .font(.system(size: 12, weight: .regular))
                     .foregroundColor(.white.opacity(0.6))
@@ -112,7 +112,7 @@ struct DashboardHeaderBar<Leading: View, Trailing: View>: View {
     let leading: Leading
     let trailing: Trailing
     var showLiquidGlass: Bool = true
-    
+
     init(
         title: String = "",
         showLiquidGlass: Bool = true,
@@ -124,21 +124,21 @@ struct DashboardHeaderBar<Leading: View, Trailing: View>: View {
         self.leading = leading()
         self.trailing = trailing()
     }
-    
+
     var body: some View {
         HStack {
             leading
-            
+
             Spacer()
-            
+
             if !title.isEmpty {
                 Text(title)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.appText)
             }
-            
+
             Spacer()
-            
+
             trailing
         }
         .padding(.horizontal, 16)

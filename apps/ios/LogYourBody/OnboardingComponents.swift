@@ -14,26 +14,26 @@ struct OnboardingBackground: View {
 // MARK: - Onboarding Header
 struct OnboardingHeader: View {
     let onBack: (() -> Void)?
-    
+
     var body: some View {
         HStack {
             if let onBack = onBack {
                 Button(
-            action: {
-                    onBack()
-                    // HapticManager.shared.buttonTap()
-                },
-            label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundColor(.appTextSecondary)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-        )
+                    action: {
+                        onBack()
+                        HapticManager.shared.buttonTap()
+                    },
+                    label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundColor(.appTextSecondary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                )
                 .modifier(LiquidGlassButtonModifier())
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -46,12 +46,12 @@ struct OnboardingTitle: View {
     let title: String
     let subtitle: String?
     @State private var animate = false
-    
+
     init(title: String, subtitle: String? = nil) {
         self.title = title
         self.subtitle = subtitle
     }
-    
+
     var body: some View {
         VStack(spacing: 16) {
             Text(title)
@@ -61,7 +61,7 @@ struct OnboardingTitle: View {
                 .opacity(animate ? 1 : 0)
                 .offset(y: animate ? 0 : 20)
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: animate)
-            
+
             if let subtitle = subtitle {
                 Text(subtitle)
                     .font(.system(size: 17, weight: .regular))
@@ -85,32 +85,32 @@ struct OnboardingContinueButton: View {
     let isEnabled: Bool
     let action: () -> Void
     let footnote: String?
-    
+
     init(title: String = "Continue →", isEnabled: Bool = true, footnote: String? = nil, action: @escaping () -> Void) {
         self.title = title
         self.isEnabled = isEnabled
         self.footnote = footnote
         self.action = action
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Button(
-            action: {
-                action()
-                // HapticManager.shared.buttonTap()
-            },
-            label: {
-                Text(title)
-                    .font(.system(size: 17, weight: .medium))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .foregroundColor(isEnabled ? .white : .appTextTertiary)
-            }
-        )
+                action: {
+                    action()
+                    HapticManager.shared.buttonTap()
+                },
+                label: {
+                    Text(title)
+                        .font(.system(size: 17, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .foregroundColor(isEnabled ? .white : .appTextTertiary)
+                }
+            )
             .modifier(LiquidGlassContinueButtonModifier(isEnabled: isEnabled))
             .disabled(!isEnabled)
-            
+
             if let footnote = footnote {
                 Text(footnote)
                     .font(.system(size: 13, weight: .regular))
@@ -128,12 +128,12 @@ struct OnboardingIcon: View {
     let systemName: String
     let size: CGFloat
     @State private var animate = false
-    
+
     init(systemName: String, size: CGFloat = 60) {
         self.systemName = systemName
         self.size = size
     }
-    
+
     var body: some View {
         Image(systemName: systemName)
             .font(.system(size: size))
@@ -156,7 +156,7 @@ struct OnboardingLiquidGlassButtonModifier: ViewModifier {
 
 struct LiquidGlassContinueButtonModifier: ViewModifier {
     let isEnabled: Bool
-    
+
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
             content
@@ -178,7 +178,7 @@ struct LiquidGlassContinueButtonModifier: ViewModifier {
 
 struct LiquidGlassFieldModifier: ViewModifier {
     let isFocused: Bool
-    
+
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
             content
@@ -244,22 +244,22 @@ struct OnboardingContainer<Content: View>: View {
     let content: Content
     let showBack: Bool
     let onBack: (() -> Void)?
-    
+
     init(showBack: Bool = true, onBack: (() -> Void)? = nil, @ViewBuilder content: () -> Content) {
         self.showBack = showBack
         self.onBack = onBack
         self.content = content()
     }
-    
+
     var body: some View {
         ZStack {
             OnboardingBackground()
-            
+
             VStack(spacing: 0) {
                 if showBack {
                     OnboardingHeader(onBack: onBack)
                 }
-                
+
                 content
             }
         }
@@ -270,11 +270,11 @@ struct OnboardingContainer<Content: View>: View {
 struct AnimatedAppearance: ViewModifier {
     @State private var isVisible = false
     let delay: Double
-    
+
     init(delay: Double = 0) {
         self.delay = delay
     }
-    
+
     func body(content: Content) -> some View {
         content
             .opacity(isVisible ? 1 : 0)

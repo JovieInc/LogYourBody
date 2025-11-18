@@ -8,18 +8,18 @@ import SwiftUI
 
 struct SettingsSectionGroup<Content: View>: View {
     let sections: [SectionData]
-    
+
     struct SectionData {
         let id = UUID()
         let header: String?
         let footer: String?
         let content: () -> Content
     }
-    
+
     init(sections: [SectionData]) {
         self.sections = sections
     }
-    
+
     var body: some View {
         VStack(spacing: 24) {
             ForEach(sections, id: \.id) { section in
@@ -41,7 +41,7 @@ struct SettingsLinkRow<Destination: View>: View {
     let value: String?
     let tintColor: Color
     let destination: () -> Destination
-    
+
     init(
         icon: String,
         title: String,
@@ -55,7 +55,7 @@ struct SettingsLinkRow<Destination: View>: View {
         self.tintColor = tintColor
         self.destination = destination
     }
-    
+
     var body: some View {
         NavigationLink(destination: destination) {
             SettingsRow(
@@ -76,7 +76,7 @@ struct SettingsActionRow: View {
     let title: String
     let tintColor: Color
     let action: () -> Void
-    
+
     init(
         icon: String,
         title: String,
@@ -88,7 +88,7 @@ struct SettingsActionRow: View {
         self.tintColor = tintColor
         self.action = action
     }
-    
+
     var body: some View {
         Button(action: action) {
             SettingsRow(
@@ -108,7 +108,7 @@ struct SettingsExternalLinkRow: View {
     let icon: String
     let title: String
     let url: URL
-    
+
     var body: some View {
         Link(destination: url) {
             SettingsRow(
@@ -135,9 +135,9 @@ struct SettingsSectionBuilder {
                 value: email ?? "",
                 showChevron: false
             )
-            
+
             DSDivider().insetted(16)
-            
+
             SettingsActionRow(
                 icon: "person.circle",
                 title: "Profile Settings",
@@ -145,7 +145,7 @@ struct SettingsSectionBuilder {
             )
         }
     }
-    
+
     static func securitySection(
         onActiveSessions: @escaping () -> Void,
         onChangePassword: @escaping () -> Void
@@ -156,9 +156,9 @@ struct SettingsSectionBuilder {
                 title: "Active Sessions",
                 action: onActiveSessions
             )
-            
+
             DSDivider().insetted(16)
-            
+
             SettingsActionRow(
                 icon: "lock.rotation",
                 title: "Change Password",
@@ -166,7 +166,7 @@ struct SettingsSectionBuilder {
             )
         }
     }
-    
+
     static func dangerSection(
         onExportData: @escaping () -> Void,
         onDeleteAccount: @escaping () -> Void
@@ -177,9 +177,9 @@ struct SettingsSectionBuilder {
                 title: "Export Data",
                 action: onExportData
             )
-            
+
             DSDivider().insetted(16)
-            
+
             SettingsActionRow(
                 icon: "trash",
                 title: "Delete Account",
@@ -197,12 +197,12 @@ struct SettingsSectionBuilder {
                 email: "user@example.com",
                 onProfileSettings: { /* Profile settings action */ }
             )
-            
+
             SettingsSectionBuilder.securitySection(
                 onActiveSessions: { /* Active sessions action */ },
                 onChangePassword: { /* Change password action */ }
             )
-            
+
             SettingsSectionBuilder.dangerSection(
                 onExportData: { /* Export data action */ },
                 onDeleteAccount: { /* Delete account action */ }

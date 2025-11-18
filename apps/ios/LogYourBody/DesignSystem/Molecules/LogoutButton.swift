@@ -8,7 +8,7 @@ import SwiftUI
 
 struct LogoutButton: View {
     let action: () -> Void
-    
+
     var body: some View {
         BaseButton(configuration: ButtonConfiguration(
             style: .custom(background: Color(.systemBackground), foreground: .red),
@@ -35,7 +35,7 @@ struct LogoutButton: View {
         LogoutButton {
             // Logout action
         }
-        
+
         LogoutButton {
             // Logout action
         }

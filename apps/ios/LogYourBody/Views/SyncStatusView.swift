@@ -7,11 +7,11 @@ import SwiftUI
 struct SyncStatusView: View {
     @StateObject private var syncManager = RealtimeSyncManager.shared
     @State private var showDetails = false
-    
+
     var body: some View {
         HStack(spacing: 8) {
             statusIcon
-            
+
             if !isCompact {
                 Text(statusText)
                     .font(.caption)
@@ -33,14 +33,14 @@ struct SyncStatusView: View {
             SyncDetailsView()
         }
     }
-    
+
     private var isCompact: Bool {
         // Show compact view on smaller screens or when space is limited
         UIScreen.main.bounds.width < 375
     }
-    
+
     @ViewBuilder
-    
+
     private var statusIcon: some View {
         switch (syncManager.isOnline, syncManager.syncStatus) {
         case (false, _):
@@ -68,12 +68,12 @@ struct SyncStatusView: View {
                 .foregroundColor(.green)
         }
     }
-    
+
     private var statusText: String {
         if !syncManager.isOnline {
             return "Offline"
         }
-        
+
         switch syncManager.syncStatus {
         case .syncing:
             return "Syncing..."
@@ -91,12 +91,12 @@ struct SyncStatusView: View {
             }
         }
     }
-    
+
     private var backgroundcolor: Color {
         if !syncManager.isOnline {
             return Color.gray.opacity(0.2)
         }
-        
+
         switch syncManager.syncStatus {
         case .error:
             return Color.red.opacity(0.2)
@@ -115,7 +115,7 @@ struct SyncStatusView: View {
 struct SyncDetailsView: View {
     @StateObject private var syncManager = RealtimeSyncManager.shared
     @Environment(\.dismiss)
-    private var dismiss    
+    private var dismiss
     var body: some View {
         NavigationView {
             List {
@@ -126,14 +126,14 @@ struct SyncDetailsView: View {
                         Text(syncManager.isOnline ? "Online" : "Offline")
                             .foregroundColor(syncManager.isOnline ? .green : .gray)
                     }
-                    
+
                     HStack {
                         Text("Real-time")
                         Spacer()
                         Text(syncManager.realtimeConnected ? "Connected" : "Disconnected")
                             .foregroundColor(syncManager.realtimeConnected ? .green : .gray)
                     }
-                    
+
                     if syncManager.pendingSyncCount > 0 {
                         HStack {
                             Text("Pending Changes")
@@ -142,7 +142,7 @@ struct SyncDetailsView: View {
                                 .foregroundColor(.orange)
                         }
                     }
-                    
+
                     if let lastSync = syncManager.lastSyncDate {
                         HStack {
                             Text("Last Sync")
@@ -152,7 +152,7 @@ struct SyncDetailsView: View {
                         }
                     }
                 }
-                
+
                 if let error = syncManager.error {
                     Section("Error Details") {
                         Text(error)
@@ -160,39 +160,39 @@ struct SyncDetailsView: View {
                             .foregroundColor(.red)
                     }
                 }
-                
+
                 Section {
                     Button(
-            action: {
-                        syncManager.syncAll()
-                        dismiss()
-                    },
-            label: {
-                        HStack {
-                            if syncManager.isSyncing {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
+                        action: {
+                            syncManager.syncAll()
+                            dismiss()
+                        },
+                        label: {
+                            HStack {
+                                if syncManager.isSyncing {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                }
+                                Text(syncManager.isSyncing ? "Syncing..." : "Sync Now")
                             }
-                            Text(syncManager.isSyncing ? "Syncing..." : "Sync Now")
                         }
-                    }
-        )
+                    )
                     .disabled(syncManager.isSyncing || !syncManager.isOnline)
-                    
+
                     if syncManager.error != nil {
                         Button(
-            action: {
-                            syncManager.clearError()
-                        },
-            label: {
-                            HStack {
-                                Image(systemName: "xmark.circle")
-                                Text("Clear Error")
+                            action: {
+                                syncManager.clearError()
+                            },
+                            label: {
+                                HStack {
+                                    Image(systemName: "xmark.circle")
+                                    Text("Clear Error")
+                                }
                             }
-                        }
-        )
+                        )
                         .foregroundColor(.red)
                     }
                 }
@@ -213,7 +213,7 @@ struct SyncDetailsView: View {
 // Minimal sync indicator for compact spaces
 struct CompactSyncIndicator: View {
     @StateObject private var syncManager = RealtimeSyncManager.shared
-    
+
     var body: some View {
         Circle()
             .fill(indicatorColor)
@@ -224,12 +224,12 @@ struct CompactSyncIndicator: View {
             )
             .animation(.easeInOut, value: syncManager.syncStatus)
     }
-    
+
     private var indicatorColor: Color {
         if !syncManager.isOnline {
             return .gray
         }
-        
+
         switch syncManager.syncStatus {
         case .error:
             return .red

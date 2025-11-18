@@ -8,7 +8,7 @@ import SwiftUI
 
 struct MarkdownView: View {
     let markdown: String
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ForEach(parseMarkdownSections(markdown), id: \.id) { section in
@@ -16,15 +16,15 @@ struct MarkdownView: View {
             }
         }
     }
-    
+
     private func parseMarkdownSections(_ markdown: String) -> [MarkdownSection] {
         var sections: [MarkdownSection] = []
         let lines = markdown.components(separatedBy: .newlines)
         var currentSection: MarkdownSection?
-        
+
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            
+
             if trimmed.isEmpty {
                 if let section = currentSection {
                     sections.append(section)
@@ -59,11 +59,11 @@ struct MarkdownView: View {
                 }
             }
         }
-        
+
         if let section = currentSection {
             sections.append(section)
         }
-        
+
         return sections
     }
 }
@@ -74,7 +74,7 @@ struct MarkdownSection: Identifiable {
     let id = UUID()
     let type: MarkdownType
     let content: String
-    
+
     enum MarkdownType {
         case h1, h2, h3, paragraph, bold, bulletPoint, divider
     }
@@ -84,7 +84,7 @@ struct MarkdownSection: Identifiable {
 
 struct MarkdownSectionView: View {
     let section: MarkdownSection
-    
+
     var body: some View {
         switch section.type {
         case .h1:
@@ -96,7 +96,7 @@ struct MarkdownSectionView: View {
             )
             .padding(.top, 20)
             .padding(.bottom, 10)
-        
+
         case .h2:
             DSText(
                 section.content,
@@ -106,7 +106,7 @@ struct MarkdownSectionView: View {
             )
             .padding(.top, 16)
             .padding(.bottom, 8)
-        
+
         case .h3:
             DSText(
                 section.content,
@@ -116,13 +116,13 @@ struct MarkdownSectionView: View {
             )
             .padding(.top, 12)
             .padding(.bottom, 4)
-        
+
         case .paragraph:
             Text(parseInlineMarkdown(section.content))
                 .font(.body)
                 .foregroundColor(.appTextSecondary)
                 .lineSpacing(4)
-        
+
         case .bold:
             DSText(
                 section.content,
@@ -130,7 +130,7 @@ struct MarkdownSectionView: View {
                 weight: .semibold,
                 color: .appText
             )
-        
+
         case .bulletPoint:
             HStack(alignment: .top, spacing: 8) {
                 DSText("•", style: .body, color: .appTextSecondary)
@@ -141,21 +141,21 @@ struct MarkdownSectionView: View {
                 Spacer()
             }
             .padding(.leading, 16)
-        
+
         case .divider:
             DSDivider()
                 .padding(.vertical, 20)
         }
     }
-    
+
     private func parseInlineMarkdown(_ text: String) -> AttributedString {
         var attributedString = AttributedString(text)
-        
+
         // Parse bold text
         if let boldRegex = try? NSRegularExpression(pattern: "\\*\\*(.+?)\\*\\*", options: []) {
             let nsString = text as NSString
             let matches = boldRegex.matches(in: text, options: [], range: NSRange(location: 0, length: nsString.length))
-            
+
             for match in matches.reversed() {
                 if let range = Range(match.range, in: text) {
                     let boldText = String(text[range]).replacingOccurrences(of: "**", with: "")
@@ -168,7 +168,7 @@ struct MarkdownSectionView: View {
                 }
             }
         }
-        
+
         return attributedString
     }
 }
@@ -180,29 +180,29 @@ struct MarkdownSectionView: View {
         MarkdownView(
             markdown: """
             # Privacy Policy
-            
+
             **Last Updated: July 11, 2025**
-            
+
             ## Introduction
-            
+
             We take your privacy seriously. This policy describes how we collect and use your data.
-            
+
             ### Data Collection
-            
+
             We collect the following types of data:
             - Personal information (name, email)
             - Health metrics
             - Usage analytics
-            
+
             ---
-            
+
             ## Your Rights
-            
+
             You have the right to:
             - Access your data
             - Delete your account
             - Export your information
-            
+
             **Contact us** if you have any questions.
             """
         )

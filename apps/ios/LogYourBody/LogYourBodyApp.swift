@@ -17,7 +17,7 @@ struct LogYourBodyApp: App {
     @State private var selectedEntryTab = 0
 
     let persistenceController = CoreDataManager.shared
-    
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -41,75 +41,12 @@ struct LogYourBodyApp: App {
                     handleDeepLink(url)
                 }
                 .task {
-                    // Perform app version management and cleanup
-                    // TODO: Add AppVersionManager.swift to Xcode project, then uncomment:
-                    // AppVersionManager.shared.performStartupMaintenance()
-
-                    // Repair any corrupted Core Data entries on startup
-                    let repairedCount = CoreDataManager.shared.repairCorruptedEntries()
-                    if repairedCount > 0 {
-                        // print("🔧 App startup: Repaired \(repairedCount) corrupted entries")
-                    }
-
-                    // Set up chart data cache invalidation for Core Data changes
-                    // TODO: Add MetricChartDataHelper.swift, MetricDetailView.swift, PeriodSelector.swift
-                    // and other new files to Xcode project, then uncomment:
-                    // MetricChartDataHelper.setupCacheInvalidation()
-
-                    // Initialize Clerk (critical path)
-                    await authManager.initializeClerk()
-
-                    // Configure RevenueCat SDK (synchronous, no network call)
-                    let apiKey = Constants.revenueCatAPIKey
-                    if !apiKey.isEmpty {
-                        await MainActor.run {
-                            revenueCatManager.configure(apiKey: apiKey)
-                        }
-
-                        // Small delay to ensure SDK delegate registration completes
-                        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-
-                        // Mark SDK as configured so other methods can proceed
-                        await revenueCatManager.markAsConfigured()
-
-                        // Identify user and fetch subscription status (sequential to avoid race condition)
-                        if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
-                            await revenueCatManager.identifyUser(userId: userId)
-                        } else {
-                            // If not authenticated, still refresh to check anonymous status
-                            await revenueCatManager.refreshCustomerInfo()
-                        }
-
-                        // Preload offerings for faster paywall display
-                        await revenueCatManager.fetchOfferings()
-                    }
-
-                    // Check HealthKit authorization status on app launch
-                    healthKitManager.checkAuthorizationStatus()
-                    
-                    // Start HealthKit sync if enabled
-                    if UserDefaults.standard.bool(forKey: "healthKitSyncEnabled") && healthKitManager.isAuthorized {
-                        // Set up observers for new data
-                        healthKitManager.observeWeightChanges()
-                        healthKitManager.observeStepChanges()
-                        
-                        // Initial sync will be handled by the observers
-                        // No need to call sync methods here to avoid concurrent saves
-                        
-                        // Enable background step delivery
-                        Task {
-                            try? await healthKitManager.setupStepCountBackgroundDelivery()
-                        }
-                    }
-                    
-                    // Setup widget data updates
-                    widgetDataManager.setupAutomaticUpdates()
-                    await widgetDataManager.updateWidgetData()
+                    await performStartupSequence()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                     // App entering background - ensure sync is complete
                     realtimeSyncManager.syncIfNeeded()
-                    
+
                     // Update widget data
                     Task {
                         await widgetDataManager.updateWidgetData()
@@ -127,35 +64,110 @@ struct LogYourBodyApp: App {
                 }
         }
     }
-    
+
+    // MARK: - Startup Helpers
+
+    @MainActor
+    private func performStartupSequence() async {
+        scheduleDeferredMaintenance()
+
+        let clerkInitializationTask = Task(priority: .userInitiated) {
+            await authManager.initializeClerk()
+        }
+
+        async let revenueCatPipeline: Void = configureRevenueCat(waitingFor: clerkInitializationTask)
+        async let healthKitPipeline: Void = bootstrapHealthKit()
+
+        _ = await (revenueCatPipeline, healthKitPipeline)
+        await clerkInitializationTask.value
+    }
+
+    @MainActor
+    private func configureRevenueCat(waitingFor clerkTask: Task<Void, Never>) async {
+        let apiKey = Constants.revenueCatAPIKey
+        guard !apiKey.isEmpty else { return }
+
+        revenueCatManager.configure(apiKey: apiKey)
+
+        async let offeringsTask: Void = revenueCatManager.fetchOfferings()
+
+        await clerkTask.value
+
+        if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
+            await revenueCatManager.identifyUser(userId: userId)
+        } else {
+            await revenueCatManager.refreshCustomerInfo()
+        }
+
+        _ = await offeringsTask
+    }
+
+    @MainActor
+    private func bootstrapHealthKit() async {
+        healthKitManager.checkAuthorizationStatus()
+
+        guard UserDefaults.standard.bool(forKey: "healthKitSyncEnabled") else { return }
+
+        guard healthKitManager.isAuthorized else { return }
+
+        healthKitManager.observeWeightChanges()
+        healthKitManager.observeStepChanges()
+
+        Task {
+            try? await healthKitManager.setupStepCountBackgroundDelivery()
+        }
+    }
+
+    @MainActor
+    private func scheduleDeferredMaintenance() {
+        Task.detached(priority: .utility) {
+            let repairedCount = await CoreDataManager.shared.repairCorruptedEntries()
+            if repairedCount > 0 {
+                // print("🔧 App startup: Repaired \(repairedCount) corrupted entries")
+            }
+        }
+
+        Task.detached(priority: .utility) {
+            AppVersionManager.shared.performStartupMaintenance()
+        }
+
+        MetricChartDataHelper.setupCacheInvalidation()
+
+        widgetDataManager.setupAutomaticUpdates()
+
+        Task {
+            await widgetDataManager.updateWidgetData()
+        }
+    }
+
     // MARK: - Deep Link Handling
-    
+
     private func handleDeepLink(_ url: URL) {
         guard url.scheme == "logyourbody" else { return }
-        
+
         switch url.host {
         case "oauth", "oauth-callback":
             // Handle OAuth callbacks (e.g., from Apple Sign In)
             // Clerk SDK handles the OAuth callback automatically
             break
-            
+
         case "log":
             // Check if user is authenticated and has completed onboarding
             guard authManager.isAuthenticated else {
                 // User needs to sign in first
                 return
             }
-            
+
             // Check if onboarding is complete
             let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Constants.hasCompletedOnboardingKey)
             let isProfileComplete = checkProfileComplete()
-            
+
             if !hasCompletedOnboarding || !isProfileComplete {
                 // User needs to complete onboarding first
                 // Don't open the add entry sheet
                 return
             }
-            
+
             // Handle specific log types
             if let path = url.pathComponents.dropFirst().first {
                 switch path {
@@ -170,18 +182,18 @@ struct LogYourBodyApp: App {
                 }
             }
             showAddEntrySheet = true
-            
+
         default:
             // Unhandled URL host
             break
         }
     }
-    
+
     private func checkProfileComplete() -> Bool {
         guard let profile = authManager.currentUser?.profile else { return false }
         return profile.fullName != nil &&
-               profile.dateOfBirth != nil &&
-               profile.height != nil &&
-               profile.gender != nil
+            profile.dateOfBirth != nil &&
+            profile.height != nil &&
+            profile.gender != nil
     }
 }

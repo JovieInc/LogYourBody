@@ -11,19 +11,19 @@ struct LoadingScreen: View {
     @Binding var progress: Double
     @Binding var loadingStatus: String
     let onComplete: () -> Void
-    
+
     var backgroundColor = Color(red: 0.071, green: 0.071, blue: 0.114)
     var showPercentage: Bool = true
-    
+
     var body: some View {
         ZStack {
             // Background
             backgroundColor
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 32) {
                 Spacer()
-                
+
                 // Animated Logo
                 DSLogoAnimated(
                     size: 80,
@@ -31,9 +31,9 @@ struct LoadingScreen: View {
                     textSize: 28,
                     animationDuration: 0.6
                 )
-                
+
                 Spacer()
-                
+
                 // Progress section
                 VStack(spacing: 16) {
                     // Status text
@@ -44,7 +44,7 @@ struct LoadingScreen: View {
                     )
                     .frame(minHeight: 20)
                     .animation(.easeInOut(duration: 0.3), value: loadingStatus)
-                    
+
                     // Progress bar
                     DSProgressBar(
                         progress: progress,
@@ -54,7 +54,7 @@ struct LoadingScreen: View {
                         animationDuration: 0.4
                     )
                     .padding(.horizontal, 60)
-                    
+
                     // Percentage
                     if showPercentage {
                         DSText(
@@ -75,7 +75,7 @@ struct LoadingScreen: View {
             checkCompletion()
         }
     }
-    
+
     private func checkCompletion() {
         if progress >= 1.0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -93,7 +93,7 @@ struct CompactLoadingScreen: View {
     var message: String = "Loading..."
     var showProgress: Bool = false
     @Binding var progress: Double
-    
+
     var body: some View {
         if isLoading {
             VStack(spacing: 16) {
@@ -103,7 +103,7 @@ struct CompactLoadingScreen: View {
                     lineWidth: 3,
                     showPercentage: showProgress
                 )
-                
+
                 DSText(
                     message,
                     style: .footnote,
@@ -127,7 +127,7 @@ struct CompactLoadingScreen: View {
             progress: .constant(0.6),
             loadingStatus: .constant("Loading user data..."),
             onComplete: {
-        // print("Loading complete")
+                // print("Loading complete")
             }
         )
     }
@@ -137,7 +137,7 @@ struct CompactLoadingScreen: View {
     ZStack {
         Color.appBackground
             .ignoresSafeArea()
-        
+
         VStack(spacing: 30) {
             // Simple loading
             CompactLoadingScreen(
@@ -146,7 +146,7 @@ struct CompactLoadingScreen: View {
                 showProgress: false,
                 progress: .constant(0)
             )
-            
+
             // With progress
             CompactLoadingScreen(
                 isLoading: .constant(true),

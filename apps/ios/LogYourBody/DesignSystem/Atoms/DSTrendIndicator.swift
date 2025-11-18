@@ -13,12 +13,12 @@ struct DSTrendIndicator: View {
     var showSign: Bool = true
     var size: Font = .system(size: 14, weight: .medium) // Increased for better visibility
     var showBackground: Bool = false // Optional pill background for better contrast
-    
+
     enum TrendType {
         case positive  // Up is good (e.g., steps, FFMI)
         case negative  // Down is good (e.g., body fat)
         case neutral   // No preference (e.g., weight)
-        
+
         func color(for trend: Double) -> Color {
             switch self {
             case .positive:
@@ -29,7 +29,7 @@ struct DSTrendIndicator: View {
                 return .appTextSecondary
             }
         }
-        
+
         func icon(for trend: Double) -> String {
             if trend > 0 {
                 return "arrow.up"
@@ -40,7 +40,7 @@ struct DSTrendIndicator: View {
             }
         }
     }
-    
+
     var body: some View {
         if let trend = trend, trend != 0 {
             Group {
@@ -65,17 +65,17 @@ struct DSTrendIndicator: View {
             )
         }
     }
-    
+
     private func formatTrend(_ value: Double) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.maximumFractionDigits = 1
         formatter.minimumFractionDigits = 0
-        
+
         if showSign && value > 0 {
             formatter.positivePrefix = "+"
         }
-        
+
         return formatter.string(from: NSNumber(value: abs(value))) ?? ""
     }
 }
@@ -92,14 +92,14 @@ struct DSTrendIndicator: View {
                 DSTrendIndicator(trend: -1_000, trendType: .positive)
                 DSTrendIndicator(trend: 0, trendType: .positive)
             }
-            
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Body Fat (negative)").font(.caption)
                 DSTrendIndicator(trend: 0.5, trendType: .negative)
                 DSTrendIndicator(trend: -1.2, trendType: .negative)
                 DSTrendIndicator(trend: 0, trendType: .negative)
             }
-            
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Weight (neutral)").font(.caption)
                 DSTrendIndicator(trend: 2.3, trendType: .neutral)

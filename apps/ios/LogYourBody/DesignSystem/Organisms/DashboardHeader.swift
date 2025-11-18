@@ -15,9 +15,9 @@ struct DashboardHeader: View {
     var showGreetingEmoji: Bool = false
     var onAvatarTap: (() -> Void)?
     var onStepsTap: (() -> Void)?
-    
+
     @Environment(\.colorScheme) var colorScheme
-    
+
     var body: some View {
         HStack {
             // Left: Avatar and greeting
@@ -30,15 +30,15 @@ struct DashboardHeader: View {
                 .onTapGesture {
                     onAvatarTap?()
                 }
-                
+
                 UserGreeting(
                     fullName: fullNameForDisplay,
                     showEmoji: showGreetingEmoji
                 )
             }
-            
+
             Spacer()
-            
+
             // Right: Status indicators
             HStack(spacing: 16) {
                 if let steps = dailySteps {
@@ -47,7 +47,7 @@ struct DashboardHeader: View {
                             onStepsTap?()
                         }
                 }
-                
+
                 if isSyncing {
                     DSCircularProgress(
                         progress: 0.75,
@@ -85,7 +85,7 @@ struct DashboardHeader: View {
         let emailLocalPart = user.email.components(separatedBy: "@").first ?? ""
         return emailLocalPart.isEmpty ? nil : emailLocalPart
     }
-    
+
     @ViewBuilder
     private var headerBackground: some View {
         if showLiquidGlass {
@@ -102,7 +102,7 @@ struct DashboardHeader: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private var headerBorder: some View {
         if showLiquidGlass {
@@ -111,7 +111,7 @@ struct DashboardHeader: View {
                 .frame(height: 0.5)
         }
     }
-    
+
     private var backgroundOpacityColor: Color {
         colorScheme == .dark ? Color.appBackground.opacity(0.8) : Color.appBackground.opacity(0.95)
     }
@@ -127,15 +127,15 @@ struct DashboardHeader: View {
             dailySteps: 8_421,
             isSyncing: true,
             onAvatarTap: {
-        // print("Avatar tapped")
+                // print("Avatar tapped")
             },
             onStepsTap: {
-        // print("Steps tapped")
+                // print("Steps tapped")
             }
         )
-        
+
         Spacer().frame(height: 20)
-        
+
         // With emoji greeting
         DashboardHeader(
             user: PreviewData.mockUser,
@@ -143,18 +143,18 @@ struct DashboardHeader: View {
             isSyncing: false,
             showGreetingEmoji: true
         )
-        
+
         Spacer().frame(height: 20)
-        
+
         // Minimal data
         DashboardHeader(
             user: nil,
             dailySteps: nil,
             isSyncing: false
         )
-        
+
         Spacer().frame(height: 20)
-        
+
         // Without liquid glass
         DashboardHeader(
             user: PreviewData.mockUser,
@@ -163,7 +163,7 @@ struct DashboardHeader: View {
             showLiquidGlass: false
         )
         .background(Color.appCard)
-        
+
         Spacer()
     }
     .background(Color.appBackground)

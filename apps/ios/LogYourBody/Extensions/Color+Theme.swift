@@ -9,12 +9,12 @@ public extension Color {
     static let linearPurple = Color(hex: "#5B63D3")
     static let linearBlue = Color(hex: "#3B82F6")
     static let linearAccent = Color(hex: "#7C7CEA")
-    
+
     // MARK: - Background Colors
     static let linearBg = Color(hex: "#111111")  // Premium near-black
     static let linearCard = Color(hex: "#1A1A1A")  // Slightly lighter for cards
     static let linearBorder = Color(hex: "#2A2A2A")  // Subtle borders
-    
+
     // MARK: - Text Colors
     static let linearText = Color(hex: "#F7F8F8")
     static let linearTextSecondary = Color(hex: "#9CA0A8")
@@ -23,8 +23,8 @@ public extension Color {
     // MARK: - Liquid Glass Dark Mode (Apple Health-inspired)
     static let liquidBg = Color(hex: "#000000")  // True black for OLED
     static let liquidTextPrimary = Color(hex: "#F5F5F7")  // Off-white for reduced eye strain
-    static let liquidAccent = Color(hex: "#6EE7F0")  // Cyan accent
-    
+    static let liquidAccent = Color(hex: "#00AFFF")  // Splash-ring blue accent
+
     // MARK: - Semantic Colors
     static let success = Color(hex: "#4CAF50")
     static let warning = Color(hex: "#FF9800")

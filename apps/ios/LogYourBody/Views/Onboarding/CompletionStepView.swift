@@ -11,15 +11,15 @@ struct CompletionStepView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var animateCheckmark = false
     @State private var animateContent = false
-    
+
     // Computed properties for cleaner code
     private var hasProfileData: Bool {
         !viewModel.data.name.isEmpty ||
-        viewModel.data.dateOfBirth != nil ||
-        viewModel.data.totalHeightInInches > 0 ||
-        viewModel.data.gender != nil
+            viewModel.data.dateOfBirth != nil ||
+            viewModel.data.totalHeightInInches > 0 ||
+            viewModel.data.gender != nil
     }
-    
+
     var body: some View {
         ZStack {
             // Edge-to-edge background
@@ -29,18 +29,18 @@ struct CompletionStepView: View {
             // Custom floating header
             HStack {
                 Button(
-            action: {
-                    viewModel.previousStep()
-                    // HapticManager.shared.buttonTap() // TODO: Add HapticManager to Xcode project
-                },
-            label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundColor(.appTextSecondary)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-        )
+                    action: {
+                        viewModel.previousStep()
+                        HapticManager.shared.buttonTap()
+                    },
+                    label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundColor(.appTextSecondary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                )
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.1))
@@ -107,11 +107,11 @@ struct CheckmarkShape: Shape {
         var path = Path()
         let width = rect.size.width
         let height = rect.size.height
-        
+
         path.move(to: CGPoint(x: width * 0.2, y: height * 0.5))
         path.addLine(to: CGPoint(x: width * 0.4, y: height * 0.7))
         path.addLine(to: CGPoint(x: width * 0.8, y: height * 0.3))
-        
+
         return path
     }
 }
@@ -122,19 +122,19 @@ struct ModernDataRow: View {
     let iconColor: Color
     let label: String
     let value: String
-    
+
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .foregroundColor(iconColor)
                 .font(.system(size: 18))
-            
+
             Text(label)
                 .font(.system(size: 15))
                 .foregroundColor(.appTextSecondary)
-            
+
             Spacer()
-            
+
             if !value.isEmpty {
                 Text(value)
                     .font(.system(size: 15, weight: .semibold))
@@ -148,7 +148,7 @@ struct ModernDataRow: View {
     ZStack {
         Color.appBackground
             .ignoresSafeArea()
-        
+
         CompletionStepView()
             .environmentObject({
                 let vm = OnboardingViewModel()

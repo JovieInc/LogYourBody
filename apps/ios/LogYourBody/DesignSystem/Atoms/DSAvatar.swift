@@ -15,13 +15,13 @@ struct DSAvatar: View {
     var backgroundColor: Color = .appPrimary
     var borderColor: Color?
     var borderWidth: CGFloat = 0
-    
+
     private var initials: String {
         guard let name = name, !name.isEmpty else { return "U" }
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let components = trimmedName.components(separatedBy: " ")
             .filter { !$0.isEmpty }
-        
+
         if components.count >= 2 {
             let firstInitial = components[0].prefix(1)
             let lastInitial = components[components.count - 1].prefix(1)
@@ -31,7 +31,7 @@ struct DSAvatar: View {
         }
         return "U"
     }
-    
+
     var body: some View {
         Group {
             if let urlString = url, !urlString.isEmpty, let url = URL(string: urlString) {
@@ -66,7 +66,7 @@ struct DSAvatar: View {
                 .strokeBorder(borderColor ?? .clear, lineWidth: borderWidth)
         )
     }
-    
+
     private var placeholderView: some View {
         Circle()
             .fill(backgroundColor)
@@ -92,7 +92,7 @@ struct DSAvatar: View {
             DSAvatar(url: nil, name: "Bob", size: 48, fontSize: 20)
             DSAvatar(url: nil, name: "Alice Johnson", size: 64, fontSize: 28)
         }
-        
+
         HStack(spacing: 20) {
             // With borders
             DSAvatar(
@@ -120,7 +120,7 @@ struct DSAvatar: View {
                 borderWidth: 1
             )
         }
-        
+
         HStack(spacing: 20) {
             // Edge cases
             DSAvatar(url: nil, name: "   ", size: 48) // Empty spaces
@@ -128,7 +128,7 @@ struct DSAvatar: View {
             DSAvatar(url: nil, name: "Single", size: 48) // Single name
             DSAvatar(url: nil, name: "Three Name Person", size: 48) // Multiple names
         }
-        
+
         HStack(spacing: 20) {
             // With URL (will show loading indicator)
             DSAvatar(
@@ -136,7 +136,7 @@ struct DSAvatar: View {
                 name: "User",
                 size: 48
             )
-            
+
             // Invalid URL fallback
             DSAvatar(
                 url: "",

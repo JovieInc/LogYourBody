@@ -9,23 +9,23 @@ import SwiftUI
 struct DeveloperTapHandler<Content: View>: View {
     let onUnlock: () -> Void
     @ViewBuilder let content: (Int) -> Content
-    
+
     @State private var tapCount = 0
-    
+
     var body: some View {
         Button(action: handleTap) {
             content(tapCount)
         }
         .buttonStyle(PlainButtonStyle())
     }
-    
+
     private func handleTap() {
         tapCount += 1
         if tapCount >= 7 {
             onUnlock()
             tapCount = 0
         }
-        
+
         // Reset tap count after 3 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             if tapCount < 7 {
@@ -57,7 +57,7 @@ struct DeveloperTapHandler<Content: View>: View {
                 .cornerRadius(8)
             }
         )
-        
+
         Text("Tap 7 times to unlock developer mode")
             .font(.caption)
             .foregroundColor(.secondary)

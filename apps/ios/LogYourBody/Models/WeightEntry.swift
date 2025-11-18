@@ -10,11 +10,11 @@ struct WeightEntry: Identifiable, Codable {
     let weightUnit: String
     let notes: String?
     let loggedAt: Date
-    
+
     var formattedWeight: String {
         String(format: "%.1f", weight)
     }
-    
+
     var displayUnit: String {
         weightUnit == "kg" ? "kg" : "lbs"
     }
@@ -31,7 +31,7 @@ extension WeightEntry {
             loggedAt: Date()
         )
     }
-    
+
     static var mockArray: [WeightEntry] {
         [
             WeightEntry(id: "1", userId: "test", weight: 75.5, weightUnit: "kg", notes: nil, loggedAt: Date().addingTimeInterval(-86_400 * 7)),

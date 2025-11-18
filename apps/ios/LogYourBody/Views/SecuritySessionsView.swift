@@ -19,10 +19,10 @@ struct SecuritySessionsView: View {
     @State private var showSuccessToast = false
     @State private var successMessage = ""
     @State private var refreshTimer: Timer?
-    
+
     // Pull to refresh
     @State private var refreshing = false
-    
+
     var body: some View {
         ZStack {
             if isLoading && sessions.isEmpty {
@@ -39,7 +39,7 @@ struct SecuritySessionsView: View {
                                 iconColor: .blue
                             )
                         }
-                        
+
                         // Sessions List
                         if sessions.isEmpty {
                             SettingsEmptyState(
@@ -67,7 +67,7 @@ struct SecuritySessionsView: View {
                                 }
                             }
                         }
-                        
+
                         // Last Updated
                         if !sessions.isEmpty {
                             Text("Last updated: \(Date().formatted(date: .omitted, time: .shortened))")
@@ -136,16 +136,16 @@ struct SecuritySessionsView: View {
             )
         )
     }
-    
+
     // MARK: - View Components
-    
+
     // MARK: - Methods
-    
+
     private func loadSessions(showLoading: Bool = true) async {
         if showLoading {
             isLoading = true
         }
-        
+
         do {
             let fetchedSessions = try await authManager.fetchActiveSessions()
             await MainActor.run {
@@ -168,10 +168,10 @@ struct SecuritySessionsView: View {
             }
         }
     }
-    
+
     private func revokeSession(_ session: SessionInfo) async {
         isRevokingSession = true
-        
+
         do {
             try await authManager.revokeSession(sessionId: session.id)
             await MainActor.run {
@@ -180,15 +180,15 @@ struct SecuritySessionsView: View {
                     sessions.removeAll { $0.id == session.id }
                 }
                 isRevokingSession = false
-                
+
                 // Show success toast
                 successMessage = "Session revoked successfully"
                 withAnimation {
                     showSuccessToast = true
                 }
-                
+
                 // Haptic feedback
-                // HapticManager.shared.successAction() // TODO: Add HapticManager to Xcode project
+                HapticManager.shared.successAction()
             }
         } catch {
             await MainActor.run {
@@ -206,88 +206,88 @@ struct SessionRowView: View {
     let session: SessionInfo
     let onRevoke: () -> Void
     @State private var isExpanded = false
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Main Content
             Button(
-            action: {
-                withAnimation(SettingsDesign.animation) {
-                    isExpanded.toggle()
-                }
-            },
-            label: {
-                HStack(spacing: 12) {
-                    // Device Icon
-                    Image(systemName: deviceIcon)
-                        .font(.system(size: SettingsDesign.iconSize))
-                        .foregroundColor(iconColor)
-                        .frame(width: SettingsDesign.iconFrame)
-                        .padding(8)
-                        .background(iconBackgroundColor)
-                        .clipShape(Circle())
-                    
-                    // Session Details
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(session.deviceName)
-                                .font(SettingsDesign.titleFont)
-                                .foregroundColor(.primary)
-                            
-                            if session.isCurrentSession {
-                                Text("THIS DEVICE")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.green)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.green.opacity(0.15))
-                                    .cornerRadius(4)
+                action: {
+                    withAnimation(SettingsDesign.animation) {
+                        isExpanded.toggle()
+                    }
+                },
+                label: {
+                    HStack(spacing: 12) {
+                        // Device Icon
+                        Image(systemName: deviceIcon)
+                            .font(.system(size: SettingsDesign.iconSize))
+                            .foregroundColor(iconColor)
+                            .frame(width: SettingsDesign.iconFrame)
+                            .padding(8)
+                            .background(iconBackgroundColor)
+                            .clipShape(Circle())
+
+                        // Session Details
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(session.deviceName)
+                                    .font(SettingsDesign.titleFont)
+                                    .foregroundColor(.primary)
+
+                                if session.isCurrentSession {
+                                    Text("THIS DEVICE")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.green)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.green.opacity(0.15))
+                                        .cornerRadius(4)
+                                }
                             }
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(session.location)
-                                .font(SettingsDesign.valueFont)
-                                .foregroundColor(.secondary)
-                            
-                            HStack(spacing: 4) {
-                                Image(systemName: "clock")
-                                    .font(.system(size: 11))
-                                Text(timeAgoString(from: session.lastActiveAt))
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(session.location)
                                     .font(SettingsDesign.valueFont)
+                                    .foregroundColor(.secondary)
+
+                                HStack(spacing: 4) {
+                                    Image(systemName: "clock")
+                                        .font(.system(size: 11))
+                                    Text(timeAgoString(from: session.lastActiveAt))
+                                        .font(SettingsDesign.valueFont)
+                                }
+                                .foregroundColor(.secondary)
                             }
-                            .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        // Revoke Button or Chevron
+                        if !session.isCurrentSession {
+                            Button(action: onRevoke) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        } else if !session.ipAddress.isEmpty {
+                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                .font(SettingsDesign.chevronSize)
+                                .foregroundColor(Color(.tertiaryLabel))
                         }
                     }
-                    
-                    Spacer()
-                    
-                    // Revoke Button or Chevron
-                    if !session.isCurrentSession {
-                        Button(action: onRevoke) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(.red)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    } else if !session.ipAddress.isEmpty {
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(SettingsDesign.chevronSize)
-                            .foregroundColor(Color(.tertiaryLabel))
-                    }
+                    .padding(.horizontal, SettingsDesign.horizontalPadding)
+                    .padding(.vertical, SettingsDesign.verticalPadding)
+                    .contentShape(Rectangle())
                 }
-                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                .padding(.vertical, SettingsDesign.verticalPadding)
-                .contentShape(Rectangle())
-            }
-        )
+            )
             .buttonStyle(PlainButtonStyle())
-            
+
             // Additional Details (expandable)
             if isExpanded {
                 VStack(spacing: 0) {
                     Divider()
-                    
+
                     VStack(spacing: 8) {
                         HStack {
                             Label("IP Address", systemImage: "network")
@@ -298,7 +298,7 @@ struct SessionRowView: View {
                                 .font(SettingsDesign.valueFont)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         HStack {
                             Label("First Signed In", systemImage: "calendar")
                                 .font(SettingsDesign.valueFont)
@@ -316,7 +316,7 @@ struct SessionRowView: View {
             }
         }
     }
-    
+
     private var deviceIcon: String {
         switch session.deviceType.lowercased() {
         case "iphone":
@@ -331,15 +331,15 @@ struct SessionRowView: View {
             return "questionmark.circle"
         }
     }
-    
+
     private var iconColor: Color {
         session.isCurrentSession ? .green : .blue
     }
-    
+
     private var iconBackgroundColor: Color {
         session.isCurrentSession ? Color.green.opacity(0.15) : Color.blue.opacity(0.15)
     }
-    
+
     private func timeAgoString(from date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated

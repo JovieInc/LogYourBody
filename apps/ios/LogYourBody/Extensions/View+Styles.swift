@@ -6,7 +6,7 @@ import SwiftUI
 
 struct ModernTextFieldModifier: ViewModifier {
     @FocusState private var isFocused: Bool
-    
+
     func body(content: Content) -> some View {
         content
             .padding(.horizontal, 12)
@@ -31,9 +31,9 @@ struct ModernTextFieldModifier: ViewModifier {
 // MARK: - Linear-Inspired Primary Button Style
 // NOTE: Temporarily using ViewModifier instead of ButtonStyle due to compilation issues
 struct ModernPrimaryButtonModifier: ViewModifier {
-    @Environment(\.isEnabled) 
+    @Environment(\.isEnabled)
     var isEnabled
-    
+
     func body(content: Content) -> some View {
         content
             .font(.system(size: 15, weight: .medium))
@@ -69,7 +69,7 @@ struct ModernSecondaryButtonModifier: ViewModifier {
 // MARK: - Modern Card Style
 struct ModernCardStyle: ViewModifier {
     var noPadding: Bool = false
-    
+
     func body(content: Content) -> some View {
         content
             .padding(noPadding ? 0 : 20)
@@ -152,27 +152,27 @@ extension View {
     func modernPrimaryButtonStyle() -> some View {
         self.modifier(ModernPrimaryButtonModifier())
     }
-    
+
     func modernSecondaryButtonStyle() -> some View {
         self.modifier(ModernSecondaryButtonModifier())
     }
-    
+
     func modernCardStyle(noPadding: Bool = false) -> some View {
         modifier(ModernCardStyle(noPadding: noPadding))
     }
-    
+
     func modernTextFieldStyle() -> some View {
         modifier(ModernTextFieldModifier())
     }
-    
+
     func glassmorphism() -> some View {
         modifier(GlassmorphismStyle())
     }
-    
+
     func subtleShadow() -> some View {
         modifier(SubtleShadow())
     }
-    
+
     // Haptic feedback helper
     func withHapticFeedback(style: UIImpactFeedbackGenerator.FeedbackStyle = .light) -> some View {
         self.onTapGesture {
@@ -187,11 +187,11 @@ extension Animation {
     static var smooth: Animation {
         .spring(response: 0.4, dampingFraction: 0.8)
     }
-    
+
     static var bouncy: Animation {
         .spring(response: 0.5, dampingFraction: 0.6)
     }
-    
+
     static var gentle: Animation {
         .easeInOut(duration: 0.3)
     }

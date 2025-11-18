@@ -121,37 +121,28 @@ struct ProgressTimelineView: View {
     private func photoModeAnchor(for anchor: TimelineAnchor) -> some View {
         Group {
             if anchor.anchorType == .photo || anchor.anchorType == .photoWithMetrics {
-                // Photo thumbnail (circular)
-                if let photoUrl = anchor.bodyMetrics.photoUrl, !photoUrl.isEmpty {
-                    // Debug logging
-                    _ = // print("[Timeline] Loading photo for anchor: \(anchor.id), URL: \(photoUrl)")
-
-                    // Validate URL before attempting to load
-                    if URL(string: photoUrl) != nil {
-                        OptimizedProgressPhotoView(
-                            photoUrl: photoUrl,
-                            maxHeight: zoomLevel.thumbnailSize
-                        )
-                        .frame(width: zoomLevel.thumbnailSize, height: zoomLevel.thumbnailSize)
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(Color.white.opacity(0.5), lineWidth: 2)
-                        )
-                    } else {
-                        _ = // print("[Timeline] Invalid URL format: \(photoUrl)")
-                        photoPlaceholder
-                    }
+                if let photoUrl = anchor.bodyMetrics.photoUrl,
+                   !photoUrl.isEmpty,
+                   let _ = URL(string: photoUrl) {
+                    OptimizedProgressPhotoView(
+                        photoUrl: photoUrl,
+                        maxHeight: zoomLevel.thumbnailSize
+                    )
+                    .frame(width: zoomLevel.thumbnailSize, height: zoomLevel.thumbnailSize)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.5), lineWidth: 2)
+                    )
                 } else {
                     photoPlaceholder
                 }
+            } else if zoomLevel.showMetricTicks {
+                Circle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 4, height: 4)
             } else {
-                // Metrics-only tick (subtle)
-                if zoomLevel.showMetricTicks {
-                    Circle()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 4, height: 4)
-                }
+                EmptyView()
             }
         }
     }
@@ -171,14 +162,13 @@ struct ProgressTimelineView: View {
         Rectangle()
             .fill(Color.white.opacity(0.8))
             .frame(width: 2, height: 12)
-            .overlay(
-                // Show faint photo indicator if photo exists
-                anchor.anchorType == .photo || anchor.anchorType == .photoWithMetrics ?
+            .overlay(alignment: .top) {
+                if anchor.anchorType == .photo || anchor.anchorType == .photoWithMetrics {
                     Circle()
                         .fill(Color.liquidAccent.opacity(0.4))
                         .frame(width: 6, height: 6)
-                    : nil
-            )
+                }
+            }
     }
 
     private var scrubberHandle: some View {
@@ -322,7 +312,7 @@ struct ProgressTimelineView: View {
                 BodyMetrics(
                     id: "1",
                     userId: "user1",
-                    date: Date().addingTimeInterval(-60*60*24*30),
+                    date: Date().addingTimeInterval(-60 * 60 * 24 * 30),
                     weight: 180,
                     weightUnit: "lbs",
                     bodyFatPercentage: 20,

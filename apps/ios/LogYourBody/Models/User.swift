@@ -11,7 +11,7 @@ struct User: Codable, Identifiable {
     var avatarUrl: String?
     var profile: UserProfile?
     var onboardingCompleted: Bool = false
-    
+
     var displayName: String {
         name ?? email.components(separatedBy: "@").first ?? "User"
     }
@@ -30,14 +30,14 @@ struct UserProfile: Codable {
     let goalWeight: Double?
     let goalWeightUnit: String?
     let onboardingCompleted: Bool?
-    
+
     var age: Int? {
         guard let dateOfBirth = dateOfBirth else { return nil }
         let calendar = Calendar.current
         let ageComponents = calendar.dateComponents([.year], from: dateOfBirth, to: Date())
         return ageComponents.year
     }
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case email

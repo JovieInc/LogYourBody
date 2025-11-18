@@ -15,7 +15,7 @@ struct AuthFormField: View {
     var textContentType: UITextContentType?
     var autocapitalization: TextInputAutocapitalization = .sentences
     var isDisabled: Bool = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Label
@@ -51,14 +51,14 @@ struct AuthFormField: View {
             textContentType: .emailAddress,
             autocapitalization: .never
         )
-        
+
         AuthFormField(
             label: "Password",
             text: .constant(""),
             isSecure: true,
             textContentType: .password
         )
-        
+
         AuthFormField(
             label: "Full Name",
             text: .constant("John Doe"),

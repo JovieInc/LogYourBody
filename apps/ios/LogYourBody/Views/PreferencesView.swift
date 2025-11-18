@@ -8,7 +8,7 @@ import LocalAuthentication
 import PhotosUI
 
 // MARK: - Measurement System Enum (Global)
-enum MeasurementSystem: String, CaseIterable {
+enum MeasurementSystem: String, Codable, CaseIterable {
     case imperial = "Imperial"
     case metric = "Metric"
 
@@ -84,7 +84,7 @@ struct PreferencesView: View {
     var currentSystem: MeasurementSystem {
         MeasurementSystem(rawValue: measurementSystem) ?? .imperial
     }
-    
+
     private func checkBiometricAvailability() {
         var error: NSError?
         if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
@@ -125,9 +125,9 @@ struct PreferencesView: View {
         cachedUserGender = authManager.currentUser?.profile?.gender?.lowercased() ?? ""
         cachedIsFemale = cachedUserGender.contains("female") || cachedUserGender.contains("woman")
         cachedDefaultBodyFatGoal = cachedIsFemale ? Constants.BodyComposition.BodyFat.femaleIdealValue :
-                                                     Constants.BodyComposition.BodyFat.maleIdealValue
+            Constants.BodyComposition.BodyFat.maleIdealValue
         cachedDefaultFFMIGoal = cachedIsFemale ? Constants.BodyComposition.FFMI.femaleIdealValue :
-                                                  Constants.BodyComposition.FFMI.maleIdealValue
+            Constants.BodyComposition.FFMI.maleIdealValue
     }
 
     private func resetToDefaults() {
@@ -594,9 +594,9 @@ struct PreferencesView: View {
                         }
                         .padding(.horizontal, SettingsDesign.horizontalPadding)
                         .padding(.vertical, SettingsDesign.verticalPadding)
-                        
+
                         Divider()
-                        
+
                         // Weight Unit Display
                         DataInfoRow(
                             icon: "scalemass",
@@ -604,9 +604,9 @@ struct PreferencesView: View {
                             description: currentSystem.weightUnit,
                             iconColor: .appTextSecondary
                         )
-                        
+
                         Divider()
-                        
+
                         // Height Unit Display
                         DataInfoRow(
                             icon: "ruler",
@@ -699,8 +699,8 @@ struct PreferencesView: View {
                                         .font(.system(size: 13))
                                         .foregroundColor(.appTextSecondary)
                                         + Text(customBodyFatGoal == nil ? " (default)" : "")
-                                            .font(.system(size: 13))
-                                            .foregroundColor(.appTextSecondary.opacity(0.7))
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.appTextSecondary.opacity(0.7))
                                 }
 
                                 Spacer()
@@ -754,8 +754,8 @@ struct PreferencesView: View {
                                         .font(.system(size: 13))
                                         .foregroundColor(.appTextSecondary)
                                         + Text(customFFMIGoal == nil ? " (default)" : "")
-                                            .font(.system(size: 13))
-                                            .foregroundColor(.appTextSecondary.opacity(0.7))
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.appTextSecondary.opacity(0.7))
                                 }
 
                                 Spacer()
@@ -963,9 +963,9 @@ struct PreferencesView: View {
                         ) {
                             ExportDataView()
                         }
-                        
+
                         Divider()
-                        
+
                         SettingsNavigationLink(
                             icon: "trash",
                             title: "Delete Account",

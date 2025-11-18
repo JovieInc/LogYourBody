@@ -11,7 +11,7 @@ struct DSText: View {
     let style: Font.TextStyle
     let weight: Font.Weight
     let color: Color
-    
+
     init(
         _ text: String,
         style: Font.TextStyle = .body,
@@ -23,7 +23,7 @@ struct DSText: View {
         self.weight = weight
         self.color = color
     }
-    
+
     var body: some View {
         Text(text)
             .font(.system(style, design: .default).weight(weight))

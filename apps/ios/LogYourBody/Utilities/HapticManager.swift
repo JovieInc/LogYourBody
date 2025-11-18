@@ -7,9 +7,9 @@ import UIKit
 
 class HapticManager {
     static let shared = HapticManager()
-    
+
     private init() {}
-    
+
     // MARK: - Impact Feedback
     func impact(style: UIImpactFeedbackGenerator.FeedbackStyle) {
         Task { @MainActor in
@@ -18,7 +18,7 @@ class HapticManager {
             generator.impactOccurred()
         }
     }
-    
+
     // MARK: - Notification Feedback
     func notification(type: UINotificationFeedbackGenerator.FeedbackType) {
         Task { @MainActor in
@@ -27,7 +27,7 @@ class HapticManager {
             generator.notificationOccurred(type)
         }
     }
-    
+
     // MARK: - Selection Feedback
     func selection() {
         Task { @MainActor in
@@ -36,24 +36,24 @@ class HapticManager {
             generator.selectionChanged()
         }
     }
-    
+
     // MARK: - Custom Patterns
     func buttonTap() {
         impact(style: .light)
     }
-    
+
     func tabSelection() {
         impact(style: .medium)
     }
-    
+
     func successAction() {
         notification(type: .success)
     }
-    
+
     func errorAction() {
         notification(type: .error)
     }
-    
+
     func warningAction() {
         notification(type: .warning)
     }

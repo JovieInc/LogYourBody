@@ -10,7 +10,7 @@ struct DSDivider: View {
     let inset: CGFloat
     let color: Color
     let thickness: CGFloat
-    
+
     init(
         inset: CGFloat = 0,
         color: Color? = nil,
@@ -20,7 +20,7 @@ struct DSDivider: View {
         self.color = color ?? Color(.systemGray4)
         self.thickness = thickness
     }
-    
+
     var body: some View {
         Rectangle()
             .fill(color)
@@ -35,7 +35,7 @@ extension DSDivider {
     func insetted(_ amount: CGFloat = 16) -> DSDivider {
         DSDivider(inset: amount, color: color, thickness: thickness)
     }
-    
+
     func colored(_ color: Color) -> DSDivider {
         DSDivider(inset: inset, color: color, thickness: thickness)
     }

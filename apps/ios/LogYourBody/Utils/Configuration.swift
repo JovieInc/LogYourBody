@@ -40,7 +40,7 @@ enum Configuration {
             return try Configuration.value(for: "API_BASE_URL")
         } catch {
             #if DEBUG
-        // print("⚠️ API_BASE_URL not configured in Config.xcconfig")
+            // print("⚠️ API_BASE_URL not configured in Config.xcconfig")
             #endif
             return "https://www.logyourbody.com"
         }
@@ -53,7 +53,7 @@ enum Configuration {
             return try Configuration.value(for: "CLERK_PUBLISHABLE_KEY")
         } catch {
             #if DEBUG
-        // print("⚠️ CLERK_PUBLISHABLE_KEY not configured in Config.xcconfig")
+            // print("⚠️ CLERK_PUBLISHABLE_KEY not configured in Config.xcconfig")
             #endif
             return ""
         }
@@ -64,7 +64,7 @@ enum Configuration {
             return try Configuration.value(for: "CLERK_FRONTEND_API")
         } catch {
             #if DEBUG
-        // print("⚠️ CLERK_FRONTEND_API not configured in Config.xcconfig")
+            // print("⚠️ CLERK_FRONTEND_API not configured in Config.xcconfig")
             #endif
             return "https://clerk.logyourbody.com"
         }
@@ -77,7 +77,7 @@ enum Configuration {
             return try Configuration.value(for: "SUPABASE_URL")
         } catch {
             #if DEBUG
-        // print("⚠️ SUPABASE_URL not configured in Config.xcconfig")
+            // print("⚠️ SUPABASE_URL not configured in Config.xcconfig")
             #endif
             return ""
         }
@@ -88,7 +88,7 @@ enum Configuration {
             return try Configuration.value(for: "SUPABASE_ANON_KEY")
         } catch {
             #if DEBUG
-        // print("⚠️ SUPABASE_ANON_KEY not configured in Config.xcconfig")
+            // print("⚠️ SUPABASE_ANON_KEY not configured in Config.xcconfig")
             #endif
             return ""
         }
@@ -101,8 +101,8 @@ enum Configuration {
             return try Configuration.value(for: "REVENUE_CAT_API_KEY")
         } catch {
             #if DEBUG
-        // print("⚠️ REVENUE_CAT_API_KEY not configured in Config.xcconfig")
-        // print("⚠️ Add REVENUE_CAT_API_KEY = your_api_key_here to Config.xcconfig")
+            // print("⚠️ REVENUE_CAT_API_KEY not configured in Config.xcconfig")
+            // print("⚠️ Add REVENUE_CAT_API_KEY = your_api_key_here to Config.xcconfig")
             #endif
             return ""
         }

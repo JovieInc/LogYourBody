@@ -14,13 +14,13 @@ struct ContentView: View {
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
-    
+
     init() {
         // We need to initialize LoadingManager with a temporary AuthManager
         // The actual authManager will be injected from environment
         _loadingManager = StateObject(wrappedValue: LoadingManager(authManager: AuthManager.shared))
     }
-    
+
     // Check if user profile is complete
     private var isProfileComplete: Bool {
         // Safely check if profile exists and is complete
@@ -37,16 +37,16 @@ struct ContentView: View {
 
         return hasName && hasDOB && hasHeight && hasGender
     }
-    
+
     private var shouldShowOnboarding: Bool {
         return !hasCompletedOnboarding
     }
-    
+
     var body: some View {
         ZStack {
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             if !isLoadingComplete {
                 LoadingView(
                     progress: $loadingManager.progress,
@@ -121,7 +121,7 @@ struct ContentView: View {
                profileOnboardingCompleted {
                 onboardingStateManager.markCompleted()
                 hasCompletedOnboarding = true
-        // print("✅ ContentView: Synced onboarding status from profile to onboarding manager")
+                // print("✅ ContentView: Synced onboarding status from profile to onboarding manager")
             }
 
             // Start loading process
@@ -152,7 +152,7 @@ struct ContentView: View {
                 onboardingStateManager.updateCompletionStatus(profileOnboardingCompleted)
                 hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
                 if profileOnboardingCompleted {
-        // print("✅ ContentView: Synced onboarding status from profile update")
+                    // print("✅ ContentView: Synced onboarding status from profile update")
                 }
             }
         }

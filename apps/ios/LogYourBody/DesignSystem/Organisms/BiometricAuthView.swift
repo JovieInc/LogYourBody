@@ -10,7 +10,7 @@ struct BiometricAuthView: View {
     enum BiometricType {
         case faceID
         case touchID
-        
+
         var icon: String {
             switch self {
             case .faceID:
@@ -19,7 +19,7 @@ struct BiometricAuthView: View {
                 return "touchid"
             }
         }
-        
+
         var title: String {
             switch self {
             case .faceID:
@@ -29,13 +29,13 @@ struct BiometricAuthView: View {
             }
         }
     }
-    
+
     let biometricType: BiometricType
     let onAuthenticate: () -> Void
     let onUsePassword: () -> Void
-    
+
     @State private var isAnimating = false
-    
+
     var body: some View {
         VStack(spacing: 40) {
             // Icon
@@ -43,7 +43,7 @@ struct BiometricAuthView: View {
                 Circle()
                     .fill(Color.appPrimary.opacity(0.1))
                     .frame(width: 120, height: 120)
-                
+
                 Image(systemName: biometricType.icon)
                     .font(.system(size: 50))
                     .foregroundColor(.appPrimary)
@@ -53,19 +53,19 @@ struct BiometricAuthView: View {
             .onAppear {
                 isAnimating = true
             }
-            
+
             // Title & Instructions
             VStack(spacing: 16) {
                 Text("Unlock with \(biometricType.title)")
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundColor(.appText)
-                
+
                 Text("Authenticate to access your account")
                     .font(.system(size: 16))
                     .foregroundColor(.appTextSecondary)
                     .multilineTextAlignment(.center)
             }
-            
+
             // Actions
             VStack(spacing: 16) {
                 BaseButton(
@@ -77,7 +77,7 @@ struct BiometricAuthView: View {
                     ),
                     action: onAuthenticate
                 )
-                
+
                 DSAuthLink(
                     title: "Use Password Instead",
                     action: onUsePassword
@@ -93,13 +93,13 @@ struct BiometricAuthView: View {
 #Preview {
     VStack {
         Spacer()
-        
+
         BiometricAuthView(
             biometricType: .faceID,
             onAuthenticate: {},
             onUsePassword: {}
         )
-        
+
         Spacer()
     }
     .background(Color.appBackground)

@@ -11,13 +11,13 @@ struct UserAvatar: View {
     let email: String?
     let size: AvatarSize
     let showBorder: Bool
-    
+
     enum AvatarSize {
         case small
         case medium
         case large
         case extraLarge
-        
+
         var dimension: CGFloat {
             switch self {
             case .small: return 32
@@ -26,7 +26,7 @@ struct UserAvatar: View {
             case .extraLarge: return 80
             }
         }
-        
+
         var fontSize: CGFloat {
             switch self {
             case .small: return 14
@@ -36,7 +36,7 @@ struct UserAvatar: View {
             }
         }
     }
-    
+
     init(
         name: String? = nil,
         email: String? = nil,
@@ -48,7 +48,7 @@ struct UserAvatar: View {
         self.size = size
         self.showBorder = showBorder
     }
-    
+
     private var initials: String {
         if let name = name, !name.isEmpty {
             return String(name.prefix(1)).uppercased()
@@ -57,7 +57,7 @@ struct UserAvatar: View {
         }
         return "U"
     }
-    
+
     var body: some View {
         ZStack {
             Circle()
@@ -84,7 +84,7 @@ struct UserAvatarWithInfo: View {
     let name: String?
     let email: String?
     let avatarSize: UserAvatar.AvatarSize
-    
+
     var body: some View {
         HStack(spacing: 12) {
             UserAvatar(
@@ -119,10 +119,10 @@ struct UserAvatarWithInfo: View {
             UserAvatar(name: "Bob Wilson", size: .large)
             UserAvatar(name: "Alice Brown", size: .extraLarge)
         }
-        
+
         // With border
         UserAvatar(name: "Test User", size: .large, showBorder: true)
-        
+
         // With info
         UserAvatarWithInfo(
             name: "John Doe",

@@ -12,7 +12,7 @@ struct LiquidGlassCTAButton: View {
     let icon: String?
     let action: () -> Void
     let isEnabled: Bool
-    
+
     // Convenience initializers
     init(
         text: String,
@@ -24,7 +24,7 @@ struct LiquidGlassCTAButton: View {
         self.action = action
         self.isEnabled = isEnabled
     }
-    
+
     init(
         text: String,
         icon: String,
@@ -36,7 +36,7 @@ struct LiquidGlassCTAButton: View {
         self.action = action
         self.isEnabled = isEnabled
     }
-    
+
     var body: some View {
         BaseButton(
             text,
@@ -56,9 +56,9 @@ struct LiquidGlassCTAButton: View {
         .overlay(liquidGlassOverlay)
         .clipShape(RoundedRectangle(cornerRadius: 28))
     }
-    
+
     // MARK: - Styling Components
-    
+
     private var liquidGlassBackground: Color {
         if #available(iOS 18.0, *) {
             if isEnabled {
@@ -70,7 +70,7 @@ struct LiquidGlassCTAButton: View {
             return isEnabled ? Color.white : Color.white.opacity(0.1)
         }
     }
-    
+
     @ViewBuilder
     private var liquidGlassOverlay: some View {
         if isEnabled {
@@ -95,7 +95,7 @@ struct LiquidGlassCTAButton: View {
 struct LiquidGlassSecondaryCTAButton: View {
     let text: String
     let action: () -> Void
-    
+
     var body: some View {
         BaseButton(
             text,
@@ -126,7 +126,7 @@ struct LiquidGlassSecondaryCTAButton: View {
 
 struct LiquidGlassCTAModifier: ViewModifier {
     let isEnabled: Bool
-    
+
     func body(content: Content) -> some View {
         content
             .font(.system(size: 17, weight: .semibold))
@@ -137,7 +137,7 @@ struct LiquidGlassCTAModifier: ViewModifier {
             .overlay(overlayView)
             .clipShape(RoundedRectangle(cornerRadius: 28))
     }
-    
+
     @ViewBuilder private var backgroundView: some View {
         if #available(iOS 18.0, *) {
             if isEnabled {
@@ -164,7 +164,7 @@ struct LiquidGlassCTAModifier: ViewModifier {
                 )
         }
     }
-    
+
     @ViewBuilder private var overlayView: some View {
         if isEnabled {
             RoundedRectangle(cornerRadius: 28)
@@ -198,7 +198,7 @@ extension View {
     ZStack {
         Color.black
             .ignoresSafeArea()
-        
+
         VStack(spacing: 24) {
             // Primary enabled
             LiquidGlassCTAButton(
@@ -207,7 +207,7 @@ extension View {
                 action: {},
                 isEnabled: true
             )
-            
+
             // Primary disabled
             LiquidGlassCTAButton(
                 text: "Continue",
@@ -215,13 +215,13 @@ extension View {
                 action: {},
                 isEnabled: false
             )
-            
+
             // Secondary
             LiquidGlassSecondaryCTAButton(
                 text: "Skip",
                 action: {}
             )
-            
+
             // Using modifier on existing button
             Button(
                 action: {},

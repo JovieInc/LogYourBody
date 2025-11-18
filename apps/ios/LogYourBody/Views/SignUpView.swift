@@ -60,7 +60,7 @@ struct SignUpView: View {
                     )
                     .padding(.top, authManager.isClerkLoaded ? 20 : 12)
                     .padding(.bottom, 40)
-                    
+
                     // Organism: Sign Up Form
                     SignUpForm(
                         email: $email,
@@ -80,13 +80,13 @@ struct SignUpView: View {
                         healthDisclaimerURL: URL(string: "https://logyourbody.com/health-disclaimer")!
                     )
                     .padding(.horizontal, 24)
-                    
+
                     // Sign In Link
                     HStack(spacing: 4) {
                         Text("Already have an account?")
                             .font(.system(size: 15))
                             .foregroundColor(.appTextSecondary)
-                        
+
                         Button("Sign in") {
                             dismiss()
                         }
@@ -94,7 +94,7 @@ struct SignUpView: View {
                         .foregroundColor(.appPrimary)
                     }
                     .padding(.top, 8)
-                    
+
                     Spacer(minLength: 40)
                 }
             }
@@ -119,7 +119,7 @@ struct SignUpView: View {
                 .ignoresSafeArea()
         }
     }
-    
+
     // Clerk status banner (same as LoginView)
     private var clerkStatusBanner: some View {
         VStack(spacing: 12) {
@@ -239,20 +239,20 @@ struct SignUpView: View {
 
 struct SafariView: UIViewControllerRepresentable {
     let url: URL
-    
+
     func makeUIViewController(context: Context) -> SFSafariViewController {
         let config = SFSafariViewController.Configuration()
         config.entersReaderIfAvailable = false
         config.barCollapsingEnabled = true
-        
+
         let controller = SFSafariViewController(url: url, configuration: config)
         controller.preferredControlTintColor = .white
         controller.preferredBarTintColor = UIColor(Color.appBackground)
         controller.dismissButtonStyle = .close
-        
+
         return controller
     }
-    
+
     func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 

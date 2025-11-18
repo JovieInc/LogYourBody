@@ -15,7 +15,7 @@ struct ButtonConfiguration {
     var icon: String?
     var iconPosition: IconPosition = .leading
     var hapticFeedback: UIImpactFeedbackGenerator.FeedbackStyle? = .light
-    
+
     enum ButtonStyleVariant {
         case primary
         case secondary
@@ -24,7 +24,7 @@ struct ButtonConfiguration {
         case ghost
         case social
         case custom(background: Color, foreground: Color)
-        
+
         var backgroundColor: Color {
             switch self {
             case .primary: return .appPrimary
@@ -36,7 +36,7 @@ struct ButtonConfiguration {
             case .custom(let bg, _): return bg
             }
         }
-        
+
         var foregroundColor: Color {
             switch self {
             case .primary: return .white
@@ -48,7 +48,7 @@ struct ButtonConfiguration {
             case .custom(_, let fg): return fg
             }
         }
-        
+
         var borderColor: Color? {
             switch self {
             case .secondary: return .appPrimary.opacity(0.5)
@@ -57,13 +57,13 @@ struct ButtonConfiguration {
             }
         }
     }
-    
+
     enum ButtonSizeVariant {
         case small
         case medium
         case large
         case custom(height: CGFloat, padding: EdgeInsets, fontSize: CGFloat)
-        
+
         var height: CGFloat {
             switch self {
             case .small: return 36
@@ -72,7 +72,7 @@ struct ButtonConfiguration {
             case .custom(let height, _, _): return height
             }
         }
-        
+
         var padding: EdgeInsets {
             switch self {
             case .small: return EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
@@ -81,7 +81,7 @@ struct ButtonConfiguration {
             case .custom(_, let padding, _): return padding
             }
         }
-        
+
         var fontSize: CGFloat {
             switch self {
             case .small: return 14
@@ -90,12 +90,12 @@ struct ButtonConfiguration {
             case .custom(_, _, let fontSize): return fontSize
             }
         }
-        
+
         var iconSize: CGFloat {
             fontSize * 0.9
         }
     }
-    
+
     enum IconPosition {
         case leading
         case trailing
@@ -106,17 +106,17 @@ struct ButtonConfiguration {
 
 struct BaseButton<Label: View>: View {
     @Environment(\.isEnabled) private var isEnvironmentEnabled
-    
+
     let configuration: ButtonConfiguration
     let action: () -> Void
     @ViewBuilder let label: () -> Label
-    
+
     @State private var isPressed = false
-    
+
     private var isEnabled: Bool {
         configuration.isEnabled && !configuration.isLoading && isEnvironmentEnabled
     }
-    
+
     var body: some View {
         Button(action: handleTap) {
             buttonContent
@@ -144,7 +144,7 @@ struct BaseButton<Label: View>: View {
             perform: {}
         )
     }
-    
+
     @ViewBuilder
     private var buttonContent: some View {
         if configuration.isLoading {
@@ -157,12 +157,12 @@ struct BaseButton<Label: View>: View {
                 .foregroundColor(configuration.style.foregroundColor)
         }
     }
-    
+
     @ViewBuilder
     private var backgroundView: some View {
         configuration.style.backgroundColor
     }
-    
+
     @ViewBuilder
     private var borderOverlay: some View {
         if let borderColor = configuration.style.borderColor {
@@ -170,15 +170,15 @@ struct BaseButton<Label: View>: View {
                 .stroke(borderColor, lineWidth: 1.5)
         }
     }
-    
+
     private func handleTap() {
         guard isEnabled else { return }
-        
+
         if let feedbackStyle = configuration.hapticFeedback {
             let generator = UIImpactFeedbackGenerator(style: feedbackStyle)
             generator.impactOccurred()
         }
-        
+
         action()
     }
 }
@@ -200,9 +200,9 @@ extension BaseButton where Label == AnyView {
                         Image(systemName: icon)
                             .font(.system(size: configuration.size.iconSize))
                     }
-                    
+
                     Text(title)
-                    
+
                     if configuration.iconPosition == .trailing, let icon = configuration.icon {
                         Image(systemName: icon)
                             .font(.system(size: configuration.size.iconSize))
@@ -220,22 +220,22 @@ struct BaseIconButton: View {
     let size: CGFloat
     let style: IconButtonStyle
     let action: () -> Void
-    
+
     @State private var isPressed = false
     @Environment(\.isEnabled) private var isEnabled
-    
+
     enum IconButtonStyle {
         case filled
         case outlined
         case plain
-        
+
         var backgroundColor: Color {
             switch self {
             case .filled: return .appCard
             case .outlined, .plain: return .clear
             }
         }
-        
+
         var borderColor: Color? {
             switch self {
             case .outlined: return .appBorder
@@ -243,7 +243,7 @@ struct BaseIconButton: View {
             }
         }
     }
-    
+
     var body: some View {
         Button(action: {
             let generator = UIImpactFeedbackGenerator(style: .light)
@@ -296,9 +296,9 @@ struct BaseIconButton: View {
                 BaseButton("Destructive", configuration: ButtonConfiguration(style: .destructive), action: {})
                 BaseButton("Ghost", configuration: ButtonConfiguration(style: .ghost), action: {})
             }
-            
+
             Divider()
-            
+
             // With icons
             Group {
                 Text("With Icons").font(.headline)
@@ -313,9 +313,9 @@ struct BaseIconButton: View {
                     action: {}
                 )
             }
-            
+
             Divider()
-            
+
             // Sizes
             Group {
                 Text("Sizes").font(.headline)
@@ -323,9 +323,9 @@ struct BaseIconButton: View {
                 BaseButton("Medium", configuration: ButtonConfiguration(size: .medium), action: {})
                 BaseButton("Large", configuration: ButtonConfiguration(size: .large), action: {})
             }
-            
+
             Divider()
-            
+
             // States
             Group {
                 Text("States").font(.headline)
@@ -333,9 +333,9 @@ struct BaseIconButton: View {
                 BaseButton("Disabled", configuration: ButtonConfiguration(isEnabled: false), action: {})
                 BaseButton("Full Width", configuration: ButtonConfiguration(fullWidth: true), action: {})
             }
-            
+
             Divider()
-            
+
             // Icon buttons
             Group {
                 Text("Icon Buttons").font(.headline)
@@ -345,9 +345,9 @@ struct BaseIconButton: View {
                     BaseIconButton(icon: "gear", size: 24, style: .plain, action: {})
                 }
             }
-            
+
             Divider()
-            
+
             // Custom content
             Group {
                 Text("Custom Content").font(.headline)

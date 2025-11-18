@@ -9,21 +9,21 @@ import Combine
 @MainActor
 class BackgroundPhotoUploadService: ObservableObject {
     static let shared = BackgroundPhotoUploadService()
-    
+
     @Published var uploadQueue: [PhotoUploadTask] = []
     @Published var completedUploads: [PhotoUploadTask] = []
     @Published var failedUploads: [PhotoUploadTask] = []
     @Published var totalProgress: Double = 0.0
     @Published var isUploading = false
     @Published var currentUploadingPhoto: PhotoUploadTask?
-    
+
     private let authManager = AuthManager.shared
     private let supabaseManager = SupabaseManager.shared
     private let coreDataManager = CoreDataManager.shared
     private let photoMetadataService = PhotoMetadataService.shared
     private var uploadCancellables = Set<AnyCancellable>()
     private var uploadTask: Task<Void, Never>?
-    
+
     struct PhotoUploadTask: Identifiable {
         let id = UUID()
         let photoItem: PhotosPickerItem
@@ -34,7 +34,7 @@ class BackgroundPhotoUploadService: ObservableObject {
         var error: String?
         var progress: Double = 0.0
     }
-    
+
     enum UploadStatus {
         case pending
         case extracting
@@ -43,14 +43,14 @@ class BackgroundPhotoUploadService: ObservableObject {
         case completed
         case failed
     }
-    
+
     private init() {}
-    
+
     // MARK: - Public Methods
-    
+
     func queuePhotosForUpload(_ photos: [PhotosPickerItem]) async {
         // print("📸 BackgroundUploadService: Queuing \(photos.count) photos for upload")
-        
+
         // Extract dates and create tasks
         for photo in photos {
             // Load the photo data first
@@ -64,54 +64,54 @@ class BackgroundPhotoUploadService: ObservableObject {
                 uploadQueue.append(task)
             }
         }
-        
+
         // Start processing if not already running
         if !isUploading {
             startProcessingQueue()
         }
     }
-    
+
     func startProcessingQueue() {
         guard !isUploading && !uploadQueue.isEmpty else { return }
-        
+
         isUploading = true
-        
+
         uploadTask = Task {
             while !uploadQueue.isEmpty {
                 if Task.isCancelled { break }
-                
+
                 // Get next task
                 var task = uploadQueue.removeFirst()
                 currentUploadingPhoto = task
-                
+
                 do {
                     // Update status
                     task.status = .extracting
                     updateTaskInQueue(task)
-                    
+
                     // Extract image data
                     guard let imageData = try await task.photoItem.loadTransferable(type: Data.self),
                           let image = UIImage(data: imageData) else {
                         throw PhotoUploadManager.PhotoError.imageConversionFailed
                     }
-                    
+
                     // Create body metrics entry
                     task.status = .uploading
                     updateTaskInQueue(task)
-                    
+
                     let metrics = await createBodyMetrics(for: task.date)
                     task.metricsId = metrics.id
-                    
+
                     // Upload photo using PhotoUploadManager
                     let photoUrl = try await PhotoUploadManager.shared.uploadProgressPhoto(
                         for: metrics,
                         image: image
                     )
-                    
+
                     task.status = .completed
                     task.photoUrl = photoUrl
                     task.progress = 1.0
-                    
+
                     completedUploads.append(task)
                 } catch {
                     // print("❌ BackgroundUploadService: Failed to upload photo: \(error)")
@@ -119,16 +119,16 @@ class BackgroundPhotoUploadService: ObservableObject {
                     task.error = error.localizedDescription
                     failedUploads.append(task)
                 }
-                
+
                 updateOverallProgress()
             }
-            
+
             currentUploadingPhoto = nil
             isUploading = false
             // print("✅ BackgroundUploadService: Queue processing complete")
         }
     }
-    
+
     func cancelAllUploads() {
         uploadTask?.cancel()
         uploadQueue.removeAll()
@@ -136,19 +136,19 @@ class BackgroundPhotoUploadService: ObservableObject {
         currentUploadingPhoto = nil
         totalProgress = 0.0
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func createBodyMetrics(for date: Date) async -> BodyMetrics {
         let userId = authManager.currentUser?.id ?? ""
-        
+
         // Check if metrics already exist for this date
         let existingMetrics = await coreDataManager.fetchBodyMetrics(for: userId)
             .first { metrics in
                 guard let metricsDate = metrics.date else { return false }
                 return Calendar.current.isDate(metricsDate, inSameDayAs: date)
             }
-        
+
         if let existing = existingMetrics {
             // Convert CachedBodyMetrics to BodyMetrics
             return BodyMetrics(
@@ -168,7 +168,7 @@ class BackgroundPhotoUploadService: ObservableObject {
                 updatedAt: existing.updatedAt ?? Date()
             )
         }
-        
+
         // Create new metrics
         let metricsId = UUID().uuidString
         let newMetrics = BodyMetrics(
@@ -187,49 +187,49 @@ class BackgroundPhotoUploadService: ObservableObject {
             createdAt: Date(),
             updatedAt: Date()
         )
-        
+
         // Save to CoreData
         coreDataManager.saveBodyMetrics(newMetrics, userId: userId, markAsSynced: false)
-        
+
         return newMetrics
     }
-    
+
     private func updateTaskInQueue(_ task: PhotoUploadTask) {
         // Update current task if it matches
         if currentUploadingPhoto?.id == task.id {
             currentUploadingPhoto = task
         }
     }
-    
+
     private func updateOverallProgress() {
         let total = Double(uploadQueue.count + completedUploads.count + failedUploads.count)
         let completed = Double(completedUploads.count)
-        
+
         if total > 0 {
             totalProgress = completed / total
         } else {
             totalProgress = 0
         }
     }
-    
+
     // MARK: - Status Helpers
-    
+
     var pendingCount: Int {
         uploadQueue.count
     }
-    
+
     var completedCount: Int {
         completedUploads.count
     }
-    
+
     var failedCount: Int {
         failedUploads.count
     }
-    
+
     var totalCount: Int {
         pendingCount + completedCount + failedCount
     }
-    
+
     var uploadSummary: String {
         if isUploading {
             return "Uploading \(completedCount + 1) of \(totalCount) photos..."
@@ -239,7 +239,7 @@ class BackgroundPhotoUploadService: ObservableObject {
             return "Ready to upload photos"
         }
     }
-    
+
     func reset() {
         uploadQueue.removeAll()
         completedUploads.removeAll()

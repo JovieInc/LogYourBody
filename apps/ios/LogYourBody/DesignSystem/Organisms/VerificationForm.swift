@@ -9,16 +9,16 @@ import SwiftUI
 struct VerificationForm: View {
     @Binding var verificationCode: String
     @Binding var isLoading: Bool
-    
+
     let email: String
     let onVerify: () -> Void
     let onResend: () -> Void
-    
+
     @State private var timeRemaining: Int = 60
     @State private var timerActive = true
-    
+
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    
+
     var body: some View {
         VStack(spacing: 32) {
             // Instructions
@@ -26,13 +26,13 @@ struct VerificationForm: View {
                 Text("We've sent a verification code to")
                     .font(.system(size: 16))
                     .foregroundColor(.appTextSecondary)
-                
+
                 Text(email)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.appText)
             }
             .multilineTextAlignment(.center)
-            
+
             // OTP Field
             OTPField(
                 code: $verificationCode,
@@ -43,7 +43,7 @@ struct VerificationForm: View {
                     }
                 }
             )
-            
+
             // Verify Button
             BaseButton(
                 "Verify",
@@ -55,7 +55,7 @@ struct VerificationForm: View {
                 ),
                 action: onVerify
             )
-            
+
             // Resend Code
             VStack(spacing: 4) {
                 if timerActive && timeRemaining > 0 {
@@ -67,7 +67,7 @@ struct VerificationForm: View {
                         Text("Didn't receive code?")
                             .font(.system(size: 14))
                             .foregroundColor(.appTextSecondary)
-                        
+
                         DSAuthLink(title: "Resend") {
                             onResend()
                             resetTimer()
@@ -84,7 +84,7 @@ struct VerificationForm: View {
             }
         }
     }
-    
+
     private func resetTimer() {
         timeRemaining = 60
         timerActive = true
@@ -100,7 +100,7 @@ struct VerificationForm: View {
             subtitle: "Enter the 6-digit code"
         )
         .padding(.top, 40)
-        
+
         VerificationForm(
             verificationCode: .constant(""),
             isLoading: .constant(false),
@@ -109,7 +109,7 @@ struct VerificationForm: View {
             onResend: {}
         )
         .padding(.horizontal, 24)
-        
+
         Spacer()
     }
     .background(Color.appBackground)

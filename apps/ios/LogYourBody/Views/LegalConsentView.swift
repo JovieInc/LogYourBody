@@ -8,22 +8,22 @@ struct LegalConsentView: View {
     @Binding var isPresented: Bool
     let userId: String
     let onAccept: () async -> Void
-    
+
     @State private var acceptedTerms = false
     @State private var acceptedPrivacy = false
     @State private var isLoading = false
-    
+
     private var canContinue: Bool {
         acceptedTerms && acceptedPrivacy && !isLoading
     }
-    
+
     var body: some View {
         ZStack {
             // Background
             Color.black.opacity(0.8)
                 .ignoresSafeArea()
                 .onTapGesture { } // Prevent dismissal by tapping background
-            
+
             VStack(spacing: 0) {
                 // Content
                 VStack(spacing: 24) {
@@ -32,13 +32,13 @@ struct LegalConsentView: View {
                         Text("Welcome to LogYourBody")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
-                        
+
                         Text("Please review and accept our terms")
                             .font(.system(size: 16))
                             .foregroundColor(.white.opacity(0.7))
                     }
                     .padding(.top, 32)
-                    
+
                     // Checkboxes
                     VStack(spacing: 16) {
                         ConsentCheckbox(
@@ -47,7 +47,7 @@ struct LegalConsentView: View {
                             linkText: "Terms of Service",
                             url: URL(string: "https://logyourbody.com/terms")!
                         )
-                        
+
                         ConsentCheckbox(
                             isChecked: $acceptedPrivacy,
                             text: "I accept the ",
@@ -56,36 +56,36 @@ struct LegalConsentView: View {
                         )
                     }
                     .padding(.horizontal, 24)
-                    
+
                     // Continue Button
                     Button(
-            action: {
-                        Task {
-                            isLoading = true
-                            await onAccept()
-                            isLoading = false
-                            isPresented = false
-                        }
-                    },
-            label: {
-                        HStack {
-                            if isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                                    .scaleEffect(0.8)
-                            } else {
-                                Text("Continue")
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundColor(canContinue ? .black : .white.opacity(0.5))
+                        action: {
+                            Task {
+                                isLoading = true
+                                await onAccept()
+                                isLoading = false
+                                isPresented = false
                             }
+                        },
+                        label: {
+                            HStack {
+                                if isLoading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Text("Continue")
+                                        .font(.system(size: 17, weight: .semibold))
+                                        .foregroundColor(canContinue ? .black : .white.opacity(0.5))
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(canContinue ? Color.white : Color.white.opacity(0.2))
+                            .cornerRadius(12)
+                            .animation(.easeInOut(duration: 0.2), value: canContinue)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(canContinue ? Color.white : Color.white.opacity(0.2))
-                        .cornerRadius(12)
-                        .animation(.easeInOut(duration: 0.2), value: canContinue)
-                    }
-        )
+                    )
                     .disabled(!canContinue)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 32)
@@ -108,46 +108,46 @@ struct ConsentCheckbox: View {
     let text: String
     let linkText: String
     let url: URL
-    
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             // Custom checkbox
             Button(
-            action: {
-                isChecked.toggle()
-            },
-            label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.white.opacity(0.3), lineWidth: 2)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(isChecked ? Color.white : Color.clear)
-                        )
-                    
-                    if isChecked {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.black)
+                action: {
+                    isChecked.toggle()
+                },
+                label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                            .frame(width: 24, height: 24)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(isChecked ? Color.white : Color.clear)
+                            )
+
+                        if isChecked {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.black)
+                        }
                     }
                 }
-            }
-        )
+            )
             .buttonStyle(PlainButtonStyle())
-            
+
             // Text with link
             HStack(spacing: 0) {
                 Text(text)
                     .font(.system(size: 15))
                     .foregroundColor(.white.opacity(0.9))
-                
+
                 Link(linkText, destination: url)
                     .font(.system(size: 15))
                     .foregroundColor(.white)
                     .underline()
             }
-            
+
             Spacer()
         }
     }

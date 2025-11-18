@@ -11,7 +11,7 @@ struct OptimizedProgressPhotoView: View {
     @State private var isLoading = true
     @State private var loadedImage: UIImage?
     @State private var loadError = false
-    
+
     // Shared image cache
     private static let imageCache: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
@@ -20,7 +20,7 @@ struct OptimizedProgressPhotoView: View {
         cache.totalCostLimit = 100 * 1_024 * 1_024 // 100MB
         return cache
     }()
-    
+
     var body: some View {
         ZStack {
             if let image = loadedImage {
@@ -60,13 +60,13 @@ struct OptimizedProgressPhotoView: View {
             loadImage()
         }
     }
-    
+
     private func loadImage() {
         guard let photoUrl = photoUrl, !photoUrl.isEmpty else {
             isLoading = false
             return
         }
-        
+
         // Check cache first
         let cacheKey = NSString(string: photoUrl)
         if let cachedImage = Self.imageCache.object(forKey: cacheKey) {
@@ -74,13 +74,13 @@ struct OptimizedProgressPhotoView: View {
             self.isLoading = false
             return
         }
-        
+
         // Load from network
         Task {
             await loadFromNetwork(urlString: photoUrl)
         }
     }
-    
+
     @MainActor
     private func loadFromNetwork(urlString: String) async {
         guard let url = URL(string: urlString) else {
@@ -88,13 +88,13 @@ struct OptimizedProgressPhotoView: View {
             loadError = true
             return
         }
-        
+
         // Check if it's a local file URL
         if url.isFileURL {
             await loadLocalFile(url: url, urlString: urlString)
             return
         }
-        
+
         do {
             // Configure URLSession for optimal image loading
             let config = URLSessionConfiguration.default
@@ -104,10 +104,10 @@ struct OptimizedProgressPhotoView: View {
                 diskPath: "progress_photos"
             )
             config.requestCachePolicy = .returnCacheDataElseLoad
-            
+
             let session = URLSession(configuration: config)
             let (data, response) = try await session.data(from: url)
-            
+
             // Verify response
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode),
@@ -116,16 +116,16 @@ struct OptimizedProgressPhotoView: View {
                 loadError = true
                 return
             }
-            
+
             // Process image on background queue
             let processedImage = await Task.detached(priority: .userInitiated) {
                 return optimizeImage(image)
             }.value
-            
+
             // Cache the processed image
             let cost = processedImage.pngData()?.count ?? 0
             Self.imageCache.setObject(processedImage, forKey: NSString(string: urlString), cost: cost)
-            
+
             // Update UI
             withAnimation(.easeInOut(duration: 0.3)) {
                 self.loadedImage = processedImage
@@ -137,7 +137,7 @@ struct OptimizedProgressPhotoView: View {
             loadError = true
         }
     }
-    
+
     @MainActor
     private func loadLocalFile(url: URL, urlString: String) async {
         do {
@@ -147,16 +147,16 @@ struct OptimizedProgressPhotoView: View {
                 loadError = true
                 return
             }
-            
+
             // Process image on background queue
             let processedImage = await Task.detached(priority: .userInitiated) {
                 return optimizeImage(image)
             }.value
-            
+
             // Cache the processed image
             let cost = processedImage.pngData()?.count ?? 0
             Self.imageCache.setObject(processedImage, forKey: NSString(string: urlString), cost: cost)
-            
+
             // Update UI
             withAnimation(.easeInOut(duration: 0.3)) {
                 self.loadedImage = processedImage
@@ -168,26 +168,26 @@ struct OptimizedProgressPhotoView: View {
             loadError = true
         }
     }
-    
+
     private func optimizeImage(_ image: UIImage) -> UIImage {
         // First fix orientation if needed
         let orientedImage = image.fixedOrientation()
-        
+
         // Optimize for display
         let maxDimension: CGFloat = UIScreen.main.bounds.width * UIScreen.main.scale
         let size = orientedImage.size
-        
+
         guard size.width > maxDimension || size.height > maxDimension else {
             return orientedImage
         }
-        
+
         let scale = min(maxDimension / size.width, maxDimension / size.height)
         let targetSize = CGSize(width: size.width * scale, height: size.height * scale)
-        
+
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0
         format.opaque = false
-        
+
         let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
         return renderer.image { _ in
             orientedImage.draw(in: CGRect(origin: .zero, size: targetSize))
@@ -200,18 +200,18 @@ extension OptimizedProgressPhotoView {
     static func preloadImages(urls: [String]) {
         for urlString in urls {
             let cacheKey = NSString(string: urlString)
-            
+
             // Skip if already cached
             if imageCache.object(forKey: cacheKey) != nil {
                 continue
             }
-            
+
             // Load in background
             Task.detached(priority: .background) {
                 guard let url = URL(string: urlString),
                       let (data, _) = try? await URLSession.shared.data(from: url),
                       let image = UIImage(data: data) else { return }
-                
+
                 let cost = data.count
                 await MainActor.run {
                     imageCache.setObject(image, forKey: cacheKey, cost: cost)

@@ -17,13 +17,13 @@ struct TextFieldConfiguration {
     var characterLimit: Int?
     var cornerRadius: CGFloat = 10
     var padding = EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
-    
+
     enum TextFieldStyle {
         case `default`
         case outlined
         case underlined
         case custom(background: Color, border: Color?)
-        
+
         var backgroundColor: Color {
             switch self {
             case .default: return Color(.systemGray6)
@@ -31,7 +31,7 @@ struct TextFieldConfiguration {
             case .custom(let bg, _): return bg
             }
         }
-        
+
         var borderColor: Color? {
             switch self {
             case .outlined: return .appBorder
@@ -56,15 +56,15 @@ struct BaseTextField: View {
     var submitLabel: SubmitLabel = .done
     var onSubmit: (() -> Void)?
     var onChange: ((String) -> Void)?
-    
+
     @State private var isSecureTextVisible = false
     @FocusState private var isFocused: Bool
     @Environment(\.isEnabled) private var isEnabled
-    
+
     private var hasError: Bool {
         configuration.errorMessage != nil
     }
-    
+
     private var effectiveBorderColor: Color {
         if hasError {
             return .red
@@ -74,7 +74,7 @@ struct BaseTextField: View {
             return configuration.style.borderColor ?? .clear
         }
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             // Main field container
@@ -85,7 +85,7 @@ struct BaseTextField: View {
                         .font(.system(size: 18))
                         .foregroundColor(.appTextSecondary)
                 }
-                
+
                 // Text field
                 Group {
                     if configuration.isSecure && !isSecureTextVisible {
@@ -111,7 +111,7 @@ struct BaseTextField: View {
                     onChange?(newValue)
                 }
                 .focused($isFocused)
-                
+
                 // Trailing elements
                 HStack(spacing: 8) {
                     // Character count
@@ -120,7 +120,7 @@ struct BaseTextField: View {
                             .font(.caption)
                             .foregroundColor(.appTextTertiary)
                     }
-                    
+
                     // Secure text toggle
                     if configuration.isSecure && configuration.showToggle {
                         Button(action: {
@@ -132,7 +132,7 @@ struct BaseTextField: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
-                    
+
                     // Error icon
                     if hasError {
                         Image(systemName: "exclamationmark.circle.fill")
@@ -147,7 +147,7 @@ struct BaseTextField: View {
             .opacity(isEnabled ? 1.0 : 0.6)
             .animation(.easeInOut(duration: 0.2), value: isFocused)
             .animation(.easeInOut(duration: 0.2), value: hasError)
-            
+
             // Helper/Error text
             if let errorMessage = configuration.errorMessage {
                 Text(errorMessage)
@@ -162,7 +162,7 @@ struct BaseTextField: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private var fieldBackground: some View {
         switch configuration.style {
@@ -173,7 +173,7 @@ struct BaseTextField: View {
                 .fill(configuration.style.backgroundColor)
         }
     }
-    
+
     @ViewBuilder
     private var fieldOverlay: some View {
         switch configuration.style {
@@ -202,7 +202,7 @@ extension TextFieldConfiguration {
             icon: "envelope"
         )
     }
-    
+
     static var password: TextFieldConfiguration {
         TextFieldConfiguration(
             hasIcon: true,
@@ -211,7 +211,7 @@ extension TextFieldConfiguration {
             showToggle: true
         )
     }
-    
+
     static var search: TextFieldConfiguration {
         TextFieldConfiguration(
             hasIcon: true,
@@ -233,7 +233,7 @@ extension TextFieldConfiguration {
                     text: .constant(""),
                     placeholder: "Enter your name"
                 )
-                
+
                 BaseTextField(
                     text: .constant("john@example.com"),
                     placeholder: "Email",
@@ -243,9 +243,9 @@ extension TextFieldConfiguration {
                     autocapitalization: .never
                 )
             }
-            
+
             Divider()
-            
+
             // Outlined style
             Group {
                 Text("Outlined Style").font(.headline)
@@ -255,9 +255,9 @@ extension TextFieldConfiguration {
                     configuration: TextFieldConfiguration(style: .outlined)
                 )
             }
-            
+
             Divider()
-            
+
             // Underlined style
             Group {
                 Text("Underlined Style").font(.headline)
@@ -267,9 +267,9 @@ extension TextFieldConfiguration {
                     configuration: TextFieldConfiguration(style: .underlined)
                 )
             }
-            
+
             Divider()
-            
+
             // Password field
             Group {
                 Text("Password Field").font(.headline)
@@ -280,9 +280,9 @@ extension TextFieldConfiguration {
                     textContentType: .password
                 )
             }
-            
+
             Divider()
-            
+
             // With character limit
             Group {
                 Text("Character Limit").font(.headline)
@@ -295,9 +295,9 @@ extension TextFieldConfiguration {
                     )
                 )
             }
-            
+
             Divider()
-            
+
             // Error state
             Group {
                 Text("Error State").font(.headline)
@@ -311,9 +311,9 @@ extension TextFieldConfiguration {
                     )
                 )
             }
-            
+
             Divider()
-            
+
             // Search field
             Group {
                 Text("Search Field").font(.headline)
@@ -323,9 +323,9 @@ extension TextFieldConfiguration {
                     configuration: .search
                 )
             }
-            
+
             Divider()
-            
+
             // Disabled state
             Group {
                 Text("Disabled State").font(.headline)

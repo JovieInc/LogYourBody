@@ -10,9 +10,9 @@ struct OTPField: View {
     @Binding var code: String
     let length: Int
     let onComplete: ((String) -> Void)?
-    
+
     @FocusState private var isFieldFocused: Bool
-    
+
     init(
         code: Binding<String>,
         length: Int = 6,
@@ -22,7 +22,7 @@ struct OTPField: View {
         self.length = length
         self.onComplete = onComplete
     }
-    
+
     var body: some View {
         ZStack {
             // Hidden TextField
@@ -36,13 +36,13 @@ struct OTPField: View {
                     if newValue.count > length {
                         code = String(newValue.prefix(length))
                     }
-                    
+
                     // Call completion handler
                     if newValue.count == length {
                         onComplete?(newValue)
                     }
                 }
-            
+
             // Visual OTP boxes
             HStack(spacing: 12) {
                 ForEach(0..<length, id: \.self) { index in
@@ -57,7 +57,7 @@ struct OTPField: View {
             }
         }
     }
-    
+
     private func digitAt(_ index: Int) -> String {
         if index < code.count {
             let codeIndex = code.index(code.startIndex, offsetBy: index)
@@ -72,7 +72,7 @@ struct OTPField: View {
 private struct OTPDigitBox: View {
     let digit: String
     let isActive: Bool
-    
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8)
@@ -82,11 +82,11 @@ private struct OTPDigitBox: View {
                         .stroke(isActive ? Color.appPrimary : Color.appBorder, lineWidth: 1)
                 )
                 .frame(width: 46, height: 56)
-            
+
             Text(digit)
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(.appText)
-            
+
             if isActive {
                 Rectangle()
                     .fill(Color.appPrimary)
@@ -103,11 +103,11 @@ private struct OTPDigitBox: View {
 #Preview {
     VStack(spacing: 40) {
         OTPField(code: .constant(""))
-        
+
         OTPField(code: .constant("123"))
-        
+
         OTPField(code: .constant("123456"))
-        
+
         OTPField(code: .constant("1234"), length: 4)
     }
     .padding()

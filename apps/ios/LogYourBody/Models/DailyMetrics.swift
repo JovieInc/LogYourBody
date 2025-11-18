@@ -12,7 +12,7 @@ struct DailyMetrics: Identifiable, Codable {
     let notes: String?
     let createdAt: Date
     let updatedAt: Date
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"

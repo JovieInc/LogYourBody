@@ -5,14 +5,14 @@
 import Foundation
 class SupabaseClient {
     static let shared = SupabaseClient()
-    
+
     private let supabaseURL = Constants.supabaseURL
     private let supabaseAnonKey = Constants.supabaseAnonKey
-    
+
     private init() {}
-    
+
     // MARK: - Database Operations
-    
+
     func query<T: Decodable>(
         table: String,
         accessToken: String,
@@ -23,7 +23,7 @@ class SupabaseClient {
     ) async throws -> [T] {
         var urlString = "\(supabaseURL)/rest/v1/\(table)"
         var queryItems: [String] = []
-        
+
         if let select = select {
             queryItems.append("select=\(select)")
         }
@@ -36,30 +36,30 @@ class SupabaseClient {
         if let limit = limit {
             queryItems.append("limit=\(limit)")
         }
-        
+
         if !queryItems.isEmpty {
             urlString += "?" + queryItems.joined(separator: "&")
         }
-        
+
         let url = URL(string: urlString)!
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SupabaseError.networkError
         }
-        
+
         if httpResponse.statusCode != 200 {
             throw SupabaseError.httpError(httpResponse.statusCode)
         }
-        
+
         return try JSONDecoder().decode([T].self, from: data)
     }
-    
+
     func insert<T: Encodable>(
         table: String,
         data: T,
@@ -72,22 +72,22 @@ class SupabaseClient {
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("return=minimal", forHTTPHeaderField: "Prefer")
-        
+
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         request.httpBody = try encoder.encode(data)
-        
+
         let (_, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SupabaseError.networkError
         }
-        
+
         if httpResponse.statusCode != 201 {
             throw SupabaseError.httpError(httpResponse.statusCode)
         }
     }
-    
+
     func update<T: Encodable>(
         table: String,
         data: T,
@@ -101,17 +101,17 @@ class SupabaseClient {
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("return=minimal", forHTTPHeaderField: "Prefer")
-        
+
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         request.httpBody = try encoder.encode(data)
-        
+
         let (_, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SupabaseError.networkError
         }
-        
+
         if httpResponse.statusCode != 204 {
             throw SupabaseError.httpError(httpResponse.statusCode)
         }
@@ -129,7 +129,7 @@ enum SupabaseError: LocalizedError {
     case httpError(Int)
     case requestFailed
     case invalidData
-    
+
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:

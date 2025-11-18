@@ -104,10 +104,10 @@ struct SecondaryMetricsRow: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
     private func formatSteps(_ steps: Int?) -> String {
         guard let steps = steps else { return "––" }
-        
+
         if steps >= 10_000 {
             return String(format: "%.1fK", Double(steps) / 1_000)
         } else {

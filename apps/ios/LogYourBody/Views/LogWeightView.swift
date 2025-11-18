@@ -17,43 +17,43 @@ struct LogWeightView: View {
     @Environment(\.dismiss)
     var dismiss
     @FocusState private var focusedField: Field?
-    
+
     enum Field {
         case weight, bodyFat
     }
-    
+
     var currentSystem: MeasurementSystem {
         MeasurementSystem(rawValue: measurementSystem) ?? .imperial
     }
-    
+
     var body: some View {
         NavigationView {
             ZStack {
                 // Background
                 Color.appBackground
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Header
                     HStack {
                         Button(
-            action: { dismiss() },
-            label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.appTextSecondary)
-                                .frame(width: 44, height: 44)
-                        }
-        )
-                        
+                            action: { dismiss() },
+                            label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(.appTextSecondary)
+                                    .frame(width: 44, height: 44)
+                            }
+                        )
+
                         Spacer()
-                        
+
                         Text("Log Metrics")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(.appText)
-                        
+
                         Spacer()
-                        
+
                         // Quick add button (optional)
                         Button(action: quickAdd) {
                             Text("Quick")
@@ -64,7 +64,7 @@ struct LogWeightView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
-                    
+
                     ScrollView {
                         VStack(spacing: 32) {
                             // Hero section with both inputs
@@ -80,7 +80,7 @@ struct LogWeightView: View {
                                             .foregroundColor(.appText)
                                         Spacer()
                                     }
-                                    
+
                                     HStack(alignment: .bottom, spacing: 8) {
                                         TextField("--", text: $weight)
                                             .font(.system(size: 40, weight: .bold, design: .rounded))
@@ -89,7 +89,7 @@ struct LogWeightView: View {
                                             .keyboardType(.decimalPad)
                                             .focused($focusedField, equals: .weight)
                                             .frame(maxWidth: 150)
-                                        
+
                                         Text(currentSystem.weightUnit)
                                             .font(.system(size: 20, weight: .medium))
                                             .foregroundColor(.appTextSecondary)
@@ -106,7 +106,7 @@ struct LogWeightView: View {
                                 .onTapGesture {
                                     focusedField = .weight
                                 }
-                                
+
                                 // Body fat input card
                                 VStack(spacing: 16) {
                                     HStack {
@@ -125,7 +125,7 @@ struct LogWeightView: View {
                                             .background(Color.appTextTertiary.opacity(0.1))
                                             .cornerRadius(8)
                                     }
-                                    
+
                                     HStack(alignment: .bottom, spacing: 8) {
                                         TextField("--", text: $bodyFat)
                                             .font(.system(size: 40, weight: .bold, design: .rounded))
@@ -134,7 +134,7 @@ struct LogWeightView: View {
                                             .keyboardType(.decimalPad)
                                             .focused($focusedField, equals: .bodyFat)
                                             .frame(maxWidth: 150)
-                                        
+
                                         Text("%")
                                             .font(.system(size: 20, weight: .medium))
                                             .foregroundColor(.appTextSecondary)
@@ -154,7 +154,7 @@ struct LogWeightView: View {
                             }
                             .padding(.horizontal, 20)
                             .padding(.top, 20)
-                            
+
                             // Date and helpful info
                             VStack(spacing: 12) {
                                 HStack {
@@ -166,7 +166,7 @@ struct LogWeightView: View {
                                         .foregroundColor(.appTextSecondary)
                                     Spacer()
                                 }
-                                
+
                                 if !weight.isEmpty || !bodyFat.isEmpty {
                                     VStack(spacing: 8) {
                                         if !weight.isEmpty, let weightValue = Double(weight) {
@@ -180,7 +180,7 @@ struct LogWeightView: View {
                                             }
                                             .font(.system(size: 14))
                                         }
-                                        
+
                                         if !bodyFat.isEmpty, let bfValue = Double(bodyFat) {
                                             HStack {
                                                 Text("Body Fat:")
@@ -199,11 +199,11 @@ struct LogWeightView: View {
                                 }
                             }
                             .padding(.horizontal, 20)
-                            
+
                             Spacer(minLength: 120)
                         }
                     }
-                    
+
                     // Save button (fixed at bottom)
                     VStack(spacing: 12) {
                         if showSuccess {
@@ -216,7 +216,7 @@ struct LogWeightView: View {
                             }
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
-                        
+
                         Button(action: saveMeasurement) {
                             Group {
                                 if isLoading {
@@ -268,15 +268,15 @@ struct LogWeightView: View {
             }
         }
     }
-    
+
     private func hideKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
-    
+
     private func isFormValid() -> Bool {
         return !weight.isEmpty || !bodyFat.isEmpty
     }
-    
+
     private func quickAdd() {
         Task {
             // Get last logged values for quick entry
@@ -298,16 +298,16 @@ struct LogWeightView: View {
             }
         }
     }
-    
+
     private func saveMeasurement() {
         isLoading = true
         hideKeyboard()
-        
+
         Task {
             do {
                 var weightValue: Double?
                 var bodyFatValue: Double?
-                
+
                 // Parse weight if provided
                 if !weight.isEmpty {
                     guard let w = Double(weight) else {
@@ -320,7 +320,7 @@ struct LogWeightView: View {
                     }
                     weightValue = w
                 }
-                
+
                 // Parse body fat if provided
                 if !bodyFat.isEmpty {
                     guard let bf = Double(bodyFat), bf >= 0, bf <= 100 else {
@@ -333,7 +333,7 @@ struct LogWeightView: View {
                     }
                     bodyFatValue = bf
                 }
-                
+
                 // At least one value must be provided
                 guard weightValue != nil || bodyFatValue != nil else {
                     await MainActor.run {
@@ -343,22 +343,22 @@ struct LogWeightView: View {
                     }
                     return
                 }
-                
+
                 // Convert weight to kg for storage
                 let weightInKg = weightValue != nil ? (currentSystem.weightUnit == "lbs" ? weightValue! * 0.453592 : weightValue!) : nil
-                
+
                 // Save to HealthKit if authorized
                 if healthKitManager.isAuthorized {
                     if let w = weightValue {
                         let weightInLbs = currentSystem.weightUnit == "kg" ? w * 2.20462 : w
                         try await healthKitManager.saveWeight(weightInLbs, date: Date())
                     }
-                    
+
                     if let bf = bodyFatValue {
                         try await healthKitManager.saveBodyFatPercentage(bf / 100, date: Date())
                     }
                 }
-                
+
                 // If only body fat is provided, try to get latest weight
                 var finalWeight = weightInKg
                 if weightInKg == nil && bodyFatValue != nil, let userId = authManager.currentUser?.id {
@@ -367,7 +367,7 @@ struct LogWeightView: View {
                     let recentMetrics = cachedMetrics.compactMap { $0.toBodyMetrics() }.sorted { $0.date > $1.date }
                     finalWeight = recentMetrics.first?.weight
                 }
-                
+
                 // Create body metrics
                 let metrics = BodyMetrics(
                     id: UUID().uuidString,
@@ -385,7 +385,7 @@ struct LogWeightView: View {
                     createdAt: Date(),
                     updatedAt: Date()
                 )
-                
+
                 // Save to local storage and sync
                 if let userId = authManager.currentUser?.id {
                     await MainActor.run {
@@ -393,15 +393,15 @@ struct LogWeightView: View {
                     }
                     RealtimeSyncManager.shared.syncIfNeeded()
                 }
-                
+
                 await MainActor.run {
                     isLoading = false
                     showSuccess = true
                 }
-                
+
                 // Show success briefly then dismiss
                 try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-                
+
                 await MainActor.run {
                     dismiss()
                 }

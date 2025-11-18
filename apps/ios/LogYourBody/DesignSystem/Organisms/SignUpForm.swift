@@ -13,39 +13,39 @@ struct SignUpForm: View {
     @Binding var agreedToTerms: Bool
     @Binding var agreedToPrivacy: Bool
     @Binding var agreedToHealthDisclaimer: Bool
-    
+
     let onSignUp: () -> Void
     let onAppleSignIn: () -> Void
     let termsURL: URL
     let privacyURL: URL
     let healthDisclaimerURL: URL
-    
+
     @FocusState private var focusedField: Field?
-    
+
     enum Field {
         case email, password
     }
-    
+
     private var isFormValid: Bool {
         !email.isEmpty &&
-        password.count >= 8 &&
-        hasUpperAndLower &&
-        hasNumberOrSymbol &&
-        agreedToTerms &&
-        agreedToPrivacy &&
-        agreedToHealthDisclaimer
+            password.count >= 8 &&
+            hasUpperAndLower &&
+            hasNumberOrSymbol &&
+            agreedToTerms &&
+            agreedToPrivacy &&
+            agreedToHealthDisclaimer
     }
-    
+
     private var hasUpperAndLower: Bool {
         password.rangeOfCharacter(from: .uppercaseLetters) != nil &&
-        password.rangeOfCharacter(from: .lowercaseLetters) != nil
+            password.rangeOfCharacter(from: .lowercaseLetters) != nil
     }
-    
+
     private var hasNumberOrSymbol: Bool {
         password.rangeOfCharacter(from: .decimalDigits) != nil ||
-        password.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil
+            password.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             // Email Field
@@ -59,7 +59,7 @@ struct SignUpForm: View {
             .onSubmit {
                 focusedField = .password
             }
-            
+
             // Password Field
             VStack(alignment: .leading, spacing: 8) {
                 AuthFormField(
@@ -74,10 +74,10 @@ struct SignUpForm: View {
                         onSignUp()
                     }
                 }
-                
+
                 PasswordStrengthIndicator(password: password)
             }
-            
+
             // Privacy Consent
             VStack(spacing: 16) {
                 AuthConsentCheckbox(
@@ -86,14 +86,14 @@ struct SignUpForm: View {
                     linkText: "Terms of Service",
                     url: termsURL
                 )
-                
+
                 AuthConsentCheckbox(
                     isChecked: $agreedToPrivacy,
                     text: "How we handle your data",
                     linkText: "Privacy Policy",
                     url: privacyURL
                 )
-                
+
                 AuthConsentCheckbox(
                     isChecked: $agreedToHealthDisclaimer,
                     text: "Important health information",
@@ -101,7 +101,7 @@ struct SignUpForm: View {
                     url: healthDisclaimerURL
                 )
             }
-            
+
             // Sign Up Button
             BaseButton(
                 "Create Account",
@@ -113,10 +113,10 @@ struct SignUpForm: View {
                 ),
                 action: onSignUp
             )
-            
+
             // Divider
             DSAuthDivider()
-            
+
             // Apple Sign In
             SocialLoginButton(
                 provider: .apple,
@@ -136,7 +136,7 @@ struct SignUpForm: View {
                 subtitle: "Start tracking your fitness journey"
             )
             .padding(.top, 40)
-            
+
             SignUpForm(
                 email: .constant(""),
                 password: .constant(""),

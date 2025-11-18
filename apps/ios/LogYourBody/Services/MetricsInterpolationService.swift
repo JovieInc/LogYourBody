@@ -16,9 +16,9 @@ struct InterpolatedMetric {
     let confidenceLevel: ConfidenceLevel?
 
     enum ConfidenceLevel: String {
-        case high = "high"      // ≤7 days gap
-        case medium = "medium"  // 8-14 days gap
-        case low = "low"        // 15-30 days gap
+        case high      // ≤7 days gap
+        case medium    // 8-14 days gap
+        case low       // 15-30 days gap
     }
 
     /// Helper to determine confidence level based on days gap
@@ -81,7 +81,6 @@ class MetricsInterpolationService {
         // Interpolate between two points
         if let beforeMetric = before, let afterMetric = after,
            let beforeWeight = beforeMetric.weight, let afterWeight = afterMetric.weight {
-
             // Check gap size
             let gapDays = Calendar.current.dateComponents([.day], from: beforeMetric.date, to: afterMetric.date).day ?? 0
             guard gapDays <= maxInterpolationGapDays else { return nil }
@@ -147,7 +146,6 @@ class MetricsInterpolationService {
         // Interpolate between two points
         if let beforeMetric = before, let afterMetric = after,
            let beforeBF = beforeMetric.bodyFatPercentage, let afterBF = afterMetric.bodyFatPercentage {
-
             // Check gap size
             let gapDays = Calendar.current.dateComponents([.day], from: beforeMetric.date, to: afterMetric.date).day ?? 0
             guard gapDays <= maxInterpolationGapDays else { return nil }
@@ -190,7 +188,7 @@ class MetricsInterpolationService {
         let isLastKnown = weightResult.isLastKnown || bodyFatResult.isLastKnown
 
         // Use the lower confidence level of the two inputs
-        var confidence: InterpolatedMetric.ConfidenceLevel? = nil
+        var confidence: InterpolatedMetric.ConfidenceLevel?
         if isInterpolated {
             if let wConf = weightResult.confidenceLevel, let bfConf = bodyFatResult.confidenceLevel {
                 // Use lower confidence

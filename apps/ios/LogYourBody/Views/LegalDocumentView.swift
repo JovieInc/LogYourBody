@@ -12,7 +12,7 @@ struct LegalDocumentView: View {
     @State private var isLoading = true
     @State private var loadError = false
     @Environment(\.dismiss) var dismiss
-    
+
     enum LegalDocumentType {
         case terms
         case privacy
@@ -20,7 +20,7 @@ struct LegalDocumentView: View {
         case gdprCompliance
         case ccpaCompliance
         case openSourceLicenses
-        
+
         var title: String {
             switch self {
             case .terms: return "Terms of Service"
@@ -31,7 +31,7 @@ struct LegalDocumentView: View {
             case .openSourceLicenses: return "Open Source Licenses"
             }
         }
-        
+
         var filename: String {
             switch self {
             case .terms: return "terms-of-service"
@@ -42,7 +42,7 @@ struct LegalDocumentView: View {
             case .openSourceLicenses: return "open-source-licenses"
             }
         }
-        
+
         var icon: String {
             switch self {
             case .terms: return "doc.text"
@@ -54,13 +54,13 @@ struct LegalDocumentView: View {
             }
         }
     }
-    
+
     var body: some View {
         ZStack {
             // Atom: Background
             Color.appBackground
                 .ignoresSafeArea()
-            
+
             if isLoading {
                 // Atom: Loading Indicator
                 DSLoadingIndicator(message: "Loading...")
@@ -80,7 +80,7 @@ struct LegalDocumentView: View {
                         )
                         .padding(.top, 20)
                         .padding(.horizontal)
-                        
+
                         // Organism: Markdown Content
                         MarkdownView(markdown: documentContent)
                             .padding(.horizontal)
@@ -95,11 +95,11 @@ struct LegalDocumentView: View {
             loadDocument()
         }
     }
-    
+
     private func loadDocument() {
         isLoading = true
         loadError = false
-        
+
         // Try to load from Resources/Legal directory in bundle
         if let bundlePath = Bundle.main.path(forResource: "Legal/\(documentType.filename)", ofType: "md"),
            let content = try? String(contentsOfFile: bundlePath) {
@@ -107,7 +107,7 @@ struct LegalDocumentView: View {
             isLoading = false
             return
         }
-        
+
         // Try alternate path without subfolder
         if let bundlePath = Bundle.main.path(forResource: documentType.filename, ofType: "md", inDirectory: "Legal"),
            let content = try? String(contentsOfFile: bundlePath) {
@@ -115,7 +115,7 @@ struct LegalDocumentView: View {
             isLoading = false
             return
         }
-        
+
         // Try without any directory
         if let bundlePath = Bundle.main.path(forResource: documentType.filename, ofType: "md"),
            let content = try? String(contentsOfFile: bundlePath) {
@@ -123,71 +123,71 @@ struct LegalDocumentView: View {
             isLoading = false
             return
         }
-        
+
         // Fallback: Load embedded placeholder content
         loadFallbackContent()
     }
-    
+
     private func loadFallbackContent() {
         switch documentType {
         case .terms:
             documentContent = """
             # Terms of Service
-            
+
             **Last Updated: July 11, 2025**
-            
+
             Please visit our website for the full Terms of Service.
-            
+
             By using LogYourBody, you agree to our terms and conditions.
             """
         case .privacy:
             documentContent = """
             # Privacy Policy
-            
+
             **Last Updated: July 11, 2025**
-            
+
             Please visit our website for the full Privacy Policy.
-            
+
             We are committed to protecting your privacy and personal data.
             """
         case .healthDisclosure:
             documentContent = """
             # Health Disclosure
-            
+
             **Last Updated: July 11, 2025**
-            
+
             Please visit our website for the full Health Disclosure.
-            
+
             LogYourBody is not a medical service and does not provide medical advice.
             """
         case .gdprCompliance:
             documentContent = """
             # GDPR Compliance
-            
+
             **Last Updated: July 14, 2025**
-            
+
             Please visit our website for the full GDPR Compliance information.
-            
+
             We comply with the General Data Protection Regulation for EU users.
             """
         case .ccpaCompliance:
             documentContent = """
             # CCPA Compliance
-            
+
             **Last Updated: July 14, 2025**
-            
+
             Please visit our website for the full CCPA Compliance information.
-            
+
             We respect the privacy rights of California residents.
             """
         case .openSourceLicenses:
             documentContent = """
             # Open Source Licenses
-            
+
             **Last Updated: July 14, 2025**
-            
+
             Please visit our website for the full list of open source licenses.
-            
+
             LogYourBody is built with amazing open source software.
             """
         }

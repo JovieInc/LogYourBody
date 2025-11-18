@@ -13,16 +13,16 @@ struct AddEntrySheet: View {
     @State private var selectedTab: Int
     @State private var selectedDate = Date()
     @AppStorage(Constants.preferredMeasurementSystemKey) private var measurementSystem = PreferencesView.defaultMeasurementSystem
-    
+
     init(isPresented: Binding<Bool>, initialTab: Int = 0) {
         self._isPresented = isPresented
         self._selectedTab = State(initialValue: initialTab)
     }
-    
+
     var currentSystem: MeasurementSystem {
         MeasurementSystem(rawValue: measurementSystem) ?? .imperial
     }
-    
+
     // Weight entry
     @State private var weight: String = ""
     @State private var weightUnit: String = ""
@@ -32,7 +32,7 @@ struct AddEntrySheet: View {
     @State private var bodyFat: String = ""
     @State private var bodyFatMethod = "Visual"
     @State private var bodyFatError: String?
-    
+
     // Photo entry
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isProcessingPhotos = false
@@ -45,7 +45,7 @@ struct AddEntrySheet: View {
     @State private var showDeletePhotosPrompt = false
     @AppStorage(Constants.deletePhotosAfterImportKey) private var deletePhotosAfterImport = false
     @AppStorage(Constants.hasPromptedDeletePhotosKey) private var hasPromptedDeletePhotos = false
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -60,23 +60,23 @@ struct AddEntrySheet: View {
                 .padding(.vertical, 12)
                 .accessibilityLabel("Entry type selector")
                 .accessibilityHint("Select the type of entry you want to add")
-                
+
                 // Date picker (common for all tabs)
                 HStack {
                     Text("Date")
                         .font(.appBodySmall)
                         .foregroundColor(.appTextSecondary)
-                    
+
                     Spacer()
-                    
+
                     DatePicker("", selection: $selectedDate, displayedComponents: .date)
                         .labelsHidden()
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
-                
+
                 Divider()
-                
+
                 // Tab content
                 ScrollView {
                     switch selectedTab {
@@ -90,7 +90,7 @@ struct AddEntrySheet: View {
                         EmptyView()
                     }
                 }
-                
+
                 // Save button
                 Button(action: saveEntry) {
                     HStack {
@@ -147,7 +147,7 @@ struct AddEntrySheet: View {
             }
         }
     }
-    
+
     // MARK: - Weight Entry View
     private var weightEntryView: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -196,7 +196,7 @@ struct AddEntrySheet: View {
         }
         .padding(.horizontal)
     }
-    
+
     // MARK: - Body Fat Entry View
     private var bodyFatEntryView: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -258,7 +258,7 @@ struct AddEntrySheet: View {
         }
         .padding(.horizontal)
     }
-    
+
     // MARK: - Photo Entry View
     private var photoEntryView: some View {
         VStack(spacing: 16) {
@@ -267,16 +267,16 @@ struct AddEntrySheet: View {
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.system(size: 60))
                         .foregroundColor(.appTextTertiary)
-                    
+
                     Text("Select progress photos")
                         .font(.appHeadline)
-                    
+
                     Text("Photos will be automatically dated based on when they were taken. You can select multiple photos for bulk upload.")
                         .font(.appBody)
                         .foregroundColor(.appTextSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 40)
-                    
+
                     PhotosPicker(
                         selection: $selectedPhotos,
                         maxSelectionCount: 10,
@@ -302,20 +302,20 @@ struct AddEntrySheet: View {
                     HStack {
                         Text("\(selectedPhotos.count) photo\(selectedPhotos.count == 1 ? "" : "s") selected")
                             .font(.appHeadline)
-                        
+
                         Spacer()
-                        
+
                         Button("Change") {
                             selectedPhotos = []
                         }
                         .foregroundColor(.appPrimary)
                     }
-                    
+
                     if isProcessingPhotos {
                         VStack(spacing: 12) {
                             ProgressView(value: photoProgress)
                                 .tint(.appPrimary)
-                            
+
                             Text("Processing \(processedCount + 1) of \(selectedPhotos.count)")
                                 .font(.appCaption)
                                 .foregroundColor(.appTextSecondary)
@@ -325,11 +325,11 @@ struct AddEntrySheet: View {
                 .padding(.horizontal)
                 .padding(.top)
             }
-            
+
             Spacer()
         }
     }
-    
+
     // MARK: - Computed Properties
     private var canSave: Bool {
         switch selectedTab {
@@ -343,7 +343,7 @@ struct AddEntrySheet: View {
             return false
         }
     }
-    
+
     private var saveButtonText: String {
         switch selectedTab {
         case 0:
@@ -356,11 +356,11 @@ struct AddEntrySheet: View {
             return "Save"
         }
     }
-    
+
     // MARK: - Actions
     private func saveEntry() {
         guard let userId = authManager.currentUser?.id else { return }
-        
+
         switch selectedTab {
         case 0:
             saveWeight(userId: userId)
@@ -374,7 +374,7 @@ struct AddEntrySheet: View {
             break
         }
     }
-    
+
     private func saveWeight(userId: String) {
         guard let weightValue = Double(weight) else { return }
 
@@ -414,7 +414,7 @@ struct AddEntrySheet: View {
 
         dismiss()
     }
-    
+
     private func savePhotos(userId: String) async {
         isProcessingPhotos = true
         photoProgress = 0

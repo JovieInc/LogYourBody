@@ -24,9 +24,9 @@ struct DesignSettingsRow: View {
     let subtitle: String?
     let type: SettingsRowType
     let action: (() -> Void)?
-    
+
     @State private var isPressed = false
-    
+
     init(
         icon: String? = nil,
         iconColor: Color? = nil,
@@ -42,7 +42,7 @@ struct DesignSettingsRow: View {
         self.type = type
         self.action = action
     }
-    
+
     var body: some View {
         Button(
             action: {
@@ -57,31 +57,31 @@ struct DesignSettingsRow: View {
             label: {
                 HStack(spacing: 12) {
                     // Icon
-                if let icon = icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 20))
-                        .foregroundColor(iconColor ?? .appPrimary)
-                        .frame(width: 28, height: 28)
-                }
-                
-                // Content
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body)
-                        .foregroundColor(.primary)
-                    
-                    if let subtitle = subtitle {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
+                    if let icon = icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 20))
+                            .foregroundColor(iconColor ?? .appPrimary)
+                            .frame(width: 28, height: 28)
                     }
-                }
-                
-                Spacer()
-                
-                // Trailing content
-                trailingContent
+
+                    // Content
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.body)
+                            .foregroundColor(.primary)
+
+                        if let subtitle = subtitle {
+                            Text(subtitle)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Trailing content
+                    trailingContent
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -102,27 +102,27 @@ struct DesignSettingsRow: View {
             }
         }, perform: {})
     }
-    
+
     @ViewBuilder private var trailingContent: some View {
         switch type {
         case .navigation:
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(Color.secondary.opacity(0.6))
-                
+
         case .toggle(let isOn):
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .tint(.appPrimary)
-                
+
         case .value(let text):
             Text(text)
                 .font(.body)
                 .foregroundColor(.secondary)
-                
+
         case .action:
             EmptyView()
-                
+
         case .picker(let selection, let options):
             Menu {
                 ForEach(options, id: \.self) { option in
@@ -131,13 +131,13 @@ struct DesignSettingsRow: View {
                             selection.wrappedValue = option
                         },
                         label: {
-                        HStack {
-                            Text(option)
-                            if selection.wrappedValue == option {
-                                Image(systemName: "checkmark")
+                            HStack {
+                                Text(option)
+                                if selection.wrappedValue == option {
+                                    Image(systemName: "checkmark")
+                                }
                             }
-                        }
-                    })
+                        })
                 }
             } label: {
                 HStack(spacing: 4) {
@@ -149,7 +149,7 @@ struct DesignSettingsRow: View {
                         .foregroundColor(Color.secondary.opacity(0.6))
                 }
             }
-            
+
         case .stepper(let value, let range):
             Stepper(
                 value: value,
@@ -162,7 +162,7 @@ struct DesignSettingsRow: View {
             .labelsHidden()
         }
     }
-    
+
     private var isInteractive: Bool {
         switch type {
         case .navigation, .action:
@@ -179,7 +179,7 @@ struct DesignSettingsSection<Content: View>: View {
     let title: String?
     let footer: String?
     @ViewBuilder let content: () -> Content
-    
+
     init(
         title: String? = nil,
         footer: String? = nil,
@@ -189,7 +189,7 @@ struct DesignSettingsSection<Content: View>: View {
         self.footer = footer
         self.content = content
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
@@ -201,7 +201,7 @@ struct DesignSettingsSection<Content: View>: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 4)
             }
-            
+
             // Content with separators
             VStack(spacing: 0) {
                 content()
@@ -209,7 +209,7 @@ struct DesignSettingsSection<Content: View>: View {
             .background(Color.appCard)
             .cornerRadius(12)
             .padding(.horizontal, 16)
-            
+
             // Footer
             if let footer = footer {
                 Text(footer)
@@ -232,9 +232,9 @@ struct ListRow: View {
     let leading: AnyView?
     let trailing: AnyView?
     let action: (() -> Void)?
-    
+
     @State private var isPressed = false
-    
+
     init(
         title: String,
         subtitle: String? = nil,
@@ -248,7 +248,7 @@ struct ListRow: View {
         self.trailing = trailing
         self.action = action
     }
-    
+
     var body: some View {
         Button(
             action: {
@@ -258,35 +258,35 @@ struct ListRow: View {
             label: {
                 HStack(spacing: 12) {
                     // Leading content
-                if let leading = leading {
-                    leading
-                }
-                
-                // Main content
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                    
-                    if let subtitle = subtitle {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
+                    if let leading = leading {
+                        leading
                     }
-                }
-                
-                Spacer()
-                
-                // Trailing content
-                if let trailing = trailing {
-                    trailing
-                } else if action != nil {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color.secondary.opacity(0.6))
-                }
+
+                    // Main content
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.body)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+
+                        if let subtitle = subtitle {
+                            Text(subtitle)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Trailing content
+                    if let trailing = trailing {
+                        trailing
+                    } else if action != nil {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Color.secondary.opacity(0.6))
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -315,9 +315,9 @@ struct DestructiveRow: View {
     let title: String
     let icon: String?
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(
             action: {
@@ -331,11 +331,11 @@ struct DestructiveRow: View {
                             .font(.system(size: 20))
                             .foregroundColor(.red)
                     }
-                    
+
                     Text(title)
                         .font(.body)
                         .foregroundColor(.red)
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal, 16)
@@ -371,29 +371,29 @@ struct SettingsRow_Previews: PreviewProvider {
                             subtitle: "John Doe",
                             type: .navigation
                         ) { }
-                        
+
                         Divider()
                             .background(Color(white: 0.15))
                             .padding(.leading, 60)
-                        
+
                         DesignSettingsRow(
                             icon: "envelope",
                             title: "Email",
                             type: .value(text: "john@example.com")
                         )
                     }
-                    
+
                     DesignSettingsSection(title: "Preferences") {
                         DesignSettingsRow(
                             icon: "moon",
                             title: "Dark Mode",
                             type: .toggle(isOn: .constant(true))
                         )
-                        
+
                         Divider()
                             .background(Color(white: 0.15))
                             .padding(.leading, 60)
-                        
+
                         DesignSettingsRow(
                             icon: "textformat",
                             title: "Font Size",
@@ -402,11 +402,11 @@ struct SettingsRow_Previews: PreviewProvider {
                                 options: ["Small", "Medium", "Large"]
                             )
                         )
-                        
+
                         Divider()
                             .background(Color(white: 0.15))
                             .padding(.leading, 60)
-                        
+
                         DesignSettingsRow(
                             icon: "bell",
                             title: "Notifications",
@@ -414,7 +414,7 @@ struct SettingsRow_Previews: PreviewProvider {
                             type: .navigation
                         ) { }
                     }
-                    
+
                     DesignSettingsSection(
                         title: "Data",
                         footer: "Your data will be permanently deleted"
@@ -424,7 +424,7 @@ struct SettingsRow_Previews: PreviewProvider {
                             icon: "trash"
                         ) { }
                     }
-                    
+
                     // List rows
                     DesignSettingsSection(title: "Recent Activity") {
                         ListRow(
@@ -441,10 +441,10 @@ struct SettingsRow_Previews: PreviewProvider {
                                     .foregroundColor(.secondary)
                             )
                         ) { }
-                        
+
                         Divider()
                             .background(Color(white: 0.15))
-                        
+
                         ListRow(
                             title: "Weight Entry",
                             subtitle: "72.5 kg",
