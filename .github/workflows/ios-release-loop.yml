@@ -74,20 +74,64 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       has_artifact: ${{ steps.check.outputs.exists }}
-      artifact_url: ${{ steps.check.outputs.url }}
-    
+      artifact_name: ${{ steps.check.outputs.artifact_name }}
+
     steps:
-    - name: Check for existing preview artifact
+    - name: Prepare artifact lookup
       id: check
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TARGET_SHA: ${{ github.sha }}
       run: |
-        # Look for recent successful preview builds
-        echo "🔍 Checking for reusable preview build..."
-        
-        # This is a placeholder - in production, you'd check artifact storage
-        echo "exists=false" >> $GITHUB_OUTPUT
-        echo "ℹ️ No reusable build found, will build fresh"
+        echo "🔍 Looking for vetted Confidence build for $TARGET_SHA"
+
+        ARTIFACT_NAME="ios-confidence-build-${TARGET_SHA}"
+        echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+
+        # Find the most recent successful Confidence loop run for this commit
+        RUN_ID=$(gh run list \
+          --workflow "iOS Confidence Loop" \
+          --limit 30 \
+          --json databaseId,headSha,conclusion \
+          --jq ".[] | select(.headSha == \"$TARGET_SHA\" and .conclusion == \"success\") | .databaseId" \
+          | head -n 1)
+
+        if [[ -z "$RUN_ID" ]]; then
+          echo "ℹ️ No successful Confidence run found for $TARGET_SHA"
+          echo "exists=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        ARTIFACT_ID=$(gh api \
+          repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts \
+          --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .id" \
+          | head -n 1)
+
+        if [[ -z "$ARTIFACT_ID" ]]; then
+          echo "ℹ️ No matching Confidence artifact named $ARTIFACT_NAME"
+          echo "exists=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        echo "✅ Found vetted artifact $ARTIFACT_NAME from run $RUN_ID"
+        echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+        echo "exists=true" >> $GITHUB_OUTPUT
+
+    - name: Download vetted Confidence artifact
+      if: steps.check.outputs.exists == 'true'
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ steps.check.outputs.artifact_name }}
+        path: apps/ios/build
+        run-id: ${{ steps.check.outputs.run_id }}
+
+    - name: Promote vetted artifact for release
+      if: steps.check.outputs.exists == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-release-build
+        path: apps/ios/build
+        retention-days: 3
 
   build-release:
     name: Build Release
