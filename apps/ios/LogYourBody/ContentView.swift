@@ -66,7 +66,7 @@ struct ContentView: View {
                 Group {
                     if authManager.isAuthenticated {
                         if shouldShowOnboarding {
-                            OnboardingContainerView()
+                            BodyScoreOnboardingFlowView()
                         } else if !revenueCatManager.isSubscribed {
                             PaywallView()
                                 .environmentObject(authManager)

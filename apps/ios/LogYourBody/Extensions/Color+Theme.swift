@@ -30,6 +30,17 @@ public extension Color {
     static let warning = Color(hex: "#FF9800")
     static let error = Color(hex: "#F44336")
 
+    // MARK: - Metric Detail Palette
+    static let metricCanvas = Color(hex: "#000000")
+    static let metricCard = Color(hex: "#080A0D")
+    static let metricSurface = Color(hex: "#050507")
+    static let metricAccent = Color(hex: "#D32AFF")
+    static let metricChartLine = Color(hex: "#4FD1FF")
+    static let metricChartFillTop = Color(hex: "#4FD1FF40")
+    static let metricChartFillBottom = Color(hex: "#4FD1FF00")
+    static let metricDeltaPositive = Color(hex: "#4CD964")
+    static let metricDeltaNegative = Color(hex: "#FF453A")
+
     // MARK: - State Colors
     static let linearDisabled = Color(hex: "#3A3A3A")
     static let linearDisabledText = Color(hex: "#5A5A5A")

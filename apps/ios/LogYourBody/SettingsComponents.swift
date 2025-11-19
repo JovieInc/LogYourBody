@@ -84,6 +84,7 @@ struct SettingsSection<Content: View>: View {
 struct SettingsRow: View {
     let icon: String?
     let title: String
+    var subtitle: String?
     var value: String?
     var showChevron: Bool
     var isExternal: Bool
@@ -92,6 +93,7 @@ struct SettingsRow: View {
     init(
         icon: String? = nil,
         title: String,
+        subtitle: String? = nil,
         value: String? = nil,
         showChevron: Bool = false,
         isExternal: Bool = false,
@@ -99,6 +101,7 @@ struct SettingsRow: View {
     ) {
         self.icon = icon
         self.title = title
+        self.subtitle = subtitle
         self.value = value
         self.showChevron = showChevron
         self.isExternal = isExternal
@@ -115,10 +118,19 @@ struct SettingsRow: View {
                     .frame(width: SettingsDesign.iconFrame)
             }
 
-            // Title
-            Text(title)
-                .font(SettingsDesign.titleFont)
-                .foregroundColor(tintColor)
+            // Title + Subtitle stack
+            VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
+                Text(title)
+                    .font(SettingsDesign.titleFont)
+                    .foregroundColor(tintColor)
+
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.appTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
             Spacer()
 
@@ -148,6 +160,7 @@ struct SettingsRow: View {
 struct SettingsNavigationLink<Destination: View>: View {
     let icon: String?
     let title: String
+    let subtitle: String?
     let value: String?
     let destination: Destination
     var tintColor: Color
@@ -155,12 +168,14 @@ struct SettingsNavigationLink<Destination: View>: View {
     init(
         icon: String? = nil,
         title: String,
+        subtitle: String? = nil,
         value: String? = nil,
         tintColor: Color = .primary,
         @ViewBuilder destination: () -> Destination
     ) {
         self.icon = icon
         self.title = title
+        self.subtitle = subtitle
         self.value = value
         self.tintColor = tintColor
         self.destination = destination()
@@ -171,6 +186,7 @@ struct SettingsNavigationLink<Destination: View>: View {
             SettingsRow(
                 icon: icon,
                 title: title,
+                subtitle: subtitle,
                 value: value,
                 showChevron: true,
                 tintColor: tintColor
@@ -186,17 +202,23 @@ struct SettingsToggleRow: View {
     let title: String
     @Binding var isOn: Bool
     var tintColor: Color
+    var subtitle: String?
+    var onToggle: ((Bool) -> Void)?
 
     init(
         icon: String? = nil,
         title: String,
         isOn: Binding<Bool>,
-        tintColor: Color = .primary
+        tintColor: Color = .primary,
+        subtitle: String? = nil,
+        onToggle: ((Bool) -> Void)? = nil
     ) {
         self.icon = icon
         self.title = title
         self._isOn = isOn
         self.tintColor = tintColor
+        self.subtitle = subtitle
+        self.onToggle = onToggle
     }
 
     var body: some View {
@@ -208,9 +230,18 @@ struct SettingsToggleRow: View {
                     .frame(width: SettingsDesign.iconFrame)
             }
 
-            Text(title)
-                .font(SettingsDesign.titleFont)
-                .foregroundColor(tintColor)
+            VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
+                Text(title)
+                    .font(SettingsDesign.titleFont)
+                    .foregroundColor(tintColor)
+
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.appTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
             Spacer()
 
@@ -220,6 +251,9 @@ struct SettingsToggleRow: View {
         }
         .padding(.horizontal, SettingsDesign.horizontalPadding)
         .padding(.vertical, SettingsDesign.verticalPadding)
+        .onChange(of: isOn) { newValue in
+            onToggle?(newValue)
+        }
     }
 }
 

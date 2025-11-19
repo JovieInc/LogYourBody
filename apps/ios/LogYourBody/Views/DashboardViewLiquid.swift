@@ -2793,205 +2793,492 @@ private struct FullMetricChartView: View {
     @State private var cachedSeries: [TimeRange: [MetricChartDataPoint]] = [:]
     @State private var isLoadingData = false
     @State private var lastFingerprint: String = ""
+    @State private var chartMode: ChartMode = .trend
+    @State private var activePoint: MetricChartDataPoint?
+    @State private var isScrubbing = false
+
+    private let chartHeight: CGFloat = 260
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    header
-                    chartCard
-                    timeRangePicker
-                    if let payload = metricEntries, !payload.entries.isEmpty {
-                        historySection(payload)
-                    } else {
-                        emptyHistoryState
-                    }
+            ZStack(alignment: .top) {
+                Color.metricCanvas.ignoresSafeArea()
 
-                    Button(action: onAdd) {
-                        Label("Add Entry", systemImage: "plus")
-                            .font(.system(size: 17, weight: .semibold))
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.white.opacity(0.12))
-                            .cornerRadius(16)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        navigationBar
+                        headlineBlock
+                        quickStatsRow
+                        timeRangeSelector
+                        chartCard
+                        historyBlock
+                        addEntryButton
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 32)
+                    .padding(.top, 12)
                 }
-                .padding(20)
             }
-            .background(Color.black.ignoresSafeArea())
         }
         .task(id: chartDataFingerprint) {
             await preprocessChartDataIfNeeded()
         }
+        .onChange(of: selectedTimeRange) { _, _ in
+            activePoint = nil
+            HapticManager.shared.selection()
+        }
+        .onChange(of: chartMode) { _, _ in
+            activePoint = nil
+            HapticManager.shared.selection()
+        }
     }
 
-    private var header: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(iconColor.opacity(0.15))
-                    .frame(width: 56, height: 56)
-                Image(systemName: icon)
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundColor(iconColor)
+    // MARK: - Layout Sections
+
+    private var navigationBar: some View {
+        HStack {
+            Button {
+                HapticManager.shared.selection()
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Color.metricSurface.opacity(0.6))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Button {
+                HapticManager.shared.selection()
+                onAdd()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(Color.metricAccent)
+                    .frame(width: 44, height: 44)
+                    .background(Color.metricSurface.opacity(0.6))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var headlineBlock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title.uppercased())
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Color.white.opacity(0.6))
+                .tracking(1)
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(headlineValueText)
+                    .font(.system(size: 62, weight: .regular, design: .default))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                if !unit.isEmpty {
+                    Text(unit)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.75))
+                }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
+            Text(headlineDateText)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.65))
+        }
+    }
 
-                HStack(spacing: 6) {
-                    Text(currentValue)
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundColor(.white)
-                    if !unit.isEmpty {
-                        Text(unit)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.7))
+    private var quickStatsRow: some View {
+        Group {
+            if !quickStats.isEmpty {
+                HStack(spacing: 12) {
+                    ForEach(quickStats) { stat in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(stat.label)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(Color.white.opacity(0.6))
+                                .tracking(0.3)
+                            Text(stat.value)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(stat.color)
+                            if let detail = stat.detail {
+                                Text(detail)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(Color.white.opacity(0.45))
+                            }
+                        }
+                        .padding(.vertical, 6)
+                        if stat.id != quickStats.last?.id {
+                            Text("·")
+                                .foregroundColor(Color.white.opacity(0.35))
+                        }
                     }
                 }
-
-                Text(currentDate)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
             }
-            Spacer()
+        }
+    }
+
+    private var timeRangeSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(TimeRange.allCases, id: \.self) { range in
+                    Button {
+                        selectedTimeRange = range
+                    } label: {
+                        Text(range.rawValue)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(selectedTimeRange == range ? .black : .white.opacity(0.8))
+                            .frame(width: 68, height: 32)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(selectedTimeRange == range ? Color.metricAccent : Color.clear)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.white.opacity(0.15), lineWidth: selectedTimeRange == range ? 0 : 1)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
         }
     }
 
     private var chartCard: some View {
-        LiquidGlassCard(padding: 20) {
-            VStack(alignment: .leading, spacing: 12) {
-                if isLoadingData {
-                    ProgressView()
-                        .tint(.white)
-                        .frame(maxWidth: .infinity, minHeight: 200)
-                } else if displayedSeries.isEmpty {
-                    Text("No data available for this range.")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
-                        .frame(maxWidth: .infinity, minHeight: 200, alignment: .center)
-                } else {
-                    Chart {
-                        ForEach(displayedSeries) { point in
-                            LineMark(
-                                x: .value("Date", point.date),
-                                y: .value("Value", point.value)
-                            )
-                            .interpolationMethod(.catmullRom)
-                            .foregroundStyle(Gradient(colors: [iconColor, iconColor.opacity(0.3)]))
-
-                            AreaMark(
-                                x: .value("Date", point.date),
-                                yStart: .value("Min", 0),
-                                yEnd: .value("Value", point.value)
-                            )
-                            .interpolationMethod(.catmullRom)
-                            .foregroundStyle(iconColor.opacity(0.15))
-                        }
-                    }
-                    .chartXAxis {
-                        AxisMarks(values: .automatic(desiredCount: 4))
-                    }
-                    .chartYAxis {
-                        AxisMarks(position: .leading)
-                    }
-                    .frame(height: 260)
-                    .chartForegroundStyleScale(["Value": iconColor])
-                }
-
-                if let latest = displayedSeries.last {
-                    Text("Latest: \(formattedValue(latest.value)) on \(latest.date.formatted(.dateTime.month().day()))")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
-                }
+        VStack(alignment: .leading, spacing: 16) {
+            chartHeader
+            if isLoadingData {
+                ProgressView()
+                    .tint(.white)
+                    .frame(maxWidth: .infinity, minHeight: chartHeight)
+            } else if activeSeries.isEmpty {
+                Text("No data available for this range.")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.6))
+                    .frame(maxWidth: .infinity, minHeight: chartHeight, alignment: .center)
+            } else {
+                chartView
+                    .frame(height: chartHeight)
             }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.metricCard)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.45), radius: 20, x: 0, y: 10)
+        )
+    }
+
+    private var chartHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Trend")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.white)
+                Text(chartSubtitle)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.6))
+            }
+            Spacer()
+            chartModeToggle
         }
     }
 
-    private var timeRangePicker: some View {
+    private var chartModeToggle: some View {
         HStack(spacing: 8) {
-            ForEach(TimeRange.allCases, id: \.self) { range in
+            ForEach(ChartMode.allCases, id: \.self) { mode in
                 Button {
-                    selectedTimeRange = range
+                    chartMode = mode
                 } label: {
-                    Text(range.rawValue)
-                        .font(.system(size: 14, weight: .semibold))
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 14)
-                        .background(selectedTimeRange == range ? Color.white.opacity(0.2) : Color.white.opacity(0.08))
-                        .cornerRadius(12)
-                        .foregroundColor(.white)
+                    Text(mode.label)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(chartMode == mode ? .black : Color.white.opacity(0.8))
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(chartMode == mode ? Color.metricAccent : Color.clear)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.2), lineWidth: chartMode == mode ? 0 : 1)
+                                )
+                        )
                 }
                 .buttonStyle(.plain)
             }
         }
     }
 
-    private func historySection(_ payload: MetricEntriesPayload) -> some View {
-        let sections = historySections(from: payload.entries)
+    private var chartView: some View {
+        Chart {
+            let series = activeSeries
+            ForEach(series) { point in
+                LineMark(
+                    x: .value("Date", point.date),
+                    y: .value("Value", point.value)
+                )
+                .interpolationMethod(.catmullRom)
+                .lineStyle(StrokeStyle(lineWidth: chartMode == .trend ? 3 : 2, lineCap: .round))
+                .foregroundStyle(Color.metricChartLine)
 
-        return VStack(alignment: .leading, spacing: 16) {
+                if chartMode == .trend {
+                    AreaMark(
+                        x: .value("Date", point.date),
+                        yStart: .value("Baseline", minSeriesValue ?? point.value),
+                        yEnd: .value("Value", point.value)
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.metricChartFillTop, Color.metricChartFillBottom]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                } else {
+                    PointMark(
+                        x: .value("Date", point.date),
+                        y: .value("Value", point.value)
+                    )
+                    .symbolSize(16)
+                    .foregroundStyle(Color.metricChartLine)
+                }
+            }
+
+            if let focus = activePoint {
+                RuleMark(x: .value("Selected", focus.date))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    .foregroundStyle(Color.white.opacity(0.4))
+
+                PointMark(
+                    x: .value("Selected", focus.date),
+                    y: .value("Selected Value", focus.value)
+                )
+                .symbolSize(120)
+                .foregroundStyle(Color.clear)
+                .annotation(position: .top) {
+                    selectedPointCallout(for: focus)
+                }
+                .symbol(CircleSymbol())
+                .foregroundStyle(Color.metricChartLine)
+                .accessibilityLabel("Selected point")
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 3)) { value in
+                AxisValueLabel()
+                    .foregroundStyle(Color.white.opacity(0.6))
+                    .font(.system(size: 11, weight: .medium))
+                AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 0.5))
+                    .foregroundStyle(Color.white.opacity(0.08))
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 1))
+                    .foregroundStyle(Color.white.opacity(0.08))
+                AxisValueLabel()
+                    .foregroundStyle(Color.white.opacity(0.6))
+                    .font(.system(size: 11, weight: .medium))
+            }
+        }
+        .chartYScale(domain: .automatic(includesZero: false))
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle().fill(Color.clear).contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                guard let plotFrame = proxy.plotAreaFrame else { return }
+                                let frame = geo[plotFrame]
+                                let origin = frame.origin
+                                let width = frame.size.width
+                                let locationX = value.location.x - origin.x
+                                guard locationX >= 0, locationX <= width else { return }
+                                let xPosition = locationX + plotFrame.origin.x
+                                if let date: Date = proxy.value(atX: xPosition) {
+                                    if !isScrubbing {
+                                        isScrubbing = true
+                                        HapticManager.shared.selection()
+                                    }
+                                    activePoint = nearestPoint(to: date)
+                                }
+                            }
+                            .onEnded { _ in
+                                isScrubbing = false
+                                activePoint = nil
+                            }
+                    )
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: activeSeries.count)
+    }
+
+    private func selectedPointCallout(for point: MetricChartDataPoint) -> some View {
+        VStack(spacing: 4) {
+            Text(formatHeadlineValue(point.value))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.black)
+            Text(point.date.formatted(.dateTime.month().day()))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.black.opacity(0.7))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(Color.white)
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.black.opacity(0.08), lineWidth: 0.5)
+        )
+    }
+
+    private var historyBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text("History")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
 
-            ForEach(sections) { section in
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text(section.title)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.8))
-
-                        Spacer()
-
-                        Text(section.entries.count == 1 ? "1 entry" : "\(section.entries.count) entries")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-
-                    VStack(spacing: 10) {
-                        ForEach(section.entries) { entry in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(historyPrimaryText(for: entry, config: payload.config))
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.white)
-
-                                Text(entry.date.formatted(.dateTime.month().day().year()))
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.6))
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                            .background(Color.white.opacity(0.05))
-                            .cornerRadius(14)
+            if let payload = metricEntries, !payload.entries.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(payload.entries.enumerated()), id: \.element.id) { index, entry in
+                        historyRow(for: entry, config: payload.config)
+                        if index < payload.entries.count - 1 {
+                            Divider()
+                                .background(Color.white.opacity(0.08))
                         }
                     }
                 }
+                .background(Color.metricSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+            } else {
+                Text("No entries yet. Add your first log to see history here.")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.6))
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.metricSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
             }
         }
     }
 
-    private var emptyHistoryState: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("History")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
-            Text("No entries yet. Add your first log to see history here.")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.05))
-                .cornerRadius(14)
+    private func historyRow(for entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(entry.date.formatted(.dateTime.month().day().year()))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white)
+                Text(sourceLabel(for: entry.source))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.45))
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(primaryHistoryValue(entry, config: config))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                if let secondary = secondaryHistoryValue(entry, config: config) {
+                    Text(secondary)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.65))
+                }
+            }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
+
+    private var addEntryButton: some View {
+        Button(action: {
+            HapticManager.shared.selection()
+            onAdd()
+        }) {
+            Label("Add Entry", systemImage: "plus")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.metricAccent.opacity(0.25))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Computed Data
 
     private var displayedSeries: [MetricChartDataPoint] {
         cachedSeries[selectedTimeRange] ?? chartData
+    }
+
+    private var smoothedSeries: [MetricChartDataPoint] {
+        movingAverage(for: displayedSeries, windowSize: 7)
+    }
+
+    private var activeSeries: [MetricChartDataPoint] {
+        chartMode == .trend ? smoothedSeries : displayedSeries
+    }
+
+    private var minSeriesValue: Double? {
+        activeSeries.map(\.value).min()
+    }
+
+    private var chartSubtitle: String {
+        "\(selectedTimeRange.rawValue) · \(chartMode.label)"
+    }
+
+    private var quickStats: [QuickStat] {
+        guard let stats = computeSeriesStats(for: displayedSeries) else { return [] }
+
+        var items: [QuickStat] = []
+
+        let averageText = "\(selectedTimeRange.rawValue) avg \(formatStatValue(stats.average))"
+        items.append(QuickStat(label: "Average", value: averageText, detail: nil, color: .white))
+
+        let deltaValue = stats.delta
+        let deltaText = formatDeltaValue(deltaValue)
+        let deltaDetail = "since start"
+        items.append(QuickStat(label: "Δ", value: deltaText, detail: deltaDetail, color: deltaColor(for: deltaValue)))
+
+        if let rangeText = rangeText(for: displayedSeries) {
+            items.append(QuickStat(label: "Range", value: rangeText, detail: nil, color: Color.white))
+        }
+
+        return items
+    }
+
+    private var headlineValueText: String {
+        if let point = activePoint {
+            return formatHeadlineValue(point.value)
+        }
+        return currentValue
+    }
+
+    private var headlineDateText: String {
+        if let point = activePoint {
+            return point.date.formatted(.dateTime.month().day().year())
+        }
+        return currentDate
     }
 
     private var chartDataFingerprint: String {
@@ -3001,37 +3288,126 @@ private struct FullMetricChartView: View {
         return "\(chartData.count)-\(first.date.timeIntervalSince1970)-\(last.date.timeIntervalSince1970)-\(first.value)-\(last.value)"
     }
 
-    private struct HistorySection: Identifiable {
-        let id: String
-        let title: String
-        let entries: [MetricHistoryEntry]
+    // MARK: - Helpers
+
+    private func formatHeadlineValue(_ value: Double) -> String {
+        if unit == "%" {
+            return String(format: "%.1f", value)
+        }
+        return String(format: value < 10 ? "%.2f" : "%.1f", value)
     }
 
-    private func historySections(from entries: [MetricHistoryEntry]) -> [HistorySection] {
-        guard !entries.isEmpty else { return [] }
+    private func formatStatValue(_ value: Double) -> String {
+        if unit == "%" {
+            return String(format: "%.1f%%", value)
+        }
+        if unit.isEmpty {
+            return String(format: "%.1f", value)
+        }
+        return String(format: "%.1f \(unit)", value)
+    }
 
-        let calendar = Calendar.current
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
+    private func formatDeltaValue(_ delta: Double) -> String {
+        let sign = delta >= 0 ? "+" : "−"
+        let magnitude = abs(delta)
+        let formatted: String
+        if unit == "%" {
+            formatted = String(format: "%.1f%%", magnitude)
+        } else if unit.isEmpty {
+            formatted = String(format: "%.1f", magnitude)
+        } else {
+            formatted = String(format: "%.1f \(unit)", magnitude)
+        }
+        return "\(sign)\(formatted)"
+    }
 
-        let grouped = Dictionary(grouping: entries) { entry -> DateComponents in
-            calendar.dateComponents([.year, .month], from: entry.date)
+    private func deltaColor(for delta: Double) -> Color {
+        if delta < 0 {
+            return Color.metricDeltaPositive
+        }
+        if delta > 0 {
+            return Color.metricDeltaNegative
+        }
+        return Color.white.opacity(0.8)
+    }
+
+    private func rangeText(for series: [MetricChartDataPoint]) -> String? {
+        guard let minValue = series.map(\.value).min(), let maxValue = series.map(\.value).max(), minValue != maxValue else {
+            return nil
+        }
+        let minFormatted = formatHeadlineValue(minValue)
+        let maxFormatted = formatHeadlineValue(maxValue)
+        return "\(minFormatted) – \(maxFormatted)"
+    }
+
+    private func primaryHistoryValue(_ entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> String {
+        let formatter = config.primaryFormatter
+        let value = formatter.string(from: NSNumber(value: entry.primaryValue)) ?? formattedValue(entry.primaryValue)
+        if config.unitLabel.isEmpty {
+            return value
+        }
+        return "\(value) \(config.unitLabel)"
+    }
+
+    private func secondaryHistoryValue(_ entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> String? {
+        guard let secondaryValue = entry.secondaryValue,
+              let formatter = config.secondaryFormatter,
+              let formatted = formatter.string(from: NSNumber(value: secondaryValue)) else {
+            return nil
         }
 
-        let sortedKeys = grouped.keys.sorted { lhs, rhs in
-            let lhsDate = calendar.date(from: lhs) ?? .distantPast
-            let rhsDate = calendar.date(from: rhs) ?? .distantPast
-            return lhsDate > rhsDate
+        if let unit = config.secondaryUnitLabel, !unit.isEmpty {
+            return "\(formatted) \(unit)"
+        }
+        return formatted
+    }
+
+    private func sourceLabel(for source: MetricEntrySourceType) -> String {
+        switch source {
+        case .manual:
+            return "Manual"
+        case .healthKit:
+            return "Apple Health"
+        case .integration(let id):
+            return id ?? "Connected"
+        }
+    }
+
+    private func computeSeriesStats(for series: [MetricChartDataPoint]) -> MetricSeriesStats? {
+        guard series.count >= 2 else { return nil }
+        guard let first = series.first, let last = series.last else { return nil }
+        let total = series.reduce(0) { $0 + $1.value }
+        let average = total / Double(series.count)
+        let delta = last.value - first.value
+        let percent: Double
+        if abs(first.value) < .leastNormalMagnitude {
+            percent = 0
+        } else {
+            percent = (delta / first.value) * 100
+        }
+        return MetricSeriesStats(average: average, delta: delta, percentageChange: percent)
+    }
+
+    private func movingAverage(for points: [MetricChartDataPoint], windowSize: Int) -> [MetricChartDataPoint] {
+        guard windowSize >= 2, points.count > windowSize else { return points }
+        var result: [MetricChartDataPoint] = []
+        var window: [Double] = []
+
+        for point in points {
+            window.append(point.value)
+            if window.count > windowSize {
+                window.removeFirst()
+            }
+            let average = window.reduce(0, +) / Double(window.count)
+            result.append(MetricChartDataPoint(date: point.date, value: average, isEstimated: point.isEstimated))
         }
 
-        return sortedKeys.compactMap { components in
-            guard let date = calendar.date(from: components),
-                  let entries = grouped[components] else { return nil }
+        return result
+    }
 
-            let title = formatter.string(from: date)
-            let sortedEntries = entries.sorted { $0.date > $1.date }
-            return HistorySection(id: UUID().uuidString, title: title, entries: sortedEntries)
-        }
+    private func nearestPoint(to date: Date) -> MetricChartDataPoint? {
+        guard !activeSeries.isEmpty else { return nil }
+        return activeSeries.min(by: { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) })
     }
 
     private func preprocessChartDataIfNeeded() async {
@@ -3067,30 +3443,33 @@ private struct FullMetricChartView: View {
         }
     }
 
-    private func historyPrimaryText(for entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> String {
-        var components: [String] = []
-        let formatter = config.primaryFormatter
-        let primary = formatter.string(from: NSNumber(value: entry.primaryValue)) ?? formattedValue(entry.primaryValue)
-        components.append(config.unitLabel.isEmpty ? primary : "\(primary) \(config.unitLabel)")
-
-        if let secondaryValue = entry.secondaryValue,
-           let secondaryFormatter = config.secondaryFormatter,
-           let secondaryText = secondaryFormatter.string(from: NSNumber(value: secondaryValue)) {
-            if let secondaryUnit = config.secondaryUnitLabel, !secondaryUnit.isEmpty {
-                components.append("\(secondaryText) \(secondaryUnit)")
-            } else {
-                components.append(secondaryText)
-            }
-        }
-
-        return components.joined(separator: " · ")
-    }
-
     private func formattedValue(_ value: Double) -> String {
         if value.isFinite {
             return String(format: value < 10 ? "%.2f" : "%.1f", value)
         }
         return "—"
+    }
+
+    // MARK: - Nested Types
+
+    private enum ChartMode: CaseIterable {
+        case trend
+        case raw
+
+        var label: String {
+            switch self {
+            case .trend: return "Smoothed"
+            case .raw: return "Raw"
+            }
+        }
+    }
+
+    private struct QuickStat: Identifiable, Equatable {
+        let id = UUID()
+        let label: String
+        let value: String
+        let detail: String?
+        let color: Color
     }
 }
 

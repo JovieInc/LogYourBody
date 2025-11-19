@@ -12,7 +12,7 @@ struct LoadingScreen: View {
     @Binding var loadingStatus: String
     let onComplete: () -> Void
 
-    var backgroundColor = Color(red: 0.071, green: 0.071, blue: 0.114)
+    var backgroundColor = Color("LaunchScreenBackground")
     var showPercentage: Bool = true
 
     var body: some View {

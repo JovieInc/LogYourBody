@@ -140,6 +140,7 @@
 		AD8872D62EB946BE0041C426 /* CompactMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726C2EB946BE0041C426 /* CompactMetricCard.swift */; };
 		ADA4B7372ECC3A7A00F4262A /* EntryVisibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */; };
 		ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */; };
+		ADA4B73B2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B73A2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift */; };
 		ADB2F6A12FFD12C500EF7A4B /* EditEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB2F6A02FFD12C500EF7A4B /* EditEntrySheet.swift */; };
 		ADBAF04E2ECAD88A00A95F98 /* BodyScoreHeightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF0442ECAD88A00A95F98 /* BodyScoreHeightView.swift */; };
 		ADBAF04F2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF03B2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift */; };
@@ -260,6 +261,7 @@
 		ADE1464F2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE1464A2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift */; };
 		ADF0A8B12FFD0A0E007C0A5C /* OnboardingStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF0A8B02FFD0A0E007C0A5C /* OnboardingStateManager.swift */; };
 		ADFC6A2D2E188FD5004FCE40 /* HKRawSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */; };
+		ADFF001E313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF001D313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift */; };
 		B39F620BFA59AFFB07513E46 /* DeveloperToolsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA1CD2B48A471ACA4D8CD1A /* DeveloperToolsList.swift */; };
 		BB5187715A77E1422F6CE947 /* DashboardHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898E428E2D5EE162E00B0BD7 /* DashboardHeader.swift */; };
 		BE72D7700686D6DF8514A3F5 /* VerificationForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 629DBB90EB2F0C9F3D9D1105 /* VerificationForm.swift */; };
@@ -526,6 +528,7 @@
 		AD99F2982E1491FA00F5ECE4 /* AuthManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = AuthManager.swift; path = Services/AuthManager.swift; sourceTree = "<group>"; };
 		ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryVisibilityManager.swift; sourceTree = "<group>"; };
 		ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreCache.swift; sourceTree = "<group>"; };
+		ADA4B73A2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreHealthConfirmationView.swift; sourceTree = "<group>"; };
 		ADA922EA2E22E7A600B82C49 /* BackgroundPhotoUploadService+Processing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackgroundPhotoUploadService+Processing.swift"; sourceTree = "<group>"; };
 		ADA922EB2E22E7A600B82C49 /* ImageProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessingService.swift; sourceTree = "<group>"; };
 		ADA922EC2E22E7A600B82C49 /* VisionOrientationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionOrientationService.swift; sourceTree = "<group>"; };
@@ -621,6 +624,7 @@
 		ADFC6A232E187717004FCE40 /* SupabaseManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseManager.swift; sourceTree = "<group>"; };
 		ADFC6A252E188F96004FCE40 /* OTPInputView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OTPInputView.swift; sourceTree = "<group>"; };
 		ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HKRawSample.swift; sourceTree = "<group>"; };
+		ADFF001D313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreOnboardingFlowView.swift; sourceTree = "<group>"; };
 		B1CDBFA72287938694EB369D /* CoreMetricsRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CoreMetricsRow.swift; path = DesignSystem/Organisms/CoreMetricsRow.swift; sourceTree = "<group>"; };
 		B4BF04D15583E3AE1CA4A836 /* View+Styles.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "View+Styles.swift"; sourceTree = "<group>"; };
 		BBB847A2050F3135D62950A1 /* AuthFormField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthFormField.swift; path = DesignSystem/Molecules/AuthFormField.swift; sourceTree = "<group>"; };
@@ -1232,6 +1236,7 @@
 			children = (
 				ADBAF03D2ECAD88A00A95F98 /* BodyScoreAccountCreationView.swift */,
 				ADBAF03E2ECAD88A00A95F98 /* BodyScoreBasicsView.swift */,
+				ADA4B73A2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift */,
 				ADBAF03F2ECAD88A00A95F98 /* BodyScoreBodyFatChoiceView.swift */,
 				ADBAF0402ECAD88A00A95F98 /* BodyScoreBodyFatNumericView.swift */,
 				ADBAF0412ECAD88A00A95F98 /* BodyScoreBodyFatVisualView.swift */,
@@ -1242,6 +1247,7 @@
 				ADBAF0462ECAD88A00A95F98 /* BodyScoreLoadingView.swift */,
 				ADBAF0472ECAD88A00A95F98 /* BodyScoreManualWeightView.swift */,
 				ADBAF0482ECAD88A00A95F98 /* BodyScoreRevealView.swift */,
+				ADFF001D313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -1550,6 +1556,7 @@
 				ADBAF0572ECAD88A00A95F98 /* BodyScoreBodyFatChoiceView.swift in Sources */,
 				ADBAF0582ECAD88A00A95F98 /* BodyScoreBodyFatNumericView.swift in Sources */,
 				ADBAF0592ECAD88A00A95F98 /* BodyScoreBasicsView.swift in Sources */,
+				ADFF001E313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift in Sources */,
 				ADBAF05A2ECAD88A00A95F98 /* OnboardingMolecules.swift in Sources */,
 				ADBAF05B2ECAD88A00A95F98 /* BodyScoreBodyFatVisualView.swift in Sources */,
 				ADBAF05C2ECAD88A00A95F98 /* BodyScoreEmailCaptureView.swift in Sources */,
@@ -1716,6 +1723,7 @@
 				AD8872D22EB946BE0041C426 /* LiquidGlassCTAButton.swift in Sources */,
 				AD8872D32EB946BE0041C426 /* DSTrendIndicator.swift in Sources */,
 				AD8872D42EB946BE0041C426 /* BaseTextField.swift in Sources */,
+				ADA4B73B2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift in Sources */,
 				AD8872D62EB946BE0041C426 /* CompactMetricCard.swift in Sources */,
 				BF2DBFBAC3B2277AE19EDC3D /* DeveloperTapHandler.swift in Sources */,
 				5763B6723CDF6F551543599B /* ErrorStateView.swift in Sources */,
