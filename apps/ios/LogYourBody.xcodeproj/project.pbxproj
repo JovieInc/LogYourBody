@@ -139,6 +139,7 @@
 		AD8872D42EB946BE0041C426 /* BaseTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724A2EB946BE0041C426 /* BaseTextField.swift */; };
 		AD8872D62EB946BE0041C426 /* CompactMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726C2EB946BE0041C426 /* CompactMetricCard.swift */; };
 		ADA4B7372ECC3A7A00F4262A /* EntryVisibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */; };
+		ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */; };
 		ADB2F6A12FFD12C500EF7A4B /* EditEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB2F6A02FFD12C500EF7A4B /* EditEntrySheet.swift */; };
 		ADBAF04E2ECAD88A00A95F98 /* BodyScoreHeightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF0442ECAD88A00A95F98 /* BodyScoreHeightView.swift */; };
 		ADBAF04F2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF03B2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift */; };
@@ -524,6 +525,7 @@
 		AD933E042E24A22D00801078 /* LegalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalView.swift; sourceTree = "<group>"; };
 		AD99F2982E1491FA00F5ECE4 /* AuthManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = AuthManager.swift; path = Services/AuthManager.swift; sourceTree = "<group>"; };
 		ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryVisibilityManager.swift; sourceTree = "<group>"; };
+		ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreCache.swift; sourceTree = "<group>"; };
 		ADA922EA2E22E7A600B82C49 /* BackgroundPhotoUploadService+Processing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackgroundPhotoUploadService+Processing.swift"; sourceTree = "<group>"; };
 		ADA922EB2E22E7A600B82C49 /* ImageProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessingService.swift; sourceTree = "<group>"; };
 		ADA922EC2E22E7A600B82C49 /* VisionOrientationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionOrientationService.swift; sourceTree = "<group>"; };
@@ -869,6 +871,7 @@
 		AD723AED2E15FA5C002376C6 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */,
 				ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */,
 				AD050C482EC12E390082A313 /* RevenueCatManager.swift */,
 				AD8872462EB9461D0041C426 /* MetricsInterpolationService.swift */,
@@ -1635,6 +1638,7 @@
 				0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */,
 				43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */,
 				F0451813784DE99328797E5F /* DSText.swift in Sources */,
+				ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */,
 				4DF78B8A5B5E0DBAF777CBC1 /* DSLogo.swift in Sources */,
 				CCE3FEEC83AAC1B3F1F82BF6 /* DSProgressBar.swift in Sources */,
 				4C2DA948F919366D436CEF26 /* DSIcon.swift in Sources */,

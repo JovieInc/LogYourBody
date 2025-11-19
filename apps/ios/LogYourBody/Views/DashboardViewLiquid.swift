@@ -134,13 +134,10 @@ struct DashboardViewLiquid: View {
     @State private var draggedMetric: MetricIdentifier?
 
     // UI state
-    @State private var showPhotoOptions = false
-    @State private var showCamera = false
-    @State private var showPhotoPicker = false
-    @State private var selectedPhoto: PhotosPickerItem?
-    @State private var isUploadingPhoto = false
     @State private var animatingPlaceholder = false
     @State private var showAddEntrySheet = false
+    @AppStorage("dashboard_selected_time_range")
+    private var storedTimeRangeRawValue: String = TimeRange.month1.rawValue
     @State private var selectedRange: TimeRange = .month1
     @State private var showSyncDetails = false
     @State private var syncBannerState: SyncBannerState?
@@ -164,9 +161,6 @@ struct DashboardViewLiquid: View {
 
     // Timeline mode
     @State private var timelineMode: TimelineMode = .photo
-
-    // Display mode (photo vs wireframe)
-    @State private var displayMode: DisplayMode = .photo
 
     // Full metric chart navigation state
     @State private var isMetricDetailActive = false
@@ -268,27 +262,14 @@ struct DashboardViewLiquid: View {
                 // Empty state
                 emptyState
             } else {
-                TabView(selection: $displayMode) {
-                    tabContent(for: .photo)
-                        .tag(DisplayMode.photo)
-                        .tabItem {
-                            Label("Home", systemImage: "house.fill")
-                        }
-
-                    tabContent(for: .metrics)
-                        .tag(DisplayMode.metrics)
-                        .tabItem {
-                            Label("Metric", systemImage: "chart.bar.fill")
-                        }
-                }
-                .tint(Color(hex: "#6EE7F0"))
+                tabContent()
             }
         }
         .onAppear {
             // Load saved metrics order from AppStorage
             loadMetricsOrder()
 
-            // Load ONLY newest metric immediately for instant display
+            selectedRange = TimeRange(rawValue: storedTimeRangeRawValue) ?? .month1
             Task { await loadData(loadOnlyNewest: true) }
 
             // Then refresh async (loads all data in background)
@@ -313,32 +294,11 @@ struct DashboardViewLiquid: View {
                 await loadData()
             }
         }
+        .onChange(of: selectedRange) { _, newValue in
+            storedTimeRangeRawValue = newValue.rawValue
+        }
         .onChange(of: selectedIndex) { _, newIndex in
             updateAnimatedValues(for: newIndex)
-        }
-        .sheet(isPresented: $showPhotoOptions) {
-            PhotoOptionsSheet(
-                showCamera: $showCamera,
-                showPhotoPicker: $showPhotoPicker
-            )
-        }
-        .fullScreenCover(isPresented: $showCamera) {
-            CameraView { image in
-                Task {
-                    await handlePhotoCapture(image)
-                }
-            }
-        }
-        .photosPicker(
-            isPresented: $showPhotoPicker,
-            selection: $selectedPhoto,
-            matching: .images,
-            photoLibrary: .shared()
-        )
-        .onChange(of: selectedPhoto) { _, newItem in
-            Task {
-                await handlePhotoSelection(newItem)
-            }
         }
         .sheet(isPresented: $showAddEntrySheet) {
             AddEntrySheet(isPresented: $showAddEntrySheet)
@@ -361,7 +321,7 @@ struct DashboardViewLiquid: View {
         )
     }
 
-    private func tabContent(for mode: DisplayMode) -> some View {
+    private func tabContent() -> some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
                 compactHeader
@@ -370,21 +330,17 @@ struct DashboardViewLiquid: View {
                 syncStatusBanner
                     .padding(.horizontal, 20)
 
-                if mode == .photo {
-                    if let metric = currentMetric {
-                        heroCard(metric: metric)
-                            .padding(.horizontal, 20)
-                    }
-
-                    timelineScrubber
-                        .padding(.top, 4)
+                if let metric = currentMetric {
+                    heroCard(metric: metric)
                         .padding(.horizontal, 20)
-
-                    metricsRow
-                        .padding(.horizontal, 20)
-                } else {
-                    metricsView
                 }
+
+                timelineScrubber
+                    .padding(.top, 4)
+                    .padding(.horizontal, 20)
+
+                metricsRow
+                    .padding(.horizontal, 20)
 
                 Spacer(minLength: 120)
             }
@@ -824,97 +780,136 @@ struct DashboardViewLiquid: View {
 
     // MARK: - Hero Card
 
-    private var noPhotoPlaceholder: some View {
-        Button(action: {
-            showPhotoOptions = true
-        }) {
-            VStack(spacing: 12) {
-                Image(systemName: "photo.badge.plus")
-                    .font(.system(size: 48, weight: .light))
-                    .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
-                Text("Tap to Add Photo")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(Color.liquidTextPrimary.opacity(0.60))
-            }
-            .frame(height: 280)
-            .frame(maxWidth: .infinity)
-            .background(Color.white.opacity(0.05))
-        }
-        .buttonStyle(PlainButtonStyle())
-        .scaleEffect(animatingPlaceholder ? 1.0 : 0.98)
-        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: animatingPlaceholder)
-        .onAppear {
-            animatingPlaceholder = true
-        }
-    }
-
-    private func photoContent(for metric: BodyMetrics) -> some View {
-        Group {
-            if let photoUrl = metric.photoUrl, !photoUrl.isEmpty,
-               let url = URL(string: photoUrl) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(height: 280)
-                            .clipped()
-                    case .failure(let error):
-                        photoFailurePlaceholder(url: photoUrl, error: error)
-                    case .empty:
-                        ProgressView()
-                            .frame(height: 280)
-                            .frame(maxWidth: .infinity)
-                    @unknown default:
-                        noPhotoPlaceholder
-                    }
-                }
-            } else {
-                noPhotoPlaceholder
-            }
-        }
-    }
-
-    private func photoFailurePlaceholder(url: String, error: Error) -> some View {
-        #if DEBUG
-        print("[Dashboard] Image load failed: \(error.localizedDescription), URL: \(url)")
-        #endif
-        return noPhotoPlaceholder
-    }
-
     private func heroCard(metric: BodyMetrics) -> some View {
-        Group {
-            if displayMode == .photo {
-                // Photo mode - carousel with hero card
-                HeroGlassCard {
-                    VStack(spacing: 0) {
-                        TabView(selection: $selectedIndex) {
-                            ForEach(Array(bodyMetrics.enumerated()), id: \.element.id) { index, m in
-                                ZStack(alignment: .topTrailing) {
-                                    photoContent(for: m)
-                                }
-                                .tag(index)
-                            }
-                        }
-                        .tabViewStyle(.page(indexDisplayMode: .always))
-                        .indexViewStyle(.page(backgroundDisplayMode: .always))
-                        .frame(height: 280)
-                        .onChange(of: selectedIndex) { _, _ in
-                            // Haptic feedback on swipe
-                            Task { @MainActor in
-                                let generator = UISelectionFeedbackGenerator()
-                                generator.prepare()
-                                generator.selectionChanged()
-                            }
-                        }
+        HeroGlassCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .lastTextBaseline, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Body Score")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color.liquidTextPrimary.opacity(0.85))
+
+                        Text(bodyScoreText().scoreText)
+                            .font(.system(size: 72, weight: .bold, design: .rounded))
+                            .foregroundColor(Color.liquidTextPrimary)
+                            .monospacedDigit()
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text(bodyScoreText().tagline)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color.liquidTextPrimary.opacity(0.75))
+
+                        progressRing(for: bodyScoreText().score)
                     }
                 }
-            } else {
-                // Metrics mode - scrollable metric cards
-                metricsView
+
+                Divider()
+                    .overlay(Color.white.opacity(0.1))
+
+                HStack(spacing: 18) {
+                    heroStatTile(title: "FFMI", value: heroFFMIValue(), caption: heroFFMICaption())
+                    heroStatTile(title: "Lean %ile", value: heroPercentileValue(), caption: "Among peers")
+                    heroStatTile(title: "Target", value: bodyScoreTargetRange(), caption: heroTargetCaption())
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func heroStatTile(title: String, value: String, caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color.liquidTextPrimary.opacity(0.6))
+
+            Text(value)
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundColor(Color.liquidTextPrimary)
+
+            Text(caption)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(Color.liquidTextPrimary.opacity(0.55))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func progressRing(for score: Int) -> some View {
+        let progress = Double(score) / 100.0
+        return ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.15), lineWidth: 12)
+
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(LinearGradient(colors: [Color(hex: "#6EE7F0"), Color(hex: "#3A7BD5")], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 12)
+                .rotationEffect(.degrees(-90))
+                .animation(.easeInOut(duration: 0.8), value: score)
+
+            VStack(spacing: 4) {
+                Text("Score")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color.liquidTextPrimary.opacity(0.7))
+                Text("/100")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Color.liquidTextPrimary.opacity(0.45))
             }
         }
+        .frame(width: 90, height: 90)
+    }
+
+    private func bodyScoreText() -> (score: Int, scoreText: String, tagline: String) {
+        guard let result = latestBodyScoreResult() else {
+            return (0, "--", "Complete onboarding to unlock")
+        }
+        return (result.score, "\(result.score)", result.statusTagline)
+    }
+
+    private func heroFFMIValue() -> String {
+        if let result = latestBodyScoreResult() {
+            return String(format: "%.1f", result.ffmi)
+        }
+
+        if let metric = currentMetric {
+            let heightInches = convertHeightToInches(height: authManager.currentUser?.profile?.height, heightUnit: authManager.currentUser?.profile?.heightUnit)
+            if let ffmiData = MetricsInterpolationService.shared.estimateFFMI(for: metric.date, metrics: bodyMetrics, heightInches: heightInches) {
+                return String(format: "%.1f", ffmiData.value)
+            }
+        }
+        return "--"
+    }
+
+    private func heroFFMICaption() -> String {
+        guard let result = latestBodyScoreResult() else {
+            return "FFMI"
+        }
+        return result.ffmiStatus
+    }
+
+    private func heroPercentileValue() -> String {
+        guard let result = latestBodyScoreResult() else {
+            return "--"
+        }
+        return String(format: "%.0f", result.leanPercentile)
+    }
+
+    private func bodyScoreTargetRange() -> String {
+        guard let result = latestBodyScoreResult() else {
+            return "--"
+        }
+        return "\(Int(result.targetBodyFat.lowerBound))%-\(Int(result.targetBodyFat.upperBound))%"
+    }
+
+    private func heroTargetCaption() -> String {
+        guard let result = latestBodyScoreResult() else { return "Body fat" }
+        return result.targetBodyFat.label
+    }
+
+    private func latestBodyScoreResult() -> BodyScoreResult? {
+        return BodyScoreCache.shared.latestResult(for: authManager.currentUser?.id)
     }
 
     // MARK: - Metrics View
@@ -1975,14 +1970,6 @@ extension DashboardViewLiquid {
                 animatedFFMI = ffmiResult.value
             }
         }
-    }
-
-    func handlePhotoCapture(_ image: UIImage) async {
-        // Copy from DashboardView
-    }
-
-    func handlePhotoSelection(_ item: PhotosPickerItem?) async {
-        // Copy from DashboardView
     }
 
     // MARK: - Metrics View Helpers

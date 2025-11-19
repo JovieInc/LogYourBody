@@ -211,6 +211,7 @@ final class OnboardingFlowViewModel: ObservableObject {
             try await Task.sleep(nanoseconds: 1_000_000_000 / 2)
             let context = BodyScoreCalculationContext(input: bodyScoreInput)
             let result = try calculator.calculateScore(context: context)
+            BodyScoreCache.shared.store(result, for: AuthManager.shared.currentUser?.id)
             await MainActor.run {
                 self.bodyScoreResult = result
                 self.currentStep = .bodyScore
