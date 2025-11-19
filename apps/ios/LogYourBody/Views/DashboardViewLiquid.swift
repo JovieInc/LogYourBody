@@ -11,6 +11,14 @@ import PhotosUI
 import Charts
 import CoreData
 
+private struct CircleSymbol: ChartSymbolShape {
+    var perceptualUnitRect: CGRect { CGRect(x: -0.5, y: -0.5, width: 1, height: 1) }
+
+    func path(in rect: CGRect) -> Path {
+        Path(ellipseIn: rect)
+    }
+}
+
 private struct SyncBannerState {
     enum Style {
         case success
@@ -3105,14 +3113,13 @@ private struct FullMetricChartView: View {
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
-                                guard let plotFrame = proxy.plotAreaFrame else { return }
+                                let plotFrame = proxy.plotAreaFrame
                                 let frame = geo[plotFrame]
                                 let origin = frame.origin
                                 let width = frame.size.width
                                 let locationX = value.location.x - origin.x
                                 guard locationX >= 0, locationX <= width else { return }
-                                let xPosition = locationX + plotFrame.origin.x
-                                if let date: Date = proxy.value(atX: xPosition) {
+                                if let date: Date = proxy.value(atX: locationX) {
                                     if !isScrubbing {
                                         isScrubbing = true
                                         HapticManager.shared.selection()
