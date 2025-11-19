@@ -100,16 +100,19 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Setup iOS Build Environment
+      id: setup-ios-build
       uses: ./.github/actions/setup-ios-build
       with:
         xcode-version: '16.1'
         working-directory: apps/ios
         create-config-files: 'true'
-    
-    - name: Install Compatible OpenSSL
+
+    - name: Summarize setup caches
       run: |
-        brew install openssl@1.1
-        echo "/usr/local/opt/openssl@1.1/bin" >> $GITHUB_PATH
+        echo "Homebrew cache hit: ${{ steps.setup-ios-build.outputs.homebrew-cache-hit }}"
+        echo "Bundler cache hit: ${{ steps.setup-ios-build.outputs.bundler-cache-hit }}"
+        echo "SPM cache hit: ${{ steps.setup-ios-build.outputs.spm-cache-hit }}"
+        echo "OpenSSL prefix: ${{ steps.setup-ios-build.outputs.openssl-prefix }}"
         
     - name: Setup Match Authentication
       run: |
@@ -224,6 +227,7 @@ jobs:
         path: apps/ios/build
     
     - name: Setup iOS Build Environment
+      id: setup-ios-build
       uses: ./.github/actions/setup-ios-build
       with:
         xcode-version: '16.1'

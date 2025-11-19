@@ -18,6 +18,11 @@ inputs:
     required: false
     default: 'gems'
 
+outputs:
+  cache-hit:
+    description: 'Whether Bundler dependencies were restored from cache'
+    value: ${{ steps.bundler-cache.outputs.cache-hit }}
+
 runs:
   using: 'composite'
   steps:

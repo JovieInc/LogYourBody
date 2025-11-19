@@ -1,5 +1,5 @@
 name: 'Setup iOS Build Environment'
-description: 'Install and cache iOS build tools (SwiftLint, xcbeautify)'
+description: 'Install and cache iOS build tools (SwiftLint, xcbeautify, OpenSSL, Bundler, SwiftPM)'
 inputs:
   xcode-version:
     description: 'Xcode version to use'
@@ -9,10 +9,28 @@ inputs:
     description: 'Working directory for iOS project'
     required: false
     default: 'apps/ios'
+  openssl-version:
+    description: 'OpenSSL formula version to install'
+    required: false
+    default: '1.1'
   create-config-files:
     description: 'Create placeholder config files for CI builds'
     required: false
     default: 'false'
+
+outputs:
+  homebrew-cache-hit:
+    description: 'Indicates whether Homebrew tool cache was restored'
+    value: ${{ steps.homebrew-cache.outputs.cache-hit }}
+  bundler-cache-hit:
+    description: 'Indicates whether Bundler dependencies were restored from cache'
+    value: ${{ steps.setup-ruby-bundler.outputs.cache-hit }}
+  spm-cache-hit:
+    description: 'Indicates whether Swift Package Manager cache was restored'
+    value: ${{ steps.spm-cache.outputs.cache-hit }}
+  openssl-prefix:
+    description: 'Resolved installation prefix for the requested OpenSSL version'
+    value: ${{ steps.install-openssl.outputs.openssl-prefix }}
 
 runs:
   using: 'composite'
@@ -29,11 +47,31 @@ runs:
         path: |
           /usr/local/Cellar/swiftlint
           /usr/local/Cellar/xcbeautify
+          /usr/local/Cellar/openssl@${{ inputs.openssl-version }}
           /opt/homebrew/Cellar/swiftlint
           /opt/homebrew/Cellar/xcbeautify
-        key: ${{ runner.os }}-homebrew-swiftlint-xcbeautify-${{ hashFiles('.github/actions/setup-ios-build/action.yml') }}
+          /opt/homebrew/Cellar/openssl@${{ inputs.openssl-version }}
+        key: ${{ runner.os }}-homebrew-swiftlint-xcbeautify-openssl-${{ inputs.openssl-version }}-${{ hashFiles('.github/actions/setup-ios-build/action.yml') }}
         restore-keys: |
           ${{ runner.os }}-homebrew-swiftlint-xcbeautify-
+
+    - name: Install OpenSSL
+      id: install-openssl
+      shell: bash
+      run: |
+        FORMULA="openssl@${{ inputs.openssl-version }}"
+
+        if ! brew list --versions "$FORMULA" >/dev/null; then
+          echo "Installing $FORMULA..."
+          brew install "$FORMULA"
+        else
+          echo "$FORMULA already installed: $(brew list --versions "$FORMULA")"
+        fi
+
+        PREFIX=$(brew --prefix "$FORMULA")
+        echo "Adding $PREFIX/bin to PATH"
+        echo "$PREFIX/bin" >> "$GITHUB_PATH"
+        echo "openssl-prefix=$PREFIX" >> "$GITHUB_OUTPUT"
 
     - name: Install SwiftLint and xcbeautify
       shell: bash
@@ -67,12 +105,14 @@ runs:
         fi
 
     - name: Setup Ruby and Bundler
+      id: setup-ruby-bundler
       uses: ./.github/actions/setup-ruby-bundler
       with:
         working-directory: ${{ inputs.working-directory }}
         cache-key-prefix: 'ios-gems'
 
     - name: Cache Swift Package Manager
+      id: spm-cache
       uses: actions/cache@v4
       with:
         path: |
@@ -89,6 +129,7 @@ runs:
         echo "Xcode: $(xcodebuild -version | head -1)"
         echo "SwiftLint: $(swiftlint version || echo 'Not installed')"
         echo "xcbeautify: $(xcbeautify --version || echo 'Not installed')"
+        echo "OpenSSL: $(openssl version || echo 'Not installed')"
         echo "Ruby: $(ruby --version)"
         echo "Bundler: $(bundle --version)"
 
