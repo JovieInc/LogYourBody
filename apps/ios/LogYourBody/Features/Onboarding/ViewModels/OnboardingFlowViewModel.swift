@@ -481,6 +481,9 @@ final class OnboardingFlowViewModel: ObservableObject {
         guard !hasMarkedOnboardingComplete else { return }
         hasMarkedOnboardingComplete = true
         OnboardingStateManager.shared.markCompleted()
+        Task {
+            await AuthManager.shared.updateProfile(["onboardingCompleted": true])
+        }
         clearPersistedProgress()
 
         if didRequestHealthSync {

@@ -1159,10 +1159,29 @@ class AuthManager: NSObject, ObservableObject {
             )
         }
 
+        let onboardingCompletedUpdate = updates["onboardingCompleted"] as? Bool
+
+        if let onboardingCompleted = onboardingCompletedUpdate {
+            updatedProfile = UserProfile(
+                id: updatedProfile.id,
+                email: updatedProfile.email,
+                username: updatedProfile.username,
+                fullName: updatedProfile.fullName,
+                dateOfBirth: updatedProfile.dateOfBirth,
+                height: updatedProfile.height,
+                heightUnit: updatedProfile.heightUnit,
+                gender: updatedProfile.gender,
+                activityLevel: updatedProfile.activityLevel,
+                goalWeight: updatedProfile.goalWeight,
+                goalWeightUnit: updatedProfile.goalWeightUnit,
+                onboardingCompleted: onboardingCompleted
+            )
+        }
+
         // Update the user's profile
         user.profile = updatedProfile
 
-        if let onboardingCompleted = updates["onboardingCompleted"] as? Bool {
+        if let onboardingCompleted = onboardingCompletedUpdate {
             user.onboardingCompleted = onboardingCompleted
             // Sync onboarding status to UserDefaults
             UserDefaults.standard.set(onboardingCompleted, forKey: Constants.hasCompletedOnboardingKey)
