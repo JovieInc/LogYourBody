@@ -2,7 +2,7 @@ import Foundation
 
 // Note: MeasurementSystem is defined globally in PreferencesView.swift
 
-enum WeightUnit: String, Codable, CaseIterable {
+enum WeightUnit: String, Codable, CaseIterable, CustomStringConvertible {
     case kilograms = "kg"
     case pounds = "lbs"
 
@@ -12,6 +12,15 @@ enum WeightUnit: String, Codable, CaseIterable {
             return .metric
         case .pounds:
             return .imperial
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .kilograms:
+            return "KG"
+        case .pounds:
+            return "LBS"
         }
     }
 }

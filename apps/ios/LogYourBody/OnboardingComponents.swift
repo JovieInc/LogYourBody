@@ -31,7 +31,7 @@ struct OnboardingHeader: View {
                             .contentShape(Rectangle())
                     }
                 )
-                .modifier(LiquidGlassButtonModifier())
+                .modifier(OnboardingLiquidGlassButtonModifier())
             }
 
             Spacer()

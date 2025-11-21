@@ -118,7 +118,7 @@ struct BaseButton<Label: View>: View {
     }
 
     var body: some View {
-        Button(action: handleTap) {
+        Button(action: handleTap, label: {
             buttonContent
                 .frame(maxWidth: configuration.fullWidth ? .infinity : nil)
                 .frame(height: configuration.size.height)
@@ -130,7 +130,7 @@ struct BaseButton<Label: View>: View {
                 .opacity(isEnabled ? 1.0 : 0.6)
                 .animation(.easeInOut(duration: 0.15), value: isPressed)
                 .animation(.easeInOut(duration: 0.15), value: configuration.isLoading)
-        }
+        })
         .buttonStyle(PlainButtonStyle())
         .disabled(!isEnabled)
         .onLongPressGesture(
@@ -249,7 +249,7 @@ struct BaseIconButton: View {
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.impactOccurred()
             action()
-        }) {
+        }, label: {
             Image(systemName: icon)
                 .font(.system(size: size, weight: .medium))
                 .foregroundColor(.appText)
@@ -266,7 +266,7 @@ struct BaseIconButton: View {
                 .scaleEffect(isPressed ? 0.9 : 1.0)
                 .opacity(isEnabled ? 1.0 : 0.6)
                 .animation(.easeInOut(duration: 0.1), value: isPressed)
-        }
+        })
         .buttonStyle(PlainButtonStyle())
         .disabled(!isEnabled)
         .onLongPressGesture(

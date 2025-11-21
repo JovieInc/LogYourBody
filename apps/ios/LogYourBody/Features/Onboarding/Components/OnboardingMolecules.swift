@@ -23,7 +23,7 @@ struct OnboardingOptionButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button(action: action, label: {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -52,7 +52,7 @@ struct OnboardingOptionButton: View {
                             .stroke(isSelected ? Color.appPrimary : Color.appBorder.opacity(0.6), lineWidth: isSelected ? 2 : 1)
                     )
             )
-        }
+        })
         .buttonStyle(.plain)
     }
 }
@@ -66,7 +66,7 @@ struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: V
     var body: some View {
         HStack(spacing: 8) {
             ForEach(options, id: \.self) { option in
-                Button(action: { selection = option }) {
+                Button(action: { selection = option }, label: {
                     Text(option.description)
                         .font(.system(.callout, design: .rounded).weight(.medium))
                         .frame(maxWidth: .infinity)
@@ -80,7 +80,7 @@ struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: V
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(selection == option ? Color.appPrimary : Color.appBorder.opacity(0.6))
                         )
-                }
+                })
                 .buttonStyle(.plain)
             }
         }
@@ -155,11 +155,11 @@ struct OnboardingValueRow: View {
             Spacer()
 
             if let actionTitle, let action {
-                Button(action: action) {
+                Button(action: action, label: {
                     Text(actionTitle)
                         .font(.system(.callout, design: .rounded).weight(.medium))
                         .foregroundStyle(Color.appPrimary)
-                }
+                })
                 .buttonStyle(.plain)
             }
         }
@@ -268,7 +268,9 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
             if showsBackButton {
-                Button(action: { onBack?() }) {
+                Button(action: {
+                    onBack?()
+                }, label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Color.appText)
@@ -277,7 +279,7 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .fill(Color.white.opacity(0.08))
                         )
-                }
+                })
                 .buttonStyle(.plain)
             }
 

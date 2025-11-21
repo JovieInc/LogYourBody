@@ -257,7 +257,11 @@ final class ErrorStateViewTests: XCTestCase {
     func testLongStrings() {
         // Given
         let longTitle = "This is a very long error title that might wrap on smaller screens"
-        let longMessage = "This is an extremely long error message that provides detailed information about what went wrong and how the user might be able to fix it. It could span multiple lines on most devices."
+        let longMessage = (
+            "This is an extremely long error message that provides detailed " +
+                "information about what went wrong and how the user might be " +
+                "able to fix it. It could span multiple lines on most devices."
+        )
         let errorView = ErrorStateView(
             title: longTitle,
             message: longMessage,

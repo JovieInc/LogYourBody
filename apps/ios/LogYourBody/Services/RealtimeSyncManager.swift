@@ -410,6 +410,13 @@ class RealtimeSyncManager: ObservableObject {
     nonisolated private func syncProfilesBatch(_ profiles: [CachedProfile], token: String) async throws {
         // Profile sync (usually just one per user)
         for profile in profiles {
+            let formattedBirthDate: Any
+            if let dateOfBirth = profile.dateOfBirth {
+                formattedBirthDate = ISO8601DateFormatter().string(from: dateOfBirth)
+            } else {
+                formattedBirthDate = NSNull()
+            }
+
             let profileData: [String: Any] = [
                 "id": profile.id ?? "",
                 "full_name": profile.fullName as Any,
@@ -418,7 +425,7 @@ class RealtimeSyncManager: ObservableObject {
                 "height": profile.height,
                 "height_unit": profile.heightUnit as Any,
                 "gender": profile.gender as Any,
-                "date_of_birth": profile.dateOfBirth != nil ? ISO8601DateFormatter().string(from: profile.dateOfBirth!) : NSNull(),
+                "date_of_birth": formattedBirthDate,
                 "activity_level": profile.activityLevel as Any
             ]
 
@@ -460,15 +467,34 @@ class RealtimeSyncManager: ObservableObject {
         if let profileData = try await supabaseManager.fetchProfile(userId: userId, token: token) {
             coreDataManager.updateOrCreateProfile(from: profileData)
         }
-    }
 
-    // MARK: - Real-time Connection
-    private func connectRealtime() {
-        guard authManager.isAuthenticated else { return }
-        guard isOnline else { return }
+        // Pull latest body metric timestamp
+        if let remoteLatest = try? await supabaseManager.fetchLatestBodyMetricTimestamp(
+            userId: userId,
+            token: token
+        ) {
+            // Use remoteLatest as needed (currently no-op)
+            _ = remoteLatest
+        }
+
+        let isStillAuthenticated = await MainActor.run {
+            self.authManager.isAuthenticated
+        }
+        let stillOnline = await MainActor.run {
+            self.isOnline
+        }
+
+        guard isStillAuthenticated else { return }
+        guard stillOnline else { return }
 
         // For now, we'll use polling instead of WebSocket to simplify
         // WebSocket implementation can be added later for true real-time
+        await MainActor.run {
+            self.realtimeConnected = false
+        }
+    }
+
+    private func connectRealtime() {
         realtimeConnected = false
     }
 

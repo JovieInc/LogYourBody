@@ -171,7 +171,10 @@ struct ProgressPhotoCutoutView: View {
                                 task.status != .completed && task.status != .failed
                             }) { task in
                                 CutoutProcessingImagePlaceholder()
-                                    .tag(displayMetrics.count + (processingService.processingTasks.firstIndex(where: { $0.id == task.id }) ?? 0))
+                                    .tag(
+                                        displayMetrics.count
+                                            + (processingService.processingTasks.firstIndex(where: { $0.id == task.id }) ?? 0)
+                                    )
                             }
                         }
                         .tabViewStyle(.page(indexDisplayMode: .never))

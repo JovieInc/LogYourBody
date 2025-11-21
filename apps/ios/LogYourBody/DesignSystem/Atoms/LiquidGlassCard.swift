@@ -155,7 +155,7 @@ struct GlassPillButton: View {
         Button(action: {
             // HapticManager.shared.buttonTap()
             action()
-        }) {
+        }, label: {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .medium))
@@ -182,7 +182,7 @@ struct GlassPillButton: View {
             )
             .scaleEffect(isPressed ? 0.95 : 1.0)
             .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4)
-        }
+        })
         .buttonStyle(PlainButtonStyle())
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -241,7 +241,7 @@ struct FrostedTabItem: View {
         Button(action: {
             // HapticManager.shared.buttonTap()
             action()
-        }) {
+        }, label: {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 24, weight: isSelected ? .semibold : .regular))
@@ -250,7 +250,7 @@ struct FrostedTabItem: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-        }
+        })
         .buttonStyle(PlainButtonStyle())
     }
 }

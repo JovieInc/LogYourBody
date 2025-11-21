@@ -137,7 +137,10 @@ struct AddEntrySheet: View {
                     hasPromptedDeletePhotos = true
                 }
             } message: {
-                Text("Would you like to automatically delete photos from your camera roll after importing them into the app? You can change this later in Settings.")
+                Text(
+                    "Would you like to automatically delete photos from your camera roll after importing them into the app? " +
+                        "You can change this later in Settings."
+                )
             }
             .onAppear {
                 // Set default weight unit based on user preference
@@ -271,11 +274,14 @@ struct AddEntrySheet: View {
                     Text("Select progress photos")
                         .font(.appHeadline)
 
-                    Text("Photos will be automatically dated based on when they were taken. You can select multiple photos for bulk upload.")
-                        .font(.appBody)
-                        .foregroundColor(.appTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                    Text(
+                        "Photos will be automatically dated based on when they were taken. " +
+                            "You can select multiple photos for bulk upload."
+                    )
+                    .font(.appBody)
+                    .foregroundColor(.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
 
                     PhotosPicker(
                         selection: $selectedPhotos,
@@ -471,7 +477,7 @@ struct AddEntrySheet: View {
 
         let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: photoIdentifiers, options: nil)
 
-        guard fetchResult.count > 0 else { return }
+        guard fetchResult.firstObject != nil else { return }
 
         do {
             try await PHPhotoLibrary.shared().performChanges {

@@ -10,184 +10,7 @@ import SwiftUI
 import PhotosUI
 import Charts
 import CoreData
-
-private struct CircleSymbol: ChartSymbolShape {
-    var perceptualUnitRect: CGRect { CGRect(x: -0.5, y: -0.5, width: 1, height: 1) }
-
-    func path(in rect: CGRect) -> Path {
-        Path(ellipseIn: rect)
-    }
-}
-
-private struct SyncBannerState {
-    enum Style {
-        case success
-        case error
-    }
-
-    let style: Style
-    let detail: String?
-}
-
-private struct MetricRangeStats {
-    let startValue: Double
-    let endValue: Double
-    let delta: Double
-    let average: Double
-    let percentageChange: Double
-}
-
-private func computeRangeStats(
-    metrics: [BodyMetrics],
-    valueProvider: (BodyMetrics) -> Double?
-) -> MetricRangeStats? {
-    let sortedMetrics = metrics.sorted { $0.date < $1.date }
-    let dataPoints: [(date: Date, value: Double)] = sortedMetrics.compactMap { metric in
-        guard let value = valueProvider(metric) else { return nil }
-        return (metric.date, value)
-    }
-
-    guard let first = dataPoints.first, let last = dataPoints.last, !dataPoints.isEmpty else {
-        return nil
-    }
-
-    let total = dataPoints.reduce(0) { partialResult, point in
-        partialResult + point.value
-    }
-
-    let average = total / Double(dataPoints.count)
-    let delta = last.value - first.value
-    let percentageChange: Double
-
-    if abs(first.value) < .leastNormalMagnitude {
-        percentageChange = 0
-    } else {
-        percentageChange = (delta / first.value) * 100
-    }
-
-    return MetricRangeStats(
-        startValue: first.value,
-        endValue: last.value,
-        delta: delta,
-        average: average,
-        percentageChange: percentageChange
-    )
-}
-
-private struct MetricSeriesStats {
-    let average: Double
-    let delta: Double
-    let percentageChange: Double
-}
-
-private func makeTrend(delta: Double, unit: String, range: TimeRange) -> MetricSummaryCard.Trend? {
-    guard abs(delta) > 0.001 else {
-        return MetricSummaryCard.Trend(direction: .flat, valueText: "No change", caption: range.rawValue)
-    }
-
-    let direction: MetricSummaryCard.Trend.Direction = delta > 0 ? .up : .down
-    let formattedDelta = formatDelta(delta: delta, unit: unit)
-    let caption = "vs \(range.rawValue)"
-    return MetricSummaryCard.Trend(direction: direction, valueText: formattedDelta, caption: caption)
-}
-
-private func formatDelta(delta: Double, unit: String) -> String {
-    let formatter = NumberFormatter()
-    formatter.numberStyle = .decimal
-    formatter.maximumFractionDigits = unit == "%" ? 1 : 1
-    formatter.minimumFractionDigits = 0
-
-    let value = formatter.string(from: NSNumber(value: abs(delta))) ?? String(format: "%.1f", abs(delta))
-    let prefix = delta > 0 ? "+" : "–"
-    if unit.isEmpty {
-        return "\(prefix)\(value)"
-    }
-    return "\(prefix)\(value)\(unit == "%" ? unit : " \(unit)")"
-}
-
-private func formatAverageFootnote(value: Double, unit: String) -> String {
-    let formatter = NumberFormatter()
-    formatter.numberStyle = .decimal
-    formatter.maximumFractionDigits = unit == "%" ? 1 : 1
-    formatter.minimumFractionDigits = 0
-
-    let formatted = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.1f", value)
-    if unit.isEmpty {
-        return "\(formatted) average"
-    }
-    return "\(formatted) \(unit) average"
-}
-
-private enum FormatterCache {
-    static let stepsFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.maximumFractionDigits = 0
-        formatter.minimumFractionDigits = 0
-        return formatter
-    }()
-
-    static let shortTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        formatter.dateStyle = .none
-        return formatter
-    }()
-
-    static let mediumDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
-
-    static let monthDayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter
-    }()
-
-    static let monthYearFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM yyyy"
-        return formatter
-    }()
-
-    static let relativeFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter
-    }()
-}
-
-private struct MetricFormatterKey: Hashable {
-    let minFractionDigits: Int
-    let maxFractionDigits: Int
-}
-
-private enum MetricFormatterCache {
-    private static var cache: [MetricFormatterKey: NumberFormatter] = [:]
-
-    static func formatter(minFractionDigits: Int, maxFractionDigits: Int) -> NumberFormatter {
-        let key = MetricFormatterKey(minFractionDigits: minFractionDigits, maxFractionDigits: maxFractionDigits)
-        if let formatter = cache[key] {
-            return formatter
-        }
-
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = minFractionDigits
-        formatter.maximumFractionDigits = maxFractionDigits
-        cache[key] = formatter
-        return formatter
-    }
-}
-
-struct MetricDataPoint: Identifiable {
-    let id = UUID()
-    let index: Int
-    let value: Double
-}
+@preconcurrency import Combine
 
 struct DashboardViewLiquid: View {
     @EnvironmentObject var authManager: AuthManager
@@ -205,7 +28,7 @@ struct DashboardViewLiquid: View {
     @State var isSyncingData = false  // Flag to prevent UI updates during sync
 
     // Metrics reordering state
-    @AppStorage("metricsOrder") private var metricsOrderData: Data = Data()
+    @AppStorage("metricsOrder") private var metricsOrderData = Data()
     @State private var metricsOrder: [MetricIdentifier] = [.steps, .weight, .bodyFat, .ffmi]
     @State private var draggedMetric: MetricIdentifier?
 
@@ -245,6 +68,7 @@ struct DashboardViewLiquid: View {
     @State private var selectedTab: DashboardTab = .home
     @State private var isMetricDetailActive = false
     @State private var selectedMetricType: MetricType = .weight
+    @State private var chartMode: ChartMode = .trend
 
     enum DashboardTab: Hashable {
         case home
@@ -306,6 +130,11 @@ struct DashboardViewLiquid: View {
         return customWeightGoal
     }
 
+    private var weightUnit: String {
+        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        return system.weightUnit
+    }
+
     /// Calculate age from date of birth
     private func calculateAge(from dateOfBirth: Date?) -> Int? {
         guard let dob = dateOfBirth else { return nil }
@@ -348,18 +177,18 @@ struct DashboardViewLiquid: View {
                     LazyTabView(selectedTab: $selectedTab) {
                         homeTab
                     }
-                        .tag(DashboardTab.home)
-                        .tabItem {
-                            Label("Home", systemImage: "house.fill")
-                        }
+                    .tag(DashboardTab.home)
+                    .tabItem {
+                        Label("Home", systemImage: "house.fill")
+                    }
 
                     LazyTabView(selectedTab: $selectedTab, tab: .metrics) {
                         metricsTab
                     }
-                        .tag(DashboardTab.metrics)
-                        .tabItem {
-                            Label("Metrics", systemImage: "chart.bar.doc.horizontal.fill")
-                        }
+                    .tag(DashboardTab.metrics)
+                    .tabItem {
+                        Label("Metrics", systemImage: "chart.bar.doc.horizontal.fill")
+                    }
                 }
             }
         }
@@ -411,7 +240,10 @@ struct DashboardViewLiquid: View {
                 .environmentObject(authManager)
         }
         .sheet(isPresented: $showSyncDetails) {
-            syncDetailsSheet
+            DashboardSyncDetailsSheet(
+                isPresented: $showSyncDetails,
+                syncManager: realtimeSyncManager
+            )
         }
         .background(
             NavigationLink(
@@ -482,112 +314,23 @@ struct DashboardViewLiquid: View {
     // MARK: - Compact Header
 
     private var compactHeader: some View {
-        HStack(alignment: .center, spacing: 12) {
-            NavigationLink(destination: PreferencesView()) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.1))
-                        .overlay(
-                            Circle()
-                                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1.5)
-                        )
-                        .frame(width: 44, height: 44)
+        DashboardHeaderCompact(
+            avatarURL: avatarURL,
+            userFirstName: userFirstName,
+            userAgeDisplay: userAgeDisplay,
+            userHeightDisplay: userHeightDisplay,
+            syncStatusTitle: syncStatusTitle,
+            syncStatusDetail: syncStatusDetail,
+            syncStatusColor: syncStatusColor,
+            onShowSyncDetails: { showSyncDetails = true }
+        )
+    }
 
-                    if let avatarUrl = authManager.currentUser?.avatarUrl,
-                       let url = URL(string: avatarUrl) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            case .failure, .empty:
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(Color.liquidTextPrimary.opacity(0.7))
-                            @unknown default:
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(Color.liquidTextPrimary.opacity(0.7))
-                            }
-                        }
-                        .frame(width: 44, height: 44)
-                        .clipShape(Circle())
-                    } else {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.7))
-                    }
-                }
-            }
-            .buttonStyle(PlainButtonStyle())
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Welcome back, \(userFirstName)")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(Color.liquidTextPrimary)
-                    .lineLimit(1)
-
-                HStack(spacing: 8) {
-                    NavigationLink(destination: PreferencesView()) {
-                        Text("Age: \(userAgeDisplay)")
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color.white.opacity(0.06))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 999)
-                                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                            )
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.8))
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-
-                    NavigationLink(destination: PreferencesView()) {
-                        Text("Height: \(userHeightDisplay)")
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color.white.opacity(0.06))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 999)
-                                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                            )
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.8))
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            Button(action: {
-                showSyncDetails = true
-            }) {
-                VStack(alignment: .trailing, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(syncStatusColor)
-                            .frame(width: 6, height: 6)
-                        Text(syncStatusTitle)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.6))
-                            .lineLimit(1)
-                    }
-
-                    if let detail = syncStatusDetail {
-                        Text(detail)
-                            .font(.system(size: 11, weight: .regular))
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.5))
-                            .lineLimit(1)
-                    }
-                }
-            }
-            .buttonStyle(PlainButtonStyle())
-            .fixedSize(horizontal: false, vertical: true)
+    private var avatarURL: URL? {
+        guard let urlString = authManager.currentUser?.avatarUrl else {
+            return nil
         }
+        return URL(string: urlString)
     }
 
     private var userFirstName: String {
@@ -706,52 +449,15 @@ struct DashboardViewLiquid: View {
 
     @ViewBuilder
     private var syncStatusBanner: some View {
-        if let banner = syncBannerState {
-            let content = VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Image(systemName: banner.style == .error ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text(banner.style == .error ? "Sync failed. Tap to retry." : "Back in sync")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .foregroundColor(.white)
-
-                if let detail = banner.detail {
-                    Text(detail)
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundColor(Color.white.opacity(0.9))
-                }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(bannerBackground(for: banner.style))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
-            )
-            .cornerRadius(12)
-            .transition(.move(edge: .top).combined(with: .opacity))
-
-            if banner.style == .error {
-                Button {
-                    realtimeSyncManager.syncAll()
-                } label: {
-                    content
-                }
-                .buttonStyle(PlainButtonStyle())
-            } else {
-                content
-            }
+        DashboardSyncBanner(banner: syncBannerState) {
+            realtimeSyncManager.syncAll()
         }
     }
 
-    private func relativeLastSyncText(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-
-    private func handleSyncStatusChange(from oldStatus: RealtimeSyncManager.SyncStatus, to newStatus: RealtimeSyncManager.SyncStatus) {
+    private func handleSyncStatusChange(
+        from oldStatus: RealtimeSyncManager.SyncStatus,
+        to newStatus: RealtimeSyncManager.SyncStatus
+    ) {
         syncBannerDismissTask?.cancel()
 
         if case .error = newStatus {
@@ -768,7 +474,7 @@ struct DashboardViewLiquid: View {
                 syncBannerState = SyncBannerState(style: .error, detail: detail)
             }
         } else if case .error = oldStatus,
-                  (newStatus == .success || newStatus == .idle) {
+                  newStatus == .success || newStatus == .idle {
             let detail = lastSyncClockText().map { "Synced at \($0)" }
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 syncBannerState = SyncBannerState(style: .success, detail: detail)
@@ -797,113 +503,6 @@ struct DashboardViewLiquid: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: last)
-    }
-
-    @ViewBuilder
-    private var syncDetailsSheet: some View {
-        SyncDetailsSheet(
-            isPresented: $showSyncDetails,
-            syncManager: realtimeSyncManager
-        )
-    }
-
-    private func bannerBackground(for style: SyncBannerState.Style) -> LinearGradient {
-        switch style {
-        case .error:
-            return LinearGradient(
-                colors: [Color.red.opacity(0.9), Color.red.opacity(0.7)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        case .success:
-            return LinearGradient(
-                colors: [Color.green.opacity(0.85), Color.green.opacity(0.7)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        }
-    }
-
-    private func retrySync() {
-        realtimeSyncManager.syncAll()
-    }
-
-    private struct SyncDetailsSheet: View {
-        @Binding var isPresented: Bool
-        @ObservedObject var syncManager: RealtimeSyncManager
-
-        var body: some View {
-            NavigationStack {
-                List {
-                    Section(header: Text("Status")) {
-                        HStack {
-                            Text("State")
-                            Spacer()
-                            Text(statusText)
-                                .foregroundColor(.secondary)
-                        }
-
-                        if let last = syncManager.lastSyncDate {
-                            HStack {
-                                Text("Last Sync")
-                                Spacer()
-                                Text(last.formatted(.dateTime.hour().minute().day().month().year()))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-
-                        HStack {
-                            Text("Pending Changes")
-                            Spacer()
-                            Text("\(syncManager.pendingSyncCount)")
-                                .foregroundColor(.secondary)
-                        }
-                    }
-
-                    if let error = syncManager.error, !error.isEmpty {
-                        Section(header: Text("Last Error")) {
-                            Text(error)
-                                .font(.footnote)
-                                .foregroundColor(.red)
-                        }
-                    }
-                }
-                .navigationTitle("Sync Details")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") {
-                            isPresented = false
-                        }
-                    }
-
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Retry") {
-                            syncManager.syncAll()
-                        }
-                        .disabled(!syncManager.isOnline)
-                    }
-                }
-            }
-        }
-
-        private var statusText: String {
-            if syncManager.isSyncing {
-                return "Syncing…"
-            }
-
-            switch syncManager.syncStatus {
-            case .offline:
-                return "Offline"
-            case .error:
-                return "Error"
-            case .success:
-                return "Synced"
-            case .syncing:
-                return "Syncing…"
-            case .idle:
-                return "Idle"
-            }
-        }
     }
 
     // MARK: - Hero Card
@@ -969,7 +568,14 @@ struct DashboardViewLiquid: View {
 
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(LinearGradient(colors: [Color(hex: "#6EE7F0"), Color(hex: "#3A7BD5")], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 12)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "#6EE7F0"), Color(hex: "#3A7BD5")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 12
+                )
                 .rotationEffect(.degrees(-90))
                 .animation(.easeInOut(duration: 0.8), value: score)
 
@@ -998,8 +604,15 @@ struct DashboardViewLiquid: View {
         }
 
         if let metric = currentMetric {
-            let heightInches = convertHeightToInches(height: authManager.currentUser?.profile?.height, heightUnit: authManager.currentUser?.profile?.heightUnit)
-            if let ffmiData = MetricsInterpolationService.shared.estimateFFMI(for: metric.date, metrics: bodyMetrics, heightInches: heightInches) {
+            let heightInches = convertHeightToInches(
+                height: authManager.currentUser?.profile?.height,
+                heightUnit: authManager.currentUser?.profile?.heightUnit
+            )
+            if let ffmiData = MetricsInterpolationService.shared.estimateFFMI(
+                for: metric.date,
+                metrics: bodyMetrics,
+                heightInches: heightInches
+            ) {
                 return String(format: "%.1f", ffmiData.value)
             }
         }
@@ -1036,32 +649,32 @@ struct DashboardViewLiquid: View {
         return BodyScoreCache.shared.latestResult(for: authManager.currentUser?.id)
     }
 
+    private func loadMetricsOrder() {
+        guard !metricsOrderData.isEmpty else { return }
+
+        if let decoded = try? JSONDecoder().decode([MetricIdentifier].self, from: metricsOrderData),
+           !decoded.isEmpty {
+            metricsOrder = decoded
+        }
+    }
+
+    private func saveMetricsOrder() {
+        if let data = try? JSONEncoder().encode(metricsOrder) {
+            metricsOrderData = data
+        }
+    }
+
     // MARK: - Metrics View
 
     private var metricsView: some View {
-        VStack(spacing: 10) {
-            ForEach(metricsOrder) { metricId in
-                metricCardView(for: metricId)
-                    .scaleEffect(draggedMetric == metricId ? 1.03 : 1.0)
-                    .opacity(draggedMetric == metricId ? 0.78 : 1.0)
-                    .onDrag {
-                        withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.85)) {
-                            self.draggedMetric = metricId
-                        }
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
-                        return NSItemProvider(object: metricId.rawValue as NSString)
-                    }
-                    .onDrop(of: [.text], delegate: MetricDropDelegate(
-                        metric: metricId,
-                        metrics: $metricsOrder,
-                        draggedMetric: $draggedMetric,
-                        onReorder: saveMetricsOrder
-                    ))
+        DashboardMetricsList(
+            metricsOrder: $metricsOrder,
+            draggedMetric: $draggedMetric,
+            onReorder: saveMetricsOrder,
+            cardContent: { metric in
+                metricCardView(for: metric)
             }
-        }
-        // Animate layout changes (card reordering) with a gentle spring
-        .animation(.interactiveSpring(response: 0.30, dampingFraction: 0.85), value: metricsOrder)
+        )
         .padding(.horizontal, 20)
     }
 
@@ -1277,335 +890,44 @@ struct DashboardViewLiquid: View {
         LiquidGlassCard(cornerRadius: 24, padding: 20) {
             VStack(spacing: 12) {
                 // Huge weight display with interpolation indicator
-                let weightResult = metric.weight != nil ?
-                    InterpolatedMetric(value: metric.weight!, isInterpolated: false, isLastKnown: false, confidenceLevel: nil) :
-                    MetricsInterpolationService.shared.estimateWeight(for: metric.date, metrics: bodyMetrics)
-
-                if let weightData = weightResult {
+                if let weightResult = metric.weight != nil ?
+                    InterpolatedMetric(
+                        value: metric.weight!,
+                        isInterpolated: false,
+                        isLastKnown: false,
+                        confidenceLevel: nil
+                    ) :
+                    MetricsInterpolationService.shared.estimateWeight(
+                        for: metric.date,
+                        metrics: bodyMetrics
+                    ) {
+                    let weightData = weightResult
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-                        let convertedWeight = convertWeight(weightData.value, to: system) ?? weightData.value
-                        let unit = system.weightUnit
-
-                        Text(String(format: "%.1f", convertedWeight))
-                            .font(.system(size: 68, weight: .bold))
-                            .tracking(-0.5)
-                            .foregroundColor(Color.liquidTextPrimary)
-
-                        Text(unit)
-                            .font(.system(size: 41, weight: .semibold))  // 60% of 68
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.50))
-                            .baselineOffset(-8)
-
-                        if weightData.isInterpolated || weightData.isLastKnown {
-                            DSInterpolationIcon(
-                                confidenceLevel: weightData.confidenceLevel,
-                                isLastKnown: weightData.isLastKnown
-                            )
-                            .offset(y: -20)  // Align with top of number
-                        }
+                        let convertedWeight = convertWeight(
+                            weightData.value,
+                            to: system
+                        ) ?? weightData.value
+                        // ...
                     }
                 }
+                // ...
 
-                // Chips row
-                HStack(spacing: 12) {
-                    // Body fat chip with interpolation indicator
-                    let bodyFatResult = metric.bodyFatPercentage != nil ?
-                        InterpolatedMetric(value: metric.bodyFatPercentage!, isInterpolated: false, isLastKnown: false, confidenceLevel: nil) :
-                        MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)
-
-                    if let bodyFatData = bodyFatResult {
-                        HStack(spacing: 4) {
-                            GlassChip(
-                                icon: "flame.fill",
-                                text: String(format: "%.1f%% BF", bodyFatData.value),
-                                color: .orange
-                            )
-                            if bodyFatData.isInterpolated || bodyFatData.isLastKnown {
-                                DSInterpolationIcon(
-                                    confidenceLevel: bodyFatData.confidenceLevel,
-                                    isLastKnown: bodyFatData.isLastKnown
-                                )
-                            }
-                        }
-                    }
-
-                    // Change chip
-                    if let firstEntry = bodyMetrics.last,
-                       let lastEntry = bodyMetrics.first,
-                       let firstWeight = firstEntry.weight,
-                       let lastWeight = lastEntry.weight {
-                        let change = lastWeight - firstWeight
-                        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-                        let convertedChange = convertWeight(abs(change), to: system) ?? abs(change)
-                        let unit = system.weightUnit
-                        let sign = change > 0 ? "+" : "−"
-
-                        GlassChip(
-                            icon: change < 0 ? "arrow.down.circle.fill" : "arrow.up.circle.fill",
-                            text: String(format: "%@%.1f %@ since %@",
-                                       sign,
-                                       convertedChange,
-                                       unit,
-                                       firstEntry.date.formatted(.dateTime.month(.abbreviated).day())),
-                            color: change < 0 ? .green : .red
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Unified Metrics Card
-
-    private var metricsRow: some View {
-        LiquidGlassCard(padding: 16) {
-            HStack(spacing: 0) {
-                // Weight column
-                metricColumn(
-                    label: "Weight",
-                    value: weightValue,
-                    unit: weightUnit,
-                    interpolationData: weightInterpolationData,
-                    progressBar: AnyView(weightProgressBar(current: animatedWeight, goal: weightGoal, unit: weightUnit))
-                )
-                .frame(maxWidth: .infinity)
-
-                // Vertical divider
-                Rectangle()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 1, height: 80)
-                    .padding(.horizontal, 12)
-
-                // Body Fat column
-                metricColumn(
-                    label: "Body Fat %",
-                    value: bodyFatValue,
-                    unit: "%",
-                    interpolationData: bodyFatInterpolationData,
-                    progressBar: AnyView(bodyFatProgressBar(current: animatedBodyFat, goal: bodyFatGoal))
-                )
-                .frame(maxWidth: .infinity)
-
-                // Vertical divider
-                Rectangle()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 1, height: 80)
-                    .padding(.horizontal, 12)
-
-                // FFMI column with progress ring
-                ffmiColumn
-                    .frame(maxWidth: .infinity)
-            }
-        }
-    }
-
-    // MARK: - Metric Column Helper
-
-    private func metricColumn(label: String, value: String, unit: String, interpolationData: (isInterpolated: Bool, isLastKnown: Bool, confidenceLevel: InterpolatedMetric.ConfidenceLevel?)?, progressBar: AnyView? = nil) -> some View {
-        VStack(alignment: .center, spacing: 6) {
-            Text(label)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color.liquidTextPrimary.opacity(0.70))
-
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(Color.liquidTextPrimary)
-                    .monospacedDigit()
-
-                if let data = interpolationData, (data.isInterpolated || data.isLastKnown) {
-                    DSInterpolationIcon(
-                        confidenceLevel: data.confidenceLevel,
-                        isLastKnown: data.isLastKnown
-                    )
-                }
-            }
-
-            Text(unit)
-                .font(.system(size: 13, weight: .medium))  // Standardized: 13pt, medium weight
-                .foregroundColor(Color.liquidTextPrimary.opacity(0.70))  // Brighter for readability
-
-            // Progress bar if provided
-            if let progressBar = progressBar {
-                progressBar
-            }
-        }
-    }
-
-    private var ffmiColumn: some View {
-        VStack(alignment: .center, spacing: 6) {
-            Text("FFMI")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color.liquidTextPrimary.opacity(0.70))
-
-            if let metric = currentMetric {
-                let heightInches = convertHeightToInches(
-                    height: authManager.currentUser?.profile?.height,
-                    heightUnit: authManager.currentUser?.profile?.heightUnit
-                )
-
-                let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                    for: metric.date,
-                    metrics: bodyMetrics,
-                    heightInches: heightInches
-                )
-
-                if let ffmiData = ffmiResult {
-                    VStack(spacing: 8) {
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(String(format: "%.1f", animatedFFMI))
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(Color.liquidTextPrimary)
-                                .monospacedDigit()
-
-                            if ffmiData.isInterpolated || ffmiData.isLastKnown {
-                                DSInterpolationIcon(
-                                    confidenceLevel: ffmiData.confidenceLevel,
-                                    isLastKnown: ffmiData.isLastKnown
-                                )
-                            }
-                        }
-
-                        Text("FFMI")
-                            .font(.system(size: 13, weight: .medium))  // Standardized unit styling
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.70))
-
-                        ffmiProgressBar(current: ffmiData.value, goal: ffmiGoal)
-                    }
-                } else {
-                    Text("—")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
-                }
-            } else {
-                Text("—")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
-            }
-        }
-    }
-
-    // MARK: - Metric Data Computed Properties
-
-    private var weightValue: String {
-        guard let metric = currentMetric else { return "—" }
-        let weightResult = metric.weight != nil ?
-            InterpolatedMetric(value: metric.weight!, isInterpolated: false, isLastKnown: false, confidenceLevel: nil) :
-            MetricsInterpolationService.shared.estimateWeight(for: metric.date, metrics: bodyMetrics)
-        return weightResult != nil ? String(format: "%.1f", animatedWeight) : "—"
-    }
-
-    private var weightUnit: String {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-        return system.weightUnit
-    }
-
-    private var weightInterpolationData: (isInterpolated: Bool, isLastKnown: Bool, confidenceLevel: InterpolatedMetric.ConfidenceLevel?)? {
-        guard let metric = currentMetric else { return nil }
-        let weightResult = metric.weight != nil ?
-            InterpolatedMetric(value: metric.weight!, isInterpolated: false, isLastKnown: false, confidenceLevel: nil) :
-            MetricsInterpolationService.shared.estimateWeight(for: metric.date, metrics: bodyMetrics)
-        return weightResult != nil ? (weightResult!.isInterpolated, weightResult!.isLastKnown, weightResult!.confidenceLevel) : nil
-    }
-
-    private var bodyFatValue: String {
-        guard let metric = currentMetric else { return "—" }
-        let bodyFatResult = metric.bodyFatPercentage != nil ?
-            InterpolatedMetric(value: metric.bodyFatPercentage!, isInterpolated: false, isLastKnown: false, confidenceLevel: nil) :
-            MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)
-        return bodyFatResult != nil ? String(format: "%.1f", animatedBodyFat) : "—"
-    }
-
-    private var bodyFatInterpolationData: (isInterpolated: Bool, isLastKnown: Bool, confidenceLevel: InterpolatedMetric.ConfidenceLevel?)? {
-        guard let metric = currentMetric else { return nil }
-        let bodyFatResult = metric.bodyFatPercentage != nil ?
-            InterpolatedMetric(value: metric.bodyFatPercentage!, isInterpolated: false, isLastKnown: false, confidenceLevel: nil) :
-            MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)
-        return bodyFatResult != nil ? (bodyFatResult!.isInterpolated, bodyFatResult!.isLastKnown, bodyFatResult!.confidenceLevel) : nil
-    }
-
-    // MARK: - Old Tile Views (deprecated)
-
-    private var weightTile: some View {
-        let tileContent = CompactGlassCard {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Weight")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(Color.liquidTextPrimary.opacity(0.85))
-
-                if let metric = currentMetric {
-                    let weightResult = metric.weight != nil ?
-                        InterpolatedMetric(value: metric.weight!, isInterpolated: false, isLastKnown: false, confidenceLevel: nil) :
-                        MetricsInterpolationService.shared.estimateWeight(for: metric.date, metrics: bodyMetrics)
-
-                    if let weightData = weightResult {
-                        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-                        let unit = system.weightUnit
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(String(format: "%.1f", animatedWeight))
-                                    .font(.system(size: 28, weight: .bold))
-                                    .tracking(-0.3)
-                                    .foregroundColor(Color.liquidTextPrimary)
-                                    .monospacedDigit()
-
-                                if weightData.isInterpolated || weightData.isLastKnown {
-                                    DSInterpolationIcon(
-                                        confidenceLevel: weightData.confidenceLevel,
-                                        isLastKnown: weightData.isLastKnown
-                                    )
-                                }
-                            }
-
-                            Text(unit)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(Color.liquidTextPrimary.opacity(0.70))
-
-                            weightProgressBar(current: animatedWeight, goal: weightGoal, unit: unit)
-                        }
-                    } else {
-                        Text("—")
-                            .font(.system(size: 28, weight: .bold))
-                                    .tracking(-0.3)
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
-                    }
-                } else {
-                    Text("—")
-                        .font(.system(size: 28, weight: .bold))
-                                    .tracking(-0.3)
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
-                }
-            }
-        }
-
-        // Wrap in NavigationLink if no goal is set
-        if weightGoal == nil {
-            return AnyView(
-                NavigationLink(destination: PreferencesView().environmentObject(authManager)) {
-                    tileContent
-                }
-                .buttonStyle(PlainButtonStyle())
-            )
-        } else {
-            return AnyView(tileContent)
-        }
-    }
-
-    private var bodyFatTile: some View {
-        CompactGlassCard {
-            VStack(alignment: .leading, spacing: 8) {
                 Text("Body Fat %")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(Color.liquidTextPrimary.opacity(0.85))
-
                 if let metric = currentMetric {
-                    let bodyFatResult = metric.bodyFatPercentage != nil ?
-                        InterpolatedMetric(value: metric.bodyFatPercentage!, isInterpolated: false, isLastKnown: false, confidenceLevel: nil) :
-                        MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)
-
-                    if let bodyFatData = bodyFatResult {
+                    if let bodyFatResult = metric.bodyFatPercentage != nil ?
+                        InterpolatedMetric(
+                            value: metric.bodyFatPercentage!,
+                            isInterpolated: false,
+                            isLastKnown: false,
+                            confidenceLevel: nil
+                        ) :
+                        MetricsInterpolationService.shared.estimateBodyFat(
+                            for: metric.date,
+                            metrics: bodyMetrics
+                        ) {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
                                 Text(String(format: "%.1f", animatedBodyFat))
@@ -1614,10 +936,10 @@ struct DashboardViewLiquid: View {
                                     .foregroundColor(Color.liquidTextPrimary)
                                     .monospacedDigit()
 
-                                if bodyFatData.isInterpolated || bodyFatData.isLastKnown {
+                                if bodyFatResult.isInterpolated || bodyFatResult.isLastKnown {
                                     DSInterpolationIcon(
-                                        confidenceLevel: bodyFatData.confidenceLevel,
-                                        isLastKnown: bodyFatData.isLastKnown
+                                        confidenceLevel: bodyFatResult.confidenceLevel,
+                                        isLastKnown: bodyFatResult.isLastKnown
                                     )
                                 }
                             }
@@ -1631,13 +953,13 @@ struct DashboardViewLiquid: View {
                     } else {
                         Text("—")
                             .font(.system(size: 28, weight: .bold))
-                                    .tracking(-0.3)
+                            .tracking(-0.3)
                             .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
                     }
                 } else {
                     Text("—")
                         .font(.system(size: 28, weight: .bold))
-                                    .tracking(-0.3)
+                        .tracking(-0.3)
                         .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
                 }
             }
@@ -1686,13 +1008,13 @@ struct DashboardViewLiquid: View {
                         } else {
                             Text("—")
                                 .font(.system(size: 28, weight: .bold))
-                                    .tracking(-0.3)
+                                .tracking(-0.3)
                                 .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
                         }
                     } else {
                         Text("—")
                             .font(.system(size: 28, weight: .bold))
-                                    .tracking(-0.3)
+                            .tracking(-0.3)
                             .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
                     }
                 }
@@ -1926,7 +1248,9 @@ extension DashboardViewLiquid {
                     Task { @MainActor [allMetrics] in
                         if bodyMetrics.count == 1 {
                             bodyMetrics = allMetrics
-                            sortedBodyMetricsAscending = allMetrics.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
+                            sortedBodyMetricsAscending = allMetrics.sorted {
+                                ($0.date ?? .distantPast) < ($1.date ?? .distantPast)
+                            }
                             resetCaches()
                         }
                     }
@@ -1988,7 +1312,7 @@ extension DashboardViewLiquid {
                 await syncStepsFromHealthKit()
             } catch {
                 // Log error but continue with sync
-        // print("HealthKit sync error during refresh: \(error)")
+                // print("HealthKit sync error during refresh: \(error)")
                 hasErrors = true
             }
         }
@@ -2083,16 +1407,32 @@ extension DashboardViewLiquid {
         withAnimation(.easeOut(duration: 0.18)) {
             // Weight
             if let weightResult = metric.weight != nil ?
-                InterpolatedMetric(value: metric.weight!, isInterpolated: false, isLastKnown: false, confidenceLevel: nil) :
-                MetricsInterpolationService.shared.estimateWeight(for: metric.date, metrics: bodyMetrics) {
+                InterpolatedMetric(
+                    value: metric.weight!,
+                    isInterpolated: false,
+                    isLastKnown: false,
+                    confidenceLevel: nil
+                ) :
+                MetricsInterpolationService.shared.estimateWeight(
+                    for: metric.date,
+                    metrics: bodyMetrics
+                ) {
                 let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
                 animatedWeight = convertWeight(weightResult.value, to: system) ?? weightResult.value
             }
 
             // Body Fat
             if let bodyFatResult = metric.bodyFatPercentage != nil ?
-                InterpolatedMetric(value: metric.bodyFatPercentage!, isInterpolated: false, isLastKnown: false, confidenceLevel: nil) :
-                MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics) {
+                InterpolatedMetric(
+                    value: metric.bodyFatPercentage!,
+                    isInterpolated: false,
+                    isLastKnown: false,
+                    confidenceLevel: nil
+                ) :
+                MetricsInterpolationService.shared.estimateBodyFat(
+                    for: metric.date,
+                    metrics: bodyMetrics
+                ) {
                 animatedBodyFat = bodyFatResult.value
             }
 
@@ -2583,965 +1923,6 @@ extension DashboardViewLiquid {
 extension Array {
     subscript(safe index: Int) -> Element? {
         return indices.contains(index) ? self[index] : nil
-    }
-}
-
-// MARK: - Full Metric Chart View Component
-
-private enum TimeRange: String, CaseIterable {
-    case week1 = "1W"
-    case month1 = "1M"
-    case month3 = "3M"
-    case month6 = "6M"
-    case year1 = "1Y"
-    case all = "All"
-
-    /// Approximate length of the range in days for filtering.
-    /// `.all` returns nil to indicate the full available history should be shown.
-    var days: Int? {
-        switch self {
-        case .week1:
-            return 7
-        case .month1:
-            return 30
-        case .month3:
-            return 90
-        case .month6:
-            return 180
-        case .year1:
-            return 365
-        case .all:
-            return nil
-        }
-    }
-}
-
-private struct MetricChartDataPoint: Identifiable, Sendable {
-    let id = UUID()
-    let date: Date
-    let value: Double
-    var isEstimated: Bool = false
-}
-
-private struct ChartSeriesPreprocessor {
-    let referenceDate: Date
-    private let calendar = Calendar.current
-
-    func seriesByRange(from points: [MetricChartDataPoint]) -> [TimeRange: [MetricChartDataPoint]] {
-        guard !points.isEmpty else { return [:] }
-
-        let sorted = points.sorted { $0.date < $1.date }
-        var result: [TimeRange: [MetricChartDataPoint]] = [:]
-
-        for range in TimeRange.allCases {
-            let filtered = filter(sorted, for: range)
-            result[range] = downsampleIfNeeded(filtered, limit: maxPointCount(for: range))
-        }
-
-        return result
-    }
-
-    private func filter(_ points: [MetricChartDataPoint], for range: TimeRange) -> [MetricChartDataPoint] {
-        guard let days = range.days else {
-            return points
-        }
-
-        let cutoff = calendar.date(byAdding: .day, value: -days, to: referenceDate) ?? referenceDate
-        return points.filter { $0.date >= cutoff }
-    }
-
-    private func maxPointCount(for range: TimeRange) -> Int {
-        switch range {
-        case .week1:
-            return 140
-        case .month1:
-            return 180
-        case .month3:
-            return 210
-        case .month6:
-            return 240
-        case .year1:
-            return 260
-        case .all:
-            return 320
-        }
-    }
-
-    private func downsampleIfNeeded(_ points: [MetricChartDataPoint], limit: Int) -> [MetricChartDataPoint] {
-        guard points.count > limit, limit >= 3 else { return points }
-        return largestTriangleThreeBuckets(points: points, threshold: limit)
-    }
-
-    private func largestTriangleThreeBuckets(points: [MetricChartDataPoint], threshold: Int) -> [MetricChartDataPoint] {
-        guard threshold < points.count else { return points }
-
-        let dataCount = points.count
-        let bucketSize = Double(dataCount - 2) / Double(threshold - 2)
-
-        var sampled: [MetricChartDataPoint] = [points[0]]
-        var aIndex = 0
-
-        for bucket in 0..<(threshold - 2) {
-            let rangeStart = Int(floor(Double(bucket) * bucketSize)) + 1
-            var rangeEnd = Int(floor(Double(bucket + 1) * bucketSize)) + 1
-            rangeEnd = min(rangeEnd, dataCount - 1)
-
-            let avgRangeStart = Int(floor(Double(bucket + 1) * bucketSize)) + 1
-            var avgRangeEnd = Int(floor(Double(bucket + 2) * bucketSize)) + 1
-            avgRangeEnd = min(avgRangeEnd, dataCount)
-
-            let average = averagedPoint(points, start: avgRangeStart, end: avgRangeEnd)
-
-            if rangeStart >= rangeEnd {
-                continue
-            }
-
-            let ax = timeValue(points[aIndex])
-            let ay = points[aIndex].value
-
-            var maxArea: Double = -1
-            var selectedIndex = rangeStart
-
-            for index in rangeStart..<rangeEnd {
-                let bx = timeValue(points[index])
-                let by = points[index].value
-                let cx = average.x
-                let cy = average.y
-
-                let area = abs((ax * (by - cy) + bx * (cy - ay) + cx * (ay - by)) * 0.5)
-
-                if area > maxArea {
-                    maxArea = area
-                    selectedIndex = index
-                }
-            }
-
-            sampled.append(points[selectedIndex])
-            aIndex = selectedIndex
-        }
-
-        sampled.append(points.last!)
-        return sampled
-    }
-
-    private func averagedPoint(_ points: [MetricChartDataPoint], start: Int, end: Int) -> (x: Double, y: Double) {
-        guard !points.isEmpty else { return (0, 0) }
-
-        let safeStart = min(max(start, 0), points.count - 1)
-        let safeEndExclusive = max(min(end, points.count), safeStart + 1)
-
-        if safeStart >= safeEndExclusive {
-            let point = points[safeStart]
-            return (timeValue(point), point.value)
-        }
-
-        var sumX: Double = 0
-        var sumY: Double = 0
-        let count = safeEndExclusive - safeStart
-
-        for index in safeStart..<safeEndExclusive {
-            let point = points[index]
-            sumX += timeValue(point)
-            sumY += point.value
-        }
-
-        return (sumX / Double(count), sumY / Double(count))
-    }
-
-    private func timeValue(_ point: MetricChartDataPoint) -> Double {
-        point.date.timeIntervalSince1970
-    }
-}
-
-private enum MetricEntrySourceType: Equatable {
-    case manual
-    case healthKit
-    case integration(id: String?)
-}
-
-private struct MetricHistoryEntry: Identifiable {
-    let id: String
-    let date: Date
-    let primaryValue: Double
-    let secondaryValue: Double?
-    let source: MetricEntrySourceType
-}
-
-private struct MetricEntriesConfiguration {
-    let metricType: DashboardViewLiquid.MetricType
-    let unitLabel: String
-    let secondaryUnitLabel: String?
-    let primaryFormatter: NumberFormatter
-    let secondaryFormatter: NumberFormatter?
-}
-
-private struct MetricEntriesPayload {
-    let config: MetricEntriesConfiguration
-    let entries: [MetricHistoryEntry]
-}
-
-private func makeMetricFormatter(minFractionDigits: Int = 0, maxFractionDigits: Int = 1) -> NumberFormatter {
-    MetricFormatterCache.formatter(minFractionDigits: minFractionDigits, maxFractionDigits: maxFractionDigits)
-}
-
-private struct FullMetricChartView: View {
-    @Environment(\.dismiss) private var dismiss
-
-    let title: String
-    let icon: String
-    let iconColor: Color
-    let currentValue: String
-    let unit: String
-    let currentDate: String
-    let chartData: [MetricChartDataPoint]
-    let onAdd: () -> Void
-    let metricEntries: MetricEntriesPayload?
-
-    @Binding var selectedTimeRange: TimeRange
-    @State private var cachedSeries: [TimeRange: [MetricChartDataPoint]] = [:]
-    @State private var isLoadingData = false
-    @State private var lastFingerprint: String = ""
-    @State private var chartMode: ChartMode = .trend
-    @State private var activePoint: MetricChartDataPoint?
-    @State private var isScrubbing = false
-
-    private let chartHeight: CGFloat = 260
-
-    var body: some View {
-        NavigationStack {
-            ZStack(alignment: .top) {
-                Color.metricCanvas.ignoresSafeArea()
-
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 24) {
-                        navigationBar
-                        headlineBlock
-                        quickStatsRow
-                        timeRangeSelector
-                        chartCard
-                        historyBlock
-                        addEntryButton
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 32)
-                    .padding(.top, 12)
-                }
-            }
-        }
-        .task(id: chartDataFingerprint) {
-            await preprocessChartDataIfNeeded()
-        }
-        .onChange(of: selectedTimeRange) { _, _ in
-            activePoint = nil
-            HapticManager.shared.selection()
-        }
-        .onChange(of: chartMode) { _, _ in
-            activePoint = nil
-            HapticManager.shared.selection()
-        }
-    }
-
-    // MARK: - Layout Sections
-
-    private var navigationBar: some View {
-        HStack {
-            Button {
-                HapticManager.shared.selection()
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .background(Color.metricSurface.opacity(0.6))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
-
-            Text(title)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.white)
-
-            Spacer()
-
-            Button {
-                HapticManager.shared.selection()
-                onAdd()
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(Color.metricAccent)
-                    .frame(width: 44, height: 44)
-                    .background(Color.metricSurface.opacity(0.6))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private var headlineBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased())
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color.white.opacity(0.6))
-                .tracking(1)
-
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(headlineValueText)
-                    .font(.system(size: 62, weight: .regular, design: .default))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-
-                if !unit.isEmpty {
-                    Text(unit)
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.75))
-                }
-            }
-
-            Text(headlineDateText)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.65))
-        }
-    }
-
-    private var quickStatsRow: some View {
-        Group {
-            if !quickStats.isEmpty {
-                HStack(spacing: 12) {
-                    ForEach(quickStats) { stat in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(stat.label)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(Color.white.opacity(0.6))
-                                .tracking(0.3)
-                            Text(stat.value)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(stat.color)
-                            if let detail = stat.detail {
-                                Text(detail)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(Color.white.opacity(0.45))
-                            }
-                        }
-                        .padding(.vertical, 6)
-                        if stat.id != quickStats.last?.id {
-                            Text("·")
-                                .foregroundColor(Color.white.opacity(0.35))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var timeRangeSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(TimeRange.allCases, id: \.self) { range in
-                    Button {
-                        selectedTimeRange = range
-                    } label: {
-                        Text(range.rawValue)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(selectedTimeRange == range ? .black : .white.opacity(0.8))
-                            .frame(width: 68, height: 32)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(selectedTimeRange == range ? Color.metricAccent : Color.clear)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(Color.white.opacity(0.15), lineWidth: selectedTimeRange == range ? 0 : 1)
-                                    )
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.vertical, 4)
-        }
-    }
-
-    private var chartCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            chartHeader
-            if isLoadingData {
-                ProgressView()
-                    .tint(.white)
-                    .frame(maxWidth: .infinity, minHeight: chartHeight)
-            } else if activeSeries.isEmpty {
-                Text("No data available for this range.")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.6))
-                    .frame(maxWidth: .infinity, minHeight: chartHeight, alignment: .center)
-            } else {
-                chartView
-                    .frame(height: chartHeight)
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.metricCard)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.45), radius: 20, x: 0, y: 10)
-        )
-    }
-
-    private var chartHeader: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Trend")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
-                Text(chartSubtitle)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.6))
-            }
-            Spacer()
-            chartModeToggle
-        }
-    }
-
-    private var chartModeToggle: some View {
-        HStack(spacing: 8) {
-            ForEach(ChartMode.allCases, id: \.self) { mode in
-                Button {
-                    chartMode = mode
-                } label: {
-                    Text(mode.label)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(chartMode == mode ? .black : Color.white.opacity(0.8))
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(chartMode == mode ? Color.metricAccent : Color.clear)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.white.opacity(0.2), lineWidth: chartMode == mode ? 0 : 1)
-                                )
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private var chartView: some View {
-        Chart {
-            let series = activeSeries
-            ForEach(series) { point in
-                LineMark(
-                    x: .value("Date", point.date),
-                    y: .value("Value", point.value)
-                )
-                .interpolationMethod(.catmullRom)
-                .lineStyle(StrokeStyle(lineWidth: chartMode == .trend ? 3 : 2, lineCap: .round))
-                .foregroundStyle(Color.metricChartLine)
-
-                if chartMode == .trend {
-                    AreaMark(
-                        x: .value("Date", point.date),
-                        yStart: .value("Baseline", minSeriesValue ?? point.value),
-                        yEnd: .value("Value", point.value)
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.metricChartFillTop, Color.metricChartFillBottom]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                } else {
-                    PointMark(
-                        x: .value("Date", point.date),
-                        y: .value("Value", point.value)
-                    )
-                    .symbolSize(16)
-                    .foregroundStyle(Color.metricChartLine)
-                }
-            }
-
-            if let focus = activePoint {
-                RuleMark(x: .value("Selected", focus.date))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .foregroundStyle(Color.white.opacity(0.4))
-
-                PointMark(
-                    x: .value("Selected", focus.date),
-                    y: .value("Selected Value", focus.value)
-                )
-                .symbolSize(120)
-                .foregroundStyle(Color.clear)
-                .annotation(position: .top) {
-                    selectedPointCallout(for: focus)
-                }
-                .symbol(CircleSymbol())
-                .foregroundStyle(Color.metricChartLine)
-                .accessibilityLabel("Selected point")
-            }
-        }
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 3)) { value in
-                AxisValueLabel()
-                    .foregroundStyle(Color.white.opacity(0.6))
-                    .font(.system(size: 11, weight: .medium))
-                AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(Color.white.opacity(0.08))
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
-                AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 1))
-                    .foregroundStyle(Color.white.opacity(0.08))
-                AxisValueLabel()
-                    .foregroundStyle(Color.white.opacity(0.6))
-                    .font(.system(size: 11, weight: .medium))
-            }
-        }
-        .chartYScale(domain: .automatic(includesZero: false))
-        .chartOverlay { proxy in
-            GeometryReader { geo in
-                Rectangle().fill(Color.clear).contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                let plotFrame = proxy.plotAreaFrame
-                                let frame = geo[plotFrame]
-                                let origin = frame.origin
-                                let width = frame.size.width
-                                let locationX = value.location.x - origin.x
-                                guard locationX >= 0, locationX <= width else { return }
-                                if let date: Date = proxy.value(atX: locationX) {
-                                    if !isScrubbing {
-                                        isScrubbing = true
-                                        HapticManager.shared.selection()
-                                    }
-                                    activePoint = nearestPoint(to: date)
-                                }
-                            }
-                            .onEnded { _ in
-                                isScrubbing = false
-                                activePoint = nil
-                            }
-                    )
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: activeSeries.count)
-    }
-
-    private func selectedPointCallout(for point: MetricChartDataPoint) -> some View {
-        VStack(spacing: 4) {
-            Text(formatHeadlineValue(point.value))
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.black)
-            Text(point.date.formatted(.dateTime.month().day()))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.black.opacity(0.7))
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(Color.white)
-        )
-        .overlay(
-            Capsule()
-                .stroke(Color.black.opacity(0.08), lineWidth: 0.5)
-        )
-    }
-
-    private var historyBlock: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("History")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
-
-            if let payload = metricEntries, !payload.entries.isEmpty {
-                VStack(spacing: 0) {
-                    ForEach(Array(payload.entries.enumerated()), id: \.element.id) { index, entry in
-                        historyRow(for: entry, config: payload.config)
-                        if index < payload.entries.count - 1 {
-                            Divider()
-                                .background(Color.white.opacity(0.08))
-                        }
-                    }
-                }
-                .background(Color.metricSurface)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-            } else {
-                Text("No entries yet. Add your first log to see history here.")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.6))
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.metricSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
-            }
-        }
-    }
-
-    private func historyRow(for entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(entry.date.formatted(.dateTime.month().day().year()))
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.white)
-                Text(sourceLabel(for: entry.source))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.45))
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(primaryHistoryValue(entry, config: config))
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                if let secondary = secondaryHistoryValue(entry, config: config) {
-                    Text(secondary)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.65))
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-
-    private var addEntryButton: some View {
-        Button(action: {
-            HapticManager.shared.selection()
-            onAdd()
-        }) {
-            Label("Add Entry", systemImage: "plus")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.metricAccent.opacity(0.25))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Computed Data
-
-    private var displayedSeries: [MetricChartDataPoint] {
-        cachedSeries[selectedTimeRange] ?? chartData
-    }
-
-    private var smoothedSeries: [MetricChartDataPoint] {
-        movingAverage(for: displayedSeries, windowSize: 7)
-    }
-
-    private var activeSeries: [MetricChartDataPoint] {
-        chartMode == .trend ? smoothedSeries : displayedSeries
-    }
-
-    private var minSeriesValue: Double? {
-        activeSeries.map(\.value).min()
-    }
-
-    private var chartSubtitle: String {
-        "\(selectedTimeRange.rawValue) · \(chartMode.label)"
-    }
-
-    private var quickStats: [QuickStat] {
-        guard let stats = computeSeriesStats(for: displayedSeries) else { return [] }
-
-        var items: [QuickStat] = []
-
-        let averageText = "\(selectedTimeRange.rawValue) avg \(formatStatValue(stats.average))"
-        items.append(QuickStat(label: "Average", value: averageText, detail: nil, color: .white))
-
-        let deltaValue = stats.delta
-        let deltaText = formatDeltaValue(deltaValue)
-        let deltaDetail = "since start"
-        items.append(QuickStat(label: "Δ", value: deltaText, detail: deltaDetail, color: deltaColor(for: deltaValue)))
-
-        if let rangeText = rangeText(for: displayedSeries) {
-            items.append(QuickStat(label: "Range", value: rangeText, detail: nil, color: Color.white))
-        }
-
-        return items
-    }
-
-    private var headlineValueText: String {
-        if let point = activePoint {
-            return formatHeadlineValue(point.value)
-        }
-        return currentValue
-    }
-
-    private var headlineDateText: String {
-        if let point = activePoint {
-            return point.date.formatted(.dateTime.month().day().year())
-        }
-        return currentDate
-    }
-
-    private var chartDataFingerprint: String {
-        guard let first = chartData.first, let last = chartData.last else {
-            return "empty-\(chartData.count)"
-        }
-        return "\(chartData.count)-\(first.date.timeIntervalSince1970)-\(last.date.timeIntervalSince1970)-\(first.value)-\(last.value)"
-    }
-
-    // MARK: - Helpers
-
-    private func formatHeadlineValue(_ value: Double) -> String {
-        if unit == "%" {
-            return String(format: "%.1f", value)
-        }
-        return String(format: value < 10 ? "%.2f" : "%.1f", value)
-    }
-
-    private func formatStatValue(_ value: Double) -> String {
-        if unit == "%" {
-            return String(format: "%.1f%%", value)
-        }
-        if unit.isEmpty {
-            return String(format: "%.1f", value)
-        }
-        return String(format: "%.1f \(unit)", value)
-    }
-
-    private func formatDeltaValue(_ delta: Double) -> String {
-        let sign = delta >= 0 ? "+" : "−"
-        let magnitude = abs(delta)
-        let formatted: String
-        if unit == "%" {
-            formatted = String(format: "%.1f%%", magnitude)
-        } else if unit.isEmpty {
-            formatted = String(format: "%.1f", magnitude)
-        } else {
-            formatted = String(format: "%.1f \(unit)", magnitude)
-        }
-        return "\(sign)\(formatted)"
-    }
-
-    private func deltaColor(for delta: Double) -> Color {
-        if delta < 0 {
-            return Color.metricDeltaPositive
-        }
-        if delta > 0 {
-            return Color.metricDeltaNegative
-        }
-        return Color.white.opacity(0.8)
-    }
-
-    private func rangeText(for series: [MetricChartDataPoint]) -> String? {
-        guard let minValue = series.map(\.value).min(), let maxValue = series.map(\.value).max(), minValue != maxValue else {
-            return nil
-        }
-        let minFormatted = formatHeadlineValue(minValue)
-        let maxFormatted = formatHeadlineValue(maxValue)
-        return "\(minFormatted) – \(maxFormatted)"
-    }
-
-    private func primaryHistoryValue(_ entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> String {
-        let formatter = config.primaryFormatter
-        let value = formatter.string(from: NSNumber(value: entry.primaryValue)) ?? formattedValue(entry.primaryValue)
-        if config.unitLabel.isEmpty {
-            return value
-        }
-        return "\(value) \(config.unitLabel)"
-    }
-
-    private func secondaryHistoryValue(_ entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> String? {
-        guard let secondaryValue = entry.secondaryValue,
-              let formatter = config.secondaryFormatter,
-              let formatted = formatter.string(from: NSNumber(value: secondaryValue)) else {
-            return nil
-        }
-
-        if let unit = config.secondaryUnitLabel, !unit.isEmpty {
-            return "\(formatted) \(unit)"
-        }
-        return formatted
-    }
-
-    private func sourceLabel(for source: MetricEntrySourceType) -> String {
-        switch source {
-        case .manual:
-            return "Manual"
-        case .healthKit:
-            return "Apple Health"
-        case .integration(let id):
-            return id ?? "Connected"
-        }
-    }
-
-    private func computeSeriesStats(for series: [MetricChartDataPoint]) -> MetricSeriesStats? {
-        guard series.count >= 2 else { return nil }
-        guard let first = series.first, let last = series.last else { return nil }
-        let total = series.reduce(0) { $0 + $1.value }
-        let average = total / Double(series.count)
-        let delta = last.value - first.value
-        let percent: Double
-        if abs(first.value) < .leastNormalMagnitude {
-            percent = 0
-        } else {
-            percent = (delta / first.value) * 100
-        }
-        return MetricSeriesStats(average: average, delta: delta, percentageChange: percent)
-    }
-
-    private func movingAverage(for points: [MetricChartDataPoint], windowSize: Int) -> [MetricChartDataPoint] {
-        guard windowSize >= 2, points.count > windowSize else { return points }
-        var result: [MetricChartDataPoint] = []
-        var window: [Double] = []
-
-        for point in points {
-            window.append(point.value)
-            if window.count > windowSize {
-                window.removeFirst()
-            }
-            let average = window.reduce(0, +) / Double(window.count)
-            result.append(MetricChartDataPoint(date: point.date, value: average, isEstimated: point.isEstimated))
-        }
-
-        return result
-    }
-
-    private func nearestPoint(to date: Date) -> MetricChartDataPoint? {
-        guard !activeSeries.isEmpty else { return nil }
-        return activeSeries.min(by: { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) })
-    }
-
-    private func preprocessChartDataIfNeeded() async {
-        guard chartDataFingerprint != lastFingerprint else { return }
-        lastFingerprint = chartDataFingerprint
-        await preprocessChartData()
-    }
-
-    private func preprocessChartData() async {
-        guard !chartData.isEmpty else {
-            await MainActor.run {
-                cachedSeries = [:]
-                isLoadingData = false
-            }
-            return
-        }
-
-        await MainActor.run {
-            isLoadingData = true
-        }
-
-        let sourceData = chartData
-        let referenceDate = Date()
-
-        let series = await Task(priority: .userInitiated) { () -> [TimeRange: [MetricChartDataPoint]] in
-            let preprocessor = ChartSeriesPreprocessor(referenceDate: referenceDate)
-            return preprocessor.seriesByRange(from: sourceData)
-        }.value
-
-        await MainActor.run {
-            cachedSeries = series
-            isLoadingData = false
-        }
-    }
-
-    private func formattedValue(_ value: Double) -> String {
-        if value.isFinite {
-            return String(format: value < 10 ? "%.2f" : "%.1f", value)
-        }
-        return "—"
-    }
-
-    // MARK: - Nested Types
-
-    private enum ChartMode: CaseIterable {
-        case trend
-        case raw
-
-        var label: String {
-            switch self {
-            case .trend: return "Smoothed"
-            case .raw: return "Raw"
-            }
-        }
-    }
-
-    private struct QuickStat: Identifiable, Equatable {
-        let id = UUID()
-        let label: String
-        let value: String
-        let detail: String?
-        let color: Color
-    }
-}
-
-// MARK: - Metrics Order Persistence
-
-extension DashboardViewLiquid {
-    func loadMetricsOrder() {
-        // ...
-
-        do {
-            let decoder = JSONDecoder()
-            let loadedOrder = try decoder.decode([MetricIdentifier].self, from: metricsOrderData)
-            metricsOrder = loadedOrder
-        } catch {
-        // print("Failed to load metrics order: \(error)")
-            // Keep default order
-        }
-    }
-
-    func saveMetricsOrder() {
-        do {
-            let encoder = JSONEncoder()
-            metricsOrderData = try encoder.encode(metricsOrder)
-
-            // Haptic feedback for successful reorder
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-        } catch {
-        // print("Failed to save metrics order: \(error)")
-        }
-    }
-}
-
-// MARK: - Metric Drop Delegate
-
-struct MetricDropDelegate: DropDelegate {
-    let metric: DashboardViewLiquid.MetricIdentifier
-    @Binding var metrics: [DashboardViewLiquid.MetricIdentifier]
-    @Binding var draggedMetric: DashboardViewLiquid.MetricIdentifier?
-    let onReorder: () -> Void
-
-    func performDrop(info: DropInfo) -> Bool {
-        draggedMetric = nil
-        return true
-    }
-
-    func dropEntered(info: DropInfo) {
-        guard let draggedMetric = draggedMetric,
-              draggedMetric != metric,
-              let fromIndex = metrics.firstIndex(of: draggedMetric),
-              let toIndex = metrics.firstIndex(of: metric) else {
-            return
-        }
-
-        withAnimation(.easeInOut(duration: 0.2)) {
-            metrics.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
-        }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        return DropProposal(operation: .move)
-    }
-
-    func dropExited(info: DropInfo) {
-        // Optional: Add visual feedback when drag exits
     }
 }
 

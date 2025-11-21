@@ -93,13 +93,23 @@ class PhotoMetadataService {
     }
 
     /// Create or update body metrics for a specific date
-    func createOrUpdateMetrics(for date: Date, photoUrl: String? = nil, weight: Double? = nil, bodyFatPercentage: Double? = nil, userId: String) async -> BodyMetrics {
+    func createOrUpdateMetrics(
+        for date: Date,
+        photoUrl: String? = nil,
+        weight: Double? = nil,
+        bodyFatPercentage: Double? = nil,
+        userId: String
+    ) async -> BodyMetrics {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
 
         // Check if metrics already exist for this date
-        let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId, from: startOfDay, to: calendar.date(byAdding: .day, value: 1, to: startOfDay))
-            .first?.toBodyMetrics()
+        let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(
+            for: userId,
+            from: startOfDay,
+            to: calendar.date(byAdding: .day, value: 1, to: startOfDay)
+        )
+        .first?.toBodyMetrics()
 
         if let existing = existingMetrics {
             // Update existing metrics

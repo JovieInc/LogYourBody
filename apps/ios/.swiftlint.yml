@@ -14,6 +14,10 @@ excluded:
   - DerivedData
   - .build
   - build
+  - SourcePackages
+  - vendor
+  - "**/SourcePackages/**"
+  - "**/vendor/**"
   - LogYourBody/Models/LogYourBody.xcdatamodeld
   - "**/*.generated.swift"
   - "**/*.pb.swift"
@@ -24,12 +28,8 @@ disabled_rules:
   - force_cast # Sometimes needed for Core Data
   - force_try # Used in some initialization code
   - file_header # Temporarily disabled to focus on zero violations
-  - closure_end_indentation # Temporarily disabled - would require extensive manual fixes
   - attributes # Temporarily disabled - would require extensive manual fixes
   - identifier_name # Temporarily disabled - minor single-letter variables
-  - line_length # Temporarily disabled - minor formatting issue
-  - vertical_parameter_alignment_on_call # Temporarily disabled - minor formatting issue
-  - trailing_whitespace # Temporarily disabled - minor formatting issue
   - function_body_length # Temporarily disabled - minor refactoring needed
   - for_where # Temporarily disabled - minor optimization suggestion
   - convenience_type # Temporarily disabled - utility class structure suggestions
@@ -104,6 +104,10 @@ opt_in_rules:
   - vertical_whitespace_opening_braces
   - yoda_condition
 
+analyzer_rules:
+  - unused_import
+  - unused_declaration
+
 # Rule configurations
 # Note: Only configure rules that are NOT in disabled_rules
 
@@ -129,6 +133,13 @@ nesting:
 vertical_whitespace:
   max_empty_lines: 2
 
+line_length:
+  warning: 130
+  error: 150
+  ignores_comments: true
+  ignores_interpolated_strings: true
+  ignores_urls: true
+
 trailing_comma:
   mandatory_comma: false
 
@@ -136,7 +147,7 @@ trailing_comma:
 custom_rules:
   no_hardcoded_strings:
     name: "Hardcoded Strings"
-    regex: '(Text|Label|Button|NavigationLink)\("[\w\s]{5,}"\)'
+    regex: '(Text|Label|Button|NavigationLink)\s*\(\s*(verbatim:\s*)?"[^"\n]{5,}"'
     message: "Consider using localized strings or constants for UI text"
     severity: warning
     match_kinds:
@@ -178,4 +189,4 @@ custom_rules:
 
 
 # Reporter type (xcode, json, csv, checkstyle, codeclimate, junit, html, emoji, sonarqube, markdown, github-actions-logging)
-reporter: "xcode"
+reporter: "github-actions-logging"

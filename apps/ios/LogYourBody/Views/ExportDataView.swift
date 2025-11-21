@@ -145,18 +145,30 @@ struct ExportDataView: View {
                                                 },
                                                 label: {
                                                     HStack {
-                                                        Image(systemName: selectedFormats.contains(format) ? "checkmark.square.fill" : "square")
-                                                            .font(.system(size: 20))
-                                                            .foregroundColor(selectedFormats.contains(format) ? .appPrimary : .appBorder)
+                                                        Image(
+                                                            systemName: selectedFormats.contains(format)
+                                                                ? "checkmark.square.fill"
+                                                                : "square"
+                                                        )
+                                                        .font(.system(size: 20))
+                                                        .foregroundColor(
+                                                            selectedFormats.contains(format)
+                                                                ? .appPrimary
+                                                                : .appBorder
+                                                        )
 
                                                         VStack(alignment: .leading, spacing: 4) {
                                                             Text(format.rawValue)
                                                                 .font(.body)
                                                                 .foregroundColor(.appText)
 
-                                                            Text(format == .json ? "Complete data with all fields" : "Spreadsheet-compatible format")
-                                                                .font(.caption)
-                                                                .foregroundColor(.appTextSecondary)
+                                                            Text(
+                                                                format == .json
+                                                                    ? "Complete data with all fields"
+                                                                    : "Spreadsheet-compatible format"
+                                                            )
+                                                            .font(.caption)
+                                                            .foregroundColor(.appTextSecondary)
                                                         }
 
                                                         Spacer()
@@ -221,12 +233,32 @@ struct ExportDataView: View {
                                 .padding(.horizontal)
 
                             VStack(alignment: .leading, spacing: 8) {
-                                DataTypeRow(icon: "person.fill", title: "Profile Information", description: "Name, email, date of birth, height")
-                                DataTypeRow(icon: "scalemass", title: "Body Metrics", description: "Weight, body fat %, measurements")
-                                DataTypeRow(icon: "chart.line.uptrend.xyaxis", title: "Progress History", description: "All historical data points")
-                                DataTypeRow(icon: "calendar", title: "Daily Logs", description: "Activity, notes, and check-ins")
+                                DataTypeRow(
+                                    icon: "person.fill",
+                                    title: "Profile Information",
+                                    description: "Name, email, date of birth, height"
+                                )
+                                DataTypeRow(
+                                    icon: "scalemass",
+                                    title: "Body Metrics",
+                                    description: "Weight, body fat %, measurements"
+                                )
+                                DataTypeRow(
+                                    icon: "chart.line.uptrend.xyaxis",
+                                    title: "Progress History",
+                                    description: "All historical data points"
+                                )
+                                DataTypeRow(
+                                    icon: "calendar",
+                                    title: "Daily Logs",
+                                    description: "Activity, notes, and check-ins"
+                                )
                                 if exportMethod == .download && includePhotos {
-                                    DataTypeRow(icon: "photo", title: "Progress Photos", description: "All uploaded photos")
+                                    DataTypeRow(
+                                        icon: "photo",
+                                        title: "Progress Photos",
+                                        description: "All uploaded photos"
+                                    )
                                 }
                             }
                             .padding()
@@ -259,14 +291,18 @@ struct ExportDataView: View {
                         .padding(.top, 8)
 
                         // Privacy Note
-                        Text(exportMethod == .email ?
-                                "A secure download link will be sent to your registered email address. The link will expire after 24 hours." :
-                                "Your data export will be prepared and saved to your device. You can then share it or save it to your preferred location.")
-                            .font(.caption)
-                            .foregroundColor(.appTextSecondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                            .padding(.bottom, 20)
+                        Text(
+                            exportMethod == .email
+                                ? "A secure download link will be sent to your registered email address. "
+                                + "The link will expire after 24 hours."
+                                : "Your data export will be prepared and saved to your device. You can then "
+                                + "share it or save it to your preferred location."
+                        )
+                        .font(.caption)
+                        .foregroundColor(.appTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                        .padding(.bottom, 20)
                     }
                 }
 

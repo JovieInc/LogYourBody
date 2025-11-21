@@ -42,6 +42,9 @@ The `.swiftlint.yml` file has been created with:
 - Sensible rules for Swift development
 - iOS-specific configurations
 - Custom rules for LogYourBody project standards
+- Analyzer rules that flag unused declarations/imports
+- Re-enabled formatting checks (line length, closure indentation, vertical parameter alignment)
+- Updated custom `no_hardcoded_strings` regex to catch more SwiftUI initializers
 
 ### 4. Running SwiftLint
 

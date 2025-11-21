@@ -71,11 +71,8 @@ struct PreferencesView: View {
 
     @State private var scrollOffset: CGFloat = 0
     @State private var showingLogoutConfirmation = false
-    @State private var isQuickExporting = false
     @State private var isTriggeringHealthResync = false
-    @State private var exportAlertTitle = ""
-    @State private var exportAlertMessage = ""
-    @State private var showingExportStatusAlert = false
+    @State private var isHealthSyncSetupInProgress = false
 
     // Cached computed properties for performance
     @State private var cachedUserGender: String = ""
@@ -214,11 +211,6 @@ struct PreferencesView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(restoreAlertMessage)
-        }
-        .alert(exportAlertTitle, isPresented: $showingExportStatusAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(exportAlertMessage)
         }
         .confirmationDialog("Log out of LogYourBody?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
             Button("Log Out", role: .destructive) {
@@ -472,7 +464,9 @@ struct PreferencesView: View {
                 goalRow(
                     icon: "target",
                     title: "Weight goal",
-                    value: customWeightGoal.map { "\(String(format: "%.1f", $0)) \(currentSystem.weightUnit)" } ?? "Not set"
+                    value: customWeightGoal.map {
+                        "\(String(format: "%.1f", $0)) \(currentSystem.weightUnit)"
+                    } ?? "Not set"
                 ) {
                     let currentValue = customWeightGoal.map { String(format: "%.1f", $0) } ?? ""
                     showTextInputAlert(
@@ -495,9 +489,14 @@ struct PreferencesView: View {
                     icon: "percent",
                     title: "Body fat goal",
                     value: String(format: "%.1f%%", currentBodyFatGoal)
-                        + (customBodyFatGoal == nil ? " (default)" : "")
+                        + (
+                            customBodyFatGoal == nil
+                                ? " (default)"
+                                : ""
+                        )
                 ) {
-                    let currentValue = customBodyFatGoal.map { String(format: "%.1f", $0) } ?? String(format: "%.1f", defaultBodyFatGoal)
+                    let currentValue = customBodyFatGoal.map { String(format: "%.1f", $0) }
+                        ?? String(format: "%.1f", defaultBodyFatGoal)
                     showTextInputAlert(
                         title: "Body fat goal",
                         message: "Enter a body fat percentage (0-40%)",
@@ -518,9 +517,14 @@ struct PreferencesView: View {
                     icon: "figure.arms.open",
                     title: "FFMI goal",
                     value: String(format: "%.1f", currentFFMIGoal)
-                        + (customFFMIGoal == nil ? " (default)" : "")
+                        + (
+                            customFFMIGoal == nil
+                                ? " (default)"
+                                : ""
+                        )
                 ) {
-                    let currentValue = customFFMIGoal.map { String(format: "%.1f", $0) } ?? String(format: "%.1f", defaultFFMIGoal)
+                    let currentValue = customFFMIGoal.map { String(format: "%.1f", $0) }
+                        ?? String(format: "%.1f", defaultFFMIGoal)
                     showTextInputAlert(
                         title: "FFMI goal",
                         message: "Enter a Fat-Free Mass Index (10-30)",
@@ -563,6 +567,20 @@ struct PreferencesView: View {
                         handleHealthSyncToggle(to: newValue)
                     }
                 )
+                .disabled(isHealthSyncSetupInProgress)
+
+                if isHealthSyncSetupInProgress {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.65)
+                        Text("Connecting to Apple Health…")
+                            .font(.caption)
+                            .foregroundColor(.appTextSecondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, SettingsDesign.horizontalPadding)
+                    .padding(.vertical, 10)
+                }
 
                 if healthKitManager.isImporting {
                     DSDivider().insetted(16)
@@ -701,7 +719,12 @@ struct PreferencesView: View {
                     Task {
                         let success = await revenueCatManager.restorePurchases()
                         await MainActor.run {
-                            restoreAlertMessage = success ? "Your subscription has been restored" : revenueCatManager.errorMessage ?? "No active subscription found"
+                            restoreAlertMessage = success
+                                ? "Your subscription has been restored"
+                                : (
+                                    revenueCatManager.errorMessage
+                                        ?? "No active subscription found"
+                                )
                             showingRestoreAlert = true
                         }
                     }
@@ -722,41 +745,6 @@ struct PreferencesView: View {
                             )
                     )
                 }
-
-                Button {
-                    triggerQuickExport()
-                } label: {
-                    HStack {
-                        if isQuickExporting {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "square.and.arrow.up")
-                        }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Export data")
-                                .fontWeight(.semibold)
-                            Text("Download a copy of your data.")
-                                .font(.caption)
-                                .foregroundColor(.appTextSecondary)
-                        }
-
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.appCard)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.appBorder, lineWidth: 1)
-                            )
-                    )
-                }
-                .disabled(isQuickExporting)
             }
             .padding(.top, 4)
             .padding(.bottom, 8)
@@ -769,8 +757,8 @@ struct PreferencesView: View {
             header: "Danger zone",
             footer: "This permanently deletes your account and all data. This can’t be undone."
         ) {
-            Button(role: .destructive) {
-                HapticManager.shared.notification(type: .error)
+            NavigationLink {
+                DeleteAccountView()
             } label: {
                 Text("Delete account")
                     .font(.system(size: 16, weight: .semibold))
@@ -781,6 +769,11 @@ struct PreferencesView: View {
                             .fill(Color.red.opacity(0.15))
                     )
             }
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    HapticManager.shared.notification(type: .error)
+                }
+            )
             .buttonStyle(.plain)
             .padding(.horizontal, SettingsDesign.horizontalPadding)
         }
@@ -1063,34 +1056,46 @@ struct PreferencesView: View {
     private func handleHealthSyncToggle(to newValue: Bool) {
         if newValue {
             Task {
-                let authorized = await healthKitManager.requestAuthorization()
-                await MainActor.run {
-                    if !authorized {
-                        healthKitSyncEnabled = false
-                    }
-                }
-
-                if healthKitManager.isAuthorized {
-                    healthKitManager.observeWeightChanges()
-                    healthKitManager.observeStepChanges()
-                    try? await healthKitManager.setupStepCountBackgroundDelivery()
-                    try? await healthKitManager.syncWeightFromHealthKit()
-                }
+                await configureHealthSyncPipelineIfNeeded()
             }
         }
     }
 
-    private func triggerQuickExport() {
-        guard !isQuickExporting else { return }
-        isQuickExporting = true
-        exportAlertTitle = "Export"
-        Task {
-            try? await Task.sleep(nanoseconds: 900_000_000)
-            await MainActor.run {
-                isQuickExporting = false
-                exportAlertMessage = "Full data export is moving here soon. For now, use Data & Privacy > Export Data."
-                showingExportStatusAlert = true
+    private func configureHealthSyncPipelineIfNeeded() async {
+        let isAlreadyConfiguring = await MainActor.run { isHealthSyncSetupInProgress }
+        guard !isAlreadyConfiguring else { return }
+
+        await MainActor.run {
+            isHealthSyncSetupInProgress = true
+        }
+
+        defer {
+            Task { @MainActor in
+                isHealthSyncSetupInProgress = false
             }
+        }
+
+        if !healthKitManager.isAuthorized {
+            let authorized = await healthKitManager.requestAuthorization()
+            guard authorized else {
+                await MainActor.run {
+                    healthKitSyncEnabled = false
+                }
+                return
+            }
+        }
+
+        healthKitManager.observeWeightChanges()
+        healthKitManager.observeStepChanges()
+
+        do {
+            try await healthKitManager.setupStepCountBackgroundDelivery()
+        } catch {
+            // Optional: surface failure to user later
+        }
+
+        Task.detached(priority: .background) {
+            try? await healthKitManager.syncWeightFromHealthKit()
         }
     }
 
@@ -1204,7 +1209,7 @@ private struct BirthdayEditSheet: View {
                 Button(action: {
                     onSave(selectedDate)
                     dismiss()
-                }) {
+                }, label: {
                     Text("Save")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.white)
@@ -1212,7 +1217,7 @@ private struct BirthdayEditSheet: View {
                         .frame(height: 50)
                         .background(Color.blue)
                         .cornerRadius(12)
-                }
+                })
                 .padding(.horizontal)
             }
             .padding()
@@ -1243,7 +1248,12 @@ private struct HeightEditSheet: View {
     @State private var inches: Int = 8
     @State private var centimeters: Int = 170
 
-    init(currentHeight: Double?, currentUnit: String?, preferredSystem: MeasurementSystem, onSave: @escaping (Double, String) -> Void) {
+    init(
+        currentHeight: Double?,
+        currentUnit: String?,
+        preferredSystem: MeasurementSystem,
+        onSave: @escaping (Double, String) -> Void
+    ) {
         self.currentHeight = currentHeight
         self.currentUnit = currentUnit
         self.preferredSystem = preferredSystem
@@ -1332,7 +1342,7 @@ private struct HeightEditSheet: View {
                         onSave(Double(centimeters), "cm")
                     }
                     dismiss()
-                }) {
+                }, label: {
                     Text("Save")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.white)
@@ -1340,7 +1350,7 @@ private struct HeightEditSheet: View {
                         .frame(height: 50)
                         .background(Color.blue)
                         .cornerRadius(12)
-                }
+                })
                 .padding(.horizontal)
             }
             .padding()

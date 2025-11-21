@@ -170,3 +170,66 @@ struct OnboardingCard<Content: View>: View {
             )
     }
 }
+
+// MARK: - FFMI Helper
+
+struct FFMIInfoContent: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("What's FFMI?")
+                .font(OnboardingTypography.headline)
+                .foregroundStyle(Color.appText)
+
+            Text("Fat-Free Mass Index compares your lean mass to your height, so bigger frames don’t get penalized.")
+                .font(OnboardingTypography.body)
+                .foregroundStyle(Color.appTextSecondary)
+
+            Text("We pair FFMI with body fat and percentile bands to surface your Body Score and coaching cues.")
+                .font(OnboardingTypography.body)
+                .foregroundStyle(Color.appTextSecondary)
+        }
+    }
+}
+
+struct FFMIInfoLink: View {
+    @State private var isPresenting = false
+
+    var body: some View {
+        Button(
+            action: {
+                isPresenting = true
+                HapticManager.shared.selection()
+            },
+            label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("What's FFMI?")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .foregroundStyle(Color.appPrimary)
+                .padding(.vertical, 4)
+            }
+        )
+        .buttonStyle(.plain)
+        .sheet(isPresented: $isPresenting) {
+            NavigationStack {
+                ScrollView {
+                    FFMIInfoContent()
+                        .padding(24)
+                }
+                .background(Color.appBackground.ignoresSafeArea())
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") {
+                            isPresenting = false
+                        }
+                        .foregroundStyle(Color.appPrimary)
+                    }
+                }
+            }
+            .presentationDetents([.height(320)])
+            .presentationDragIndicator(.visible)
+        }
+    }
+}

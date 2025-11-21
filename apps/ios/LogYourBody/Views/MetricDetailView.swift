@@ -721,7 +721,10 @@ struct MetricDetailView: View {
         await refreshAfterEntryMutation()
     }
 
-    private func filteredMetrics(for metricType: DashboardViewLiquid.DashboardMetricKind, metrics: [BodyMetrics]) -> [BodyMetrics] {
+    private func filteredMetrics(
+        for metricType: DashboardViewLiquid.DashboardMetricKind,
+        metrics: [BodyMetrics]
+    ) -> [BodyMetrics] {
         metrics
             .filter { metric in
                 switch metricType {

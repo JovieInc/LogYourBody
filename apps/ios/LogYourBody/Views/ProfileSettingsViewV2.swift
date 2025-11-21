@@ -18,7 +18,7 @@ struct ProfileSettingsViewV2: View {
     @State private var editableLastName: String = ""
     @State private var editableDateOfBirth = Date()
     @State private var editableHeightCm: Int = 170
-    @State private var editableGender: OnboardingData.Gender = .male
+    @State private var editableGender: BiologicalSex = .male
     @State private var useMetricHeight: Bool = false
 
     // UI State
@@ -205,8 +205,8 @@ struct ProfileSettingsViewV2: View {
             Spacer()
 
             Picker("Biological Sex", selection: $editableGender) {
-                ForEach(OnboardingData.Gender.allCases, id: \.self) { gender in
-                    Text(gender.rawValue).tag(gender)
+                ForEach(BiologicalSex.allCases, id: \.self) { gender in
+                    Text(gender.description).tag(gender)
                 }
             }
             .pickerStyle(SegmentedPickerStyle())
@@ -551,7 +551,7 @@ struct ProfileSettingsViewV2: View {
         }
 
         if let genderString = user.profile?.gender {
-            editableGender = OnboardingData.Gender(rawValue: genderString) ?? .male
+            editableGender = BiologicalSex(rawValue: genderString.lowercased()) ?? .male
         }
 
         hasChanges = false
@@ -582,7 +582,7 @@ struct ProfileSettingsViewV2: View {
                     dateOfBirth: editableDateOfBirth,
                     height: heightInInches,
                     heightUnit: useMetricHeight ? "cm" : "in",
-                    gender: editableGender.rawValue,
+                    gender: editableGender.description,
                     activityLevel: currentUser.profile?.activityLevel,
                     goalWeight: currentUser.profile?.goalWeight,
                     goalWeightUnit: currentUser.profile?.goalWeightUnit,
@@ -598,7 +598,7 @@ struct ProfileSettingsViewV2: View {
                     "dateOfBirth": editableDateOfBirth,
                     "height": heightInInches,
                     "heightUnit": useMetricHeight ? "cm" : "in",
-                    "gender": editableGender.rawValue,
+                    "gender": editableGender.description,
                     "onboardingCompleted": true
                 ]
 

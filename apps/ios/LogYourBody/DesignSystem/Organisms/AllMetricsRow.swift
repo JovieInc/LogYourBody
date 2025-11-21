@@ -102,6 +102,16 @@ struct AllMetricsRow: View {
             if let weight = weight {
                 let displayWeight = useMetricUnits ? weight : weight * 2.20462
                 let unit = useMetricUnits ? "kg" : "lbs"
+                let weightChartData = MetricChartDataHelper
+                    .generateWeightChartData(
+                        for: userId,
+                        useMetric: useMetricUnits
+                    )
+                    .map {
+                        MetricSummaryCard.DataPoint(index: $0.index, value: $0.value)
+                    }
+                let latestWeightDescription = "Latest value "
+                    + "\(formatWeight(displayWeight, useMetric: useMetricUnits)) \(unit)"
 
                 Button {
                     selectedMetric = .weight
@@ -114,11 +124,9 @@ struct AllMetricsRow: View {
                             value: formatWeight(displayWeight, useMetric: useMetricUnits),
                             unit: unit,
                             timestamp: formatTimestamp(),
-                            dataPoints: MetricChartDataHelper.generateWeightChartData(for: userId, useMetric: useMetricUnits).map {
-                                MetricSummaryCard.DataPoint(index: $0.index, value: $0.value)
-                            },
+                            dataPoints: weightChartData,
                             chartAccessibilityLabel: "Weight trend for the past week",
-                            chartAccessibilityValue: "Latest value \(formatWeight(displayWeight, useMetric: useMetricUnits)) \(unit)",
+                            chartAccessibilityValue: latestWeightDescription,
                             trend: nil,
                             footnote: nil
                         )),

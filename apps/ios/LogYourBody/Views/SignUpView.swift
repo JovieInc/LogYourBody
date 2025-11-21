@@ -224,7 +224,10 @@ struct SignUpView: View {
                 } else {
                     // Check if it's a password strength error
                     if error.localizedDescription.contains("not strong enough") {
-                        errorMessage = "Please choose a stronger password. Use at least 8 characters with a mix of uppercase, lowercase, and numbers or symbols."
+                        errorMessage = (
+                            "Please choose a stronger password. Use at least 8 characters " +
+                                "with a mix of uppercase, lowercase, and numbers or symbols."
+                        )
                     } else {
                         errorMessage = error.localizedDescription
                     }

@@ -16,11 +16,11 @@ struct DSInterpolationIcon: View {
     var body: some View {
         Button(action: {
             showTooltip.toggle()
-        }) {
+        }, label: {
             Image(systemName: isLastKnown ? "clock.arrow.circlepath" : "waveform.path")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(iconColor)
-        }
+        })
         .buttonStyle(PlainButtonStyle())
         .popover(isPresented: $showTooltip, arrowEdge: .top) {
             tooltipContent

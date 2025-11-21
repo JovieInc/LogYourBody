@@ -219,10 +219,18 @@ class SyncManager: ObservableObject {
             let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
 
             // Fetch body metrics from Supabase
-            let remoteBodyMetrics = try await supabaseManager.fetchBodyMetrics(userId: userId, since: thirtyDaysAgo, token: token)
+            let remoteBodyMetrics = try await supabaseManager.fetchBodyMetrics(
+                userId: userId,
+                since: thirtyDaysAgo,
+                token: token
+            )
 
             // Fetch daily metrics from Supabase
-            let remoteDailyMetrics = try await supabaseManager.fetchDailyMetrics(userId: userId, since: thirtyDaysAgo, token: token)
+            let remoteDailyMetrics = try await supabaseManager.fetchDailyMetrics(
+                userId: userId,
+                since: thirtyDaysAgo,
+                token: token
+            )
 
             // Process and save remote body metrics to CoreData
             for remoteMetric in remoteBodyMetrics {
@@ -354,7 +362,9 @@ class SyncManager: ObservableObject {
                             "photo_url": cached.photoUrl ?? NSNull(),
                             "data_source": cached.dataSource ?? "Manual",
                             "original_photo_url": cached.originalPhotoUrl ?? NSNull(),
-                            "photo_processed_at": cached.photoProcessedAt != nil ? ISO8601DateFormatter().string(from: cached.photoProcessedAt!) : NSNull()
+                            "photo_processed_at": cached.photoProcessedAt != nil
+                                ? ISO8601DateFormatter().string(from: cached.photoProcessedAt!)
+                                : NSNull()
                         ]
 
                         return metrics

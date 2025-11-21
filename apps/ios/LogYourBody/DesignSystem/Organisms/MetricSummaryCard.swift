@@ -52,7 +52,17 @@ public struct MetricSummaryCard: View {
         public let trend: Trend?
         public let footnote: String?
 
-        public init(title: String, value: String, unit: String, timestamp: String?, dataPoints: [DataPoint], chartAccessibilityLabel: String?, chartAccessibilityValue: String?, trend: Trend?, footnote: String?) {
+        public init(
+            title: String,
+            value: String,
+            unit: String,
+            timestamp: String?,
+            dataPoints: [DataPoint],
+            chartAccessibilityLabel: String?,
+            chartAccessibilityValue: String?,
+            trend: Trend?,
+            footnote: String?
+        ) {
             self.title = title
             self.value = value
             self.unit = unit
@@ -181,9 +191,22 @@ public struct MetricSummaryCard: View {
         case .loading:
             return AnyView(loadingView())
         case .empty(let message, let action):
-            return AnyView(messageView(message: message, action: action, iconName: "plus") )
+            return AnyView(
+                messageView(
+                    message: message,
+                    action: action,
+                    iconName: "plus"
+                )
+            )
         case .error(let message, let action):
-            return AnyView(messageView(message: message, action: action, iconName: "exclamationmark.triangle.fill", isError: true))
+            return AnyView(
+                messageView(
+                    message: message,
+                    action: action,
+                    iconName: "exclamationmark.triangle.fill",
+                    isError: true
+                )
+            )
         case .data(let content):
             return AnyView(dataView(content))
         }
@@ -523,7 +546,7 @@ public struct MetricSummaryCard: View {
 #Preview("Metric Summary Card States") {
     ScrollView {
         VStack(spacing: 20) {
-            Button(action: {}) {
+            Button(action: {}, label: {
                 MetricSummaryCard(
                     icon: "flame.fill",
                     accentColor: .orange,
@@ -544,7 +567,7 @@ public struct MetricSummaryCard: View {
                     ),
                     isButtonContext: true
                 )
-            }
+            })
 
             MetricSummaryCard(
                 icon: "figure.stand",

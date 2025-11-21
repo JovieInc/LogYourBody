@@ -10,7 +10,11 @@ struct BodyScoreHookView: View {
     ]
 
     var body: some View {
-        OnboardingPageTemplate(title: "Build a dialed-in body.", subtitle: "Get your Body Score in under a minute.", showsBackButton: false) {
+        OnboardingPageTemplate(
+            title: "Build a dialed-in body.",
+            subtitle: "Get your Body Score in under a minute.",
+            showsBackButton: false
+        ) {
             VStack(spacing: 32) {
                 OnboardingBadge(text: "Body Score Early Access")
 
@@ -38,7 +42,7 @@ struct BodyScoreHookView: View {
                 )
 
                 VStack(spacing: 16) {
-                    Button("See my Body Score") {
+                    Button("See my score") {
                         viewModel.goToNextStep()
                     }
                     .buttonStyle(OnboardingPrimaryButtonStyle())

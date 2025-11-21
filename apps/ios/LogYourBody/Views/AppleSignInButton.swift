@@ -25,10 +25,17 @@ struct AppleSignInButton: UIViewRepresentable {
         button.isUserInteractionEnabled = true
 
         // Add the target
-        button.addTarget(context.coordinator, action: #selector(Coordinator.handleAuthorizationAppleIDButtonPress), for: .touchUpInside)
+        button.addTarget(
+            context.coordinator,
+            action: #selector(Coordinator.handleAuthorizationAppleIDButtonPress),
+            for: .touchUpInside
+        )
 
         // Also add a tap gesture recognizer as a fallback
-        let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTapGesture))
+        let tapGesture = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleTapGesture)
+        )
         button.addGestureRecognizer(tapGesture)
 
         // print("🍎 Button created - isEnabled: \(button.isEnabled), isUserInteractionEnabled: \(button.isUserInteractionEnabled)")
@@ -39,7 +46,11 @@ struct AppleSignInButton: UIViewRepresentable {
     func updateUIView(_ uiView: ASAuthorizationAppleIDButton, context: Context) {
         // Re-add target in case it was lost
         uiView.removeTarget(nil, action: nil, for: .allEvents)
-        uiView.addTarget(context.coordinator, action: #selector(Coordinator.handleAuthorizationAppleIDButtonPress), for: .touchUpInside)
+        uiView.addTarget(
+            context.coordinator,
+            action: #selector(Coordinator.handleAuthorizationAppleIDButtonPress),
+            for: .touchUpInside
+        )
     }
 
     func makeCoordinator() -> Coordinator {
@@ -121,7 +132,10 @@ struct AppleSignInButton: UIViewRepresentable {
             return UIWindow(frame: UIScreen.main.bounds)
         }
 
-        func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        func authorizationController(
+            controller: ASAuthorizationController,
+            didCompleteWithAuthorization authorization: ASAuthorization
+        ) {
             // print("🍎 Authorization completed successfully")
 
             if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {

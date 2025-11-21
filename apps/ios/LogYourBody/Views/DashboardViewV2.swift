@@ -216,7 +216,10 @@ struct DashboardViewV2: View {
                     .font(.appBody)
                     .foregroundColor(.white.opacity(0.7))
                     .rotationEffect(.degrees(realtimeSyncManager.isSyncing ? 360 : 0))
-                    .animation(Animation.linear(duration: 1).repeatForever(autoreverses: false), value: realtimeSyncManager.isSyncing)
+                    .animation(
+                        Animation.linear(duration: 1).repeatForever(autoreverses: false),
+                        value: realtimeSyncManager.isSyncing
+                    )
                     .accessibilityLabel("Syncing in progress")
             }
         }
@@ -587,7 +590,11 @@ struct DashboardViewV2: View {
 
     private func calculateFFMI() -> Double? {
         guard let weight = currentMetric?.weight,
-              let bodyFat = currentMetric?.bodyFatPercentage ?? PhotoMetadataService.shared.estimateBodyFat(for: currentMetric?.date ?? Date(), metrics: bodyMetrics)?.value,
+              let bodyFat = currentMetric?.bodyFatPercentage
+                ?? PhotoMetadataService.shared.estimateBodyFat(
+                    for: currentMetric?.date ?? Date(),
+                    metrics: bodyMetrics
+                )?.value,
               let height = authManager.currentUser?.profile?.height,
               height > 0 else { return nil }
 

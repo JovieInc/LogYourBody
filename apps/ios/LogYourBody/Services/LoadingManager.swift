@@ -74,7 +74,9 @@ class LoadingManager: ObservableObject {
             let startTime = Date()
             let maxWaitTime: TimeInterval = 10.0 // Allow 10 seconds for Clerk to initialize (increased for slow networks)
 
-            while !authManager.isClerkLoaded && authManager.clerkInitError == nil && Date().timeIntervalSince(startTime) < maxWaitTime {
+            while !authManager.isClerkLoaded,
+                  authManager.clerkInitError == nil,
+                  Date().timeIntervalSince(startTime) < maxWaitTime {
                 try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s polling interval
             }
 

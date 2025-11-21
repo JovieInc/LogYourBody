@@ -15,14 +15,21 @@ struct ImageProcessingStatusView: View {
                         .font(.system(size: 14))
                         .foregroundColor(.appPrimary)
 
-                    Text("Processing \(processingService.activeProcessingCount) image\(processingService.activeProcessingCount > 1 ? "s" : "")")
+                    Text(
+                        "Processing \(processingService.activeProcessingCount) " +
+                            "image\(processingService.activeProcessingCount > 1 ? "s" : "")"
+                    )
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.appText)
 
                     Spacer()
 
                     if processingService.activeProcessingCount == 1,
-                       let task = processingService.processingTasks.first(where: { $0.status != .completed && $0.status != .failed }) {
+                       let task = processingService.processingTasks.first(
+                           where: { task in
+                               task.status != .completed && task.status != .failed
+                           }
+                       ) {
                         ProcessingProgressView(progress: task.progress)
                     }
                 }

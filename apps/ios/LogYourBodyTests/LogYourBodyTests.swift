@@ -5,27 +5,60 @@
 import XCTest
 @testable import LogYourBody
 
-final class LogYourBodyTests: XCTestCase {
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+@MainActor
+final class OnboardingFlowViewModelTests: XCTestCase {
+    func testAdvanceAfterHealthConfirmationSkipsToLoadingWhenMetricsExist() {
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.bodyScoreInput.weight = WeightValue(value: 185, unit: .pounds)
+        viewModel.bodyScoreInput.bodyFat = BodyFatValue(percentage: 18, source: .healthKit)
+        viewModel.currentStep = .healthConfirmation
+
+        viewModel.goToNextStep()
+
+        XCTAssertEqual(viewModel.currentStep, .loading)
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+    func testAdvanceAfterHealthConfirmationRequestsBodyFatWhenMissing() {
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.bodyScoreInput.weight = WeightValue(value: 185, unit: .pounds)
+        viewModel.bodyScoreInput.bodyFat = BodyFatValue()
+        viewModel.currentStep = .healthConfirmation
+
+        viewModel.goToNextStep()
+
+        XCTAssertEqual(viewModel.currentStep, .bodyFatChoice)
     }
 
-    func testExample() throws {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // Any test you write for XCTest can be annotated as throws and async.
-        // Mark your test throws to produce an unexpected failure when your test encounters an uncaught error.
-        // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
+    func testAdvanceAfterHealthConfirmationRequiresWeightWhenMissing() {
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.bodyScoreInput.weight = WeightValue()
+        viewModel.bodyScoreInput.bodyFat = BodyFatValue(percentage: 18, source: .healthKit)
+        viewModel.currentStep = .healthConfirmation
+
+        viewModel.goToNextStep()
+
+        XCTAssertEqual(viewModel.currentStep, .manualWeight)
     }
 
-    func testPerformanceExample() throws {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
-        }
+    func testManualWeightStepContinuesToBodyFatChoiceWhenNeeded() {
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.bodyScoreInput.weight = WeightValue(value: 180, unit: .pounds)
+        viewModel.bodyScoreInput.bodyFat = BodyFatValue()
+        viewModel.currentStep = .manualWeight
+
+        viewModel.goToNextStep()
+
+        XCTAssertEqual(viewModel.currentStep, .bodyFatChoice)
+    }
+
+    func testManualWeightStepSkipsBodyFatWhenAlreadyEntered() {
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.bodyScoreInput.weight = WeightValue(value: 180, unit: .pounds)
+        viewModel.bodyScoreInput.bodyFat = BodyFatValue(percentage: 17.5, source: .manualValue)
+        viewModel.currentStep = .manualWeight
+
+        viewModel.goToNextStep()
+
+        XCTAssertEqual(viewModel.currentStep, .loading)
     }
 }

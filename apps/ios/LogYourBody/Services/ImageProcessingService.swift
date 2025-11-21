@@ -14,7 +14,11 @@ class ImageProcessingService: ObservableObject {
     @Published var processingTasks: [ProcessingTask] = []
     @Published var activeProcessingCount: Int = 0
 
-    private let processingQueue = DispatchQueue(label: "com.logyourbody.imageprocessing", qos: .userInitiated, attributes: .concurrent)
+    private let processingQueue = DispatchQueue(
+        label: "com.logyourbody.imageprocessing",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
     struct ProcessingTask: Identifiable {

@@ -100,7 +100,9 @@ struct DeleteAccountView: View {
                     BaseButton(
                         "Delete My Account",
                         configuration: ButtonConfiguration(
-                            style: confirmationText == confirmationPhrase ? .custom(background: .red, foreground: .white) : .custom(background: .gray, foreground: .white),
+                            style: confirmationText == confirmationPhrase
+                                ? .custom(background: .red, foreground: .white)
+                                : .custom(background: .gray, foreground: .white),
                             isLoading: isDeleting,
                             isEnabled: confirmationText == confirmationPhrase,
                             fullWidth: true

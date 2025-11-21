@@ -134,7 +134,9 @@ class VisionOrientationService {
     /// Analyzes face rectangles to determine orientation
     private func analyzeFaceOrientation(_ faces: [VNFaceObservation], imageSize: CGSize) -> CGFloat {
         // If we have multiple faces, use the largest one
-        guard let largestFace = faces.max(by: { $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height }) else {
+        guard let largestFace = faces.max(by: {
+            $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height
+        }) else {
             return 0
         }
 
@@ -152,7 +154,8 @@ class VisionOrientationService {
             } else {
                 return -90 // Rotate left
             }
-        } else if aspectRatio < 0.8 && faceRect.midY < 0.3 {
+        } else if aspectRatio < 0.8,
+                  faceRect.midY < 0.3 {
             // Face is at top and narrow, likely upside down
             return 180
         }

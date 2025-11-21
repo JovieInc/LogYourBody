@@ -194,7 +194,7 @@ struct FloatingActionButton: View {
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()
             action()
-        }) {
+        }, label: {
             Image(systemName: icon)
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(.white)
@@ -211,7 +211,7 @@ struct FloatingActionButton: View {
                 )
                 .scaleEffect(isPressed ? 0.9 : 1.0)
                 .animation(.easeInOut(duration: 0.1), value: isPressed)
-        }
+        })
         .buttonStyle(PlainButtonStyle())
         .onLongPressGesture(
             minimumDuration: 0,

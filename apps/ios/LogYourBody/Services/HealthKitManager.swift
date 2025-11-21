@@ -902,7 +902,9 @@ class HealthKitManager: ObservableObject {
 
         do {
             // Get the earliest available weight data date
-            let earliestDate = try await getEarliestWeightDate() ?? Date().addingTimeInterval(-10 * 365 * 24 * 60 * 60) // Default to 10 years ago
+            let defaultHistoricalRange = TimeInterval(10 * 365 * 24 * 60 * 60)
+            let earliestDate = try await getEarliestWeightDate()
+                ?? Date().addingTimeInterval(-defaultHistoricalRange) // Default to 10 years ago
             let endDate = Date()
 
             // Calculate total months to process

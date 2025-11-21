@@ -645,7 +645,11 @@ class CoreDataManager: ObservableObject {
     // MARK: - Sync Operations
 
     /// Async version - does NOT block the main thread
-    func fetchUnsyncedEntries() async -> (bodyMetrics: [CachedBodyMetrics], dailyMetrics: [CachedDailyMetrics], profiles: [CachedProfile]) {
+    func fetchUnsyncedEntries() async -> (
+        bodyMetrics: [CachedBodyMetrics],
+        dailyMetrics: [CachedDailyMetrics],
+        profiles: [CachedProfile]
+    ) {
         let context = viewContext
 
         return await context.perform {
@@ -674,7 +678,11 @@ class CoreDataManager: ObservableObject {
     }
 
     @available(*, unavailable, message: "Use async fetchUnsyncedEntries() instead")
-    func fetchUnsyncedEntriesSync() -> (bodyMetrics: [CachedBodyMetrics], dailyMetrics: [CachedDailyMetrics], profiles: [CachedProfile]) {
+    func fetchUnsyncedEntriesSync() -> (
+        bodyMetrics: [CachedBodyMetrics],
+        dailyMetrics: [CachedDailyMetrics],
+        profiles: [CachedProfile]
+    ) {
         fatalError("fetchUnsyncedEntriesSync has been removed. Use the async counterpart instead.")
     }
 

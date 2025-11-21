@@ -125,11 +125,11 @@ struct BaseTextField: View {
                     if configuration.isSecure && configuration.showToggle {
                         Button(action: {
                             isSecureTextVisible.toggle()
-                        }) {
+                        }, label: {
                             Image(systemName: isSecureTextVisible ? "eye.slash" : "eye")
                                 .font(.system(size: 18))
                                 .foregroundColor(.appTextSecondary)
-                        }
+                        })
                         .buttonStyle(PlainButtonStyle())
                     }
 

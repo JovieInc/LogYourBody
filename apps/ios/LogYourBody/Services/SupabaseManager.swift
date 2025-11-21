@@ -115,6 +115,31 @@ class SupabaseManager: ObservableObject {
         return result
     }
 
+    func fetchLatestBodyMetricTimestamp(userId: String, token: String) async throws -> Date? {
+        let url = URL(string: "\(supabaseURL)/rest/v1/body_metrics?user_id=eq.\(userId)&order=logged_at.desc&limit=1")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await self.session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw SupabaseError.requestFailed
+        }
+
+        let result = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
+        guard let first = result.first,
+              let dateString = first["logged_at"] as? String else {
+            return nil
+        }
+
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: dateString)
+    }
+
     func fetchBodyMetrics(userId: String, since: Date, token: String) async throws -> [[String: Any]] {
         let dateFormatter = ISO8601DateFormatter()
         let sinceString = dateFormatter.string(from: since)

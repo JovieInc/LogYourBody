@@ -283,20 +283,55 @@ struct MetricChartDataHelper {
 
     // Old 7-day sparkline helpers have been removed in favor of generateChartData().
 
-    static func generateWeightChartData(for userId: String, useMetric: Bool, profile: UserProfile? = nil) -> [SparklineDataPoint] {
-        generateChartData(for: userId, days: 7, metricType: .weight, useMetric: useMetric, profile: profile)
+    static func generateWeightChartData(
+        for userId: String,
+        useMetric: Bool,
+        profile: UserProfile? = nil
+    ) -> [SparklineDataPoint] {
+        generateChartData(
+            for: userId,
+            days: 7,
+            metricType: .weight,
+            useMetric: useMetric,
+            profile: profile
+        )
     }
 
-    static func generateBodyFatChartData(for userId: String, profile: UserProfile? = nil) -> [SparklineDataPoint] {
-        generateChartData(for: userId, days: 7, metricType: .bodyFat, useMetric: true, profile: profile)
+    static func generateBodyFatChartData(
+        for userId: String,
+        profile: UserProfile? = nil
+    ) -> [SparklineDataPoint] {
+        generateChartData(
+            for: userId,
+            days: 7,
+            metricType: .bodyFat,
+            useMetric: true,
+            profile: profile
+        )
     }
 
     static func generateFFMIChartData(for userId: String, profile: UserProfile?) -> [SparklineDataPoint] {
-        generateChartData(for: userId, days: 7, metricType: .ffmi, useMetric: true, profile: profile)
+        generateChartData(
+            for: userId,
+            days: 7,
+            metricType: .ffmi,
+            useMetric: true,
+            profile: profile
+        )
     }
 
-    static func generateWaistChartData(for userId: String, useMetric: Bool, profile: UserProfile? = nil) -> [SparklineDataPoint] {
-        generateChartData(for: userId, days: 7, metricType: .waist, useMetric: useMetric, profile: profile)
+    static func generateWaistChartData(
+        for userId: String,
+        useMetric: Bool,
+        profile: UserProfile? = nil
+    ) -> [SparklineDataPoint] {
+        generateChartData(
+            for: userId,
+            days: 7,
+            metricType: .waist,
+            useMetric: useMetric,
+            profile: profile
+        )
     }
 
     // MARK: - FFMI Calculation
@@ -359,8 +394,8 @@ struct MetricChartDataHelper {
         }
 
         let metrics = bodyMetrics(for: userId, from: startDate, to: today)
-        return composeChartData(
-            for: userId,
+        let context = ChartCompositionContext(
+            userId: userId,
             days: days,
             metricType: metricType,
             useMetric: useMetric,
@@ -368,6 +403,8 @@ struct MetricChartDataHelper {
             metrics: metrics,
             startDate: startDate
         )
+
+        return composeChartData(with: context)
     }
 
     /// Async version for generating chart data using non-blocking Core Data fetches
@@ -389,9 +426,8 @@ struct MetricChartDataHelper {
         }
 
         let metrics = await bodyMetricsAsync(for: userId, from: startDate, to: today)
-
-        return composeChartData(
-            for: userId,
+        let context = ChartCompositionContext(
+            userId: userId,
             days: days,
             metricType: metricType,
             useMetric: useMetric,
@@ -399,21 +435,26 @@ struct MetricChartDataHelper {
             metrics: metrics,
             startDate: startDate
         )
+
+        return composeChartData(with: context)
     }
 
-    private static func composeChartData(
-        for userId: String,
-        days: Int?,
-        metricType: DashboardViewLiquid.DashboardMetricKind,
-        useMetric: Bool,
-        profile: UserProfile?,
-        metrics: [BodyMetrics],
-        startDate: Date?
-    ) -> [SparklineDataPoint] {
+    private struct ChartCompositionContext {
+        let userId: String
+        let days: Int?
+        let metricType: DashboardViewLiquid.DashboardMetricKind
+        let useMetric: Bool
+        let profile: UserProfile?
+        let metrics: [BodyMetrics]
+        let startDate: Date?
+    }
+
+    private static func composeChartData(with context: ChartCompositionContext) -> [SparklineDataPoint] {
+        let metrics = context.metrics
         guard !metrics.isEmpty else { return [] }
 
         let filteredMetrics: [BodyMetrics]
-        if let startDate {
+        if let startDate = context.startDate {
             filteredMetrics = metrics.filter { $0.date >= startDate }
         } else {
             filteredMetrics = metrics
@@ -423,18 +464,18 @@ struct MetricChartDataHelper {
 
         guard let fingerprint = metricFingerprint(
             for: filteredMetrics,
-            metricType: metricType,
-            useMetric: useMetric,
-            profile: profile
+            metricType: context.metricType,
+            useMetric: context.useMetric,
+            profile: context.profile
         ) else {
             return []
         }
 
         let cacheKey = ChartCacheKey(
-            userId: userId,
-            days: days,
-            metricIdentifier: metricIdentifier(for: metricType),
-            useMetric: useMetric,
+            userId: context.userId,
+            days: context.days,
+            metricIdentifier: metricIdentifier(for: context.metricType),
+            useMetric: context.useMetric,
             dataFingerprint: fingerprint
         )
 
@@ -443,13 +484,13 @@ struct MetricChartDataHelper {
         }
 
         let dataPoints = filteredMetrics.enumerated().compactMap { index, metric -> SparklineDataPoint? in
-            switch metricType {
+            switch context.metricType {
             case .steps:
-                guard let value = dailyMetric(for: userId, date: metric.date)?.steps else { return nil }
+                guard let value = dailyMetric(for: context.userId, date: metric.date)?.steps else { return nil }
                 return SparklineDataPoint(index: index, value: Double(value))
             case .weight:
                 guard let weight = metric.weight else { return nil }
-                let targetSystem: MeasurementSystem = useMetric ? .metric : .imperial
+                let targetSystem: MeasurementSystem = context.useMetric ? .metric : .imperial
                 let converted = convertWeight(weight, to: targetSystem)
                 return SparklineDataPoint(index: index, value: converted)
             case .bodyFat:
@@ -460,8 +501,15 @@ struct MetricChartDataHelper {
                     SparklineDataPoint(index: index, value: $0.value, isEstimated: $0.isInterpolated)
                 }
             case .ffmi:
-                let heightInches = convertHeightToInches(height: profile?.height, heightUnit: profile?.heightUnit)
-                guard let ffmi = MetricsInterpolationService.shared.estimateFFMI(for: metric.date, metrics: metrics, heightInches: heightInches) else {
+                let heightInches = convertHeightToInches(
+                    height: context.profile?.height,
+                    heightUnit: context.profile?.heightUnit
+                )
+                guard let ffmi = MetricsInterpolationService.shared.estimateFFMI(
+                    for: metric.date,
+                    metrics: metrics,
+                    heightInches: heightInches
+                ) else {
                     return nil
                 }
                 return SparklineDataPoint(index: index, value: ffmi.value, isEstimated: ffmi.isInterpolated)
@@ -473,7 +521,7 @@ struct MetricChartDataHelper {
         guard !dataPoints.isEmpty else { return [] }
 
         let finalData: [SparklineDataPoint]
-        if let days, days > 90 {
+        if let days = context.days, days > 90 {
             finalData = downsampleData(dataPoints)
         } else {
             finalData = dataPoints

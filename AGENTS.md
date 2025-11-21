@@ -1,5 +1,7 @@
 # LogYourBody Codebase Guidelines
 
+> **Source of truth**: This document consolidates all AI-assistant rules for LogYourBody (including the former `apps/ios/docs/development/CLAUDE.md` notes and `.windsurf/rules/ios-rules.md`). Update this file whenever process guidance changes so every agent uses a single, canonical reference.
+
 ## Repository Overview
 
 LogYourBody is a comprehensive fitness tracking application with native iOS and web applications. The codebase follows a monorepo structure with shared utilities and independent app implementations.
@@ -17,6 +19,15 @@ LogYourBody/
 └── docs/              # Project documentation
 ```
 
+## Project Context
+
+- Mission: help users monitor weight, body composition, and progress photos with HealthKit integration and Supabase-backed sync.
+- Platforms: Native iOS app (SwiftUI, Swift 5.9+) and Next.js web app share Clerk-based authentication.
+- Key stacks:
+  - **Authentication**: Clerk SDK with browser-based OAuth for Apple Sign In.
+  - **Design System**: iOS 26 Liquid Glass with graceful fallbacks.
+  - **Data**: Core Data for local storage, Supabase for cloud sync, HealthKit for weight and step data.
+
 ## Working with the iOS App
 
 ### Key Directories
@@ -32,7 +43,7 @@ LogYourBody/
 - `LogYourBody.xcodeproj` - Xcode project file
 - `Supabase.xcconfig` - Supabase configuration (not in git)
 - `LogYourBody/Config.xcconfig` - App configuration (not in git)
-- `CLAUDE.md` - iOS-specific AI assistant context
+- `CLAUDE.md` - Legacy iOS-specific AI assistant context (all guidance now mirrored here)
 
 ### Validation Commands
 When making iOS changes, run these commands from `apps/ios/`:
@@ -91,6 +102,12 @@ pnpm build
 - Follow existing patterns in the codebase
 - Use meaningful variable and function names
 - Add comments only when the code isn't self-explanatory
+- Keep each screen/view/controller focused on a single responsibility. If a screen contains distinct sections, repeated patterns, or section-specific state/logic, split it into subviews/components and move non-UI logic into a ViewModel. Use line counts only as guardrails: aim for ≤500 lines per view/controller and ≤40 lines per function; refactor into named components when exceeding those limits. Always reuse existing components instead of re-implementing near-identical UI.
+- Typography: stick to SF Pro / system fonts (or Inter where specified) for a confident, neutral tone.
+- Color palette: blacks, whites, and neutral grays with subtle accent colors reserved for UX cues (progress indicators, toggles, CTA states).
+- Backgrounds: true or near-black Liquid Glass surfaces; ensure text respects AA contrast in light and dark modes.
+- Copywriting: concise, Apple-style language—capitalize sparingly and avoid filler text.
+- Accessibility: test against Dynamic Type, avoid low-contrast combinations, and never rely on color alone for meaning.
 
 ### TypeScript/React (Web)
 - Use TypeScript strict mode
@@ -109,6 +126,7 @@ pnpm build
 - Maintain 60fps scrolling performance
 - Support Dynamic Type for accessibility
 - Test on both iPhone and iPad
+- See the Swift guidelines above for typography, color, copywriting, and accessibility guardrails that were previously maintained in `CLAUDE.md`.
 
 ### Web Design Guidelines
 - Mobile-first responsive design
@@ -152,15 +170,13 @@ pnpm build
 ## Working with AI Agents
 
 ### Context Files
-- Always check `CLAUDE.md` in the iOS directory for iOS-specific context
-- Reference this `AGENTS.md` for general repository guidelines
-- Update context files when making significant architectural changes
+- Reference this `AGENTS.md` for *all* AI-assistant guidance. Other docs (e.g., `CLAUDE.md`, `.windsurf/rules/ios-rules.md`) now simply point back here.
+- Update this file whenever process guidance changes.
 
 ### Best Practices
 1. **Exploration**: Use grep/glob tools to understand code structure before making changes
 2. **Validation**: Always run lint and tests before committing
 3. **Documentation**: Update relevant documentation when changing APIs
-4. **Commits**: Write clear, concise commit messages following conventional commits
 5. **PRs**: Include test results and coverage in PR descriptions
 
 ### Common Tasks
@@ -176,6 +192,15 @@ If the compiler reports that a referenced Swift file or type cannot be found, as
 3. As a last resort, resolve import, module, or path configuration issues.
 
 Never “fix” this by swapping to legacy classes (for example `DashboardOld.swift`), commenting out the new feature, or reverting without explicit user approval. If you genuinely believe reverting is the only option, ask the user first.
+
+## Change Management Discipline (formerly `.windsurf/rules/ios-rules.md`)
+
+- Treat the current project files, build settings, and dependency graph as the single source of truth; never resurrect deleted code or alternate implementations without explicit direction.
+- Before creating a new file/module/component, verify that an equivalent does not already exist. Prefer incremental updates over parallel versions, and ensure new code is fully wired into the runtime flow (routes, DI, targets, etc.).
+- Keep a single active implementation per feature. If you replace a screen or service, update every call site and clearly mark any deprecated code so it is unused.
+- Respect task scope: when asked to adjust a label/metric/endpoint, change only what is required to fulfill that request. Avoid opportunistic refactors or renames unless mandatory for the fix.
+- Favor minimal diffs. Touch the fewest files/lines necessary and avoid unrelated formatting churn. Document in explanations which files changed, how they are used, and whether any previous files became obsolete.
+- On Xcode projects, honor target membership: ensure new files are added to the correct targets, avoid reintroducing files that the project no longer references, and never leave “floating” alternative implementations disconnected from the app.
 
 ## Security Considerations
 

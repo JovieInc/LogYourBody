@@ -145,7 +145,9 @@ struct ChangePasswordView: View {
                     BaseButton(
                         "Update Password",
                         configuration: ButtonConfiguration(
-                            style: isValidForm ? .custom(background: .appPrimary, foreground: .white) : .custom(background: .gray, foreground: .white),
+                            style: isValidForm
+                                ? .custom(background: .appPrimary, foreground: .white)
+                                : .custom(background: .gray, foreground: .white),
                             isLoading: isLoading,
                             isEnabled: isValidForm,
                             fullWidth: true

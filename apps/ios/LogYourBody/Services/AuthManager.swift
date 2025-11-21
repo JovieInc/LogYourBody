@@ -12,6 +12,8 @@ typealias LocalUser = LogYourBody.User  // Disambiguate between Clerk SDK User a
 
 typealias ASPresentationAnchor = UIWindow
 
+typealias AppleCredentialContinuation = CheckedContinuation<ASAuthorizationAppleIDCredential, Error>
+
 enum AuthError: LocalizedError {
     case clerkNotInitialized
     case invalidCredentials
@@ -33,6 +35,11 @@ enum AuthError: LocalizedError {
             return "Failed to sync data: \(reason)"
         }
     }
+}
+
+enum EmailRegistrationStatus {
+    case available
+    case registered
 }
 
 // MARK: - AsyncGate Helper
@@ -672,7 +679,7 @@ class AuthManager: NSObject, ObservableObject {
             let authorizationController = ASAuthorizationController(authorizationRequests: [request])
 
             // Use a continuation to handle the delegate callbacks
-            let appleIDCredential = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) in
+            let appleIDCredential = try await withCheckedThrowingContinuation { (continuation: AppleCredentialContinuation) in
                 let delegate = AppleSignInDelegate(continuation: continuation)
                 authorizationController.delegate = delegate
                 authorizationController.presentationContextProvider = delegate
@@ -948,18 +955,23 @@ class AuthManager: NSObject, ObservableObject {
             }
 
             // Prepare profile data
+            let dateOfBirthString = user.profile?.dateOfBirth.map { date in
+                ISO8601DateFormatter().string(from: date)
+            }
+            let goalWeightString = user.profile?.goalWeight.map { "\($0)" }
+
             let profileData: [String: Any] = [
                 "id": user.id,
                 "email": user.email,
                 "name": user.name ?? NSNull(),
                 "avatar_url": user.avatarUrl ?? NSNull(),
-                "date_of_birth": user.profile?.dateOfBirth != nil ? ISO8601DateFormatter().string(from: user.profile!.dateOfBirth!) : NSNull(),
+                "date_of_birth": dateOfBirthString ?? NSNull(),
                 "gender": user.profile?.gender ?? NSNull(),
                 "weight_unit": user.profile?.goalWeightUnit ?? "kg",
                 "height_unit": user.profile?.heightUnit ?? "cm",
                 "height": user.profile?.height ?? NSNull(),
                 "activity_level": user.profile?.activityLevel ?? NSNull(),
-                "goal": user.profile?.goalWeight != nil ? "\(user.profile!.goalWeight!)" : NSNull(),
+                "goal": goalWeightString ?? NSNull(),
                 "onboarding_completed": user.onboardingCompleted,
                 "updated_at": ISO8601DateFormatter().string(from: Date())
             ]
@@ -1274,7 +1286,12 @@ class AuthManager: NSObject, ObservableObject {
         }
     }
 
-    private func parseDeviceInfo(from session: Any) -> (deviceName: String, deviceType: String, location: String, ipAddress: String) {
+    private func parseDeviceInfo(from session: Any) -> (
+        deviceName: String,
+        deviceType: String,
+        location: String,
+        ipAddress: String
+    ) {
         // In a real implementation, you would parse the session's client info
         // For now, we'll use placeholder data based on the session
 
@@ -1660,7 +1677,9 @@ class AuthManager: NSObject, ObservableObject {
 }
 
 // MARK: - Apple Sign In Delegate
-private class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+private class AppleSignInDelegate: NSObject,
+                                   ASAuthorizationControllerDelegate,
+                                   ASAuthorizationControllerPresentationContextProviding {
     let continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>
 
     init(continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) {
@@ -1668,7 +1687,10 @@ private class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate, 
         super.init()
     }
 
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+    func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithAuthorization authorization: ASAuthorization
+    ) {
         if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
             continuation.resume(returning: appleIDCredential)
         } else {

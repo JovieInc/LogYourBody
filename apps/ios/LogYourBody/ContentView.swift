@@ -9,7 +9,9 @@ struct ContentView: View {
     @EnvironmentObject var revenueCatManager: RevenueCatManager
     @StateObject private var loadingManager: LoadingManager
     private let onboardingStateManager = OnboardingStateManager.shared
+    @State private var currentUserId: String?
     @State private var hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion
+    @State private var lastProfileCompletionSync: Bool?
     @State private var isLoadingComplete = false
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
@@ -19,6 +21,15 @@ struct ContentView: View {
         // We need to initialize LoadingManager with a temporary AuthManager
         // The actual authManager will be injected from environment
         _loadingManager = StateObject(wrappedValue: LoadingManager(authManager: AuthManager.shared))
+    }
+
+    private func applyProfileCompletionIfNeeded(_ completionFlag: Bool?) {
+        guard let completionFlag else { return }
+        guard lastProfileCompletionSync != completionFlag else { return }
+
+        lastProfileCompletionSync = completionFlag
+        onboardingStateManager.updateCompletionStatus(completionFlag)
+        hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
     }
 
     // Check if user profile is complete
@@ -114,14 +125,11 @@ struct ContentView: View {
         .onAppear {
             // Initialize onboarding status
             hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
+            currentUserId = authManager.currentUser?.id
 
             // Fallback: Check profile if UserDefaults doesn't have it
-            if !hasCompletedOnboarding,
-               let profileOnboardingCompleted = authManager.currentUser?.profile?.onboardingCompleted,
-               profileOnboardingCompleted {
-                onboardingStateManager.markCompleted()
-                hasCompletedOnboarding = true
-                // print("✅ ContentView: Synced onboarding status from profile to onboarding manager")
+            if !hasCompletedOnboarding {
+                applyProfileCompletionIfNeeded(authManager.currentUser?.profile?.onboardingCompleted)
             }
 
             // Start loading process
@@ -138,23 +146,27 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: OnboardingStateManager.onboardingStateDidChange)) { _ in
             hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
         }
-        .onChange(of: authManager.isAuthenticated) { _, _ in
-            // print("🔄 Authentication state changed to: \(newValue)")
-            // print("🔄 Should show onboarding: \(shouldShowOnboarding)")
-            // print("🔄 Onboarding completed: \(hasCompletedOnboarding)")
-            // print("🔄 isLoadingComplete: \(isLoadingComplete)")
-            // print("🔄 Current user: \(authManager.currentUser?.email ?? "nil")")
-            // print("🔄 Clerk session: \(authManager.clerkSession?.id ?? "nil")")
+        .onChange(of: authManager.isAuthenticated) { _, newValue in
+            currentUserId = authManager.currentUser?.id
+            if newValue {
+                hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
+            } else {
+                lastProfileCompletionSync = nil
+                if hasCompletedOnboarding {
+                    onboardingStateManager.updateCompletionStatus(false)
+                    hasCompletedOnboarding = false
+                }
+            }
+        }
+        .onChange(of: authManager.currentUser?.id) { oldValue, newValue in
+            guard oldValue != newValue else { return }
+            currentUserId = newValue
+            lastProfileCompletionSync = nil
+            applyProfileCompletionIfNeeded(authManager.currentUser?.profile?.onboardingCompleted)
         }
         .onChange(of: authManager.currentUser?.profile?.onboardingCompleted) { _, newValue in
             // Sync onboarding status from profile when it changes
-            if let profileOnboardingCompleted = newValue {
-                onboardingStateManager.updateCompletionStatus(profileOnboardingCompleted)
-                hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
-                if profileOnboardingCompleted {
-                    // print("✅ ContentView: Synced onboarding status from profile update")
-                }
-            }
+            applyProfileCompletionIfNeeded(newValue)
         }
         .onChange(of: hasCompletedOnboarding) { _, newValue in
             if newValue && isLoadingComplete {

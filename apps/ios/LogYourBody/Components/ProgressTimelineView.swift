@@ -222,7 +222,8 @@ struct ProgressTimelineView: View {
                   let lastDate = bodyMetrics.last?.date else {
                 return
             }
-            dragPosition = dataProvider.dateFromPosition(0.5, from: firstDate, to: lastDate).timeIntervalSince1970 / metric.date.timeIntervalSince1970
+            let midpointDate = dataProvider.dateFromPosition(0.5, from: firstDate, to: lastDate)
+            dragPosition = midpointDate.timeIntervalSince1970 / metric.date.timeIntervalSince1970
             return
         }
 

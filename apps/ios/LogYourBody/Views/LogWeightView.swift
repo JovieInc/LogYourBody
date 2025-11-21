@@ -101,7 +101,10 @@ struct LogWeightView: View {
                                 .cornerRadius(16)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .stroke(focusedField == .weight ? Color.appPrimary : Color.appBorder, lineWidth: focusedField == .weight ? 2 : 1)
+                                        .stroke(
+                                            focusedField == .weight ? Color.appPrimary : Color.appBorder,
+                                            lineWidth: focusedField == .weight ? 2 : 1
+                                        )
                                 )
                                 .onTapGesture {
                                     focusedField = .weight
@@ -146,7 +149,10 @@ struct LogWeightView: View {
                                 .cornerRadius(16)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .stroke(focusedField == .bodyFat ? Color.appPrimary : Color.appBorder, lineWidth: focusedField == .bodyFat ? 2 : 1)
+                                        .stroke(
+                                            focusedField == .bodyFat ? Color.appPrimary : Color.appBorder,
+                                            lineWidth: focusedField == .bodyFat ? 2 : 1
+                                        )
                                 )
                                 .onTapGesture {
                                     focusedField = .bodyFat
@@ -170,7 +176,9 @@ struct LogWeightView: View {
                                 if !weight.isEmpty || !bodyFat.isEmpty {
                                     VStack(spacing: 8) {
                                         if !weight.isEmpty, let weightValue = Double(weight) {
-                                            let convertedWeight = currentSystem.weightUnit == "lbs" ? weightValue * 0.453592 : weightValue
+                                            let convertedWeight = currentSystem.weightUnit == "lbs"
+                                                ? weightValue * 0.453592
+                                                : weightValue
                                             HStack {
                                                 Text("Weight:")
                                                     .foregroundColor(.appTextSecondary)
@@ -345,12 +353,20 @@ struct LogWeightView: View {
                 }
 
                 // Convert weight to kg for storage
-                let weightInKg = weightValue != nil ? (currentSystem.weightUnit == "lbs" ? weightValue! * 0.453592 : weightValue!) : nil
+                let weightInKg = weightValue != nil
+                    ? (
+                        currentSystem.weightUnit == "lbs"
+                            ? weightValue! * 0.453592
+                            : weightValue!
+                    )
+                    : nil
 
                 // Save to HealthKit if authorized
                 if healthKitManager.isAuthorized {
                     if let w = weightValue {
-                        let weightInLbs = currentSystem.weightUnit == "kg" ? w * 2.20462 : w
+                        let weightInLbs = currentSystem.weightUnit == "kg"
+                            ? w * 2.20462
+                            : w
                         try await healthKitManager.saveWeight(weightInLbs, date: Date())
                     }
 
@@ -363,8 +379,14 @@ struct LogWeightView: View {
                 var finalWeight = weightInKg
                 if weightInKg == nil && bodyFatValue != nil, let userId = authManager.currentUser?.id {
                     let fromDate = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-                    let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId, from: fromDate, to: Date())
-                    let recentMetrics = cachedMetrics.compactMap { $0.toBodyMetrics() }.sorted { $0.date > $1.date }
+                    let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(
+                        for: userId,
+                        from: fromDate,
+                        to: Date()
+                    )
+                    let recentMetrics = cachedMetrics
+                        .compactMap { $0.toBodyMetrics() }
+                        .sorted { $0.date > $1.date }
                     finalWeight = recentMetrics.first?.weight
                 }
 
@@ -389,7 +411,11 @@ struct LogWeightView: View {
                 // Save to local storage and sync
                 if let userId = authManager.currentUser?.id {
                     await MainActor.run {
-                        CoreDataManager.shared.saveBodyMetrics(metrics, userId: userId, markAsSynced: false)
+                        CoreDataManager.shared.saveBodyMetrics(
+                            metrics,
+                            userId: userId,
+                            markAsSynced: false
+                        )
                     }
                     RealtimeSyncManager.shared.syncIfNeeded()
                 }

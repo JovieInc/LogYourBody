@@ -2,36 +2,59 @@ import SwiftUI
 
 struct BodyScoreRevealView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
+    @State private var animateScore = false
 
     var body: some View {
-        if let result = viewModel.bodyScoreResult {
-            OnboardingPageTemplate(
-                title: "Your Body Score",
-                subtitle: result.statusTagline,
-                showsBackButton: false
-            ) {
-                VStack(spacing: 24) {
-                    scoreCard(result: result)
+        Group {
+            if let result = viewModel.bodyScoreResult {
+                OnboardingPageTemplate(
+                    title: "Your Body Score",
+                    subtitle: result.statusTagline,
+                    showsBackButton: false
+                ) {
+                    VStack(spacing: 24) {
+                        scoreCard(result: result)
+                            .scaleEffect(animateScore ? 1 : 0.9)
+                            .opacity(animateScore ? 1 : 0)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.75), value: animateScore)
 
-                    statGrid(result: result)
+                        statGrid(result: result)
+                            .opacity(animateScore ? 1 : 0)
+                            .offset(y: animateScore ? 0 : 12)
+                            .animation(.easeOut(duration: 0.4).delay(0.1), value: animateScore)
 
-                    targetCard(result: result)
-                }
-            } footer: {
-                VStack(spacing: 12) {
-                    Button("Save my progress") {
-                        viewModel.goToNextStep()
+                        targetCard(result: result)
+                            .opacity(animateScore ? 1 : 0)
+                            .offset(y: animateScore ? 0 : 16)
+                            .animation(.easeOut(duration: 0.4).delay(0.15), value: animateScore)
                     }
-                    .buttonStyle(OnboardingPrimaryButtonStyle())
+                } footer: {
+                    VStack(spacing: 12) {
+                        Button("Save my progress") {
+                            viewModel.goToNextStep()
+                        }
+                        .buttonStyle(OnboardingPrimaryButtonStyle())
 
-                    Button("Retake inputs") {
-                        viewModel.goBack()
+                        Button("Retake inputs") {
+                            viewModel.goBack()
+                        }
+                        .buttonStyle(OnboardingSecondaryButtonStyle())
                     }
-                    .buttonStyle(OnboardingSecondaryButtonStyle())
                 }
+            } else {
+                BodyScoreLoadingView(viewModel: viewModel)
             }
-        } else {
-            BodyScoreLoadingView(viewModel: viewModel)
+        }
+        .onAppear {
+            guard viewModel.bodyScoreResult != nil else { return }
+            triggerRevealFeedback()
+        }
+        .onChange(of: viewModel.bodyScoreResult) { _, newValue in
+            if newValue != nil {
+                triggerRevealFeedback()
+            } else {
+                animateScore = false
+            }
         }
     }
 
@@ -47,7 +70,16 @@ struct BodyScoreRevealView: View {
         .padding(32)
         .background(
             RoundedRectangle(cornerRadius: 36, style: .continuous)
-                .fill(LinearGradient(colors: [Color.appPrimary, Color.appPrimary.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.appPrimary,
+                            Color.appPrimary.opacity(0.6)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
         )
     }
 
@@ -100,6 +132,13 @@ struct BodyScoreRevealView: View {
                     .foregroundStyle(Color.appTextSecondary)
             }
         }
+    }
+
+    private func triggerRevealFeedback() {
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
+            animateScore = true
+        }
+        HapticManager.shared.successAction()
     }
 }
 

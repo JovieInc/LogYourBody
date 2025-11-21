@@ -15,60 +15,62 @@ struct BodyScoreHealthConfirmationView: View {
         OnboardingPageTemplate(
             title: "Health data synced",
             subtitle: "We grabbed the latest stats from Apple Health. Confirm or edit anything before continuing.",
-            onBack: { viewModel.goBack() }
-        ) {
-            VStack(spacing: 24) {
-                OnboardingCard {
-                    VStack(alignment: .leading, spacing: 16) {
-                        ForEach(metrics) { metric in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: metric.icon)
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(Color.appPrimary)
+            onBack: { viewModel.goBack() },
+            content: {
+                VStack(spacing: 24) {
+                    OnboardingCard {
+                        VStack(alignment: .leading, spacing: 16) {
+                            ForEach(metrics) { metric in
+                                HStack(alignment: .top, spacing: 12) {
+                                    Image(systemName: metric.icon)
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundStyle(Color.appPrimary)
 
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(metric.title.uppercased())
-                                        .font(OnboardingTypography.caption)
-                                        .foregroundStyle(Color.appTextSecondary)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(metric.title.uppercased())
+                                            .font(OnboardingTypography.caption)
+                                            .foregroundStyle(Color.appTextSecondary)
 
-                                    Text(metric.value)
-                                        .font(.system(.title2, design: .rounded).weight(.semibold))
-                                        .foregroundStyle(Color.appText)
+                                        Text(metric.value)
+                                            .font(.system(.title2, design: .rounded).weight(.semibold))
+                                            .foregroundStyle(Color.appText)
 
-                                    Text(metric.subtitle)
-                                        .font(OnboardingTypography.body)
-                                        .foregroundStyle(Color.appTextSecondary)
+                                        Text(metric.subtitle)
+                                            .font(OnboardingTypography.body)
+                                            .foregroundStyle(Color.appTextSecondary)
+                                    }
+
+                                    Spacer()
                                 }
 
-                                Spacer()
-                            }
-
-                            if metric.id != metrics.last?.id {
-                                Divider()
-                                    .overlay(Color.appBorder.opacity(0.4))
+                                if metric.id != metrics.last?.id {
+                                    Divider()
+                                        .overlay(Color.appBorder.opacity(0.4))
+                                }
                             }
                         }
                     }
-                }
 
-                if let note = snapshotNote {
-                    OnboardingCaptionText(text: note, alignment: .leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let note = snapshotNote {
+                        OnboardingCaptionText(text: note, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            },
+            footer: {
+                VStack(spacing: 12) {
+                    Button("Looks good") {
+                        viewModel.goToNextStep()
+                    }
+                    .buttonStyle(OnboardingPrimaryButtonStyle())
+
+                    Button("I'd rather enter manually") {
+                        viewModel.skipHealthKit()
+                    }
+                    .buttonStyle(OnboardingSecondaryButtonStyle())
                 }
             }
-        } footer: {
-            VStack(spacing: 12) {
-                Button("Looks good") {
-                    viewModel.goToNextStep()
-                }
-                .buttonStyle(OnboardingPrimaryButtonStyle())
-
-                Button("I'd rather enter manually") {
-                    viewModel.skipHealthKit()
-                }
-                .buttonStyle(OnboardingSecondaryButtonStyle())
-            }
-        }
+        )
     }
 
     private var metrics: [Metric] {
@@ -122,21 +124,31 @@ struct BodyScoreHealthConfirmationView: View {
     }
 
     private var formattedHeight: String? {
-        guard let centimeters = viewModel.bodyScoreInput.healthSnapshot.heightCm else { return nil }
-        let inches = centimeters / 2.54
-        let feet = Int(inches) / 12
-        let remainingInches = Int(round(inches)) % 12
-        return "\(feet)' \(remainingInches)\" (\(Int(round(centimeters))) cm)"
+        let centimeters = viewModel.bodyScoreInput.healthSnapshot.heightCm
+            ?? viewModel.bodyScoreInput.height.inCentimeters
+
+        guard let centimeters else { return nil }
+
+        switch preferredMeasurementSystem {
+        case .metric:
+            return "\(Int(round(centimeters))) cm (\(imperialHeightString(fromCentimeters: centimeters)))"
+        case .imperial:
+            let imperial = imperialHeightString(fromCentimeters: centimeters)
+            return "\(imperial) (\(Int(round(centimeters))) cm)"
+        }
     }
 
     private var formattedWeight: String? {
         if let kg = viewModel.bodyScoreInput.healthSnapshot.weightKg {
-            let pounds = kg * 2.2046226218
-            return String(format: "%.0f lbs", pounds)
+            return formatWeight(fromKilograms: kg)
         }
 
-        if let pounds = viewModel.bodyScoreInput.weight.inPounds {
-            return String(format: "%.0f lbs", pounds)
+        if let stored = storedWeightValue {
+            return formatWeight(value: stored, unit: preferredWeightUnit)
+        }
+
+        if let fallbackKg = viewModel.bodyScoreInput.weight.inKilograms {
+            return formatWeight(fromKilograms: fallbackKg)
         }
 
         return nil
@@ -160,6 +172,49 @@ struct BodyScoreHealthConfirmationView: View {
         }
 
         return "You can update these anytime from Apple Health. We only read what you allow."
+    }
+
+    private var preferredMeasurementSystem: MeasurementSystem {
+        viewModel.bodyScoreInput.measurementPreference
+    }
+
+    private var preferredWeightUnit: WeightUnit {
+        viewModel.weightUnit
+    }
+
+    private var storedWeightValue: Double? {
+        switch preferredWeightUnit {
+        case .kilograms:
+            return viewModel.bodyScoreInput.weight.inKilograms
+        case .pounds:
+            return viewModel.bodyScoreInput.weight.inPounds
+        }
+    }
+
+    private func imperialHeightString(fromCentimeters centimeters: Double) -> String {
+        let inchesTotal = centimeters / 2.54
+        let feet = Int(inchesTotal) / 12
+        let inches = Int(round(inchesTotal)) % 12
+        return "\(feet)' \(inches)\""
+    }
+
+    private func formatWeight(fromKilograms kilograms: Double) -> String {
+        switch preferredWeightUnit {
+        case .kilograms:
+            return formatWeight(value: kilograms, unit: .kilograms)
+        case .pounds:
+            return formatWeight(value: kilograms * 2.2046226218, unit: .pounds)
+        }
+    }
+
+    private func formatWeight(value: Double, unit: WeightUnit) -> String {
+        let rounded = value.rounded()
+        switch unit {
+        case .kilograms:
+            return String(format: "%.0f kg", rounded)
+        case .pounds:
+            return String(format: "%.0f lbs", rounded)
+        }
     }
 }
 

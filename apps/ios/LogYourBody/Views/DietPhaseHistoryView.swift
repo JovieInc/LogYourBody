@@ -14,15 +14,47 @@ struct DietPhaseHistoryView: View {
     @EnvironmentObject var authManager: AuthManager
 
     // Sample data for now
-    private let samplePhases: [(phase: PhaseType, startDate: Date, endDate: Date, startWeight: Double, endWeight: Double, startBodyFat: Double?, endBodyFat: Double?)] = [
+    private let samplePhases: [(
+        phase: PhaseType,
+        startDate: Date,
+        endDate: Date,
+        startWeight: Double,
+        endWeight: Double,
+        startBodyFat: Double?,
+        endBodyFat: Double?
+    )] = [
         // Current maintenance phase (ongoing)
-        (.maintenance, Date().addingTimeInterval(-60 * 60 * 24 * 14), Date(), 180.5, 181.2, 15.2, 15.0),
+        (
+            .maintenance,
+            Date().addingTimeInterval(-60 * 60 * 24 * 14),
+            Date(),
+            180.5,
+            181.2,
+            15.2,
+            15.0
+        ),
 
         // Recent cut phase (completed)
-        (.cut, Date().addingTimeInterval(-60 * 60 * 24 * 98), Date().addingTimeInterval(-60 * 60 * 24 * 14), 195.0, 180.5, 20.5, 15.2),
+        (
+            .cut,
+            Date().addingTimeInterval(-60 * 60 * 24 * 98),
+            Date().addingTimeInterval(-60 * 60 * 24 * 14),
+            195.0,
+            180.5,
+            20.5,
+            15.2
+        ),
 
         // Previous bulk phase (completed)
-        (.bulk, Date().addingTimeInterval(-60 * 60 * 24 * 154), Date().addingTimeInterval(-60 * 60 * 24 * 98), 175.0, 195.0, 14.0, 20.5)
+        (
+            .bulk,
+            Date().addingTimeInterval(-60 * 60 * 24 * 154),
+            Date().addingTimeInterval(-60 * 60 * 24 * 98),
+            175.0,
+            195.0,
+            14.0,
+            20.5
+        )
     ]
 
     var body: some View {

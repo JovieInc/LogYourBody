@@ -7,29 +7,31 @@ struct BodyScoreHeightView: View {
     var body: some View {
         OnboardingPageTemplate(
             title: "How tall are you?",
-            subtitle: "Height helps us normalize lean mass and FFMI.",
-            onBack: { viewModel.goBack() }
-        ) {
-            VStack(spacing: 28) {
-                OnboardingSegmentedControl(options: HeightUnit.allCases, selection: heightUnitBinding)
+            subtitle: "Height helps us normalize your Body Score.",
+            onBack: { viewModel.goBack() },
+            content: {
+                VStack(spacing: 28) {
+                    OnboardingSegmentedControl(options: HeightUnit.allCases, selection: heightUnitBinding)
 
-                if viewModel.heightUnit == .centimeters {
-                    centimetersInput
-                } else {
-                    imperialInput
+                    if viewModel.heightUnit == .centimeters {
+                        centimetersInput
+                    } else {
+                        imperialInput
+                    }
+
+                    helperCard
                 }
-
-                helperCard
+            },
+            footer: {
+                Button("Continue") {
+                    viewModel.persistHeightEntry()
+                    viewModel.goToNextStep()
+                }
+                .buttonStyle(OnboardingPrimaryButtonStyle())
+                .disabled(!viewModel.canContinueHeight)
+                .opacity(continueButtonOpacity)
             }
-        } footer: {
-            Button("Continue") {
-                viewModel.persistHeightEntry()
-                viewModel.goToNextStep()
-            }
-            .buttonStyle(OnboardingPrimaryButtonStyle())
-            .disabled(!viewModel.canContinueHeight)
-            .opacity(viewModel.canContinueHeight ? 1 : 0.4)
-        }
+        )
     }
 
     private var heightUnitBinding: Binding<HeightUnit> {
@@ -37,6 +39,10 @@ struct BodyScoreHeightView: View {
             get: { viewModel.heightUnit },
             set: { viewModel.setHeightUnit($0) }
         )
+    }
+
+    private var continueButtonOpacity: Double {
+        viewModel.canContinueHeight ? 1 : 0.4
     }
 
     private var centimetersInput: some View {
@@ -82,6 +88,9 @@ struct BodyScoreHeightView: View {
                 }
                 .pickerStyle(.wheel)
                 .frame(maxWidth: .infinity)
+                .onChange(of: viewModel.heightFeet) { _ in
+                    HapticManager.shared.selection()
+                }
 
                 Picker("Inches", selection: Binding(
                     get: { viewModel.heightInches },
@@ -93,6 +102,9 @@ struct BodyScoreHeightView: View {
                 }
                 .pickerStyle(.wheel)
                 .frame(maxWidth: .infinity)
+                .onChange(of: viewModel.heightInches) { _ in
+                    HapticManager.shared.selection()
+                }
             }
             .frame(height: 160)
             .background(
@@ -118,9 +130,12 @@ struct BodyScoreHeightView: View {
                     .font(OnboardingTypography.headline)
                     .foregroundStyle(Color.appText)
 
-                Text("Height anchors fat-free mass index (FFMI) and keeps comparisons fair across frames.")
+                Text("Height anchors lean mass so taller frames stay comparable.")
                     .font(OnboardingTypography.body)
                     .foregroundStyle(Color.appTextSecondary)
+
+                FFMIInfoLink()
+                    .padding(.top, 4)
             }
         }
     }

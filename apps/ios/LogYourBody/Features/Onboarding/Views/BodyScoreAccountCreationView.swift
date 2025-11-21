@@ -9,39 +9,48 @@ struct BodyScoreAccountCreationView: View {
         OnboardingPageTemplate(
             title: "Create your account",
             subtitle: "Use your email and a secure password to save progress.",
-            onBack: { viewModel.goBack() }
-        ) {
-            VStack(spacing: 24) {
-                summaryCard
-                secureField
-                passwordRules
-            }
-        } footer: {
-            Button(action: submit) {
-                if viewModel.isCreatingAccount {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            onBack: { viewModel.goBack() },
+            content: {
+                VStack(spacing: 24) {
+                    summaryCard
+                    secureField
+                    passwordRules
+                }
+            },
+            footer: {
+                Button(action: submit) {
+                    if viewModel.isCreatingAccount {
+                        VStack(spacing: 8) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            if let status = viewModel.accountCreationStatusMessage {
+                                Text(status)
+                                    .font(OnboardingTypography.caption)
+                                    .foregroundStyle(Color.white.opacity(0.8))
+                            }
+                        }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                } else {
-                    Text("Create account")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
+                    } else {
+                        Text("Create account")
+                            .font(.system(size: 18, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                    }
+                }
+                .buttonStyle(OnboardingPrimaryButtonStyle())
+                .disabled(!viewModel.canContinueAccountCreation || viewModel.isCreatingAccount)
+                .opacity(viewModel.canContinueAccountCreation ? 1 : 0.4)
+
+                if let error = viewModel.accountCreationError {
+                    Text(error)
+                        .font(OnboardingTypography.caption)
+                        .foregroundStyle(Color.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 8)
                 }
             }
-            .buttonStyle(OnboardingPrimaryButtonStyle())
-            .disabled(!viewModel.canContinueAccountCreation || viewModel.isCreatingAccount)
-            .opacity(viewModel.canContinueAccountCreation ? 1 : 0.4)
-
-            if let error = viewModel.accountCreationError {
-                Text(error)
-                    .font(OnboardingTypography.caption)
-                    .foregroundStyle(Color.red)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 8)
-            }
-        }
+        )
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 passwordFieldFocused = true
