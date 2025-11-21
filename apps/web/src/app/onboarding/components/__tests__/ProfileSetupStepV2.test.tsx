@@ -24,17 +24,21 @@ const mockValidData = {
   gender: ''
 }
 
+const mockUseOnboarding = useOnboarding as jest.MockedFunction<typeof useOnboarding>
+const mockUseMediaQuery = useMediaQuery as jest.MockedFunction<typeof useMediaQuery>
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>
+
 describe('ProfileSetupStepV2', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-      ; (useOnboarding as jest.Mock).mockReturnValue({
-        data: {},
-        updateData: mockUpdateData,
-        nextStep: mockNextStep,
-        previousStep: mockPreviousStep
-      })
-      ; (useMediaQuery as jest.Mock).mockReturnValue(false) // Desktop by default
-      ; (useAuth as jest.Mock).mockReturnValue({ user: null })
+    mockUseOnboarding.mockReturnValue({
+      data: {},
+      updateData: mockUpdateData,
+      nextStep: mockNextStep,
+      previousStep: mockPreviousStep
+    })
+    mockUseMediaQuery.mockReturnValue(false) // Desktop by default
+    mockUseAuth.mockReturnValue({ user: null })
   })
 
   describe('Step Flow', () => {
@@ -69,7 +73,7 @@ describe('ProfileSetupStepV2', () => {
 
     it('should show Complete button on last step', async () => {
       // Provide data that makes all steps valid
-      ; (useOnboarding as jest.Mock).mockReturnValue({
+      mockUseOnboarding.mockReturnValue({
         data: {
           fullName: 'John Doe',
           dateOfBirth: '1990-01-01',
@@ -173,7 +177,7 @@ describe('ProfileSetupStepV2', () => {
 
   describe('Date of Birth Step - Mobile', () => {
     beforeEach(async () => {
-      ; (useMediaQuery as jest.Mock).mockReturnValue(true) // Mobile view
+      mockUseMediaQuery.mockReturnValue(true) // Mobile view
 
       render(<ProfileSetupStepV2 />)
 
@@ -201,7 +205,7 @@ describe('ProfileSetupStepV2', () => {
 
   describe('Height Step', () => {
     beforeEach(async () => {
-      ; (useOnboarding as jest.Mock).mockReturnValue({
+      mockUseOnboarding.mockReturnValue({
         data: { ...mockValidData },
         updateData: mockUpdateData,
         nextStep: mockNextStep,
@@ -237,7 +241,7 @@ describe('ProfileSetupStepV2', () => {
 
   describe('Gender Step', () => {
     beforeEach(async () => {
-      ; (useOnboarding as jest.Mock).mockReturnValue({
+      mockUseOnboarding.mockReturnValue({
         data: { ...mockValidData },
         updateData: mockUpdateData,
         nextStep: mockNextStep,
@@ -331,7 +335,7 @@ describe('ProfileSetupStepV2', () => {
 
   describe('Mobile Responsiveness', () => {
     beforeEach(() => {
-      ; (useMediaQuery as jest.Mock).mockReturnValue(true) // Mobile view
+      mockUseMediaQuery.mockReturnValue(true) // Mobile view
     })
 
     it('should show mobile-appropriate text', () => {
@@ -344,21 +348,20 @@ describe('ProfileSetupStepV2', () => {
       render(<ProfileSetupStepV2 />)
 
       const firstNameInput = screen.getByPlaceholderText('First name')
-      const lastNameInput = screen.getByPlaceholderText('Last name')
       expect(firstNameInput).toHaveClass('text-base')
       expect(firstNameInput).toHaveClass('h-12')
     })
 
     it('prefers existing onboarding fullName over Clerk user data', () => {
-      ; (useAuth as jest.Mock).mockReturnValue({
+      mockUseAuth.mockReturnValue({
         user: { firstName: 'ClerkFirst', lastName: 'ClerkLast' }
       })
-        ; (useOnboarding as jest.Mock).mockReturnValue({
-          data: { fullName: 'Existing User' },
-          updateData: mockUpdateData,
-          nextStep: mockNextStep,
-          previousStep: mockPreviousStep
-        })
+      mockUseOnboarding.mockReturnValue({
+        data: { fullName: 'Existing User' },
+        updateData: mockUpdateData,
+        nextStep: mockNextStep,
+        previousStep: mockPreviousStep
+      })
 
       render(<ProfileSetupStepV2 />)
 
@@ -366,3 +369,4 @@ describe('ProfileSetupStepV2', () => {
       expect(screen.getByPlaceholderText('Last name')).toHaveValue('User')
     })
   })
+})

@@ -1,18 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
+interface TestResult {
+  success: boolean
+  [key: string]: unknown
+}
+
+type TestResults = Record<string, TestResult>
+
 export default function ComprehensiveTestPage() {
-  const [testResults, setTestResults] = useState<Record<string, any>>({})
+  const [testResults, setTestResults] = useState<TestResults>({})
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
-  const runTests = async () => {
+  const runTests = useCallback(async () => {
     setLoading(true)
-    const results: Record<string, any> = {}
+    const results: TestResults = {}
 
     // Test 1: Check authentication status
     try {
@@ -110,11 +117,11 @@ export default function ComprehensiveTestPage() {
 
     setTestResults(results)
     setLoading(false)
-  }
+  }, [supabase])
 
   useEffect(() => {
     runTests()
-  }, [])
+  }, [runTests])
 
   return (
     <div className="container mx-auto py-8 px-4">

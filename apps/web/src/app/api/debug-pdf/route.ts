@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+type DebugMethodResult = Record<string, unknown>
+
+interface DebugPdfResults {
+  filename: string
+  fileSize: number
+  methods: Record<string, DebugMethodResult>
+}
+
 // Debug endpoint to see what text is extracted from PDF
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +21,7 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer())
     
     // Try different methods to extract text
-    const results: any = {
+    const results: DebugPdfResults = {
       filename: file.name,
       fileSize: file.size,
       methods: {}

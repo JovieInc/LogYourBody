@@ -9,11 +9,19 @@ import { uploadToStorage, ensurePublicUrl } from '@/utils/storage-utils'
 import { createClient } from '@/lib/supabase/client'
 import { Upload, Image as ImageIcon, CheckCircle, XCircle } from 'lucide-react'
 
+interface UploadResult {
+  uploadedUrl: string
+  correctedUrl: string
+  retrievedUrl: string
+  metricsId: string
+  fileName: string
+}
+
 export default function TestPhotoUploadPage() {
   const { user } = useAuth()
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
-  const [uploadResult, setUploadResult] = useState<any>(null)
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

@@ -22,53 +22,75 @@ jest.mock('@/hooks/use-toast', () => ({
 }))
 
 // Mock lodash debounce to execute immediately in tests
-jest.mock('lodash', () => ({
-  ...jest.requireActual('lodash'),
-  debounce: (fn: any) => {
-    fn.cancel = jest.fn()
-    fn.flush = jest.fn()
-    return fn
+jest.mock('lodash', () => {
+  const actual = jest.requireActual('lodash')
+  return {
+    ...actual,
+    debounce: <T extends (...args: unknown[]) => unknown>(fn: T) => {
+      const debounced = ((...args: Parameters<T>) => fn(...args)) as T & {
+        cancel: jest.Mock
+        flush: jest.Mock
+      }
+      debounced.cancel = jest.fn()
+      debounced.flush = jest.fn()
+      return debounced
+    }
   }
-}))
+})
+
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement>
+type DivProps = React.HTMLAttributes<HTMLDivElement>
+type ParagraphProps = React.HTMLAttributes<HTMLParagraphElement>
+type HeadingProps = React.HTMLAttributes<HTMLHeadingElement>
+type InputProps = React.InputHTMLAttributes<HTMLInputElement>
+type LabelProps = React.LabelHTMLAttributes<HTMLLabelElement>
+type SpanProps = React.HTMLAttributes<HTMLSpanElement>
+type ImgProps = React.ImgHTMLAttributes<HTMLImageElement>
+interface SelectProps extends DivProps {
+  onValueChange?: (value: string) => void
+}
+interface WheelPickerProps extends DivProps {
+  onSelect?: (value: number | string) => void
+}
 
 // Mock UI components
 jest.mock('@/components/ui/button', () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>
+  Button: ({ children, ...props }: React.PropsWithChildren<ButtonProps>) => <button {...props}>{children}</button>
 }))
 jest.mock('@/components/ui/card', () => ({
-  Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardDescription: ({ children, ...props }: any) => <p {...props}>{children}</p>,
-  CardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardTitle: ({ children, ...props }: any) => <h3 {...props}>{children}</h3>
+  Card: ({ children, ...props }: React.PropsWithChildren<DivProps>) => <div {...props}>{children}</div>,
+  CardContent: ({ children, ...props }: React.PropsWithChildren<DivProps>) => <div {...props}>{children}</div>,
+  CardDescription: ({ children, ...props }: React.PropsWithChildren<ParagraphProps>) => <p {...props}>{children}</p>,
+  CardHeader: ({ children, ...props }: React.PropsWithChildren<DivProps>) => <div {...props}>{children}</div>,
+  CardTitle: ({ children, ...props }: React.PropsWithChildren<HeadingProps>) => <h3 {...props}>{children}</h3>
 }))
 jest.mock('@/components/ui/input', () => ({
-  Input: (props: any) => <input {...props} />
+  Input: (props: InputProps) => <input {...props} />
 }))
 jest.mock('@/components/ui/label', () => ({
-  Label: ({ children, ...props }: any) => <label {...props}>{children}</label>
+  Label: ({ children, ...props }: React.PropsWithChildren<LabelProps>) => <label {...props}>{children}</label>
 }))
 jest.mock('@/components/ui/select', () => ({
-  Select: ({ children, onValueChange, ...props }: any) => <div {...props}>{children}</div>,
-  SelectContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SelectItem: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SelectTrigger: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  SelectValue: ({ children, ...props }: any) => <span {...props}>{children}</span>
+  Select: ({ children, ...props }: React.PropsWithChildren<SelectProps>) => <div {...props}>{children}</div>,
+  SelectContent: ({ children, ...props }: React.PropsWithChildren<DivProps>) => <div {...props}>{children}</div>,
+  SelectItem: ({ children, ...props }: React.PropsWithChildren<DivProps>) => <div {...props}>{children}</div>,
+  SelectTrigger: ({ children, ...props }: React.PropsWithChildren<ButtonProps>) => <button {...props}>{children}</button>,
+  SelectValue: ({ children, ...props }: React.PropsWithChildren<SpanProps>) => <span {...props}>{children}</span>
 }))
 jest.mock('@/components/ui/avatar', () => ({
-  Avatar: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  AvatarFallback: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  AvatarImage: ({ src, alt, ...props }: any) => <img src={src} alt={alt} {...props} />
+  Avatar: ({ children, ...props }: React.PropsWithChildren<DivProps>) => <div {...props}>{children}</div>,
+  AvatarFallback: ({ children, ...props }: React.PropsWithChildren<DivProps>) => <div {...props}>{children}</div>,
+  AvatarImage: ({ src, alt, ...props }: ImgProps) => <img src={src} alt={alt} {...props} />
 }))
 jest.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  DialogContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  DialogHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  DialogTitle: ({ children, ...props }: any) => <h2 {...props}>{children}</h2>
+  Dialog: ({ children, ...props }: React.PropsWithChildren<DivProps>) => <div {...props}>{children}</div>,
+  DialogContent: ({ children, ...props }: React.PropsWithChildren<DivProps>) => <div {...props}>{children}</div>,
+  DialogHeader: ({ children, ...props }: React.PropsWithChildren<DivProps>) => <div {...props}>{children}</div>,
+  DialogTitle: ({ children, ...props }: React.PropsWithChildren<HeadingProps>) => <h2 {...props}>{children}</h2>
 }))
 jest.mock('@/components/ui/wheel-picker', () => ({
-  HeightWheelPicker: ({ onSelect, ...props }: any) => <div {...props}>Height Picker</div>,
-  DateWheelPicker: ({ onSelect, ...props }: any) => <div {...props}>Date Picker</div>
+  HeightWheelPicker: ({ ...props }: WheelPickerProps) => <div {...props}>Height Picker</div>,
+  DateWheelPicker: ({ ...props }: WheelPickerProps) => <div {...props}>Date Picker</div>
 }))
 jest.mock('@/utils/pravatar-utils', () => ({
   getProfileAvatarUrl: (email: string) => `https://example.com/avatar/${email}`,
@@ -88,7 +110,7 @@ jest.mock('lucide-react', () => ({
 // Mock next/link
 jest.mock('next/link', () => ({
   __esModule: true,
-  default: ({ children, ...props }: any) => <a {...props}>{children}</a>
+  default: ({ children, ...props }: React.PropsWithChildren<React.AnchorHTMLAttributes<HTMLAnchorElement>>) => <a {...props}>{children}</a>
 }))
 
 const mockUser = {

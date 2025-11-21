@@ -9,12 +9,39 @@ import { useAuth } from '@/contexts/ClerkAuthContext'
 import { toast } from '@/hooks/use-toast'
 import { Upload, CheckCircle, XCircle } from 'lucide-react'
 
+interface BucketInfo {
+  id: string
+  [key: string]: unknown
+}
+
+interface BucketTestResult {
+  success: boolean
+  buckets?: BucketInfo[]
+  photosBucketExists?: boolean
+  photosBucketDetails?: BucketInfo
+  error?: unknown
+}
+
+type UploadTestResult =
+  | {
+      success: true
+      publicUrl: string
+      fileName: string
+      bucketTest: BucketTestResult
+    }
+  | {
+      success: false
+      error: string
+      errorDetails: unknown
+      bucketTest?: BucketTestResult
+    }
+
 export default function TestStoragePage() {
   const { user } = useAuth()
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadResult, setUploadResult] = useState<any>(null)
+  const [uploadResult, setUploadResult] = useState<UploadTestResult | null>(null)
 
-  const testBucketCreation = async () => {
+  const testBucketCreation = async (): Promise<BucketTestResult> => {
     try {
       const supabase = createClient()
       const { data, error } = await supabase.storage.listBuckets()
@@ -31,7 +58,7 @@ export default function TestStoragePage() {
         success: true,
         buckets: data,
         photosBucketExists: !!photosBucket,
-        photosBucketDetails: photosBucket
+        photosBucketDetails: photosBucket ?? undefined
       }
     } catch (error) {
       console.error('Bucket test error:', error)

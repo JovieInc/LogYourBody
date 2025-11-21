@@ -65,8 +65,7 @@ export function useRealtimeSync(): UseRealtimeSyncReturn {
 
 // Hook for components that need to track specific data changes
 export function useRealtimeData<T>(
-  dataFetcher: () => Promise<T>,
-  dependencies: any[] = []
+  dataFetcher: () => Promise<T>
 ) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,7 +87,7 @@ export function useRealtimeData<T>(
 
   useEffect(() => {
     fetchData();
-  }, [...dependencies, realtimeConnected]);
+  }, [fetchData, realtimeConnected]);
 
   // Subscribe to realtime updates
   useEffect(() => {

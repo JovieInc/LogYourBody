@@ -1,25 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/ClerkAuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
 
 export default function DebugAuthPage() {
   const { user, session, loading: authLoading } = useAuth()
-  const [supabaseUser, setSupabaseUser] = useState<any>(null)
+  const [supabaseUser, setSupabaseUser] = useState<User | null>(null)
   const [isChecking, setIsChecking] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       setIsChecking(true)
       const { data: { user }, error } = await supabase.auth.getUser()
@@ -28,12 +25,16 @@ export default function DebugAuthPage() {
       } else {
         setSupabaseUser(user)
       }
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to check auth')
     } finally {
       setIsChecking(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
 
   const signOut = async () => {
     await supabase.auth.signOut()

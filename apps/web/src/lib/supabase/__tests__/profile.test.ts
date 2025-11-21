@@ -11,7 +11,17 @@ jest.mock('../client', () => ({
 }))
 
 describe('Profile API', () => {
-  const mockSupabase: any = {
+  type SupabaseResponse = Promise<{ data: unknown; error: unknown }>
+  interface SupabaseMock {
+    from: jest.Mock<SupabaseMock, [string]>
+    select: jest.Mock<SupabaseMock, [string]>
+    eq: jest.Mock<SupabaseMock, [string, unknown]>
+    single: jest.Mock<SupabaseResponse, []>
+    update: jest.Mock<SupabaseMock, [Record<string, unknown>]>
+    insert: jest.Mock<SupabaseMock, [Record<string, unknown>]>
+  }
+
+  const mockSupabase: SupabaseMock = {
     from: jest.fn(),
     select: jest.fn(),
     eq: jest.fn(),

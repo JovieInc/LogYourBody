@@ -31,12 +31,14 @@ import { uploadToStorage } from '@/utils/storage-utils'
 
 type FileType = 'image' | 'pdf' | 'csv' | 'unknown'
 
+type WeightUnit = 'kg' | 'lbs'
+
 interface ParsedData {
   type: 'weight' | 'body_composition' | 'photos'
   entries: Array<{
     date: string
     weight?: number
-    weight_unit?: string
+    weight_unit?: WeightUnit
     body_fat_percentage?: number
     muscle_mass?: number
     waist?: number
@@ -196,7 +198,8 @@ export default function ImportPage() {
 
   const parseSpreadsheet = async (file: File): Promise<ParsedData | null> => {
     try {
-      let data: any[][] = []
+      type SpreadsheetCell = string | number | boolean | Date | null | undefined
+      let data: SpreadsheetCell[][] = []
 
       if (file.name.endsWith('.csv')) {
         // Parse CSV
@@ -212,19 +215,19 @@ export default function ImportPage() {
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
         const sheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[sheetName]
-        data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false }) as any[][]
+        data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false }) as SpreadsheetCell[][]
       }
       
       if (data.length < 2) return null
       
       const headers = data[0].map(h => String(h).toLowerCase())
-      const entries = []
+      const entries: ParsedData['entries'] = []
       
       for (let i = 1; i < data.length; i++) {
         const row = data[i]
         if (!row || row.every(cell => !cell)) continue // Skip empty rows
         
-        const entry: any = {}
+        const entry: Partial<ParsedData['entries'][number]> = {}
         
         headers.forEach((header, index) => {
           const value = row[index]
@@ -259,7 +262,16 @@ export default function ImportPage() {
         })
         
         if (entry.date && (entry.weight || entry.body_fat_percentage)) {
-          entries.push(entry)
+          entries.push({
+            date: entry.date,
+            weight: entry.weight,
+            weight_unit: entry.weight_unit,
+            body_fat_percentage: entry.body_fat_percentage,
+            muscle_mass: entry.muscle_mass,
+            waist: entry.waist,
+            hip: entry.hip,
+            notes: entry.notes
+          })
         }
       }
       

@@ -9,7 +9,7 @@ export default function DownloadPage() {
   useEffect(() => {
     // Detect user's platform and redirect accordingly
     const userAgent = navigator.userAgent || navigator.vendor
-    const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !('MSStream' in window)
     const isAndroid = /android/i.test(userAgent)
 
     if (isIOS) {

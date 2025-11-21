@@ -35,7 +35,8 @@ export async function parsePDFWithPdfJs(arrayBuffer: ArrayBuffer): Promise<strin
       const page = await pdf.getPage(i)
       const textContent = await page.getTextContent()
       const pageText = textContent.items
-        .map((item: any) => item.str)
+        .filter((item): item is { str: string } => typeof (item as { str?: unknown }).str === 'string')
+        .map((item) => item.str)
         .join(' ')
       fullText += pageText + '\n'
     }

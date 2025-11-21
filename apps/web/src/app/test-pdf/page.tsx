@@ -6,9 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from '@/hooks/use-toast'
 import { FileText, Upload, CheckCircle, XCircle } from 'lucide-react'
 
+type PdfParseResult =
+  | { success: true; data: unknown; filename: string }
+  | { success: false; error: string; errorDetails?: unknown }
+
 export default function TestPDFPage() {
   const [isProcessing, setIsProcessing] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<PdfParseResult | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

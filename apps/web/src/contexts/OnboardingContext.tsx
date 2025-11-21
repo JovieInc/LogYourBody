@@ -5,7 +5,19 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from './ClerkAuthContext'
 import { formatDateForDB } from '@/utils/date-utils'
 
-interface OnboardingData {
+export interface DexaScan {
+  id?: string
+  date: string
+  weight?: number
+  weight_unit?: 'kg' | 'lbs'
+  body_fat_percentage?: number
+  muscle_mass?: number
+  bone_mass?: number
+  source?: string
+  [key: string]: unknown
+}
+
+export interface OnboardingData {
   // DEXA scan data
   weight?: number
   bodyFatPercentage?: number
@@ -15,10 +27,10 @@ interface OnboardingData {
   scanDate?: string
   
   // Multiple scans data
-  extractedScans?: any[]
+  extractedScans?: DexaScan[]
   scanCount?: number
   filename?: string
-  confirmedScans?: any[]
+  confirmedScans?: DexaScan[]
   selectedScanCount?: number
   
   // Profile data

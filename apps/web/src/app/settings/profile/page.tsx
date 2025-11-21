@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/ClerkAuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { getProfile, updateProfile } from '@/lib/supabase/profile'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,7 +26,7 @@ import { format, parseISO } from 'date-fns'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 export default function ProfileSettingsPage() {
-  const { user, loading, uploadProfileImage, deleteProfileImage } = useAuth()
+  const { user, loading, uploadProfileImage } = useAuth()
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isSaving, setIsSaving] = useState(false)

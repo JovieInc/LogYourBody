@@ -17,11 +17,21 @@ interface SyncState {
   error?: string;
 }
 
+type SyncTable = 'body_metrics' | 'user_profiles' | 'daily_metrics' | 'weight_logs';
+
+interface WeightLogRecord {
+  id: string;
+  user_id: string;
+  [key: string]: unknown;
+}
+
+type SyncableRecord = BodyMetrics | UserProfile | DailyMetrics | WeightLogRecord | Record<string, unknown>;
+
 interface QueuedChange {
   id: string;
-  table: 'body_metrics' | 'user_profiles' | 'daily_metrics' | 'weight_logs';
+  table: SyncTable;
   operation: 'INSERT' | 'UPDATE' | 'DELETE';
-  data: any;
+  data: SyncableRecord;
   timestamp: Date;
   retryCount: number;
 }
@@ -154,8 +164,8 @@ export class RealtimeSyncManager {
   }
 
   private async handleRealtimeChange(
-    table: string,
-    payload: RealtimePostgresChangesPayload<any>
+    table: SyncTable,
+    payload: RealtimePostgresChangesPayload<Record<string, unknown>>
   ) {
     // Skip if this change originated from our own sync
     // TODO: Add sync_id tracking to prevent echo
@@ -179,25 +189,25 @@ export class RealtimeSyncManager {
     }
   }
 
-  private async handleRealtimeInsert(table: string, data: any) {
+  private async handleRealtimeInsert(table: SyncTable, data: SyncableRecord) {
     if (!data) return;
 
     switch (table) {
       case 'body_metrics':
-        await indexedDB.saveBodyMetrics({ ...data, syncStatus: 'synced' }, this.userId!);
+        await indexedDB.saveBodyMetrics({ ...(data as BodyMetrics), syncStatus: 'synced' }, this.userId!);
         break;
       case 'user_profiles':
-        await indexedDB.saveProfile({ ...data, syncStatus: 'synced' });
+        await indexedDB.saveProfile({ ...(data as UserProfile), syncStatus: 'synced' });
         break;
       case 'daily_metrics':
-        await indexedDB.saveDailyMetrics({ ...data, syncStatus: 'synced' });
+        await indexedDB.saveDailyMetrics({ ...(data as DailyMetrics), syncStatus: 'synced' });
         break;
     }
     
     this.notifyListeners();
   }
 
-  private async handleRealtimeUpdate(table: string, newData: any, _oldData: any) {
+  private async handleRealtimeUpdate(table: SyncTable, newData: SyncableRecord, _oldData: SyncableRecord | null) {
     if (!newData) return;
 
     // Check for conflicts with local unsynced changes
@@ -205,7 +215,7 @@ export class RealtimeSyncManager {
     
     if (localData && localData.syncStatus === 'pending') {
       // We have a conflict - resolve it based on table type
-      let resolved: any;
+      let resolved: BodyMetrics | UserProfile | DailyMetrics | undefined;
       
       switch (table) {
         case 'body_metrics':
@@ -227,7 +237,7 @@ export class RealtimeSyncManager {
     }
   }
 
-  private async handleRealtimeDelete(table: string, data: any) {
+  private async handleRealtimeDelete(table: SyncTable, data: Record<string, unknown>) {
     if (!data?.id) return;
 
     switch (table) {
@@ -236,7 +246,7 @@ export class RealtimeSyncManager {
         const metrics = await indexedDB.getBodyMetrics(this.userId!, undefined, undefined);
         const toDelete = metrics.find(m => m.id === data.id);
         if (toDelete) {
-          await indexedDB.saveBodyMetrics({ ...toDelete, is_deleted: true } as any, this.userId!);
+          await indexedDB.saveBodyMetrics({ ...toDelete, is_deleted: true }, this.userId!);
         }
         break;
       case 'daily_metrics':
@@ -248,11 +258,11 @@ export class RealtimeSyncManager {
     this.notifyListeners();
   }
 
-  private async getLocalRecord(table: string, id: string): Promise<any> {
+  private async getLocalRecord(table: SyncTable, id: string): Promise<BodyMetrics | UserProfile | DailyMetrics | null> {
     switch (table) {
       case 'body_metrics':
         const metrics = await indexedDB.getBodyMetrics(this.userId!, undefined, undefined);
-        return metrics.find(m => m.id === id);
+        return metrics.find(m => m.id === id) ?? null;
       case 'user_profiles':
         return await indexedDB.getProfile(this.userId!);
       case 'daily_metrics':

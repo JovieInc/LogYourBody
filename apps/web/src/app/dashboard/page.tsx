@@ -17,7 +17,6 @@ import {
   Upload,
   ChevronDown
 } from 'lucide-react'
-import { format } from 'date-fns'
 import { BodyMetrics, UserProfile, ProgressPhoto } from '@/types/body-metrics'
 import { calculateFFMI, getBodyFatCategory, convertWeight } from '@/utils/body-calculations'
 import { getAvatarUrl } from '@/utils/avatar-utils'
@@ -28,7 +27,7 @@ import { ensurePublicUrl } from '@/utils/storage-utils'
 import { getProfile } from '@/lib/supabase/profile'
 import { createClient } from '@/lib/supabase/client'
 import { createTimelineData, getTimelineDisplayValues, TimelineEntry } from '@/utils/data-interpolation'
-import { Info, TrendingDown, TrendingUp, Minus } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { BodyFatScale } from '@/components/BodyFatScale'
 import { calculatePhase, PhaseResult } from '@/utils/phase-calculator'
@@ -693,18 +692,6 @@ export default function DashboardPage() {
     }
   }, [selectedDateIndex, timelineData])
 
-  if (loading || profileLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-bg">
-        <Loader2 className="h-8 w-8 animate-spin text-linear-text-secondary" aria-label="Loading" />
-      </div>
-    )
-  }
-
-  if (!user) {
-    return null
-  }
-
   // Get current timeline entry based on selected date
   const currentEntry = useMemo(() =>
     selectedDateIndex >= 0 && selectedDateIndex < timelineData.length
@@ -761,6 +748,18 @@ export default function DashboardPage() {
     }
     return undefined
   }, [currentEntry])
+
+  if (loading || profileLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-linear-bg">
+        <Loader2 className="h-8 w-8 animate-spin text-linear-text-secondary" aria-label="Loading" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-linear-bg text-linear-text">

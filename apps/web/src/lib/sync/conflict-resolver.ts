@@ -1,4 +1,4 @@
-import type { BodyMetrics, UserProfile } from '@/types/body-metrics';
+import type { BodyMetrics, UserProfile, UserSettings } from '@/types/body-metrics';
 import type { DailyMetrics } from '@/lib/db/indexed-db';
 
 export type ConflictResolutionStrategy = 'last-write-wins' | 'server-wins' | 'client-wins' | 'merge';
@@ -158,7 +158,7 @@ export class ConflictResolver {
     return `${note1}\n---\n${note2}`;
   }
 
-  private mergeSettings(settings1?: any, settings2?: any): any {
+  private mergeSettings(settings1?: UserSettings, settings2?: UserSettings): UserSettings | undefined {
     if (!settings1) return settings2;
     if (!settings2) return settings1;
     

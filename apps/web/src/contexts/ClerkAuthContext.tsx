@@ -5,9 +5,16 @@ import { createContext, useContext, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { processImageFile, validateImageFile } from '@/lib/clerk-avatar-upload'
 
+type ClerkUserResource = ReturnType<typeof useUser>['user']
+type ClerkGetToken = ReturnType<typeof useClerkAuth>['getToken']
+
+interface AuthSession {
+  getToken: ClerkGetToken
+}
+
 interface AuthContextType {
-  user: any | null
-  session: any | null
+  user: ClerkUserResource | null
+  session: AuthSession | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>
@@ -83,13 +90,13 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!clerkSignIn) throw new Error('Sign in not available')
 
-      const providerMap = {
+      const providerMap: Record<'google' | 'apple', 'oauth_google' | 'oauth_apple'> = {
         google: 'oauth_google',
         apple: 'oauth_apple'
       }
 
       await clerkSignIn.authenticateWithRedirect({
-        strategy: providerMap[provider] as any,
+        strategy: providerMap[provider],
         redirectUrl: '/auth/callback',
         redirectUrlComplete: '/dashboard',
       })
@@ -152,17 +159,20 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user])
 
-  const value = useMemo(() => ({
-    user,
-    session: { getToken }, // Provide getToken method for Supabase integration
-    loading: !isLoaded,
-    signIn,
-    signUp,
-    signOut,
-    signInWithProvider,
-    uploadProfileImage,
-    deleteProfileImage,
-  }), [user, getToken, isLoaded, signIn, signUp, signOut, signInWithProvider, uploadProfileImage, deleteProfileImage])
+  const value = useMemo(() => {
+    const currentSession: AuthSession | null = getToken ? { getToken } : null
+    return ({
+      user,
+      session: currentSession,
+      loading: !isLoaded,
+      signIn,
+      signUp,
+      signOut,
+      signInWithProvider,
+      uploadProfileImage,
+      deleteProfileImage,
+    })
+  }, [user, getToken, isLoaded, signIn, signUp, signOut, signInWithProvider, uploadProfileImage, deleteProfileImage])
 
   return (
     <AuthContext.Provider value={value}>

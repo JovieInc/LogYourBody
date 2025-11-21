@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { toast } from '@/hooks/use-toast'
+import type { BeforeInstallPromptEvent } from '@/types/pwa'
 
 export function PWAProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -42,7 +43,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
       })
 
       // Listen for app install prompt
-      let deferredPrompt: any
+      let deferredPrompt: BeforeInstallPromptEvent | null = null
       window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault()
         deferredPrompt = e

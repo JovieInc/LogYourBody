@@ -2,25 +2,31 @@
 
 import { useUser } from '@clerk/nextjs'
 import { useClerkSupabaseClient } from '@/lib/supabase/clerk-client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { PostgrestError } from '@supabase/supabase-js'
+
+type ProfileRow = Record<string, unknown> & { id?: string; email?: string | null }
+interface WeightLog {
+  id?: string
+  user_id: string
+  weight?: number
+  weight_unit?: 'kg' | 'lbs'
+  notes?: string | null
+  logged_at?: string
+  [key: string]: unknown
+}
 
 export default function TestClerkSupabasePage() {
   const { user, isLoaded } = useUser()
   const supabase = useClerkSupabaseClient()
-  const [profile, setProfile] = useState<any>(null)
-  const [weights, setWeights] = useState<any[]>([])
+  const [profile, setProfile] = useState<ProfileRow | null>(null)
+  const [weights, setWeights] = useState<WeightLog[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (isLoaded && user) {
-      fetchData()
-    }
-  }, [isLoaded, user])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!user) return
     
     setLoading(true)
@@ -34,11 +40,11 @@ export default function TestClerkSupabasePage() {
         .eq('id', user.id)
         .single()
 
-      if (profileError && profileError.code !== 'PGRST116') {
+      if (profileError && (profileError as PostgrestError).code !== 'PGRST116') {
         console.error('Profile error:', profileError)
         setError(`Profile error: ${profileError.message}`)
       } else {
-        setProfile(profileData)
+        setProfile(profileData as ProfileRow | null)
       }
 
       // Test fetching weights
@@ -53,15 +59,21 @@ export default function TestClerkSupabasePage() {
         console.error('Weights error:', weightsError)
         setError(prev => prev ? `${prev}\nWeights error: ${weightsError.message}` : `Weights error: ${weightsError.message}`)
       } else {
-        setWeights(weightsData || [])
+        setWeights((weightsData as WeightLog[] | null) || [])
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Unexpected error:', err)
-      setError(`Unexpected error: ${err}`)
+      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, user])
+
+  useEffect(() => {
+    if (isLoaded && user) {
+      fetchData()
+    }
+  }, [fetchData, isLoaded, user])
 
   const createTestProfile = async () => {
     if (!user) return
@@ -88,8 +100,8 @@ export default function TestClerkSupabasePage() {
         setProfile(data)
         await fetchData()
       }
-    } catch (err) {
-      setError(`Unexpected error: ${err}`)
+    } catch (err: unknown) {
+      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
     }
@@ -119,8 +131,8 @@ export default function TestClerkSupabasePage() {
       } else {
         await fetchData()
       }
-    } catch (err) {
-      setError(`Unexpected error: ${err}`)
+    } catch (err: unknown) {
+      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
     }

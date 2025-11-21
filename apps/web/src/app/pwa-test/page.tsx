@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import type { BeforeInstallPromptEvent } from '@/types/pwa'
 
 export default function PWATestPage() {
   const [swStatus, setSwStatus] = useState<string>('Checking...')
   const [isInstallable, setIsInstallable] = useState(false)
   const [isStandalone, setIsStandalone] = useState(false)
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
 
   useEffect(() => {
     // Check if running in standalone mode
@@ -37,7 +38,7 @@ export default function PWATestPage() {
     }
 
     // Listen for install prompt
-    const handleBeforeInstallPrompt = (e: any) => {
+    const handleBeforeInstallPrompt = (e: BeforeInstallPromptEvent) => {
       e.preventDefault()
       setDeferredPrompt(e)
       setIsInstallable(true)

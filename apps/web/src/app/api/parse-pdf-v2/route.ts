@@ -28,7 +28,8 @@ async function extractTextFromPDF(buffer: ArrayBuffer): Promise<string> {
       
       // Combine text items
       const pageText = textContent.items
-        .map((item: any) => item.str)
+        .filter((item): item is { str: string } => typeof (item as { str?: unknown }).str === 'string')
+        .map((item) => item.str)
         .join(' ')
       
       fullText += pageText + '\n\n'

@@ -35,6 +35,9 @@ export interface BodyMetrics {
   
   created_at: string
   updated_at: string
+  sync_status?: 'pending' | 'synced' | 'error'
+  is_deleted?: boolean
+  last_modified?: string | Date
 }
 
 export interface UserProfile {
@@ -63,6 +66,9 @@ export interface UserProfile {
   settings: UserSettings
   created_at: string
   updated_at: string
+  sync_status?: 'pending' | 'synced' | 'error'
+  is_deleted?: boolean
+  last_modified?: string | Date
 }
 
 export interface UserSettings {

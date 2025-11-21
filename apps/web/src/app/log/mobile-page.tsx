@@ -42,6 +42,7 @@ import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
 type Step = 'weight' | 'method' | 'measurements' | 'photo' | 'review'
+type BodyFatMethod = 'simple' | 'navy' | '3-site'
 
 const STEPS: Step[] = ['weight', 'method', 'measurements', 'photo', 'review']
 
@@ -64,7 +65,7 @@ export default function MobileLogPage() {
   const [formData, setFormData] = useState({
     weight: '',
     weight_unit: 'lbs' as 'kg' | 'lbs',
-    method: 'simple' as 'simple' | 'navy' | '3-site',
+    method: 'simple' as BodyFatMethod,
     body_fat_percentage: null as number | null,
     // Navy method
     neck: '',
@@ -525,7 +526,7 @@ export default function MobileLogPage() {
 
                   <RadioGroup
                     value={formData.method}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, method: value as any }))}
+                    onValueChange={(value) => value && setFormData(prev => ({ ...prev, method: value as BodyFatMethod }))}
                     className="space-y-4"
                   >
                     <label htmlFor="simple" className="block">

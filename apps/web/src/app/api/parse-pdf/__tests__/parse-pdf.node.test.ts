@@ -4,6 +4,24 @@
 import { NextRequest } from 'next/server'
 import { POST } from '../route'
 
+type WeightUnit = 'kg' | 'lbs'
+
+interface MockScan {
+  date: string
+  weight: number
+  weight_unit: WeightUnit
+  body_fat_percentage?: number
+  muscle_mass?: number
+  source: string
+}
+
+interface MockOpenAIResponseData {
+  scans: MockScan[]
+  total_scans: number
+  extraction_confidence: 'low' | 'medium' | 'high'
+  extraction_notes?: string
+}
+
 // Mock OpenAI
 jest.mock('openai', () => {
   return jest.fn().mockImplementation(() => ({
@@ -47,7 +65,7 @@ jest.mock('pdf-parse', () => {
 })
 
 describe('PDF Parsing API', () => {
-  const mockOpenAIResponse = (data: any) => {
+  const mockOpenAIResponse = (data: MockOpenAIResponseData) => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const OpenAI = require('openai')
     

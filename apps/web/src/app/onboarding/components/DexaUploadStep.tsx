@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { useOnboarding } from '@/contexts/OnboardingContext'
+import { useOnboarding, type OnboardingData } from '@/contexts/OnboardingContext'
 import { Upload, FileText, X, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -115,7 +115,7 @@ export function DexaUploadStep() {
         // If there's only one scan, also populate the form fields
         if (data.scans.length === 1) {
           const scan = data.scans[0]
-          const updates: any = {}
+          const updates: Partial<OnboardingData> = {}
           
           if (scan.weight) {
             updates.weight = scan.weight_unit === 'lbs' ? scan.weight * 0.453592 : scan.weight
@@ -142,7 +142,7 @@ export function DexaUploadStep() {
         }
       } else {
         // Fallback to old format if no scans array
-        const updates: any = {}
+        const updates: Partial<OnboardingData> = {}
         
         if (data.weight) {
           updates.weight = data.weight_unit === 'lbs' ? data.weight * 0.453592 : data.weight

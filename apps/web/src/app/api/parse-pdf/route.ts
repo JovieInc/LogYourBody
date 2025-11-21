@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
+type WeightUnit = 'kg' | 'lbs'
+
+interface ExtractedScan {
+  id?: string
+  user_id?: string
+  date: string
+  weight: number
+  weight_unit: WeightUnit
+  body_fat_percentage?: number
+  muscle_mass?: number
+  bone_mass?: number
+  visceral_fat?: number
+  source?: string
+  [key: string]: unknown
+}
+
+interface ExtractionResult {
+  scans?: ExtractedScan[]
+  total_scans?: number
+  extraction_confidence?: 'high' | 'medium' | 'low'
+  extraction_notes?: string
+}
+
 // Dynamic import with error handling
 async function loadPdfParse() {
   try {
@@ -189,7 +212,9 @@ export async function POST(request: NextRequest) {
       temperature: 0.1,
     })
 
-    const extractedData = JSON.parse(completion.choices[0].message.content || '{}')
+    const extractedData = JSON.parse(
+      completion.choices[0].message.content || '{}'
+    ) as ExtractionResult
     
     console.log('OpenAI extraction result:', {
       scanCount: extractedData.total_scans,
@@ -211,9 +236,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate that the data looks reasonable
-    const validScans = extractedData.scans.filter((scan: any) => {
+    const validScans = (extractedData.scans ?? []).filter((scan): scan is ExtractedScan => {
+      if (!scan || typeof scan !== 'object') {
+        return false
+      }
       // Basic validation - must have at least a date and weight
-      if (!scan.date || !scan.weight) return false
+      if (typeof scan.date !== 'string' || typeof scan.weight !== 'number') {
+        return false
+      }
       
       // Weight should be reasonable (20-300 kg or 44-660 lbs)
       const weightInKg = scan.weight_unit === 'lbs' ? scan.weight * 0.453592 : scan.weight

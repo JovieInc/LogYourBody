@@ -181,36 +181,36 @@ export function generatePhotoFilename(userId: string, type: 'progress' | 'thumbn
 /**
  * Handles upload errors with user-friendly messages
  */
-export function getUploadErrorMessage(error: any): string {
+export function getUploadErrorMessage(error: unknown): string {
   if (!error) return 'An unknown error occurred'
 
   // Network errors
-  if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+  if (error instanceof Error && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
     return 'Network error. Please check your connection and try again.'
   }
 
   // Storage quota errors
-  if (error.message?.includes('storage') || error.message?.includes('quota')) {
+  if (error instanceof Error && (error.message.includes('storage') || error.message.includes('quota'))) {
     return 'Storage limit reached. Please try again later.'
   }
 
   // Permission errors
-  if (error.message?.includes('permission') || error.message?.includes('unauthorized')) {
+  if (error instanceof Error && (error.message.includes('permission') || error.message.includes('unauthorized'))) {
     return 'You do not have permission to upload photos. Please log in again.'
   }
 
   // File size errors
-  if (error.message?.includes('payload too large') || error.message?.includes('size')) {
+  if (error instanceof Error && (error.message.includes('payload too large') || error.message.includes('size'))) {
     return 'File too large. Please use a smaller image.'
   }
 
   // Rate limiting
-  if (error.message?.includes('rate limit') || error.statusCode === 429) {
+  if ((error instanceof Error && error.message.includes('rate limit')) || (typeof error === 'object' && error !== null && 'statusCode' in error && error.statusCode === 429)) {
     return 'Too many uploads. Please wait a moment and try again.'
   }
 
   // Default error with details
-  return error.message || 'Failed to upload photo. Please try again.'
+  return error instanceof Error ? error.message : 'Failed to upload photo. Please try again.'
 }
 
 /**
@@ -221,7 +221,7 @@ export async function retryUpload<T>(
   maxRetries: number = 3,
   initialDelay: number = 1000
 ): Promise<T> {
-  let lastError: any
+  let lastError: unknown
 
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -231,7 +231,8 @@ export async function retryUpload<T>(
       
       // Don't retry on client errors
       if (error && typeof error === 'object' && 'statusCode' in error) {
-        const statusCode = (error as any).statusCode
+        const statusCodeProp = (error as { statusCode?: number }).statusCode
+        const statusCode = typeof statusCodeProp === 'number' ? statusCodeProp : undefined
         if (statusCode >= 400 && statusCode < 500 && statusCode !== 429) {
           throw error
         }

@@ -33,7 +33,7 @@ export default function IOSDownloadPage() {
   useEffect(() => {
     // Detect if user is on iOS
     const userAgent = navigator.userAgent || navigator.vendor
-    const isIOSDevice = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream
+    const isIOSDevice = /iPad|iPhone|iPod/.test(userAgent) && !('MSStream' in window)
     setIsIOS(isIOSDevice)
   }, [])
 

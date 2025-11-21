@@ -84,19 +84,19 @@ describe('Profile Utilities', () => {
       // Mock current date for consistent testing
       const originalDate = Date
       const mockDate = new Date('2024-06-20T12:00:00Z')
-      global.Date = class extends Date {
-        constructor(...args: any[]) {
+      class MockDate extends Date {
+        constructor(...args: ConstructorParameters<typeof Date>) {
           if (args.length === 0) {
             super(mockDate.getTime())
           } else {
-            // @ts-expect-error - Spread argument type issue in tests
             super(...args)
           }
         }
         static now() {
           return mockDate.getTime()
         }
-      } as any
+      }
+      global.Date = MockDate as unknown as typeof Date
 
       expect(calculateAge('1990-01-01')).toBe(34)
       expect(calculateAge('2000-12-31')).toBe(23)
@@ -175,16 +175,16 @@ describe('Profile Utilities', () => {
       }
 
       const mockDate = new Date('2024-06-20')
-      global.Date = class extends Date {
-        constructor(...args: any[]) {
+      class LimitedMockDate extends Date {
+        constructor(...args: ConstructorParameters<typeof Date>) {
           if (args.length === 0) {
             super(mockDate.getTime())
           } else {
-            // @ts-expect-error - Spread argument type issue in tests
             super(...args)
           }
         }
-      } as any
+      }
+      global.Date = LimitedMockDate as unknown as typeof Date
 
       expect(isValidDateOfBirth('1990-01-01')).toBe(true)
       expect(isValidDateOfBirth('2011-12-31')).toBe(true) // 12 years old, which is actually December 31, 2011, making them 12.5 years old

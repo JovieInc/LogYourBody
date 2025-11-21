@@ -13,8 +13,8 @@ declare module 'pdf-parse' {
   }
 
   interface PDFMetadata {
-    _metadata?: any
-    [key: string]: any
+    _metadata?: unknown
+    [key: string]: unknown
   }
 
   interface PDFData {
@@ -26,7 +26,7 @@ declare module 'pdf-parse' {
     version: string
   }
 
-  function pdf(dataBuffer: Buffer | ArrayBuffer | Uint8Array, options?: any): Promise<PDFData>
+  function pdf(dataBuffer: Buffer | ArrayBuffer | Uint8Array, options?: Record<string, unknown>): Promise<PDFData>
   
   export = pdf
 }

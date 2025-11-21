@@ -1,28 +1,31 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/contexts/ClerkAuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
+import type { Session, User } from '@supabase/supabase-js'
+
+type AuthContextValue = ReturnType<typeof useAuth>
 
 interface DebugInfo {
   auth: {
-    user: any
-    session: any
+    user: AuthContextValue['user']
+    session: AuthContextValue['session']
     loading: boolean
     error: string | null
   }
   supabase: {
-    session: any
-    user: any
+    session: Session | null
+    user: User | null
     error: string | null
   }
   browser: {
     cookies: string
-    localStorage: Record<string, any>
-    sessionStorage: Record<string, any>
+    localStorage: Record<string, string | null>
+    sessionStorage: Record<string, string | null>
   }
   network: {
     online: boolean
@@ -37,9 +40,9 @@ interface DebugInfo {
 export default function DebugLoginPage() {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null)
   const [loading, setLoading] = useState(true)
-  const [apiDebug, setApiDebug] = useState<any>(null)
+  const [apiDebug, setApiDebug] = useState<Record<string, unknown> | null>(null)
   const { user, session, loading: authLoading } = useAuth()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   // Capture console errors
   const [consoleErrors, setConsoleErrors] = useState<string[]>([])
@@ -50,12 +53,12 @@ export default function DebugLoginPage() {
     const originalError = console.error
     const originalWarn = console.warn
     
-    console.error = (...args) => {
+    console.error = (...args: unknown[]) => {
       setConsoleErrors(prev => [...prev, args.join(' ')])
       originalError(...args)
     }
     
-    console.warn = (...args) => {
+    console.warn = (...args: unknown[]) => {
       setConsoleWarnings(prev => [...prev, args.join(' ')])
       originalWarn(...args)
     }
@@ -74,8 +77,8 @@ export default function DebugLoginPage() {
         const { data: { user: supabaseUser }, error: userError } = await supabase.auth.getUser()
         
         // Get browser storage
-        const localStorage: Record<string, any> = {}
-        const sessionStorage: Record<string, any> = {}
+        const localStorage: Record<string, string | null> = {}
+        const sessionStorage: Record<string, string | null> = {}
         
         try {
           for (let i = 0; i < window.localStorage.length; i++) {
@@ -121,7 +124,7 @@ export default function DebugLoginPage() {
             warnings: consoleWarnings,
           },
         })
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Debug error:', error)
         setDebugInfo({
           auth: {
@@ -162,7 +165,7 @@ export default function DebugLoginPage() {
       const response = await fetch('/api/debug/auth')
       const data = await response.json()
       setApiDebug(data)
-    } catch (error) {
+    } catch (error: unknown) {
       setApiDebug({ error: error instanceof Error ? error.message : 'Failed to fetch' })
     }
   }
@@ -175,7 +178,7 @@ export default function DebugLoginPage() {
         },
       })
       alert(`Login route status: ${response.status}, redirected: ${response.redirected}, url: ${response.url}`)
-    } catch (error) {
+    } catch (error: unknown) {
       alert(`Login route error: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }

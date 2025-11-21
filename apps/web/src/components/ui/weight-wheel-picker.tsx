@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { WheelPicker } from './wheel-picker'
 
@@ -20,10 +20,13 @@ export const WeightWheelPicker: React.FC<WeightWheelPickerProps> = ({
   const maxWeight = unit === 'kg' ? 300 : 660 // 300kg or 660lbs max
 
   // Generate whole numbers
-  const wholeNumbers: number[] = []
-  for (let i = minWeight; i <= maxWeight; i++) {
-    wholeNumbers.push(i)
-  }
+  const wholeNumbers = useMemo(() => {
+    const numbers: number[] = []
+    for (let i = minWeight; i <= maxWeight; i++) {
+      numbers.push(i)
+    }
+    return numbers
+  }, [minWeight, maxWeight])
 
   // Generate decimals (0.0 to 0.9)
   const decimals = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -43,7 +46,7 @@ export const WeightWheelPicker: React.FC<WeightWheelPickerProps> = ({
     const decimal = Math.round((weight - whole) * 10)
     setWholeIndex(Math.max(0, wholeNumbers.indexOf(whole)))
     setDecimalIndex(decimal)
-  }, [weight, unit])
+  }, [weight, unit, wholeNumbers])
 
   const handleWholeChange = (index: number) => {
     setWholeIndex(index)

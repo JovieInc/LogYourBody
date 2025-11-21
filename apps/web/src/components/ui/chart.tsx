@@ -101,12 +101,14 @@ ${colorConfig
 const ChartTooltip = RechartsPrimitive.Tooltip;
 
 // Define proper types for tooltip payload
+type PayloadRecord = Record<string, unknown>;
+
 interface TooltipPayloadItem {
   dataKey?: string | number;
   name?: string;
   value?: number | string;
   color?: string;
-  payload?: Record<string, any>;
+  payload?: PayloadRecord;
   fill?: string;
 }
 
@@ -114,8 +116,14 @@ interface ChartTooltipContentProps extends Omit<React.ComponentProps<"div">, "co
   active?: boolean;
   payload?: TooltipPayloadItem[];
   label?: string | number;
-  labelFormatter?: (value: any, payload: TooltipPayloadItem[]) => React.ReactNode;
-  formatter?: (value: any, name: string, item: TooltipPayloadItem, index: number, payload: any) => React.ReactNode;
+  labelFormatter?: (value: string | number, payload: TooltipPayloadItem[]) => React.ReactNode;
+  formatter?: (
+    value: string | number,
+    name: string,
+    item: TooltipPayloadItem,
+    index: number,
+    payload?: PayloadRecord
+  ) => React.ReactNode;
   labelClassName?: string;
   color?: string;
   hideLabel?: boolean;
@@ -280,7 +288,7 @@ interface LegendPayloadItem {
   dataKey?: string | number;
   color?: string;
   type?: string;
-  payload?: Record<string, any>;
+  payload?: PayloadRecord;
 }
 
 interface ChartLegendContentProps extends React.ComponentProps<"div"> {
@@ -354,7 +362,7 @@ function getPayloadConfigFromPayload(
     return undefined;
   }
 
-  const payloadObj = payload as Record<string, any>;
+  const payloadObj = payload as PayloadRecord;
   const payloadPayload =
     "payload" in payloadObj &&
     typeof payloadObj.payload === "object" &&

@@ -4,6 +4,24 @@
 import { POST } from '../route'
 import OpenAI from 'openai'
 
+type WeightUnit = 'kg' | 'lbs'
+
+interface MockScan {
+  date: string
+  weight: number
+  weight_unit: WeightUnit
+  body_fat_percentage?: number
+  muscle_mass?: number
+  source: string
+}
+
+interface MockOpenAIResponseData {
+  scans: MockScan[]
+  total_scans: number
+  extraction_confidence: 'low' | 'medium' | 'high'
+  extraction_notes?: string
+}
+
 // Mock Next.js server components
 jest.mock('next/server', () => ({
   NextRequest: jest.fn().mockImplementation((url, init) => {
@@ -15,9 +33,9 @@ jest.mock('next/server', () => ({
     }
   }),
   NextResponse: {
-    json: (data: any, init?: any) => ({
+    json: (data: unknown, init?: ResponseInit) => ({
       json: async () => data,
-      status: init?.status || 200
+      status: init?.status ?? 200
     })
   }
 }))
@@ -55,7 +73,7 @@ jest.mock('pdf-parse', () => {
 })
 
 describe('PDF Parsing API', () => {
-  const mockOpenAIResponse = (data: any) => {
+  const mockOpenAIResponse = (data: MockOpenAIResponseData) => {
     const mockCreate = jest.fn().mockResolvedValue({
       choices: [{
         message: {
@@ -72,7 +90,9 @@ describe('PDF Parsing API', () => {
       }
     }
     
-    ;(OpenAI as jest.MockedClass<typeof OpenAI>).mockImplementation(() => mockOpenAI as any)
+    ;(OpenAI as jest.MockedClass<typeof OpenAI>).mockImplementation(
+      () => mockOpenAI as unknown as OpenAI
+    )
     
     return mockCreate
   }
