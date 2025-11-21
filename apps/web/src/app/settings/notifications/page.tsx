@@ -11,8 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { toast } from '@/hooks/use-toast'
-import { 
-  Loader2, 
+import {
+  Loader2,
   ArrowLeft,
   Mail,
   Save,
@@ -25,7 +25,7 @@ export default function NotificationsSettingsPage() {
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
-  
+
   const [settings, setSettings] = useState({
     push_notifications: {
       enabled: true,
@@ -65,6 +65,10 @@ export default function NotificationsSettingsPage() {
     return null
   }
 
+  const primaryEmail = user.primaryEmailAddress?.emailAddress
+    ?? user.emailAddresses?.[0]?.emailAddress
+    ?? ''
+
   const updateSettings = (category: string, setting: string, value: boolean | string | string[]) => {
     setSettings(prev => ({
       ...prev,
@@ -78,10 +82,10 @@ export default function NotificationsSettingsPage() {
 
   const toggleReminderDay = (day: string) => {
     const days = settings.reminder_settings.reminder_days
-    const newDays = days.includes(day) 
+    const newDays = days.includes(day)
       ? days.filter(d => d !== day)
       : [...days, day]
-    
+
     updateSettings('reminder_settings', 'reminder_days', newDays)
   }
 
@@ -130,7 +134,7 @@ export default function NotificationsSettingsPage() {
               <h1 className="text-xl font-bold text-linear-text">Notifications</h1>
             </div>
             {hasChanges && (
-              <Button 
+              <Button
                 onClick={handleSave}
                 disabled={isSaving}
                 size="sm"
@@ -184,7 +188,7 @@ export default function NotificationsSettingsPage() {
                     onCheckedChange={(checked) => updateSettings('push_notifications', 'daily_reminder', checked)}
                   />
                 </div>
-                
+
                 {settings.push_notifications.daily_reminder && (
                   <div className="ml-6 space-y-3">
                     <div className="space-y-2">
@@ -199,7 +203,7 @@ export default function NotificationsSettingsPage() {
                         className="bg-linear-bg border-linear-border text-linear-text max-w-xs"
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label className="text-sm text-linear-text">
                         Reminder Days
@@ -225,9 +229,9 @@ export default function NotificationsSettingsPage() {
                   </div>
                 )}
               </div>
-              
+
               <Separator className="bg-linear-border" />
-              
+
               {/* Weekly Summary */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
@@ -244,9 +248,9 @@ export default function NotificationsSettingsPage() {
                   onCheckedChange={(checked) => updateSettings('push_notifications', 'weekly_summary', checked)}
                 />
               </div>
-              
+
               <Separator className="bg-linear-border" />
-              
+
               {/* Goal Achievements */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
@@ -263,9 +267,9 @@ export default function NotificationsSettingsPage() {
                   onCheckedChange={(checked) => updateSettings('push_notifications', 'goal_achievements', checked)}
                 />
               </div>
-              
+
               <Separator className="bg-linear-border" />
-              
+
               {/* Tips & Insights */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
@@ -298,10 +302,10 @@ export default function NotificationsSettingsPage() {
             <Alert className="border-linear-border bg-linear-card">
               <Mail className="h-4 w-4 text-linear-text" />
               <AlertDescription className="text-linear-text-secondary">
-                Emails will be sent to: <strong className="text-linear-text">{user.email}</strong>
+                Emails will be sent to: <strong className="text-linear-text">{primaryEmail}</strong>
               </AlertDescription>
             </Alert>
-            
+
             {/* Weekly Report */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -318,9 +322,9 @@ export default function NotificationsSettingsPage() {
                 onCheckedChange={(checked) => updateSettings('email_notifications', 'weekly_report', checked)}
               />
             </div>
-            
+
             <Separator className="bg-linear-border" />
-            
+
             {/* Monthly Summary */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -337,9 +341,9 @@ export default function NotificationsSettingsPage() {
                 onCheckedChange={(checked) => updateSettings('email_notifications', 'monthly_summary', checked)}
               />
             </div>
-            
+
             <Separator className="bg-linear-border" />
-            
+
             {/* Product Updates */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -356,9 +360,9 @@ export default function NotificationsSettingsPage() {
                 onCheckedChange={(checked) => updateSettings('email_notifications', 'product_updates', checked)}
               />
             </div>
-            
+
             <Separator className="bg-linear-border" />
-            
+
             {/* Marketing Emails */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">

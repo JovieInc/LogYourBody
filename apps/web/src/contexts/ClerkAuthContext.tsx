@@ -160,7 +160,7 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
   }, [user])
 
   const value = useMemo(() => {
-    const currentSession: AuthSession | null = getToken ? { getToken } : null
+    const currentSession: AuthSession | null = isLoaded ? { getToken } : null
     return ({
       user,
       session: currentSession,

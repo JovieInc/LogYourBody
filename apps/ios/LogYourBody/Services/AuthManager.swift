@@ -108,6 +108,7 @@ class AuthManager: NSObject, ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var sessionObservationTask: Task<Void, Never>?
     private let legalConsentGate = AsyncGate()
+    private var clerkInitializationTask: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -120,6 +121,8 @@ class AuthManager: NSObject, ObservableObject {
 
         // Clear any stale user data
         userDefaults.removeObject(forKey: userKey)
+
+        migrateLegacyAuthToken()
     }
 
     func initializeClerk() async {
@@ -176,6 +179,13 @@ class AuthManager: NSObject, ObservableObject {
             }
         } catch {
             let errorMessage = error.localizedDescription
+            let context = ErrorContext(
+                feature: "auth",
+                operation: "initializeClerk",
+                screen: nil,
+                userId: nil
+            )
+            ErrorReporter.shared.captureNonFatal(error, context: context)
             // print("❌ Failed to load Clerk: \(error)")
             // print("❌ Error type: \(type(of: error))")
             // print("❌ Error details: \(String(describing: error))")
@@ -188,10 +198,29 @@ class AuthManager: NSObject, ObservableObject {
         }
     }
 
+    @discardableResult
+    func ensureClerkInitializationTask(priority: TaskPriority = .userInitiated) -> Task<Void, Never> {
+        if let existingTask = clerkInitializationTask, !existingTask.isCancelled {
+            return existingTask
+        }
+
+        let task = Task(priority: priority) { [weak self] in
+            guard let self else { return }
+            await self.initializeClerk()
+        }
+
+        clerkInitializationTask = task
+        return task
+    }
+
     /// Retry Clerk initialization after a failure
     func retryClerkInitialization() async {
         // print("🔄 Retrying Clerk initialization...")
-        await initializeClerk()
+        clerkInitializationTask?.cancel()
+        clerkInitializationTask = nil
+
+        let task = ensureClerkInitializationTask()
+        await task.value
     }
 
     private func observeSessionChanges() {
@@ -497,6 +526,8 @@ class AuthManager: NSObject, ObservableObject {
         userDefaults.removeObject(forKey: Constants.currentUserKey)
         userDefaults.removeObject(forKey: Constants.authTokenKey)
 
+        try? KeychainManager.shared.clearAll()
+
         // Clear any cached step history flags
         UserDefaults.standard.removeObject(forKey: "HasSyncedHistoricalSteps")
 
@@ -661,11 +692,9 @@ class AuthManager: NSObject, ObservableObject {
                 )
             )
 
-            await MainActor.run {
-                self.currentUser = mockUser
-                self.isAuthenticated = true
-                UserDefaults.standard.set(false, forKey: Constants.hasCompletedOnboardingKey)
-            }
+            currentUser = mockUser
+            isAuthenticated = true
+
             return
         }
 
@@ -923,19 +952,40 @@ class AuthManager: NSObject, ObservableObject {
     // MARK: - Token Management
 
     func getAccessToken() async -> String? {
+        if let cachedToken = try? KeychainManager.shared.getAuthToken(), !cachedToken.isEmpty {
+            return cachedToken
+        }
+
         guard let session = clerk.session else {
-            // print("❌ No active Clerk session")
             return nil
         }
 
         do {
-            // Get JWT token from Clerk
             let tokenResource = try await session.getToken()
-            return tokenResource?.jwt
+            guard let jwt = tokenResource?.jwt else {
+                return nil
+            }
+
+            try? KeychainManager.shared.saveAuthToken(jwt)
+            return jwt
         } catch {
-            // print("❌ Failed to get JWT token: \(error)")
             return nil
         }
+    }
+
+    private func migrateLegacyAuthToken() {
+        guard let token = userDefaults.string(forKey: Constants.authTokenKey),
+              !token.isEmpty else {
+            return
+        }
+
+        do {
+            try KeychainManager.shared.saveAuthToken(token)
+        } catch {
+            // Ignore Keychain failures for legacy migration
+        }
+
+        userDefaults.removeObject(forKey: Constants.authTokenKey)
     }
 
     // MARK: - Supabase Profile Sync

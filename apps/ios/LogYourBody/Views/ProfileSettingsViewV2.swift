@@ -10,8 +10,6 @@ struct ProfileSettingsViewV2: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss)
     var dismiss
-    @StateObject private var syncManager = RealtimeSyncManager.shared
-
     // Editable fields
     @State private var editableName: String = ""
     @State private var editableFirstName: String = ""

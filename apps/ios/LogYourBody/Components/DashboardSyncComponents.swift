@@ -78,11 +78,16 @@ struct DashboardSyncBanner: View {
 struct DashboardSyncDetailsSheet: View {
     @Binding var isPresented: Bool
     @ObservedObject var syncManager: RealtimeSyncManager
+    @ObservedObject private var healthKitManager = HealthKitManager.shared
 
     var body: some View {
         NavigationStack {
             List {
                 statusSection
+
+                unsyncedSection
+
+                healthKitSection
 
                 if let error = syncManager.error, !error.isEmpty {
                     Section(header: Text("Last Error")) {
@@ -134,6 +139,82 @@ struct DashboardSyncDetailsSheet: View {
                 Text("\(syncManager.pendingSyncCount)")
                     .foregroundColor(.secondary)
             }
+        }
+    }
+
+    private var unsyncedSection: some View {
+        Section(header: Text("Unsynced Data")) {
+            HStack {
+                Text("Body Metrics")
+                Spacer()
+                Text("\(syncManager.unsyncedBodyCount)")
+                    .foregroundColor(.secondary)
+            }
+
+            HStack {
+                Text("Daily Metrics")
+                Spacer()
+                Text("\(syncManager.unsyncedDailyCount)")
+                    .foregroundColor(.secondary)
+            }
+
+            HStack {
+                Text("Profiles")
+                Spacer()
+                Text("\(syncManager.unsyncedProfileCount)")
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    private var healthKitSection: some View {
+        Section(header: Text("HealthKit")) {
+            HStack {
+                Text("Authorization")
+                Spacer()
+                Text(healthKitManager.isAuthorized ? "Authorized" : "Not authorized")
+                    .foregroundColor(healthKitManager.isAuthorized ? .green : .orange)
+            }
+
+            if healthKitManager.isImporting {
+                HStack {
+                    Text("Import Progress")
+                    Spacer()
+                    ProgressView(value: healthKitManager.importProgress)
+                        .frame(width: 120)
+                }
+
+                if !healthKitManager.importStatus.isEmpty {
+                    Text(healthKitManager.importStatus)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+            } else if !healthKitManager.importStatus.isEmpty {
+                Text(healthKitManager.importStatus)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            }
+
+            if healthKitManager.importedCount > 0 {
+                HStack {
+                    Text("Imported Entries")
+                    Spacer()
+                    Text("\(healthKitManager.importedCount)")
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Button {
+                Task {
+                    await healthKitManager.forceFullHealthKitSync()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.clockwise.heart")
+                    Text(healthKitManager.isImporting ? "HealthKit Sync Running…" : "Run Full HealthKit Sync")
+                }
+            }
+            .disabled(!healthKitManager.isAuthorized || healthKitManager.isImporting)
         }
     }
 

@@ -70,23 +70,19 @@ class LoadingManager: ObservableObject {
 
         // Skip Clerk loading wait if using mock auth
         if !Constants.useMockAuth {
-            // Wait for Clerk to be loaded with timeout
-            let startTime = Date()
-            let maxWaitTime: TimeInterval = 10.0 // Allow 10 seconds for Clerk to initialize (increased for slow networks)
+            let clerkTask = authManager.ensureClerkInitializationTask()
+            let maxWaitTimeNanoseconds: UInt64 = 500_000_000 // 0.5 seconds
+            let clerkReady = await waitForClerkInitialization(
+                task: clerkTask,
+                timeoutNanoseconds: maxWaitTimeNanoseconds
+            )
 
-            while !authManager.isClerkLoaded,
-                  authManager.clerkInitError == nil,
-                  Date().timeIntervalSince(startTime) < maxWaitTime {
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s polling interval
-            }
-
-            // Log the result
-            if authManager.isClerkLoaded {
+            if clerkReady {
                 // print("✅ LoadingManager: Clerk loaded successfully")
             } else if let error = authManager.clerkInitError {
                 // print("⚠️ LoadingManager: Clerk failed to load: \(error)")
             } else {
-                // print("⚠️ LoadingManager: Clerk loading timed out after \(maxWaitTime)s")
+                // print("⚠️ LoadingManager: Clerk loading timed out after \(Double(maxWaitTimeNanoseconds) / 1_000_000_000)s")
             }
         }
 
@@ -124,56 +120,13 @@ class LoadingManager: ObservableObject {
             }
 
             await updateProgress(for: .loadProfile)
-
-            // Run HealthKit, Local Data, and Sync concurrently
-            await withTaskGroup(of: Void.self) { group in
-                // Step 4: Setup HealthKit
-                group.addTask { @MainActor [weak self] in
-                    guard let self = self else { return }
-                    await self.updateProgress(for: .setupHealthKit, partial: 0.3)
-                    self.healthKitManager.checkAuthorizationStatus()
-
-                    if self.healthKitManager.isAuthorized {
-                        // Request fresh data from HealthKit in background
-                        Task.detached {
-                            try? await self.healthKitManager.fetchTodayStepCount()
-                        }
-                    }
-                    await self.updateProgress(for: .setupHealthKit)
-                }
-
-                // Step 5: Load Local Data
-                group.addTask { @MainActor [weak self] in
-                    guard let self = self else { return }
-                    await self.updateProgress(for: .loadLocalData, partial: 0.5)
-                    self.syncManager.updatePendingSyncCount()
-                    await self.updateProgress(for: .loadLocalData)
-                }
-
-                // Step 6: Start Sync (non-blocking)
-                group.addTask { @MainActor [weak self] in
-                    guard let self = self else { return }
-                    await self.updateProgress(for: .syncData, partial: 0.3)
-
-                    // Start sync in background - don't wait for completion
-                    self.syncManager.syncIfNeeded()
-
-                    await self.updateProgress(for: .syncData)
-                }
-
-                // Wait for all concurrent tasks to complete
-                await group.waitForAll()
-            }
         } else {
-            // Skip profile, healthkit, and sync steps if not authenticated
+            // Skip profile step weight if not authenticated
             completedWeight += LoadingStep.loadProfile.weight
-            completedWeight += LoadingStep.setupHealthKit.weight
-            completedWeight += LoadingStep.loadLocalData.weight
-            completedWeight += LoadingStep.syncData.weight
             progress = completedWeight
         }
 
-        // Step 7: Complete
+        // Step 4: Complete blocking phase
         await updateProgress(for: .complete)
         progress = 1.0
         loadingStatus = "Ready!"
@@ -181,6 +134,47 @@ class LoadingManager: ObservableObject {
         // Minimal delay just for UI transition
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
         isLoading = false
+
+        // Step 5: Warm-up tasks (HealthKit, local data, sync) in background
+        if authManager.isAuthenticated {
+            Task { @MainActor [weak self] in
+                await self?.runWarmUpTasks()
+            }
+        }
+    }
+
+    private func runWarmUpTasks() async {
+        guard authManager.isAuthenticated else { return }
+
+        await withTaskGroup(of: Void.self) { group in
+            // Setup HealthKit
+            group.addTask { @MainActor [weak self] in
+                guard let self else { return }
+                self.healthKitManager.checkAuthorizationStatus()
+
+                if self.healthKitManager.isAuthorized {
+                    // Request fresh data from HealthKit in background
+                    Task.detached { [weak self] in
+                        guard let self else { return }
+                        try? await self.healthKitManager.fetchTodayStepCount()
+                    }
+                }
+            }
+
+            // Load local data / pending sync counts
+            group.addTask { @MainActor [weak self] in
+                guard let self else { return }
+                self.syncManager.updatePendingSyncCount()
+            }
+
+            // Start sync (non-blocking for UI)
+            group.addTask { @MainActor [weak self] in
+                guard let self else { return }
+                self.syncManager.syncIfNeeded()
+            }
+
+            await group.waitForAll()
+        }
     }
 
     private func updateProgress(for step: LoadingStep, partial: Double = 1.0) async {
@@ -196,5 +190,26 @@ class LoadingManager: ObservableObject {
 
         // Minimal delay only for UI responsiveness
         try? await Task.sleep(nanoseconds: 10_000_000) // 0.01s
+    }
+
+    private func waitForClerkInitialization(
+        task: Task<Void, Never>,
+        timeoutNanoseconds: UInt64
+    ) async -> Bool {
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                await task.value
+                return true
+            }
+
+            group.addTask {
+                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                return false
+            }
+
+            let result = await group.next() ?? false
+            group.cancelAll()
+            return result
+        }
     }
 }

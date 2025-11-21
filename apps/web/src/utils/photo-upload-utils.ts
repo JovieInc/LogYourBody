@@ -33,10 +33,10 @@ export async function compressImage(
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    
+
     reader.onload = (e) => {
       const img = new Image()
-      
+
       img.onload = () => {
         const canvas = document.createElement('canvas')
         let width = img.width
@@ -45,7 +45,7 @@ export async function compressImage(
         // Calculate new dimensions while maintaining aspect ratio
         if (width > maxWidth || height > maxHeight) {
           const aspectRatio = width / height
-          
+
           if (width > height) {
             width = maxWidth
             height = width / aspectRatio
@@ -67,7 +67,7 @@ export async function compressImage(
         // Use better image smoothing
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
-        
+
         // Draw the image
         ctx.drawImage(img, 0, 0, width, height)
 
@@ -228,12 +228,12 @@ export async function retryUpload<T>(
       return await operation()
     } catch (error) {
       lastError = error
-      
+
       // Don't retry on client errors
       if (error && typeof error === 'object' && 'statusCode' in error) {
         const statusCodeProp = (error as { statusCode?: number }).statusCode
         const statusCode = typeof statusCodeProp === 'number' ? statusCodeProp : undefined
-        if (statusCode >= 400 && statusCode < 500 && statusCode !== 429) {
+        if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500 && statusCode !== 429) {
           throw error
         }
       }

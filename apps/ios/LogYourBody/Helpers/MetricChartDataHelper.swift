@@ -8,6 +8,18 @@
 import Foundation
 import CoreData
 
+struct SparklineDataPoint {
+    let index: Int
+    let value: Double
+    let isEstimated: Bool
+
+    init(index: Int, value: Double, isEstimated: Bool = false) {
+        self.index = index
+        self.value = value
+        self.isEstimated = isEstimated
+    }
+}
+
 /// Helper functions to generate sparkline chart data for metric cards
 struct MetricChartDataHelper {
     // MARK: - Cache Infrastructure

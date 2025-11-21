@@ -58,6 +58,23 @@
       {
         "basedOn" : null,
         "packageRef" : {
+          "identity" : "purchases-ios",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/RevenueCat/purchases-ios",
+          "name" : "purchases-ios"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "1548d80a9910dcdf8a2f6db53fcdb647997f17bb",
+            "version" : "5.47.0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "purchases-ios"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
           "identity" : "simplekeychain",
           "kind" : "remoteSourceControl",
           "location" : "https://github.com/auth0/SimpleKeychain",

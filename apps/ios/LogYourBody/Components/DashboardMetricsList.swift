@@ -23,7 +23,7 @@ struct DashboardMetricsList<CardContent: View>: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 14) {
             ForEach(metricsOrder) { metricId in
                 cardContent(metricId)
                     .scaleEffect(draggedMetric == metricId ? 1.03 : 1.0)

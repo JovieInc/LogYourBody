@@ -82,13 +82,13 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
             ([theme, prefix]) => `
 ${prefix} [data-chart=${id}] {
 ${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
-      itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
-  })
-  .join("\n")}
+                .map(([key, itemConfig]) => {
+                  const color =
+                    itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
+                    itemConfig.color;
+                  return color ? `  --color-${key}: ${color};` : null;
+                })
+                .join("\n")}
 }
 `,
           )
@@ -116,7 +116,7 @@ interface ChartTooltipContentProps extends Omit<React.ComponentProps<"div">, "co
   active?: boolean;
   payload?: TooltipPayloadItem[];
   label?: string | number;
-  labelFormatter?: (value: string | number, payload: TooltipPayloadItem[]) => React.ReactNode;
+  labelFormatter?: (value: React.ReactNode, payload: TooltipPayloadItem[]) => React.ReactNode;
   formatter?: (
     value: string | number,
     name: string,
@@ -165,7 +165,7 @@ const ChartTooltipContent = React.forwardRef<
       const [item] = payload;
       const key = `${labelKey || item.dataKey || item.name || "value"}`;
       const itemConfig = getPayloadConfigFromPayload(config, item, key);
-      const value =
+      const labelValue: React.ReactNode =
         !labelKey && typeof label === "string"
           ? config[label as keyof typeof config]?.label || label
           : itemConfig?.label;
@@ -173,16 +173,16 @@ const ChartTooltipContent = React.forwardRef<
       if (labelFormatter) {
         return (
           <div className={cn("font-medium", labelClassName)}>
-            {labelFormatter(value, payload)}
+            {labelFormatter(labelValue, payload)}
           </div>
         );
       }
 
-      if (!value) {
+      if (!labelValue) {
         return null;
       }
 
-      return <div className={cn("font-medium", labelClassName)}>{value}</div>;
+      return <div className={cn("font-medium", labelClassName)}>{labelValue}</div>;
     }, [
       label,
       labelFormatter,
@@ -203,7 +203,7 @@ const ChartTooltipContent = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
+          "grid min-w-32 items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
           className,
         )}
       >
@@ -362,11 +362,10 @@ function getPayloadConfigFromPayload(
     return undefined;
   }
 
-  const payloadObj = payload as PayloadRecord;
-  const payloadPayload =
-    "payload" in payloadObj &&
+  const payloadObj = payload as PayloadRecord & { payload?: PayloadRecord };
+  const payloadPayload: PayloadRecord | undefined =
     typeof payloadObj.payload === "object" &&
-    payloadObj.payload !== null
+      payloadObj.payload !== null
       ? payloadObj.payload
       : undefined;
 

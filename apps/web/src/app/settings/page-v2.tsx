@@ -4,10 +4,10 @@ import { useAuth } from '@/contexts/ClerkAuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import Link from 'next/link'
-import { 
-  Loader2, 
-  User, 
-  Shield, 
+import {
+  Loader2,
+  User,
+  Shield,
   Globe,
   Bell,
   Heart,
@@ -36,6 +36,10 @@ export default function SettingsPageV2() {
   }
 
   if (!user) return null
+
+  const primaryEmail = user.primaryEmailAddress?.emailAddress
+    ?? user.emailAddresses?.[0]?.emailAddress
+    ?? ''
 
   const handleSignOut = async () => {
     await signOut()
@@ -95,7 +99,7 @@ export default function SettingsPageV2() {
       <main className="container max-w-3xl mx-auto px-4 py-8">
         {/* User Info - Minimal */}
         <div className="mb-8">
-          <p className="text-sm text-linear-text-secondary">{user.email}</p>
+          <p className="text-sm text-linear-text-secondary">{primaryEmail}</p>
         </div>
 
         {/* Settings List - Clean and Simple */}

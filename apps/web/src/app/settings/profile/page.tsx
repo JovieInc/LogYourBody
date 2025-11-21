@@ -233,6 +233,10 @@ export default function ProfileSettingsPage() {
     return null
   }
 
+  const primaryEmail = user.primaryEmailAddress?.emailAddress
+    ?? user.emailAddresses?.[0]?.emailAddress
+    ?? ''
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -331,7 +335,7 @@ export default function ProfileSettingsPage() {
                     {getInitials(
                       (nameFields.firstName || nameFields.lastName)
                         ? `${nameFields.firstName} ${nameFields.lastName}`
-                        : profile.full_name || user.email || 'U'
+                        : profile.full_name || primaryEmail || 'U'
                     )}
                   </AvatarFallback>
                 </Avatar>
@@ -395,7 +399,7 @@ export default function ProfileSettingsPage() {
                   <Label htmlFor="email" className="text-linear-text-secondary text-sm">Email</Label>
                   <Input
                     id="email"
-                    value={profile.email || user.email || ''}
+                    value={profile.email || primaryEmail || ''}
                     disabled
                     className="bg-linear-bg border-linear-border text-linear-text-tertiary"
                   />
@@ -410,8 +414,8 @@ export default function ProfileSettingsPage() {
                 <button
                   onClick={() => updateLocalProfile({ gender: 'male' })}
                   className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${profile.gender === 'male'
-                      ? 'bg-linear-card text-linear-text shadow-sm'
-                      : 'text-linear-text-tertiary hover:text-linear-text-secondary'
+                    ? 'bg-linear-card text-linear-text shadow-sm'
+                    : 'text-linear-text-tertiary hover:text-linear-text-secondary'
                     }`}
                 >
                   Male
@@ -419,8 +423,8 @@ export default function ProfileSettingsPage() {
                 <button
                   onClick={() => updateLocalProfile({ gender: 'female' })}
                   className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${profile.gender === 'female'
-                      ? 'bg-linear-card text-linear-text shadow-sm'
-                      : 'text-linear-text-tertiary hover:text-linear-text-secondary'
+                    ? 'bg-linear-card text-linear-text shadow-sm'
+                    : 'text-linear-text-tertiary hover:text-linear-text-secondary'
                     }`}
                 >
                   Female

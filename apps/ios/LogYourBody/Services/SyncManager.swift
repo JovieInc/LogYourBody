@@ -167,6 +167,13 @@ class SyncManager: ObservableObject {
                     // print("✅ Got Clerk session token, starting sync...")
                     self.performSync(token: token)
                 } catch {
+                    let context = ErrorContext(
+                        feature: "sync",
+                        operation: "syncAll",
+                        screen: nil,
+                        userId: self.authManager.currentUser?.id
+                    )
+                    ErrorReporter.shared.captureNonFatal(error, context: context)
                     // print("❌ Token error: \(error)")
                     self.isSyncing = false
                     self.syncStatus = .error("Token error: \(error.localizedDescription)")
@@ -259,6 +266,13 @@ class SyncManager: ObservableObject {
                 self.lastSyncDate = Date()
             }
         } catch {
+            let context = ErrorContext(
+                feature: "sync",
+                operation: "downloadRemoteChanges",
+                screen: nil,
+                userId: userId
+            )
+            ErrorReporter.shared.captureNonFatal(error, context: context)
             await MainActor.run {
                 self.isSyncing = false
                 self.syncStatus = .error("Download failed: \(error.localizedDescription)")
@@ -479,6 +493,14 @@ class SyncManager: ObservableObject {
                     self.updatePendingSyncCount()
                 }
             } catch {
+                let userId = await MainActor.run { self.authManager.currentUser?.id }
+                let context = ErrorContext(
+                    feature: "sync",
+                    operation: "performSync",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.captureNonFatal(error, context: context)
                 // print("❌ Sync error: \(error)")
                 await MainActor.run {
                     self.isSyncing = false

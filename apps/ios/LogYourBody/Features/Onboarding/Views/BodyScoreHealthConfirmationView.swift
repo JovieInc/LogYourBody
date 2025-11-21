@@ -16,10 +16,28 @@ struct BodyScoreHealthConfirmationView: View {
             title: "Health data synced",
             subtitle: "We grabbed the latest stats from Apple Health. Confirm or edit anything before continuing.",
             onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .healthConfirmation),
             content: {
                 VStack(spacing: 24) {
                     OnboardingCard {
                         VStack(alignment: .leading, spacing: 16) {
+                            if let status = viewModel.healthKitConnectionStatusText {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(Color.green)
+
+                                    Text(status)
+                                        .font(OnboardingTypography.caption)
+                                        .foregroundStyle(Color.appTextSecondary)
+
+                                    Spacer()
+                                }
+
+                                Divider()
+                                    .overlay(Color.appBorder.opacity(0.4))
+                            }
+
                             ForEach(metrics) { metric in
                                 HStack(alignment: .top, spacing: 12) {
                                     Image(systemName: metric.icon)

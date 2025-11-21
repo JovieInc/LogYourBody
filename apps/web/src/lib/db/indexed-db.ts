@@ -92,7 +92,7 @@ class IndexedDBManager {
     const cached: CachedBodyMetrics = {
       ...metrics,
       user_id: userId,
-      sync_status: 'pending',
+      sync_status: metrics.sync_status ?? 'pending',
       is_deleted: false,
       last_modified: new Date(),
     };
@@ -131,7 +131,7 @@ class IndexedDBManager {
 
     const cached: DailyMetrics = {
       ...metrics,
-      sync_status: 'pending',
+      sync_status: metrics.sync_status ?? 'pending',
       is_deleted: false,
       last_modified: new Date(),
     };
@@ -168,7 +168,7 @@ class IndexedDBManager {
 
     const cached: CachedProfile = {
       ...profile,
-      sync_status: 'pending',
+      sync_status: profile.sync_status ?? 'pending',
       is_deleted: false,
       last_modified: new Date(),
     };

@@ -3,12 +3,14 @@ import SwiftUI
 struct BodyScoreManualWeightView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var weightFieldFocused: Bool
+    @State private var weightError: String?
 
     var body: some View {
         OnboardingPageTemplate(
             title: "What’s your most recent weight?",
             subtitle: "Helps us calculate lean mass and Body Score.",
             onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .manualWeight),
             content: {
                 VStack(spacing: 28) {
                     VStack(alignment: .leading, spacing: 16) {
@@ -25,6 +27,13 @@ struct BodyScoreManualWeightView: View {
                             ))
                             .keyboardType(.decimalPad)
                             .focused($weightFieldFocused)
+                            .submitLabel(.done)
+                            .onSubmit {
+                                weightFieldFocused = false
+                            }
+                            .onChange(of: viewModel.manualWeightText) { _, newValue in
+                                validateWeight(newValue)
+                            }
                             .padding(.horizontal, 20)
                             .padding(.vertical, 16)
                             .background(
@@ -37,8 +46,14 @@ struct BodyScoreManualWeightView: View {
                             )
                         }
 
-                        OnboardingCaptionText(text: viewModel.weightHelperText, alignment: .leading)
-                            .foregroundStyle(Color.appTextSecondary)
+                        if let error = weightError {
+                            Text(error)
+                                .font(OnboardingTypography.caption)
+                                .foregroundStyle(Color.red)
+                        } else {
+                            OnboardingCaptionText(text: viewModel.weightHelperText, alignment: .leading)
+                                .foregroundStyle(Color.appTextSecondary)
+                        }
                     }
 
                     OnboardingCard {
@@ -72,6 +87,16 @@ struct BodyScoreManualWeightView: View {
                 self.weightFieldFocused = true
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .keyboard) {
+                HStack {
+                    Spacer()
+                    Button("Done") {
+                        weightFieldFocused = false
+                    }
+                }
+            }
+        }
     }
 
     private var weightUnitBinding: Binding<WeightUnit> {
@@ -83,6 +108,35 @@ struct BodyScoreManualWeightView: View {
 
     private var continueButtonOpacity: Double {
         viewModel.canContinueWeight ? 1 : 0.4
+    }
+
+    private func validateWeight(_ value: String) {
+        guard !value.isEmpty else {
+            weightError = nil
+            return
+        }
+
+        guard let numeric = Double(value) else {
+            weightError = "Enter a valid number."
+            return
+        }
+
+        let poundsEquivalent: Double
+        if viewModel.weightUnit == .kilograms {
+            poundsEquivalent = numeric * 2.2046226218
+        } else {
+            poundsEquivalent = numeric
+        }
+
+        if poundsEquivalent < 70 {
+            if viewModel.weightUnit == .kilograms {
+                weightError = "Enter at least 32 kg (about 70 lbs)."
+            } else {
+                weightError = "Enter at least 70 lbs (about 32 kg)."
+            }
+        } else {
+            weightError = nil
+        }
     }
 
     private var weightFieldBorderColor: Color {

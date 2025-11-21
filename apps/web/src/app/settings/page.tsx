@@ -6,11 +6,11 @@ import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Loader2, 
-  User, 
-  Shield, 
-  Bell, 
+import {
+  Loader2,
+  User,
+  Shield,
+  Bell,
   Globe,
   ChevronRight,
   ArrowLeft,
@@ -43,6 +43,12 @@ export default function SettingsPage() {
   if (!user) {
     return null
   }
+
+  const primaryEmail = user.primaryEmailAddress?.emailAddress
+    ?? user.emailAddresses?.[0]?.emailAddress
+    ?? ''
+
+  const memberSinceYear = user.createdAt?.getFullYear() ?? new Date().getFullYear()
 
   const settingsItems = [
     {
@@ -116,13 +122,13 @@ export default function SettingsPage() {
               <div className="flex items-center gap-4">
                 <div className="h-16 w-16 rounded-full bg-linear-purple/10 flex items-center justify-center">
                   <span className="text-xl font-bold text-linear-text">
-                    {user.email?.charAt(0).toUpperCase()}
+                    {primaryEmail.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-linear-text">{user.email}</h2>
+                  <h2 className="text-lg font-semibold text-linear-text">{primaryEmail}</h2>
                   <p className="text-sm text-linear-text-secondary">
-                    Free Plan • Member since {new Date().getFullYear()}
+                    Free Plan • Member since {memberSinceYear}
                   </p>
                 </div>
               </div>
@@ -161,8 +167,8 @@ export default function SettingsPage() {
           {/* Sign Out Button */}
           <Card className="bg-linear-card border-linear-border mt-8">
             <CardContent className="p-4">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 className="w-full justify-start text-red-500 hover:text-red-400 hover:bg-red-500/10"
                 onClick={signOut}
               >

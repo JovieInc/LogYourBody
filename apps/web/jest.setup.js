@@ -109,7 +109,7 @@ jest.mock('@/lib/supabase/client', () => ({
     url: { exists: true, valid: true, value: 'https://test.supabase.co' },
     anonKey: { exists: true, valid: true, value: 'test-key' },
   })),
-  testSupabaseConnection: jest.fn(() => 
+  testSupabaseConnection: jest.fn(() =>
     Promise.resolve({ success: true, message: 'Connected successfully' })
   ),
 }))
@@ -125,15 +125,15 @@ if (typeof global !== 'undefined') {
       this.error = null
       this.readyState = 'pending'
     }
-    
+
     addEventListener(event, handler) {
       if (event === 'success') this.onsuccess = handler
       if (event === 'error') this.onerror = handler
     }
-    
-    removeEventListener() {}
+
+    removeEventListener() { }
   }
-  
+
   // Set up global IndexedDB mocks
   global.IDBRequest = MockIDBRequest
   global.IDBDatabase = jest.fn()
@@ -147,7 +147,7 @@ if (typeof global !== 'undefined') {
     upperBound: jest.fn(),
     only: jest.fn(),
   }
-  
+
   global.indexedDB = {
     open: jest.fn(() => {
       const request = new MockIDBRequest()
@@ -181,7 +181,7 @@ if (typeof window !== 'undefined') {
       dispatchEvent: jest.fn(),
     })),
   })
-  
+
   // Also add window.location.origin for tests - don't delete, just extend
   if (!window.location.origin) {
     Object.defineProperty(window.location, 'origin', {
@@ -230,15 +230,6 @@ jest.mock('@/contexts/ClerkAuthContext', () => ({
     signOut: jest.fn(),
     signInWithProvider: jest.fn(),
   })),
-}))
-
-// Mock lucide-react icons
-jest.mock('lucide-react', () => ({
-  BarChart3: function BarChart3() {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('react').createElement('svg')
-  },
-  // Add other icons as needed
 }))
 
 // Mock framer-motion

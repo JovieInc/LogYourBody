@@ -141,16 +141,16 @@ export default function ImportPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      
+
       const response = await fetch('/api/parse-pdf', {
         method: 'POST',
         body: formData
       })
-      
+
       if (!response.ok) {
         const errorData = await response.json()
         console.error('PDF parsing error response:', errorData)
-        
+
         // Check for specific error types
         if (errorData.error?.includes('OpenAI API key not configured')) {
           throw new Error('PDF parsing requires an OpenAI API key. Please set OPENAI_API_KEY in your environment variables.')
@@ -159,12 +159,12 @@ export default function ImportPage() {
         } else if (errorData.details?.includes('rate limit')) {
           throw new Error('OpenAI rate limit exceeded. Please try again in a few moments.')
         }
-        
+
         throw new Error(errorData.error || errorData.details || 'Failed to parse PDF')
       }
-      
+
       const result = await response.json()
-      
+
       if (result.success && result.data) {
         const data = result.data
         return {
@@ -217,32 +217,35 @@ export default function ImportPage() {
         const worksheet = workbook.Sheets[sheetName]
         data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false }) as SpreadsheetCell[][]
       }
-      
+
       if (data.length < 2) return null
-      
+
       const headers = data[0].map(h => String(h).toLowerCase())
       const entries: ParsedData['entries'] = []
-      
+
       for (let i = 1; i < data.length; i++) {
         const row = data[i]
         if (!row || row.every(cell => !cell)) continue // Skip empty rows
-        
+
         const entry: Partial<ParsedData['entries'][number]> = {}
-        
+
         headers.forEach((header, index) => {
           const value = row[index]
           if (!value) return
-          
+
           if (header.includes('date')) {
             // Handle various date formats
             if (value instanceof Date) {
               entry.date = format(value, 'yyyy-MM-dd')
-            } else {
+            } else if (typeof value === 'string' || typeof value === 'number') {
               try {
                 entry.date = format(new Date(value), 'yyyy-MM-dd')
               } catch {
-                entry.date = value
+                entry.date = String(value)
               }
+            } else {
+              // Fallback: store as string if we somehow get another type
+              entry.date = String(value)
             }
           } else if (header.includes('weight')) {
             entry.weight = parseFloat(String(value))
@@ -260,7 +263,7 @@ export default function ImportPage() {
             entry.notes = String(value)
           }
         })
-        
+
         if (entry.date && (entry.weight || entry.body_fat_percentage)) {
           entries.push({
             date: entry.date,
@@ -274,11 +277,11 @@ export default function ImportPage() {
           })
         }
       }
-      
+
       if (entries.length > 0) {
         // Sort by date
         entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        
+
         return {
           type: 'weight',
           entries: entries,
@@ -311,13 +314,13 @@ export default function ImportPage() {
 
       for (const file of uploadedFiles) {
         const fileType = detectFileType(file)
-        
+
         if (fileType === 'image') {
           setProcessingStatus(`Extracting date from ${file.name}...`)
           // Process image with EXIF date extraction
           const date = await extractDateFromImage(file)
           const photoUrl = URL.createObjectURL(file)
-          
+
           allEntries.push({
             date,
             photo_url: photoUrl,
@@ -326,7 +329,7 @@ export default function ImportPage() {
           })
           dataType = 'photos'
           sources.push('Images')
-          
+
         } else if (fileType === 'pdf') {
           setProcessingStatus(`Analyzing PDF with AI: ${file.name}...`)
           // Process PDF with OpenAI
@@ -336,7 +339,7 @@ export default function ImportPage() {
             dataType = 'body_composition'
             sources.push(pdfData.metadata?.source || 'PDF')
           }
-          
+
         } else if (fileType === 'csv') {
           setProcessingStatus(`Parsing spreadsheet: ${file.name}...`)
           // Process CSV or Excel
@@ -351,7 +354,7 @@ export default function ImportPage() {
       if (allEntries.length > 0) {
         // Sort entries by date
         allEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        
+
         setParsedData({
           type: dataType,
           entries: allEntries,
@@ -364,7 +367,7 @@ export default function ImportPage() {
             } : undefined
           }
         })
-        
+
         // Select all by default
         setSelectedEntries(new Set(Array.from({ length: allEntries.length }, (_, i) => i)))
       } else {
@@ -377,7 +380,7 @@ export default function ImportPage() {
     } catch (error) {
       console.error('Error processing files:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      
+
       // Show specific error message for OpenAI API key
       if (errorMessage.includes('OpenAI API key') || errorMessage.includes('PDF parsing requires')) {
         toast({
@@ -436,90 +439,90 @@ export default function ImportPage() {
     setUploadProgress(0)
     setUploadErrors([])
     setSuccessCount(0)
-    
+
     try {
       const supabase = createClient()
       const selectedData = parsedData.entries.filter((_, index) => selectedEntries.has(index))
-      
+
       if (parsedData.type === 'photos') {
         setProcessingStatus('Starting photo upload...')
         // Upload photos to Supabase Storage first - sequentially to avoid rate limits
         const uploadResults = []
         let successfulUploads = 0
         const errors: string[] = []
-        
+
         for (let index = 0; index < selectedData.length; index++) {
           const entry = selectedData[index]
           const progress = Math.round(((index + 1) / selectedData.length) * 100)
           setUploadProgress(progress)
-          
+
           if (!entry.photo_url) {
             uploadResults.push(null)
             continue
           }
-          
+
           try {
             setProcessingStatus(`Uploading photo ${index + 1} of ${selectedData.length}...`)
-            
+
             // Convert blob URL to file
             const response = await fetch(entry.photo_url)
             if (!response.ok) {
               throw new Error(`Failed to fetch photo: ${response.status} ${response.statusText}`)
             }
-            
+
             const blob = await response.blob()
             if (!blob || blob.size === 0) {
               throw new Error('Invalid photo data: empty blob')
             }
-            
+
             const fileName = `${user.id}/${Date.now()}-${entry.notes?.replace(/[^a-zA-Z0-9]/g, '-') || 'photo'}.jpg`
-          
-          // Upload to Supabase Storage using our utility
-          const { publicUrl, error: uploadError } = await uploadToStorage(
-            'photos',
-            fileName,
-            blob,
-            { contentType: 'image/jpeg' }
-          )
-          
-          if (uploadError) {
-            console.error('Upload error details:', {
-              error: uploadError,
+
+            // Upload to Supabase Storage using our utility
+            const { publicUrl, error: uploadError } = await uploadToStorage(
+              'photos',
               fileName,
-              blobSize: blob.size,
-              blobType: blob.type
-            })
-            throw uploadError
-          }
-          
-          // Create body metrics entry with photo
-          const { error: metricsError } = await supabase
-            .from('body_metrics')
-            .insert({
-              user_id: user.id,
-              date: entry.date,
-              photo_url: publicUrl,
-              notes: entry.notes
-            })
-          
-          if (metricsError) {
-            console.error('Metrics error:', metricsError)
-            throw metricsError
-          }
-          
-          uploadResults.push({ success: true, url: publicUrl })
-          successfulUploads++
-          setSuccessCount(successfulUploads)
+              blob,
+              { contentType: 'image/jpeg' }
+            )
+
+            if (uploadError) {
+              console.error('Upload error details:', {
+                error: uploadError,
+                fileName,
+                blobSize: blob.size,
+                blobType: blob.type
+              })
+              throw uploadError
+            }
+
+            // Create body metrics entry with photo
+            const { error: metricsError } = await supabase
+              .from('body_metrics')
+              .insert({
+                user_id: user.id,
+                date: entry.date,
+                photo_url: publicUrl,
+                notes: entry.notes
+              })
+
+            if (metricsError) {
+              console.error('Metrics error:', metricsError)
+              throw metricsError
+            }
+
+            uploadResults.push({ success: true, url: publicUrl })
+            successfulUploads++
+            setSuccessCount(successfulUploads)
           } catch (photoError) {
             // Properly extract error details
-            const errorMessage = photoError instanceof Error 
-              ? photoError.message 
-              : typeof photoError === 'string' 
-              ? photoError 
-              : 'Unknown error occurred'
-            
+            const errorMessage = photoError instanceof Error
+              ? photoError.message
+              : typeof photoError === 'string'
+                ? photoError
+                : 'Unknown error occurred'
+
             console.error(`Error uploading photo ${index + 1}:`, errorMessage)
-            
+
             // Log full error details for debugging
             if (photoError instanceof Error) {
               console.error('Error details:', {
@@ -530,22 +533,22 @@ export default function ImportPage() {
             } else {
               console.error('Non-Error object:', JSON.stringify(photoError, null, 2))
             }
-            
+
             const errorString = `Photo ${index + 1}: ${errorMessage}`
             errors.push(errorString)
             setUploadErrors(errors)
             uploadResults.push({ success: false, error: errorMessage, fileName: entry.notes })
           }
-          
+
           // Add a small delay between uploads to avoid rate limiting
           if (index < selectedData.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 500))
           }
         }
-        
+
         const successCount = uploadResults.filter(r => r?.success).length
         const failCount = uploadResults.filter(r => r && !r.success).length
-        
+
         if (failCount > 0) {
           // Get first few error messages for display
           const errorMessages = uploadResults
@@ -553,13 +556,13 @@ export default function ImportPage() {
             .slice(0, 3)
             .map(r => r.error)
             .join(', ')
-          
+
           toast({
             title: "Some photos failed to upload",
             description: `${successCount} photos imported successfully, ${failCount} failed. Errors: ${errorMessages}`,
             variant: "default"
           })
-          
+
           // Log all errors for debugging
           uploadResults
             .filter((r): r is NonNullable<typeof r> => r !== null && !r.success)
@@ -579,11 +582,11 @@ export default function ImportPage() {
           hip: entry.hip,
           notes: entry.notes
         }))
-        
+
         const { error } = await supabase
           .from('body_metrics')
           .insert(metricsData)
-        
+
         if (error) throw error
       }
 
@@ -763,8 +766,8 @@ export default function ImportPage() {
                     </CardDescription>
                   </div>
                   <Badge variant="secondary">
-                    {parsedData.type === 'photos' ? 'Progress Photos' : 
-                     parsedData.type === 'body_composition' ? 'Body Composition' : 'Weight History'}
+                    {parsedData.type === 'photos' ? 'Progress Photos' :
+                      parsedData.type === 'body_composition' ? 'Body Composition' : 'Weight History'}
                   </Badge>
                 </div>
               </CardHeader>
@@ -798,9 +801,8 @@ export default function ImportPage() {
                       {parsedData.entries.map((entry, index) => (
                         <div
                           key={index}
-                          className={`relative cursor-pointer transition-opacity ${
-                            selectedEntries.has(index) ? 'opacity-100' : 'opacity-40'
-                          }`}
+                          className={`relative cursor-pointer transition-opacity ${selectedEntries.has(index) ? 'opacity-100' : 'opacity-40'
+                            }`}
                           onClick={() => handleEntryToggle(index)}
                         >
                           <div className="aspect-[3/4] relative bg-linear-border rounded-lg overflow-hidden">
@@ -813,11 +815,10 @@ export default function ImportPage() {
                             )}
                           </div>
                           <div className="absolute top-2 right-2">
-                            <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${
-                              selectedEntries.has(index) 
-                                ? 'bg-linear-purple border-linear-purple' 
+                            <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${selectedEntries.has(index)
+                                ? 'bg-linear-purple border-linear-purple'
                                 : 'bg-linear-bg border-linear-border'
-                            }`}>
+                              }`}>
                               {selectedEntries.has(index) && (
                                 <Check className="h-3 w-3 text-white" />
                               )}
@@ -835,16 +836,14 @@ export default function ImportPage() {
                       {parsedData.entries.map((entry, index) => (
                         <div
                           key={index}
-                          className={`flex items-center gap-2 sm:gap-4 p-3 sm:p-4 hover:bg-linear-card/50 cursor-pointer transition-colors ${
-                            selectedEntries.has(index) ? 'bg-linear-purple/5' : ''
-                          }`}
+                          className={`flex items-center gap-2 sm:gap-4 p-3 sm:p-4 hover:bg-linear-card/50 cursor-pointer transition-colors ${selectedEntries.has(index) ? 'bg-linear-purple/5' : ''
+                            }`}
                           onClick={() => handleEntryToggle(index)}
                         >
-                          <div className={`h-5 w-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                            selectedEntries.has(index) 
-                              ? 'bg-linear-purple border-linear-purple' 
+                          <div className={`h-5 w-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selectedEntries.has(index)
+                              ? 'bg-linear-purple border-linear-purple'
                               : 'border-linear-border'
-                          }`}>
+                            }`}>
                             {selectedEntries.has(index) && (
                               <Check className="h-3 w-3 text-white" />
                             )}
@@ -917,7 +916,7 @@ export default function ImportPage() {
       </main>
 
       {/* Upload Progress Dialog */}
-      <Dialog open={isProcessing} onOpenChange={() => {}}>
+      <Dialog open={isProcessing} onOpenChange={() => { }}>
         <DialogContent className="sm:max-w-md bg-linear-card border-linear-border">
           <DialogHeader>
             <DialogTitle className="text-linear-text">
@@ -927,7 +926,7 @@ export default function ImportPage() {
               {processingStatus}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Progress Bar */}
             <div className="space-y-2">

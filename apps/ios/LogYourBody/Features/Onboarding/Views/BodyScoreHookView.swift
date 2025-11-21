@@ -13,7 +13,8 @@ struct BodyScoreHookView: View {
         OnboardingPageTemplate(
             title: "Build a dialed-in body.",
             subtitle: "Get your Body Score in under a minute.",
-            showsBackButton: false
+            showsBackButton: false,
+            progress: viewModel.progress(for: .hook)
         ) {
             VStack(spacing: 32) {
                 OnboardingBadge(text: "Body Score Early Access")

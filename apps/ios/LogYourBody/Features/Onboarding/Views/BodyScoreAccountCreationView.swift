@@ -10,6 +10,7 @@ struct BodyScoreAccountCreationView: View {
             title: "Create your account",
             subtitle: "Use your email and a secure password to save progress.",
             onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .account),
             content: {
                 VStack(spacing: 24) {
                     summaryCard
@@ -104,8 +105,18 @@ struct BodyScoreAccountCreationView: View {
 
     private var passwordRules: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ruleRow(text: "At least 8 characters", satisfied: viewModel.accountPassword.count >= 8)
-            ruleRow(text: "Mix of letters & numbers", satisfied: hasLetters && hasNumbers)
+            ruleRow(
+                text: "At least 8 characters",
+                satisfied: viewModel.accountPasswordHasMinLength
+            )
+            ruleRow(
+                text: "Mix of uppercase & lowercase",
+                satisfied: viewModel.accountPasswordHasUpperAndLowercase
+            )
+            ruleRow(
+                text: "At least one number or symbol",
+                satisfied: viewModel.accountPasswordHasNumberOrSymbol
+            )
         }
     }
 
@@ -117,14 +128,6 @@ struct BodyScoreAccountCreationView: View {
                 .font(OnboardingTypography.caption)
                 .foregroundStyle(satisfied ? Color.appText : Color.appTextSecondary)
         }
-    }
-
-    private var hasLetters: Bool {
-        viewModel.accountPassword.rangeOfCharacter(from: .letters) != nil
-    }
-
-    private var hasNumbers: Bool {
-        viewModel.accountPassword.rangeOfCharacter(from: .decimalDigits) != nil
     }
 
     private func submit() {

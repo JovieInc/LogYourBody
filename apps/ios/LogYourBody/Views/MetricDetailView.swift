@@ -647,10 +647,11 @@ struct MetricDetailView: View {
 
     private var displayedTimestamp: String {
         if let selected = selectedDataPoint,
-           let point = chartData.first(where: { $0.index == selected.index }) {
-            // Calculate the date for this point
-            let daysAgo = chartData.count - 1 - chartData.firstIndex(where: { $0.index == point.index })!
-            let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+           let index = chartData.firstIndex(where: { $0.index == selected.index }) {
+            let daysAgo = chartData.count - 1 - index
+            let baseDate = Date()
+            let calendar = Calendar.current
+            let date = calendar.date(byAdding: .day, value: -daysAgo, to: baseDate) ?? baseDate
             return formatTimestamp(date)
         }
         return timestamp.map { formatTimestamp($0) } ?? ""
@@ -844,17 +845,17 @@ private struct MetricStatCard: View {
         VStack(spacing: 8) {
             Text(label)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.metricTextSecondary)
 
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(.system(size: 26, weight: .semibold))
-                    .foregroundColor(isChange ? changeColor : .white)
+                    .foregroundColor(isChange ? changeColor : Color.metricTextPrimary)
 
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.metricTextTertiary)
                 }
             }
         }
@@ -866,11 +867,11 @@ private struct MetricStatCard: View {
 
     private var changeColor: Color {
         if value.hasPrefix("+") {
-            return .green
+            return Color.metricDeltaPositive
         } else if value.hasPrefix("-") {
-            return .red
+            return Color.metricDeltaNegative
         } else {
-            return .white
+            return Color.metricTextPrimary
         }
     }
 }

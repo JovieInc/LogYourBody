@@ -213,6 +213,19 @@ class HealthKitManager: ObservableObject {
 
             return isAuthorized
         } catch {
+            let appError: AppError
+            if let hkError = error as? HealthKitError {
+                appError = .healthKit(hkError)
+            } else {
+                appError = .unexpected(context: "requestAuthorization", underlying: error)
+            }
+            let context = ErrorContext(
+                feature: "healthKit",
+                operation: "requestAuthorization",
+                screen: nil,
+                userId: await MainActor.run { AuthManager.shared.currentUser?.id }
+            )
+            ErrorReporter.shared.capture(appError, context: context)
             // print("HealthKit authorization failed: \(error)")
             return false
         }
@@ -816,78 +829,11 @@ class HealthKitManager: ObservableObject {
             bodyFatByDate[normalizedDate] = percentage
         }
 
-        // Process weight entries and match with body fat if available
-        var newEntriesCount = 0
-        var skippedEntriesCount = 0
-
-        for (weight, date) in weightHistory {
-            // Check if this entry already exists (by date)
-            let exists = await weightEntryExists(for: date)
-
-            if !exists {
-                newEntriesCount += 1
-                // Check if we have body fat data for the same day
-                let normalizedDate = Calendar.current.startOfDay(for: date)
-                let bodyFatPercentage = bodyFatByDate[normalizedDate]
-
-                // Create body metrics with both weight and body fat
-                let metrics = BodyMetrics(
-                    id: UUID().uuidString,
-                    userId: "", // Will be filled by SyncManager
-                    date: date,
-                    weight: weight,  // Already in kg from fetchWeightHistory
-                    weightUnit: "kg",  // Always store in kg
-                    bodyFatPercentage: bodyFatPercentage,
-                    bodyFatMethod: bodyFatPercentage != nil ? "HealthKit" : nil,
-                    muscleMass: nil,
-                    boneMass: nil,
-                    notes: "Imported from HealthKit (incremental)",
-                    photoUrl: nil,
-                    dataSource: "HealthKit",
-                    createdAt: Date(),
-                    updatedAt: Date()
-                )
-
-                // Save to local storage and sync to backend
-                try await saveBodyMetrics(metrics)
-            }
-        }
-
-        // Also check for standalone body fat entries (without weight)
-        for (percentage, date) in bodyFatHistory {
-            let normalizedDate = Calendar.current.startOfDay(for: date)
-
-            // Check if we already processed this with weight data
-            let alreadyProcessed = weightHistory.contains { _, weightDate in
-                Calendar.current.startOfDay(for: weightDate) == normalizedDate
-            }
-
-            if !alreadyProcessed {
-                let exists = await dailyMetricsExists(for: date)
-
-                if !exists {
-                    // Create body metrics with just body fat
-                    let metrics = BodyMetrics(
-                        id: UUID().uuidString,
-                        userId: "", // Will be filled by SyncManager
-                        date: date,
-                        weight: nil,
-                        weightUnit: nil,
-                        bodyFatPercentage: percentage,
-                        bodyFatMethod: "HealthKit",
-                        muscleMass: nil,
-                        boneMass: nil,
-                        notes: "Body fat imported from HealthKit (incremental)",
-                        photoUrl: nil,
-                        dataSource: "HealthKit",
-                        createdAt: Date(),
-                        updatedAt: Date()
-                    )
-
-                    try await saveBodyMetrics(metrics)
-                }
-            }
-        }
+        // Process weight and body fat entries using shared batch logic
+        _ = await processBatchHealthKitData(
+            weightHistory: weightHistory,
+            bodyFatHistory: bodyFatHistory
+        )
     }
 
     // Sync ALL historical HealthKit data efficiently
@@ -981,12 +927,29 @@ class HealthKitManager: ObservableObject {
                 }
             }
         } catch {
+            let appError: AppError
+            if let hkError = error as? HealthKitError {
+                appError = .healthKit(hkError)
+            } else {
+                appError = .unexpected(context: "syncAllHistoricalHealthKitData", underlying: error)
+            }
+            let context = ErrorContext(
+                feature: "healthKit",
+                operation: "syncAllHistoricalHealthKitData",
+                screen: nil,
+                userId: await MainActor.run { AuthManager.shared.currentUser?.id }
+            )
+            ErrorReporter.shared.capture(appError, context: context)
             await MainActor.run {
                 importProgress = 0.0
                 importStatus = "Import failed: \(error.localizedDescription)"
                 isImporting = false
             }
         }
+    }
+
+    func forceFullHealthKitSync() async {
+        await syncAllHistoricalHealthKitData()
     }
 
     // Get the earliest weight entry date from HealthKit
@@ -1088,6 +1051,19 @@ class HealthKitManager: ObservableObject {
                     imported += 1
                     existingEntriesByHour.insert(hourKey) // Add to set to prevent duplicates in same batch
                 } catch {
+                    let appError: AppError
+                    if let hkError = error as? HealthKitError {
+                        appError = .healthKit(hkError)
+                    } else {
+                        appError = .unexpected(context: "processBatchHealthKitData.saveBodyMetrics", underlying: error)
+                    }
+                    let context = ErrorContext(
+                        feature: "healthKit",
+                        operation: "processBatchHealthKitData",
+                        screen: nil,
+                        userId: userId
+                    )
+                    ErrorReporter.shared.capture(appError, context: context)
                     // print("Failed to save entry: \(error)")
                 }
             } else {
@@ -1228,6 +1204,14 @@ class HealthKitManager: ObservableObject {
             )
             // print("✅ Enabled background step delivery")
         } catch {
+            let appError = AppError.unexpected(context: "enableBackgroundStepDelivery", underlying: error)
+            let context = ErrorContext(
+                feature: "healthKit",
+                operation: "enableBackgroundStepDelivery",
+                screen: nil,
+                userId: await MainActor.run { AuthManager.shared.currentUser?.id }
+            )
+            ErrorReporter.shared.capture(appError, context: context)
             // print("❌ Failed to enable background step delivery: \(error)")
         }
     }
@@ -1296,7 +1280,7 @@ class HealthKitManager: ObservableObject {
 
     func syncStepsToSupabase(userId: String) async {
         // Get today's steps
-        let todaySteps = self.todayStepCount
+        let todaySteps = todayStepCount
         guard todaySteps > 0 else { return }
 
         // Get or create today's daily metrics
@@ -1316,7 +1300,7 @@ class HealthKitManager: ObservableObject {
                 createdAt: today,
                 updatedAt: today
             )
-        } else if var existingMetrics = metrics {
+        } else if let existingMetrics = metrics {
             // Update existing metrics with new step count
             metrics = DailyMetrics(
                 id: existingMetrics.id,
@@ -1331,26 +1315,12 @@ class HealthKitManager: ObservableObject {
 
         // Save to Core Data
         if let metrics = metrics {
-            await CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
+            CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
 
             // Trigger sync to remote
             Task.detached {
                 await RealtimeSyncManager.shared.syncIfNeeded()
             }
-        }
-    }
-
-    // Force a full HealthKit sync
-    func forceFullHealthKitSync() async {
-        // print("🔄 Force full HealthKit sync requested")
-        // Clear the flag to force a full sync
-        UserDefaults.standard.set(false, forKey: "hasPerformedFullHealthKitSync")
-
-        // Trigger the sync
-        do {
-            try await syncWeightFromHealthKit()
-        } catch {
-            // print("❌ Force sync failed: \(error)")
         }
     }
 
@@ -1377,7 +1347,7 @@ class HealthKitManager: ObservableObject {
                     createdAt: Date(),
                     updatedAt: Date()
                 )
-            } else if var existingMetrics = metrics, existingMetrics.steps != stepCount {
+            } else if let existingMetrics = metrics, existingMetrics.steps != stepCount {
                 // Update if step count is different
                 metrics = DailyMetrics(
                     id: existingMetrics.id,
@@ -1395,7 +1365,7 @@ class HealthKitManager: ObservableObject {
 
             // Save to Core Data
             if let metrics = metrics {
-                await CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
+                CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
             }
         }
 
@@ -1443,7 +1413,7 @@ class HealthKitManager: ObservableObject {
             updatedAt: Date()
         )
 
-        await CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
+        CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
         await RealtimeSyncManager.shared.syncIfNeeded()
     }
 }

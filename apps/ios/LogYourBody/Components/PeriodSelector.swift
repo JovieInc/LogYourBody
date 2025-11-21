@@ -57,22 +57,27 @@ struct PeriodSelector: View {
                 } label: {
                     Text(period.rawValue)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(selectedPeriod == period ? .black : .white.opacity(0.6))
+                        .foregroundColor(
+                            selectedPeriod == period ? Color.metricTextPrimary : Color(hex: "#C7CBD3")
+                        )
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(
-                            selectedPeriod == period ?
-                                Color.white.opacity(0.9) :
-                                Color.clear
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(selectedPeriod == period ? Color.metricAccent : Color.clear)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(
+                                            selectedPeriod == period ? Color.clear : Color(hex: "#2A2E36"),
+                                            lineWidth: selectedPeriod == period ? 0 : 1
+                                        )
+                                )
                         )
-                        .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
             }
         }
         .padding(4)
-        .background(Color.white.opacity(0.1))
-        .cornerRadius(10)
     }
 }
 

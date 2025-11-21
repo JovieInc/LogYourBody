@@ -26,8 +26,9 @@ export default function DataExportPage() {
     setStatusMessage('')
 
     try {
-      const token = await user.getToken()
-      
+      const auth = useAuth()
+      const token = await auth.session?.getToken()
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/export-user-data`, {
         method: 'POST',
         headers: {
@@ -59,7 +60,7 @@ export default function DataExportPage() {
           a.click()
           document.body.removeChild(a)
           URL.revokeObjectURL(url)
-          
+
           setExportStatus('success')
           setStatusMessage('Your data has been downloaded successfully.')
         }
@@ -194,8 +195,8 @@ export default function DataExportPage() {
             )}
 
             {/* Export Button */}
-            <Button 
-              onClick={handleExport} 
+            <Button
+              onClick={handleExport}
               disabled={isExporting}
               className="w-full"
             >
@@ -214,7 +215,7 @@ export default function DataExportPage() {
 
             {/* Privacy Note */}
             <p className="text-sm text-linear-text-secondary text-center">
-              {exportMethod === 'email' 
+              {exportMethod === 'email'
                 ? "A secure download link will be sent to your registered email address. The link will expire after 24 hours for security."
                 : "Your data will be prepared and downloaded directly to this device."
               }

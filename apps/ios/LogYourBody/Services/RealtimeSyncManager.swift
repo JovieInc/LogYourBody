@@ -18,6 +18,9 @@ class RealtimeSyncManager: ObservableObject {
     @Published var lastSyncDate: Date?
     @Published var syncStatus: SyncStatus = .idle
     @Published var pendingSyncCount = 0
+    @Published var unsyncedBodyCount = 0
+    @Published var unsyncedDailyCount = 0
+    @Published var unsyncedProfileCount = 0
     @Published var isOnline = true
     @Published var realtimeConnected = false
     @Published var error: String?
@@ -562,6 +565,9 @@ class RealtimeSyncManager: ObservableObject {
             let unsynced = await self.coreDataManager.fetchUnsyncedEntries()
             let operationsCount = await MainActor.run { self.pendingOperations.count }
             await MainActor.run {
+                self.unsyncedBodyCount = unsynced.bodyMetrics.count
+                self.unsyncedDailyCount = unsynced.dailyMetrics.count
+                self.unsyncedProfileCount = unsynced.profiles.count
                 self.pendingSyncCount = unsynced.bodyMetrics.count +
                     unsynced.dailyMetrics.count +
                     unsynced.profiles.count +

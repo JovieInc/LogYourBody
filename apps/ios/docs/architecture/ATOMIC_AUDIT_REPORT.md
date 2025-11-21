@@ -90,7 +90,6 @@ DesignSystem/
 │   └── ...
 ├── Molecules/
 │   ├── Cards/
-│   │   ├── MetricCard.swift
 │   │   ├── DietPhaseCard.swift
 │   │   └── ...
 │   ├── Forms/
@@ -107,6 +106,7 @@ DesignSystem/
 │   │   ├── SignUpForm.swift
 │   │   └── ...
 │   ├── Dashboard/
+│   │   ├── MetricSummaryCard.swift
 │   │   ├── DashboardHeader.swift
 │   │   ├── DashboardContent.swift
 │   │   └── ...
@@ -129,11 +129,11 @@ DesignSystem/
 
 #### Molecules
 - ✅ UserGreeting (partial)
-- ⏳ MetricCard
 - ⏳ SocialLoginButton
 - ⏳ StepsIndicator
 
 #### Organisms
+- ⏳ MetricSummaryCard
 - ⏳ DashboardHeader
 - ⏳ LoadingScreen
 - ⏳ LoginForm

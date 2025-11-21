@@ -19,6 +19,7 @@ struct BodyScoreBasicsView: View {
             title: "Let’s dial in basics.",
             subtitle: "Keep it simple—these power your Body Score.",
             onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .basics),
             content: {
                 VStack(spacing: 28) {
                     OnboardingFormSection(title: "Biological Sex", caption: "Keeps your Body Score precise.") {

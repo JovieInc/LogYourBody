@@ -69,7 +69,7 @@ struct AllMetricsRow: View {
                 } label: {
                     MetricSummaryCard(
                         icon: "figure.walk",
-                        accentColor: .orange,
+                        accentColor: Color(hex: "#FF9F0A"),
                         state: .data(MetricSummaryCard.Content(
                             title: "Steps",
                             value: formatSteps(steps),
@@ -90,7 +90,7 @@ struct AllMetricsRow: View {
             } else {
                 MetricSummaryCard(
                     icon: "figure.walk",
-                    accentColor: .orange,
+                    accentColor: Color(hex: "#FF9F0A"),
                     state: .empty(message: "No steps data", action: nil)
                 )
             }
@@ -118,7 +118,7 @@ struct AllMetricsRow: View {
                 } label: {
                     MetricSummaryCard(
                         icon: "figure.stand",
-                        accentColor: .purple,
+                        accentColor: Color(hex: "#AF52DE"),
                         state: .data(MetricSummaryCard.Content(
                             title: "Weight",
                             value: formatWeight(displayWeight, useMetric: useMetricUnits),
@@ -137,7 +137,7 @@ struct AllMetricsRow: View {
             } else {
                 MetricSummaryCard(
                     icon: "figure.stand",
-                    accentColor: .purple,
+                    accentColor: Color(hex: "#AF52DE"),
                     state: .empty(message: "No weight data", action: nil)
                 )
             }
@@ -152,7 +152,7 @@ struct AllMetricsRow: View {
                 } label: {
                     MetricSummaryCard(
                         icon: "percent",
-                        accentColor: .purple,
+                        accentColor: Color(hex: "#FF2D55"),
                         state: .data(MetricSummaryCard.Content(
                             title: "Body Fat Percentage",
                             value: String(format: "%.1f", bodyFat),
@@ -173,7 +173,7 @@ struct AllMetricsRow: View {
             } else {
                 MetricSummaryCard(
                     icon: "percent",
-                    accentColor: .purple,
+                    accentColor: Color(hex: "#FF2D55"),
                     state: .empty(message: "No body fat data", action: nil)
                 )
             }

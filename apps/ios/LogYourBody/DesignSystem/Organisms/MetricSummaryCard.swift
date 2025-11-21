@@ -115,19 +115,19 @@ public struct MetricSummaryCard: View {
     @ScaledMetric(relativeTo: .body) private var headerIconSize: CGFloat = 18
 
     private let horizontalPadding: CGFloat = 16
-    private let verticalPadding: CGFloat = 16
+    private let verticalPadding: CGFloat = 12
 
     private var isAccessibilityCategory: Bool {
         dynamicTypeSize >= .accessibility1
     }
 
     public var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
 
         return ZStack {
             // Solid background layer
             shape
-                .fill(Color.linearCard)
+                .fill(cardBackgroundColor)
 
             // Optional material overlay for subtle softness (reduced for flatter look)
             if !reduceTransparency {
@@ -143,11 +143,11 @@ public struct MetricSummaryCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
                     .padding(.horizontal, horizontalPadding)
-                    .padding(.top, verticalPadding)
+                    .padding(.top, verticalPadding + 2)
 
                 stateView
                     .padding(.horizontal, horizontalPadding)
-                    .padding(.top, 16)
+                    .padding(.top, verticalPadding)
                     .padding(.bottom, verticalPadding)
             }
         }
@@ -163,11 +163,11 @@ public struct MetricSummaryCard: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: headerIconSize, weight: .semibold))
-                    .foregroundStyle(accentColor)
+                    .foregroundStyle(accentColor.opacity(0.9))
 
                 Text(titleText)
-                    .font(.system(.footnote, design: .rounded).weight(.semibold))
-                    .foregroundStyle(accentColor)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(accentColor.opacity(0.9))
                     .lineLimit(1)
             }
 
@@ -255,7 +255,9 @@ public struct MetricSummaryCard: View {
             if let footnote = content.footnote, !footnote.isEmpty {
                 Text(footnote)
                     .font(.system(.footnote, design: .rounded))
-                    .foregroundStyle(secondaryTextColor.opacity(0.8))
+                    .foregroundStyle(
+                        colorScheme == .dark ? Color.metricTextTertiary : secondaryTextColor.opacity(0.8)
+                    )
             }
         }
     }
@@ -268,6 +270,7 @@ public struct MetricSummaryCard: View {
                         .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
                         .foregroundStyle(primaryTextColor)
                         .monospacedDigit()
+                        .tracking(-0.5)
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
                         .layoutPriority(2)
@@ -279,6 +282,7 @@ public struct MetricSummaryCard: View {
                             .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
                             .foregroundStyle(primaryTextColor)
                             .monospacedDigit()
+                            .tracking(-0.5)
                             +
                             Text(" \(content.unit)")
                             .font(.system(size: unitFontSize, weight: .medium, design: .rounded))
@@ -306,56 +310,59 @@ public struct MetricSummaryCard: View {
 
             if let caption = trend.caption {
                 Text(caption)
-                    .font(.system(.caption2, design: .rounded))
-                    .foregroundStyle(secondaryTextColor.opacity(0.75))
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.metricTextTertiary)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(trendBackground(for: trend.direction))
-        .cornerRadius(20)
+        .cornerRadius(14)
         .foregroundStyle(trendForeground(for: trend.direction))
     }
 
+    private func isStepsContent(_ content: Content) -> Bool {
+        content.unit.lowercased() == "steps"
+    }
+
     private func chart(for content: Content) -> some View {
-        let lineColor = colorScheme == .dark ? Color.white.opacity(0.35) : Color.black.opacity(0.35)
+        let lineColor = Color.metricChartLine
+        let isSteps = isStepsContent(content)
 
         return Chart {
-            // Subtle grey line
-            ForEach(content.dataPoints) { point in
-                LineMark(
-                    x: .value("Index", point.index),
-                    y: .value("Value", point.value)
-                )
-                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                .foregroundStyle(lineColor)
-                .interpolationMethod(.catmullRom)
-            }
+            if isSteps {
+                ForEach(content.dataPoints) { point in
+                    BarMark(
+                        x: .value("Index", point.index),
+                        y: .value("Value", point.value)
+                    )
+                    .foregroundStyle(lineColor)
+                }
+            } else {
+                ForEach(content.dataPoints) { point in
+                    LineMark(
+                        x: .value("Index", point.index),
+                        y: .value("Value", point.value)
+                    )
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    .foregroundStyle(lineColor)
+                    .interpolationMethod(.catmullRom)
+                }
 
-            // Grey dots for all points
-            ForEach(content.dataPoints) { point in
-                PointMark(
-                    x: .value("Index", point.index),
-                    y: .value("Value", point.value)
-                )
-                .symbolSize(12)
-                .foregroundStyle(lineColor)
-            }
-
-            // Accent-colored last point
-            if let last = content.dataPoints.last {
-                PointMark(
-                    x: .value("Index", last.index),
-                    y: .value("Value", last.value)
-                )
-                .symbolSize(18)
-                .foregroundStyle(accentColor)
+                if let last = content.dataPoints.last {
+                    PointMark(
+                        x: .value("Index", last.index),
+                        y: .value("Value", last.value)
+                    )
+                    .symbolSize(9)
+                    .foregroundStyle(lineColor)
+                }
             }
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartLegend(.hidden)
-        .chartYScale(domain: .automatic(includesZero: false))
+        .chartYScale(domain: .automatic(includesZero: isSteps))
         .padding(.vertical, 4)
         .accessibilityLabel(content.chartAccessibilityLabel ?? "Trend chart")
         .accessibilityValue(content.chartAccessibilityValue ?? "Latest value \(content.value) \(content.unit)")
@@ -438,21 +445,25 @@ public struct MetricSummaryCard: View {
         }
     }
 
+    private var cardBackgroundColor: Color {
+        colorScheme == .dark ? Color.metricCard : Color.linearCard
+    }
+
     private var borderColor: Color {
         // Increased opacity for better card definition
-        colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10)
+        colorScheme == .dark ? Color.metricCardBorder.opacity(0.6) : Color.black.opacity(0.10)
     }
 
     private var shadowColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.45) : Color.black.opacity(0.12)
+        colorScheme == .dark ? Color.black.opacity(0.3) : Color.black.opacity(0.12)
     }
 
     private var primaryTextColor: Color {
-        colorScheme == .dark ? Color.white : Color.appText
+        colorScheme == .dark ? Color.metricTextPrimary : Color.appText
     }
 
     private var secondaryTextColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.7) : Color.appTextSecondary
+        colorScheme == .dark ? Color.metricTextSecondary : Color.appTextSecondary
     }
 
     private var placeholderColor: Color {
@@ -470,9 +481,9 @@ public struct MetricSummaryCard: View {
     private func trendBackground(for direction: Trend.Direction) -> Color {
         switch direction {
         case .up:
-            return accentColor.opacity(0.15)
+            return Color.metricDeltaPositive.opacity(0.15)
         case .down:
-            return Color.red.opacity(0.15)
+            return Color.metricDeltaNegative.opacity(0.15)
         case .flat:
             return secondaryTextColor.opacity(0.15)
         }
@@ -481,9 +492,9 @@ public struct MetricSummaryCard: View {
     private func trendForeground(for direction: Trend.Direction) -> Color {
         switch direction {
         case .up:
-            return accentColor
+            return Color.metricDeltaPositive
         case .down:
-            return Color.red
+            return Color.metricDeltaNegative
         case .flat:
             return secondaryTextColor
         }

@@ -104,12 +104,23 @@ StandardCard {
     Text("Card content")
 }
 
-// Metric card
-MetricCard(
-    value: "72.5",
-    label: "Weight (kg)",
+// Metric summary card (Apple Health-style organism)
+MetricSummaryCard(
     icon: "scalemass",
-    trend: .down(2.3)
+    accentColor: .purple,
+    state: .data(
+        .init(
+            title: "Weight",
+            value: "72.5",
+            unit: "kg",
+            timestamp: "Today 9:42 AM",
+            dataPoints: [.init(index: 0, value: 72.8), .init(index: 1, value: 72.5)],
+            chartAccessibilityLabel: "Weight history",
+            chartAccessibilityValue: "Down 0.3 kilograms",
+            trend: .init(direction: .down, valueText: "0.3 kg", caption: "vs last week"),
+            footnote: "Synced via HealthKit"
+        )
+    )
 )
 
 // Info card

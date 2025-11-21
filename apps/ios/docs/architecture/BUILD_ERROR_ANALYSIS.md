@@ -32,7 +32,7 @@ The BaseButton.swift and BaseTextField.swift files are not being included in the
 
 ## Attempted Solutions
 
-1. ✅ Fixed argument order errors in UserGreeting.swift and MetricCard.swift
+1. ✅ Fixed argument order errors in UserGreeting.swift and MetricSummaryCard.swift (replacement for legacy MetricCard.swift)
 2. ✅ Fixed LoadingIndicator → DSLoadingIndicator naming
 3. ❌ Attempted to add files via Ruby script - files not appearing in project
 4. ❌ Clean rebuild - same errors persist

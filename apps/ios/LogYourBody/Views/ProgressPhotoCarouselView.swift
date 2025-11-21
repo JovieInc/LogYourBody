@@ -134,7 +134,7 @@ struct ProgressPhotoCarouselView: View {
             }.filter { !$0.isEmpty }
 
             // Use centralized ImageCacheService for preloading
-            await ImageCacheService.shared.preloadImages(urlsToPreload)
+            ImageCacheService.shared.preloadImages(urlsToPreload)
         }
     }
 }

@@ -3,12 +3,14 @@ import SwiftUI
 struct BodyScoreEmailCaptureView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var emailFieldFocused: Bool
+    @State private var emailError: String?
 
     var body: some View {
         OnboardingPageTemplate(
             title: "Want to save your score?",
             subtitle: "Drop your email to sync progress across devices.",
             onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .emailCapture),
             content: {
                 VStack(spacing: 28) {
                     VStack(alignment: .leading, spacing: 16) {
@@ -24,6 +26,13 @@ struct BodyScoreEmailCaptureView: View {
                         .keyboardType(.emailAddress)
                         .autocorrectionDisabled(true)
                         .focused($emailFieldFocused)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            emailFieldFocused = false
+                        }
+                        .onChange(of: viewModel.emailAddress) { _, _ in
+                            updateEmailError()
+                        }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 16)
                         .background(
@@ -35,10 +44,16 @@ struct BodyScoreEmailCaptureView: View {
                                 .stroke(emailFieldStrokeColor)
                         )
 
-                        OnboardingCaptionText(
-                            text: "We’ll send your Body Score and keep progress synced.",
-                            alignment: .leading
-                        )
+                        if let error = emailError {
+                            Text(error)
+                                .font(OnboardingTypography.caption)
+                                .foregroundStyle(Color.red)
+                        } else {
+                            OnboardingCaptionText(
+                                text: "We’ll send your Body Score and keep progress synced.",
+                                alignment: .leading
+                            )
+                        }
                     }
 
                     OnboardingCard {
@@ -68,6 +83,17 @@ struct BodyScoreEmailCaptureView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 self.emailFieldFocused = true
             }
+            updateEmailError()
+        }
+        .toolbar {
+            ToolbarItem(placement: .keyboard) {
+                HStack {
+                    Spacer()
+                    Button("Done") {
+                        emailFieldFocused = false
+                    }
+                }
+            }
         }
     }
 }
@@ -82,6 +108,20 @@ private extension BodyScoreEmailCaptureView {
             return Color.appPrimary
         }
         return Color.appBorder.opacity(0.4)
+    }
+
+    private func updateEmailError() {
+        let trimmed = viewModel.emailAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            emailError = nil
+            return
+        }
+
+        if viewModel.canContinueEmailCapture {
+            emailError = nil
+        } else {
+            emailError = "Enter a valid email address."
+        }
     }
 }
 

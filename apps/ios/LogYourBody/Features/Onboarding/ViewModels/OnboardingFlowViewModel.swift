@@ -39,6 +39,17 @@ final class OnboardingFlowViewModel: ObservableObject {
         case paywall
     }
 
+    struct ProgressContext: Equatable {
+        let currentIndex: Int
+        let totalCount: Int
+        let label: String
+
+        var fractionComplete: Double {
+            guard totalCount > 0 else { return 0 }
+            return min(max(Double(currentIndex) / Double(totalCount), 0), 1)
+        }
+    }
+
     func startHealthKitImport() {
         guard !isRequestingHealthImport else { return }
         isRequestingHealthImport = true
@@ -111,6 +122,9 @@ final class OnboardingFlowViewModel: ObservableObject {
     private var hasMarkedOnboardingComplete = false
     private let progressStore = OnboardingProgressStore.shared
     private var isRestoringProgress = false
+    private var progressPersistenceWorkItem: DispatchWorkItem?
+    private let persistenceQueue = DispatchQueue(label: "com.logyourbody.onboarding.progressPersistence", qos: .utility)
+    private let persistenceDebounceInterval: TimeInterval = 0.4
 
     private var hasWeightEntry: Bool {
         bodyScoreInput.weight.value != nil
@@ -211,6 +225,39 @@ final class OnboardingFlowViewModel: ObservableObject {
         hasBodyFatEntry ? .loading : .bodyFatChoice
     }
 
+    func progress(for step: Step) -> ProgressContext? {
+        let steps = activeProgressSteps
+        guard let index = steps.firstIndex(of: step) else { return nil }
+        return ProgressContext(
+            currentIndex: index + 1,
+            totalCount: steps.count,
+            label: step.progressLabel
+        )
+    }
+
+    private var activeProgressSteps: [Step] {
+        Step.progressSequence.filter { shouldIncludeInProgress($0) }
+    }
+
+    private func shouldIncludeInProgress(_ step: Step) -> Bool {
+        switch step {
+        case .hook, .basics, .height, .healthConnect, .bodyScore, .emailCapture, .account:
+            return true
+        case .healthConfirmation:
+            return healthKitManager.isAuthorized
+        case .manualWeight:
+            return !hasWeightEntry
+        case .bodyFatChoice:
+            return !hasBodyFatEntry
+        case .bodyFatNumeric:
+            return bodyScoreInput.bodyFat.source == .manualValue
+        case .bodyFatVisual:
+            return bodyScoreInput.bodyFat.source == .visualEstimate
+        case .loading, .paywall:
+            return false
+        }
+    }
+
     // MARK: - HealthKit
 
     func attemptHealthImport() async {
@@ -237,11 +284,13 @@ final class OnboardingFlowViewModel: ObservableObject {
         do {
             let (weight, bodyFat, height) = try await (weightResult, bodyFatResult, heightResult)
 
-            if let kg = weight.weight {
+            if let pounds = weight.weight {
+                // HealthKitManager returns pounds; convert once so manual entry stays accurate
+                let weightInKilograms = pounds * 0.45359237
                 let preferredUnit = weightUnit
-                let value = preferredUnit == .kilograms ? kg : kg * 2.2046226218
+                let value = preferredUnit == .kilograms ? weightInKilograms : pounds
                 bodyScoreInput.weight = WeightValue(value: value, unit: preferredUnit)
-                bodyScoreInput.healthSnapshot.weightKg = kg
+                bodyScoreInput.healthSnapshot.weightKg = weightInKilograms
                 manualWeightText = Self.formatNumber(value)
             }
 
@@ -346,16 +395,43 @@ final class OnboardingFlowViewModel: ObservableObject {
         selectedVisualBodyFat != nil
     }
 
+    private var trimmedEmailAddress: String {
+        emailAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedAccountPassword: String {
+        accountPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var canContinueEmailCapture: Bool {
-        let trimmed = emailAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = trimmedEmailAddress
         guard !trimmed.isEmpty else { return false }
         let pattern = "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
         return trimmed.range(of: pattern, options: .regularExpression) != nil
     }
 
     var canContinueAccountCreation: Bool {
-        let password = accountPassword.trimmingCharacters(in: .whitespacesAndNewlines)
-        return canContinueEmailCapture && password.count >= 8
+        canContinueEmailCapture &&
+            accountPasswordHasMinLength &&
+            accountPasswordHasUpperAndLowercase &&
+            accountPasswordHasNumberOrSymbol
+    }
+
+    var accountPasswordHasMinLength: Bool {
+        trimmedAccountPassword.count >= 8
+    }
+
+    var accountPasswordHasUpperAndLowercase: Bool {
+        guard !trimmedAccountPassword.isEmpty else { return false }
+        let hasUppercase = trimmedAccountPassword.rangeOfCharacter(from: .uppercaseLetters) != nil
+        let hasLowercase = trimmedAccountPassword.rangeOfCharacter(from: .lowercaseLetters) != nil
+        return hasUppercase && hasLowercase
+    }
+
+    var accountPasswordHasNumberOrSymbol: Bool {
+        guard !trimmedAccountPassword.isEmpty else { return false }
+        return trimmedAccountPassword.rangeOfCharacter(from: .decimalDigits) != nil ||
+            trimmedAccountPassword.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil
     }
 
     func updateSex(_ sex: BiologicalSex) {
@@ -433,7 +509,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     func persistEmailCapture() {
-        emailAddress = emailAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        emailAddress = trimmedEmailAddress
         // Placeholder for future analytics/backend hook
     }
 
@@ -445,13 +521,23 @@ final class OnboardingFlowViewModel: ObservableObject {
             accountCreationStage = .preparing
         }
 
+        if authManager.isAuthenticated {
+            await MainActor.run {
+                accountCreationStage = .finalizing
+                accountCreationStage = .idle
+                isCreatingAccount = false
+                goToNextStep()
+            }
+            return
+        }
+
         do {
             await MainActor.run {
                 accountCreationStage = .creatingAccount
             }
             try await authManager.signUp(
-                email: emailAddress,
-                password: accountPassword,
+                email: trimmedEmailAddress,
+                password: trimmedAccountPassword,
                 name: ""
             )
 
@@ -481,8 +567,9 @@ final class OnboardingFlowViewModel: ObservableObject {
         guard !hasMarkedOnboardingComplete else { return }
         hasMarkedOnboardingComplete = true
         OnboardingStateManager.shared.markCompleted()
+        let updates = buildOnboardingProfileUpdates()
         Task {
-            await AuthManager.shared.updateProfile(["onboardingCompleted": true])
+            await AuthManager.shared.updateProfile(updates)
         }
         clearPersistedProgress()
 
@@ -502,6 +589,46 @@ final class OnboardingFlowViewModel: ObservableObject {
         }
     }
 
+    func buildOnboardingProfileUpdates() -> [String: Any] {
+        var updates: [String: Any] = [:]
+
+        // Persist biological sex as gender string used by profile/settings
+        if let sex = bodyScoreInput.sex {
+            updates["gender"] = sex.description
+        }
+
+        // Convert birth year into a concrete Date (Jan 1 of that year)
+        if let birthYear = bodyScoreInput.birthYear {
+            var components = DateComponents()
+            components.year = birthYear
+            components.month = 1
+            components.day = 1
+            if let dateOfBirth = Calendar.current.date(from: components) {
+                updates["dateOfBirth"] = dateOfBirth
+            }
+        }
+
+        // Store canonical height in inches, with preferred display unit
+        if let heightInches = bodyScoreInput.height.inInches {
+            updates["height"] = heightInches
+
+            let preferredHeightUnit: String
+            switch heightUnit {
+            case .centimeters:
+                preferredHeightUnit = "cm"
+            case .inches:
+                preferredHeightUnit = "in"
+            }
+
+            updates["heightUnit"] = preferredHeightUnit
+        }
+
+        // Always mark onboarding as completed
+        updates["onboardingCompleted"] = true
+
+        return updates
+    }
+
     var weightFieldTitle: String {
         "Weight (\(weightUnit == .kilograms ? "kg" : "lbs"))"
     }
@@ -515,6 +642,31 @@ final class OnboardingFlowViewModel: ObservableObject {
             return "Valid range: 32–300 kg • We'll store it in lbs too."
         }
         return "Valid range: 70–660 lbs • We'll store it in kg too."
+    }
+
+    var isHealthKitConnected: Bool {
+        healthKitManager.isAuthorized
+    }
+
+    var latestHealthSampleDate: Date? {
+        let dates = [
+            healthKitManager.latestWeightDate,
+            healthKitManager.latestBodyFatDate,
+            healthKitManager.latestStepCountDate
+        ]
+        return dates.compactMap { $0 }.max()
+    }
+
+    var healthKitConnectionStatusText: String? {
+        guard isHealthKitConnected else { return nil }
+        guard let date = latestHealthSampleDate else {
+            return "Connected to Apple Health"
+        }
+
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        let relative = formatter.localizedString(for: date, relativeTo: Date())
+        return "Connected • Last synced \(relative)"
     }
 
     private static func formatNumber(_ value: Double) -> String {
@@ -651,6 +803,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     private func persistProgress() {
         guard !isRestoringProgress else { return }
         guard !OnboardingStateManager.shared.hasCompletedCurrentVersion else {
+            progressPersistenceWorkItem?.cancel()
             clearPersistedProgress()
             return
         }
@@ -673,7 +826,17 @@ final class OnboardingFlowViewModel: ObservableObject {
             lastUpdated: Date()
         )
 
-        progressStore.save(snapshot, for: userId)
+        progressPersistenceWorkItem?.cancel()
+
+        let pendingWorkItem = DispatchWorkItem { [progressStore] in
+            progressStore.save(snapshot, for: userId)
+        }
+        progressPersistenceWorkItem = pendingWorkItem
+
+        persistenceQueue.asyncAfter(
+            deadline: .now() + persistenceDebounceInterval,
+            execute: pendingWorkItem
+        )
     }
 
     private func restorePersistedProgressIfNeeded() {
@@ -703,8 +866,45 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     private func clearPersistedProgress() {
+        progressPersistenceWorkItem?.cancel()
         guard let userId = AuthManager.shared.currentUser?.id else { return }
         progressStore.clearProgress(for: userId)
+    }
+}
+
+private extension OnboardingFlowViewModel.Step {
+    static var progressSequence: [Self] {
+        [
+            .hook,
+            .basics,
+            .height,
+            .healthConnect,
+            .healthConfirmation,
+            .manualWeight,
+            .bodyFatChoice,
+            .bodyFatNumeric,
+            .bodyFatVisual,
+            .bodyScore,
+            .emailCapture,
+            .account
+        ]
+    }
+
+    var progressLabel: String {
+        switch self {
+        case .hook: return "Welcome"
+        case .basics: return "Basics"
+        case .height: return "Height"
+        case .healthConnect: return "Health Sync"
+        case .healthConfirmation: return "Review"
+        case .manualWeight: return "Weight"
+        case .bodyFatChoice, .bodyFatNumeric, .bodyFatVisual: return "Body Fat"
+        case .bodyScore: return "Your Score"
+        case .emailCapture: return "Save Progress"
+        case .account: return "Account"
+        case .loading: return "Loading"
+        case .paywall: return "Upgrade"
+        }
     }
 }
 
@@ -727,7 +927,6 @@ private struct OnboardingProgressSnapshot: Codable {
     let lastUpdated: Date
 }
 
-@MainActor
 final class OnboardingProgressStore {
     static let shared = OnboardingProgressStore()
     static let snapshotVersion = 1
@@ -735,6 +934,7 @@ final class OnboardingProgressStore {
     private let userDefaults: UserDefaults
     private let storageKey = "bodyScoreOnboardingProgress"
     private var snapshots: [String: OnboardingProgressSnapshot] = [:]
+    private let queue = DispatchQueue(label: "com.logyourbody.onboarding.progressStore", qos: .utility)
 
     private init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
@@ -742,19 +942,27 @@ final class OnboardingProgressStore {
     }
 
     fileprivate func save(_ snapshot: OnboardingProgressSnapshot, for userId: String) {
-        guard snapshot.version == Self.snapshotVersion else { return }
-        snapshots[userId] = snapshot
-        persistToDisk()
+        queue.async { [weak self] in
+            guard let self else { return }
+            guard snapshot.version == Self.snapshotVersion else { return }
+            self.snapshots[userId] = snapshot
+            self.persistToDiskLocked()
+        }
     }
 
     fileprivate func loadProgress(for userId: String) -> OnboardingProgressSnapshot? {
-        guard let snapshot = snapshots[userId], snapshot.version == Self.snapshotVersion else { return nil }
-        return snapshot
+        queue.sync {
+            guard let snapshot = snapshots[userId], snapshot.version == Self.snapshotVersion else { return nil }
+            return snapshot
+        }
     }
 
     func clearProgress(for userId: String) {
-        guard snapshots.removeValue(forKey: userId) != nil else { return }
-        persistToDisk()
+        queue.async { [weak self] in
+            guard let self else { return }
+            guard self.snapshots.removeValue(forKey: userId) != nil else { return }
+            self.persistToDiskLocked()
+        }
     }
 
     private func loadFromDisk() {
@@ -765,7 +973,7 @@ final class OnboardingProgressStore {
         }
     }
 
-    private func persistToDisk() {
+    private func persistToDiskLocked() {
         let encoder = JSONEncoder()
         if let data = try? encoder.encode(snapshots) {
             userDefaults.set(data, forKey: storageKey)

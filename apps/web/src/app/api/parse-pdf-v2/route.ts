@@ -11,30 +11,31 @@ async function setupPdfJs() {
 async function extractTextFromPDF(buffer: ArrayBuffer): Promise<string> {
   try {
     const pdfjsLib = await setupPdfJs()
-    
+
     // Load the PDF document
     const loadingTask = pdfjsLib.getDocument({
       data: buffer,
       useSystemFonts: true,
     })
-    
+
     const pdf = await loadingTask.promise
     let fullText = ''
-    
+
     // Extract text from each page
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum)
       const textContent = await page.getTextContent()
-      
+
       // Combine text items
-      const pageText = textContent.items
-        .filter((item): item is { str: string } => typeof (item as { str?: unknown }).str === 'string')
+      const itemsWithText = textContent.items
+        .filter((item) => typeof (item as { str?: unknown }).str === 'string') as { str: string }[]
+      const pageText = itemsWithText
         .map((item) => item.str)
         .join(' ')
-      
+
       fullText += pageText + '\n\n'
     }
-    
+
     return fullText
   } catch (error) {
     console.error('Error extracting text with PDF.js:', error)
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     // Get the PDF file from the request
     const formData = await request.formData()
     const file = formData.get('file') as File
-    
+
     if (!file || file.type !== 'application/pdf') {
       return NextResponse.json(
         { error: 'Invalid file type. Please provide a PDF file.' },
@@ -69,18 +70,18 @@ export async function POST(request: NextRequest) {
 
     // Convert file to ArrayBuffer
     const arrayBuffer = await file.arrayBuffer()
-    
+
     let pdfText = ''
-    
+
     try {
       // Extract text using PDF.js
       pdfText = await extractTextFromPDF(arrayBuffer)
     } catch (error) {
       console.error('Failed to extract text from PDF:', error)
-      
+
       // If text extraction fails, we could try OCR or other methods
       return NextResponse.json(
-        { 
+        {
           error: 'Could not extract text from PDF',
           details: 'The PDF might be image-based or corrupted. Please try uploading a text-based PDF or enter your data manually.'
         },
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
     // Check if we extracted any meaningful text
     if (!pdfText || pdfText.trim().length < 50) {
       return NextResponse.json(
-        { 
+        {
           error: 'No text found in PDF',
           details: 'The PDF appears to be empty or image-based. Please upload a text-based PDF.'
         },
@@ -153,10 +154,10 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error parsing PDF:', error)
-    
+
     return NextResponse.json(
-      { 
-        error: 'Failed to parse PDF', 
+      {
+        error: 'Failed to parse PDF',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

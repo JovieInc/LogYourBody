@@ -23,6 +23,10 @@ struct AddEntrySheet: View {
         MeasurementSystem(rawValue: measurementSystem) ?? .imperial
     }
 
+    private var resolvedWeightUnit: String {
+        weightUnit.isEmpty ? currentSystem.weightUnit : weightUnit
+    }
+
     // Weight entry
     @State private var weight: String = ""
     @State private var weightUnit: String = ""
@@ -189,7 +193,7 @@ struct AddEntrySheet: View {
                         .foregroundColor(.error)
                         .accessibilityLabel("Weight validation error: \(error)")
                 } else {
-                    Text(weightUnit == "kg" ? "Valid range: 20-300 kg" : "Valid range: 44-660 lbs")
+                    Text(resolvedWeightUnit == "kg" ? "Valid range: 20-500 kg" : "Valid range: 44-1100 lbs")
                         .font(.appBodySmall)
                         .foregroundColor(.appTextTertiary)
                 }
@@ -382,43 +386,57 @@ struct AddEntrySheet: View {
     }
 
     private func saveWeight(userId: String) {
-        guard let weightValue = Double(weight) else { return }
+        do {
+            let validatedWeight = try ValidationService.shared.validateWeight(weight, unit: resolvedWeightUnit)
+            let weightInKg = resolvedWeightUnit == "lbs" ? validatedWeight * 0.453592 : validatedWeight
 
-        let weightInKg = weightUnit == "lbs" ? weightValue * 0.453592 : weightValue
+            weightError = nil
 
-        Task {
-            _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
-                for: selectedDate,
-                weight: weightInKg,
-                userId: userId
-            )
+            Task {
+                _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
+                    for: selectedDate,
+                    weight: weightInKg,
+                    userId: userId
+                )
 
-            // Update widget data
-            await WidgetDataManager.shared.updateWidgetData()
+                // Update widget data
+                await WidgetDataManager.shared.updateWidgetData()
 
-            RealtimeSyncManager.shared.syncIfNeeded()
+                RealtimeSyncManager.shared.syncIfNeeded()
+            }
+
+            dismiss()
+        } catch let error as ValidationError {
+            handleValidationError(error, for: .weight)
+        } catch {
+            handleValidationError(.invalidWeight("Please enter a valid number"), for: .weight)
         }
-
-        dismiss()
     }
 
     private func saveBodyFat(userId: String) {
-        guard let bodyFatValue = Double(bodyFat) else { return }
+        do {
+            let validatedBodyFat = try ValidationService.shared.validateBodyFat(bodyFat)
+            bodyFatError = nil
 
-        Task {
-            _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
-                for: selectedDate,
-                bodyFatPercentage: bodyFatValue,
-                userId: userId
-            )
+            Task {
+                _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
+                    for: selectedDate,
+                    bodyFatPercentage: validatedBodyFat,
+                    userId: userId
+                )
 
-            // Update widget data
-            await WidgetDataManager.shared.updateWidgetData()
+                // Update widget data
+                await WidgetDataManager.shared.updateWidgetData()
 
-            RealtimeSyncManager.shared.syncIfNeeded()
+                RealtimeSyncManager.shared.syncIfNeeded()
+            }
+
+            dismiss()
+        } catch let error as ValidationError {
+            handleValidationError(error, for: .bodyFat)
+        } catch {
+            handleValidationError(.invalidBodyFat("Please enter a valid percentage"), for: .bodyFat)
         }
-
-        dismiss()
     }
 
     private func savePhotos(userId: String) async {
@@ -491,26 +509,33 @@ struct AddEntrySheet: View {
 
     // MARK: - Validation Functions
 
+    private enum InputField {
+        case weight
+        case bodyFat
+    }
+
+    private func handleValidationError(_ error: ValidationError, for field: InputField) {
+        switch field {
+        case .weight:
+            weightError = error.errorDescription
+        case .bodyFat:
+            bodyFatError = error.errorDescription
+        }
+    }
+
     private func validateWeight(_ value: String) {
         guard !value.isEmpty else {
             weightError = nil
             return
         }
 
-        guard let weightValue = Double(value) else {
-            weightError = "Please enter a valid number"
-            return
-        }
-
-        let minWeight = weightUnit == "kg" ? 20.0 : 44.0
-        let maxWeight = weightUnit == "kg" ? 300.0 : 660.0
-
-        if weightValue < minWeight {
-            weightError = "Weight must be at least \(Int(minWeight)) \(weightUnit)"
-        } else if weightValue > maxWeight {
-            weightError = "Weight must be less than \(Int(maxWeight)) \(weightUnit)"
-        } else {
+        do {
+            _ = try ValidationService.shared.validateWeight(value, unit: resolvedWeightUnit)
             weightError = nil
+        } catch let error as ValidationError {
+            weightError = error.errorDescription
+        } catch {
+            weightError = "Please enter a valid number"
         }
     }
 
@@ -520,17 +545,13 @@ struct AddEntrySheet: View {
             return
         }
 
-        guard let bfValue = Double(value) else {
-            bodyFatError = "Please enter a valid number"
-            return
-        }
-
-        if bfValue < 3.0 {
-            bodyFatError = "Body fat must be at least 3%"
-        } else if bfValue > 50.0 {
-            bodyFatError = "Body fat must be less than 50%"
-        } else {
+        do {
+            _ = try ValidationService.shared.validateBodyFat(value)
             bodyFatError = nil
+        } catch let error as ValidationError {
+            bodyFatError = error.errorDescription
+        } catch {
+            bodyFatError = "Please enter a valid number"
         }
     }
 }

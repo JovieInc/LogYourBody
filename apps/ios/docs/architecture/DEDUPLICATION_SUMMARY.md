@@ -131,14 +131,13 @@ No changes required - all existing components continue to work as legacy wrapper
 - ✅ DSMetricValue
 
 ### Molecules (Small Reusable Groups)
-- ✅ MetricCard (uses atoms)
 - ✅ UserGreeting (uses atoms)
 - ✅ StepsIndicator (uses atoms)
-- ✅ CompactMetricCard (uses atoms)
 - ✅ SocialLoginButton (uses BaseButton)
 - ✅ LogoutButton (uses BaseButton)
 
 ### Organisms (Larger Semantic Structures)
+- ✅ MetricSummaryCard (replaces legacy MetricCard/CompactMetricCard)
 - ✅ DashboardHeader (uses molecules + atoms)
 - ✅ LoadingScreen (uses atoms)
 - ✅ CoreMetricsRow (uses molecules)
@@ -156,3 +155,57 @@ No changes required - all existing components continue to work as legacy wrapper
 4. **Documentation**: Add comprehensive documentation to base components with usage examples
 
 5. **Testing**: Create unit tests for base components to ensure reliability
+
+## iOS Settings & Profile Deduplication
+
+### Canonical Views
+
+- **Settings screen**: `PreferencesView`
+  - Location: `/Views/PreferencesView.swift`
+  - Responsibilities:
+    - Account details (email, logout, delete account)
+    - Profile summary (name, DOB, height display only)
+    - Measurement system and tracking goals
+    - Integrations (Apple Health, resync)
+    - Security & privacy (biometrics, password, sessions)
+    - Subscription, photos, advanced, and danger sections
+  - Entry points:
+    - `DashboardHeaderCompact` avatar tap
+    - `DashboardHeaderCompact` "Add age" and "Add height" chips
+
+- **Profile editor**: `ProfileSettingsViewV2`
+  - Location: `/Views/ProfileSettingsViewV2.swift`
+  - Responsibilities:
+    - Edit first/last name and consolidated display name
+    - Edit date of birth, height (metric/imperial), and biological sex
+    - Manage profile photo upload
+    - Drive profile persistence via `AuthManager` + Core Data + Supabase
+  - Presentation:
+    - Presented as a sheet from `PreferencesView` when the user taps
+      **Full name**, **Date of birth**, or **Height** in the Profile section.
+
+### Removed / Legacy Implementations
+
+- **Legacy `SettingsView`**
+  - File: `Views/SettingsView.swift`
+  - Status: Removed from the target and codebase; no remaining references.
+  - Rationale: Duplicated the settings surface using an alternate atomic layout
+    while `PreferencesView` remained the actual runtime entry point.
+
+- **Inline profile edit sheets in `PreferencesView`**
+  - Types removed:
+    - `BirthdayEditSheet`
+    - `HeightEditSheet`
+  - Rationale: These were ad-hoc editors for DOB/height that duplicated logic
+    now centralized in `ProfileSettingsViewV2` (via `DatePickerSheet` and
+    `ProfileHeightPickerSheet`). All profile edits now go through the
+    consolidated profile editor.
+
+### Guidance for New Code
+
+- Route **all** settings/profile navigation to `PreferencesView`.
+- For any edits to name, DOB, height, or biological sex:
+  - Present `ProfileSettingsViewV2` instead of introducing new sheets or
+    inline editors.
+- Do **not** reintroduce `SettingsView` or alternate settings/profile screens
+  without explicitly deprecating and updating all entry points.

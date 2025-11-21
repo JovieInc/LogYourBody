@@ -40,3 +40,21 @@
 2. Move `repairCorruptedEntries()` to a background queue
 3. Implement progressive loading for large datasets
 4. Add skeleton screens instead of blocking loading views
+
+## Launch De-Blocking Updates (November 2025)
+
+### 1. LoadingManager Behavior
+- `startLoading()` now only blocks for:
+  - App initialization
+  - Authentication check (with a 0.5s Clerk initialization timeout)
+  - Local profile loading from Core Data (if authenticated)
+- HealthKit setup, local sync metadata, and Supabase sync now run as a **background warm-up** once the root view is visible.
+
+### 2. Dashboard Loading UX
+- The old full-screen `ProgressView` that blocked `DashboardViewLiquid` while metrics loaded has been **removed**.
+- Initial dashboard load now uses the `DashboardSkeleton` component to show a skeleton version of the dashboard layout instead of a blocking spinner.
+- The empty state behavior for users with no data is unchanged; only the pre-data loading path has moved from spinner → skeleton.
+
+### 3. Deprecated Pattern
+- **Deprecated:** full-screen blocking spinners for primary app surfaces (e.g., dashboard) during data fetch.
+- **Preferred:** show the real screen layout immediately and use skeleton loaders (`DashboardSkeleton`, `SkeletonView`, etc.) while data and charts are warming up.

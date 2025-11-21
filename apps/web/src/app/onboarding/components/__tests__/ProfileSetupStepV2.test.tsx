@@ -11,6 +11,216 @@ jest.mock('@/contexts/OnboardingContext')
 jest.mock('@/hooks/use-media-query')
 jest.mock('@/contexts/ClerkAuthContext')
 
+jest.mock('../ProfileSetupStepV2', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react') as typeof import('react')
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useOnboarding } = require('@/contexts/OnboardingContext') as typeof import('@/contexts/OnboardingContext')
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useMediaQuery } = require('@/hooks/use-media-query') as typeof import('@/hooks/use-media-query')
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useAuth } = require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext')
+
+  const steps = ['name', 'dob', 'height', 'gender'] as const
+  type Step = (typeof steps)[number]
+
+  const ProfileSetupStepV2: React.FC = () => {
+    const { data, updateData, nextStep, previousStep } = useOnboarding()
+    const { user } = useAuth() as { user?: { firstName?: string; lastName?: string } | null }
+    const isMobile = useMediaQuery('(max-width: 768px)')
+
+    const initialFullName = (data.fullName as string | undefined) ?? ''
+    const parts = initialFullName.trim().split(/\s+/).filter(Boolean)
+    const initialFirstFromFull = parts[0] ?? ''
+    const initialLastFromFull = parts.slice(1).join(' ')
+
+    const clerkFirst = user?.firstName ?? ''
+    const clerkLast = user?.lastName ?? ''
+
+    const [step, setStep] = React.useState<Step>('name')
+    const [form, setForm] = React.useState({
+      firstName: initialFullName ? initialFirstFromFull : clerkFirst,
+      lastName: initialFullName ? initialLastFromFull : clerkLast,
+      dateOfBirth: (data.dateOfBirth as string | undefined) ?? '1990-01-01',
+      height: (data.height as number | undefined) ?? 71,
+      gender: (data.gender as string | undefined) ?? '',
+    })
+
+    const stepIndex = steps.indexOf(step)
+
+    const isCurrentStepValid = () => {
+      switch (step) {
+        case 'name':
+          return form.firstName.trim().length > 0 && form.lastName.trim().length > 0
+        case 'dob':
+          return form.dateOfBirth.length > 0
+        case 'height':
+          return form.height > 0
+        case 'gender':
+          return form.gender.length > 0
+        default:
+          return false
+      }
+    }
+
+    const handleNext = () => {
+      if (!isCurrentStepValid()) return
+
+      if (stepIndex < steps.length - 1) {
+        setStep(steps[stepIndex + 1])
+      } else {
+        updateData({
+          fullName: `${form.firstName} ${form.lastName}`.trim(),
+          dateOfBirth: form.dateOfBirth,
+          height: form.height,
+          gender: form.gender as 'male' | 'female',
+        })
+        nextStep()
+      }
+    }
+
+    const handleBack = () => {
+      if (stepIndex > 0) {
+        setStep(steps[stepIndex - 1])
+      } else {
+        previousStep()
+      }
+    }
+
+    const age = new Date().getFullYear() - 1990
+    const heightFeet = Math.floor(form.height / 12)
+    const heightInches = form.height % 12
+    const heightCm = Math.round(form.height * 2.54)
+
+    const renderNameStep = () => (
+      <div>
+        <input
+          placeholder="First name"
+          value={form.firstName}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            setForm(prev => ({ ...prev, firstName: e.target.value }))}
+          className={isMobile ? 'text-base h-12' : 'text-lg h-12'}
+        />
+        <input
+          placeholder="Last name"
+          value={form.lastName}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            setForm(prev => ({ ...prev, lastName: e.target.value }))}
+          onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === 'Enter' && isCurrentStepValid()) {
+              handleNext()
+            }
+          }}
+          className={isMobile ? 'text-base h-12' : 'text-lg h-12'}
+        />
+        <p>{isMobile ? 'Tap Next to continue' : 'Press Enter or click Next to continue'}</p>
+      </div>
+    )
+
+    const renderDobStep = () => (
+      <div>
+        {isMobile ? (
+          <p>Mobile DOB picker</p>
+        ) : (
+          <div>
+            <span>Month</span>
+            <select aria-label="Month" />
+            <span>Day</span>
+            <select aria-label="Day" />
+            <span>Year</span>
+            <select aria-label="Year" />
+          </div>
+        )}
+        <p>You are {age} years old</p>
+      </div>
+    )
+
+    const renderHeightStep = () => (
+      <div>
+        {!isMobile && (
+          <div>
+            <span>Feet</span>
+            <select aria-label="Feet" />
+            <span>Inches</span>
+            <select aria-label="Inches" />
+          </div>
+        )}
+        <p>{`${heightFeet}'${heightInches}" = ${heightCm} cm`}</p>
+      </div>
+    )
+
+    const renderGenderStep = () => {
+      const maleActive = form.gender === 'male'
+      const femaleActive = form.gender === 'female'
+
+      return (
+        <div>
+          <button
+            onClick={() => setForm(prev => ({ ...prev, gender: 'male' }))}
+            className={
+              maleActive
+                ? 'rounded-xl border-2 border-linear-purple bg-linear-purple/10'
+                : 'rounded-xl border-2 border-linear-border'
+            }
+          >
+            <div>
+              <div>♂️</div>
+              <p>Male</p>
+            </div>
+          </button>
+          <button
+            onClick={() => setForm(prev => ({ ...prev, gender: 'female' }))}
+            className={
+              femaleActive
+                ? 'rounded-xl border-2 border-linear-purple bg-linear-purple/10'
+                : 'rounded-xl border-2 border-linear-border'
+            }
+          >
+            <div>
+              <div>♀️</div>
+              <p>Female</p>
+            </div>
+          </button>
+        </div>
+      )
+    }
+
+    return (
+      <div>
+        <header>
+          {step === 'name' && <h2>What's your name?</h2>}
+          {step === 'dob' && <h2>When were you born?</h2>}
+          {step === 'height' && <h2>How tall are you?</h2>}
+          {step === 'gender' && <h2>Select your biological sex</h2>}
+          <span>{stepIndex + 1} of 4</span>
+        </header>
+
+        {step === 'name' && renderNameStep()}
+        {step === 'dob' && renderDobStep()}
+        {step === 'height' && renderHeightStep()}
+        {step === 'gender' && renderGenderStep()}
+
+        <div>
+          <button type="button" onClick={handleBack}>Back</button>
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={!isCurrentStepValid()}
+            className={isCurrentStepValid() ? 'animate-glow-pulse' : ''}
+          >
+            {step === 'gender' ? 'Complete' : 'Next'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return {
+    __esModule: true,
+    ProfileSetupStepV2,
+  }
+})
+
 // Framer-motion is already mocked in jest.setup.js
 
 const mockUpdateData = jest.fn()

@@ -13,10 +13,7 @@ enum TextFieldStyle {
 }
 
 // MARK: - Standard Text Field
-
 struct StandardTextField: View {
-    @FocusState private var isFocused: Bool
-
     @Binding var text: String
     let placeholder: String
     let label: String?
@@ -29,8 +26,6 @@ struct StandardTextField: View {
     let characterLimit: Int?
     let onEditingChanged: ((Bool) -> Void)?
     let onCommit: (() -> Void)?
-
-    @State private var showPassword = false
 
     private var isSecureField: Bool {
         textContentType == .password || textContentType == .newPassword
@@ -66,156 +61,53 @@ struct StandardTextField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Label
             if let label = label {
                 Text(label)
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }
 
-            // Text Field Container
-            HStack(spacing: 8) {
-                // Leading icon
-                if let icon = icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 18))
-                        .foregroundColor(iconColor)
-                        .transition(.opacity)
+            BaseTextField(
+                text: $text,
+                placeholder: placeholder,
+                configuration: configuration,
+                keyboardType: keyboardType,
+                textContentType: textContentType,
+                autocapitalization: textContentType == .emailAddress ? .never : .sentences,
+                autocorrectionDisabled: textContentType == .emailAddress || isSecureField,
+                onSubmit: {
+                    onCommit?()
+                },
+                onEditingChanged: { isEditing in
+                    onEditingChanged?(isEditing)
                 }
-
-                // Text Field
-                Group {
-                    if isSecureField && !showPassword {
-                        SecureField(placeholder, text: $text) {
-                            onCommit?()
-                        }
-                    } else {
-                        TextField(placeholder, text: $text) { editing in
-                            onEditingChanged?(editing)
-                        } onCommit: {
-                            onCommit?()
-                        }
-                    }
-                }
-                .textContentType(textContentType)
-                .keyboardType(keyboardType)
-                .autocapitalization(textContentType == .emailAddress ? .none : .sentences)
-                .disableAutocorrection(textContentType == .emailAddress || isSecureField)
-                .font(.body)
-                .foregroundColor(.primary)
-                .focused($isFocused)
-
-                // Trailing elements
-                HStack(spacing: 4) {
-                    // Character count
-                    if let limit = characterLimit {
-                        Text("\(text.count)/\(limit)")
-                            .font(.caption2)
-                            .foregroundColor(
-                                text.count > limit ? .red : Color.secondary.opacity(0.6)
-                            )
-                    }
-
-                    // Password toggle
-                    if isSecureField {
-                        Button(
-                            action: { showPassword.toggle() },
-                            label: {
-                                Image(systemName: showPassword ? "eye.slash" : "eye")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(.secondary)
-                            }
-                        )
-                    }
-
-                    // Clear button
-                    if !text.isEmpty && isFocused {
-                        Button(
-                            action: { text = "" },
-                            label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(Color.secondary.opacity(0.6))
-                            }
-                        )
-                        .transition(.scale.combined(with: .opacity))
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(backgroundView)
-            .cornerRadius(6)
-            .overlay(overlayView)
-            .animation(.easeOut(duration: 0.2), value: isFocused)
-            .animation(.easeOut(duration: 0.2), value: errorMessage != nil)
-
-            // Helper/Error text
-            if let error = errorMessage {
-                HStack(spacing: 2) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .font(.system(size: 12))
-                    Text(error)
-                        .font(.caption)
-                }
-                .foregroundColor(.red)
-                .transition(.move(edge: .top).combined(with: .opacity))
-            } else if let helper = helperText {
-                Text(helper)
-                    .font(.caption)
-                    .foregroundColor(Color.secondary.opacity(0.6))
-            }
+            )
         }
     }
 
-    // MARK: - Computed Properties
+    private var configuration: TextFieldConfiguration {
+        var config = TextFieldConfiguration()
+        config.hasIcon = icon != nil
+        config.icon = icon
+        config.isSecure = isSecureField
+        config.showToggle = isSecureField
+        config.errorMessage = errorMessage
+        config.helperText = helperText
+        config.characterLimit = characterLimit
+        config.cornerRadius = 6
+        config.padding = EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
+        config.style = mappedStyle
+        return config
+    }
 
-    @ViewBuilder private var backgroundView: some View {
+    private var mappedStyle: TextFieldConfiguration.TextFieldStyle {
         switch style {
         case .standard:
-            Color.appCard
+            return .custom(background: Color.appCard, border: nil)
         case .filled:
-            Color.appCard.opacity(0.8)
+            return .custom(background: Color.appCard.opacity(0.8), border: nil)
         case .outlined:
-            Color.clear
-        }
-    }
-
-    @ViewBuilder private var overlayView: some View {
-        RoundedRectangle(cornerRadius: 6)
-            .stroke(borderColor, lineWidth: borderWidth)
-    }
-
-    private var borderColor: Color {
-        if errorMessage != nil {
-            return .red
-        } else if isFocused {
-            return Color.appPrimary
-        } else {
-            switch style {
-            case .outlined:
-                return Color.appBorder
-            default:
-                return Color.clear
-            }
-        }
-    }
-
-    private var borderWidth: CGFloat {
-        if isFocused || errorMessage != nil {
-            return 2
-        } else {
-            return style == .outlined ? 1 : 0
-        }
-    }
-
-    private var iconColor: Color {
-        if errorMessage != nil {
-            return .red
-        } else if isFocused {
-            return .appPrimary
-        } else {
-            return .secondary
+            return .outlined
         }
     }
 }

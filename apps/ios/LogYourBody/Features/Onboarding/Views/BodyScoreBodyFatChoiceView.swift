@@ -13,6 +13,7 @@ struct BodyScoreBodyFatChoiceView: View {
             title: "How do you want to estimate body fat?",
             subtitle: "Pick whichever feels most accurate.",
             onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .bodyFatChoice),
             content: {
                 VStack(spacing: 20) {
                     ForEach(options, id: \.title) { option in

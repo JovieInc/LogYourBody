@@ -533,8 +533,8 @@ platform :ios do
 
   desc "Build and upload Alpha to TestFlight (dev branch - rapid)"
   lane :alpha do |options|
-    # Setup App Store Connect API authentication
-    setup_app_store_connect_api
+    # Ensure distribution certificates and provisioning profiles are available (Match)
+    setup_provisioning(type: "appstore")
     
     # Use the shared build lane
     build_result = build(

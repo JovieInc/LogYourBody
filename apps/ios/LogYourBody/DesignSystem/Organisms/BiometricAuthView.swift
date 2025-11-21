@@ -34,49 +34,89 @@ struct BiometricAuthView: View {
     let onAuthenticate: () -> Void
     let onUsePassword: () -> Void
 
-    @State private var isAnimating = false
+    @State private var pulse = false
 
     var body: some View {
-        VStack(spacing: 40) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Color.appPrimary.opacity(0.1))
-                    .frame(width: 120, height: 120)
+        VStack(spacing: 32) {
+            VStack(spacing: 4) {
+                Text("Need help unlocking?")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.linearTextSecondary)
 
-                Image(systemName: biometricType.icon)
-                    .font(.system(size: 50))
-                    .foregroundColor(.appPrimary)
-                    .scaleEffect(isAnimating ? 1.1 : 1.0)
-                    .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isAnimating)
-            }
-            .onAppear {
-                isAnimating = true
+                Text("\(biometricType.title) fell back to your passcode")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.linearText)
             }
 
-            // Title & Instructions
-            VStack(spacing: 16) {
-                Text("Unlock with \(biometricType.title)")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(.appText)
+            VStack(spacing: 26) {
+                ZStack {
+                    Circle()
+                        .fill(Color.linearBorder.opacity(0.25))
+                        .frame(width: 130, height: 130)
 
-                Text("Authenticate to access your account")
-                    .font(.system(size: 16))
-                    .foregroundColor(.appTextSecondary)
-                    .multilineTextAlignment(.center)
-            }
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color.appPrimary, Color.linearBlue]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 12
+                        )
+                        .frame(width: 130, height: 130)
 
-            // Actions
-            VStack(spacing: 16) {
+                    Image(systemName: biometricType.icon)
+                        .font(.system(size: 40))
+                        .foregroundColor(Color.linearText)
+                        .scaleEffect(pulse ? 1.05 : 0.95)
+                        .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: pulse)
+                }
+                .onAppear {
+                    pulse = true
+                }
+
+                VStack(spacing: 6) {
+                    Text("Try \(biometricType.title) again")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.linearText)
+
+                    Text("Make sure the TrueDepth camera is clean and visible.")
+                        .font(.system(size: 15))
+                        .foregroundColor(.linearTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                }
+
                 BaseButton(
-                    "Use \(biometricType.title)",
+                    "Retry \(biometricType.title)",
                     configuration: ButtonConfiguration(
-                        style: .custom(background: .white, foreground: .black),
+                        style: .primary,
                         fullWidth: true,
                         icon: biometricType.icon
                     ),
                     action: onAuthenticate
                 )
+            }
+            .padding(28)
+            .background(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .background(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .fill(Color.liquidBg.opacity(0.85))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(Color.appPrimary.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: Color.linearBlue.opacity(0.35), radius: 25, x: 0, y: 15)
+            )
+
+            VStack(spacing: 8) {
+                Text("Use your passcode if Face ID still doesn't recognize you.")
+                    .font(.system(size: 13))
+                    .foregroundColor(.linearTextTertiary)
+                    .multilineTextAlignment(.center)
 
                 DSAuthLink(
                     title: "Use Password Instead",
@@ -84,7 +124,7 @@ struct BiometricAuthView: View {
                 )
             }
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 20)
     }
 }
 

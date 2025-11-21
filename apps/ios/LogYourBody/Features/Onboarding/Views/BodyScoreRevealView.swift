@@ -10,7 +10,8 @@ struct BodyScoreRevealView: View {
                 OnboardingPageTemplate(
                     title: "Your Body Score",
                     subtitle: result.statusTagline,
-                    showsBackButton: false
+                    showsBackButton: false,
+                    progress: viewModel.progress(for: .bodyScore)
                 ) {
                     VStack(spacing: 24) {
                         scoreCard(result: result)

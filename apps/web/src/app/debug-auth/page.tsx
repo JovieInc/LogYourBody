@@ -15,6 +15,9 @@ export default function DebugAuthPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const primaryEmail = user?.primaryEmailAddress?.emailAddress
+    ?? user?.emailAddresses?.[0]?.emailAddress
+    ?? null
 
   const checkAuth = useCallback(async () => {
     try {
@@ -45,14 +48,14 @@ export default function DebugAuthPage() {
     <div className="min-h-screen p-8 bg-linear-bg">
       <div className="max-w-4xl mx-auto space-y-6">
         <h1 className="text-3xl font-bold text-linear-text">Auth Debug Page</h1>
-        
+
         <Card className="bg-linear-card border-linear-border">
           <CardHeader>
             <CardTitle>Auth Context Status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <p><strong>Loading:</strong> {authLoading ? 'Yes' : 'No'}</p>
-            <p><strong>User:</strong> {user ? user.email : 'None'}</p>
+            <p><strong>User:</strong> {primaryEmail ?? 'None'}</p>
             <p><strong>Session:</strong> {session ? 'Active' : 'None'}</p>
             {user && (
               <pre className="bg-black/20 p-4 rounded overflow-auto text-xs">

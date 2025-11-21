@@ -3,6 +3,17 @@ import SwiftUI
 struct BodyScoreHealthConnectView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
+    private var cardTitle: String {
+        viewModel.isHealthKitConnected ? "Apple Health connected" : "Sync Apple Health"
+    }
+
+    private var cardSubtitle: String {
+        if viewModel.isHealthKitConnected {
+            return "We'll keep height, weight, and body fat in sync."
+        }
+        return "We only read the basics–never share without consent."
+    }
+
     private var connectButtonTitle: String {
         viewModel.isRequestingHealthImport ? "Connecting…" : "Connect Apple Health"
     }
@@ -16,6 +27,7 @@ struct BodyScoreHealthConnectView: View {
             title: "Pull from Apple Health?",
             subtitle: "Auto-fill weight, body fat, and height. Quick and private.",
             onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .healthConnect),
             content: {
                 VStack(spacing: 24) {
                     OnboardingCard {
@@ -26,13 +38,80 @@ struct BodyScoreHealthConnectView: View {
                                     .foregroundStyle(.pink)
 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("Sync Apple Health")
+                                    Text(cardTitle)
                                         .font(OnboardingTypography.headline)
                                         .foregroundStyle(Color.appText)
 
-                                    Text("We only read the basics—never share without consent.")
+                                    Text(cardSubtitle)
                                         .font(OnboardingTypography.body)
                                         .foregroundStyle(Color.appTextSecondary)
+                                }
+                            }
+
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: "ruler")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(Color.appPrimary)
+                                        .frame(width: 20)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Height")
+                                            .font(OnboardingTypography.caption)
+                                            .foregroundStyle(Color.appTextSecondary)
+
+                                        Text("Read from Apple Health for your profile.")
+                                            .font(OnboardingTypography.body)
+                                            .foregroundStyle(Color.appText)
+                                    }
+                                }
+
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: "figure.scale")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(Color.appPrimary)
+                                        .frame(width: 20)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Weight")
+                                            .font(OnboardingTypography.caption)
+                                            .foregroundStyle(Color.appTextSecondary)
+
+                                        Text("Read & write with your permission.")
+                                            .font(OnboardingTypography.body)
+                                            .foregroundStyle(Color.appText)
+                                    }
+                                }
+
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: "percent")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(Color.appPrimary)
+                                        .frame(width: 20)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Body fat")
+                                            .font(OnboardingTypography.caption)
+                                            .foregroundStyle(Color.appTextSecondary)
+
+                                        Text("Read & write with your permission.")
+                                            .font(OnboardingTypography.body)
+                                            .foregroundStyle(Color.appText)
+                                    }
+                                }
+                            }
+
+                            if let status = viewModel.healthKitConnectionStatusText {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(Color.green)
+
+                                    Text(status)
+                                        .font(OnboardingTypography.caption)
+                                        .foregroundStyle(Color.appTextSecondary)
+
+                                    Spacer()
                                 }
                             }
 
@@ -53,6 +132,19 @@ struct BodyScoreHealthConnectView: View {
                             .opacity(connectButtonOpacity)
 
                             OnboardingCaptionText(text: "Only stored locally unless you opt in to sync.", alignment: .leading)
+
+                            if viewModel.isHealthKitConnected {
+                                Button {
+                                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                                        UIApplication.shared.open(url)
+                                    }
+                                } label: {
+                                    Text("Adjust in Settings")
+                                        .font(OnboardingTypography.caption)
+                                        .foregroundStyle(Color.appPrimary)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
 

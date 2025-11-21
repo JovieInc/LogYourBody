@@ -13,7 +13,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
           .register('/sw.js')
           .then((registration) => {
             console.log('SW registered: ', registration)
-            
+
             // Handle updates
             registration.addEventListener('updatefound', () => {
               const newWorker = registration.installing
@@ -44,10 +44,11 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
       // Listen for app install prompt
       let deferredPrompt: BeforeInstallPromptEvent | null = null
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault()
-        deferredPrompt = e
-        
+      const handleBeforeInstallPrompt = (e: Event) => {
+        const promptEvent = e as BeforeInstallPromptEvent
+        promptEvent.preventDefault()
+        deferredPrompt = promptEvent
+
         // Show install button after 30 seconds
         setTimeout(() => {
           if (deferredPrompt) {
@@ -73,7 +74,9 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
             })
           }
         }, 30000)
-      })
+      }
+
+      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener)
 
       // Handle app installed
       window.addEventListener('appinstalled', () => {

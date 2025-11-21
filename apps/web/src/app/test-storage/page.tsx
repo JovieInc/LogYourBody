@@ -11,7 +11,7 @@ import { Upload, CheckCircle, XCircle } from 'lucide-react'
 
 interface BucketInfo {
   id: string
-  [key: string]: unknown
+  public?: boolean
 }
 
 interface BucketTestResult {
@@ -24,17 +24,17 @@ interface BucketTestResult {
 
 type UploadTestResult =
   | {
-      success: true
-      publicUrl: string
-      fileName: string
-      bucketTest: BucketTestResult
-    }
+    success: true
+    publicUrl: string
+    fileName: string
+    bucketTest: BucketTestResult
+  }
   | {
-      success: false
-      error: string
-      errorDetails: unknown
-      bucketTest?: BucketTestResult
-    }
+    success: false
+    error: string
+    errorDetails: unknown
+    bucketTest?: BucketTestResult
+  }
 
 export default function TestStoragePage() {
   const { user } = useAuth()
@@ -45,15 +45,15 @@ export default function TestStoragePage() {
     try {
       const supabase = createClient()
       const { data, error } = await supabase.storage.listBuckets()
-      
+
       if (error) {
         console.error('Error listing buckets:', error)
         return { success: false, error }
       }
-      
+
       console.log('Available buckets:', data)
       const photosBucket = data.find(b => b.id === 'photos')
-      
+
       return {
         success: true,
         buckets: data,
@@ -90,7 +90,7 @@ export default function TestStoragePage() {
       canvas.height = 200
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Could not create canvas context')
-      
+
       // Draw a test pattern
       ctx.fillStyle = '#4B5563'
       ctx.fillRect(0, 0, 200, 200)
@@ -168,7 +168,7 @@ export default function TestStoragePage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
-              <Button 
+              <Button
                 onClick={testPhotoUpload}
                 disabled={isUploading || !user}
                 className="w-full bg-linear-purple hover:bg-linear-purple/80"
@@ -194,11 +194,10 @@ export default function TestStoragePage() {
             </div>
 
             {uploadResult && (
-              <div className={`p-4 rounded-lg border ${
-                uploadResult.success 
-                  ? 'bg-green-900/20 border-green-800' 
+              <div className={`p-4 rounded-lg border ${uploadResult.success
+                  ? 'bg-green-900/20 border-green-800'
                   : 'bg-red-900/20 border-red-800'
-              }`}>
+                }`}>
                 <div className="flex items-start gap-3">
                   {uploadResult.success ? (
                     <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
@@ -209,7 +208,7 @@ export default function TestStoragePage() {
                     <p className="font-medium text-linear-text">
                       {uploadResult.success ? 'Upload Successful' : 'Upload Failed'}
                     </p>
-                    
+
                     {uploadResult.success ? (
                       <>
                         <p className="text-sm text-linear-text-secondary">

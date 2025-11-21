@@ -142,6 +142,22 @@ class PhotoUploadManager: ObservableObject {
             return processedUrl
         } catch {
             self.uploadError = error.localizedDescription
+            let appError: AppError
+            if let photoError = error as? PhotoError {
+                appError = AppError.photo(photoError)
+            } else {
+                appError = AppError.unexpected(
+                    context: "uploadProgressPhoto",
+                    underlying: error
+                )
+            }
+            let context = ErrorContext(
+                feature: "photos",
+                operation: "uploadProgressPhoto",
+                screen: nil,
+                userId: userId
+            )
+            ErrorReporter.shared.capture(appError, context: context)
             self.currentUploadTask = UploadTask(
                 id: uploadId,
                 metricsId: metrics.id,

@@ -56,6 +56,7 @@ struct BaseTextField: View {
     var submitLabel: SubmitLabel = .done
     var onSubmit: (() -> Void)?
     var onChange: ((String) -> Void)?
+    var onEditingChanged: ((Bool) -> Void)?
 
     @State private var isSecureTextVisible = false
     @FocusState private var isFocused: Bool
@@ -111,6 +112,9 @@ struct BaseTextField: View {
                     onChange?(newValue)
                 }
                 .focused($isFocused)
+                .onChange(of: isFocused) { isFocused in
+                    onEditingChanged?(isFocused)
+                }
 
                 // Trailing elements
                 HStack(spacing: 8) {

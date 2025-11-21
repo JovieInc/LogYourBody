@@ -218,6 +218,45 @@ struct OnboardingFormSection<Content: View>: View {
     }
 }
 
+// MARK: - Progress Indicator
+
+struct OnboardingProgressIndicator: View {
+    let context: OnboardingFlowViewModel.ProgressContext
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Step \(context.currentIndex) of \(context.totalCount)")
+                    .font(.system(.caption, design: .rounded).weight(.medium))
+                    .foregroundStyle(Color.appTextSecondary)
+
+                Spacer()
+
+                Text(context.label)
+                    .font(OnboardingTypography.caption)
+                    .foregroundStyle(Color.appTextSecondary)
+            }
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.appCard.opacity(0.45))
+
+                    Capsule()
+                        .fill(Color.appPrimary)
+                        .frame(
+                            width: min(
+                                max(geometry.size.width * context.fractionComplete, 12),
+                                geometry.size.width
+                            )
+                        )
+                }
+            }
+            .frame(height: 6)
+        }
+    }
+}
+
 // MARK: - Page Template
 
 struct OnboardingPageTemplate<Content: View, Footer: View>: View {
@@ -227,12 +266,14 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
     var onBack: (() -> Void)?
     var content: Content
     var footer: Footer
+    var progress: OnboardingFlowViewModel.ProgressContext?
 
     init(
         title: String,
         subtitle: String? = nil,
         showsBackButton: Bool = true,
         onBack: (() -> Void)? = nil,
+        progress: OnboardingFlowViewModel.ProgressContext? = nil,
         @ViewBuilder content: () -> Content,
         @ViewBuilder footer: () -> Footer = { EmptyView() }
     ) {
@@ -242,6 +283,7 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
         self.onBack = onBack
         self.content = content()
         self.footer = footer()
+        self.progress = progress
     }
 
     var body: some View {
@@ -281,6 +323,10 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
                         )
                 })
                 .buttonStyle(.plain)
+            }
+
+            if let progress {
+                OnboardingProgressIndicator(context: progress)
             }
 
             OnboardingTitleText(text: title, alignment: .leading)

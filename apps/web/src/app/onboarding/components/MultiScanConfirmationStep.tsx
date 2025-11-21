@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useOnboarding } from '@/contexts/OnboardingContext'
+import type { DexaScan } from '@/contexts/OnboardingContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { CalendarIcon, TrendingUp, Weight, Percent } from 'lucide-react'
@@ -10,42 +11,32 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { formatDateForDisplay } from '@/utils/date-utils'
 
-interface Scan {
-  date: string
-  weight: number
-  weight_unit: 'kg' | 'lbs'
-  body_fat_percentage?: number
-  muscle_mass?: number
-  bone_mass?: number
-  source?: string
-}
-
 export function MultiScanConfirmationStep() {
   const { data, updateData, nextStep, previousStep } = useOnboarding()
-  const scans = (data.extractedScans || []) as Scan[]
+  const scans = (data.extractedScans || []) as DexaScan[]
   const scanCount = data.scanCount || 0
-  
+
   // Initialize with all scans selected
-  const [selectedScans, setSelectedScans] = useState<number[]>(() => 
+  const [selectedScans, setSelectedScans] = useState<number[]>(() =>
     scans.map((_, index) => index)
   )
-  
+
   const toggleScan = (index: number) => {
-    setSelectedScans(prev => 
-      prev.includes(index) 
+    setSelectedScans(prev =>
+      prev.includes(index)
         ? prev.filter(i => i !== index)
         : [...prev, index]
     )
   }
-  
+
   const selectAll = () => {
     setSelectedScans(scans.map((_, i) => i))
   }
-  
+
   const deselectAll = () => {
     setSelectedScans([])
   }
-  
+
   const handleSubmit = () => {
     const selectedScanData = selectedScans.map(i => scans[i])
     updateData({
@@ -54,9 +45,10 @@ export function MultiScanConfirmationStep() {
     })
     nextStep()
   }
-  
-  const formatWeight = (weight: number, unit: string) => {
-    return `${weight.toFixed(1)} ${unit}`
+
+  const formatWeight = (weight: number | undefined, unit: string | undefined) => {
+    if (typeof weight !== 'number') return '—'
+    return `${weight.toFixed(1)} ${unit ?? ''}`
   }
 
   return (
@@ -74,7 +66,7 @@ export function MultiScanConfirmationStep() {
             Importing multiple scans helps track your progress over time and provides better insights.
           </AlertDescription>
         </Alert>
-        
+
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm text-linear-text-secondary">
             {selectedScans.length} of {scans.length} selected
@@ -98,17 +90,16 @@ export function MultiScanConfirmationStep() {
             </Button>
           </div>
         </div>
-        
+
         <ScrollArea className="h-[400px] pr-4">
           <div className="space-y-3">
             {scans.map((scan, index) => (
               <div
                 key={index}
-                className={`p-4 rounded-lg border transition-all cursor-pointer ${
-                  selectedScans.includes(index)
+                className={`p-4 rounded-lg border transition-all cursor-pointer ${selectedScans.includes(index)
                     ? 'border-linear-purple bg-linear-purple/10'
                     : 'border-linear-border hover:border-linear-border/70'
-                }`}
+                  }`}
                 onClick={() => toggleScan(index)}
               >
                 <div className="flex items-start gap-3">
@@ -130,7 +121,7 @@ export function MultiScanConfirmationStep() {
                         </span>
                       )}
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         <Weight className="h-3 w-3 text-linear-text-tertiary" />
@@ -139,7 +130,7 @@ export function MultiScanConfirmationStep() {
                           {formatWeight(scan.weight, scan.weight_unit)}
                         </span>
                       </div>
-                      
+
                       {scan.body_fat_percentage && (
                         <div className="flex items-center gap-2">
                           <Percent className="h-3 w-3 text-linear-text-tertiary" />
@@ -149,7 +140,7 @@ export function MultiScanConfirmationStep() {
                           </span>
                         </div>
                       )}
-                      
+
                       {scan.muscle_mass && (
                         <div className="flex items-center gap-2">
                           <span className="text-linear-text-secondary">Muscle:</span>
@@ -158,7 +149,7 @@ export function MultiScanConfirmationStep() {
                           </span>
                         </div>
                       )}
-                      
+
                       {scan.bone_mass && (
                         <div className="flex items-center gap-2">
                           <span className="text-linear-text-secondary">Bone:</span>
@@ -182,7 +173,7 @@ export function MultiScanConfirmationStep() {
           >
             Back
           </Button>
-          
+
           <Button
             onClick={handleSubmit}
             disabled={selectedScans.length === 0}

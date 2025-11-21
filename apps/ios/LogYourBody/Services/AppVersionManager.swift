@@ -187,8 +187,7 @@ class AppVersionManager {
                 try? FileManager.default.removeItem(at: file)
             }
 
-            let megabytes = Double(clearedSize) / (1_024 * 1_024)
-            // print("✅ Cleared \(String(format: "%.1f", megabytes)) MB from cache")
+            _ = Double(clearedSize) / (1_024 * 1_024)
         } catch {
             // print("Failed to clear app caches: \(error)")
         }

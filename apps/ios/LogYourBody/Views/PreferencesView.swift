@@ -58,10 +58,7 @@ struct PreferencesView: View {
     @State private var editingFFMIGoal: String = ""
 
     // Local state for editing profile fields
-    @State private var isEditingName = false
-    @State private var isEditingBirthday = false
-    @State private var isEditingHeight = false
-    @State private var isSavingProfile = false
+    @State private var isShowingProfileSettings = false
 
     // Photo picker state
     @State private var showingPhotoPicker = false
@@ -236,6 +233,12 @@ struct PreferencesView: View {
                 }
             }
         }
+        .sheet(isPresented: $isShowingProfileSettings) {
+            NavigationStack {
+                ProfileSettingsViewV2()
+                    .environmentObject(authManager)
+            }
+        }
         .onAppear {
             checkBiometricAvailability()
             updateCachedValues() // Cache computed properties for performance
@@ -391,19 +394,7 @@ struct PreferencesView: View {
                     title: "Full name",
                     value: authManager.currentUser?.profile?.fullName ?? authManager.currentUser?.name ?? "Not set"
                 ) {
-                    let currentName = authManager.currentUser?.profile?.fullName ?? authManager.currentUser?.name ?? ""
-                    showTextInputAlert(
-                        title: "Full name",
-                        message: "Enter your full name",
-                        currentValue: currentName,
-                        keyboardType: .default
-                    ) { newValue in
-                        Task {
-                            isSavingProfile = true
-                            await authManager.updateProfile(["name": newValue])
-                            isSavingProfile = false
-                        }
-                    }
+                    isShowingProfileSettings = true
                 }
 
                 DSDivider().insetted(16)
@@ -413,7 +404,7 @@ struct PreferencesView: View {
                     title: "Date of birth",
                     value: dateOfBirthDisplay
                 ) {
-                    isEditingBirthday = true
+                    isShowingProfileSettings = true
                 }
 
                 DSDivider().insetted(16)
@@ -423,7 +414,7 @@ struct PreferencesView: View {
                     title: "Height",
                     value: heightDisplayText
                 ) {
-                    isEditingHeight = true
+                    isShowingProfileSettings = true
                 }
             }
         }
@@ -538,141 +529,6 @@ struct PreferencesView: View {
                 } resetAction: {
                     customFFMIGoal = nil
                 }
-
-                DSDivider().insetted(16)
-
-                Button {
-                    HapticManager.shared.selection()
-                    resetToDefaults()
-                } label: {
-                    Text("Reset goals to defaults")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.appPrimary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                }
-            }
-        }
-    }
-
-    private var integrationsSection: some View {
-        SettingsSection(header: "Integrations") {
-            VStack(spacing: 0) {
-                SettingsToggleRow(
-                    icon: "heart.fill",
-                    title: "Sync with Apple Health",
-                    isOn: $healthKitSyncEnabled,
-                    subtitle: "Automatically sync weight and body metrics.",
-                    onToggle: { newValue in
-                        handleHealthSyncToggle(to: newValue)
-                    }
-                )
-                .disabled(isHealthSyncSetupInProgress)
-
-                if isHealthSyncSetupInProgress {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .scaleEffect(0.65)
-                        Text("Connecting to Apple Health…")
-                            .font(.caption)
-                            .foregroundColor(.appTextSecondary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, SettingsDesign.horizontalPadding)
-                    .padding(.vertical, 10)
-                }
-
-                if healthKitManager.isImporting {
-                    DSDivider().insetted(16)
-
-                    VStack(spacing: 12) {
-                        HStack {
-                            ProgressView(value: healthKitManager.importProgress)
-                                .tint(Color.liquidAccent)
-
-                            Text("\(Int(healthKitManager.importProgress * 100))%")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.appTextSecondary)
-                                .frame(width: 45, alignment: .trailing)
-                        }
-
-                        if !healthKitManager.importStatus.isEmpty {
-                            Text(healthKitManager.importStatus)
-                                .font(.caption)
-                                .foregroundColor(.appTextSecondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                    .padding(.horizontal, SettingsDesign.horizontalPadding)
-                    .padding(.vertical, SettingsDesign.verticalPadding)
-                }
-
-                DSDivider().insetted(16)
-
-                Button {
-                    guard !isTriggeringHealthResync else { return }
-                    HapticManager.shared.impact(style: .light)
-                    isTriggeringHealthResync = true
-                    Task {
-                        await healthKitManager.forceFullHealthKitSync()
-                        await MainActor.run {
-                            isTriggeringHealthResync = false
-                        }
-                    }
-                } label: {
-                    HStack {
-                        if isTriggeringHealthResync || healthKitManager.isImporting {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 16, weight: .semibold))
-                        }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Re-sync data from Apple Health")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.appText)
-
-                            Text("Pull in all available measurements again.")
-                                .font(.caption)
-                                .foregroundColor(.appTextSecondary)
-                        }
-
-                        Spacer()
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.appBorder, lineWidth: 1)
-                            .background(Color.appCard)
-                    )
-                }
-                .disabled(isTriggeringHealthResync)
-                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                .padding(.top, 12)
-                .padding(.bottom, 4)
-            }
-        }
-    }
-
-    private var securitySection: some View {
-        SettingsSection(header: "Security & privacy") {
-            VStack(spacing: 0) {
-                SettingsToggleRow(
-                    icon: biometricType == .faceID ? "faceid" : "touchid",
-                    title: biometricType == .faceID ? "Face ID lock" : "Touch ID lock",
-                    isOn: $biometricLockEnabled,
-                    subtitle: "Require biometrics to open the app.",
-                    onToggle: { newValue in
-                        if biometricType != .none {
-                            HapticManager.shared.selection()
-                            biometricLockEnabled = newValue
-                        }
-                    }
-                )
-                .disabled(biometricType == .none)
 
                 DSDivider().insetted(16)
 
@@ -1176,198 +1032,6 @@ struct PreferencesView: View {
         return formatter.string(from: date)
     }
 }
-
-// MARK: - Birthday Edit Sheet
-
-private struct BirthdayEditSheet: View {
-    @Environment(\.dismiss) var dismiss
-    let currentDate: Date
-    let onSave: (Date) -> Void
-
-    @State private var selectedDate: Date
-
-    init(currentDate: Date, onSave: @escaping (Date) -> Void) {
-        self.currentDate = currentDate
-        self.onSave = onSave
-        self._selectedDate = State(initialValue: currentDate)
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                DatePicker(
-                    "Date of Birth",
-                    selection: $selectedDate,
-                    in: ...Date(),
-                    displayedComponents: .date
-                )
-                .datePickerStyle(.wheel)
-                .labelsHidden()
-
-                Spacer()
-
-                Button(action: {
-                    onSave(selectedDate)
-                    dismiss()
-                }, label: {
-                    Text("Save")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Color.blue)
-                        .cornerRadius(12)
-                })
-                .padding(.horizontal)
-            }
-            .padding()
-            .background(Color(hex: "#111111").ignoresSafeArea())
-            .navigationTitle("Date of Birth")
-            .navigationBarTitleDisplayMode(NavigationBarItem.TitleDisplayMode.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Height Edit Sheet
-
-private struct HeightEditSheet: View {
-    @Environment(\.dismiss) var dismiss
-    let currentHeight: Double?
-    let currentUnit: String?
-    let preferredSystem: MeasurementSystem
-    let onSave: (Double, String) -> Void
-
-    @State private var feet: Int = 5
-    @State private var inches: Int = 8
-    @State private var centimeters: Int = 170
-
-    init(
-        currentHeight: Double?,
-        currentUnit: String?,
-        preferredSystem: MeasurementSystem,
-        onSave: @escaping (Double, String) -> Void
-    ) {
-        self.currentHeight = currentHeight
-        self.currentUnit = currentUnit
-        self.preferredSystem = preferredSystem
-        self.onSave = onSave
-
-        // Initialize based on current height
-        if let height = currentHeight {
-            if currentUnit == "in" {
-                let totalInches = Int(height)
-                _feet = State(initialValue: totalInches / 12)
-                _inches = State(initialValue: totalInches % 12)
-                _centimeters = State(initialValue: Int(height * 2.54))
-            } else if currentUnit == "cm" {
-                _centimeters = State(initialValue: Int(height))
-                let totalInches = height / 2.54
-                _feet = State(initialValue: Int(totalInches) / 12)
-                _inches = State(initialValue: Int(totalInches) % 12)
-            }
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 30) {
-                if preferredSystem == .imperial {
-                    // Feet and inches pickers
-                    VStack(spacing: 10) {
-                        Text("Height")
-                            .font(.headline)
-                            .foregroundColor(Color(hex: "#F7F8F8"))
-
-                        HStack(spacing: 20) {
-                            // Feet picker
-                            VStack {
-                                Text("Feet")
-                                    .font(.caption)
-                                    .foregroundColor(.appTextSecondary)
-                                Picker("Feet", selection: $feet) {
-                                    ForEach(3..<9) { ft in
-                                        Text("\(ft)").tag(ft)
-                                    }
-                                }
-                                .pickerStyle(.wheel)
-                                .frame(width: 100)
-                            }
-
-                            // Inches picker
-                            VStack {
-                                Text("Inches")
-                                    .font(.caption)
-                                    .foregroundColor(.appTextSecondary)
-                                Picker("Inches", selection: $inches) {
-                                    ForEach(0..<12) { inch in
-                                        Text("\(inch)").tag(inch)
-                                    }
-                                }
-                                .pickerStyle(.wheel)
-                                .frame(width: 100)
-                            }
-                        }
-                    }
-                } else {
-                    // Centimeters picker
-                    VStack(spacing: 10) {
-                        Text("Height")
-                            .font(.headline)
-                            .foregroundColor(Color(hex: "#F7F8F8"))
-
-                        Picker("Centimeters", selection: $centimeters) {
-                            ForEach(120..<220) { cm in
-                                Text("\(cm) cm").tag(cm)
-                            }
-                        }
-                        .pickerStyle(.wheel)
-                        .frame(height: 200)
-                    }
-                }
-
-                Spacer()
-
-                Button(action: {
-                    if preferredSystem == .imperial {
-                        let totalInches = Double(feet * 12 + inches)
-                        onSave(totalInches, "in")
-                    } else {
-                        onSave(Double(centimeters), "cm")
-                    }
-                    dismiss()
-                }, label: {
-                    Text("Save")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Color.blue)
-                        .cornerRadius(12)
-                })
-                .padding(.horizontal)
-            }
-            .padding()
-            .background(Color(hex: "#111111").ignoresSafeArea())
-            .navigationTitle("Height")
-            .navigationBarTitleDisplayMode(NavigationBarItem.TitleDisplayMode.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
 // Custom label styles removed - use default SwiftUI label styles
 
 #Preview {

@@ -3,12 +3,14 @@ import SwiftUI
 struct BodyScoreBodyFatNumericView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var percentageFieldFocused: Bool
+    @State private var bodyFatError: String?
 
     var body: some View {
         OnboardingPageTemplate(
             title: "Enter your body fat %",
             subtitle: "You can update this anytime.",
             onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .bodyFatNumeric),
             content: {
                 VStack(spacing: 28) {
                     VStack(alignment: .leading, spacing: 16) {
@@ -22,6 +24,13 @@ struct BodyScoreBodyFatNumericView: View {
                         ))
                         .keyboardType(.decimalPad)
                         .focused($percentageFieldFocused)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            percentageFieldFocused = false
+                        }
+                        .onChange(of: viewModel.bodyFatPercentageText) { _, newValue in
+                            validateBodyFat(newValue)
+                        }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 16)
                         .background(
@@ -33,10 +42,16 @@ struct BodyScoreBodyFatNumericView: View {
                                 .stroke(percentageFieldStrokeColor)
                         )
 
-                        OnboardingCaptionText(
-                            text: "Most smart scales, DEXA, or caliper tests provide this number.",
-                            alignment: .leading
-                        )
+                        if let error = bodyFatError {
+                            Text(error)
+                                .font(OnboardingTypography.caption)
+                                .foregroundStyle(Color.red)
+                        } else {
+                            OnboardingCaptionText(
+                                text: "Most people fall between 4–60% body fat.",
+                                alignment: .leading
+                            )
+                        }
                     }
 
                     OnboardingCard {
@@ -67,6 +82,16 @@ struct BodyScoreBodyFatNumericView: View {
                 self.percentageFieldFocused = true
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .keyboard) {
+                HStack {
+                    Spacer()
+                    Button("Done") {
+                        percentageFieldFocused = false
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -85,5 +110,23 @@ private extension BodyScoreBodyFatNumericView {
             return Color.appPrimary
         }
         return Color.appBorder.opacity(0.4)
+    }
+
+    private func validateBodyFat(_ value: String) {
+        guard !value.isEmpty else {
+            bodyFatError = nil
+            return
+        }
+
+        guard let numeric = Double(value) else {
+            bodyFatError = "Enter a valid percentage."
+            return
+        }
+
+        if numeric < 4 || numeric > 60 {
+            bodyFatError = "Enter a body fat between 4–60%."
+        } else {
+            bodyFatError = nil
+        }
     }
 }

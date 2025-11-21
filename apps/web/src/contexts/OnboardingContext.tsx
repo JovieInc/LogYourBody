@@ -25,20 +25,20 @@ export interface OnboardingData {
   fatMass?: number
   boneMass?: number
   scanDate?: string
-  
+
   // Multiple scans data
   extractedScans?: DexaScan[]
   scanCount?: number
   filename?: string
   confirmedScans?: DexaScan[]
   selectedScanCount?: number
-  
+
   // Profile data
   fullName?: string
   dateOfBirth?: string
   height?: number
   gender?: 'male' | 'female'
-  
+
   // Settings
   notificationsEnabled?: boolean
 }
@@ -62,7 +62,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [currentStep, setCurrentStep] = useState(1)
   const [data, setData] = useState<OnboardingData>({})
   const [isLoading, setIsLoading] = useState(false)
-  
+
   const totalSteps = 6
 
   const updateData = useCallback((newData: Partial<OnboardingData>) => {
@@ -83,7 +83,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const completeOnboarding = useCallback(async () => {
     if (!user) return
-    
+
     // Validate data before submission to avoid constraint violations
     if (data.height) {
       // Height should be between 12 and 96 inches for 'ft' unit
@@ -97,7 +97,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         return
       }
     }
-    
+
     if (data.bodyFatPercentage) {
       // Body fat should be between 0 and 70%
       if (data.bodyFatPercentage < 0 || data.bodyFatPercentage > 70) {
@@ -110,19 +110,21 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         return
       }
     }
-    
+
     setIsLoading(true)
     try {
       // Save profile data
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
-      
+      const primaryEmail = user.primaryEmailAddress?.emailAddress
+        ?? user.emailAddresses?.[0]?.emailAddress
+
       // Update user profile
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
           id: user.id,
-          email: user.email || '', // Include email from auth user
+          email: primaryEmail || '', // Include email from auth user
           full_name: data.fullName,
           date_of_birth: data.dateOfBirth,
           height: data.height,
@@ -131,16 +133,18 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           onboarding_completed: true,
           updated_at: new Date().toISOString()
         })
-      
+
       if (profileError) throw profileError
-      
+
       // Save body metrics - either multiple scans or single entry
       if (data.confirmedScans && data.confirmedScans.length > 0) {
         // Multiple scans from PDF
         const metricsToInsert = data.confirmedScans.map(scan => ({
           user_id: user.id,
           date: formatDateForDB(scan.date),
-          weight: scan.weight_unit === 'lbs' ? scan.weight * 0.453592 : scan.weight, // Convert to kg
+          weight: typeof scan.weight === 'number'
+            ? (scan.weight_unit === 'lbs' ? scan.weight * 0.453592 : scan.weight)
+            : undefined, // Convert to kg when weight is present
           weight_unit: 'kg',
           body_fat_percentage: scan.body_fat_percentage || null,
           body_fat_method: 'dexa',
@@ -148,17 +152,17 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }))
-        
+
         const { error: metricsError } = await supabase
           .from('body_metrics')
           .insert(metricsToInsert)
-        
+
         if (metricsError) throw metricsError
       } else if (data.weight && data.bodyFatPercentage) {
         // Single entry (manual or single scan)
         // Convert weight to kg for storage (database expects kg when weight_unit is 'kg')
         const weightInKg = data.weight * 0.453592 // Convert lbs to kg
-        
+
         const { error: metricsError } = await supabase
           .from('body_metrics')
           .insert({
@@ -172,10 +176,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
-        
+
         if (metricsError) throw metricsError
       }
-      
+
       // Navigate to dashboard
       router.push('/dashboard')
     } catch (error) {

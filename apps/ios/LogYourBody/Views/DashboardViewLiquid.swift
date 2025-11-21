@@ -15,17 +15,10 @@ import CoreData
 struct DashboardViewLiquid: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
-    let healthKitManager = HealthKitManager.shared
+    @StateObject var viewModel = DashboardViewModel()
 
-    // Core data
-    @State var dailyMetrics: DailyMetrics?
-    @State var bodyMetrics: [BodyMetrics] = []
-    @State private var sortedBodyMetricsAscending: [BodyMetrics] = []
-    @State private var recentDailyMetrics: [DailyMetrics] = []
+    // Core data / selection
     @State var selectedIndex: Int = 0
-    @State var hasLoadedInitialData = false
-    @State var lastRefreshDate: Date?
-    @State var isSyncingData = false  // Flag to prevent UI updates during sync
 
     // Metrics reordering state
     @AppStorage("metricsOrder") private var metricsOrderData = Data()
@@ -37,19 +30,19 @@ struct DashboardViewLiquid: View {
     @State private var showAddEntrySheet = false
     @AppStorage("dashboard_selected_time_range")
     private var storedTimeRangeRawValue: String = TimeRange.month1.rawValue
-    @State private var selectedRange: TimeRange = .month1
+    @State var selectedRange: TimeRange = .month1
     @State private var showSyncDetails = false
     @State private var syncBannerState: SyncBannerState?
     @State private var syncBannerDismissTask: Task<Void, Never>?
     @State private var previousSyncStatus: RealtimeSyncManager.SyncStatus = .idle
     @State private var coreDataReloadTask: Task<Void, Never>?
-    @State private var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
-    @State private var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
+    @State var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
+    @State var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
 
     // Animated metric values for tweening
-    @State private var animatedWeight: Double = 0
-    @State private var animatedBodyFat: Double = 0
-    @State private var animatedFFMI: Double = 0
+    @State var animatedWeight: Double = 0
+    @State var animatedBodyFat: Double = 0
+    @State var animatedFFMI: Double = 0
 
     // Goals - Optional values, nil means use gender-based default
     @AppStorage("stepGoal") var stepGoal: Int = 10_000
@@ -63,6 +56,7 @@ struct DashboardViewLiquid: View {
 
     // Timeline mode
     @State private var timelineMode: TimelineMode = .photo
+    @State private var photoDisplayMode: DashboardDisplayMode = .photo
 
     // Navigation state
     @State private var selectedTab: DashboardTab = .home
@@ -72,6 +66,7 @@ struct DashboardViewLiquid: View {
 
     enum DashboardTab: Hashable {
         case home
+        case photos
         case metrics
     }
 
@@ -135,6 +130,22 @@ struct DashboardViewLiquid: View {
         return system.weightUnit
     }
 
+    var bodyMetrics: [BodyMetrics] {
+        viewModel.bodyMetrics
+    }
+
+    var sortedBodyMetricsAscending: [BodyMetrics] {
+        viewModel.sortedBodyMetricsAscending
+    }
+
+    var recentDailyMetrics: [DailyMetrics] {
+        viewModel.recentDailyMetrics
+    }
+
+    var dailyMetrics: DailyMetrics? {
+        viewModel.dailyMetrics
+    }
+
     /// Calculate age from date of birth
     private func calculateAge(from dateOfBirth: Date?) -> Int? {
         guard let dob = dateOfBirth else { return nil }
@@ -145,8 +156,9 @@ struct DashboardViewLiquid: View {
     }
 
     var currentMetric: BodyMetrics? {
-        guard !bodyMetrics.isEmpty && selectedIndex >= 0 && selectedIndex < bodyMetrics.count else { return nil }
-        return bodyMetrics[selectedIndex]
+        let metrics = viewModel.bodyMetrics
+        guard !metrics.isEmpty && selectedIndex >= 0 && selectedIndex < metrics.count else { return nil }
+        return metrics[selectedIndex]
     }
 
     var greeting: String {
@@ -167,28 +179,37 @@ struct DashboardViewLiquid: View {
             )
             .ignoresSafeArea()
 
-            if bodyMetrics.isEmpty && !hasLoadedInitialData {
-                ProgressView()
-                    .tint(Color(hex: "#6EE7F0"))
-            } else if bodyMetrics.isEmpty {
+            if viewModel.bodyMetrics.isEmpty && !viewModel.hasLoadedInitialData {
+                DashboardSkeleton()
+            } else if viewModel.bodyMetrics.isEmpty {
                 emptyState
             } else {
-                TabView(selection: $selectedTab) {
-                    LazyTabView(selectedTab: $selectedTab) {
-                        homeTab
-                    }
-                    .tag(DashboardTab.home)
-                    .tabItem {
-                        Label("Home", systemImage: "house.fill")
+                ZStack {
+                    TabView(selection: $selectedTab) {
+                        LazyTabView(selectedTab: $selectedTab) {
+                            homeTab
+                        }
+                        .tag(DashboardTab.home)
+
+                        LazyTabView(selectedTab: $selectedTab, tab: .photos) {
+                            photosTab
+                        }
+                        .tag(DashboardTab.photos)
+
+                        LazyTabView(selectedTab: $selectedTab, tab: .metrics) {
+                            metricsTab
+                        }
+                        .tag(DashboardTab.metrics)
                     }
 
-                    LazyTabView(selectedTab: $selectedTab, tab: .metrics) {
-                        metricsTab
+                    VStack {
+                        Spacer()
+                        DashboardBottomTabBar(selectedTab: $selectedTab)
+                            .frame(maxWidth: 360)
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 24)
                     }
-                    .tag(DashboardTab.metrics)
-                    .tabItem {
-                        Label("Metrics", systemImage: "chart.bar.doc.horizontal.fill")
-                    }
+                    .ignoresSafeArea(edges: .bottom)
                 }
             }
         }
@@ -197,11 +218,26 @@ struct DashboardViewLiquid: View {
             loadMetricsOrder()
 
             selectedRange = TimeRange(rawValue: storedTimeRangeRawValue) ?? .month1
-            Task { await loadData(loadOnlyNewest: true) }
+            Task {
+                await viewModel.loadData(
+                    authManager: authManager,
+                    loadOnlyNewest: true,
+                    selectedIndex: selectedIndex
+                )
+                if !viewModel.bodyMetrics.isEmpty {
+                    updateAnimatedValues(for: selectedIndex)
+                }
+            }
 
             // Then refresh async (loads all data in background)
             Task {
-                await refreshData()
+                await viewModel.refreshData(
+                    authManager: authManager,
+                    realtimeSyncManager: realtimeSyncManager
+                )
+                if !viewModel.bodyMetrics.isEmpty {
+                    updateAnimatedValues(for: selectedIndex)
+                }
             }
 
             previousSyncStatus = realtimeSyncManager.syncStatus
@@ -215,7 +251,7 @@ struct DashboardViewLiquid: View {
             handleSyncStatusChange(from: oldStatus, to: newStatus)
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)) { notification in
-            guard !isSyncingData else { return }
+            guard !viewModel.isSyncingData else { return }
 
             coreDataReloadTask?.cancel()
             coreDataReloadTask = Task { @MainActor in
@@ -226,7 +262,13 @@ struct DashboardViewLiquid: View {
                     return
                 }
 
-                await loadData()
+                await viewModel.loadData(
+                    authManager: authManager,
+                    selectedIndex: selectedIndex
+                )
+                if !viewModel.bodyMetrics.isEmpty {
+                    updateAnimatedValues(for: selectedIndex)
+                }
             }
         }
         .onChange(of: selectedRange) { _, newValue in
@@ -257,9 +299,47 @@ struct DashboardViewLiquid: View {
             )
             .hidden()
         )
+        .toolbar(.hidden, for: .tabBar)
     }
 
     private var homeTab: some View {
+        DashboardHomeTab(
+            header: {
+                compactHeader
+            },
+            syncBanner: {
+                syncStatusBanner
+            },
+            metricContent: {
+                Group {
+                    if let metric = currentMetric {
+                        VStack(spacing: 16) {
+                            heroCard(metric: metric)
+                            stepsCard
+                            primaryMetricCard(metric: metric)
+                            ffmiTile
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                }
+            },
+            quickActions: {
+                quickActions
+                    .padding(.horizontal, 20)
+            },
+            onRefresh: {
+                await viewModel.refreshData(
+                    authManager: authManager,
+                    realtimeSyncManager: realtimeSyncManager
+                )
+                if !viewModel.bodyMetrics.isEmpty {
+                    updateAnimatedValues(for: selectedIndex)
+                }
+            }
+        )
+    }
+
+    private var photosTab: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
                 compactHeader
@@ -268,28 +348,47 @@ struct DashboardViewLiquid: View {
                 syncStatusBanner
                     .padding(.horizontal, 20)
 
-                if let metric = currentMetric {
-                    heroCard(metric: metric)
-                        .padding(.horizontal, 20)
+                Group {
+                    if !bodyMetrics.isEmpty {
+                        VStack(spacing: 16) {
+                            ProgressPhotoCarouselView(
+                                currentMetric: currentMetric,
+                                historicalMetrics: bodyMetrics,
+                                selectedMetricsIndex: $selectedIndex,
+                                displayMode: $photoDisplayMode
+                            )
+                            .frame(height: 360)
+
+                            timelineScrubber
+                                .padding(.horizontal, 20)
+                        }
+                    }
                 }
+
                 Spacer(minLength: 160)
             }
             .padding(.top, 8)
         }
         .refreshable {
-            await refreshData()
+            await viewModel.refreshData(
+                authManager: authManager,
+                realtimeSyncManager: realtimeSyncManager
+            )
+            if !viewModel.bodyMetrics.isEmpty {
+                updateAnimatedValues(for: selectedIndex)
+            }
         }
     }
 
     private var metricsTab: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 20) {
+        DashboardMetricsTab(
+            header: {
                 compactHeader
-                    .padding(.horizontal, 20)
-
+            },
+            syncBanner: {
                 syncStatusBanner
-                    .padding(.horizontal, 20)
-
+            },
+            titleBlock: {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Your Metrics")
                         .font(.system(size: 20, weight: .bold))
@@ -299,16 +398,17 @@ struct DashboardViewLiquid: View {
                         .foregroundColor(Color.liquidTextPrimary.opacity(0.6))
                 }
                 .padding(.horizontal, 20)
-
+            },
+            metricsContent: {
                 metricsView
-
-                Spacer(minLength: 120)
+            },
+            onRefresh: {
+                await viewModel.refreshData(
+                    authManager: authManager,
+                    realtimeSyncManager: realtimeSyncManager
+                )
             }
-            .padding(.top, 8)
-        }
-        .refreshable {
-            await refreshData()
-        }
+        )
     }
 
     // MARK: - Compact Header
@@ -317,11 +417,12 @@ struct DashboardViewLiquid: View {
         DashboardHeaderCompact(
             avatarURL: avatarURL,
             userFirstName: userFirstName,
-            userAgeDisplay: userAgeDisplay,
-            userHeightDisplay: userHeightDisplay,
+            hasAge: hasAge,
+            hasHeight: hasHeight,
             syncStatusTitle: syncStatusTitle,
             syncStatusDetail: syncStatusDetail,
             syncStatusColor: syncStatusColor,
+            isSyncError: isSyncError,
             onShowSyncDetails: { showSyncDetails = true }
         )
     }
@@ -364,6 +465,21 @@ struct DashboardViewLiquid: View {
         }
     }
 
+    private var hasAge: Bool {
+        if let dob = authManager.currentUser?.profile?.dateOfBirth,
+           let age = calculateAge(from: dob), age > 0 {
+            return true
+        }
+        return false
+    }
+
+    private var hasHeight: Bool {
+        if let height = authManager.currentUser?.profile?.height, height > 0 {
+            return true
+        }
+        return false
+    }
+
     private var userAgeDisplay: String {
         if let dob = authManager.currentUser?.profile?.dateOfBirth,
            let age = calculateAge(from: dob), age > 0 {
@@ -395,6 +511,13 @@ struct DashboardViewLiquid: View {
         return "\(feet)'\(inches)\""
     }
 
+    private var isSyncError: Bool {
+        if case .error = realtimeSyncManager.syncStatus {
+            return true
+        }
+        return false
+    }
+
     private var syncStatusTitle: String {
         if realtimeSyncManager.isSyncing || realtimeSyncManager.syncStatus == .syncing {
             return "Syncing…"
@@ -414,6 +537,18 @@ struct DashboardViewLiquid: View {
     }
 
     private var syncStatusDetail: String? {
+        if case .error = realtimeSyncManager.syncStatus {
+            if let message = realtimeSyncManager.error, !message.isEmpty {
+                return message
+            }
+
+            if let timeString = lastSyncClockText() {
+                return "Last successful sync: \(timeString)"
+            }
+
+            return nil
+        }
+
         // Offline messaging stays inline, since the banner is reserved for hard errors
         if !realtimeSyncManager.isOnline || realtimeSyncManager.syncStatus == .offline {
             return "Offline · changes queued"
@@ -508,87 +643,17 @@ struct DashboardViewLiquid: View {
     // MARK: - Hero Card
 
     private func heroCard(metric: BodyMetrics) -> some View {
-        HeroGlassCard {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Body Score")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color.white.opacity(0.65))
-
-                        Text(bodyScoreText().scoreText)
-                            .font(.system(size: 78, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .monospacedDigit()
-
-                        Text(bodyScoreText().tagline)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color.white.opacity(0.7))
-                    }
-
-                    Spacer()
-
-                    progressRing(for: bodyScoreText().score)
-                        .frame(width: 120, height: 120)
-                }
-
-                HStack(spacing: 18) {
-                    heroStatTile(title: "FFMI", value: heroFFMIValue(), caption: heroFFMICaption())
-                    heroStatTile(title: "Lean %ile", value: heroPercentileValue(), caption: "Among peers")
-                    heroStatTile(title: "Target", value: bodyScoreTargetRange(), caption: heroTargetCaption())
-                }
-            }
-            .padding(28)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private func heroStatTile(title: String, value: String, caption: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color.liquidTextPrimary.opacity(0.6))
-
-            Text(value)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundColor(Color.liquidTextPrimary)
-
-            Text(caption)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(Color.liquidTextPrimary.opacity(0.55))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func progressRing(for score: Int) -> some View {
-        let progress = Double(score) / 100.0
-        return ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.15), lineWidth: 12)
-
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    LinearGradient(
-                        colors: [Color(hex: "#6EE7F0"), Color(hex: "#3A7BD5")],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 12
-                )
-                .rotationEffect(.degrees(-90))
-                .animation(.easeInOut(duration: 0.8), value: score)
-
-            VStack(spacing: 4) {
-                Text("Score")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color.liquidTextPrimary.opacity(0.7))
-                Text("/100")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color.liquidTextPrimary.opacity(0.45))
-            }
-        }
-        .frame(width: 90, height: 90)
+        let bodyScore = bodyScoreText()
+        return DashboardBodyScoreHeroCard(
+            score: bodyScore.score,
+            scoreText: bodyScore.scoreText,
+            tagline: bodyScore.tagline,
+            ffmiValue: heroFFMIValue(),
+            ffmiCaption: heroFFMICaption(),
+            percentileValue: heroPercentileValue(),
+            targetRange: bodyScoreTargetRange(),
+            targetCaption: heroTargetCaption()
+        )
     }
 
     private func bodyScoreText() -> (score: Int, scoreText: String, tagline: String) {
@@ -690,7 +755,7 @@ struct DashboardViewLiquid: View {
 
                 MetricSummaryCard(
                     icon: "flame.fill",
-                    accentColor: .orange,
+                    accentColor: Color(hex: "#FF9F0A"),
                     state: .data(MetricSummaryCard.Content(
                         title: "Steps",
                         value: formatSteps(latestSteps.value),
@@ -718,7 +783,7 @@ struct DashboardViewLiquid: View {
                 } label: {
                     MetricSummaryCard(
                         icon: "figure.stand",
-                        accentColor: .purple,
+                        accentColor: Color(hex: "#AF52DE"),
                         state: .data(MetricSummaryCard.Content(
                             title: "Weight",
                             value: formatWeightValue(currentMetric.weight),
@@ -747,7 +812,7 @@ struct DashboardViewLiquid: View {
                 } label: {
                     MetricSummaryCard(
                         icon: "percent",
-                        accentColor: .purple,
+                        accentColor: Color(hex: "#FF2D55"),
                         state: .data(MetricSummaryCard.Content(
                             title: "Body Fat %",
                             value: formatBodyFatValue(currentMetric.bodyFatPercentage),
@@ -811,11 +876,11 @@ struct DashboardViewLiquid: View {
                 currentValue: formatSteps(dailyMetrics?.steps),
                 unit: "steps",
                 currentDate: formatDate(dailyMetrics?.updatedAt ?? Date()),
-                chartData: [], // Steps chart data would need daily metrics history
+                chartData: cachedChartData(for: .steps, generator: generateFullScreenStepsChartData),
                 onAdd: {
                     showAddEntrySheet = true
                 },
-                metricEntries: nil,
+                metricEntries: cachedMetricEntries(for: .steps),
                 selectedTimeRange: $selectedRange
             )
 
@@ -872,207 +937,99 @@ struct DashboardViewLiquid: View {
     // MARK: - Timeline Scrubber (Standalone)
 
     private var timelineScrubber: some View {
-        Group {
-            if bodyMetrics.count > 1 {
-                ProgressTimelineView(
-                    bodyMetrics: bodyMetrics,
-                    selectedIndex: $selectedIndex,
-                    mode: $timelineMode
-                )
-                .frame(height: 80)
-            }
-        }
+        DashboardTimelineScrubber(
+            bodyMetrics: bodyMetrics,
+            selectedIndex: $selectedIndex,
+            timelineMode: $timelineMode
+        )
     }
 
     // MARK: - Primary Metric Card
 
-    private func primaryMetricCard(metric: BodyMetrics) -> some View {
-        LiquidGlassCard(cornerRadius: 24, padding: 20) {
-            VStack(spacing: 12) {
-                // Huge weight display with interpolation indicator
-                if let weightResult = metric.weight != nil ?
-                    InterpolatedMetric(
-                        value: metric.weight!,
-                        isInterpolated: false,
-                        isLastKnown: false,
-                        confidenceLevel: nil
-                    ) :
-                    MetricsInterpolationService.shared.estimateWeight(
-                        for: metric.date,
-                        metrics: bodyMetrics
-                    ) {
-                    let weightData = weightResult
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-                        let convertedWeight = convertWeight(
-                            weightData.value,
-                            to: system
-                        ) ?? weightData.value
-                        // ...
-                    }
-                }
-                // ...
+    private var stepsCard: some View {
+        let stepsValue = dailyMetrics?.steps ?? 0
+        let goalValue = max(stepGoal, 1)
+        let formattedSteps = formatSteps(stepsValue)
+        let formattedGoal = formatSteps(goalValue)
+        let subtext = stepsGoalSubtext(steps: stepsValue, goal: goalValue)
 
-                Text("Body Fat %")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(Color.liquidTextPrimary.opacity(0.85))
-                if let metric = currentMetric {
-                    if let bodyFatResult = metric.bodyFatPercentage != nil ?
-                        InterpolatedMetric(
-                            value: metric.bodyFatPercentage!,
-                            isInterpolated: false,
-                            isLastKnown: false,
-                            confidenceLevel: nil
-                        ) :
-                        MetricsInterpolationService.shared.estimateBodyFat(
-                            for: metric.date,
-                            metrics: bodyMetrics
-                        ) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(String(format: "%.1f", animatedBodyFat))
-                                    .font(.system(size: 28, weight: .bold))
-                                    .tracking(-0.3)
-                                    .foregroundColor(Color.liquidTextPrimary)
-                                    .monospacedDigit()
-
-                                if bodyFatResult.isInterpolated || bodyFatResult.isLastKnown {
-                                    DSInterpolationIcon(
-                                        confidenceLevel: bodyFatResult.confidenceLevel,
-                                        isLastKnown: bodyFatResult.isLastKnown
-                                    )
-                                }
-                            }
-
-                            Text("%")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(Color.liquidTextPrimary.opacity(0.70))
-
-                            bodyFatProgressBar(current: animatedBodyFat, goal: bodyFatGoal)
-                        }
-                    } else {
-                        Text("—")
-                            .font(.system(size: 28, weight: .bold))
-                            .tracking(-0.3)
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
-                    }
-                } else {
-                    Text("—")
-                        .font(.system(size: 28, weight: .bold))
-                        .tracking(-0.3)
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
-                }
+        return DashboardStepsCard(
+            formattedSteps: formattedSteps,
+            formattedGoal: formattedGoal,
+            subtext: subtext,
+            progressView: {
+                stepsProgressBar(steps: stepsValue, goal: goalValue)
             }
-        }
+        )
+    }
+
+    private func primaryMetricCard(metric: BodyMetrics) -> some View {
+        let bodyFatResult: InterpolatedMetric? = {
+            guard let metric = currentMetric else {
+                return nil
+            }
+
+            if let bodyFat = metric.bodyFatPercentage {
+                return InterpolatedMetric(
+                    value: bodyFat,
+                    isInterpolated: false,
+                    isLastKnown: false,
+                    confidenceLevel: nil
+                )
+            }
+
+            return MetricsInterpolationService.shared.estimateBodyFat(
+                for: metric.date,
+                metrics: bodyMetrics
+            )
+        }()
+
+        return DashboardPrimaryMetricCard(
+            animatedBodyFat: animatedBodyFat,
+            bodyFatResult: bodyFatResult,
+            bodyFatProgress: bodyFatProgressBar(current: animatedBodyFat, goal: bodyFatGoal)
+        )
     }
 
     private var ffmiTile: some View {
-        CompactGlassCard {
-            HStack(spacing: 12) {
-                // Left: Value and goal
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("FFMI")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.85))
+        let heightInches = convertHeightToInches(
+            height: authManager.currentUser?.profile?.height,
+            heightUnit: authManager.currentUser?.profile?.heightUnit
+        )
 
-                    if let metric = currentMetric {
-                        let heightInches = convertHeightToInches(
-                            height: authManager.currentUser?.profile?.height,
-                            heightUnit: authManager.currentUser?.profile?.heightUnit
-                        )
-
-                        let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                            for: metric.date,
-                            metrics: bodyMetrics,
-                            heightInches: heightInches
-                        )
-
-                        if let ffmiData = ffmiResult {
-                            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(String(format: "%.1f", animatedFFMI))
-                                    .font(.system(size: 28, weight: .bold))
-                                    .tracking(-0.3)
-                                    .foregroundColor(Color.liquidTextPrimary)
-                                    .monospacedDigit()
-
-                                if ffmiData.isInterpolated || ffmiData.isLastKnown {
-                                    DSInterpolationIcon(
-                                        confidenceLevel: ffmiData.confidenceLevel,
-                                        isLastKnown: ffmiData.isLastKnown
-                                    )
-                                }
-                            }
-                            Text("of \(String(format: "%.0f", ffmiGoal))")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(Color.liquidTextPrimary.opacity(0.70))
-                        } else {
-                            Text("—")
-                                .font(.system(size: 28, weight: .bold))
-                                .tracking(-0.3)
-                                .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
-                        }
-                    } else {
-                        Text("—")
-                            .font(.system(size: 28, weight: .bold))
-                            .tracking(-0.3)
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
-                    }
-                }
-
-                Spacer()
-
-                // Right: Progress ring
-                if let metric = currentMetric {
-                    let heightInches = convertHeightToInches(
-                        height: authManager.currentUser?.profile?.height,
-                        heightUnit: authManager.currentUser?.profile?.heightUnit
-                    )
-
-                    let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                        for: metric.date,
-                        metrics: bodyMetrics,
-                        heightInches: heightInches
-                    )
-
-                    if let ffmiData = ffmiResult {
-                        ffmiProgressBar(current: ffmiData.value, goal: ffmiGoal)
-                    }
-                }
-            }
-        }
+        return DashboardFFMITile(
+            currentMetric: currentMetric,
+            bodyMetrics: bodyMetrics,
+            heightInches: heightInches,
+            ffmiGoal: ffmiGoal,
+            animatedFFMI: animatedFFMI
+        )
     }
 
     // MARK: - Progress Bars
 
-    private func ffmiProgressBar(current: Double, goal: Double) -> some View {
-        // Human FFMI range: 10 (very low) to 30 (elite bodybuilder)
-        let minFFMI: Double = 10
-        let maxFFMI: Double = 30
-        let range = maxFFMI - minFFMI
+    private func stepsProgressBar(steps: Int, goal: Int) -> some View {
+        let clampedGoal = max(goal, 1)
+        let progress = max(0, min(Double(steps) / Double(clampedGoal), 1))
 
-        // Calculate positions (0.0 to 1.0)
-        let currentPosition = max(0, min(1, (current - minFFMI) / range))
-        let goalPosition = max(0, min(1, (goal - minFFMI) / range))
-
-        return VStack(spacing: 0) {
+        return GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                // Background track
-                RoundedRectangle(cornerRadius: 2)
+                RoundedRectangle(cornerRadius: 999)
                     .fill(Color.white.opacity(0.15))
-                    .frame(height: 4)
 
-                // Progress fill (from min to current value)
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color(hex: "#6EE7F0"))
-                    .frame(width: max(0, currentPosition * 60), height: 4)  // 60pt total width
-
-                // Goal indicator tick
-                Rectangle()
-                    .fill(Color.white.opacity(0.90))
-                    .frame(width: 2, height: 8)
-                    .offset(x: goalPosition * 60 - 1)  // Center the tick on goal position
+                RoundedRectangle(cornerRadius: 999)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#6EE7F0"),
+                                Color(hex: "#22C1C3")
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: geometry.size.width * CGFloat(progress))
             }
-            .frame(width: 60, height: 8)  // Container for the bar
         }
     }
 
@@ -1158,7 +1115,28 @@ struct DashboardViewLiquid: View {
         }
     }
 
+    private func stepsGoalSubtext(steps: Int, goal: Int) -> String {
+        let remaining = max(goal - steps, 0)
+        guard remaining > 0 else {
+            return "Goal reached"
+        }
+
+        let formattedRemaining = FormatterCache.stepsFormatter.string(from: NSNumber(value: remaining)) ?? "\(remaining)"
+        return "\(formattedRemaining) to goal"
+    }
+
     // MARK: - Quick Actions
+
+    private var quickActions: some View {
+        HStack(spacing: 12) {
+            GlassPillButton(icon: "plus.circle.fill", title: "Log Weight") {
+                showAddEntrySheet = true
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
     // MARK: - Visual Divider
 
@@ -1171,747 +1149,147 @@ struct DashboardViewLiquid: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 60))
-                .foregroundColor(.white.opacity(0.3))
-            Text("No metrics yet")
-                .font(.title2)
-                .foregroundColor(Color.liquidTextPrimary)
-            Text("Tap the + button to log your first entry")
-                .foregroundColor(.white.opacity(0.7))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+        DashboardEmptyStateLiquid {
+            showAddEntrySheet = true
+        }
+    }
+}
 
-            GlassPillButton(icon: "plus.circle.fill", title: "Get Started") {
-                showAddEntrySheet = true
+// MARK: - Timeline Scrubber Component
+
+private struct DashboardTimelineScrubber: View {
+    let bodyMetrics: [BodyMetrics]
+    @Binding var selectedIndex: Int
+    @Binding var timelineMode: TimelineMode
+
+    var body: some View {
+        Group {
+            if bodyMetrics.count > 1 {
+                ProgressTimelineView(
+                    bodyMetrics: bodyMetrics,
+                    selectedIndex: $selectedIndex,
+                    mode: $timelineMode
+                )
+                .frame(height: 80)
             }
         }
     }
 }
 
-// MARK: - Helpers (using existing extension methods)
+private struct DashboardEmptyStateLiquid: View {
+    let onAddEntry: () -> Void
 
-extension DashboardViewLiquid {
-    // Import these from DashboardView+Helpers.swift and DashboardView+Calculations.swift
-    func convertWeight(_ weight: Double?, to system: MeasurementSystem) -> Double? {
-        guard let weight = weight else { return nil }
-        switch system {
-        case .metric: return weight
-        case .imperial: return weight * 2.20462
-        }
-    }
-
-    func convertHeightToInches(height: Double?, heightUnit: String?) -> Double? {
-        guard let height = height else { return nil }
-        if heightUnit == "cm" {
-            return height / 2.54
-        } else {
-            return height
-        }
-    }
-
-    func calculateFFMI(weight: Double?, bodyFat: Double?, heightInches: Double?) -> Double? {
-        guard let weight = weight, let bodyFat = bodyFat, let heightInches = heightInches else {
-            return nil
-        }
-        let heightMeters = heightInches * 0.0254
-        let leanMassKg = weight * (1 - bodyFat / 100)
-        return leanMassKg / (heightMeters * heightMeters)
-    }
-
-    func loadData(loadOnlyNewest: Bool = false) async {
-        guard let userId = authManager.currentUser?.id else {
-            await MainActor.run { hasLoadedInitialData = true }
-            return
-        }
-
-        let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
-        let allMetrics = fetchedMetrics
-            .compactMap { $0.toBodyMetrics() }
-            .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
-
-        let todayMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date())
-        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
-        let recentDailyCached = await CoreDataManager.shared.fetchDailyMetrics(for: userId, from: thirtyDaysAgo, to: nil)
-        let recentDaily = recentDailyCached.map { $0.toDailyMetrics() }
-
-        await MainActor.run {
-            if loadOnlyNewest {
-                if let newest = allMetrics.first {
-                    bodyMetrics = [newest]
-                    sortedBodyMetricsAscending = [newest]
-                    resetCaches()
-                    updateAnimatedValues(for: 0)
-                    hasLoadedInitialData = true
-
-                    Task { @MainActor [allMetrics] in
-                        if bodyMetrics.count == 1 {
-                            bodyMetrics = allMetrics
-                            sortedBodyMetricsAscending = allMetrics.sorted {
-                                ($0.date ?? .distantPast) < ($1.date ?? .distantPast)
-                            }
-                            resetCaches()
-                        }
-                    }
-                }
-            } else {
-                bodyMetrics = allMetrics
-                sortedBodyMetricsAscending = allMetrics.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
-                resetCaches()
-                if !bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
-                hasLoadedInitialData = true
-            }
-
-            if let todayMetrics {
-                dailyMetrics = todayMetrics.toDailyMetrics()
-            }
-
-            recentDailyMetrics = recentDaily
-        }
-    }
-
-    private func resetCaches() {
-        metricEntriesCache = [:]
-        fullChartCache = [:]
-    }
-
-    func refreshData() async {
-        // Debouncing: Skip refresh if last refresh was within 3 minutes
-        if let lastRefresh = lastRefreshDate {
-            let timeSinceLastRefresh = Date().timeIntervalSince(lastRefresh)
-            if timeSinceLastRefresh < 180 { // 3 minutes in seconds
-                // Just reload from cache for quick refresh (async - won't block UI)
-                await loadData()
-
-                // Subtle haptic for quick refresh
-                await MainActor.run {
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                }
-                return
-            }
-        }
-
-        // Set syncing flag to prevent Core Data observer from firing
-        await MainActor.run {
-            isSyncingData = true
-        }
-
-        var hasErrors = false
-
-        // Sync from HealthKit if authorized
-        if healthKitManager.isAuthorized {
-            do {
-                // Sync weight and body fat data from HealthKit (last 30 days)
-                try await healthKitManager.syncWeightFromHealthKit()
-
-                // Sync today's steps
-                await syncStepsFromHealthKit()
-            } catch {
-                // Log error but continue with sync
-                // print("HealthKit sync error during refresh: \(error)")
-                hasErrors = true
-            }
-        }
-
-        // Upload local changes to Supabase and pull latest from server
-        await MainActor.run {
-            realtimeSyncManager.syncAll()
-        }
-
-        // Wait for sync operations to complete
-        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-
-        // Re-enable Core Data observer
-        await MainActor.run {
-            isSyncingData = false
-        }
-
-        // Reload from local cache (async - won't block UI)
-        await loadData()
-
-        // Update last refresh timestamp and provide haptic feedback
-        await MainActor.run {
-            lastRefreshDate = Date()
-
-            // Provide haptic feedback based on result
-            let generator = UINotificationFeedbackGenerator()
-            generator.prepare()
-
-            if hasErrors {
-                generator.notificationOccurred(.warning)
-            } else {
-                generator.notificationOccurred(.success)
-            }
-        }
-    }
-
-    func syncStepsFromHealthKit() async {
-        do {
-            let stepCount = try await healthKitManager.fetchTodayStepCount()
-            await updateStepCount(stepCount)
-        } catch {
-            // Silently fail - HealthKit sync is optional
-        }
-    }
-
-    func updateStepCount(_ steps: Int) async {
-        guard let userId = authManager.currentUser?.id else { return }
-
-        let today = Date()
-
-        if let existingMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today) {
-            // Update existing metrics
-            existingMetrics.steps = Int32(steps)
-            existingMetrics.updatedAt = Date()
-
-            let dailyMetrics = existingMetrics.toDailyMetrics()
-            await MainActor.run {
-                self.dailyMetrics = dailyMetrics
-            }
-        } else {
-            // Create new daily metrics
-            let newMetrics = DailyMetrics(
-                id: UUID().uuidString,
-                userId: userId,
-                date: today,
-                steps: steps,
-                notes: nil,
-                createdAt: Date(),
-                updatedAt: Date()
-            )
-
-            CoreDataManager.shared.saveDailyMetrics(newMetrics, userId: userId)
-
-            await MainActor.run {
-                self.dailyMetrics = newMetrics
-            }
-        }
-
-        // Sync to backend
-        await MainActor.run {
-            realtimeSyncManager.syncAll()
-        }
-    }
-
-    // MARK: - Animation Helpers
-
-    /// Update animated metric values with 180ms ease-out animation
-    private func updateAnimatedValues(for index: Int) {
-        guard index >= 0 && index < bodyMetrics.count else { return }
-        let metric = bodyMetrics[index]
-
-        withAnimation(.easeOut(duration: 0.18)) {
-            // Weight
-            if let weightResult = metric.weight != nil ?
-                InterpolatedMetric(
-                    value: metric.weight!,
-                    isInterpolated: false,
-                    isLastKnown: false,
-                    confidenceLevel: nil
-                ) :
-                MetricsInterpolationService.shared.estimateWeight(
-                    for: metric.date,
-                    metrics: bodyMetrics
-                ) {
-                let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-                animatedWeight = convertWeight(weightResult.value, to: system) ?? weightResult.value
-            }
-
-            // Body Fat
-            if let bodyFatResult = metric.bodyFatPercentage != nil ?
-                InterpolatedMetric(
-                    value: metric.bodyFatPercentage!,
-                    isInterpolated: false,
-                    isLastKnown: false,
-                    confidenceLevel: nil
-                ) :
-                MetricsInterpolationService.shared.estimateBodyFat(
-                    for: metric.date,
-                    metrics: bodyMetrics
-                ) {
-                animatedBodyFat = bodyFatResult.value
-            }
-
-            // FFMI
-            if let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                for: metric.date,
-                metrics: bodyMetrics,
-                heightInches: authManager.currentUser?.profile?.height
-            ) {
-                animatedFFMI = ffmiResult.value
-            }
-        }
-    }
-
-    // MARK: - Metrics View Helpers
-
-    private func formatSteps(_ steps: Int?) -> String {
-        guard let steps = steps else { return "–" }
-        return FormatterCache.stepsFormatter.string(from: NSNumber(value: steps)) ?? "\(steps)"
-    }
-
-    private func formatWeightValue(_ weight: Double?) -> String {
-        guard let weight = weight else { return "–" }
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-        let converted = convertWeight(weight, to: system) ?? weight
-        // Apple Health-style: no decimals for displayed weight
-        return String(format: "%.0f", converted)
-    }
-
-    private func formatBodyFatValue(_ bodyFat: Double?) -> String {
-        guard let bodyFat = bodyFat else {
-            // Try to get estimated value
-            if let metric = currentMetric,
-               let estimated = MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics) {
-                return String(format: "%.1f", estimated.value)
-            }
-            return "–"
-        }
-        return String(format: "%.1f", bodyFat)
-    }
-
-    private func formatFFMIValue(_ metric: BodyMetrics) -> String {
-        let heightInches = convertHeightToInches(
-            height: authManager.currentUser?.profile?.height,
-            heightUnit: authManager.currentUser?.profile?.heightUnit
+    var body: some View {
+        DashboardEmptyStateView(
+            icon: "figure.stand",
+            title: "Start tracking your progress",
+            message: "Add your first entry to unlock trends, charts, and insights.",
+            action: onAddEntry
         )
+    }
+}
 
-        if let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-            for: metric.date,
-            metrics: bodyMetrics,
-            heightInches: heightInches
+private struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, QuickActions: View>: View {
+    let header: () -> Header
+    let syncBanner: () -> SyncBanner
+    let metricContent: () -> MetricContent
+    let quickActions: () -> QuickActions
+    let onRefresh: () async -> Void
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 16) {
+                header()
+                    .padding(.horizontal, 20)
+
+                syncBanner()
+                    .padding(.horizontal, 20)
+
+                metricContent()
+
+                quickActions()
+                Spacer(minLength: 160)
+            }
+            .padding(.top, 8)
+        }
+        .refreshable {
+            await onRefresh()
+        }
+    }
+}
+
+private struct DashboardMetricsTab<Header: View, SyncBanner: View, TitleBlock: View, MetricsContent: View>: View {
+    let header: () -> Header
+    let syncBanner: () -> SyncBanner
+    let titleBlock: () -> TitleBlock
+    let metricsContent: () -> MetricsContent
+    let onRefresh: () async -> Void
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 16) {
+                header()
+                    .padding(.horizontal, 20)
+
+                syncBanner()
+                    .padding(.horizontal, 20)
+
+                titleBlock()
+
+                metricsContent()
+
+                Spacer(minLength: 160)
+            }
+            .padding(.top, 8)
+        }
+        .refreshable {
+            await onRefresh()
+        }
+    }
+}
+
+private struct DashboardStepsCard<ProgressView: View>: View {
+    let formattedSteps: String
+    let formattedGoal: String
+    let subtext: String
+    let progressView: () -> ProgressView
+
+    var body: some View {
+        LiquidGlassCard(
+            cornerRadius: 24,
+            blurRadius: 30,
+            padding: 20,
+            showShadow: true,
+            showHighlight: true
         ) {
-            // Apple Health-style: no decimals for FFMI headline value
-            return String(format: "%.0f", ffmiResult.value)
-        }
-        return "–"
-    }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(formattedSteps)
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
 
-    // MARK: - Metric Entries Helpers
+                    Text("/" + formattedGoal)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.7))
 
-    private func metricEntriesPayload(for metricType: MetricType) -> MetricEntriesPayload? {
-        switch metricType {
-        case .weight:
-            return weightEntriesPayload()
-        case .bodyFat:
-            return bodyFatEntriesPayload()
-        case .ffmi:
-            return ffmiEntriesPayload()
-        case .steps:
-            return nil
-        }
-    }
+                    Spacer()
 
-    private func weightEntriesPayload() -> MetricEntriesPayload? {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-        let primaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
-        let secondaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
-
-        let entries = sortedBodyMetricsAscending
-            .compactMap { metric -> MetricHistoryEntry? in
-                guard let rawWeight = metric.weight else { return nil }
-                let convertedWeight = convertWeight(rawWeight, to: system) ?? rawWeight
-                return MetricHistoryEntry(
-                    id: metric.id,
-                    date: metric.date,
-                    primaryValue: convertedWeight,
-                    secondaryValue: metric.bodyFatPercentage,
-                    source: metricEntrySourceType(from: metric.dataSource)
-                )
-            }
-
-        guard !entries.isEmpty else { return nil }
-
-        let config = MetricEntriesConfiguration(
-            metricType: .weight,
-            unitLabel: system.weightUnit,
-            secondaryUnitLabel: "%",
-            primaryFormatter: primaryFormatter,
-            secondaryFormatter: secondaryFormatter
-        )
-
-        return MetricEntriesPayload(config: config, entries: entries)
-    }
-
-    private func bodyFatEntriesPayload() -> MetricEntriesPayload? {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-        let primaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 1, maxFractionDigits: 1)
-        let secondaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
-
-        let entries = sortedBodyMetricsAscending
-            .compactMap { metric -> MetricHistoryEntry? in
-                let primaryValue = metric.bodyFatPercentage
-                    ?? MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)?.value
-                guard let bodyFatValue = primaryValue else { return nil }
-
-                let secondaryValue: Double?
-                if let weight = metric.weight {
-                    secondaryValue = convertWeight(weight, to: system) ?? weight
-                } else {
-                    secondaryValue = nil
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(Color.orange)
                 }
 
-                return MetricHistoryEntry(
-                    id: metric.id,
-                    date: metric.date,
-                    primaryValue: bodyFatValue,
-                    secondaryValue: secondaryValue,
-                    source: metricEntrySourceType(from: metric.dataSource)
-                )
-            }
+                progressView()
+                    .frame(height: 10)
 
-        guard !entries.isEmpty else { return nil }
-
-        let config = MetricEntriesConfiguration(
-            metricType: .bodyFat,
-            unitLabel: "%",
-            secondaryUnitLabel: system.weightUnit,
-            primaryFormatter: primaryFormatter,
-            secondaryFormatter: secondaryFormatter
-        )
-
-        return MetricEntriesPayload(config: config, entries: entries)
-    }
-
-    private func ffmiEntriesPayload() -> MetricEntriesPayload? {
-        let heightInches = convertHeightToInches(
-            height: authManager.currentUser?.profile?.height,
-            heightUnit: authManager.currentUser?.profile?.heightUnit
-        )
-
-        guard let heightInches else { return nil }
-
-        let formatter = MetricFormatterCache.formatter(minFractionDigits: 1, maxFractionDigits: 1)
-
-        let entries = sortedBodyMetricsAscending
-            .compactMap { metric -> MetricHistoryEntry? in
-                guard let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                    for: metric.date,
-                    metrics: bodyMetrics,
-                    heightInches: heightInches
-                ) else {
-                    return nil
-                }
-
-                return MetricHistoryEntry(
-                    id: metric.id,
-                    date: metric.date,
-                    primaryValue: ffmiResult.value,
-                    secondaryValue: nil,
-                    source: metricEntrySourceType(from: metric.dataSource)
-                )
-            }
-
-        guard !entries.isEmpty else { return nil }
-
-        let config = MetricEntriesConfiguration(
-            metricType: .ffmi,
-            unitLabel: "",
-            secondaryUnitLabel: nil,
-            primaryFormatter: formatter,
-            secondaryFormatter: nil
-        )
-
-        return MetricEntriesPayload(config: config, entries: entries)
-    }
-
-    private func metricEntrySourceType(from dataSource: String?) -> MetricEntrySourceType {
-        let normalized = dataSource?.lowercased() ?? ""
-
-        if normalized.contains("healthkit") || normalized.contains("health") {
-            return .healthKit
-        }
-
-        if normalized.isEmpty || normalized == "manual" {
-            return .manual
-        }
-
-        return .integration(id: dataSource)
-    }
-
-    private func formatTime(_ date: Date?) -> String? {
-        guard let date = date else { return nil }
-        return FormatterCache.shortTimeFormatter.string(from: date)
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        return FormatterCache.mediumDateFormatter.string(from: date)
-    }
-
-    private func formatCardDateOnly(_ date: Date?) -> String? {
-        guard let date = date else { return nil }
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let day = calendar.startOfDay(for: date)
-
-        if day == today {
-            return "Today"
-        }
-
-        if let days = calendar.dateComponents([.day], from: day, to: today).day, days == 1 {
-            return "Yesterday"
-        }
-
-        let formatter = DateFormatter()
-        let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: today)
-        formatter.dateFormat = sameYear ? "MMM d" : "MMM yyyy"
-        return formatter.string(from: date)
-    }
-
-    private func formatCardDate(_ date: Date) -> String {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let day = calendar.startOfDay(for: date)
-
-        if day == today {
-            return "Today"
-        }
-
-        if let days = calendar.dateComponents([.day], from: day, to: today).day, days == 1 {
-            return "Yesterday"
-        }
-
-        let formatter = DateFormatter()
-        let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: today)
-        formatter.dateFormat = sameYear ? "MMM d" : "MMM yyyy"
-        return formatter.string(from: date)
-    }
-
-    private func generateStepsChartData() -> [MetricDataPoint] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let lookup = dailyMetricsLookup()
-
-        guard !lookup.isEmpty else { return [] }
-
-        var chartData: [MetricDataPoint] = []
-
-        for offset in stride(from: 6, through: 0, by: -1) {
-            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
-            let stepsValue = lookup[date]?.steps ?? 0
-            chartData.append(
-                MetricDataPoint(index: 6 - offset, value: Double(max(stepsValue ?? 0, 0)))
-            )
-        }
-
-        return chartData
-    }
-
-    private func latestStepsSnapshot() -> (value: Int?, date: Date?) {
-        // Prefer Core Data so we can fall back to the most recent day with data
-        guard let userId = authManager.currentUser?.id else {
-            return (dailyMetrics?.steps, dailyMetrics?.date)
-        }
-
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let lookup = dailyMetricsLookup()
-
-        // Look back up to 30 days for the latest non-zero steps entry
-        for offset in 0..<30 {
-            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
-            if let entry = lookup[date], let steps = entry.steps, steps > 0 {
-                return (steps, entry.date)
+                Text(subtext)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.7))
             }
         }
-
-        if let metrics = dailyMetrics {
-            return (metrics.steps, metrics.date)
-        }
-
-        return (nil, nil)
-    }
-
-    private func dailyMetricsLookup() -> [Date: DailyMetrics] {
-        var lookup: [Date: DailyMetrics] = [:]
-        let calendar = Calendar.current
-
-        for metric in recentDailyMetrics {
-            let key = calendar.startOfDay(for: metric.date)
-            if let existing = lookup[key] {
-                if metric.updatedAt > existing.updatedAt {
-                    lookup[key] = metric
-                }
-            } else {
-                lookup[key] = metric
-            }
-        }
-
-        return lookup
-    }
-
-    private func generateWeightChartData() -> [MetricDataPoint] {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-        return filteredMetrics(for: selectedRange).enumerated().compactMap { index, metric in
-            guard let weight = metric.weight else { return nil }
-            let converted = convertWeight(weight, to: system) ?? weight
-            return MetricDataPoint(index: index, value: converted)
-        }
-    }
-
-    private func generateBodyFatChartData() -> [MetricDataPoint] {
-        filteredMetrics(for: selectedRange).enumerated().compactMap { index, metric in
-            if let bf = metric.bodyFatPercentage {
-                return MetricDataPoint(index: index, value: bf)
-            } else if let estimated = MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics) {
-                return MetricDataPoint(index: index, value: estimated.value)
-            }
-            return nil
-        }
-    }
-
-    private func generateFFMIChartData() -> [MetricDataPoint] {
-        let heightInches = convertHeightToInches(
-            height: authManager.currentUser?.profile?.height,
-            heightUnit: authManager.currentUser?.profile?.heightUnit
-        )
-
-        return filteredMetrics(for: selectedRange).enumerated().compactMap { index, metric in
-            if let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                for: metric.date,
-                metrics: bodyMetrics,
-                heightInches: heightInches
-            ) {
-                return MetricDataPoint(index: index, value: ffmiResult.value)
-            }
-            return nil
-        }
-    }
-
-    private func filteredMetrics(for range: TimeRange) -> [BodyMetrics] {
-        guard let days = range.days else {
-            return sortedBodyMetricsAscending
-        }
-
-        let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
-        return sortedBodyMetricsAscending.filter { $0.date >= cutoffDate }
-    }
-
-    private func cachedMetricEntries(for type: MetricType) -> MetricEntriesPayload? {
-        if let cached = metricEntriesCache[type] {
-            return cached
-        }
-        let payload = metricEntriesPayload(for: type)
-        metricEntriesCache[type] = payload
-        return payload
-    }
-
-    private func cachedChartData(
-        for type: MetricType,
-        generator: () -> [MetricChartDataPoint]
-    ) -> [MetricChartDataPoint] {
-        if let cached = fullChartCache[type] {
-            return cached
-        }
-        let data = generator()
-        fullChartCache[type] = data
-        return data
-    }
-
-    private func weightRangeStats() -> MetricRangeStats? {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-        return computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
-            guard let weight = metric.weight else { return nil }
-            return convertWeight(weight, to: system) ?? weight
-        }
-    }
-
-    private func bodyFatRangeStats() -> MetricRangeStats? {
-        computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
-            if let value = metric.bodyFatPercentage {
-                return value
-            }
-            return MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)?.value
-        }
-    }
-
-    private func ffmiRangeStats() -> MetricRangeStats? {
-        let heightInches = convertHeightToInches(
-            height: authManager.currentUser?.profile?.height,
-            heightUnit: authManager.currentUser?.profile?.heightUnit
-        )
-
-        guard let heightInches else { return nil }
-
-        return computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
-            MetricsInterpolationService.shared.estimateFFMI(
-                for: metric.date,
-                metrics: bodyMetrics,
-                heightInches: heightInches
-            )?.value
-        }
-    }
-
-    // Full-screen chart data helpers use the **entire** history and real dates
-    // so that time ranges (W/M/6M/Y) can filter by date window.
-
-    private func generateFullScreenWeightChartData() -> [MetricChartDataPoint] {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-
-        return sortedBodyMetricsAscending
-            .compactMap { metric in
-                guard let weight = metric.weight else { return nil }
-                let converted = convertWeight(weight, to: system) ?? weight
-                return MetricChartDataPoint(
-                    date: metric.date,
-                    value: converted
-                )
-            }
-    }
-
-    private func generateFullScreenBodyFatChartData() -> [MetricChartDataPoint] {
-        return bodyMetrics
-            .sorted { $0.date < $1.date }
-            .compactMap { metric in
-                if let bf = metric.bodyFatPercentage {
-                    return MetricChartDataPoint(
-                        date: metric.date,
-                        value: bf,
-                        isEstimated: false
-                    )
-                }
-
-                if let estimated = MetricsInterpolationService.shared.estimateBodyFat(
-                    for: metric.date,
-                    metrics: bodyMetrics
-                ) {
-                    return MetricChartDataPoint(
-                        date: metric.date,
-                        value: estimated.value,
-                        isEstimated: true
-                    )
-                }
-
-                return nil
-            }
-    }
-
-    private func generateFullScreenFFMIChartData() -> [MetricChartDataPoint] {
-        let heightInches = convertHeightToInches(
-            height: authManager.currentUser?.profile?.height,
-            heightUnit: authManager.currentUser?.profile?.heightUnit
-        )
-
-        return sortedBodyMetricsAscending
-            .compactMap { metric in
-                guard let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                    for: metric.date,
-                    metrics: bodyMetrics,
-                    heightInches: heightInches
-                ) else {
-                    return nil
-                }
-
-                return MetricChartDataPoint(
-                    date: metric.date,
-                    value: ffmiResult.value,
-                    isEstimated: ffmiResult.isInterpolated
-                )
-            }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Steps: " + formattedSteps + " of " + formattedGoal)
+        .accessibilityHint(subtext)
     }
 }
 
@@ -1930,6 +1308,107 @@ extension Array {
     DashboardViewLiquid()
         .environmentObject(AuthManager.shared)
         .environmentObject(RealtimeSyncManager.shared)
+}
+
+// MARK: - Dashboard Bottom Tab Bar
+
+private struct DashboardBottomTabBar: View {
+    @Binding var selectedTab: DashboardViewLiquid.DashboardTab
+
+    var body: some View {
+        LiquidGlassCard(
+            cornerRadius: 28,
+            blurRadius: 24,
+            padding: 4,
+            showShadow: true,
+            showHighlight: true
+        ) {
+            HStack(spacing: 4) {
+                tabButton(
+                    tab: .home,
+                    icon: "house.fill",
+                    title: "Home"
+                )
+                tabButton(
+                    tab: .photos,
+                    icon: "photo.fill",
+                    title: "Photos"
+                )
+                tabButton(
+                    tab: .metrics,
+                    icon: "chart.bar.doc.horizontal.fill",
+                    title: "Metrics"
+                )
+            }
+        }
+    }
+
+    private func tabButton(
+        tab: DashboardViewLiquid.DashboardTab,
+        icon: String,
+        title: String
+    ) -> some View {
+        let isSelected = selectedTab == tab
+
+        return Button(
+            action: {
+                guard selectedTab != tab else { return }
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    selectedTab = tab
+                }
+            },
+            label: {
+                VStack(spacing: 4) {
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(
+                            isSelected ?
+                                Color.black.opacity(0.9) :
+                                Color.white.opacity(0.75)
+                        )
+
+                    Text(title)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(
+                            isSelected ?
+                                Color.black.opacity(0.9) :
+                                Color.white.opacity(0.75)
+                        )
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(
+                    Group {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(Color.white)
+                                .shadow(
+                                    color: Color.white.opacity(0.35),
+                                    radius: 16,
+                                    x: 0,
+                                    y: 6
+                                )
+                        } else {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(Color.white.opacity(0.02))
+                        }
+                    }
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(
+                            Color.white.opacity(isSelected ? 0.25 : 0.12),
+                            lineWidth: isSelected ? 1.2 : 0.8
+                        )
+                )
+                .contentShape(Rectangle())
+            }
+        )
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
 }
 
 // MARK: - Lazy Tab Loader

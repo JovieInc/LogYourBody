@@ -4,56 +4,55 @@ struct BodyScoreBodyFatVisualView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
     private struct VisualEstimate: Identifiable {
-        let id = UUID()
         let percentage: Double
         let label: String
         let description: String
         let imageName: String
+        var id: Double { percentage }
     }
 
-    private var estimates: [VisualEstimate] {
-        [
-            .init(
-                percentage: 10,
-                label: "Athletic",
-                description: "Visible abs, sharp muscle separation.",
-                imageName: "figure.run"
-            ),
-            .init(
-                percentage: 15,
-                label: "Lean",
-                description: "Flat midsection with light definition.",
-                imageName: "figure.strengthtraining.traditional"
-            ),
-            .init(
-                percentage: 20,
-                label: "Balanced",
-                description: "Soft definition, steady energy.",
-                imageName: "figure.core.training"
-            ),
-            .init(
-                percentage: 25,
-                label: "Building",
-                description: "Comfortable, ready to tighten up.",
-                imageName: "figure.walk"
-            ),
-            .init(
-                percentage: 30,
-                label: "Rebuilding",
-                description: "Focusing on consistency and momentum.",
-                imageName: "bed.double"
-            )
-        ]
-    }
+    private static let visualEstimates: [VisualEstimate] = [
+        .init(
+            percentage: 10,
+            label: "Athletic",
+            description: "Visible abs, sharp muscle separation.",
+            imageName: "figure.run"
+        ),
+        .init(
+            percentage: 15,
+            label: "Lean",
+            description: "Flat midsection with light definition.",
+            imageName: "figure.strengthtraining.traditional"
+        ),
+        .init(
+            percentage: 20,
+            label: "Balanced",
+            description: "Soft definition, steady energy.",
+            imageName: "figure.core.training"
+        ),
+        .init(
+            percentage: 25,
+            label: "Building",
+            description: "Comfortable, ready to tighten up.",
+            imageName: "figure.walk"
+        ),
+        .init(
+            percentage: 30,
+            label: "Rebuilding",
+            description: "Focusing on consistency and momentum.",
+            imageName: "bed.double"
+        )
+    ]
 
     var body: some View {
         OnboardingPageTemplate(
             title: "Pick the closest match",
             subtitle: "Use the cues to estimate your body fat.",
             onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .bodyFatVisual),
             content: {
                 VStack(spacing: 16) {
-                    ForEach(estimates) { estimate in
+                    ForEach(Self.visualEstimates) { estimate in
                         Button {
                             viewModel.selectVisualBodyFat(estimate.percentage)
                         } label: {

@@ -3,12 +3,14 @@ import SwiftUI
 struct BodyScoreHeightView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var centimetersFocused: Bool
+    @State private var heightError: String?
 
     var body: some View {
         OnboardingPageTemplate(
             title: "How tall are you?",
             subtitle: "Height helps us normalize your Body Score.",
             onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .height),
             content: {
                 VStack(spacing: 28) {
                     OnboardingSegmentedControl(options: HeightUnit.allCases, selection: heightUnitBinding)
@@ -32,6 +34,16 @@ struct BodyScoreHeightView: View {
                 .opacity(continueButtonOpacity)
             }
         )
+        .toolbar {
+            ToolbarItem(placement: .keyboard) {
+                HStack {
+                    Spacer()
+                    Button("Done") {
+                        centimetersFocused = false
+                    }
+                }
+            }
+        }
     }
 
     private var heightUnitBinding: Binding<HeightUnit> {
@@ -43,6 +55,20 @@ struct BodyScoreHeightView: View {
 
     private var continueButtonOpacity: Double {
         viewModel.canContinueHeight ? 1 : 0.4
+    }
+
+    private func validateHeightCentimeters(_ value: String) {
+        guard !value.isEmpty else {
+            heightError = nil
+            return
+        }
+
+        let numeric = Double(value) ?? 0
+        if numeric < 100 {
+            heightError = "Enter at least 100 cm."
+        } else {
+            heightError = nil
+        }
     }
 
     private var centimetersInput: some View {
@@ -57,6 +83,13 @@ struct BodyScoreHeightView: View {
             ))
             .keyboardType(.decimalPad)
             .focused($centimetersFocused)
+            .submitLabel(.done)
+            .onSubmit {
+                centimetersFocused = false
+            }
+            .onChange(of: viewModel.heightCentimetersText) { _, newValue in
+                validateHeightCentimeters(newValue)
+            }
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
             .background(
@@ -71,6 +104,16 @@ struct BodyScoreHeightView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     self.centimetersFocused = true
                 }
+            }
+
+            if let error = heightError {
+                Text(error)
+                    .font(OnboardingTypography.caption)
+                    .foregroundStyle(Color.red)
+            } else {
+                Text("Most adults fall between 100–250 cm.")
+                    .font(OnboardingTypography.caption)
+                    .foregroundStyle(Color.appTextTertiary)
             }
         }
     }

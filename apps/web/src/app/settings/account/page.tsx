@@ -9,8 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { toast } from '@/hooks/use-toast'
-import { 
-  Loader2, 
+import {
+  Loader2,
   ArrowLeft,
   Lock,
   Smartphone,
@@ -44,6 +44,15 @@ export default function AccountSettingsPage() {
     return null
   }
 
+  const primaryEmail = user.primaryEmailAddress?.emailAddress
+    ?? user.emailAddresses?.[0]?.emailAddress
+    ?? ''
+
+  const emailVerified = user.emailAddresses?.some((address) => address.verification?.status === 'verified') ?? false
+
+  const createdAt = user.createdAt
+  const lastSignInAt = user.lastSignInAt
+
   const handlePasswordChange = () => {
     toast({
       title: "Password reset email sent",
@@ -67,18 +76,18 @@ export default function AccountSettingsPage() {
     try {
       // TODO: Add actual API call to delete account
       // const { error } = await supabase.rpc('delete_user_account')
-      
+
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 2000))
-      
+
       toast({
         title: "Account deleted",
         description: "Your account has been permanently deleted."
       })
-      
+
       // Sign out the user after account deletion
       await signOut()
-      
+
       // Redirect to home page
       router.push('/')
     } catch {
@@ -121,13 +130,13 @@ export default function AccountSettingsPage() {
             <div className="flex items-center justify-between py-2">
               <div>
                 <p className="text-sm text-linear-text-secondary">Email</p>
-                <p className="font-medium text-linear-text">{user.email}</p>
+                <p className="font-medium text-linear-text">{primaryEmail}</p>
               </div>
-              <Badge 
-                variant={user.email_confirmed_at ? "secondary" : "destructive"}
+              <Badge
+                variant={emailVerified ? "secondary" : "destructive"}
                 className="text-xs"
               >
-                {user.email_confirmed_at ? (
+                {emailVerified ? (
                   <>
                     <Check className="h-3 w-3 mr-1" />
                     Verified
@@ -150,13 +159,13 @@ export default function AccountSettingsPage() {
               <div className="flex items-center justify-between py-2">
                 <span className="text-sm text-linear-text-secondary">Account Created</span>
                 <span className="text-sm text-linear-text">
-                  {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : 'Unknown'}
+                  {createdAt ? format(createdAt, 'MMM d, yyyy') : 'Unknown'}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-sm text-linear-text-secondary">Last Sign In</span>
                 <span className="text-sm text-linear-text">
-                  {user.last_sign_in_at ? format(new Date(user.last_sign_in_at), 'MMM d, yyyy') : 'Unknown'}
+                  {lastSignInAt ? format(lastSignInAt, 'MMM d, yyyy') : 'Unknown'}
                 </span>
               </div>
             </div>
@@ -172,8 +181,8 @@ export default function AccountSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full justify-start border-linear-border"
               onClick={handlePasswordChange}
             >
@@ -181,8 +190,8 @@ export default function AccountSettingsPage() {
               Change Password
             </Button>
 
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full justify-start border-linear-border"
               onClick={handleEnable2FA}
             >
@@ -193,8 +202,8 @@ export default function AccountSettingsPage() {
               </Badge>
             </Button>
 
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full justify-start border-linear-border"
               disabled
             >
@@ -222,9 +231,9 @@ export default function AccountSettingsPage() {
                 Once you delete your account, there is no going back. All your data will be permanently removed.
               </AlertDescription>
             </Alert>
-            
-            <Button 
-              variant="destructive" 
+
+            <Button
+              variant="destructive"
               className="w-full"
               onClick={handleDeleteAccount}
               disabled={isDeleting}

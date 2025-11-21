@@ -37,7 +37,9 @@ export function EmailConfirmationBanner() {
   }, [user, supabase])
 
   const handleResendEmail = async () => {
-    if (!user?.email || isSending) return
+    const email = user?.primaryEmailAddress?.emailAddress
+      ?? user?.emailAddresses?.[0]?.emailAddress
+    if (!email || isSending) return
 
     // Check if we sent an email recently (within 60 seconds)
     if (lastSent && new Date().getTime() - lastSent.getTime() < 60000) {
@@ -51,7 +53,7 @@ export function EmailConfirmationBanner() {
     try {
       const { error } = await supabase.auth.resend({
         type: 'signup',
-        email: user.email,
+        email,
       })
 
       if (error) throw error
@@ -69,7 +71,7 @@ export function EmailConfirmationBanner() {
   if (!isVisible) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 p-4 bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg">
+    <div className="fixed top-0 left-0 right-0 z-50 p-4 bg-linear-to-r from-blue-600 to-blue-700 shadow-lg">
       <div className="max-w-7xl mx-auto">
         <Alert className="bg-white/10 border-white/20 text-white">
           <Mail className="h-4 w-4" />

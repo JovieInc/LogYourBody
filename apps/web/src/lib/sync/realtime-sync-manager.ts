@@ -38,7 +38,7 @@ interface QueuedChange {
 
 export class RealtimeSyncManager {
   private static instance: RealtimeSyncManager;
-  
+
   private state: SyncState = {
     isSyncing: false,
     lastSyncDate: null,
@@ -56,15 +56,15 @@ export class RealtimeSyncManager {
   private processingQueue = false;
   private supabase = createClient();
   private userId: string | null = null;
-  
+
   // Debounce timers for batch operations
   private syncDebounceTimer: NodeJS.Timeout | null = null;
   private batchSyncDelay = 500; // ms
-  
+
   // Retry configuration
   private maxRetries = 3;
   private retryDelay = 1000; // ms, exponential backoff
-  
+
   private constructor() {
     if (typeof window !== 'undefined') {
       this.initialize();
@@ -82,13 +82,13 @@ export class RealtimeSyncManager {
     // Setup network monitoring
     window.addEventListener('online', this.handleOnline);
     window.addEventListener('offline', this.handleOffline);
-    
+
     // Start periodic sync for missed updates
     this.startPeriodicSync();
-    
+
     // Initialize pending count
     await this.updatePendingCount();
-    
+
     // Setup realtime subscriptions
     await this.setupRealtimeSubscriptions();
   }
@@ -194,16 +194,16 @@ export class RealtimeSyncManager {
 
     switch (table) {
       case 'body_metrics':
-        await indexedDB.saveBodyMetrics({ ...(data as BodyMetrics), syncStatus: 'synced' }, this.userId!);
+        await indexedDB.saveBodyMetrics({ ...(data as BodyMetrics), sync_status: 'synced' }, this.userId!);
         break;
       case 'user_profiles':
-        await indexedDB.saveProfile({ ...(data as UserProfile), syncStatus: 'synced' });
+        await indexedDB.saveProfile({ ...(data as UserProfile), sync_status: 'synced' });
         break;
       case 'daily_metrics':
-        await indexedDB.saveDailyMetrics({ ...(data as DailyMetrics), syncStatus: 'synced' });
+        await indexedDB.saveDailyMetrics({ ...(data as DailyMetrics), sync_status: 'synced' });
         break;
     }
-    
+
     this.notifyListeners();
   }
 
@@ -211,25 +211,38 @@ export class RealtimeSyncManager {
     if (!newData) return;
 
     // Check for conflicts with local unsynced changes
-    const localData = await this.getLocalRecord(table, newData.id);
-    
-    if (localData && localData.syncStatus === 'pending') {
+    const id = (newData as { id?: string | number }).id;
+    const localData = id != null ? await this.getLocalRecord(table, String(id)) : null;
+
+    const localSyncStatus = localData && (localData as { sync_status?: 'pending' | 'synced' | 'error' }).sync_status;
+
+    if (localData && localSyncStatus === 'pending') {
       // We have a conflict - resolve it based on table type
-      let resolved: BodyMetrics | UserProfile | DailyMetrics | undefined;
-      
       switch (table) {
-        case 'body_metrics':
-          resolved = this.conflictResolver.resolveBodyMetrics({ local: localData, remote: newData });
-          await indexedDB.saveBodyMetrics({ ...resolved, syncStatus: 'synced' }, this.userId!);
+        case 'body_metrics': {
+          const resolved = this.conflictResolver.resolveBodyMetrics({
+            local: localData as BodyMetrics,
+            remote: newData as BodyMetrics,
+          });
+          await indexedDB.saveBodyMetrics({ ...resolved, sync_status: 'synced' }, this.userId!);
           break;
-        case 'user_profiles':
-          resolved = this.conflictResolver.resolveProfile({ local: localData, remote: newData });
-          await indexedDB.saveProfile({ ...resolved, syncStatus: 'synced' });
+        }
+        case 'user_profiles': {
+          const resolved = this.conflictResolver.resolveProfile({
+            local: localData as UserProfile,
+            remote: newData as UserProfile,
+          });
+          await indexedDB.saveProfile({ ...resolved, sync_status: 'synced' });
           break;
-        case 'daily_metrics':
-          resolved = this.conflictResolver.resolveDailyMetrics({ local: localData, remote: newData });
-          await indexedDB.saveDailyMetrics({ ...resolved, syncStatus: 'synced' });
+        }
+        case 'daily_metrics': {
+          const resolved = this.conflictResolver.resolveDailyMetrics({
+            local: localData as DailyMetrics,
+            remote: newData as DailyMetrics,
+          });
+          await indexedDB.saveDailyMetrics({ ...resolved, sync_status: 'synced' });
           break;
+        }
       }
     } else {
       // No conflict, apply the update
@@ -254,7 +267,7 @@ export class RealtimeSyncManager {
         // TODO: Implement soft delete for daily metrics
         break;
     }
-    
+
     this.notifyListeners();
   }
 
@@ -282,10 +295,10 @@ export class RealtimeSyncManager {
       timestamp: new Date(),
       retryCount: 0,
     };
-    
+
     this.syncQueue.push(queuedChange);
     await this.saveQueueToStorage();
-    
+
     // Try to process immediately if online
     if (this.state.isOnline) {
       this.debouncedProcessQueue();
@@ -296,7 +309,7 @@ export class RealtimeSyncManager {
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer);
     }
-    
+
     this.syncDebounceTimer = setTimeout(() => {
       this.processQueue();
     }, this.batchSyncDelay);
@@ -318,17 +331,17 @@ export class RealtimeSyncManager {
         processedIds.push(change.id);
       } catch (error) {
         console.error(`Failed to process queued change:`, error);
-        
+
         change.retryCount++;
         if (change.retryCount >= this.maxRetries) {
           // Move to failed queue or notify user
           processedIds.push(change.id);
-          this.updateState({ 
-            error: `Failed to sync ${change.table} after ${this.maxRetries} attempts` 
+          this.updateState({
+            error: `Failed to sync ${change.table} after ${this.maxRetries} attempts`
           });
         } else {
           // Exponential backoff for retry
-          await new Promise(resolve => 
+          await new Promise(resolve =>
             setTimeout(resolve, this.retryDelay * Math.pow(2, change.retryCount))
           );
         }
@@ -338,12 +351,12 @@ export class RealtimeSyncManager {
     // Remove processed items
     this.syncQueue = this.syncQueue.filter(item => !processedIds.includes(item.id));
     await this.saveQueueToStorage();
-    
+
     this.processingQueue = false;
     await this.updatePendingCount();
-    
-    this.updateState({ 
-      isSyncing: false, 
+
+    this.updateState({
+      isSyncing: false,
       syncStatus: this.syncQueue.length === 0 ? 'success' : 'error',
       lastSyncDate: new Date()
     });
@@ -351,10 +364,10 @@ export class RealtimeSyncManager {
 
   private async processQueuedChange(change: QueuedChange) {
     const { table, operation, data } = change;
-    
+
     // Add sync ID to prevent echo
     const syncData = { ...data, sync_id: this.getSyncId() };
-    
+
     switch (operation) {
       case 'INSERT':
         await this.supabase.from(table).insert(syncData);
@@ -380,7 +393,7 @@ export class RealtimeSyncManager {
 
       // Then sync any unsynced local data
       const unsynced = await indexedDB.getUnsyncedItems();
-      
+
       // Sync profiles
       for (const profile of unsynced.profiles) {
         await this.syncProfile(profile);
@@ -399,16 +412,16 @@ export class RealtimeSyncManager {
       // Pull latest data from server
       await this.pullLatestData();
 
-      this.updateState({ 
-        syncStatus: 'success', 
+      this.updateState({
+        syncStatus: 'success',
         lastSyncDate: new Date(),
-        error: undefined 
+        error: undefined
       });
     } catch (error) {
       console.error('Sync failed:', error);
-      this.updateState({ 
-        syncStatus: 'error', 
-        error: error instanceof Error ? error.message : 'Sync failed' 
+      this.updateState({
+        syncStatus: 'error',
+        error: error instanceof Error ? error.message : 'Sync failed'
       });
     } finally {
       this.updateState({ isSyncing: false });
@@ -427,7 +440,7 @@ export class RealtimeSyncManager {
       .single();
 
     if (!error && data) {
-      await indexedDB.saveProfile({ ...data, syncStatus: 'synced' });
+      await indexedDB.saveProfile({ ...data, sync_status: 'synced' });
     }
   }
 
@@ -442,7 +455,7 @@ export class RealtimeSyncManager {
       .single();
 
     if (!error && data) {
-      await indexedDB.saveBodyMetrics({ ...data, syncStatus: 'synced' }, this.userId!);
+      await indexedDB.saveBodyMetrics({ ...data, sync_status: 'synced' }, this.userId!);
     }
   }
 
@@ -457,7 +470,7 @@ export class RealtimeSyncManager {
       .single();
 
     if (!error && data) {
-      await indexedDB.saveDailyMetrics({ ...data, syncStatus: 'synced' });
+      await indexedDB.saveDailyMetrics({ ...data, sync_status: 'synced' });
     }
   }
 
@@ -487,18 +500,18 @@ export class RealtimeSyncManager {
 
     // Update local data
     if (profileResult.data) {
-      await indexedDB.saveProfile({ ...profileResult.data, syncStatus: 'synced' });
+      await indexedDB.saveProfile({ ...profileResult.data, sync_status: 'synced' });
     }
 
     if (metricsResult.data) {
       for (const metric of metricsResult.data) {
-        await indexedDB.saveBodyMetrics({ ...metric, syncStatus: 'synced' }, this.userId!);
+        await indexedDB.saveBodyMetrics({ ...metric, sync_status: 'synced' }, this.userId!);
       }
     }
 
     if (dailyResult.data) {
       for (const metric of dailyResult.data) {
-        await indexedDB.saveDailyMetrics({ ...metric, syncStatus: 'synced' });
+        await indexedDB.saveDailyMetrics({ ...metric, sync_status: 'synced' });
       }
     }
   }
@@ -510,12 +523,12 @@ export class RealtimeSyncManager {
 
   private async updatePendingCount() {
     const unsynced = await indexedDB.getUnsyncedItems();
-    const pendingCount = 
-      unsynced.bodyMetrics.length + 
-      unsynced.dailyMetrics.length + 
+    const pendingCount =
+      unsynced.bodyMetrics.length +
+      unsynced.dailyMetrics.length +
       unsynced.profiles.length +
       this.syncQueue.length;
-    
+
     this.updateState({ pendingSyncCount: pendingCount });
   }
 
@@ -547,7 +560,7 @@ export class RealtimeSyncManager {
   subscribe(listener: (state: SyncState) => void) {
     this.listeners.add(listener);
     listener(this.state);
-    
+
     return () => {
       this.listeners.delete(listener);
     };
@@ -590,18 +603,18 @@ export class RealtimeSyncManager {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
     }
-    
+
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer);
     }
-    
+
     if (this.realtimeChannel) {
       this.supabase.removeChannel(this.realtimeChannel);
     }
-    
+
     window.removeEventListener('online', this.handleOnline);
     window.removeEventListener('offline', this.handleOffline);
-    
+
     this.listeners.clear();
   }
 }

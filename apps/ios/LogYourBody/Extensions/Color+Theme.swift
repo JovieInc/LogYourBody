@@ -32,14 +32,20 @@ public extension Color {
 
     // MARK: - Metric Detail Palette
     static let metricCanvas = Color(hex: "#000000")
-    static let metricCard = Color(hex: "#080A0D")
+    static let metricCard = Color(hex: "#14161A")
     static let metricSurface = Color(hex: "#050507")
-    static let metricAccent = Color(hex: "#D32AFF")
-    static let metricChartLine = Color(hex: "#4FD1FF")
-    static let metricChartFillTop = Color(hex: "#4FD1FF40")
-    static let metricChartFillBottom = Color(hex: "#4FD1FF00")
-    static let metricDeltaPositive = Color(hex: "#4CD964")
-    static let metricDeltaNegative = Color(hex: "#FF453A")
+    static let metricAccent = Color(hex: "#1EB4EA")  // Blue 500 primary
+    static let metricChartLine = Color(hex: "#1EB4EA")  // Blue 500 for primary series
+    static let metricChartFillTop = Color(hex: "#301EB4EA")  // Blue 500 @ ~18% opacity (ARGB)
+    static let metricChartFillBottom = Color(hex: "#001EB4EA")  // Blue 500 @ 0% opacity (ARGB)
+    static let metricDeltaPositive = Color(hex: "#30D158")  // Green
+    static let metricDeltaNegative = Color(hex: "#FF453A")  // System red
+    static let metricTextPrimary = Color(hex: "#FFFFFF")
+    static let metricTextSecondary = Color(hex: "#9AA0AA")
+    static let metricTextTertiary = Color(hex: "#6E737C")
+    static let metricCardBorder = Color(hex: "#1F2228")
+    static let metricGridMajor = Color(hex: "#242830")
+    static let metricGridMinor = Color(hex: "#1C1F26")
 
     // MARK: - State Colors
     static let linearDisabled = Color(hex: "#3A3A3A")

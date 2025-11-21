@@ -38,16 +38,17 @@ export default function PWATestPage() {
     }
 
     // Listen for install prompt
-    const handleBeforeInstallPrompt = (e: BeforeInstallPromptEvent) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
+    const handleBeforeInstallPrompt = (e: Event) => {
+      const promptEvent = e as BeforeInstallPromptEvent
+      promptEvent.preventDefault()
+      setDeferredPrompt(promptEvent)
       setIsInstallable(true)
     }
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener)
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener)
     }
   }, [])
 
@@ -77,7 +78,7 @@ export default function PWATestPage() {
   return (
     <div className="container mx-auto p-4 max-w-2xl">
       <h1 className="text-3xl font-bold mb-6">PWA Test Page</h1>
-      
+
       <div className="space-y-4">
         <Card className="p-4">
           <h2 className="text-xl font-semibold mb-2">PWA Status</h2>
@@ -91,23 +92,23 @@ export default function PWATestPage() {
         <Card className="p-4">
           <h2 className="text-xl font-semibold mb-2">PWA Features</h2>
           <div className="space-y-2">
-            <Button 
-              onClick={handleInstall} 
+            <Button
+              onClick={handleInstall}
               disabled={!isInstallable}
               className="w-full"
             >
               Install App
             </Button>
-            
-            <Button 
+
+            <Button
               onClick={handleTestNotification}
               variant="outline"
               className="w-full"
             >
               Test Notification
             </Button>
-            
-            <Button 
+
+            <Button
               onClick={() => navigator.serviceWorker.getRegistration().then(r => r?.update())}
               variant="outline"
               className="w-full"

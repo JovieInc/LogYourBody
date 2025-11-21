@@ -15,14 +15,23 @@ struct DashboardViewV2: View {
     @State private var bodyMetrics: [BodyMetrics] = []
     @State private var selectedIndex: Int = 0
     @State private var isLoading = false
-    @State private var refreshID = UUID()
     @State private var showPhotoOptions = false
     @State private var showCamera = false
     @State private var showPhotoPicker = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showingModal = false
+    @State private var bodyFatEstimateCache: [Date: (value: Double, isEstimated: Bool)] = [:]
+    @State private var dailyMetricsCache: [Date: DailyMetrics] = [:]
+    @State private var missingDailyMetricDates: Set<Date> = []
+    @State private var selectedDateFetchTask: Task<Void, Never>?
     @Namespace private var namespace
     @AppStorage(Constants.preferredMeasurementSystemKey) private var measurementSystem = PreferencesView.defaultMeasurementSystem
+    private let calendar = Calendar.current
+    private static let monthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter
+    }()
 
     var currentSystem: MeasurementSystem {
         MeasurementSystem(rawValue: measurementSystem) ?? .imperial
@@ -92,11 +101,6 @@ struct DashboardViewV2: View {
             }
         }
         .onAppear {
-            Task {
-                await loadData()
-            }
-        }
-        .onChange(of: refreshID) { _, _ in
             Task {
                 await loadData()
             }
@@ -427,21 +431,18 @@ struct DashboardViewV2: View {
             .accessibilityValue("\(String(format: "%.1f", weightInCurrentUnit)) \(currentSystem == .imperial ? "pounds" : "kilograms")")
 
             // Body Fat gauge
-            let estimatedBF = currentMetric?.bodyFatPercentage == nil && selectedIndex < bodyMetrics.count
-                ? PhotoMetadataService.shared.estimateBodyFat(for: bodyMetrics[selectedIndex].date, metrics: bodyMetrics)
-                : nil
-
-            let bodyFatValue = currentMetric?.bodyFatPercentage ?? estimatedBF?.value ?? 0
+            let resolvedBodyFatValue = currentMetric.flatMap { resolvedBodyFat(for: $0) }
+            let bodyFatValue = resolvedBodyFatValue?.value ?? 0
 
             CleanMetricGauge(
                 value: bodyFatValue,
                 maxValue: 50,
                 label: "Body Fat",
                 unit: "%",
-                isEstimated: currentMetric?.bodyFatPercentage == nil && estimatedBF != nil
+                isEstimated: resolvedBodyFatValue?.isEstimated ?? false
             )
             .accessibilityLabel("Body fat percentage gauge")
-            .accessibilityValue("\(String(format: "%.1f", bodyFatValue)) percent\(currentMetric?.bodyFatPercentage == nil && estimatedBF != nil ? ", estimated" : "")")
+            .accessibilityValue("\(String(format: "%.1f", bodyFatValue)) percent\(resolvedBodyFatValue?.isEstimated == true ? ", estimated" : "")")
         }
     }
 
@@ -550,7 +551,6 @@ struct DashboardViewV2: View {
     // MARK: - Helper Methods
 
     private func formatDateForSlider(_ date: Date) -> String {
-        let calendar = Calendar.current
         let now = Date()
 
         if calendar.isDateInToday(date) {
@@ -562,17 +562,13 @@ struct DashboardViewV2: View {
             if daysDifference <= 7 && daysDifference >= 0 {
                 return "\(daysDifference)d ago"
             } else {
-                let formatter = DateFormatter()
-                formatter.dateFormat = "MMM d"
-                return formatter.string(from: date)
+                return Self.monthDayFormatter.string(from: date)
             }
         }
     }
 
     private func formatDateShort(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
+        Self.monthDayFormatter.string(from: date)
     }
 
     private func formatHeightToFeetInches(_ inches: Double) -> String {
@@ -588,13 +584,31 @@ struct DashboardViewV2: View {
         return "\(number)"
     }
 
+    private func resolvedBodyFat(for metric: BodyMetrics) -> (value: Double, isEstimated: Bool)? {
+        if let value = metric.bodyFatPercentage {
+            return (value, false)
+        }
+
+        let key = calendar.startOfDay(for: metric.date)
+        if let cached = bodyFatEstimateCache[key] {
+            return cached
+        }
+
+        guard let estimate = PhotoMetadataService.shared.estimateBodyFat(
+            for: metric.date,
+            metrics: bodyMetrics
+        ) else {
+            return nil
+        }
+
+        bodyFatEstimateCache[key] = estimate
+        return estimate
+    }
+
     private func calculateFFMI() -> Double? {
-        guard let weight = currentMetric?.weight,
-              let bodyFat = currentMetric?.bodyFatPercentage
-                ?? PhotoMetadataService.shared.estimateBodyFat(
-                    for: currentMetric?.date ?? Date(),
-                    metrics: bodyMetrics
-                )?.value,
+        guard let metric = currentMetric,
+              let weight = metric.weight,
+              let bodyFat = resolvedBodyFat(for: metric)?.value,
               let height = authManager.currentUser?.profile?.height,
               height > 0 else { return nil }
 
@@ -608,46 +622,97 @@ struct DashboardViewV2: View {
     // MARK: - Data Loading
 
     private func loadData() async {
-        isLoading = true
+        await MainActor.run {
+            isLoading = true
+        }
 
-        guard let userId = authManager.currentUser?.id else {
-            isLoading = false
+        guard let userId = await MainActor.run(body: { authManager.currentUser?.id }) else {
+            await MainActor.run {
+                isLoading = false
+            }
             return
         }
 
-        // Load body metrics
+        // Load and prepare body metrics off the main thread
         let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
-        bodyMetrics = cachedMetrics.compactMap { $0.toBodyMetrics() }
+        let preparedMetrics = cachedMetrics
+            .compactMap { $0.toBodyMetrics() }
             .sorted { $0.date < $1.date }
+        let todaysMetrics = await CoreDataManager.shared
+            .fetchDailyMetrics(for: userId, date: calendar.startOfDay(for: Date()))?
+            .toDailyMetrics()
 
-        if !bodyMetrics.isEmpty {
-            selectedIndex = bodyMetrics.count - 1
-            loadMetricsForSelectedDate()
+        await MainActor.run {
+            bodyMetrics = preparedMetrics
+            dailyMetrics = todaysMetrics
+            bodyFatEstimateCache.removeAll()
+            dailyMetricsCache.removeAll()
+            missingDailyMetricDates.removeAll()
+            selectedDateFetchTask?.cancel()
+            selectedDateFetchTask = nil
+
+            if let todaysMetrics {
+                let normalizedDate = calendar.startOfDay(for: todaysMetrics.date)
+                dailyMetricsCache[normalizedDate] = todaysMetrics
+            }
+
+            if !preparedMetrics.isEmpty {
+                selectedIndex = preparedMetrics.count - 1
+            } else {
+                selectedIndex = 0
+                selectedDateMetrics = nil
+            }
+
+            isLoading = false
         }
 
-        // Load daily metrics
-        dailyMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date())?.toDailyMetrics()
-
-        isLoading = false
+        if !preparedMetrics.isEmpty {
+            await MainActor.run {
+                loadMetricsForSelectedDate()
+            }
+        }
     }
 
     private func loadMetricsForSelectedDate() {
-        guard let metric = currentMetric,
-              let userId = authManager.currentUser?.id else { return }
+        guard let metric = currentMetric else {
+            selectedDateMetrics = nil
+            return
+        }
 
-        let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: metric.date)
 
-        Task {
-            selectedDateMetrics = await CoreDataManager.shared.fetchDailyMetrics(
+        if let cached = dailyMetricsCache[startOfDay] {
+            selectedDateMetrics = cached
+            return
+        }
+
+        if missingDailyMetricDates.contains(startOfDay) {
+            selectedDateMetrics = nil
+            return
+        }
+
+        selectedDateFetchTask?.cancel()
+        selectedDateFetchTask = Task {
+            guard let userId = await MainActor.run(body: { authManager.currentUser?.id }) else { return }
+            let fetchedMetrics = await CoreDataManager.shared.fetchDailyMetrics(
                 for: userId,
                 date: startOfDay
             )?.toDailyMetrics()
+
+            await MainActor.run {
+                guard !Task.isCancelled else { return }
+                if let fetchedMetrics {
+                    dailyMetricsCache[startOfDay] = fetchedMetrics
+                    selectedDateMetrics = fetchedMetrics
+                } else {
+                    missingDailyMetricDates.insert(startOfDay)
+                    selectedDateMetrics = nil
+                }
+            }
         }
     }
 
     private func refreshData() async {
-        refreshID = UUID()
         await loadData()
     }
 

@@ -7,37 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		02FF59428632FBC25F9456AA /* DSCircularProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEFB36F814C3D7E8AE709B4 /* DSCircularProgress.swift */; };
 		0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A5D6BAAD9FB2F7B8AFACB /* BaseButton.swift */; };
 		0DAECF9694453077367DCB0E /* Font+Custom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CA7B3D87EC0BFA00AC6A9F /* Font+Custom.swift */; };
-		11129CEC79A594A3564C81AE /* CompactMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 524C903734E2308C8A35B5B7 /* CompactMetricCard.swift */; };
 		1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */; };
-		18A6F3A9477330EC42DC0665 /* DashboardContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C4817DC7BA2D43606C0D8CB /* DashboardContent.swift */; };
 		2B3C4D5E6F7890ABCDEF1234 /* LoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */; };
-		3CD3199B3979B906B642DB4E /* LegalDocumentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCD81BE70A7B449921973AEA /* LegalDocumentRow.swift */; };
 		43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */; };
 		4C2DA948F919366D436CEF26 /* DSIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458AAF24645E3634CCF88E16 /* DSIcon.swift */; };
 		4DF78B8A5B5E0DBAF777CBC1 /* DSLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = FECEBC7B2B956D26BF45822F /* DSLogo.swift */; };
-		5763B6723CDF6F551543599B /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4590E4EDF067461157CAE028 /* ErrorStateView.swift */; };
 		5952A0969501ACC7277BE893 /* View+Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4BF04D15583E3AE1CA4A836 /* View+Styles.swift */; };
 		5B2F64647650AAF5937280BD /* DSDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2465B2ED058FAFC5389161E /* DSDivider.swift */; };
-		614FDFBE0D01B7D3980EFC41 /* CoreMetricsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CDBFA72287938694EB369D /* CoreMetricsRow.swift */; };
-		6C5205839E0D5C677543FBA3 /* DSMetricValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D288685A7D97CBCF127A7B /* DSMetricValue.swift */; };
-		6E12FF06B7836C9AFAEC5560 /* AuthFormField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBB847A2050F3135D62950A1 /* AuthFormField.swift */; };
-		7063273108B46C6BAE9E8682 /* OTPField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22BF10E43507028B75EE0B6B /* OTPField.swift */; };
-		717301BDF536203C9A49A25E /* MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F3E230F03B9DA06BCAA669D /* MetricCard.swift */; };
-		7244EF0EC36788731EA69D2D /* SocialLoginButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A65AF31E24C0B8890ABB203D /* SocialLoginButton.swift */; };
-		87532EA234E13B76D5B1656B /* SecondaryMetricsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55090E3269B8A8F8E45E46D0 /* SecondaryMetricsRow.swift */; };
-		89F49B6560AB71DC7F50C78F /* DSMetricLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4A969A7EF2C7FA9661D869 /* DSMetricLabel.swift */; };
-		89FCC2B284012FAA14EC7A16 /* DSTrendIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 012FFE30028F04055FFF6538 /* DSTrendIndicator.swift */; };
-		936AD43A357EA14452357BE4 /* DocumentHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A28294A184FBD2E6E0D43EF /* DocumentHeader.swift */; };
-		943F92706B6E58D43C5D7C82 /* BiometricAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AB2ACF16AEA86A36EDAD936 /* BiometricAuthView.swift */; };
-		959266B6DE7EC1EDC2A2177D /* DSAuthDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CFEB1A3F5D9DF386EE0836D /* DSAuthDivider.swift */; };
-		967B3CC5CB17B299210CD849 /* AuthHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB947FE422689993FD02B4F6 /* AuthHeader.swift */; };
 		9B5611E2F8314E22A5BF7889 /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75034CADEA1D4697BDCB5555 /* ImageCacheService.swift */; };
-		9B88D79235D58979AFCFF0F2 /* StepsIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AC3C23E6923176F103B414 /* StepsIndicator.swift */; };
-		A4F541B201F4587D933EF604 /* DSAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */; };
-		A50ADB1035F1D7684F9E7DD1 /* PasswordStrengthIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */; };
 		AD0054EB2E2197600029E0FF /* privacy-policy.md in Resources */ = {isa = PBXBuildFile; fileRef = AD0054E82E2197600029E0FF /* privacy-policy.md */; };
 		AD0054EC2E2197600029E0FF /* terms-of-service.md in Resources */ = {isa = PBXBuildFile; fileRef = AD0054E92E2197600029E0FF /* terms-of-service.md */; };
 		AD0054ED2E2197600029E0FF /* health-disclosure.md in Resources */ = {isa = PBXBuildFile; fileRef = AD0054E72E2197600029E0FF /* health-disclosure.md */; };
@@ -69,7 +48,6 @@
 		AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30A62E1490810072AA5B /* LogYourBodyTests.swift */; };
 		AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */; };
 		AD7D30B32E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */; };
-		AD8872312EB4050B0041C426 /* LiquidGlassCTAButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */; };
 		AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872322EB405C00041C426 /* BackgroundTaskType.swift */; };
 		AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */; };
 		AD8872372EB406430041C426 /* BackgroundTaskDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */; };
@@ -84,35 +62,28 @@
 		AD8872972EB946BE0041C426 /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872712EB946BE0041C426 /* ErrorStateView.swift */; };
 		AD8872982EB946BE0041C426 /* LiquidGlassTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872862EB946BE0041C426 /* LiquidGlassTabBar.swift */; };
 		AD8872992EB946BE0041C426 /* DSAuthDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872702EB946BE0041C426 /* DSAuthDivider.swift */; };
-		AD88729A2EB946BE0041C426 /* DSText.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725A2EB946BE0041C426 /* DSText.swift */; };
 		AD88729B2EB946BE0041C426 /* AuthFormField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726A2EB946BE0041C426 /* AuthFormField.swift */; };
 		AD88729C2EB946BE0041C426 /* StandardTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872632EB946BE0041C426 /* StandardTextField.swift */; };
 		AD88729D2EB946BE0041C426 /* UserGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727C2EB946BE0041C426 /* UserGreeting.swift */; };
 		AD88729E2EB946BE0041C426 /* DSMetricLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872562EB946BE0041C426 /* DSMetricLabel.swift */; };
 		AD88729F2EB946BE0041C426 /* CommonModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872672EB946BE0041C426 /* CommonModifiers.swift */; };
 		AD8872A02EB946BE0041C426 /* SettingsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725F2EB946BE0041C426 /* SettingsRow.swift */; };
-		AD8872A12EB946BE0041C426 /* DSIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872522EB946BE0041C426 /* DSIcon.swift */; };
 		AD8872A22EB946BE0041C426 /* BiometricAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727E2EB946BE0041C426 /* BiometricAuthView.swift */; };
 		AD8872A32EB946BE0041C426 /* SocialLoginButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872792EB946BE0041C426 /* SocialLoginButton.swift */; };
 		AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724C2EB946BE0041C426 /* DSAuthLink.swift */; };
 		AD8872A52EB946BE0041C426 /* LoginForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872882EB946BE0041C426 /* LoginForm.swift */; };
-		AD8872A72EB946BE0041C426 /* LoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872872EB946BE0041C426 /* LoadingScreen.swift */; };
 		AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728D2EB946BE0041C426 /* UserHeaderSection.swift */; };
-		AD8872AA2EB946BE0041C426 /* DSLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872552EB946BE0041C426 /* DSLogo.swift */; };
 		AD8872AB2EB946BE0041C426 /* DSAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724D2EB946BE0041C426 /* DSAvatar.swift */; };
 		AD8872AC2EB946BE0041C426 /* StepsIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727A2EB946BE0041C426 /* StepsIndicator.swift */; };
 		AD8872AD2EB946BE0041C426 /* DashboardHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872812EB946BE0041C426 /* DashboardHeader.swift */; };
 		AD8872AE2EB946BE0041C426 /* StandardButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872602EB946BE0041C426 /* StandardButton.swift */; };
 		AD8872AF2EB946BE0041C426 /* UserAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727B2EB946BE0041C426 /* UserAvatar.swift */; };
 		AD8872B02EB946BE0041C426 /* SecondaryMetricsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728A2EB946BE0041C426 /* SecondaryMetricsRow.swift */; };
-		AD8872B12EB946BE0041C426 /* MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872752EB946BE0041C426 /* MetricCard.swift */; };
 		AD8872B22EB946BE0041C426 /* AuthHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726B2EB946BE0041C426 /* AuthHeader.swift */; };
 		AD8872B32EB946BE0041C426 /* LegalSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872852EB946BE0041C426 /* LegalSection.swift */; };
 		AD8872B42EB946BE0041C426 /* DSInterpolationIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872532EB946BE0041C426 /* DSInterpolationIcon.swift */; };
-		AD8872B52EB946BE0041C426 /* LiquidGlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725D2EB946BE0041C426 /* LiquidGlassCard.swift */; };
 		AD8872B62EB946BE0041C426 /* DeveloperToolsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872842EB946BE0041C426 /* DeveloperToolsList.swift */; };
 		AD8872B72EB946BE0041C426 /* AuthConsentCheckbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872692EB946BE0041C426 /* AuthConsentCheckbox.swift */; };
-		AD8872B82EB946BE0041C426 /* DSProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872582EB946BE0041C426 /* DSProgressBar.swift */; };
 		AD8872B92EB946BE0041C426 /* DSCircularProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872502EB946BE0041C426 /* DSCircularProgress.swift */; };
 		AD8872BA2EB946BE0041C426 /* DocumentHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726F2EB946BE0041C426 /* DocumentHeader.swift */; };
 		AD8872BB2EB946BE0041C426 /* DeveloperTapIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726E2EB946BE0041C426 /* DeveloperTapIndicator.swift */; };
@@ -121,13 +92,9 @@
 		AD8872BF2EB946BE0041C426 /* DashboardContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872802EB946BE0041C426 /* DashboardContent.swift */; };
 		AD8872C02EB946BE0041C426 /* MetricGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872762EB946BE0041C426 /* MetricGauge.swift */; };
 		AD8872C22EB946BE0041C426 /* PasswordStrengthIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872782EB946BE0041C426 /* PasswordStrengthIndicator.swift */; };
-		AD8872C32EB946BE0041C426 /* DSLoadingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872542EB946BE0041C426 /* DSLoadingIndicator.swift */; };
-		AD8872C42EB946BE0041C426 /* LogoutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872742EB946BE0041C426 /* LogoutButton.swift */; };
-		AD8872C62EB946BE0041C426 /* BaseButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872492EB946BE0041C426 /* BaseButton.swift */; };
 		AD8872C82EB946BE0041C426 /* VerificationForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728E2EB946BE0041C426 /* VerificationForm.swift */; };
 		AD8872C92EB946BE0041C426 /* SettingsSectionGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728B2EB946BE0041C426 /* SettingsSectionGroup.swift */; };
 		AD8872CA2EB946BE0041C426 /* StateViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872642EB946BE0041C426 /* StateViews.swift */; };
-		AD8872CB2EB946BE0041C426 /* DSDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872512EB946BE0041C426 /* DSDivider.swift */; };
 		AD8872CC2EB946BE0041C426 /* LegalDocumentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872722EB946BE0041C426 /* LegalDocumentRow.swift */; };
 		AD8872CD2EB946BE0041C426 /* SignUpForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728C2EB946BE0041C426 /* SignUpForm.swift */; };
 		AD8872CE2EB946BE0041C426 /* DSMetricValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872572EB946BE0041C426 /* DSMetricValue.swift */; };
@@ -136,8 +103,6 @@
 		AD8872D12EB946BE0041C426 /* StandardCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872612EB946BE0041C426 /* StandardCard.swift */; };
 		AD8872D22EB946BE0041C426 /* LiquidGlassCTAButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872732EB946BE0041C426 /* LiquidGlassCTAButton.swift */; };
 		AD8872D32EB946BE0041C426 /* DSTrendIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725C2EB946BE0041C426 /* DSTrendIndicator.swift */; };
-		AD8872D42EB946BE0041C426 /* BaseTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724A2EB946BE0041C426 /* BaseTextField.swift */; };
-		AD8872D62EB946BE0041C426 /* CompactMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726C2EB946BE0041C426 /* CompactMetricCard.swift */; };
 		ADA4B7372ECC3A7A00F4262A /* EntryVisibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */; };
 		ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */; };
 		ADA4B73B2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B73A2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift */; };
@@ -147,6 +112,16 @@
 		ADA4B7452ECFE0F300F4262A /* FullMetricChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7442ECFE0F300F4262A /* FullMetricChartView.swift */; };
 		ADA4B7472ECFE34F00F4262A /* DashboardHeaderCompact.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7462ECFE34F00F4262A /* DashboardHeaderCompact.swift */; };
 		ADA4B7492ECFE59C00F4262A /* DashboardMetricsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7482ECFE59C00F4262A /* DashboardMetricsList.swift */; };
+		ADA4B74B2ED00E1F00F4262A /* ValidationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B74A2ED00E1F00F4262A /* ValidationService.swift */; };
+		ADA4B74D2ED00F1500F4262A /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B74C2ED00F1500F4262A /* KeychainManager.swift */; };
+		ADA4B74F2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B74E2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift */; };
+		ADA4B7532ED0E61600F4262A /* ErrorReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7522ED0E61600F4262A /* ErrorReporter.swift */; };
+		ADA4B7542ED0E61600F4262A /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7502ED0E61600F4262A /* AppError.swift */; };
+		ADA4B7552ED0E61600F4262A /* AppLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7512ED0E61600F4262A /* AppLogger.swift */; };
+		ADA4B7582ED0E7D700F4262A /* DashboardFFMITile.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */; };
+		ADA4B7592ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */; };
+		ADA4B75B2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B75A2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift */; };
+		ADA4B75D2ED1183900F4262A /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */; };
 		ADB2F6A12FFD12C500EF7A4B /* EditEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB2F6A02FFD12C500EF7A4B /* EditEntrySheet.swift */; };
 		ADBAF04E2ECAD88A00A95F98 /* BodyScoreHeightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF0442ECAD88A00A95F98 /* BodyScoreHeightView.swift */; };
 		ADBAF04F2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF03B2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift */; };
@@ -220,7 +195,6 @@
 		ADDC47EA2E2D89F3003C97E7 /* LogWeightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B042E15FA5C002376C6 /* LogWeightView.swift */; };
 		ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B052E15FA5C002376C6 /* MainTabView.swift */; };
 		ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B062E15FA5C002376C6 /* PreferencesView.swift */; };
-		ADDC47ED2E2D89F3003C97E7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B082E15FA5C002376C6 /* SettingsView.swift */; };
 		ADDC47EE2E2D89F3003C97E7 /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B092E15FA5C002376C6 /* SignUpView.swift */; };
 		ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B0E2E15FA5C002376C6 /* ContentView.swift */; };
 		ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B122E15FA5C002376C6 /* LogYourBodyApp.swift */; };
@@ -255,24 +229,11 @@
 		ADF0A8B12FFD0A0E007C0A5C /* OnboardingStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF0A8B02FFD0A0E007C0A5C /* OnboardingStateManager.swift */; };
 		ADFC6A2D2E188FD5004FCE40 /* HKRawSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */; };
 		ADFF001E313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF001D313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift */; };
-		B39F620BFA59AFFB07513E46 /* DeveloperToolsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA1CD2B48A471ACA4D8CD1A /* DeveloperToolsList.swift */; };
-		BB5187715A77E1422F6CE947 /* DashboardHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898E428E2D5EE162E00B0BD7 /* DashboardHeader.swift */; };
-		BE72D7700686D6DF8514A3F5 /* VerificationForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 629DBB90EB2F0C9F3D9D1105 /* VerificationForm.swift */; };
-		BF2DBFBAC3B2277AE19EDC3D /* DeveloperTapHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0401CF23AE214F20C7EB5886 /* DeveloperTapHandler.swift */; };
-		C00904926079E360A71A9DC6 /* MetricGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */; };
 		C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED9F05E697F00813F824903 /* LogoutButton.swift */; };
 		CCE3FEEC83AAC1B3F1F82BF6 /* DSProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18AA7A0EC7327CC6EB9725D /* DSProgressBar.swift */; };
-		CFEBF01684AD95AF515DFF59 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82670AD733C4BBFF727489CC /* MarkdownView.swift */; };
-		DD2B2C6E766FCD6E60668009 /* LoginForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0FE397063AA257AA67F731 /* LoginForm.swift */; };
-		E0E380C2E78BD2BAC87480ED /* DSAuthLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EF9F0EEBB2D999F7FEEF7D0 /* DSAuthLink.swift */; };
-		E714109633DA0CF0B7A6F341 /* LegalSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD8E482BE1E84E0DEAF9819D /* LegalSection.swift */; };
-		E890A5CBBCF0CD3A8CD5D440 /* UserHeaderSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C89CCE0BFAE9B2ACB9A017B /* UserHeaderSection.swift */; };
-		EC7E97F84940FD554A7EB5A1 /* UserGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03041E8A638B1A252407398 /* UserGreeting.swift */; };
-		F032D524300252FDE4C30601 /* SignUpForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2013EF479280EB0CB67121E /* SignUpForm.swift */; };
 		F0451813784DE99328797E5F /* DSText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05F19CFBFEA440516AFCE98B /* DSText.swift */; };
 		F0A6090ABF6B0497684F9816 /* DSLoadingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D90F6DA60C58AF02CF23737 /* DSLoadingIndicator.swift */; };
 		F44F78267E1DBA90010176C1 /* Color+Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD667EA50710CE217FD95E4C /* Color+Theme.swift */; };
-		FE28F6428506E763B1BD001E /* AuthConsentCheckbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1424DF5DCE3F9859106AB687 /* AuthConsentCheckbox.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -320,7 +281,6 @@
 		2C4A969A7EF2C7FA9661D869 /* DSMetricLabel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSMetricLabel.swift; path = DesignSystem/Atoms/DSMetricLabel.swift; sourceTree = "<group>"; };
 		458AAF24645E3634CCF88E16 /* DSIcon.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSIcon.swift; path = DesignSystem/Atoms/DSIcon.swift; sourceTree = "<group>"; };
 		4590E4EDF067461157CAE028 /* ErrorStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ErrorStateView.swift; path = DesignSystem/Molecules/ErrorStateView.swift; sourceTree = "<group>"; };
-		524C903734E2308C8A35B5B7 /* CompactMetricCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CompactMetricCard.swift; path = DesignSystem/Molecules/CompactMetricCard.swift; sourceTree = "<group>"; };
 		53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiquidGlassCTAButton.swift; path = DesignSystem/Molecules/LiquidGlassCTAButton.swift; sourceTree = "<group>"; };
 		55090E3269B8A8F8E45E46D0 /* SecondaryMetricsRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SecondaryMetricsRow.swift; path = DesignSystem/Organisms/SecondaryMetricsRow.swift; sourceTree = "<group>"; };
 		629DBB90EB2F0C9F3D9D1105 /* VerificationForm.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VerificationForm.swift; path = DesignSystem/Organisms/VerificationForm.swift; sourceTree = "<group>"; };
@@ -336,7 +296,6 @@
 		898E428E2D5EE162E00B0BD7 /* DashboardHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DashboardHeader.swift; path = DesignSystem/Organisms/DashboardHeader.swift; sourceTree = "<group>"; };
 		9C89CCE0BFAE9B2ACB9A017B /* UserHeaderSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserHeaderSection.swift; path = DesignSystem/Organisms/UserHeaderSection.swift; sourceTree = "<group>"; };
 		9ED9F05E697F00813F824903 /* LogoutButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogoutButton.swift; path = DesignSystem/Molecules/LogoutButton.swift; sourceTree = "<group>"; };
-		9F3E230F03B9DA06BCAA669D /* MetricCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricCard.swift; path = DesignSystem/Molecules/MetricCard.swift; sourceTree = "<group>"; };
 		A65AF31E24C0B8890ABB203D /* SocialLoginButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SocialLoginButton.swift; path = DesignSystem/Molecules/SocialLoginButton.swift; sourceTree = "<group>"; };
 		AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PasswordStrengthIndicator.swift; path = DesignSystem/Molecules/PasswordStrengthIndicator.swift; sourceTree = "<group>"; };
 		AD0054DA2E20C6270029E0FF /* HealthDisclaimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthDisclaimerView.swift; sourceTree = "<group>"; };
@@ -403,7 +362,6 @@
 		AD723B042E15FA5C002376C6 /* LogWeightView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogWeightView.swift; sourceTree = "<group>"; };
 		AD723B052E15FA5C002376C6 /* MainTabView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		AD723B062E15FA5C002376C6 /* PreferencesView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
-		AD723B082E15FA5C002376C6 /* SettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		AD723B092E15FA5C002376C6 /* SignUpView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		AD723B0B2E15FA5C002376C6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AD723B0C2E15FA5C002376C6 /* Config.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
@@ -473,7 +431,6 @@
 		AD8872692EB946BE0041C426 /* AuthConsentCheckbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthConsentCheckbox.swift; sourceTree = "<group>"; };
 		AD88726A2EB946BE0041C426 /* AuthFormField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthFormField.swift; sourceTree = "<group>"; };
 		AD88726B2EB946BE0041C426 /* AuthHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthHeader.swift; sourceTree = "<group>"; };
-		AD88726C2EB946BE0041C426 /* CompactMetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactMetricCard.swift; sourceTree = "<group>"; };
 		AD88726D2EB946BE0041C426 /* DeveloperTapHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperTapHandler.swift; sourceTree = "<group>"; };
 		AD88726E2EB946BE0041C426 /* DeveloperTapIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperTapIndicator.swift; sourceTree = "<group>"; };
 		AD88726F2EB946BE0041C426 /* DocumentHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentHeader.swift; sourceTree = "<group>"; };
@@ -482,7 +439,6 @@
 		AD8872722EB946BE0041C426 /* LegalDocumentRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalDocumentRow.swift; sourceTree = "<group>"; };
 		AD8872732EB946BE0041C426 /* LiquidGlassCTAButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassCTAButton.swift; sourceTree = "<group>"; };
 		AD8872742EB946BE0041C426 /* LogoutButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoutButton.swift; sourceTree = "<group>"; };
-		AD8872752EB946BE0041C426 /* MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCard.swift; sourceTree = "<group>"; };
 		AD8872762EB946BE0041C426 /* MetricGauge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricGauge.swift; sourceTree = "<group>"; };
 		AD8872772EB946BE0041C426 /* OTPField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPField.swift; sourceTree = "<group>"; };
 		AD8872782EB946BE0041C426 /* PasswordStrengthIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStrengthIndicator.swift; sourceTree = "<group>"; };
@@ -521,6 +477,16 @@
 		ADA4B7442ECFE0F300F4262A /* FullMetricChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FullMetricChartView.swift; path = Components/FullMetricChartView.swift; sourceTree = "<group>"; };
 		ADA4B7462ECFE34F00F4262A /* DashboardHeaderCompact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardHeaderCompact.swift; path = Components/DashboardHeaderCompact.swift; sourceTree = "<group>"; };
 		ADA4B7482ECFE59C00F4262A /* DashboardMetricsList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardMetricsList.swift; path = Components/DashboardMetricsList.swift; sourceTree = "<group>"; };
+		ADA4B74A2ED00E1F00F4262A /* ValidationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationService.swift; sourceTree = "<group>"; };
+		ADA4B74C2ED00F1500F4262A /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
+		ADA4B74E2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardBodyScoreHeroCard.swift; path = Components/DashboardBodyScoreHeroCard.swift; sourceTree = "<group>"; };
+		ADA4B7502ED0E61600F4262A /* AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppError.swift; sourceTree = "<group>"; };
+		ADA4B7512ED0E61600F4262A /* AppLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLogger.swift; sourceTree = "<group>"; };
+		ADA4B7522ED0E61600F4262A /* ErrorReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorReporter.swift; sourceTree = "<group>"; };
+		ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardFFMITile.swift; path = Components/DashboardFFMITile.swift; sourceTree = "<group>"; };
+		ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardPrimaryMetricCard.swift; path = Components/DashboardPrimaryMetricCard.swift; sourceTree = "<group>"; };
+		ADA4B75A2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+MetricsHelpers.swift"; sourceTree = "<group>"; };
+		ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		ADA922EA2E22E7A600B82C49 /* BackgroundPhotoUploadService+Processing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackgroundPhotoUploadService+Processing.swift"; sourceTree = "<group>"; };
 		ADA922EB2E22E7A600B82C49 /* ImageProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessingService.swift; sourceTree = "<group>"; };
 		ADA922EC2E22E7A600B82C49 /* VisionOrientationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionOrientationService.swift; sourceTree = "<group>"; };
@@ -702,6 +668,9 @@
 		60C9D5106098C441A5EF3D53 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
+				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
+				ADA4B74E2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift */,
 				ADA4B7482ECFE59C00F4262A /* DashboardMetricsList.swift */,
 				ADA4B7462ECFE34F00F4262A /* DashboardHeaderCompact.swift */,
 				ADA4B7442ECFE0F300F4262A /* FullMetricChartView.swift */,
@@ -736,8 +705,6 @@
 				AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */,
 				1424DF5DCE3F9859106AB687 /* AuthConsentCheckbox.swift */,
 				7CFEB1A3F5D9DF386EE0836D /* DSAuthDivider.swift */,
-				9F3E230F03B9DA06BCAA669D /* MetricCard.swift */,
-				524C903734E2308C8A35B5B7 /* CompactMetricCard.swift */,
 				E2AC3C23E6923176F103B414 /* StepsIndicator.swift */,
 				D03041E8A638B1A252407398 /* UserGreeting.swift */,
 				28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */,
@@ -864,6 +831,8 @@
 		AD723AED2E15FA5C002376C6 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				ADA4B74C2ED00F1500F4262A /* KeychainManager.swift */,
+				ADA4B74A2ED00E1F00F4262A /* ValidationService.swift */,
 				ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */,
 				ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */,
 				AD050C482EC12E390082A313 /* RevenueCatManager.swift */,
@@ -897,6 +866,9 @@
 		AD723AF02E15FA5C002376C6 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
+				ADA4B7502ED0E61600F4262A /* AppError.swift */,
+				ADA4B7512ED0E61600F4262A /* AppLogger.swift */,
+				ADA4B7522ED0E61600F4262A /* ErrorReporter.swift */,
 				ADE6D39B2E24AD30001F82A8 /* LiquidGlassComponents.swift */,
 				ADE6D3962E24A96A001F82A8 /* ShakeDetector.swift */,
 				AD3304BF2E241FE80043C4AC /* AppVersion.swift */,
@@ -911,6 +883,7 @@
 		AD723AF22E15FA5C002376C6 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -918,6 +891,7 @@
 		AD723B0A2E15FA5C002376C6 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				ADA4B75A2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift */,
 				AD0B7BF82EC692FB008B29E7 /* MetricDetailView.swift */,
 				ADB2F6A02FFD12C500EF7A4B /* EditEntrySheet.swift */,
 				AD050C4A2EC12E590082A313 /* PaywallView.swift */,
@@ -955,7 +929,6 @@
 				AD723B042E15FA5C002376C6 /* LogWeightView.swift */,
 				AD723B052E15FA5C002376C6 /* MainTabView.swift */,
 				AD723B062E15FA5C002376C6 /* PreferencesView.swift */,
-				AD723B082E15FA5C002376C6 /* SettingsView.swift */,
 				AD723B092E15FA5C002376C6 /* SignUpView.swift */,
 			);
 			path = Views;
@@ -1117,7 +1090,6 @@
 				AD8872692EB946BE0041C426 /* AuthConsentCheckbox.swift */,
 				AD88726A2EB946BE0041C426 /* AuthFormField.swift */,
 				AD88726B2EB946BE0041C426 /* AuthHeader.swift */,
-				AD88726C2EB946BE0041C426 /* CompactMetricCard.swift */,
 				AD88726D2EB946BE0041C426 /* DeveloperTapHandler.swift */,
 				AD88726E2EB946BE0041C426 /* DeveloperTapIndicator.swift */,
 				AD88726F2EB946BE0041C426 /* DocumentHeader.swift */,
@@ -1126,7 +1098,6 @@
 				AD8872722EB946BE0041C426 /* LegalDocumentRow.swift */,
 				AD8872732EB946BE0041C426 /* LiquidGlassCTAButton.swift */,
 				AD8872742EB946BE0041C426 /* LogoutButton.swift */,
-				AD8872752EB946BE0041C426 /* MetricCard.swift */,
 				AD8872762EB946BE0041C426 /* MetricGauge.swift */,
 				AD8872772EB946BE0041C426 /* OTPField.swift */,
 				AD8872782EB946BE0041C426 /* PasswordStrengthIndicator.swift */,
@@ -1389,7 +1360,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1640;
-				LastUpgradeCheck = 2600;
+				LastUpgradeCheck = 2610;
 				TargetAttributes = {
 					AD7D30912E14907F0072AA5B = {
 						CreatedOnToolsVersion = 15.4;
@@ -1591,7 +1562,6 @@
 				AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */,
 				ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */,
 				AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */,
-				ADDC47ED2E2D89F3003C97E7 /* SettingsView.swift in Sources */,
 				ADDC47EE2E2D89F3003C97E7 /* SignUpView.swift in Sources */,
 				ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */,
 				ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */,
@@ -1603,6 +1573,9 @@
 				ADDC47FE2E2D89F3003C97E7 /* SkeletonLoaders.swift in Sources */,
 				ADDC47FF2E2D89F3003C97E7 /* UIComponents.swift in Sources */,
 				0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */,
+				ADA4B7532ED0E61600F4262A /* ErrorReporter.swift in Sources */,
+				ADA4B7542ED0E61600F4262A /* AppError.swift in Sources */,
+				ADA4B7552ED0E61600F4262A /* AppLogger.swift in Sources */,
 				43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */,
 				F0451813784DE99328797E5F /* DSText.swift in Sources */,
 				ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */,
@@ -1615,25 +1588,24 @@
 				C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */,
 				AD8872932EB946BE0041C426 /* DeveloperTapHandler.swift in Sources */,
 				AD8872952EB946BE0041C426 /* CoreMetricsRow.swift in Sources */,
+				ADA4B75D2ED1183900F4262A /* DashboardViewModel.swift in Sources */,
 				AD8872962EB946BE0041C426 /* Theme.swift in Sources */,
 				AD8872972EB946BE0041C426 /* ErrorStateView.swift in Sources */,
 				AD8872982EB946BE0041C426 /* LiquidGlassTabBar.swift in Sources */,
 				AD8872992EB946BE0041C426 /* DSAuthDivider.swift in Sources */,
-				AD88729A2EB946BE0041C426 /* DSText.swift in Sources */,
 				AD88729B2EB946BE0041C426 /* AuthFormField.swift in Sources */,
 				AD88729C2EB946BE0041C426 /* StandardTextField.swift in Sources */,
 				AD88729D2EB946BE0041C426 /* UserGreeting.swift in Sources */,
 				AD88729E2EB946BE0041C426 /* DSMetricLabel.swift in Sources */,
 				AD88729F2EB946BE0041C426 /* CommonModifiers.swift in Sources */,
 				AD8872A02EB946BE0041C426 /* SettingsRow.swift in Sources */,
-				AD8872A12EB946BE0041C426 /* DSIcon.swift in Sources */,
 				AD8872A22EB946BE0041C426 /* BiometricAuthView.swift in Sources */,
 				AD8872A32EB946BE0041C426 /* SocialLoginButton.swift in Sources */,
+				ADA4B7582ED0E7D700F4262A /* DashboardFFMITile.swift in Sources */,
+				ADA4B7592ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift in Sources */,
 				AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */,
 				AD8872A52EB946BE0041C426 /* LoginForm.swift in Sources */,
-				AD8872A72EB946BE0041C426 /* LoadingScreen.swift in Sources */,
 				AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */,
-				AD8872AA2EB946BE0041C426 /* DSLogo.swift in Sources */,
 				AD8872AB2EB946BE0041C426 /* DSAvatar.swift in Sources */,
 				AD8872AC2EB946BE0041C426 /* StepsIndicator.swift in Sources */,
 				AD8872AD2EB946BE0041C426 /* DashboardHeader.swift in Sources */,
@@ -1643,17 +1615,15 @@
 				ADE1464E2EBF0BDF00B64DA0 /* TimelineZoomLevel.swift in Sources */,
 				AD050C492EC12E390082A313 /* RevenueCatManager.swift in Sources */,
 				ADE1464F2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift in Sources */,
-				AD8872B12EB946BE0041C426 /* MetricCard.swift in Sources */,
 				AD8872B22EB946BE0041C426 /* AuthHeader.swift in Sources */,
+				ADA4B75B2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift in Sources */,
 				AD8872B32EB946BE0041C426 /* LegalSection.swift in Sources */,
 				AD8872B42EB946BE0041C426 /* DSInterpolationIcon.swift in Sources */,
-				AD8872B52EB946BE0041C426 /* LiquidGlassCard.swift in Sources */,
 				AD8872B62EB946BE0041C426 /* DeveloperToolsList.swift in Sources */,
 				ADA4B7472ECFE34F00F4262A /* DashboardHeaderCompact.swift in Sources */,
 				ADA4B73E2ECFAB0B00F4262A /* DashboardMetricFormatting.swift in Sources */,
 				ADA4B73F2ECFAB0B00F4262A /* TimelineCalculator.swift in Sources */,
 				AD8872B72EB946BE0041C426 /* AuthConsentCheckbox.swift in Sources */,
-				AD8872B82EB946BE0041C426 /* DSProgressBar.swift in Sources */,
 				AD8872B92EB946BE0041C426 /* DSCircularProgress.swift in Sources */,
 				AD8872BA2EB946BE0041C426 /* DocumentHeader.swift in Sources */,
 				AD8872BB2EB946BE0041C426 /* DeveloperTapIndicator.swift in Sources */,
@@ -1661,18 +1631,17 @@
 				AD8872BD2EB946BE0041C426 /* AnimatedTaskIcon.swift in Sources */,
 				AD8872BE2EB946BE0041C426 /* OTPField.swift in Sources */,
 				AD8872BF2EB946BE0041C426 /* DashboardContent.swift in Sources */,
+				ADA4B74B2ED00E1F00F4262A /* ValidationService.swift in Sources */,
 				AD8872C02EB946BE0041C426 /* MetricGauge.swift in Sources */,
 				AD8872C22EB946BE0041C426 /* PasswordStrengthIndicator.swift in Sources */,
-				AD8872C32EB946BE0041C426 /* DSLoadingIndicator.swift in Sources */,
-				AD8872C42EB946BE0041C426 /* LogoutButton.swift in Sources */,
-				AD8872C62EB946BE0041C426 /* BaseButton.swift in Sources */,
 				ADE146482EBF0B4800B64DA0 /* TimelineDataProvider.swift in Sources */,
 				AD8872C82EB946BE0041C426 /* VerificationForm.swift in Sources */,
+				ADA4B74D2ED00F1500F4262A /* KeychainManager.swift in Sources */,
 				AD8872C92EB946BE0041C426 /* SettingsSectionGroup.swift in Sources */,
 				AD8872CA2EB946BE0041C426 /* StateViews.swift in Sources */,
-				AD8872CB2EB946BE0041C426 /* DSDivider.swift in Sources */,
 				AD8872CC2EB946BE0041C426 /* LegalDocumentRow.swift in Sources */,
 				AD8872CD2EB946BE0041C426 /* SignUpForm.swift in Sources */,
+				ADA4B74F2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift in Sources */,
 				AD050C432EBFFEE50082A313 /* DashboardDisplayMode.swift in Sources */,
 				AD8872CE2EB946BE0041C426 /* DSMetricValue.swift in Sources */,
 				ADA4B7372ECC3A7A00F4262A /* EntryVisibilityManager.swift in Sources */,
@@ -1685,48 +1654,11 @@
 				AD8872D12EB946BE0041C426 /* StandardCard.swift in Sources */,
 				AD8872D22EB946BE0041C426 /* LiquidGlassCTAButton.swift in Sources */,
 				AD8872D32EB946BE0041C426 /* DSTrendIndicator.swift in Sources */,
-				AD8872D42EB946BE0041C426 /* BaseTextField.swift in Sources */,
 				ADA4B73B2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift in Sources */,
-				AD8872D62EB946BE0041C426 /* CompactMetricCard.swift in Sources */,
-				BF2DBFBAC3B2277AE19EDC3D /* DeveloperTapHandler.swift in Sources */,
-				5763B6723CDF6F551543599B /* ErrorStateView.swift in Sources */,
-				3CD3199B3979B906B642DB4E /* LegalDocumentRow.swift in Sources */,
-				936AD43A357EA14452357BE4 /* DocumentHeader.swift in Sources */,
-				E890A5CBBCF0CD3A8CD5D440 /* UserHeaderSection.swift in Sources */,
-				B39F620BFA59AFFB07513E46 /* DeveloperToolsList.swift in Sources */,
-				E714109633DA0CF0B7A6F341 /* LegalSection.swift in Sources */,
-				CFEBF01684AD95AF515DFF59 /* MarkdownView.swift in Sources */,
 				AD8872372EB406430041C426 /* BackgroundTaskDetailsSheet.swift in Sources */,
 				AD8872402EB87EF80041C426 /* (null) in Sources */,
 				AD8872412EB87EF80041C426 /* DashboardViewLiquid.swift in Sources */,
-				E0E380C2E78BD2BAC87480ED /* DSAuthLink.swift in Sources */,
-				6E12FF06B7836C9AFAEC5560 /* AuthFormField.swift in Sources */,
-				7244EF0EC36788731EA69D2D /* SocialLoginButton.swift in Sources */,
-				967B3CC5CB17B299210CD849 /* AuthHeader.swift in Sources */,
-				7063273108B46C6BAE9E8682 /* OTPField.swift in Sources */,
-				A50ADB1035F1D7684F9E7DD1 /* PasswordStrengthIndicator.swift in Sources */,
-				DD2B2C6E766FCD6E60668009 /* LoginForm.swift in Sources */,
-				F032D524300252FDE4C30601 /* SignUpForm.swift in Sources */,
-				BE72D7700686D6DF8514A3F5 /* VerificationForm.swift in Sources */,
-				943F92706B6E58D43C5D7C82 /* BiometricAuthView.swift in Sources */,
-				FE28F6428506E763B1BD001E /* AuthConsentCheckbox.swift in Sources */,
-				959266B6DE7EC1EDC2A2177D /* DSAuthDivider.swift in Sources */,
 				ADA4B7492ECFE59C00F4262A /* DashboardMetricsList.swift in Sources */,
-				6C5205839E0D5C677543FBA3 /* DSMetricValue.swift in Sources */,
-				89F49B6560AB71DC7F50C78F /* DSMetricLabel.swift in Sources */,
-				89FCC2B284012FAA14EC7A16 /* DSTrendIndicator.swift in Sources */,
-				02FF59428632FBC25F9456AA /* DSCircularProgress.swift in Sources */,
-				A4F541B201F4587D933EF604 /* DSAvatar.swift in Sources */,
-				717301BDF536203C9A49A25E /* MetricCard.swift in Sources */,
-				11129CEC79A594A3564C81AE /* CompactMetricCard.swift in Sources */,
-				AD8872312EB4050B0041C426 /* LiquidGlassCTAButton.swift in Sources */,
-				9B88D79235D58979AFCFF0F2 /* StepsIndicator.swift in Sources */,
-				EC7E97F84940FD554A7EB5A1 /* UserGreeting.swift in Sources */,
-				C00904926079E360A71A9DC6 /* MetricGauge.swift in Sources */,
-				BB5187715A77E1422F6CE947 /* DashboardHeader.swift in Sources */,
-				614FDFBE0D01B7D3980EFC41 /* CoreMetricsRow.swift in Sources */,
-				87532EA234E13B76D5B1656B /* SecondaryMetricsRow.swift in Sources */,
-				18A6F3A9477330EC42DC0665 /* DashboardContent.swift in Sources */,
 				AD435B592EC79EEB0084E5C5 /* MetricSummaryCard.swift in Sources */,
 				F44F78267E1DBA90010176C1 /* Color+Theme.swift in Sources */,
 				0DAECF9694453077367DCB0E /* Font+Custom.swift in Sources */,
@@ -1883,7 +1815,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = LogYourBody/LogYourBody.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251104164617;
+				CURRENT_PROJECT_VERSION = 20251120220025;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1919,7 +1851,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = LogYourBody/LogYourBody.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251104164617;
+				CURRENT_PROJECT_VERSION = 20251120220025;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1952,7 +1884,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251104164617;
+				CURRENT_PROJECT_VERSION = 20251120220025;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1971,7 +1903,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251104164617;
+				CURRENT_PROJECT_VERSION = 20251120220025;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1989,7 +1921,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251104164617;
+				CURRENT_PROJECT_VERSION = 20251120220025;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -2007,7 +1939,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251104164617;
+				CURRENT_PROJECT_VERSION = 20251120220025;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

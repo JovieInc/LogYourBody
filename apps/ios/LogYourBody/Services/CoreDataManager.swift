@@ -23,6 +23,14 @@ class CoreDataManager: ObservableObject {
 
         container.loadPersistentStores { description, error in
             if let error = error {
+                let appError = AppError.coreData(operation: "loadPersistentStores", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "loadPersistentStores",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // Log the error but don't crash - fallback to in-memory store
                 // print("⚠️ CoreData Error: Unable to load persistent stores: \(error)")
                 // print("⚠️ Falling back to in-memory store. Data will not persist.")
@@ -35,6 +43,14 @@ class CoreDataManager: ObservableObject {
                 // Attempt to load in-memory store
                 container.loadPersistentStores { _, inMemoryError in
                     if let inMemoryError = inMemoryError {
+                        let criticalError = AppError.coreData(operation: "loadInMemoryStore", underlying: inMemoryError)
+                        let criticalContext = ErrorContext(
+                            feature: "coreData",
+                            operation: "loadInMemoryStore",
+                            screen: nil,
+                            userId: nil
+                        )
+                        ErrorReporter.shared.capture(criticalError, context: criticalContext)
                         // print("❌ CoreData Critical: Even in-memory store failed: \(inMemoryError)")
                     }
                 }
@@ -82,6 +98,14 @@ class CoreDataManager: ObservableObject {
                         try context.save()
                         // print("✅ Core Data context saved successfully")
                     } catch {
+                        let appError = AppError.coreData(operation: "saveContext", underlying: error)
+                        let contextInfo = ErrorContext(
+                            feature: "coreData",
+                            operation: "save",
+                            screen: nil,
+                            userId: nil
+                        )
+                        ErrorReporter.shared.capture(appError, context: contextInfo)
                         // print("Failed to save Core Data context: \(error)")
                     }
                 }
@@ -124,6 +148,14 @@ class CoreDataManager: ObservableObject {
                 }
             } catch {
                 #if DEBUG
+                let appError = AppError.coreData(operation: "saveDailyMetrics", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "saveDailyMetrics",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to save daily metrics: \(error)")
                 #endif
             }
@@ -287,6 +319,14 @@ class CoreDataManager: ObservableObject {
                     try context.save()
                     // print("✅ Core Data context saved asynchronously")
                 } catch {
+                    let appError = AppError.coreData(operation: "saveAsync", underlying: error)
+                    let contextInfo = ErrorContext(
+                        feature: "coreData",
+                        operation: "saveAsync",
+                        screen: nil,
+                        userId: nil
+                    )
+                    ErrorReporter.shared.capture(appError, context: contextInfo)
                     // print("Failed to save Core Data context: \(error)")
                 }
             }
@@ -345,6 +385,14 @@ class CoreDataManager: ObservableObject {
             } catch {
                 // Use OSLog for production-safe logging
                 #if DEBUG
+                let appError = AppError.coreData(operation: "saveBodyMetrics", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "saveBodyMetrics",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to save body metrics: \(error)")
                 #endif
             }
@@ -567,6 +615,14 @@ class CoreDataManager: ObservableObject {
                 return true
             } catch {
                 #if DEBUG
+                let appError = AppError.coreData(operation: "markBodyMetricDeleted", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "markBodyMetricDeleted",
+                    screen: nil,
+                    userId: cachedMetric.userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to delete body metric: \(error)")
                 #endif
                 return false
@@ -612,6 +668,14 @@ class CoreDataManager: ObservableObject {
 
                 self.save()
             } catch {
+                let appError = AppError.coreData(operation: "saveProfile", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "saveProfile",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to save profile: \(error)")
             }
         }
@@ -670,6 +734,14 @@ class CoreDataManager: ObservableObject {
                 return (bodyMetrics, dailyMetrics, profiles)
             } catch {
                 #if DEBUG
+                let appError = AppError.coreData(operation: "fetchUnsyncedEntries", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchUnsyncedEntries",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to fetch unsynced entries: \(error)")
                 #endif
                 return ([], [], [])
@@ -781,6 +853,14 @@ class CoreDataManager: ObservableObject {
                 try context.execute(deleteDailyMetrics)
                 self.save()
             } catch {
+                let appError = AppError.coreData(operation: "cleanupDeletedEntries", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "cleanupDeletedEntries",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to cleanup deleted entries: \(error)")
             }
         }
@@ -864,6 +944,14 @@ class CoreDataManager: ObservableObject {
 
                 self.save()
             } catch {
+                let appError = AppError.coreData(operation: "updateOrCreateBodyMetric", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "updateOrCreateBodyMetric",
+                    screen: nil,
+                    userId: data["user_id"] as? String
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating body metric from server: \(error)")
             }
         }
@@ -899,6 +987,14 @@ class CoreDataManager: ObservableObject {
 
                 self.save()
             } catch {
+                let appError = AppError.coreData(operation: "updateOrCreateDailyMetric", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "updateOrCreateDailyMetric",
+                    screen: nil,
+                    userId: data["user_id"] as? String
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating daily metric from server: \(error)")
             }
         }
@@ -939,6 +1035,14 @@ class CoreDataManager: ObservableObject {
 
                 self.save()
             } catch {
+                let appError = AppError.coreData(operation: "updateOrCreateProfile", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "updateOrCreateProfile",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating profile from server: \(error)")
             }
         }
@@ -1006,6 +1110,14 @@ class CoreDataManager: ObservableObject {
                 }
             } catch {
                 #if DEBUG
+                let appError = AppError.coreData(operation: "fetchAllDailyLogs", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchAllDailyLogs",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error fetching all daily logs: \(error)")
                 #endif
                 return []
