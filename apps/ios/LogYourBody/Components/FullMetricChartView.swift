@@ -15,14 +15,6 @@ enum ChartMode: CaseIterable {
     }
 }
 
-struct QuickStat: Identifiable, Equatable {
-    let id = UUID()
-    let label: String
-    let value: String
-    let detail: String?
-    let color: Color
-}
-
 // MARK: - Time Range & Data Points
 
 enum TimeRange: String, CaseIterable {
@@ -235,8 +227,6 @@ private struct HistorySection: Identifiable {
 // MARK: - Full Metric Chart View
 
 struct FullMetricChartView: View {
-    @Environment(\.dismiss) private var dismiss
-
     let title: String
     let icon: String
     let iconColor: Color
@@ -246,6 +236,8 @@ struct FullMetricChartView: View {
     let chartData: [MetricChartDataPoint]
     let onAdd: () -> Void
     let metricEntries: MetricEntriesPayload?
+
+    let goalValue: Double?
 
     @Binding var selectedTimeRange: TimeRange
     @State private var cachedSeries: [TimeRange: [MetricChartDataPoint]] = [:]
@@ -257,34 +249,38 @@ struct FullMetricChartView: View {
     @State private var activeHistorySectionIndex: Int?
     @State private var isHistoryScrubbing = false
 
-    private let chartHeight: CGFloat = 260
+    @State private var localHistorySections: [HistorySection]?
+    @State private var historyEntryPendingDeletion: MetricHistoryEntry?
+    @State private var showingHistoryDeleteConfirmation = false
+
+    private let chartHeight: CGFloat = 300
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .top) {
-                Color.metricCanvas.ignoresSafeArea()
+        ZStack(alignment: .top) {
+            Color.metricCanvas.ignoresSafeArea()
 
-                ScrollViewReader { proxy in
-                    ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 24) {
-                            navigationBar
-                            headlineBlock
-                            quickStatsRow
-                            timeRangeSelector
-                            chartCard
-                            historyBlock
-                            addEntryButton
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 32)
-                        .padding(.top, 12)
+            ScrollViewReader { proxy in
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 20) {
+                        headlineBlock
+                        chartCard
+                        historyBlock
+                        addEntryButton
                     }
-                    .overlay(alignment: .trailing) {
-                        historyScrubber(proxy: proxy)
-                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 32)
+                    .padding(.top, 12)
+                }
+                .overlay(alignment: .trailing) {
+                    historyScrubber(proxy: proxy)
                 }
             }
         }
+        .overlay(alignment: .bottomTrailing) {
+            addEntryFloatingButton
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
         .task(id: chartDataFingerprint) {
             await preprocessChartDataIfNeeded()
         }
@@ -296,55 +292,26 @@ struct FullMetricChartView: View {
             activePoint = nil
             HapticManager.shared.selection()
         }
-    }
-
-    // MARK: - Layout Sections
-
-    private var navigationBar: some View {
-        HStack {
-            Button {
-                HapticManager.shared.selection()
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .background(Color.metricSurface.opacity(0.6))
-                    .clipShape(Circle())
+        .alert(
+            "Delete Entry?",
+            isPresented: $showingHistoryDeleteConfirmation,
+            presenting: historyEntryPendingDeletion
+        ) { entry in
+            Button("Delete", role: .destructive) {
+                Task {
+                    await deleteHistoryEntry(entry)
+                }
             }
-            .buttonStyle(.plain)
-
-            Spacer()
-
-            Text(title)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.white)
-
-            Spacer()
-
-            Button {
-                HapticManager.shared.selection()
-                onAdd()
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(Color.metricAccent)
-                    .frame(width: 44, height: 44)
-                    .background(Color.metricSurface.opacity(0.6))
-                    .clipShape(Circle())
+            Button("Cancel", role: .cancel) {
+                historyEntryPendingDeletion = nil
             }
-            .buttonStyle(.plain)
+        } message: { _ in
+            Text("This will remove the entry and update your history.")
         }
     }
 
     private var headlineBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased())
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color.white.opacity(0.6))
-                .tracking(1)
-
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(headlineValueText)
                     .font(.system(size: 62, weight: .regular, design: .default))
@@ -361,35 +328,32 @@ struct FullMetricChartView: View {
             Text(headlineDateText)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.65))
-        }
-    }
 
-    private var quickStatsRow: some View {
-        Group {
-            if !quickStats.isEmpty {
-                HStack(spacing: 12) {
-                    ForEach(quickStats) { stat in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(stat.label)
-                                .font(.system(size: 12, weight: .semibold))
+            if let stats = computeSeriesStats(for: displayedSeries) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("\(selectedTimeRange.rawValue) avg \(formatStatValue(stats.average))")
+                            .foregroundColor(Color.metricTextSecondary)
+
+                        Spacer()
+
+                        Text("Change \(formatDeltaValue(stats.delta))")
+                            .foregroundColor(deltaColor(for: stats.delta))
+                    }
+
+                    if let bounds = minMaxTexts(for: displayedSeries) {
+                        HStack {
+                            Text("Low \(bounds.min)")
                                 .foregroundColor(Color.metricTextSecondary)
-                                .tracking(0.3)
-                            Text(stat.value)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(stat.color)
-                            if let detail = stat.detail {
-                                Text(detail)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(Color.metricTextTertiary)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                        if stat.id != quickStats.last?.id {
-                            Text("·")
-                                .foregroundColor(Color.white.opacity(0.35))
+
+                            Spacer()
+
+                            Text("High \(bounds.max)")
+                                .foregroundColor(Color.metricTextSecondary)
                         }
                     }
                 }
+                .font(.system(size: 13, weight: .medium))
             }
         }
     }
@@ -452,33 +416,38 @@ struct FullMetricChartView: View {
         return sections
     }
 
+    private var displayedHistorySections: [HistorySection] {
+        localHistorySections ?? historySections
+    }
+
     private var timeRangeSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(TimeRange.allCases, id: \.self) { range in
-                    Button {
-                        selectedTimeRange = range
-                    } label: {
-                        Text(range.rawValue)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(
-                                selectedTimeRange == range ? Color.metricTextPrimary : Color(hex: "#C7CBD3")
-                            )
-                            .frame(width: 68, height: 32)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(selectedTimeRange == range ? Color.metricAccent : Color.clear)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(
-                                                selectedTimeRange == range ? Color.clear : Color(hex: "#2A2E36"),
-                                                lineWidth: selectedTimeRange == range ? 0 : 1
-                                            )
-                                    )
-                            )
+            HStack {
+                HStack(spacing: 4) {
+                    ForEach(TimeRange.allCases, id: \.self) { range in
+                        Button {
+                            selectedTimeRange = range
+                        } label: {
+                            Text(range.rawValue)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(
+                                    selectedTimeRange == range ? Color.black : Color.metricTextSecondary
+                                )
+                                .frame(minWidth: 44, minHeight: 26)
+                                .background(
+                                    Capsule()
+                                        .fill(selectedTimeRange == range ? Color.white : Color.clear)
+                                )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.08))
+                )
             }
             .padding(.vertical, 4)
         }
@@ -499,7 +468,7 @@ struct FullMetricChartView: View {
                     .frame(height: chartHeight)
             }
         }
-        .padding(16)
+        .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(Color.metricCard)
@@ -524,17 +493,19 @@ struct FullMetricChartView: View {
     }
 
     private var chartHeader: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 12) {
                 Text("Trend")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.white)
-                Text(chartSubtitle)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.6))
+
+                Spacer()
+
+                chartModeToggle
             }
-            Spacer()
-            chartModeToggle
+
+            timeRangeSelector
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -560,7 +531,6 @@ struct FullMetricChartView: View {
             }
         }
     }
-
     private var chartView: some View {
         Chart {
             let series = activeSeries
@@ -569,7 +539,8 @@ struct FullMetricChartView: View {
                 ForEach(series) { point in
                     BarMark(
                         x: .value("Date", point.date),
-                        y: .value("Value", point.value)
+                        y: .value("Value", point.value),
+                        width: selectedTimeRange == .week1 ? .fixed(18) : .automatic
                     )
                     .foregroundStyle(Color.metricChartLine)
                 }
@@ -601,6 +572,12 @@ struct FullMetricChartView: View {
                 }
             }
 
+            if let goalValue {
+                RuleMark(y: .value("Goal", goalValue))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    .foregroundStyle(Color.metricAccent.opacity(0.45))
+            }
+
             if let focus = activePoint {
                 RuleMark(x: .value("Selected", focus.date))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
@@ -625,14 +602,12 @@ struct FullMetricChartView: View {
                 AxisValueLabel()
                     .foregroundStyle(Color.metricTextSecondary)
                     .font(.system(size: 11, weight: .medium))
-                AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(Color.metricGridMinor)
             }
         }
         .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { _ in
-                AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 1))
-                    .foregroundStyle(Color.metricGridMajor)
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { _ in
+                AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 0.5))
+                    .foregroundStyle(Color.metricGridMajor.opacity(0.45))
                 AxisValueLabel()
                     .foregroundStyle(Color.metricTextSecondary)
                     .font(.system(size: 11, weight: .medium))
@@ -692,15 +667,21 @@ struct FullMetricChartView: View {
 
     private var historyBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Divider()
+                .background(Color.metricGridMinor.opacity(0.55))
+                .padding(.bottom, 8)
+
             Text("History")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(.white)
 
             if let payload = metricEntries,
                !payload.entries.isEmpty,
-               !historySections.isEmpty {
+               !displayedHistorySections.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(historySections.enumerated()), id: \.element.id) { index, section in
+                    ForEach(Array(displayedHistorySections.enumerated()), id: \
+                        .element.id
+                    ) { index, section in
                         VStack(alignment: .leading, spacing: 0) {
                             if section.showsHeader {
                                 Text(section.title)
@@ -712,6 +693,14 @@ struct FullMetricChartView: View {
 
                             ForEach(section.entries) { entry in
                                 historyRow(for: entry, config: payload.config)
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button(role: .destructive) {
+                                            historyEntryPendingDeletion = entry
+                                            showingHistoryDeleteConfirmation = true
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    }
 
                                 if entry.id != section.entries.last?.id {
                                     Divider()
@@ -752,36 +741,32 @@ struct FullMetricChartView: View {
             }
         }
 
-        return HStack {
+        return HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.date.formatted(.dateTime.month().day().year()))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
 
-                Text(sourceLabel(for: entry.source))
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color.metricTextTertiary)
+                HStack(spacing: 6) {
+                    historySourceIcon(for: entry.source)
+
+                    Text(sourceLabel(for: entry.source))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Color.metricTextTertiary)
+                }
             }
 
             Spacer(minLength: 12)
 
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(valueText)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(valueText)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
 
-                    if let unitText {
-                        Text(unitText)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color.metricTextSecondary)
-                    }
-                }
-
-                if let secondary = secondaryHistoryValue(entry, config: config) {
-                    Text(secondary)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(Color.metricTextTertiary)
+                if let unitText {
+                    Text(unitText)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color.metricTextSecondary)
                 }
             }
         }
@@ -821,6 +806,26 @@ struct FullMetricChartView: View {
         }
     }
 
+    @ViewBuilder
+    private func historySourceIcon(for source: MetricEntrySourceType) -> some View {
+        switch source {
+        case .healthKit:
+            Image(systemName: "heart.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.red)
+        case .manual:
+            Image("AppIcon")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 16, height: 16)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        case .integration:
+            Image(systemName: "bolt.horizontal.circle.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color.metricAccent)
+        }
+    }
+
     private var addEntryButton: some View {
         Button {
             HapticManager.shared.selection()
@@ -837,6 +842,26 @@ struct FullMetricChartView: View {
         .buttonStyle(.plain)
     }
 
+    private var addEntryFloatingButton: some View {
+        Button {
+            HapticManager.shared.selection()
+            onAdd()
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.black)
+                .frame(width: 54, height: 54)
+                .background(
+                    Circle()
+                        .fill(Color.metricAccent)
+                        .shadow(color: Color.black.opacity(0.45), radius: 16, x: 0, y: 10)
+                )
+        }
+        .buttonStyle(.plain)
+        .padding(.trailing, 24)
+        .padding(.bottom, 28)
+    }
+
     private func historyScrubber(proxy: ScrollViewProxy) -> some View {
         Group {
             if historySections.isEmpty {
@@ -845,21 +870,29 @@ struct FullMetricChartView: View {
                 GeometryReader { geometry in
                     let sectionCount = historySections.count
                     let height = geometry.size.height
-                    let trackWidth: CGFloat = 32
+                    let thumbWidth: CGFloat = 3
+                    let minThumbHeight: CGFloat = 36
                     let step = height / CGFloat(max(sectionCount, 1))
                     let clampedIndex = min(max(activeHistorySectionIndex ?? 0, 0), max(sectionCount - 1, 0))
+                    let thumbHeight = max(minThumbHeight, step * 0.7)
+                    let yOffset = CGFloat(clampedIndex) * step
 
                     ZStack(alignment: .topTrailing) {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.metricSurface.opacity(0.9))
-                            .frame(width: trackWidth)
+                        // Optional hairline track for subtle context, only while scrubbing
+                        Capsule()
+                            .fill(Color.white.opacity(0.12))
+                            .frame(width: 1, height: height)
+                            .opacity(isHistoryScrubbing ? 1 : 0)
 
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.metricAccent)
-                            .frame(width: trackWidth - 8, height: max(step, 40))
-                            .padding(.vertical, 4)
-                            .offset(y: CGFloat(clampedIndex) * step)
+                        Capsule()
+                            .fill(Color.white.opacity(0.6))
+                            .frame(width: thumbWidth, height: thumbHeight)
+                            .offset(y: yOffset)
+                            .opacity(isHistoryScrubbing ? 1 : 0)
                     }
+                    .padding(.trailing, 4)
+                    .animation(.easeInOut(duration: 0.2), value: isHistoryScrubbing)
+                    .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
@@ -869,7 +902,9 @@ struct FullMetricChartView: View {
 
                                 if activeHistorySectionIndex != index {
                                     activeHistorySectionIndex = index
-                                    isHistoryScrubbing = true
+                                    if !isHistoryScrubbing {
+                                        isHistoryScrubbing = true
+                                    }
                                     let sectionId = historySections[index].id
                                     withAnimation(.easeInOut(duration: 0.15)) {
                                         proxy.scrollTo(sectionId, anchor: .top)
@@ -882,8 +917,7 @@ struct FullMetricChartView: View {
                             }
                     )
                 }
-                .frame(width: 32)
-                .padding(.trailing, 4)
+                .frame(width: 20)
             }
         }
     }
@@ -904,30 +938,6 @@ struct FullMetricChartView: View {
 
     private var minSeriesValue: Double? {
         activeSeries.map(\.value).min()
-    }
-
-    private var chartSubtitle: String {
-        "\(selectedTimeRange.rawValue) · \(chartMode.label)"
-    }
-
-    private var quickStats: [QuickStat] {
-        guard let stats = computeSeriesStats(for: displayedSeries) else { return [] }
-
-        var items: [QuickStat] = []
-
-        let averageText = "\(selectedTimeRange.rawValue) avg \(formatStatValue(stats.average))"
-        items.append(QuickStat(label: "Average", value: averageText, detail: nil, color: .white))
-
-        let deltaValue = stats.delta
-        let deltaText = formatDeltaValue(deltaValue)
-        let deltaDetail = "since start"
-        items.append(QuickStat(label: "Δ", value: deltaText, detail: deltaDetail, color: deltaColor(for: deltaValue)))
-
-        if let rangeText = rangeText(for: displayedSeries) {
-            items.append(QuickStat(label: "Range", value: rangeText, detail: nil, color: Color.white))
-        }
-
-        return items
     }
 
     private var headlineValueText: String {
@@ -1045,9 +1055,9 @@ struct FullMetricChartView: View {
         return delta > 0 ? Color.metricDeltaPositive : Color.metricDeltaNegative
     }
 
-    private func rangeText(
+    private func minMaxTexts(
         for series: [MetricChartDataPoint]
-    ) -> String? {
+    ) -> (min: String, max: String)? {
         guard
             let minValue = series.map(\.value).min(),
             let maxValue = series.map(\.value).max(),
@@ -1058,7 +1068,43 @@ struct FullMetricChartView: View {
 
         let minText = formatStatValue(minValue)
         let maxText = formatStatValue(maxValue)
-        return "\(minText) – \(maxText)"
+        return (min: minText, max: maxText)
+    }
+
+    @MainActor
+    private func deleteHistoryEntry(_ entry: MetricHistoryEntry) async {
+        defer {
+            historyEntryPendingDeletion = nil
+            showingHistoryDeleteConfirmation = false
+        }
+
+        let success = await CoreDataManager.shared.markBodyMetricDeleted(id: entry.id)
+        guard success else { return }
+
+        var sections = localHistorySections ?? historySections
+
+        for (sectionIndex, section) in sections.enumerated() {
+            if let rowIndex = section.entries.firstIndex(where: { $0.id == entry.id }) {
+                var newEntries = section.entries
+                newEntries.remove(at: rowIndex)
+
+                if newEntries.isEmpty {
+                    sections.remove(at: sectionIndex)
+                } else {
+                    let updatedSection = HistorySection(
+                        id: section.id,
+                        title: section.title,
+                        showsHeader: section.showsHeader,
+                        entries: newEntries
+                    )
+                    sections[sectionIndex] = updatedSection
+                }
+
+                break
+            }
+        }
+
+        localHistorySections = sections
     }
 
     private func nearestPoint(to date: Date) -> MetricChartDataPoint? {
@@ -1085,13 +1131,19 @@ struct FullMetricChartView: View {
         }
 
         isLoadingData = true
-        defer { isLoadingData = false }
+        let data = chartData
+        let referenceDate = data.last?.date ?? Date()
 
-        let referenceDate = chartData.last?.date ?? Date()
-        let preprocessor = ChartSeriesPreprocessor(referenceDate: referenceDate)
-        let newSeries = preprocessor.seriesByRange(from: chartData)
+        let newSeries = await Task.detached(priority: .userInitiated) {
+            let preprocessor = ChartSeriesPreprocessor(referenceDate: referenceDate)
+            return preprocessor.seriesByRange(from: data)
+        }.value
 
-        cachedSeries = newSeries
-        lastFingerprint = fingerprint
+        if fingerprint == chartDataFingerprint {
+            cachedSeries = newSeries
+            lastFingerprint = fingerprint
+        }
+
+        isLoadingData = false
     }
 }

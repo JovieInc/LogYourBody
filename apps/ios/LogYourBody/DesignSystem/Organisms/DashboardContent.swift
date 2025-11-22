@@ -234,21 +234,22 @@ struct DashboardContent: View {
     }
 
     private func calculateFFMI() -> Double? {
-        guard let weight = currentMetric?.weight,
-              let userHeightValue = userHeight,
-              let bf = getBodyFatValue() else { return nil }
+        guard let metric = currentMetric,
+              let heightCm = userHeight,
+              heightCm > 0,
+              let _ = getBodyFatValue() else { return nil }
 
-        // Convert height to cm if stored in inches
-        let heightInCm: Double
-        if userHeightUnit == "in" {
-            heightInCm = userHeightValue * 2.54
-        } else {
-            heightInCm = userHeightValue
+        let heightInches = heightCm / 2.54
+
+        guard let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
+            for: metric.date,
+            metrics: bodyMetrics,
+            heightInches: heightInches
+        ) else {
+            return nil
         }
 
-        let leanMass = weight * (1 - bf / 100)
-        let heightInMeters = heightInCm / 100
-        return leanMass / (heightInMeters * heightInMeters)
+        return ffmiResult.value
     }
 
     // Stub calculation methods - implement based on your logic

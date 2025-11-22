@@ -59,6 +59,17 @@ struct BodyScoreHealthConfirmationView: View {
                                     }
 
                                     Spacer()
+
+                                    if metric.title != "No data" {
+                                        Button {
+                                            edit(metric: metric)
+                                        } label: {
+                                            Image(systemName: "square.and.pencil")
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundStyle(Color.appPrimary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
 
                                 if metric.id != metrics.last?.id {
@@ -77,15 +88,14 @@ struct BodyScoreHealthConfirmationView: View {
             },
             footer: {
                 VStack(spacing: 12) {
-                    Button("Looks good") {
+                    Button("Continue") {
                         viewModel.goToNextStep()
                     }
                     .buttonStyle(OnboardingPrimaryButtonStyle())
 
-                    Button("I'd rather enter manually") {
+                    OnboardingTextButton(title: "Enter manually instead") {
                         viewModel.skipHealthKit()
                     }
-                    .buttonStyle(OnboardingSecondaryButtonStyle())
                 }
             }
         )
@@ -99,7 +109,7 @@ struct BodyScoreHealthConfirmationView: View {
                 Metric(
                     title: "Height",
                     value: heightString,
-                    subtitle: "From Health",
+                    subtitle: heightSubtitle,
                     icon: "ruler"
                 )
             )
@@ -110,8 +120,8 @@ struct BodyScoreHealthConfirmationView: View {
                 Metric(
                     title: "Weight",
                     value: weightString,
-                    subtitle: "Last logged weight",
-                    icon: "figure.scale"
+                    subtitle: weightSubtitle,
+                    icon: "scalemass.fill"
                 )
             )
         }
@@ -121,7 +131,7 @@ struct BodyScoreHealthConfirmationView: View {
                 Metric(
                     title: "Body Fat",
                     value: bodyFatString,
-                    subtitle: "Imported from Health",
+                    subtitle: bodyFatSubtitle,
                     icon: "percent"
                 )
             )
@@ -189,7 +199,7 @@ struct BodyScoreHealthConfirmationView: View {
             return nil
         }
 
-        return "You can update these anytime from Apple Health. We only read what you allow."
+        return "We read only what you allow."
     }
 
     private var preferredMeasurementSystem: MeasurementSystem {
@@ -207,6 +217,55 @@ struct BodyScoreHealthConfirmationView: View {
         case .pounds:
             return viewModel.bodyScoreInput.weight.inPounds
         }
+    }
+
+    private func edit(metric: Metric) {
+        switch metric.title {
+        case "Height":
+            viewModel.currentStep = .height
+        case "Weight":
+            viewModel.currentStep = .manualWeight
+        case "Body Fat":
+            viewModel.currentStep = .bodyFatChoice
+        default:
+            break
+        }
+    }
+
+    private func relativeDateString(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    private var heightSubtitle: String {
+        if let date = viewModel.bodyScoreInput.healthSnapshot.heightDate {
+            return "Last measured \(relativeDateString(from: date))"
+        }
+        if viewModel.bodyScoreInput.healthSnapshot.heightCm != nil {
+            return "From Apple Health"
+        }
+        return "From your profile"
+    }
+
+    private var weightSubtitle: String {
+        if let date = viewModel.bodyScoreInput.healthSnapshot.weightDate {
+            return "Last logged \(relativeDateString(from: date))"
+        }
+        if viewModel.bodyScoreInput.healthSnapshot.weightKg != nil {
+            return "From Apple Health"
+        }
+        return "From your profile"
+    }
+
+    private var bodyFatSubtitle: String {
+        if let date = viewModel.bodyScoreInput.healthSnapshot.bodyFatDate {
+            return "Last logged \(relativeDateString(from: date))"
+        }
+        if viewModel.bodyScoreInput.healthSnapshot.bodyFatPercentage != nil {
+            return "Imported from Health"
+        }
+        return "From your estimate"
     }
 
     private func imperialHeightString(fromCentimeters centimeters: Double) -> String {

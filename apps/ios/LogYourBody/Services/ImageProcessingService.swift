@@ -7,18 +7,12 @@ import Vision
 import CoreImage
 import Combine
 
-@MainActor
 class ImageProcessingService: ObservableObject {
     static let shared = ImageProcessingService()
 
     @Published var processingTasks: [ProcessingTask] = []
     @Published var activeProcessingCount: Int = 0
 
-    private let processingQueue = DispatchQueue(
-        label: "com.logyourbody.imageprocessing",
-        qos: .userInitiated,
-        attributes: .concurrent
-    )
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
     struct ProcessingTask: Identifiable {
@@ -55,21 +49,12 @@ class ImageProcessingService: ObservableObject {
         await showProcessingNotification(for: imageId)
 
         do {
-            // Process on background queue
-            let result = try await withCheckedThrowingContinuation { continuation in
-                processingQueue.async { [weak self] in
-                    guard let self = self else { return }
-
-                    Task { @MainActor in
-                        do {
-                            let processedResult = try self.performImageProcessing(image, taskId: task.id)
-                            continuation.resume(returning: processedResult)
-                        } catch {
-                            continuation.resume(throwing: error)
-                        }
-                    }
+            let result = try await Task.detached(priority: .userInitiated) { [image, taskId = task.id, weak self] () async throws -> ProcessedImageResult in
+                guard let self else {
+                    throw ProcessingError.processingFailed
                 }
-            }
+                return try await self.performImageProcessing(image, taskId: taskId)
+            }.value
 
             // Update task status
             await updateTaskStatus(task.id, status: .completed, result: result.finalImage)
@@ -98,7 +83,7 @@ class ImageProcessingService: ObservableObject {
 
     // MARK: - Private Processing Methods
 
-    private func performImageProcessing(_ image: UIImage, taskId: UUID) throws -> ProcessedImageResult {
+    private func performImageProcessing(_ image: UIImage, taskId: UUID) async throws -> ProcessedImageResult {
         // Step 0: Apply EXIF-aware orientation first
         let orientationFixedImage = image.fixedOrientation()
 
@@ -120,7 +105,7 @@ class ImageProcessingService: ObservableObject {
 
         // Step 4: Remove background
         updateTaskProgress(taskId, status: .removingBackground, progress: 0.6)
-        let backgroundRemovedImage = try removeBackground(from: aspectFilledImage)
+        let backgroundRemovedImage = try await BackgroundRemovalService.shared.removeBackground(from: aspectFilledImage)
 
         // Step 5: Create thumbnail
         updateTaskProgress(taskId, status: .finalizing, progress: 0.8)
@@ -343,11 +328,6 @@ class ImageProcessingService: ObservableObject {
         return centerPoint
     }
 
-    private func removeBackground(from image: UIImage) throws -> UIImage {
-        // Use existing BackgroundRemovalService
-        return try BackgroundRemovalService.shared.removeBackgroundSync(from: image)
-    }
-
     private func createThumbnail(from image: UIImage, size: CGSize) throws -> UIImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0
@@ -422,37 +402,6 @@ enum ProcessingError: LocalizedError {
             return "Failed to crop image"
         case .processingFailed:
             return "Image processing failed"
-        }
-    }
-}
-
-// MARK: - BackgroundRemovalService Extension
-
-extension BackgroundRemovalService {
-    func removeBackgroundSync(from image: UIImage) throws -> UIImage {
-        // Synchronous wrapper for background removal
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: Result<UIImage, Error>?
-
-        Task {
-            do {
-                let processed = try await removeBackground(from: image)
-                result = .success(processed)
-            } catch {
-                result = .failure(error)
-            }
-            semaphore.signal()
-        }
-
-        semaphore.wait()
-
-        switch result {
-        case .success(let image):
-            return image
-        case .failure(let error):
-            throw error
-        case .none:
-            throw ProcessingError.processingFailed
         }
     }
 }

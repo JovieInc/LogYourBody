@@ -64,6 +64,7 @@ struct PreferencesView: View {
     @State private var showingPhotoPicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var isUploadingPhoto = false
+    @State private var avatarUploadProgress: Double = 0.0
     @State private var profileImageURL: String?
 
     @State private var scrollOffset: CGFloat = 0
@@ -217,7 +218,7 @@ struct PreferencesView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
-        .navigationTitle("Preferences")
+        .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .photosPicker(
@@ -260,6 +261,12 @@ struct PreferencesView: View {
                     Text(userEmail)
                         .font(.subheadline)
                         .foregroundColor(.appTextSecondary)
+
+                    if let memberSinceText {
+                        Text(memberSinceText)
+                            .font(.caption)
+                            .foregroundColor(.appTextSecondary)
+                    }
                 }
 
                 Spacer()
@@ -269,18 +276,20 @@ struct PreferencesView: View {
                 statusBadge
 
                 if let planName = subscriptionPlanDisplay {
-                    Text(planName)
-                        .font(.caption)
-                        .foregroundColor(.appTextSecondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(planName)
+                            .font(.caption)
+                            .foregroundColor(.appTextSecondary)
+
+                        if let renewal = subscriptionRenewalText {
+                            Text("Valid to \(renewal)")
+                                .font(.caption)
+                                .foregroundColor(.appTextSecondary)
+                        }
+                    }
                 }
 
                 Spacer()
-
-                if revenueCatManager.isSubscribed, let renewal = subscriptionRenewalText {
-                    Text(renewal)
-                        .font(.caption)
-                        .foregroundColor(.appTextSecondary)
-                }
             }
         }
         .padding()
@@ -328,6 +337,8 @@ struct PreferencesView: View {
                     .padding(.vertical, SettingsDesign.verticalPadding)
                 }
                 .disabled(isUploadingPhoto)
+                .accessibilityLabel("Change profile photo")
+                .accessibilityHint("Choose a new photo for your profile.")
 
                 DSDivider().insetted(16)
 
@@ -339,6 +350,8 @@ struct PreferencesView: View {
                     HapticManager.shared.notification(type: .warning)
                     showingLogoutConfirmation = true
                 }
+                .accessibilityLabel("Log out")
+                .accessibilityHint("Signs you out of LogYourBody on this device.")
             }
         }
     }
@@ -382,6 +395,8 @@ struct PreferencesView: View {
                         tintColor: .appText
                     )
                 }
+                .accessibilityLabel("Manage subscription")
+                .accessibilityHint("Opens the App Store to manage your subscription.")
             }
         }
     }
@@ -423,7 +438,7 @@ struct PreferencesView: View {
     private var trackingGoalsSection: some View {
         SettingsSection(
             header: "Tracking & goals",
-            footer: "Set custom targets or keep LogYourBody defaults."
+            footer: "Set custom targets or use defaults."
         ) {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -529,13 +544,29 @@ struct PreferencesView: View {
                 } resetAction: {
                     customFFMIGoal = nil
                 }
+            }
+        }
+    }
 
-                DSDivider().insetted(16)
+    private var integrationsSection: some View {
+        SettingsSection(header: "Integrations") {
+            SettingsNavigationLink(
+                icon: "square.stack.3d.up.fill",
+                title: "Integrations",
+                subtitle: "Connect Apple Health and other services."
+            ) {
+                IntegrationsView()
+            }
+        }
+    }
 
+    private var securitySection: some View {
+        SettingsSection(header: "Security") {
+            VStack(spacing: 0) {
                 SettingsNavigationLink(
                     icon: "lock.rotation",
                     title: "Change password",
-                    subtitle: "Update your LogYourBody password."
+                    subtitle: "Update your password."
                 ) {
                     ChangePasswordView()
                 }
@@ -545,7 +576,7 @@ struct PreferencesView: View {
                 SettingsNavigationLink(
                     icon: "desktopcomputer",
                     title: "Active sessions",
-                    subtitle: "Review devices logged in with your account."
+                    subtitle: "Review devices signed in to your account."
                 ) {
                     SecuritySessionsView()
                 }
@@ -557,7 +588,7 @@ struct PreferencesView: View {
         SettingsSection(header: "Photos") {
             SettingsToggleRow(
                 icon: "photo.on.rectangle.angled",
-                title: "Remove from Camera Roll after import",
+                title: "Remove from Photos after import",
                 isOn: $deletePhotosAfterImport,
                 subtitle: "Automatically delete photos after importing them.",
                 onToggle: { _ in
@@ -601,6 +632,8 @@ struct PreferencesView: View {
                             )
                     )
                 }
+                .accessibilityLabel("Restore purchases")
+                .accessibilityHint("Attempts to restore your active subscription.")
             }
             .padding(.top, 4)
             .padding(.bottom, 8)
@@ -625,6 +658,8 @@ struct PreferencesView: View {
                             .fill(Color.red.opacity(0.15))
                     )
             }
+            .accessibilityLabel("Delete account")
+            .accessibilityHint("Permanently deletes your account and all data.")
             .simultaneousGesture(
                 TapGesture().onEnded {
                     HapticManager.shared.notification(type: .error)
@@ -675,20 +710,43 @@ struct PreferencesView: View {
 
     @ViewBuilder
     private var heroAvatar: some View {
-        if let avatarUrl = profileImageURL ?? authManager.currentUser?.avatarUrl, !avatarUrl.isEmpty {
-            CachedAsyncImage(urlString: avatarUrl) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                avatarPlaceholder
+        let avatarSize: CGFloat = 72
+        let ringSize: CGFloat = 84
+
+        ZStack {
+            ProgressRing(
+                progress: avatarUploadProgress,
+                size: ringSize,
+                lineWidth: 4,
+                accentColor: .metricAccent,
+                showPercentage: false
+            )
+            .opacity(isUploadingPhoto ? 1 : 0)
+
+            Group {
+                if let avatarUrl = profileImageURL ?? authManager.currentUser?.avatarUrl, !avatarUrl.isEmpty {
+                    CachedAsyncImage(urlString: avatarUrl) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        avatarPlaceholder
+                    }
+                    .frame(width: avatarSize, height: avatarSize)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.2), lineWidth: 2)
+                    )
+                } else {
+                    avatarPlaceholder
+                        .frame(width: avatarSize, height: avatarSize)
+                }
             }
-            .frame(width: 72, height: 72)
-            .clipShape(Circle())
-            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 2))
-        } else {
-            avatarPlaceholder
         }
+        .frame(width: ringSize, height: ringSize)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Profile photo")
     }
 
     @ViewBuilder
@@ -855,6 +913,13 @@ struct PreferencesView: View {
         authManager.currentUser?.email ?? "Not available"
     }
 
+    private var memberSinceText: String? {
+        guard let date = authManager.memberSinceDate else { return nil }
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: date)
+        return "Member since \(year)"
+    }
+
     private var userInitials: String {
         let nameSource = authManager.currentUser?.profile?.fullName ??
             authManager.currentUser?.name ??
@@ -956,51 +1021,55 @@ struct PreferencesView: View {
     }
 
     private func convertHeightToCurrentSystem(height: Double, fromUnit: String) -> String {
-        if currentSystem == .imperial && fromUnit == "in" {
-            let feet = Int(height) / 12
-            let inches = Int(height) % 12
-            return "\(feet)' \(inches)\""
-        } else if currentSystem == .metric && fromUnit == "cm" {
-            return "\(Int(height)) cm"
-        } else if currentSystem == .imperial && fromUnit == "cm" {
-            // Convert cm to inches
-            let totalInches = height / 2.54
-            let feet = Int(totalInches) / 12
-            let inches = Int(totalInches) % 12
-            return "\(feet)' \(inches)\""
-        } else if currentSystem == .metric && fromUnit == "in" {
-            // Convert inches to cm
-            let cm = height * 2.54
-            return "\(Int(cm)) cm"
+        let heightCm = height
+
+        if currentSystem == .metric {
+            let centimeters = Int(heightCm.rounded())
+            return "\(centimeters) cm"
         }
-        return "\(Int(height)) \(fromUnit)"
+
+        let totalInches = Int((heightCm / 2.54).rounded())
+        let feet = totalInches / 12
+        let inches = totalInches % 12
+        return "\(feet)' \(inches)\""
     }
 
     private func handlePhotoSelection(_ item: PhotosPickerItem) async {
-        isUploadingPhoto = true
+        await MainActor.run {
+            isUploadingPhoto = true
+            avatarUploadProgress = 0.15
+        }
 
         do {
             // Load the image data
             if let data = try await item.loadTransferable(type: Data.self),
                let image = UIImage(data: data) {
+                await MainActor.run {
+                    avatarUploadProgress = 0.4
+                }
+
                 // Upload to Clerk
                 if let newImageURL = try await authManager.uploadProfilePicture(image) {
                     await MainActor.run {
                         profileImageURL = newImageURL
+                        avatarUploadProgress = 1.0
                         isUploadingPhoto = false
                     }
                 } else {
                     await MainActor.run {
+                        avatarUploadProgress = 0.0
                         isUploadingPhoto = false
                     }
                 }
             } else {
                 await MainActor.run {
+                    avatarUploadProgress = 0.0
                     isUploadingPhoto = false
                 }
             }
         } catch {
             await MainActor.run {
+                avatarUploadProgress = 0.0
                 isUploadingPhoto = false
             }
         }

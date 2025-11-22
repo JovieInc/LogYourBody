@@ -9,6 +9,8 @@ struct IntegrationsView: View {
     @StateObject private var healthKitManager = HealthKitManager.shared
     @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
     @State private var showHealthKitConnect = false
+    @State private var bodySpecLastSyncedText: String?
+    @State private var isLoadingBodySpecLastSynced = false
     @Environment(\.dismiss)
 
     var dismiss
@@ -134,25 +136,60 @@ struct IntegrationsView: View {
 
                             Divider()
 
-                            // BodySpec (Coming Soon)
-                            HStack {
-                                Image(systemName: "waveform.path.ecg")
-                                    .foregroundColor(.blue)
-                                    .font(.system(size: SettingsDesign.iconSize))
-                                    .frame(width: SettingsDesign.iconFrame)
+                            if Constants.isBodySpecEnabled {
+                                NavigationLink(
+                                    destination: BodySpecIntegrationView()
+                                        .environmentObject(authManager)
+                                ) {
+                                    HStack {
+                                        Image(systemName: "waveform.path.ecg")
+                                            .foregroundColor(.blue)
+                                            .font(.system(size: SettingsDesign.iconSize))
+                                            .frame(width: SettingsDesign.iconFrame)
 
-                                Text("BodySpec")
-                                    .font(SettingsDesign.titleFont)
+                                        Text("BodySpec")
+                                            .font(SettingsDesign.titleFont)
 
-                                Spacer()
+                                        Spacer()
 
-                                Text("Coming Soon")
-                                    .font(SettingsDesign.valueFont)
-                                    .foregroundColor(.appTextSecondary)
+                                        if isLoadingBodySpecLastSynced {
+                                            Text("Checking…")
+                                                .font(SettingsDesign.valueFont)
+                                                .foregroundColor(.appTextSecondary)
+                                        } else if let bodySpecLastSyncedText {
+                                            Text(bodySpecLastSyncedText)
+                                                .font(SettingsDesign.valueFont)
+                                                .foregroundColor(.appTextSecondary)
+                                        } else {
+                                            Text("Not synced yet")
+                                                .font(SettingsDesign.valueFont)
+                                                .foregroundColor(.appTextSecondary)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, SettingsDesign.horizontalPadding)
+                                .padding(.vertical, SettingsDesign.verticalPadding)
+                            } else {
+                                // BodySpec (Coming Soon)
+                                HStack {
+                                    Image(systemName: "waveform.path.ecg")
+                                        .foregroundColor(.blue)
+                                        .font(.system(size: SettingsDesign.iconSize))
+                                        .frame(width: SettingsDesign.iconFrame)
+
+                                    Text("BodySpec")
+                                        .font(SettingsDesign.titleFont)
+
+                                    Spacer()
+
+                                    Text("Coming Soon")
+                                        .font(SettingsDesign.valueFont)
+                                        .foregroundColor(.appTextSecondary)
+                                }
+                                .padding(.horizontal, SettingsDesign.horizontalPadding)
+                                .padding(.vertical, SettingsDesign.verticalPadding)
+                                .opacity(0.6)
                             }
-                            .padding(.horizontal, SettingsDesign.horizontalPadding)
-                            .padding(.vertical, SettingsDesign.verticalPadding)
-                            .opacity(0.6)
                         }
                     }
 
@@ -255,6 +292,10 @@ struct IntegrationsView: View {
         .onAppear {
             // Check HealthKit authorization status
             healthKitManager.checkAuthorizationStatus()
+
+            Task { @MainActor in
+                await loadBodySpecLastSynced()
+            }
         }
     }
 }
@@ -263,5 +304,47 @@ struct IntegrationsView: View {
     NavigationView {
         IntegrationsView()
             .environmentObject(AuthManager.shared)
+    }
+}
+
+// MARK: - BodySpec Helpers
+
+extension IntegrationsView {
+    @MainActor
+    private func loadBodySpecLastSynced() async {
+        guard Constants.isBodySpecEnabled,
+              let userId = authManager.currentUser?.id else {
+            bodySpecLastSyncedText = nil
+            isLoadingBodySpecLastSynced = false
+            return
+        }
+
+        isLoadingBodySpecLastSynced = true
+
+        do {
+            let results = try await SupabaseManager.shared.fetchDexaResults(userId: userId, limit: 1)
+
+            if let latest = results.first {
+                let date = latest.acquireTime ?? latest.updatedAt
+                bodySpecLastSyncedText = formatBodySpecLastSynced(date: date)
+            } else {
+                bodySpecLastSyncedText = "Not synced yet"
+            }
+        } catch {
+            bodySpecLastSyncedText = nil
+        }
+
+        isLoadingBodySpecLastSynced = false
+    }
+
+    private func formatBodySpecLastSynced(date: Date?) -> String {
+        guard let date else {
+            return "Not synced yet"
+        }
+
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        let relative = formatter.localizedString(for: date, relativeTo: Date())
+        return "Last synced · \(relative)"
     }
 }

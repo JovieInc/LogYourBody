@@ -31,7 +31,7 @@ struct CoreMetricsRow: View {
                 if let bf = bodyFatPercentage {
                     MetricSummaryCard(
                         icon: "percent",
-                        accentColor: .purple,
+                        accentColor: Color.metricAccentBodyFat,
                         state: .data(MetricSummaryCard.Content(
                             title: isEstimated ? "Est. Body Fat" : "Body Fat",
                             value: String(format: "%.1f", bf),
@@ -58,7 +58,7 @@ struct CoreMetricsRow: View {
                 } else {
                     MetricSummaryCard(
                         icon: "percent",
-                        accentColor: .purple,
+                        accentColor: Color.metricAccentBodyFat,
                         state: .empty(message: "No body fat data", action: nil)
                     )
                 }
@@ -77,7 +77,7 @@ struct CoreMetricsRow: View {
                 if let w = weight {
                     MetricSummaryCard(
                         icon: "figure.stand",
-                        accentColor: .purple,
+                        accentColor: Color.metricAccentWeight,
                         state: .data(MetricSummaryCard.Content(
                             title: "Weight",
                             value: formatWeight(w),
@@ -104,7 +104,7 @@ struct CoreMetricsRow: View {
                 } else {
                     MetricSummaryCard(
                         icon: "figure.stand",
-                        accentColor: .purple,
+                        accentColor: Color.metricAccentWeight,
                         state: .empty(message: "No weight data", action: nil)
                     )
                 }

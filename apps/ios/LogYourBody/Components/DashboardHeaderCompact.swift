@@ -11,6 +11,8 @@ struct DashboardHeaderCompact: View {
     let isSyncError: Bool
     let onShowSyncDetails: () -> Void
 
+    @State private var isSyncIndicatorExpanded = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 12) {
@@ -117,29 +119,65 @@ struct DashboardHeaderCompact: View {
         Button {
             onShowSyncDetails()
         } label: {
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(syncStatusColor)
-                        .frame(width: 6, height: 6)
-
-                    if isSyncError {
-                        Text(syncStatusTitle)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.7))
-                            .lineLimit(1)
-                    }
-                }
-
-                if isSyncError, let detail = syncStatusDetail {
-                    Text(detail)
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.5))
+            HStack(spacing: 8) {
+                if isSyncIndicatorExpanded, isSyncError {
+                    Text(syncIndicatorLabelText)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Color.liquidTextPrimary.opacity(0.7))
                         .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 999)
+                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    )
+                    .clipShape(Capsule())
+                    .transition(
+                        .move(edge: .trailing)
+                            .combined(with: .opacity)
+                    )
                 }
+
+                Circle()
+                    .fill(syncStatusColor)
+                    .frame(width: 6, height: 6)
             }
         }
         .buttonStyle(PlainButtonStyle())
         .fixedSize(horizontal: false, vertical: true)
+        .onAppear {
+            handleSyncIndicatorStatusChange()
+        }
+        .onChange(of: isSyncError) { _, _ in
+            handleSyncIndicatorStatusChange()
+        }
+    }
+
+    private var syncIndicatorLabelText: String {
+        guard isSyncError else {
+            return syncStatusTitle
+        }
+
+        return "Sync paused (tap for details)"
+    }
+
+    private func handleSyncIndicatorStatusChange() {
+        guard isSyncError else {
+            withAnimation(.easeOut(duration: 0.25)) {
+                isSyncIndicatorExpanded = false
+            }
+            return
+        }
+
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            isSyncIndicatorExpanded = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            withAnimation(.easeOut(duration: 0.25)) {
+                isSyncIndicatorExpanded = false
+            }
+        }
     }
 }

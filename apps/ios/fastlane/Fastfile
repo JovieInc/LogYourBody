@@ -531,6 +531,24 @@ platform :ios do
     )
   end
 
+  desc "Upload dSYMs to Sentry using sentry-cli"
+  lane :sentry_upload_symbols do |options|
+    auth_token = ENV["SENTRY_AUTH_TOKEN"]
+    org = ENV["SENTRY_ORG"] || "jovie"
+    project = ENV["SENTRY_PROJECT"] || "log-your-body-ios"
+
+    if auth_token.to_s.empty?
+      UI.message("SENTRY_AUTH_TOKEN not set, skipping Sentry dSYM upload")
+    elsif !system("which sentry-cli > /dev/null 2>&1")
+      UI.important("sentry-cli not found in PATH, skipping Sentry dSYM upload")
+    else
+      dsym_dir = options[:dsym_dir] || "./build"
+
+      UI.message("Uploading dSYMs from #{dsym_dir} to Sentry project #{org}/#{project}")
+      sh("SENTRY_AUTH_TOKEN=#{auth_token} SENTRY_ORG=#{org} SENTRY_PROJECT=#{project} sentry-cli upload-dif #{dsym_dir}")
+    end
+  end
+
   desc "Build and upload Alpha to TestFlight (dev branch - rapid)"
   lane :alpha do |options|
     # Ensure distribution certificates and provisioning profiles are available (Match)
@@ -564,7 +582,9 @@ platform :ios do
       changelog: release_notes,
       distribute_external: false
     )
-    
+
+    sentry_upload_symbols(dsym_dir: "./build")
+
     # Clean up
     clean_build_artifacts
     notify_success(context: 'alpha')
@@ -603,7 +623,9 @@ platform :ios do
       groups: ["Beta Testers"],
       distribute_external: true # Beta includes external testers
     )
-    
+
+    sentry_upload_symbols(dsym_dir: "./build")
+
     # Clean up
     clean_build_artifacts
     notify_success(context: 'beta')

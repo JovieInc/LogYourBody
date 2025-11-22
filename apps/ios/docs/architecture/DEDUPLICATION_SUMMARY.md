@@ -209,3 +209,67 @@ No changes required - all existing components continue to work as legacy wrapper
     inline editors.
 - Do **not** reintroduce `SettingsView` or alternate settings/profile screens
   without explicitly deprecating and updating all entry points.
+
+## Dashboard & Metric Detail Deduplication
+
+### Canonical Views
+
+- **Dashboard**: `DashboardViewLiquid`
+  - Location: `/Views/DashboardViewLiquid.swift` (+ `DashboardViewLiquid+*.swift` and `DashboardViewModel.swift`)
+  - Entry point: `MainTabView` when onboarding is complete and the user is subscribed.
+- **Metric detail**: `FullMetricChartView`
+  - Location: `/Components/FullMetricChartView.swift`
+  - Entry point: presented from `DashboardViewLiquid` when a metric tile is tapped.
+
+### Removed / Legacy Implementations
+
+- `DashboardViewV2`
+  - File: `Views/DashboardViewV2.swift`
+  - Status: Removed from the app build; no remaining call sites.
+  - Rationale: Full alternate dashboard implementation that duplicated the Liquid dashboard experience without being the actual runtime entry point.
+
+- `DashboardViewSimple`
+  - File: `Views/DashboardViewSimple.swift`
+  - Status: Removed from the app build; no remaining call sites.
+  - Rationale: Early placeholder dashboard, superseded by `DashboardViewLiquid`.
+
+- `MetricDetailView`
+  - File: `Views/MetricDetailView.swift`
+  - Status: Removed from the app build; no remaining call sites.
+  - Rationale: Alternate full-screen metric detail screen; replaced by `FullMetricChartView` which is used by `DashboardViewLiquid`.
+  - Shared models:
+    - `MetricEntry` and `EntrySource` have been moved to `/CommonComponents.swift` as shared models used by metric detail editing (`EditEntrySheet`) and history.
+
+### Guidance for New Code
+
+- Route **all** dashboard flows through `DashboardViewLiquid` and its view model.
+- For full-screen metric details, present `FullMetricChartView` instead of creating new detail screens.
+- Do **not** reintroduce `DashboardViewV2`, `DashboardViewSimple`, or `MetricDetailView` without explicitly deprecating and updating all entry points.
+
+## Onboarding Flow Deduplication
+
+### Canonical Flow
+
+- **Onboarding flow**: `BodyScoreOnboardingFlowView`
+  - Location: `/Features/Onboarding/Views/BodyScoreOnboardingFlowView.swift`
+  - Drives step-based onboarding using `OnboardingFlowViewModel` and the BodyScore view stack.
+- **Onboarding components**:
+  - Atoms: `/Features/Onboarding/Components/OnboardingAtoms.swift`
+  - Molecules: `/Features/Onboarding/Components/OnboardingMolecules.swift`
+
+### Removed / Legacy Implementations
+
+- `OnboardingComponents`
+  - File: `OnboardingComponents.swift`
+  - Status: Legacy Liquid Glass onboarding container/components; removed from the app build.
+  - Rationale: Superseded by the BodyScore onboarding atoms/molecules and dedicated BodyScore views.
+
+- Legacy onboarding typealiases
+  - File: `Components/CommonComponents.swift`
+  - Status: Legacy typealiases pointing to `OnboardingComponents`; no remaining call sites.
+  - Rationale: Old attempt to “re-export” onboarding UI components; superseded by the new onboarding design system.
+
+### Guidance for New Code
+
+- Route **all** onboarding UX through `BodyScoreOnboardingFlowView` and the BodyScore atoms/molecules.
+- Do **not** add new screens to the old `OnboardingComponents` stack or reintroduce those types.

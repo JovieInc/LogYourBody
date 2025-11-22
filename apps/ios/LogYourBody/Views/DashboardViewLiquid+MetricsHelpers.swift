@@ -43,11 +43,17 @@ extension DashboardViewLiquid {
             }
 
             // FFMI
-            if let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                for: metric.date,
-                metrics: viewModel.bodyMetrics,
-                heightInches: authManager.currentUser?.profile?.height
-            ) {
+            let heightInches = convertHeightToInches(
+                height: authManager.currentUser?.profile?.height,
+                heightUnit: authManager.currentUser?.profile?.heightUnit
+            )
+
+            if let heightInches,
+               let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
+                   for: metric.date,
+                   metrics: viewModel.bodyMetrics,
+                   heightInches: heightInches
+               ) {
                 animatedFFMI = ffmiResult.value
             }
         }
@@ -94,6 +100,35 @@ extension DashboardViewLiquid {
             // Apple Health-style: no decimals for FFMI headline value
             return String(format: "%.0f", ffmiResult.value)
         }
+        return "–"
+    }
+
+    /// Headline formatter for the weight metric card using trend-weight when enabled.
+    func formatTrendWeightHeadline(_ metric: BodyMetrics, usesTrend: Bool) -> String {
+        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+
+        if usesTrend,
+           let trendResult = MetricsInterpolationService.shared.estimateTrendWeight(
+               for: metric.date,
+               metrics: bodyMetrics
+           ) {
+            let converted = convertWeight(trendResult.value, to: system) ?? trendResult.value
+            return String(format: "%.1f", converted)
+        }
+
+        if let rawWeight = metric.weight {
+            let converted = convertWeight(rawWeight, to: system) ?? rawWeight
+            return String(format: "%.1f", converted)
+        }
+
+        if let trendFallback = MetricsInterpolationService.shared.estimateTrendWeight(
+            for: metric.date,
+            metrics: bodyMetrics
+        ) {
+            let converted = convertWeight(trendFallback.value, to: system) ?? trendFallback.value
+            return String(format: "%.1f", converted)
+        }
+
         return "–"
     }
 
@@ -177,10 +212,13 @@ extension DashboardViewLiquid {
         let primaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 1, maxFractionDigits: 1)
         let secondaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
 
+        let interpolationContext = MetricsInterpolationService.shared
+            .makeBodyFatInterpolationContext(for: bodyMetrics)
+
         let entries = sortedBodyMetricsAscending
             .compactMap { metric -> MetricHistoryEntry? in
                 let primaryValue = metric.bodyFatPercentage
-                    ?? MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)?.value
+                    ?? interpolationContext?.estimate(for: metric.date)?.value
                 guard let bodyFatValue = primaryValue else { return nil }
 
                 let secondaryValue: Double?
@@ -220,15 +258,16 @@ extension DashboardViewLiquid {
 
         guard let heightInches else { return nil }
 
+        guard let interpolationContext = MetricsInterpolationService.shared
+            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
+            return nil
+        }
+
         let formatter = MetricFormatterCache.formatter(minFractionDigits: 1, maxFractionDigits: 1)
 
         let entries = sortedBodyMetricsAscending
             .compactMap { metric -> MetricHistoryEntry? in
-                guard let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                    for: metric.date,
-                    metrics: bodyMetrics,
-                    heightInches: heightInches
-                ) else {
+                guard let ffmiResult = interpolationContext.estimate(for: metric.date) else {
                     return nil
                 }
 
@@ -394,14 +433,14 @@ extension DashboardViewLiquid {
     }
 
     func generateBodyFatChartData() -> [MetricDataPoint] {
+        let interpolationContext = MetricsInterpolationService.shared
+            .makeBodyFatInterpolationContext(for: bodyMetrics)
+
         let allPoints: [Double] = sortedBodyMetricsAscending.compactMap { metric in
             if let bf = metric.bodyFatPercentage {
                 return bf
             }
-            if let estimated = MetricsInterpolationService.shared.estimateBodyFat(
-                for: metric.date,
-                metrics: bodyMetrics
-            ) {
+            if let estimated = interpolationContext?.estimate(for: metric.date) {
                 return estimated.value
             }
             return nil
@@ -421,12 +460,13 @@ extension DashboardViewLiquid {
 
         guard let heightInches else { return [] }
 
+        guard let interpolationContext = MetricsInterpolationService.shared
+            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
+            return []
+        }
+
         let allPoints: [Double] = sortedBodyMetricsAscending.compactMap { metric in
-            guard let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                for: metric.date,
-                metrics: bodyMetrics,
-                heightInches: heightInches
-            ) else {
+            guard let ffmiResult = interpolationContext.estimate(for: metric.date) else {
                 return nil
             }
             return ffmiResult.value
@@ -477,11 +517,14 @@ extension DashboardViewLiquid {
     }
 
     func bodyFatRangeStats() -> MetricRangeStats? {
-        computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
+        let interpolationContext = MetricsInterpolationService.shared
+            .makeBodyFatInterpolationContext(for: bodyMetrics)
+
+        return computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
             if let value = metric.bodyFatPercentage {
                 return value
             }
-            return MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: bodyMetrics)?.value
+            return interpolationContext?.estimate(for: metric.date)?.value
         }
     }
 
@@ -493,12 +536,13 @@ extension DashboardViewLiquid {
 
         guard let heightInches else { return nil }
 
+        guard let interpolationContext = MetricsInterpolationService.shared
+            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
+            return nil
+        }
+
         return computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
-            MetricsInterpolationService.shared.estimateFFMI(
-                for: metric.date,
-                metrics: bodyMetrics,
-                heightInches: heightInches
-            )?.value
+            interpolationContext.estimate(for: metric.date)?.value
         }
     }
 
@@ -535,8 +579,10 @@ extension DashboardViewLiquid {
     }
 
     func generateFullScreenBodyFatChartData() -> [MetricChartDataPoint] {
-        return bodyMetrics
-            .sorted { $0.date < $1.date }
+        let interpolationContext = MetricsInterpolationService.shared
+            .makeBodyFatInterpolationContext(for: bodyMetrics)
+
+        return sortedBodyMetricsAscending
             .compactMap { metric in
                 if let bf = metric.bodyFatPercentage {
                     return MetricChartDataPoint(
@@ -546,10 +592,7 @@ extension DashboardViewLiquid {
                     )
                 }
 
-                if let estimated = MetricsInterpolationService.shared.estimateBodyFat(
-                    for: metric.date,
-                    metrics: bodyMetrics
-                ) {
+                if let estimated = interpolationContext?.estimate(for: metric.date) {
                     return MetricChartDataPoint(
                         date: metric.date,
                         value: estimated.value,
@@ -567,13 +610,16 @@ extension DashboardViewLiquid {
             heightUnit: authManager.currentUser?.profile?.heightUnit
         )
 
+        guard let heightInches else { return [] }
+
+        guard let interpolationContext = MetricsInterpolationService.shared
+            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
+            return []
+        }
+
         return sortedBodyMetricsAscending
             .compactMap { metric in
-                guard let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                    for: metric.date,
-                    metrics: bodyMetrics,
-                    heightInches: heightInches
-                ) else {
+                guard let ffmiResult = interpolationContext.estimate(for: metric.date) else {
                     return nil
                 }
 
@@ -586,11 +632,8 @@ extension DashboardViewLiquid {
     }
 
     func convertHeightToInches(height: Double?, heightUnit: String?) -> Double? {
-        guard let height else { return nil }
-        if heightUnit?.lowercased() == "cm" {
-            return height / 2.54
-        }
-        return height
+        guard let height, height > 0 else { return nil }
+        return height / 2.54
     }
 
     func convertWeight(_ weight: Double, to system: MeasurementSystem) -> Double? {

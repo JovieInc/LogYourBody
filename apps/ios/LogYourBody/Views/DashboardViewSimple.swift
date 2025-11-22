@@ -4,6 +4,7 @@
 //
 import SwiftUI
 
+@available(*, deprecated, message: "Use DashboardViewLiquid instead of this placeholder dashboard.")
 struct DashboardViewSimple: View {
     @EnvironmentObject var authManager: AuthManager
 

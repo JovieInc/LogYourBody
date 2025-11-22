@@ -23,7 +23,7 @@ struct SecondaryMetricsRow: View {
             // Steps
             MetricSummaryCard(
                 icon: "figure.walk",
-                accentColor: .orange,
+                accentColor: Color.metricAccentSteps,
                 state: steps != nil ? .data(MetricSummaryCard.Content(
                     title: "Steps",
                     value: formatSteps(steps),
@@ -53,7 +53,7 @@ struct SecondaryMetricsRow: View {
             } label: {
                 MetricSummaryCard(
                     icon: "figure.arms.open",
-                    accentColor: .purple,
+                    accentColor: Color.metricAccentFFMI,
                     state: ffmi != nil ? .data(MetricSummaryCard.Content(
                         title: "FFMI",
                         value: String(format: "%.1f", ffmi!),
@@ -83,7 +83,7 @@ struct SecondaryMetricsRow: View {
             // Lean Mass
             MetricSummaryCard(
                 icon: "figure.arms.open",
-                accentColor: .blue,
+                accentColor: Color.metricAccentWaist,
                 state: leanMass != nil ? .data(MetricSummaryCard.Content(
                     title: "Lean \(weightUnit)",
                     value: "\(Int(leanMass!))",

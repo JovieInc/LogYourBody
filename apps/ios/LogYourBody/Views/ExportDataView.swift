@@ -571,18 +571,38 @@ struct ExportDataView: View {
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .short
 
-        for metric in metrics.sorted(by: { $0.date < $1.date }) {
+        let heightCm = authManager.currentUser?.profile?.height
+        let heightInches: Double?
+        if let heightCm, heightCm > 0 {
+            heightInches = heightCm / 2.54
+        } else {
+            heightInches = nil
+        }
+
+        let sortedMetrics = metrics.sorted { $0.date < $1.date }
+
+        for metric in sortedMetrics {
             let date = dateFormatter.string(from: metric.date)
             let weight = metric.weight ?? 0
             let weightUnit = metric.weightUnit ?? "lbs"
             let bodyFat = metric.bodyFatPercentage ?? 0
-            let ffmi = calculateFFMI(weight: weight, bodyFat: bodyFat, heightCm: 175) // Default height
+            let ffmiValue: Double
+            if let heightInches,
+               let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
+                   for: metric.date,
+                   metrics: sortedMetrics,
+                   heightInches: heightInches
+               ) {
+                ffmiValue = ffmiResult.value
+            } else {
+                ffmiValue = 0
+            }
             let muscleMass = metric.muscleMass ?? 0
             let boneMass = metric.boneMass ?? 0
             let notes = metric.notes ?? ""
             let photoURL = metric.photoUrl ?? ""
 
-            csv += "\(date),\(weight),\(weightUnit),\(bodyFat),\(ffmi),\(muscleMass),\(boneMass),\"\(notes)\",\(photoURL)\n"
+            csv += "\(date),\(weight),\(weightUnit),\(bodyFat),\(ffmiValue),\(muscleMass),\(boneMass),\"\(notes)\",\(photoURL)\n"
         }
 
         return csv
@@ -618,12 +638,6 @@ struct ExportDataView: View {
 
     private func extractPhotoURLs(from metrics: [BodyMetrics]) -> [String] {
         return metrics.compactMap { $0.photoUrl }
-    }
-
-    private func calculateFFMI(weight: Double, bodyFat: Double, heightCm: Double) -> Double {
-        let heightM = heightCm / 100
-        let leanMass = weight * (1 - bodyFat / 100)
-        return leanMass / (heightM * heightM)
     }
 
     private func formatDate(_ date: Date) -> String {

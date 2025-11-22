@@ -69,7 +69,7 @@ struct AllMetricsRow: View {
                 } label: {
                     MetricSummaryCard(
                         icon: "figure.walk",
-                        accentColor: Color(hex: "#FF9F0A"),
+                        accentColor: Color.metricAccentSteps,
                         state: .data(MetricSummaryCard.Content(
                             title: "Steps",
                             value: formatSteps(steps),
@@ -90,7 +90,7 @@ struct AllMetricsRow: View {
             } else {
                 MetricSummaryCard(
                     icon: "figure.walk",
-                    accentColor: Color(hex: "#FF9F0A"),
+                    accentColor: Color.metricAccentSteps,
                     state: .empty(message: "No steps data", action: nil)
                 )
             }
@@ -118,7 +118,7 @@ struct AllMetricsRow: View {
                 } label: {
                     MetricSummaryCard(
                         icon: "figure.stand",
-                        accentColor: Color(hex: "#AF52DE"),
+                        accentColor: Color.metricAccentWeight,
                         state: .data(MetricSummaryCard.Content(
                             title: "Weight",
                             value: formatWeight(displayWeight, useMetric: useMetricUnits),
@@ -137,7 +137,7 @@ struct AllMetricsRow: View {
             } else {
                 MetricSummaryCard(
                     icon: "figure.stand",
-                    accentColor: Color(hex: "#AF52DE"),
+                    accentColor: Color.metricAccentWeight,
                     state: .empty(message: "No weight data", action: nil)
                 )
             }
@@ -152,7 +152,7 @@ struct AllMetricsRow: View {
                 } label: {
                     MetricSummaryCard(
                         icon: "percent",
-                        accentColor: Color(hex: "#FF2D55"),
+                        accentColor: Color.metricAccentBodyFat,
                         state: .data(MetricSummaryCard.Content(
                             title: "Body Fat Percentage",
                             value: String(format: "%.1f", bodyFat),
@@ -173,7 +173,7 @@ struct AllMetricsRow: View {
             } else {
                 MetricSummaryCard(
                     icon: "percent",
-                    accentColor: Color(hex: "#FF2D55"),
+                    accentColor: Color.metricAccentBodyFat,
                     state: .empty(message: "No body fat data", action: nil)
                 )
             }
@@ -188,7 +188,7 @@ struct AllMetricsRow: View {
                 } label: {
                     MetricSummaryCard(
                         icon: "figure.arms.open",
-                        accentColor: .purple,
+                        accentColor: Color.metricAccentFFMI,
                         state: .data(MetricSummaryCard.Content(
                             title: "Fat Free Mass Index",
                             value: String(format: "%.1f", ffmi),
@@ -209,7 +209,7 @@ struct AllMetricsRow: View {
             } else {
                 MetricSummaryCard(
                     icon: "figure.arms.open",
-                    accentColor: .purple,
+                    accentColor: Color.metricAccentFFMI,
                     state: .empty(message: "No FFMI data", action: nil)
                 )
             }
@@ -227,7 +227,7 @@ struct AllMetricsRow: View {
                 } label: {
                     MetricSummaryCard(
                         icon: "ruler",
-                        accentColor: .blue,
+                        accentColor: Color.metricAccentWaist,
                         state: .data(MetricSummaryCard.Content(
                             title: "Waist",
                             value: formatWaist(displayWaist, useMetric: useMetricUnits),
@@ -248,7 +248,7 @@ struct AllMetricsRow: View {
             } else {
                 MetricSummaryCard(
                     icon: "ruler",
-                    accentColor: .blue,
+                    accentColor: Color.metricAccentWaist,
                     state: .empty(message: "No waist data", action: nil)
                 )
             }

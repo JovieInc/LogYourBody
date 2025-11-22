@@ -7,17 +7,20 @@ struct DashboardMetricsList<CardContent: View>: View {
 
     @Binding var metricsOrder: [MetricIdentifier]
     @Binding var draggedMetric: MetricIdentifier?
+    @Binding var dropTargetMetric: MetricIdentifier?
     let onReorder: () -> Void
     private let cardContent: (MetricIdentifier) -> CardContent
 
     init(
         metricsOrder: Binding<[MetricIdentifier]>,
         draggedMetric: Binding<MetricIdentifier?>,
+        dropTargetMetric: Binding<MetricIdentifier?>,
         onReorder: @escaping () -> Void,
         @ViewBuilder cardContent: @escaping (MetricIdentifier) -> CardContent
     ) {
         _metricsOrder = metricsOrder
         _draggedMetric = draggedMetric
+        _dropTargetMetric = dropTargetMetric
         self.onReorder = onReorder
         self.cardContent = cardContent
     }
@@ -26,11 +29,28 @@ struct DashboardMetricsList<CardContent: View>: View {
         VStack(spacing: 14) {
             ForEach(metricsOrder) { metricId in
                 cardContent(metricId)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(
+                                (draggedMetric == metricId || dropTargetMetric == metricId) ?
+                                    Color.metricAccent.opacity(draggedMetric == metricId ? 0.9 : 0.6) :
+                                    Color.clear,
+                                lineWidth: draggedMetric == metricId ? 2 : (dropTargetMetric == metricId ? 1.5 : 0)
+                            )
+                    )
                     .scaleEffect(draggedMetric == metricId ? 1.03 : 1.0)
-                    .opacity(draggedMetric == metricId ? 0.78 : 1.0)
+                    .opacity(1.0)
+                    .shadow(
+                        color: draggedMetric == metricId ? Color.black.opacity(0.45) : Color.clear,
+                        radius: draggedMetric == metricId ? 18 : 0,
+                        x: 0,
+                        y: draggedMetric == metricId ? 10 : 0
+                    )
+                    .zIndex(draggedMetric == metricId ? 1 : 0)
                     .onDrag {
                         withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.85)) {
                             draggedMetric = metricId
+                            dropTargetMetric = metricId
                         }
                         let impact = UIImpactFeedbackGenerator(style: .medium)
                         impact.impactOccurred()
@@ -42,6 +62,7 @@ struct DashboardMetricsList<CardContent: View>: View {
                             metric: metricId,
                             metrics: $metricsOrder,
                             draggedMetric: $draggedMetric,
+                            dropTargetMetric: $dropTargetMetric,
                             onReorder: onReorder
                         )
                     )
@@ -50,6 +71,14 @@ struct DashboardMetricsList<CardContent: View>: View {
         .animation(
             .interactiveSpring(response: 0.30, dampingFraction: 0.85),
             value: metricsOrder
+        )
+        .animation(
+            .interactiveSpring(response: 0.28, dampingFraction: 0.90),
+            value: draggedMetric
+        )
+        .animation(
+            .easeOut(duration: 0.16),
+            value: dropTargetMetric
         )
     }
 }
@@ -60,10 +89,12 @@ private struct DashboardMetricDropDelegate: DropDelegate {
     let metric: MetricIdentifier
     @Binding var metrics: [MetricIdentifier]
     @Binding var draggedMetric: MetricIdentifier?
+    @Binding var dropTargetMetric: MetricIdentifier?
     let onReorder: () -> Void
 
     func performDrop(info: DropInfo) -> Bool {
         draggedMetric = nil
+        dropTargetMetric = nil
         onReorder()
         return true
     }
@@ -82,6 +113,7 @@ private struct DashboardMetricDropDelegate: DropDelegate {
             toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex
         )
         metrics = updated
+        dropTargetMetric = metric
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
@@ -89,6 +121,8 @@ private struct DashboardMetricDropDelegate: DropDelegate {
     }
 
     func dropExited(info: DropInfo) {
-        // No-op
+        if dropTargetMetric == metric {
+            dropTargetMetric = nil
+        }
     }
 }

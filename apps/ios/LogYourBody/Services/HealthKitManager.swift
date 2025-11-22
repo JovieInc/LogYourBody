@@ -758,10 +758,12 @@ class HealthKitManager: ObservableObject {
         // print("📊 Recent sync: \(imported) imported, \(skipped) skipped")
 
         // Only trigger full historical sync if this is truly the first time and we have very little data
-        let hasPerformedFullSync = UserDefaults.standard.bool(forKey: "hasPerformedFullHealthKitSync")
+        let currentUserId = await MainActor.run { AuthManager.shared.currentUser?.id }
+        let fullSyncKey = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: currentUserId)
+        let hasPerformedFullSync = userDefaults.bool(forKey: fullSyncKey)
+
         let totalCachedEntries: Int
-        let userId = await MainActor.run { AuthManager.shared.currentUser?.id }
-        if let userId = userId {
+        if let userId = currentUserId {
             totalCachedEntries = await CoreDataManager.shared.fetchBodyMetrics(for: userId).count
         } else {
             totalCachedEntries = 0
@@ -772,7 +774,9 @@ class HealthKitManager: ObservableObject {
             // print("📊 Current cached entries: \(totalCachedEntries)")
             Task.detached(priority: .background) {
                 await self.syncAllHistoricalHealthKitData()
-                UserDefaults.standard.set(true, forKey: "hasPerformedFullHealthKitSync")
+                let userId = await MainActor.run { AuthManager.shared.currentUser?.id }
+                let key = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: userId)
+                self.userDefaults.set(true, forKey: key)
             }
         } else if totalCachedEntries < 50 && imported > 0 {
             // Also trigger if we have very few entries despite having done a sync before
@@ -1071,6 +1075,9 @@ class HealthKitManager: ObservableObject {
             }
         }
 
+        // Trigger a background body score recalculation now that metrics have changed.
+        BodyScoreRecalculationService.shared.scheduleRecalculation()
+
         return (imported, skipped)
     }
 
@@ -1127,7 +1134,8 @@ class HealthKitManager: ObservableObject {
         let query = HKObserverQuery(sampleType: weightType, predicate: nil) { [weak self] _, completionHandler, error in
             if error == nil {
                 // Check if we should sync (not more than once per hour)
-                let lastSyncKey = "lastHealthKitObserverSyncDate"
+                let currentUserId = AuthManager.shared.currentUser?.id
+                let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: currentUserId)
                 let shouldSync: Bool = {
                     if let lastSync = UserDefaults.standard.object(forKey: lastSyncKey) as? Date {
                         let minutesSinceLastSync = Date().timeIntervalSince(lastSync) / 60

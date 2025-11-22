@@ -3,8 +3,7 @@
 // LogYourBody
 //
 import SwiftUI
-import Clerk
-import PhotosUI
+import OSLog
 
 struct ProfileSettingsViewV2: View {
     @EnvironmentObject var authManager: AuthManager
@@ -19,6 +18,8 @@ struct ProfileSettingsViewV2: View {
     @State private var editableGender: BiologicalSex = .male
     @State private var useMetricHeight: Bool = false
 
+    private static let logger = Logger(subsystem: "com.logyourbody.app", category: "ProfileSettings")
+
     // UI State
     @State private var showingHeightPicker = false
     @State private var showingDatePicker = false
@@ -26,20 +27,10 @@ struct ProfileSettingsViewV2: View {
     @State private var isSaving = false
     @State private var showingSaveSuccess = false
 
-    // Photo picker
-    @State private var showingPhotoPicker = false
-    @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var isUploadingPhoto = false
-    @State private var profileImageURL: String?
-
     var body: some View {
         ZStack {
-            // Background
-            Color.appBackground
-                .ignoresSafeArea()
-
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: SettingsDesign.sectionSpacing) {
                     // Profile Header
                     profileHeader
                         .padding(.top)
@@ -49,25 +40,13 @@ struct ProfileSettingsViewV2: View {
 
                     // Physical Information Card
                     physicalInformationCard
-
-                    // Sync Status - removed for MVP
-                    // HStack {
-                    //     SyncStatusView()
-                    //     Spacer()
-                    // }
-                    // .padding(.horizontal)
-
-                    // Security Section
-                    securitySection
-
-                    // Additional Actions
-                    additionalActionsSection
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 100)  // Increased to ensure delete account button is visible
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
             }
         }
-        .navigationTitle("Profile")
+        .settingsBackground()
+        .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -97,37 +76,21 @@ struct ProfileSettingsViewV2: View {
                 hasChanges: $hasChanges
             )
         }
-        .photosPicker(
-            isPresented: $showingPhotoPicker,
-            selection: $selectedPhotoItem,
-            matching: .images,
-            photoLibrary: .shared()
-        )
-        .onChange(of: selectedPhotoItem) { _, newItem in
-            if let newItem {
-                Task {
-                    await handlePhotoSelection(newItem)
-                }
-            }
-        }
         .onAppear {
             loadCurrentProfile()
         }
         .overlay(
-            Group {
-                if showingSaveSuccess {
-                    successOverlay
-                }
-            }
+            SuccessOverlay(
+                isShowing: $showingSaveSuccess,
+                message: "Profile updated"
+            )
         )
     }
 
     // MARK: - View Components
 
     private var basicInformationCard: some View {
-        VStack(spacing: 0) {
-            sectionHeader("Basic Information")
-
+        SettingsSection(header: "Basic Information") {
             VStack(spacing: 0) {
                 // First Name Field
                 settingsRow(
@@ -189,8 +152,6 @@ struct ProfileSettingsViewV2: View {
                 // Gender Selector with modern segmented control
                 genderSelector
             }
-            .background(Color.appCard)
-            .cornerRadius(12)
         }
     }
 
@@ -216,12 +177,13 @@ struct ProfileSettingsViewV2: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Biological sex")
+        .accessibilityValue(editableGender.description)
     }
 
     private var physicalInformationCard: some View {
-        VStack(spacing: 0) {
-            sectionHeader("Physical Information")
-
+        SettingsSection(header: "Physical Information") {
             VStack(spacing: 0) {
                 // Height
                 Button {
@@ -246,6 +208,9 @@ struct ProfileSettingsViewV2: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
+                .accessibilityLabel("Height")
+                .accessibilityValue(formattedHeight)
+                .accessibilityHint("Double-tap to edit your height.")
 
                 Divider()
                     .padding(.leading, 16)
@@ -273,90 +238,20 @@ struct ProfileSettingsViewV2: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
-            }
-            .background(Color.appCard)
-            .cornerRadius(12)
-        }
-    }
-
-    private var securitySection: some View {
-        VStack(spacing: 0) {
-            sectionHeader("Security")
-
-            VStack(spacing: 0) {
-                NavigationLink(destination: SecuritySessionsView()) {
-                    HStack {
-                        Label("Active Sessions", systemImage: "desktopcomputer")
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption2)
-                            .foregroundColor(Color(.tertiaryLabel))
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
-
-                Divider()
-                    .padding(.leading, 16)
-
-                NavigationLink(destination: ChangePasswordView()) {
-                    HStack {
-                        Label("Change Password", systemImage: "lock.rotation")
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption2)
-                            .foregroundColor(Color(.tertiaryLabel))
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
-            }
-            .background(Color.appCard)
-            .cornerRadius(12)
-        }
-    }
-
-    private var additionalActionsSection: some View {
-        VStack(spacing: 12) {
-            NavigationLink(destination: ExportDataView()) {
-                HStack {
-                    Label("Export Data", systemImage: "square.and.arrow.up")
-                        .foregroundColor(.primary)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .foregroundColor(Color(.tertiaryLabel))
-                }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(10)
-            }
-
-            NavigationLink(destination: DeleteAccountView()) {
-                HStack {
-                    Label("Delete Account", systemImage: "trash")
-                        .foregroundColor(.red)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .foregroundColor(Color(.tertiaryLabel))
-                }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(10)
+                .accessibilityLabel("Age")
+                .accessibilityValue(formattedAge)
+                .accessibilityHint("Double-tap to edit your date of birth.")
             }
         }
-        .padding(.top, 10)
     }
 
     private var profileHeader: some View {
         VStack(spacing: 16) {
             // Avatar
             ZStack {
-                if let urlString = profileImageURL ?? authManager.currentUser?.avatarUrl,
-                   let url = URL(string: urlString) {
+                if let avatarUrl = authManager.currentUser?.avatarUrl,
+                   !avatarUrl.isEmpty,
+                   let url = URL(string: avatarUrl) {
                     AsyncImage(url: url) { image in
                         image
                             .resizable()
@@ -376,39 +271,15 @@ struct ProfileSettingsViewV2: View {
                     Circle()
                         .fill(Color(.systemGray5))
                         .frame(width: 80, height: 80)
-
-                    Text(profileInitials)
-                        .font(.system(size: 32, weight: .semibold))
-                        .foregroundColor(.secondary)
-                }
-
-                if isUploadingPhoto {
-                    Circle()
-                        .fill(Color.black.opacity(0.5))
-                        .frame(width: 80, height: 80)
                         .overlay(
-                            ProgressView()
-                                .tint(.white)
+                            Text(profileInitials)
+                                .font(.system(size: 32, weight: .semibold))
+                                .foregroundColor(.secondary)
                         )
                 }
             }
-            .overlay(
-                Button {
-                    showingPhotoPicker = true
-                } label: {
-                    Circle()
-                        .fill(Color(.systemBackground))
-                        .frame(width: 28, height: 28)
-                        .overlay(
-                            Image(systemName: "camera.fill")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        )
-                        .shadow(color: .black.opacity(0.1), radius: 2)
-                }
-                .offset(x: 28, y: 28)
-                .disabled(isUploadingPhoto)
-            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Profile photo")
 
             // Name and email
             VStack(spacing: 4) {
@@ -420,20 +291,6 @@ struct ProfileSettingsViewV2: View {
                     .foregroundColor(.secondary)
             }
         }
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.appTextSecondary)
-                .textCase(.uppercase)
-                .tracking(0.5)
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-        .padding(.top, 4)
     }
 
     @ViewBuilder
@@ -465,31 +322,9 @@ struct ProfileSettingsViewV2: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-    }
-
-    private var successOverlay: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                Text("Profile Updated")
-                    .fontWeight(.medium)
-            }
-            .padding()
-            .background(Color.appCard)
-            .cornerRadius(12)
-            .shadow(radius: 10)
-            .padding(.bottom, 50)
-        }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                withAnimation {
-                    showingSaveSuccess = false
-                }
-            }
-        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 
     // MARK: - Computed Properties
@@ -543,8 +378,7 @@ struct ProfileSettingsViewV2: View {
         editableDateOfBirth = user.profile?.dateOfBirth ?? Date()
 
         if let height = user.profile?.height {
-            // Height is stored in inches, convert to cm
-            editableHeightCm = Int(height * 2.54)
+            editableHeightCm = Int(height.rounded())
             useMetricHeight = user.profile?.heightUnit == "cm"
         }
 
@@ -562,14 +396,12 @@ struct ProfileSettingsViewV2: View {
         hasChanges = false
 
         Task {
+            let start = Date()
             do {
                 // Update name using consolidated method if changed
                 if editableName != currentUser.name {
                     try await authManager.consolidateNameUpdate(editableName)
                 }
-
-                // Calculate height in inches for storage (editableHeightCm is always in cm)
-                let heightInInches = Double(editableHeightCm) / 2.54
 
                 // Create updated profile
                 let updatedProfile = UserProfile(
@@ -578,7 +410,7 @@ struct ProfileSettingsViewV2: View {
                     username: currentUser.profile?.username,
                     fullName: editableName.isEmpty ? nil : editableName,
                     dateOfBirth: editableDateOfBirth,
-                    height: heightInInches,
+                    height: Double(editableHeightCm),
                     heightUnit: useMetricHeight ? "cm" : "in",
                     gender: editableGender.description,
                     activityLevel: currentUser.profile?.activityLevel,
@@ -594,7 +426,7 @@ struct ProfileSettingsViewV2: View {
                 let updates: [String: Any] = [
                     "name": editableName.isEmpty ? "" : editableName,
                     "dateOfBirth": editableDateOfBirth,
-                    "height": heightInInches,
+                    "height": Double(editableHeightCm),
                     "heightUnit": useMetricHeight ? "cm" : "in",
                     "gender": editableGender.description,
                     "onboardingCompleted": true
@@ -611,62 +443,22 @@ struct ProfileSettingsViewV2: View {
                     // Force UI refresh
                     NotificationCenter.default.post(name: .profileUpdated, object: nil)
                 }
+
+                let elapsed = Date().timeIntervalSince(start)
+                Self.logger.debug("Profile save completed in \(elapsed, privacy: .public)s")
             } catch {
                 await MainActor.run {
                     isSaving = false
                     hasChanges = true
                     // print("Failed to update profile: \(error)")
                 }
+
+                let elapsed = Date().timeIntervalSince(start)
+                Self.logger.debug("Profile save failed after \(elapsed, privacy: .public)s")
             }
         }
     }
 
-    private func handlePhotoSelection(_ item: PhotosPickerItem) async {
-        isUploadingPhoto = true
-
-        do {
-            // Load the image data
-            if let data = try await item.loadTransferable(type: Data.self),
-               let image = UIImage(data: data) {
-                // Upload to Clerk
-                if let newImageURL = try await authManager.uploadProfilePicture(image) {
-                    await MainActor.run {
-                        profileImageURL = newImageURL
-                        isUploadingPhoto = false
-
-                        // Show success feedback
-                        withAnimation {
-                            showingSaveSuccess = true
-                        }
-
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            withAnimation {
-                                showingSaveSuccess = false
-                            }
-                        }
-                    }
-                } else {
-                    await MainActor.run {
-                        isUploadingPhoto = false
-                    }
-                }
-            } else {
-                await MainActor.run {
-                    isUploadingPhoto = false
-                }
-            }
-        } catch {
-            // print("Failed to upload photo: \(error)")
-            await MainActor.run {
-                isUploadingPhoto = false
-            }
-        }
-
-        // Clear selection
-        await MainActor.run {
-            selectedPhotoItem = nil
-        }
-    }
 }
 
 // MARK: - Height Picker Sheet

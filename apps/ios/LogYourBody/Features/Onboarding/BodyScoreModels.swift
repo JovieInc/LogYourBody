@@ -51,7 +51,6 @@ enum HeightUnit: String, Codable, CaseIterable, CustomStringConvertible {
 enum BiologicalSex: String, Codable, CaseIterable, Identifiable, CustomStringConvertible {
     case male
     case female
-    case other
 
     var id: String { rawValue }
 
@@ -59,7 +58,6 @@ enum BiologicalSex: String, Codable, CaseIterable, Identifiable, CustomStringCon
         switch self {
         case .male: return "Male"
         case .female: return "Female"
-        case .other: return "Other"
         }
     }
 }
@@ -148,6 +146,9 @@ struct HealthImportSnapshot: Codable, Equatable {
     var weightKg: Double?
     var bodyFatPercentage: Double?
     var birthYear: Int?
+    var heightDate: Date?
+    var weightDate: Date?
+    var bodyFatDate: Date?
 
     var hasAnyValue: Bool {
         heightCm != nil || weightKg != nil || bodyFatPercentage != nil || birthYear != nil
@@ -188,7 +189,7 @@ struct BodyScoreInput: Codable, Equatable {
     }
 
     var isReadyForCalculation: Bool {
-        sex != nil && birthYear != nil && height.inCentimeters != nil && weight.inKilograms != nil && bodyFat.percentage != nil
+        sex != nil && height.inCentimeters != nil && weight.inKilograms != nil && bodyFat.percentage != nil
     }
 }
 

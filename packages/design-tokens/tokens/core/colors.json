@@ -59,6 +59,16 @@
           "value": "#3B42B3"
         }
       },
+      "blue": {
+        "500": {
+          "value": "#1EB4EA",
+          "comment": "Primary brand blue"
+        },
+        "600": {
+          "value": "#1598C6",
+          "comment": "Primary brand blue hover"
+        }
+      },
       "red": {
         "500": {
           "value": "#F44336",
@@ -101,11 +111,11 @@
         "comment": "Subtle border color"
       },
       "primary": {
-        "value": "{color.base.purple.500}",
+        "value": "{color.base.blue.500}",
         "comment": "Primary brand color"
       },
       "primaryHover": {
-        "value": "{color.base.purple.600}"
+        "value": "{color.base.blue.600}"
       },
       "error": {
         "value": "{color.base.red.500}"

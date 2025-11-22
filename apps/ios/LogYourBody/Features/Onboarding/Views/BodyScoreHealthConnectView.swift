@@ -3,6 +3,17 @@ import SwiftUI
 struct BodyScoreHealthConnectView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
+    private var pageTitle: String {
+        viewModel.isHealthKitConnected ? "Apple Health is connected" : "Pull from Apple Health?"
+    }
+
+    private var pageSubtitle: String {
+        if viewModel.isHealthKitConnected {
+            return "We'll use your latest height, weight, and body fat from Apple Health."
+        }
+        return "Auto-fill weight, body fat, and height. Quick and private."
+    }
+
     private var cardTitle: String {
         viewModel.isHealthKitConnected ? "Apple Health connected" : "Sync Apple Health"
     }
@@ -15,7 +26,13 @@ struct BodyScoreHealthConnectView: View {
     }
 
     private var connectButtonTitle: String {
-        viewModel.isRequestingHealthImport ? "Connecting…" : "Connect Apple Health"
+        if viewModel.isRequestingHealthImport {
+            return "Connecting…"
+        }
+        if viewModel.isHealthKitConnected {
+            return "Continue"
+        }
+        return "Connect Apple Health"
     }
 
     private var connectButtonOpacity: Double {
@@ -24,8 +41,8 @@ struct BodyScoreHealthConnectView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Pull from Apple Health?",
-            subtitle: "Auto-fill weight, body fat, and height. Quick and private.",
+            title: pageTitle,
+            subtitle: pageSubtitle,
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .healthConnect),
             content: {
@@ -49,56 +66,15 @@ struct BodyScoreHealthConnectView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 12) {
-                                HStack(alignment: .top, spacing: 8) {
-                                    Image(systemName: "ruler")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundStyle(Color.appPrimary)
-                                        .frame(width: 20)
+                                OnboardingCaptionText(
+                                    text: "We'll read height, weight, and body fat from Apple Health.",
+                                    alignment: .leading
+                                )
 
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Height")
-                                            .font(OnboardingTypography.caption)
-                                            .foregroundStyle(Color.appTextSecondary)
-
-                                        Text("Read from Apple Health for your profile.")
-                                            .font(OnboardingTypography.body)
-                                            .foregroundStyle(Color.appText)
-                                    }
-                                }
-
-                                HStack(alignment: .top, spacing: 8) {
-                                    Image(systemName: "figure.scale")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundStyle(Color.appPrimary)
-                                        .frame(width: 20)
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Weight")
-                                            .font(OnboardingTypography.caption)
-                                            .foregroundStyle(Color.appTextSecondary)
-
-                                        Text("Read & write with your permission.")
-                                            .font(OnboardingTypography.body)
-                                            .foregroundStyle(Color.appText)
-                                    }
-                                }
-
-                                HStack(alignment: .top, spacing: 8) {
-                                    Image(systemName: "percent")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundStyle(Color.appPrimary)
-                                        .frame(width: 20)
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Body fat")
-                                            .font(OnboardingTypography.caption)
-                                            .foregroundStyle(Color.appTextSecondary)
-
-                                        Text("Read & write with your permission.")
-                                            .font(OnboardingTypography.body)
-                                            .foregroundStyle(Color.appText)
-                                    }
-                                }
+                                OnboardingCaptionText(
+                                    text: "You control permissions in Settings.",
+                                    alignment: .leading
+                                )
                             }
 
                             if let status = viewModel.healthKitConnectionStatusText {
@@ -131,7 +107,10 @@ struct BodyScoreHealthConnectView: View {
                             .disabled(viewModel.isRequestingHealthImport)
                             .opacity(connectButtonOpacity)
 
-                            OnboardingCaptionText(text: "Only stored locally unless you opt in to sync.", alignment: .leading)
+                            OnboardingCaptionText(
+                                text: "Stored on your device. We don't sell or share health data.",
+                                alignment: .leading
+                            )
 
                             if viewModel.isHealthKitConnected {
                                 Button {
@@ -148,27 +127,9 @@ struct BodyScoreHealthConnectView: View {
                         }
                     }
 
-                    Button {
+                    OnboardingTextButton(title: "Enter manually instead") {
                         viewModel.skipHealthKit()
-                    } label: {
-                        VStack(spacing: 8) {
-                            Text("Enter manually instead")
-                                .font(OnboardingTypography.headline)
-                                .foregroundStyle(Color.appText)
-                            OnboardingCaptionText(text: "Takes about 30 seconds.", alignment: .center)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(24)
-                        .background(
-                            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                .fill(Color.appCard.opacity(0.65))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                .stroke(Color.appBorder.opacity(0.4))
-                        )
                     }
-                    .buttonStyle(.plain)
                 }
             }
         )

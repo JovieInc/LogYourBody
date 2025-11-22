@@ -265,10 +265,14 @@ struct MetricChartView: View {
 
         case .ffmiChart:
             // Get height from user profile
-            guard let heightInches = AuthManager.shared.currentUser?.profile?.height else {
+            guard let profile = AuthManager.shared.currentUser?.profile,
+                  let heightCm = profile.height,
+                  heightCm > 0 else {
                 chartData = []
                 return
             }
+
+            let heightInches = heightCm / 2.54
 
             for metric in bodyMetrics {
                 if let ffmiResult = interpolationService.estimateFFMI(

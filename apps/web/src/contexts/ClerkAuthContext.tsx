@@ -1,12 +1,14 @@
 'use client'
 
 import { useUser, useAuth as useClerkAuth, useSignIn, useSignUp, useClerk } from '@clerk/nextjs'
-import { createContext, useContext, useMemo, useCallback } from 'react'
+import { createContext, useContext, useMemo, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { processImageFile, validateImageFile } from '@/lib/clerk-avatar-upload'
 
 type ClerkUserResource = ReturnType<typeof useUser>['user']
 type ClerkGetToken = ReturnType<typeof useClerkAuth>['getToken']
+
+type AuthExitReason = 'none' | 'userInitiated' | 'sessionExpired'
 
 interface AuthSession {
   getToken: ClerkGetToken
@@ -22,6 +24,8 @@ interface AuthContextType {
   signInWithProvider: (provider: 'google' | 'apple') => Promise<{ error: Error | null }>
   uploadProfileImage: (file: File) => Promise<{ imageUrl?: string; error: Error | null }>
   deleteProfileImage: () => Promise<{ error: Error | null }>
+  exitReason: AuthExitReason
+  clearExitReason: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -33,6 +37,54 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
   const { signIn: clerkSignIn } = useSignIn()
   const { signUp: clerkSignUp } = useSignUp()
   const router = useRouter()
+
+  const [exitReason, setExitReason] = useState<AuthExitReason>('none')
+  const previousUserIdRef = useRef<string | null>(null)
+
+  // Load any stored exit reason on mount (e.g. after a redirect to /signin)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const stored = window.sessionStorage.getItem('authExitReason')
+    if (stored === 'sessionExpired' || stored === 'userInitiated') {
+      setExitReason(stored as AuthExitReason)
+    }
+  }, [])
+
+  // Persist exit reason for cross-navigation visibility
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    if (exitReason === 'none') {
+      window.sessionStorage.removeItem('authExitReason')
+    } else {
+      window.sessionStorage.setItem('authExitReason', exitReason)
+    }
+  }, [exitReason])
+
+  // Detect session transitions from Clerk user changes
+  useEffect(() => {
+    if (!isLoaded) return
+
+    const currentUserId = user?.id ?? null
+    const previousUserId = previousUserIdRef.current
+
+    if (!previousUserId && currentUserId) {
+      // New sign-in in this tab: clear any previous exit reason
+      if (exitReason !== 'none') {
+        setExitReason('none')
+      }
+    } else if (previousUserId && !currentUserId && exitReason === 'none') {
+      // Session was lost without an explicit reason (e.g. expiry or remote sign-out)
+      setExitReason('sessionExpired')
+    }
+
+    previousUserIdRef.current = currentUserId
+  }, [user?.id, isLoaded, exitReason])
+
+  const clearExitReason = useCallback(() => {
+    setExitReason('none')
+  }, [])
 
   const signIn = useCallback(async (email: string, password: string) => {
     try {
@@ -82,6 +134,7 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
   }, [clerkSignUp, setActive])
 
   const signOut = useCallback(async () => {
+    setExitReason('userInitiated')
     await clerkSignOut()
     router.push('/')
   }, [clerkSignOut, router])
@@ -171,8 +224,10 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
       signInWithProvider,
       uploadProfileImage,
       deleteProfileImage,
+      exitReason,
+      clearExitReason,
     })
-  }, [user, getToken, isLoaded, signIn, signUp, signOut, signInWithProvider, uploadProfileImage, deleteProfileImage])
+  }, [user, getToken, isLoaded, signIn, signUp, signOut, signInWithProvider, uploadProfileImage, deleteProfileImage, exitReason, clearExitReason])
 
   return (
     <AuthContext.Provider value={value}>

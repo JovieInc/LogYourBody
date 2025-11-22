@@ -474,6 +474,32 @@ struct MetricChartDataHelper {
 
         guard !filteredMetrics.isEmpty else { return [] }
 
+        let interpolationService = MetricsInterpolationService.shared
+        let bodyFatContext: MetricsInterpolationService.BodyFatInterpolationContext?
+        let ffmiContext: MetricsInterpolationService.FFMIInterpolationContext?
+
+        switch context.metricType {
+        case .bodyFat:
+            bodyFatContext = interpolationService.makeBodyFatInterpolationContext(for: filteredMetrics)
+            ffmiContext = nil
+        case .ffmi:
+            if let heightInches = convertHeightToInches(
+                height: context.profile?.height,
+                heightUnit: context.profile?.heightUnit
+            ) {
+                ffmiContext = interpolationService.makeFFMIInterpolationContext(
+                    for: filteredMetrics,
+                    heightInches: heightInches
+                )
+            } else {
+                ffmiContext = nil
+            }
+            bodyFatContext = nil
+        default:
+            bodyFatContext = nil
+            ffmiContext = nil
+        }
+
         guard let fingerprint = metricFingerprint(
             for: filteredMetrics,
             metricType: context.metricType,
@@ -509,19 +535,11 @@ struct MetricChartDataHelper {
                 if let value = metric.bodyFatPercentage {
                     return SparklineDataPoint(index: index, value: value)
                 }
-                return MetricsInterpolationService.shared.estimateBodyFat(for: metric.date, metrics: metrics).map {
+                return bodyFatContext?.estimate(for: metric.date).map {
                     SparklineDataPoint(index: index, value: $0.value, isEstimated: $0.isInterpolated)
                 }
             case .ffmi:
-                let heightInches = convertHeightToInches(
-                    height: context.profile?.height,
-                    heightUnit: context.profile?.heightUnit
-                )
-                guard let ffmi = MetricsInterpolationService.shared.estimateFFMI(
-                    for: metric.date,
-                    metrics: metrics,
-                    heightInches: heightInches
-                ) else {
+                guard let ffmi = ffmiContext?.estimate(for: metric.date) else {
                     return nil
                 }
                 return SparklineDataPoint(index: index, value: ffmi.value, isEstimated: ffmi.isInterpolated)
@@ -556,11 +574,8 @@ struct MetricChartDataHelper {
     }
 
     private static func convertHeightToInches(height: Double?, heightUnit: String?) -> Double? {
-        guard let height else { return nil }
-        if heightUnit?.lowercased() == "cm" {
-            return height / 2.54
-        }
-        return height
+        guard let height, height > 0 else { return nil }
+        return height / 2.54
     }
 
     // MARK: - Async Chart Data Generation

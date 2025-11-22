@@ -579,7 +579,13 @@ class CoreDataManager: ObservableObject {
                 if context.hasChanges {
                     try context.save()
                 }
-                return cachedMetric.toBodyMetrics()
+
+                let updated = cachedMetric.toBodyMetrics()
+
+                // Schedule background body score recalculation when weight/body fat entries change.
+                BodyScoreRecalculationService.shared.scheduleRecalculation()
+
+                return updated
             } catch {
                 #if DEBUG
                 // print("Failed to update body metric: \(error)")
@@ -925,17 +931,32 @@ class CoreDataManager: ObservableObject {
                 let results = try context.fetch(request)
                 let metric = results.first ?? CachedBodyMetrics(context: context)
 
+                let formatter = ISO8601DateFormatter()
+
                 // Update fields
                 metric.id = id
                 metric.userId = data["user_id"] as? String
                 metric.weight = data["weight"] as? Double ?? 0
+                metric.weightUnit = data["weight_unit"] as? String
                 metric.bodyFatPercentage = data["body_fat_percentage"] as? Double ?? 0
+                metric.bodyFatMethod = data["body_fat_method"] as? String
                 metric.muscleMass = data["muscle_mass"] as? Double ?? 0
+                metric.boneMass = data["bone_mass"] as? Double ?? 0
                 metric.notes = data["notes"] as? String
-                // metric.source = data["source"] as? String ?? "manual" // source field not in Core Data model
+                metric.photoUrl = data["photo_url"] as? String
 
-                if let dateString = data["logged_at"] as? String {
-                    metric.date = ISO8601DateFormatter().date(from: dateString)
+                if let dateString = data["date"] as? String {
+                    metric.date = formatter.date(from: dateString)
+                }
+
+                if let createdString = data["created_at"] as? String,
+                   let createdAt = formatter.date(from: createdString) {
+                    metric.createdAt = createdAt
+                }
+
+                if let updatedString = data["updated_at"] as? String,
+                   let updatedAt = formatter.date(from: updatedString) {
+                    metric.updatedAt = updatedAt
                 }
 
                 metric.syncStatus = "synced"
@@ -971,6 +992,8 @@ class CoreDataManager: ObservableObject {
                 let results = try context.fetch(request)
                 let metric = results.first ?? CachedDailyMetrics(context: context)
 
+                let formatter = ISO8601DateFormatter()
+
                 // Update fields
                 metric.id = id
                 metric.userId = data["user_id"] as? String
@@ -978,7 +1001,17 @@ class CoreDataManager: ObservableObject {
                 metric.notes = data["notes"] as? String
 
                 if let dateString = data["date"] as? String {
-                    metric.date = ISO8601DateFormatter().date(from: dateString)
+                    metric.date = formatter.date(from: dateString)
+                }
+
+                if let createdString = data["created_at"] as? String,
+                   let createdAt = formatter.date(from: createdString) {
+                    metric.createdAt = createdAt
+                }
+
+                if let updatedString = data["updated_at"] as? String,
+                   let updatedAt = formatter.date(from: updatedString) {
+                    metric.updatedAt = updatedAt
                 }
 
                 metric.syncStatus = "synced"
@@ -1363,19 +1396,39 @@ extension CachedDailyMetrics {
 
 extension CachedProfile {
     func toUserProfile() -> UserProfile {
-        UserProfile(
+        let storedHeight = height
+        let unit = heightUnit?.lowercased()
+
+        let heightCm: Double?
+        if storedHeight > 0 {
+            if unit == "in" {
+                if storedHeight >= 100 {
+                    heightCm = storedHeight
+                } else {
+                    heightCm = storedHeight * 2.54
+                }
+            } else if unit == "cm" {
+                heightCm = storedHeight < 100 ? storedHeight * 2.54 : storedHeight
+            } else {
+                heightCm = storedHeight >= 100 ? storedHeight : storedHeight * 2.54
+            }
+        } else {
+            heightCm = nil
+        }
+
+        return UserProfile(
             id: id ?? "",
             email: email ?? "",
             username: username,
             fullName: fullName,
             dateOfBirth: dateOfBirth,
-            height: height > 0 ? height : nil,
+            height: heightCm,
             heightUnit: heightUnit,
             gender: gender,
             activityLevel: activityLevel,
             goalWeight: goalWeight > 0 ? goalWeight : nil,
             goalWeightUnit: goalWeightUnit,
-            onboardingCompleted: nil  // Core Data entity doesn't have this field yet
+            onboardingCompleted: nil
         )
     }
 }

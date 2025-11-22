@@ -66,6 +66,14 @@ class SyncManager: ObservableObject {
         }
     }
 
+    func propagateSupabaseUnauthorizedIfNeeded(_ error: Error) async {
+        if let supabaseError = error as? SupabaseError {
+            if case .unauthorized = supabaseError {
+                await authManager.handleSupabaseUnauthorized()
+            }
+        }
+    }
+
     private func setupAutoSync() {
         // Sync every 15 minutes when app is active (reduced for better battery life)
         syncTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
@@ -273,6 +281,9 @@ class SyncManager: ObservableObject {
                 userId: userId
             )
             ErrorReporter.shared.captureNonFatal(error, context: context)
+
+            await propagateSupabaseUnauthorizedIfNeeded(error)
+
             await MainActor.run {
                 self.isSyncing = false
                 self.syncStatus = .error("Download failed: \(error.localizedDescription)")
@@ -501,7 +512,9 @@ class SyncManager: ObservableObject {
                     userId: userId
                 )
                 ErrorReporter.shared.captureNonFatal(error, context: context)
-                // print("❌ Sync error: \(error)")
+
+                await self.propagateSupabaseUnauthorizedIfNeeded(error)
+
                 await MainActor.run {
                     self.isSyncing = false
                     self.syncStatus = .error(error.localizedDescription)

@@ -17,9 +17,11 @@ struct DSLogo: View {
 
     var body: some View {
         VStack(spacing: spacing) {
-            Image(systemName: "figure.walk.circle.fill")
-                .font(.system(size: size))
-                .foregroundColor(color)
+            Image("LaunchLogo")
+                .resizable()
+                .renderingMode(.original)
+                .scaledToFit()
+                .frame(width: size, height: size)
 
             if showText {
                 Text("LogYourBody")

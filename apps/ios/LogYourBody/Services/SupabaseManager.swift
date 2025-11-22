@@ -23,7 +23,7 @@ class SupabaseManager: ObservableObject {
         return URLSession(configuration: configuration)
     }()
 
-    private init() {}
+    init() {}
 
     // MARK: - JWT Token Management
 
@@ -116,7 +116,7 @@ class SupabaseManager: ObservableObject {
     }
 
     func fetchLatestBodyMetricTimestamp(userId: String, token: String) async throws -> Date? {
-        let url = URL(string: "\(supabaseURL)/rest/v1/body_metrics?user_id=eq.\(userId)&order=logged_at.desc&limit=1")!
+        let url = URL(string: "\(supabaseURL)/rest/v1/body_metrics?user_id=eq.\(userId)&order=updated_at.desc&limit=1")!
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -132,7 +132,7 @@ class SupabaseManager: ObservableObject {
 
         let result = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
         guard let first = result.first,
-              let dateString = first["logged_at"] as? String else {
+              let dateString = first["updated_at"] as? String else {
             return nil
         }
 
@@ -304,6 +304,67 @@ class SupabaseManager: ObservableObject {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         request.httpBody = try encoder.encode(profile)
+
+        let (_, response) = try await self.session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseError.networkError
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw SupabaseError.unauthorized
+        }
+
+        if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+    }
+
+    func fetchDexaResults(userId: String, limit: Int = 50) async throws -> [DexaResult] {
+        let jwt = try await getSupabaseJWT()
+
+        let url = URL(string: "\(supabaseURL)/rest/v1/dexa_results?user_id=eq.\(userId)&order=acquire_time.desc&limit=\(limit)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await self.session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseError.networkError
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw SupabaseError.unauthorized
+        }
+
+        if httpResponse.statusCode != 200 {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([DexaResult].self, from: data)
+    }
+
+    // MARK: - Dexa Results Operations
+
+    func upsertDexaResult(_ result: DexaResult) async throws {
+        let jwt = try await getSupabaseJWT()
+
+        let url = URL(string: "\(supabaseURL)/rest/v1/dexa_results")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("return=minimal,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        request.httpBody = try encoder.encode(result)
 
         let (_, response) = try await self.session.data(for: request)
 

@@ -6,6 +6,7 @@ import SwiftUI
 
 extension Notification.Name {
     static let profileUpdated = Notification.Name("profileUpdated")
+    static let bodyScoreUpdated = Notification.Name("bodyScoreUpdated")
 }
 
 struct Constants {
@@ -13,6 +14,9 @@ struct Constants {
     static let appName = "LogYourBody"
     static let appVersion = "1.0.0"
     static let buildNumber = "1"
+
+    // MARK: - Feature Flags
+    static let isBodySpecEnabled = true
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)
     static var baseURL: String {

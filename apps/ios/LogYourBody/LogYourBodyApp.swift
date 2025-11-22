@@ -71,6 +71,8 @@ struct LogYourBodyApp: App {
     private func performStartupSequence() async {
         scheduleDeferredMaintenance()
 
+        ErrorTrackingService.shared.start()
+
         let clerkInitializationTask = authManager.ensureClerkInitializationTask(priority: .userInitiated)
 
         async let revenueCatPipeline: Void = configureRevenueCat(waitingFor: clerkInitializationTask)

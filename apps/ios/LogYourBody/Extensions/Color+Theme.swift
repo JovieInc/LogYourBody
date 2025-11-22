@@ -46,6 +46,11 @@ public extension Color {
     static let metricCardBorder = Color(hex: "#1F2228")
     static let metricGridMajor = Color(hex: "#242830")
     static let metricGridMinor = Color(hex: "#1C1F26")
+    static let metricAccentSteps = Color(hex: "#FF9F0A")
+    static let metricAccentWeight = Color(hex: "#AF52DE")
+    static let metricAccentBodyFat = Color(hex: "#FF2D55")
+    static let metricAccentFFMI = Color.purple
+    static let metricAccentWaist = Color.blue
 
     // MARK: - State Colors
     static let linearDisabled = Color(hex: "#3A3A3A")
@@ -55,7 +60,7 @@ public extension Color {
     static let appBackground = linearBg
     static let appCard = linearCard
     static let appBorder = linearBorder
-    static let appPrimary = linearPurple  // Note: linearPurple is the canonical name
+    static let appPrimary = metricAccent  // Note: linearPurple is the canonical name
     static let appText = linearText
     static let appTextSecondary = linearTextSecondary
     static let appTextTertiary = linearTextTertiary

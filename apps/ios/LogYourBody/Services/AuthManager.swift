@@ -37,6 +37,12 @@ enum AuthError: LocalizedError {
     }
 }
 
+enum AuthExitReason {
+    case none
+    case userInitiated
+    case sessionExpired
+}
+
 enum EmailRegistrationStatus {
     case available
     case registered
@@ -95,6 +101,8 @@ class AuthManager: NSObject, ObservableObject {
     @Published var clerkInitError: String?
     @Published var needsLegalConsent = false
     @Published var pendingAppleUserId: String?
+    @Published var lastExitReason: AuthExitReason = .none
+    @Published var memberSinceDate: Date?
 
     private var currentSignUp: SignUp?
     private var pendingSignUpCredentials: (email: String, password: String)?
@@ -282,6 +290,9 @@ class AuthManager: NSObject, ObservableObject {
             } else {
                 // No valid session or user
                 // print("🔄 Clerk session state: signed out")
+                if previousSessionId != nil && currentSessionId == nil && lastExitReason == .none {
+                    lastExitReason = .sessionExpired
+                }
                 self.isAuthenticated = false
                 self.currentUser = nil
                 userDefaults.removeObject(forKey: userKey)
@@ -289,7 +300,7 @@ class AuthManager: NSObject, ObservableObject {
         }
     }
 
-    private func updateLocalUser(clerkUser: Any) {
+    func updateLocalUser(clerkUser: Any) {
         // Use Mirror to access properties dynamically due to type naming conflict
         let mirror = Mirror(reflecting: clerkUser)
 
@@ -366,15 +377,17 @@ class AuthManager: NSObject, ObservableObject {
 
         self.currentUser = localUser
         self.isAuthenticated = true  // Set authenticated only after successful user creation
+        self.lastExitReason = .none
 
         // Store user data
         if let encoded = try? JSONEncoder().encode(localUser) {
             userDefaults.set(encoded, forKey: userKey)
         }
 
-        // Create or update profile in Supabase
+        // Create or update profile in Supabase, then apply any pending pre-auth onboarding
         Task {
             await self.createOrUpdateSupabaseProfile(user: localUser)
+            await self.applyPreAuthOnboardingIfNeeded()
         }
     }
 
@@ -510,6 +523,7 @@ class AuthManager: NSObject, ObservableObject {
         }
 
         await MainActor.run {
+            self.lastExitReason = .userInitiated
             self.clerkSession = nil
             self.currentUser = nil
             self.isAuthenticated = false
@@ -538,6 +552,29 @@ class AuthManager: NSObject, ObservableObject {
         // print("🧹 Cleared all user data from UserDefaults")
     }
 
+    func handleSupabaseUnauthorized() async {
+        await MainActor.run {
+            if self.lastExitReason == .none {
+                self.lastExitReason = .sessionExpired
+            }
+        }
+
+        do {
+            try await clerk.signOut()
+        } catch {
+            // Ignore sign-out failures when handling backend unauthorized errors
+        }
+
+        await MainActor.run {
+            self.clerkSession = nil
+            self.currentUser = nil
+            self.isAuthenticated = false
+            self.currentSignUp = nil
+            self.pendingSignUpCredentials = nil
+            self.needsEmailVerification = false
+        }
+    }
+
     private func loadUserProfile(userId: String) async {
         guard let token = await getSupabaseToken() else {
             // print("❌ No Supabase token available")
@@ -552,6 +589,26 @@ class AuthManager: NSObject, ObservableObject {
             )
 
             if let profile = profiles.first {
+                let remoteHeight = profile.height ?? 0
+                let remoteUnit = profile.heightUnit?.lowercased()
+
+                let heightCm: Double?
+                if remoteHeight > 0 {
+                    if remoteUnit == "in" {
+                        if remoteHeight >= 100 {
+                            heightCm = remoteHeight
+                        } else {
+                            heightCm = remoteHeight * 2.54
+                        }
+                    } else if remoteUnit == "cm" {
+                        heightCm = remoteHeight < 100 ? remoteHeight * 2.54 : remoteHeight
+                    } else {
+                        heightCm = remoteHeight >= 100 ? remoteHeight : remoteHeight * 2.54
+                    }
+                } else {
+                    heightCm = nil
+                }
+
                 let user = LocalUser(
                     id: profile.id,
                     email: profile.email,
@@ -563,7 +620,7 @@ class AuthManager: NSObject, ObservableObject {
                         username: profile.username,
                         fullName: profile.fullName,
                         dateOfBirth: profile.dateOfBirth,
-                        height: profile.height,
+                        height: heightCm,
                         heightUnit: profile.heightUnit ?? "cm",
                         gender: profile.gender,
                         activityLevel: profile.activityLevel,
@@ -575,6 +632,7 @@ class AuthManager: NSObject, ObservableObject {
 
                 await MainActor.run {
                     self.currentUser = user
+                    self.memberSinceDate = profile.createdAt
                 }
 
                 // Store user data
@@ -1237,23 +1295,23 @@ class AuthManager: NSObject, ObservableObject {
             UserDefaults.standard.set(onboardingCompleted, forKey: Constants.hasCompletedOnboardingKey)
             // print("✅ AuthManager: Synced onboarding status to UserDefaults: \(onboardingCompleted)")
         }
-
-        // Save updated user locally
-        self.currentUser = user
-        if let encoded = try? JSONEncoder().encode(user) {
-            userDefaults.set(encoded, forKey: userKey)
-        }
-
-        // Sync to Supabase
-        await createOrUpdateSupabaseProfile(user: user)
     }
 
-    // MARK: - Session Management
-
-    func fetchActiveSessions() async throws -> [SessionInfo] {
-        guard let clerkUser = clerk.user else {
-            throw AuthError.clerkNotInitialized
-        }
+    if let dateOfBirth = updates["dateOfBirth"] as? Date {
+        updatedProfile = UserProfile(
+            id: updatedProfile.id,
+            email: updatedProfile.email,
+            username: updatedProfile.username,
+            fullName: updatedProfile.fullName,
+            dateOfBirth: dateOfBirth,
+            height: updatedProfile.height,
+            heightUnit: updatedProfile.heightUnit,
+            gender: updatedProfile.gender,
+            activityLevel: updatedProfile.activityLevel,
+            goalWeight: updatedProfile.goalWeight,
+            goalWeightUnit: updatedProfile.goalWeightUnit,
+            onboardingCompleted: updatedProfile.onboardingCompleted
+        )
 
         do {
             // Get all sessions from Clerk

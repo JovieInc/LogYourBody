@@ -54,7 +54,7 @@ struct BodyScoreBodyFatVisualView: View {
                 VStack(spacing: 16) {
                     ForEach(Self.visualEstimates) { estimate in
                         Button {
-                            viewModel.selectVisualBodyFat(estimate.percentage)
+                            handleSelection(estimate)
                         } label: {
                             HStack(spacing: 16) {
                                 Image(systemName: estimate.imageName)
@@ -136,6 +136,20 @@ extension BodyScoreBodyFatVisualView {
 
     private func isSelected(_ estimate: VisualEstimate) -> Bool {
         viewModel.selectedVisualBodyFat == estimate.percentage
+    }
+
+    private func handleSelection(_ estimate: VisualEstimate) {
+        let previousSelection = viewModel.selectedVisualBodyFat
+        viewModel.selectVisualBodyFat(estimate.percentage)
+
+        guard previousSelection != estimate.percentage else { return }
+
+        let delay: TimeInterval = 0.35
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            if viewModel.canContinueBodyFatVisual && viewModel.currentStep == .bodyFatVisual {
+                viewModel.goToNextStep()
+            }
+        }
     }
 }
 

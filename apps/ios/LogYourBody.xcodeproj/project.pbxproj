@@ -30,7 +30,6 @@
 		AD050C512EC135360082A313 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C502EC135360082A313 /* RevenueCatUI */; };
 		AD0B7BF52EC552FA008B29E7 /* LogYourBody.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */; };
 		AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */; };
-		AD0B7BF92EC692FB008B29E7 /* MetricDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BF82EC692FB008B29E7 /* MetricDetailView.swift */; };
 		AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */; };
 		AD25A7822E17439500611A56 /* Clerk in Frameworks */ = {isa = PBXBuildFile; productRef = AD25A7812E17439500611A56 /* Clerk */; };
 		AD3E4F652E17A12300345678 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AD3E4F642E17A12300345678 /* HealthKit.framework */; };
@@ -122,6 +121,20 @@
 		ADA4B7592ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */; };
 		ADA4B75B2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B75A2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift */; };
 		ADA4B75D2ED1183900F4262A /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */; };
+		ADA600222ED2594300088042 /* DexaResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600212ED2594200088042 /* DexaResult.swift */; };
+		ADA600242ED2596700088042 /* BodyScoreProfileDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600232ED2596700088042 /* BodyScoreProfileDetailsView.swift */; };
+		ADA600262ED259A700088042 /* BodyScoreShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600252ED259A700088042 /* BodyScoreShareCard.swift */; };
+		ADA600282ED259DB00088042 /* BodyScoreRecalculationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */; };
+		ADA6002A2ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600292ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift */; };
+		ADA6002C2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002B2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift */; };
+		ADA600302ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */; };
+		ADA600312ED25F6700088042 /* BodySpecIntegrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */; };
+		ADA600322ED25F6700088042 /* DashboardViewLiquid+Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */; };
+		ADA600372ED2602F00088042 /* BodySpecDexaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600352ED2602F00088042 /* BodySpecDexaImporter.swift */; };
+		ADA600382ED2602F00088042 /* BodySpecAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600332ED2602F00088042 /* BodySpecAPI.swift */; };
+		ADA600392ED2602F00088042 /* ErrorTrackingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600362ED2602F00088042 /* ErrorTrackingService.swift */; };
+		ADA6003A2ED2602F00088042 /* BodySpecAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600342ED2602F00088042 /* BodySpecAuthManager.swift */; };
+		ADA6003C2ED27D0000088042 /* PreAuthOnboardingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */; };
 		ADB2F6A12FFD12C500EF7A4B /* EditEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB2F6A02FFD12C500EF7A4B /* EditEntrySheet.swift */; };
 		ADBAF04E2ECAD88A00A95F98 /* BodyScoreHeightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF0442ECAD88A00A95F98 /* BodyScoreHeightView.swift */; };
 		ADBAF04F2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF03B2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift */; };
@@ -141,7 +154,6 @@
 		ADBAF05D2ECAD88A00A95F98 /* OnboardingAtoms.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF0382ECAD88A00A95F98 /* OnboardingAtoms.swift */; };
 		ADBAF05E2ECAD88A00A95F98 /* BodyScoreRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF0482ECAD88A00A95F98 /* BodyScoreRevealView.swift */; };
 		ADDC479E2E2D89F3003C97E7 /* CommonComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */; };
-		ADDC47A02E2D89F3003C97E7 /* OnboardingComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F72E22EE9D00B82C49 /* OnboardingComponents.swift */; };
 		ADDC47A12E2D89F3003C97E7 /* ProcessingImagePlaceholder.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F82E22EE9D00B82C49 /* ProcessingImagePlaceholder.swift */; };
 		ADDC47A32E2D89F3003C97E7 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0054F32E2228F70029E0FF /* SettingsComponents.swift */; };
 		ADDC47A72E2D89F3003C97E7 /* Changelog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD85525F2E19DC44003552EE /* Changelog.swift */; };
@@ -209,7 +221,6 @@
 		ADDC486C2E2D8A4C003C97E7 /* gdpr-compliance.md in Resources */ = {isa = PBXBuildFile; fileRef = ADDC48682E2D8A4C003C97E7 /* gdpr-compliance.md */; };
 		ADDC487C2E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48772E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift */; };
 		ADDC487D2E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48752E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift */; };
-		ADDC487E2E2D8A6B003C97E7 /* DashboardViewV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48712E2D8A6B003C97E7 /* DashboardViewV2.swift */; };
 		ADDC487F2E2D8A6B003C97E7 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC486E2E2D8A6B003C97E7 /* CameraView.swift */; };
 		ADDC48802E2D8A6B003C97E7 /* ChangePasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC486F2E2D8A6B003C97E7 /* ChangePasswordView.swift */; };
 		ADDC48812E2D8A6B003C97E7 /* EnhancedOTPInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48722E2D8A6B003C97E7 /* EnhancedOTPInputView.swift */; };
@@ -313,7 +324,6 @@
 		AD050C4A2EC12E590082A313 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = LogYourBody.storekit; sourceTree = "<group>"; };
 		AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricChartDataHelper.swift; sourceTree = "<group>"; };
-		AD0B7BF82EC692FB008B29E7 /* MetricDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDetailView.swift; sourceTree = "<group>"; };
 		AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PeriodSelector.swift; path = Components/PeriodSelector.swift; sourceTree = "<group>"; };
 		AD1B2C3F2E15A00300123456 /* OnboardingContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingContainerView.swift; sourceTree = "<group>"; };
 		AD1B2C402E15A00400123456 /* WelcomeStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeStepView.swift; sourceTree = "<group>"; };
@@ -487,12 +497,25 @@
 		ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardPrimaryMetricCard.swift; path = Components/DashboardPrimaryMetricCard.swift; sourceTree = "<group>"; };
 		ADA4B75A2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+MetricsHelpers.swift"; sourceTree = "<group>"; };
 		ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		ADA600212ED2594200088042 /* DexaResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DexaResult.swift; sourceTree = "<group>"; };
+		ADA600232ED2596700088042 /* BodyScoreProfileDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreProfileDetailsView.swift; sourceTree = "<group>"; };
+		ADA600252ED259A700088042 /* BodyScoreShareCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BodyScoreShareCard.swift; path = Components/BodyScoreShareCard.swift; sourceTree = "<group>"; };
+		ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreRecalculationService.swift; sourceTree = "<group>"; };
+		ADA600292ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HeroAndActions.swift"; sourceTree = "<group>"; };
+		ADA6002B2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+CoreAccessors.swift"; sourceTree = "<group>"; };
+		ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecIntegrationView.swift; sourceTree = "<group>"; };
+		ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+Components.swift"; sourceTree = "<group>"; };
+		ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HeaderAndSync.swift"; sourceTree = "<group>"; };
+		ADA600332ED2602F00088042 /* BodySpecAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecAPI.swift; sourceTree = "<group>"; };
+		ADA600342ED2602F00088042 /* BodySpecAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecAuthManager.swift; sourceTree = "<group>"; };
+		ADA600352ED2602F00088042 /* BodySpecDexaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecDexaImporter.swift; sourceTree = "<group>"; };
+		ADA600362ED2602F00088042 /* ErrorTrackingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorTrackingService.swift; sourceTree = "<group>"; };
+		ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreAuthOnboardingStore.swift; sourceTree = "<group>"; };
 		ADA922EA2E22E7A600B82C49 /* BackgroundPhotoUploadService+Processing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackgroundPhotoUploadService+Processing.swift"; sourceTree = "<group>"; };
 		ADA922EB2E22E7A600B82C49 /* ImageProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessingService.swift; sourceTree = "<group>"; };
 		ADA922EC2E22E7A600B82C49 /* VisionOrientationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionOrientationService.swift; sourceTree = "<group>"; };
 		ADA922F02E22E7D500B82C49 /* SecuritySessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySessionsView.swift; sourceTree = "<group>"; };
 		ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonComponents.swift; sourceTree = "<group>"; };
-		ADA922F72E22EE9D00B82C49 /* OnboardingComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingComponents.swift; sourceTree = "<group>"; };
 		ADA922F82E22EE9D00B82C49 /* ProcessingImagePlaceholder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingImagePlaceholder.swift; sourceTree = "<group>"; };
 		ADA923002E22EF4600B82C49 /* UIComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIComponents.swift; sourceTree = "<group>"; };
 		ADB2F6A02FFD12C500EF7A4B /* EditEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditEntrySheet.swift; sourceTree = "<group>"; };
@@ -527,7 +550,6 @@
 		ADDC486D2E2D8A6B003C97E7 /* BiometricLockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricLockView.swift; sourceTree = "<group>"; };
 		ADDC486E2E2D8A6B003C97E7 /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		ADDC486F2E2D8A6B003C97E7 /* ChangePasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangePasswordView.swift; sourceTree = "<group>"; };
-		ADDC48712E2D8A6B003C97E7 /* DashboardViewV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewV2.swift; sourceTree = "<group>"; };
 		ADDC48722E2D8A6B003C97E7 /* EnhancedOTPInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancedOTPInputView.swift; sourceTree = "<group>"; };
 		ADDC48732E2D8A6B003C97E7 /* HealthDisclaimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthDisclaimerView.swift; sourceTree = "<group>"; };
 		ADDC48742E2D8A6B003C97E7 /* LegalConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalConsentView.swift; sourceTree = "<group>"; };
@@ -668,6 +690,7 @@
 		60C9D5106098C441A5EF3D53 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				ADA600252ED259A700088042 /* BodyScoreShareCard.swift */,
 				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
 				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
 				ADA4B74E2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift */,
@@ -793,6 +816,7 @@
 		AD723ADC2E15FA5C002376C6 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				ADA600212ED2594200088042 /* DexaResult.swift */,
 				AD050C422EBFFEE50082A313 /* DashboardDisplayMode.swift */,
 				ADDC48642E2D8A33003C97E7 /* LogYourBody.xcdatamodeld */,
 				AD85525F2E19DC44003552EE /* Changelog.swift */,
@@ -831,6 +855,12 @@
 		AD723AED2E15FA5C002376C6 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */,
+				ADA600332ED2602F00088042 /* BodySpecAPI.swift */,
+				ADA600342ED2602F00088042 /* BodySpecAuthManager.swift */,
+				ADA600352ED2602F00088042 /* BodySpecDexaImporter.swift */,
+				ADA600362ED2602F00088042 /* ErrorTrackingService.swift */,
+				ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */,
 				ADA4B74C2ED00F1500F4262A /* KeychainManager.swift */,
 				ADA4B74A2ED00E1F00F4262A /* ValidationService.swift */,
 				ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */,
@@ -891,15 +921,18 @@
 		AD723B0A2E15FA5C002376C6 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */,
+				ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */,
+				ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */,
+				ADA6002B2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift */,
+				ADA600292ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift */,
 				ADA4B75A2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift */,
-				AD0B7BF82EC692FB008B29E7 /* MetricDetailView.swift */,
 				ADB2F6A02FFD12C500EF7A4B /* EditEntrySheet.swift */,
 				AD050C4A2EC12E590082A313 /* PaywallView.swift */,
 				AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */,
 				ADDC486D2E2D8A6B003C97E7 /* BiometricLockView.swift */,
 				ADDC486E2E2D8A6B003C97E7 /* CameraView.swift */,
 				ADDC486F2E2D8A6B003C97E7 /* ChangePasswordView.swift */,
-				ADDC48712E2D8A6B003C97E7 /* DashboardViewV2.swift */,
 				ADDC48722E2D8A6B003C97E7 /* EnhancedOTPInputView.swift */,
 				ADDC48732E2D8A6B003C97E7 /* HealthDisclaimerView.swift */,
 				ADDC48742E2D8A6B003C97E7 /* LegalConsentView.swift */,
@@ -940,7 +973,6 @@
 				ADBAF04D2ECAD88A00A95F98 /* Features */,
 				AD8872922EB946BE0041C426 /* DesignSystem */,
 				ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */,
-				ADA922F72E22EE9D00B82C49 /* OnboardingComponents.swift */,
 				ADA922F82E22EE9D00B82C49 /* ProcessingImagePlaceholder.swift */,
 				AD0054F32E2228F70029E0FF /* SettingsComponents.swift */,
 				ADE1464C2EBF0BDF00B64DA0 /* Helpers */,
@@ -1174,6 +1206,7 @@
 		ADBAF0492ECAD88A00A95F98 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				ADA600232ED2596700088042 /* BodyScoreProfileDetailsView.swift */,
 				ADBAF03D2ECAD88A00A95F98 /* BodyScoreAccountCreationView.swift */,
 				ADBAF03E2ECAD88A00A95F98 /* BodyScoreBasicsView.swift */,
 				ADA4B73A2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift */,
@@ -1462,7 +1495,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				ADDC479E2E2D89F3003C97E7 /* CommonComponents.swift in Sources */,
-				ADDC47A02E2D89F3003C97E7 /* OnboardingComponents.swift in Sources */,
 				ADDC47A12E2D89F3003C97E7 /* ProcessingImagePlaceholder.swift in Sources */,
 				ADE146462EBF090D00B64DA0 /* ProgressTimelineView.swift in Sources */,
 				ADDC47A32E2D89F3003C97E7 /* SettingsComponents.swift in Sources */,
@@ -1477,7 +1509,6 @@
 				ADDC487C2E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift in Sources */,
 				ADDC487D2E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift in Sources */,
 				AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */,
-				ADDC487E2E2D8A6B003C97E7 /* DashboardViewV2.swift in Sources */,
 				ADDC487F2E2D8A6B003C97E7 /* CameraView.swift in Sources */,
 				ADDC48802E2D8A6B003C97E7 /* ChangePasswordView.swift in Sources */,
 				ADBAF04E2ECAD88A00A95F98 /* BodyScoreHeightView.swift in Sources */,
@@ -1502,6 +1533,7 @@
 				ADDC48822E2D8A6B003C97E7 /* OTPInputView.swift in Sources */,
 				ADDC48832E2D8A6B003C97E7 /* LegalConsentView.swift in Sources */,
 				ADDC48842E2D8A6B003C97E7 /* WhatsNewView.swift in Sources */,
+				ADA6002A2ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift in Sources */,
 				ADDC48852E2D8A6B003C97E7 /* BiometricLockView.swift in Sources */,
 				ADDC48862E2D8A6B003C97E7 /* HealthDisclaimerView.swift in Sources */,
 				ADDC48872E2D8A6B003C97E7 /* ProgressPhotoCutoutView.swift in Sources */,
@@ -1541,6 +1573,7 @@
 				ADDC47D02E2D89F3003C97E7 /* SecuritySessionsView.swift in Sources */,
 				ADDC47D12E2D89F3003C97E7 /* ProfileSettingsViewV2.swift in Sources */,
 				ADDC47D82E2D89F3003C97E7 /* AppleSignInButton.swift in Sources */,
+				ADA6003C2ED27D0000088042 /* PreAuthOnboardingStore.swift in Sources */,
 				ADDC47DD2E2D89F3003C97E7 /* SyncStatusView.swift in Sources */,
 				ADDC47DE2E2D89F3003C97E7 /* IntegrationsView.swift in Sources */,
 				ADDC47DF2E2D89F3003C97E7 /* LegalView.swift in Sources */,
@@ -1562,10 +1595,12 @@
 				AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */,
 				ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */,
 				AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */,
+				ADA600242ED2596700088042 /* BodyScoreProfileDetailsView.swift in Sources */,
 				ADDC47EE2E2D89F3003C97E7 /* SignUpView.swift in Sources */,
 				ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */,
 				ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */,
 				ADDC47F72E2D89F3003C97E7 /* AnimatedTabView.swift in Sources */,
+				ADA600262ED259A700088042 /* BodyScoreShareCard.swift in Sources */,
 				ADDC47F82E2D89F3003C97E7 /* Components/DashboardComponents.swift in Sources */,
 				ADA4B7452ECFE0F300F4262A /* FullMetricChartView.swift in Sources */,
 				ADDC47F92E2D89F3003C97E7 /* Components/DashboardMetricCards.swift in Sources */,
@@ -1574,6 +1609,10 @@
 				ADDC47FF2E2D89F3003C97E7 /* UIComponents.swift in Sources */,
 				0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */,
 				ADA4B7532ED0E61600F4262A /* ErrorReporter.swift in Sources */,
+				ADA600372ED2602F00088042 /* BodySpecDexaImporter.swift in Sources */,
+				ADA600382ED2602F00088042 /* BodySpecAPI.swift in Sources */,
+				ADA600392ED2602F00088042 /* ErrorTrackingService.swift in Sources */,
+				ADA6003A2ED2602F00088042 /* BodySpecAuthManager.swift in Sources */,
 				ADA4B7542ED0E61600F4262A /* AppError.swift in Sources */,
 				ADA4B7552ED0E61600F4262A /* AppLogger.swift in Sources */,
 				43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */,
@@ -1603,6 +1642,7 @@
 				AD8872A32EB946BE0041C426 /* SocialLoginButton.swift in Sources */,
 				ADA4B7582ED0E7D700F4262A /* DashboardFFMITile.swift in Sources */,
 				ADA4B7592ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift in Sources */,
+				ADA600222ED2594300088042 /* DexaResult.swift in Sources */,
 				AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */,
 				AD8872A52EB946BE0041C426 /* LoginForm.swift in Sources */,
 				AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */,
@@ -1623,6 +1663,9 @@
 				ADA4B7472ECFE34F00F4262A /* DashboardHeaderCompact.swift in Sources */,
 				ADA4B73E2ECFAB0B00F4262A /* DashboardMetricFormatting.swift in Sources */,
 				ADA4B73F2ECFAB0B00F4262A /* TimelineCalculator.swift in Sources */,
+				ADA600302ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift in Sources */,
+				ADA600312ED25F6700088042 /* BodySpecIntegrationView.swift in Sources */,
+				ADA600322ED25F6700088042 /* DashboardViewLiquid+Components.swift in Sources */,
 				AD8872B72EB946BE0041C426 /* AuthConsentCheckbox.swift in Sources */,
 				AD8872B92EB946BE0041C426 /* DSCircularProgress.swift in Sources */,
 				AD8872BA2EB946BE0041C426 /* DocumentHeader.swift in Sources */,
@@ -1646,12 +1689,13 @@
 				AD8872CE2EB946BE0041C426 /* DSMetricValue.swift in Sources */,
 				ADA4B7372ECC3A7A00F4262A /* EntryVisibilityManager.swift in Sources */,
 				AD8872CF2EB946BE0041C426 /* StandardHeader.swift in Sources */,
-				AD0B7BF92EC692FB008B29E7 /* MetricDetailView.swift in Sources */,
+				ADA6002C2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift in Sources */,
 				AD050C412EBFD8160082A313 /* HapticManager.swift in Sources */,
 				AD4B1C7E2FFC0A4E00A3B9E1 /* LRUCache.swift in Sources */,
 				AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */,
 				AD8872D02EB946BE0041C426 /* MarkdownView.swift in Sources */,
 				AD8872D12EB946BE0041C426 /* StandardCard.swift in Sources */,
+				ADA600282ED259DB00088042 /* BodyScoreRecalculationService.swift in Sources */,
 				AD8872D22EB946BE0041C426 /* LiquidGlassCTAButton.swift in Sources */,
 				AD8872D32EB946BE0041C426 /* DSTrendIndicator.swift in Sources */,
 				ADA4B73B2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift in Sources */,

@@ -15,6 +15,8 @@ struct LoginView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isRetrying = false
+    @State private var showPreAuthOnboarding = false
+    @State private var navigateToSignUp = false
 
     var body: some View {
         ZStack {
@@ -31,13 +33,23 @@ struct LoginView: View {
                             .padding(.horizontal, 24)
                     }
 
+                    if authManager.lastExitReason == .sessionExpired {
+                        sessionStatusBanner
+                            .padding(.top, 16)
+                            .padding(.horizontal, 24)
+                    }
+
                     // Molecule: Auth Header
                     AuthHeader(
                         title: "LogYourBody",
                         subtitle: "Track your fitness journey"
                     )
                     .padding(.top, authManager.isClerkLoaded ? 80 : 20)
-                    .padding(.bottom, 50)
+                    .padding(.bottom, 24)
+
+                    preAuthOnboardingCTA
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 26)
 
                     // Organism: Login Form
                     LoginForm(
@@ -69,6 +81,14 @@ struct LoginView: View {
                     }
                     .padding(.top, 20)
 
+                    NavigationLink(
+                        destination: SignUpView(),
+                        isActive: $navigateToSignUp
+                    ) {
+                        EmptyView()
+                    }
+                    .hidden()
+
                     Spacer(minLength: 40)
                 }
             }
@@ -80,6 +100,33 @@ struct LoginView: View {
         } message: {
             Text(errorMessage)
         }
+        .fullScreenCover(isPresented: $showPreAuthOnboarding) {
+            PreAuthBodyScoreOnboardingContainer {
+                navigateToSignUp = true
+            }
+        }
+    }
+
+    private var sessionStatusBanner: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.circle")
+                .foregroundColor(.appTextSecondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Session expired")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.appText)
+
+                Text("Your session ended. Please sign in again to continue.")
+                    .font(.system(size: 13))
+                    .foregroundColor(.appTextSecondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(Color.black.opacity(0.25))
+        .cornerRadius(12)
     }
 
     // Clerk status banner

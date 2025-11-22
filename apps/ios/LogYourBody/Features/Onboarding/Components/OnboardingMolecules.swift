@@ -46,7 +46,7 @@ struct OnboardingOptionButton: View {
             .padding(20)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.appCard.opacity(0.7))
+                    .fill(isSelected ? Color.appPrimary.opacity(0.18) : Color.appCard.opacity(0.7))
                     .overlay(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .stroke(isSelected ? Color.appPrimary : Color.appBorder.opacity(0.6), lineWidth: isSelected ? 2 : 1)
@@ -89,6 +89,24 @@ struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: V
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color.appCard.opacity(0.4))
         )
+    }
+}
+
+struct OnboardingInfoRow: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "questionmark.circle")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.appTextSecondary)
+                .padding(.top, 2)
+
+            Text(text)
+                .font(OnboardingTypography.caption)
+                .foregroundStyle(Color.appTextSecondary)
+                .multilineTextAlignment(.leading)
+        }
     }
 }
 

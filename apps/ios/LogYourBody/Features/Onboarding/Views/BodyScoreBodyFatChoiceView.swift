@@ -60,6 +60,14 @@ struct BodyScoreBodyFatChoiceView: View {
                         viewModel.goToNextStep()
                     }
                     .buttonStyle(OnboardingSecondaryButtonStyle())
+
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .font(OnboardingTypography.caption)
+                            .foregroundStyle(Color.red)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
             }
         )

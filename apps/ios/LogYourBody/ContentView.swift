@@ -58,6 +58,46 @@ struct ContentView: View {
             Color.appBackground
                 .ignoresSafeArea()
 
+            Group {
+                if authManager.isAuthenticated {
+                    if shouldShowOnboarding {
+                        BodyScoreOnboardingFlowView()
+                    } else if !revenueCatManager.isSubscribed {
+                        PaywallView()
+                            .environmentObject(authManager)
+                            .environmentObject(revenueCatManager)
+                            .onAppear {
+                                // print("💰 Showing PaywallView")
+                            }
+                    } else {
+                        MainTabView()
+                            .onAppear {
+                                // print("🏠 Showing MainTabView (Dashboard)")
+                            }
+                    }
+                } else if authManager.needsEmailVerification {
+                    NavigationStack {
+                        EmailVerificationView()
+                    }
+                    .onAppear {
+                        // print("📧 Showing EmailVerificationView")
+                    }
+                } else {
+                    NavigationStack {
+                        LoginView()
+                    }
+                    .onAppear {
+                        // print("🔐 Showing LoginView")
+                    }
+                }
+            }
+            .transition(.opacity)
+
+            if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked {
+                BiometricLockView(isUnlocked: $isUnlocked)
+                    .transition(AnyTransition.opacity)
+            }
+
             if !isLoadingComplete {
                 LoadingView(
                     progress: $loadingManager.progress,
@@ -68,45 +108,6 @@ struct ContentView: View {
                         }
                     }
                 )
-                .transition(.opacity)
-            } else if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked {
-                // Show biometric lock screen
-                BiometricLockView(isUnlocked: $isUnlocked)
-                    .transition(AnyTransition.opacity)
-            } else {
-                Group {
-                    if authManager.isAuthenticated {
-                        if shouldShowOnboarding {
-                            BodyScoreOnboardingFlowView()
-                        } else if !revenueCatManager.isSubscribed {
-                            PaywallView()
-                                .environmentObject(authManager)
-                                .environmentObject(revenueCatManager)
-                                .onAppear {
-                                    // print("💰 Showing PaywallView")
-                                }
-                        } else {
-                            MainTabView()
-                                .onAppear {
-                                    // print("🏠 Showing MainTabView (Dashboard)")
-                                }
-                        }
-                    } else if authManager.needsEmailVerification {
-                        NavigationStack {
-                            EmailVerificationView()
-                        }
-                        .onAppear {
-                            // print("📧 Showing EmailVerificationView")
-                        }
-                    } else {
-                        NavigationStack {
-                            LoginView()
-                        }
-                        .onAppear {
-                            // print("🔐 Showing LoginView")
-                        }
-                    }
-                }
                 .transition(.opacity)
             }
         }

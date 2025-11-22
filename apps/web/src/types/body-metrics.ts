@@ -6,7 +6,7 @@ export interface BodyMetrics {
   weight_unit?: 'kg' | 'lbs'
   body_fat_percentage?: number
   body_fat_method?: 'navy' | '3-site' | '7-site' | 'dexa' | 'bodpod'
-  
+
   // Measurements for body fat calculations and ratios
   waist?: number
   waist_circumference?: number // More explicit naming
@@ -14,7 +14,7 @@ export interface BodyMetrics {
   hip_circumference?: number // More explicit naming
   neck?: number
   waist_unit?: 'cm' | 'in'
-  
+
   // Skinfold measurements
   chest_skinfold?: number
   abdominal_skinfold?: number
@@ -23,16 +23,16 @@ export interface BodyMetrics {
   suprailiac_skinfold?: number
   subscapular_skinfold?: number
   midaxillary_skinfold?: number
-  
+
   // Calculated values
   lean_body_mass?: number
   ffmi?: number // Fat-Free Mass Index
-  
+
   // Additional data
   photo_url?: string
   notes?: string
   step_count?: number
-  
+
   created_at: string
   updated_at: string
   sync_status?: 'pending' | 'synced' | 'error'
@@ -50,9 +50,9 @@ export interface UserProfile {
   date_of_birth?: string
   height?: number
   height_unit?: 'cm' | 'ft'
-  gender?: 'male' | 'female' | 'other'
+  gender?: 'male' | 'female'
   activity_level?: 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | 'extremely_active'
-  
+
   // Goal metrics based on research
   goal_body_fat_percentage?: number
   goal_ffmi?: number
@@ -60,7 +60,7 @@ export interface UserProfile {
   goal_waist_to_height_ratio?: number
   goal_weight?: number
   goal_weight_unit?: 'kg' | 'lbs'
-  
+
   email_verified: boolean
   onboarding_completed: boolean
   settings: UserSettings

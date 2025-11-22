@@ -28,7 +28,7 @@ struct ButtonConfiguration {
         var backgroundColor: Color {
             switch self {
             case .primary: return .appPrimary
-            case .secondary: return .appPrimary.opacity(0.1)
+            case .secondary: return .appCard
             case .tertiary: return .appCard
             case .destructive: return .red
             case .ghost: return .clear
@@ -40,10 +40,10 @@ struct ButtonConfiguration {
         var foregroundColor: Color {
             switch self {
             case .primary: return .white
-            case .secondary: return .appPrimary
+            case .secondary: return .appText
             case .tertiary: return .appText
             case .destructive: return .white
-            case .ghost: return .appPrimary
+            case .ghost: return .appTextSecondary
             case .social: return .black
             case .custom(_, let fg): return fg
             }
@@ -51,7 +51,7 @@ struct ButtonConfiguration {
 
         var borderColor: Color? {
             switch self {
-            case .secondary: return .appPrimary.opacity(0.5)
+            case .secondary: return .appBorder
             case .tertiary: return .appBorder
             default: return nil
             }

@@ -119,6 +119,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       const primaryEmail = user.primaryEmailAddress?.emailAddress
         ?? user.emailAddresses?.[0]?.emailAddress
 
+      const normalizedGender: 'male' | 'female' = data.gender === 'female' ? 'female' : 'male'
+
       // Update user profile
       const { error: profileError } = await supabase
         .from('profiles')
@@ -129,7 +131,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           date_of_birth: data.dateOfBirth,
           height: data.height,
           height_unit: 'ft', // Heights in inches use 'ft' unit per database constraint
-          gender: data.gender,
+          gender: normalizedGender,
           onboarding_completed: true,
           updated_at: new Date().toISOString()
         })

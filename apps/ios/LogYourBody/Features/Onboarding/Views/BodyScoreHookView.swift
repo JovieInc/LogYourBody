@@ -11,19 +11,17 @@ struct BodyScoreHookView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Build a dialed-in body.",
-            subtitle: "Get your Body Score in under a minute.",
+            title: "Get your Body Score in 60 seconds.",
+            subtitle: "See muscle, body fat, and FFMI vs people like you.",
             showsBackButton: false,
             progress: viewModel.progress(for: .hook)
         ) {
             VStack(spacing: 32) {
                 OnboardingBadge(text: "Body Score Early Access")
 
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("You bring height, weight, and a rough body fat read. We highlight what’s working and what’s not.")
-                        .font(OnboardingTypography.body)
-                        .foregroundStyle(Color.appTextSecondary)
+                OnboardingCaptionText(text: "Beta feature • helps us fine-tune the score for you.", alignment: .leading)
 
+                VStack(alignment: .leading, spacing: 20) {
                     OnboardingBulletList(items: bulletItems)
                 }
                 .padding(24)
@@ -43,15 +41,14 @@ struct BodyScoreHookView: View {
                 )
 
                 VStack(spacing: 16) {
-                    Button("See my score") {
+                    Button("Start my 60-sec check") {
                         viewModel.goToNextStep()
                     }
                     .buttonStyle(OnboardingPrimaryButtonStyle())
 
-                    Button("I already have an account") {
+                    OnboardingTextButton(title: "I already have an account") {
                         NotificationCenter.default.post(name: Notification.Name("showLoginFromOnboarding"), object: nil)
                     }
-                    .buttonStyle(OnboardingSecondaryButtonStyle())
                 }
             }
         }

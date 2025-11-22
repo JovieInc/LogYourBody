@@ -109,13 +109,14 @@ export default function ProfileSettingsPage() {
     if (user) {
       getProfile(user.id).then((profileData) => {
         if (profileData) {
+          const normalizedGender = profileData.gender === 'female' ? 'female' : 'male'
           setProfile({
             email: profileData.email,
             full_name: profileData.full_name || '',
             username: profileData.username || '',
             height: profileData.height || 71,
             height_unit: profileData.height_unit || 'ft',
-            gender: profileData.gender || 'male',
+            gender: normalizedGender,
             date_of_birth: profileData.date_of_birth || '',
             bio: profileData.bio || '',
             activity_level: profileData.activity_level || 'moderately_active',

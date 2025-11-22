@@ -1,7 +1,13 @@
+'use client'
+
 import { SignIn } from '@clerk/nextjs'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, AlertCircle } from 'lucide-react'
+import { useAuth } from '@/contexts/ClerkAuthContext'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export default function SignInPage() {
+  const { exitReason } = useAuth()
+  const showSessionExpired = exitReason === 'sessionExpired'
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-bg p-4">
       <div className="w-full max-w-md">
@@ -15,7 +21,21 @@ export default function SignInPage() {
           </p>
         </div>
 
-        <SignIn 
+        {showSessionExpired && (
+          <div className="mb-4">
+            <Alert className="bg-yellow-500/10 border-yellow-500/40 text-yellow-100">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              <AlertDescription>
+                <p className="font-medium">Session expired</p>
+                <p className="text-sm text-yellow-100/80">
+                  Your session ended. Please sign in again to continue.
+                </p>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
+        <SignIn
           appearance={{
             baseTheme: undefined,
             variables: {

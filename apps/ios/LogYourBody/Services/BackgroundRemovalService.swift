@@ -116,33 +116,38 @@ class BackgroundRemovalService {
     }
 
     /// Prepare image data for upload (convert to PNG to preserve alpha channel)
-    func prepareForUpload(_ image: UIImage, maxSize: CGSize = CGSize(width: 1_200, height: 1_600)) -> Data? {
-        // Process on background queue to avoid blocking main thread
-        return DispatchQueue.global(qos: .userInitiated).sync {
-            // Resize if needed while maintaining aspect ratio
-            let resizedImage: UIImage
-            if image.size.width > maxSize.width || image.size.height > maxSize.height {
-                let scale = min(maxSize.width / image.size.width, maxSize.height / image.size.height)
-                let newSize = CGSize(
-                    width: image.size.width * scale,
-                    height: image.size.height * scale
-                )
+    func prepareForUpload(
+        _ image: UIImage,
+        maxSize: CGSize = CGSize(width: 1_200, height: 1_600)
+    ) async -> Data? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                // Resize if needed while maintaining aspect ratio
+                let resizedImage: UIImage
+                if image.size.width > maxSize.width || image.size.height > maxSize.height {
+                    let scale = min(maxSize.width / image.size.width, maxSize.height / image.size.height)
+                    let newSize = CGSize(
+                        width: image.size.width * scale,
+                        height: image.size.height * scale
+                    )
 
-                // Use modern UIGraphicsImageRenderer instead of deprecated API
-                let format = UIGraphicsImageRendererFormat()
-                format.scale = 1.0
-                format.opaque = false // Important for transparency
+                    // Use modern UIGraphicsImageRenderer instead of deprecated API
+                    let format = UIGraphicsImageRendererFormat()
+                    format.scale = 1.0
+                    format.opaque = false // Important for transparency
 
-                let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
-                resizedImage = renderer.image { _ in
-                    image.draw(in: CGRect(origin: .zero, size: newSize))
+                    let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+                    resizedImage = renderer.image { _ in
+                        image.draw(in: CGRect(origin: .zero, size: newSize))
+                    }
+                } else {
+                    resizedImage = image
                 }
-            } else {
-                resizedImage = image
-            }
 
-            // Convert to PNG to preserve alpha channel
-            return resizedImage.pngData()
+                // Convert to PNG to preserve alpha channel
+                let data = resizedImage.pngData()
+                continuation.resume(returning: data)
+            }
         }
     }
 }

@@ -36,7 +36,13 @@ final class OnboardingFlowViewModel: ObservableObject {
         case bodyScore
         case emailCapture
         case account
+        case profileDetails
         case paywall
+    }
+
+    enum EntryContext {
+        case authenticated
+        case preAuth
     }
 
     struct ProgressContext: Equatable {
@@ -117,6 +123,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     @Published var accountCreationError: String?
     @Published private(set) var accountCreationStage: AccountCreationStage = .idle
 
+    private let entryContext: EntryContext
     private let healthKitManager: HealthKitManager
     private let calculator: BodyScoreCalculating
     private var hasMarkedOnboardingComplete = false
@@ -135,9 +142,11 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     init(
+        entryContext: EntryContext = .authenticated,
         healthKitManager: HealthKitManager = .shared,
         calculator: BodyScoreCalculating = BodyScoreCalculator()
     ) {
+        self.entryContext = entryContext
         self.healthKitManager = healthKitManager
         self.calculator = calculator
 
@@ -149,7 +158,9 @@ final class OnboardingFlowViewModel: ObservableObject {
             bodyFatPercentageText = Self.formatNumber(bodyFat)
         }
 
-        restorePersistedProgressIfNeeded()
+        if entryContext == .authenticated {
+            restorePersistedProgressIfNeeded()
+        }
     }
 
     // MARK: - Flow Control
@@ -167,13 +178,26 @@ final class OnboardingFlowViewModel: ObservableObject {
             switch bodyScoreInput.bodyFat.source {
             case .manualValue: currentStep = .bodyFatNumeric
             case .visualEstimate: currentStep = .bodyFatVisual
-            default: currentStep = .loading
+            default: currentStep = hasBodyFatEntry ? .loading : .bodyFatChoice
             }
         case .bodyFatNumeric, .bodyFatVisual: currentStep = .loading
         case .loading: currentStep = .bodyScore
-        case .bodyScore: currentStep = .emailCapture
+        case .bodyScore:
+            if entryContext == .preAuth {
+                if let result = bodyScoreResult {
+                    PreAuthOnboardingStore.shared.save(input: bodyScoreInput, result: result)
+                }
+
+                NotificationCenter.default.post(
+                    name: Notification.Name("preAuthOnboardingCompleted"),
+                    object: nil
+                )
+            } else {
+                currentStep = .emailCapture
+            }
         case .emailCapture: currentStep = .account
-        case .account:
+        case .account: currentStep = .profileDetails
+        case .profileDetails:
             completeOnboardingIfNeeded()
             currentStep = .paywall
         case .paywall: break
@@ -190,11 +214,20 @@ final class OnboardingFlowViewModel: ObservableObject {
         case .manualWeight: currentStep = .healthConnect
         case .bodyFatChoice: decideManualWeightBack()
         case .bodyFatNumeric, .bodyFatVisual: currentStep = .bodyFatChoice
-        case .loading: currentStep = .bodyFatChoice
-        case .bodyScore: currentStep = .bodyFatChoice
+        case .loading:
+            bodyScoreResult = nil
+            isLoading = false
+            errorMessage = nil
+            currentStep = .bodyFatChoice
+        case .bodyScore:
+            bodyScoreResult = nil
+            isLoading = false
+            errorMessage = nil
+            currentStep = .bodyFatChoice
         case .emailCapture: currentStep = .bodyScore
         case .account: currentStep = .emailCapture
-        case .paywall: currentStep = .account
+        case .profileDetails: currentStep = .account
+        case .paywall: currentStep = .profileDetails
         }
     }
 
@@ -241,7 +274,7 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     private func shouldIncludeInProgress(_ step: Step) -> Bool {
         switch step {
-        case .hook, .basics, .height, .healthConnect, .bodyScore, .emailCapture, .account:
+        case .hook, .basics, .height, .healthConnect, .bodyScore, .emailCapture, .account, .profileDetails:
             return true
         case .healthConfirmation:
             return healthKitManager.isAuthorized
@@ -291,17 +324,20 @@ final class OnboardingFlowViewModel: ObservableObject {
                 let value = preferredUnit == .kilograms ? weightInKilograms : pounds
                 bodyScoreInput.weight = WeightValue(value: value, unit: preferredUnit)
                 bodyScoreInput.healthSnapshot.weightKg = weightInKilograms
+                bodyScoreInput.healthSnapshot.weightDate = weight.date
                 manualWeightText = Self.formatNumber(value)
             }
 
             if let bf = bodyFat.percentage {
                 bodyScoreInput.bodyFat = BodyFatValue(percentage: bf, source: .healthKit)
                 bodyScoreInput.healthSnapshot.bodyFatPercentage = bf
+                bodyScoreInput.healthSnapshot.bodyFatDate = bodyFat.date
             }
 
             if let heightCm = height.value {
                 bodyScoreInput.height = HeightValue(value: heightCm, unit: .centimeters)
                 bodyScoreInput.healthSnapshot.heightCm = heightCm
+                bodyScoreInput.healthSnapshot.heightDate = height.date
                 heightCentimetersText = Self.formatHeight(heightCm)
                 if heightUnit == .inches {
                     updateImperialFields(fromCentimeters: heightCm)
@@ -317,6 +353,8 @@ final class OnboardingFlowViewModel: ObservableObject {
     func calculateScore() async {
         guard bodyScoreInput.isReadyForCalculation else {
             errorMessage = "Missing inputs for score calculation."
+            isLoading = false
+            currentStep = .bodyFatChoice
             return
         }
 
@@ -331,6 +369,7 @@ final class OnboardingFlowViewModel: ObservableObject {
                 self.bodyScoreResult = result
                 self.currentStep = .bodyScore
                 self.isLoading = false
+                self.errorMessage = nil
             }
         } catch {
             await MainActor.run {
@@ -342,25 +381,14 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     func calculateScoreIfNeeded() async {
-        guard bodyScoreResult == nil else { return }
-        if !isLoading {
-            await calculateScore()
-        }
+        guard !isLoading else { return }
+        await calculateScore()
     }
 
     // MARK: - Input Helpers
 
-    var birthYearOptions: [Int] {
-        let currentYear = Calendar.current.component(.year, from: Date())
-        return Array((currentYear - 80)...(currentYear - 16)).reversed()
-    }
-
-    var defaultBirthYear: Int {
-        birthYearOptions[birthYearOptions.count / 3]
-    }
-
     var canContinueBasics: Bool {
-        bodyScoreInput.sex != nil && bodyScoreInput.birthYear != nil
+        bodyScoreInput.sex != nil
     }
 
     var canContinueHeight: Bool {
@@ -436,10 +464,6 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     func updateSex(_ sex: BiologicalSex) {
         bodyScoreInput.sex = sex
-    }
-
-    func updateBirthYear(_ year: Int) {
-        bodyScoreInput.birthYear = year
     }
 
     func setHeightUnit(_ unit: HeightUnit) {
@@ -564,6 +588,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     func completeOnboardingIfNeeded() {
+        guard entryContext == .authenticated else { return }
         guard !hasMarkedOnboardingComplete else { return }
         hasMarkedOnboardingComplete = true
         OnboardingStateManager.shared.markCompleted()
@@ -590,43 +615,10 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     func buildOnboardingProfileUpdates() -> [String: Any] {
-        var updates: [String: Any] = [:]
-
-        // Persist biological sex as gender string used by profile/settings
-        if let sex = bodyScoreInput.sex {
-            updates["gender"] = sex.description
-        }
-
-        // Convert birth year into a concrete Date (Jan 1 of that year)
-        if let birthYear = bodyScoreInput.birthYear {
-            var components = DateComponents()
-            components.year = birthYear
-            components.month = 1
-            components.day = 1
-            if let dateOfBirth = Calendar.current.date(from: components) {
-                updates["dateOfBirth"] = dateOfBirth
-            }
-        }
-
-        // Store canonical height in inches, with preferred display unit
-        if let heightInches = bodyScoreInput.height.inInches {
-            updates["height"] = heightInches
-
-            let preferredHeightUnit: String
-            switch heightUnit {
-            case .centimeters:
-                preferredHeightUnit = "cm"
-            case .inches:
-                preferredHeightUnit = "in"
-            }
-
-            updates["heightUnit"] = preferredHeightUnit
-        }
-
-        // Always mark onboarding as completed
-        updates["onboardingCompleted"] = true
-
-        return updates
+        OnboardingProfileUpdateBuilder.buildUpdates(
+            bodyScoreInput: bodyScoreInput,
+            heightUnit: heightUnit
+        )
     }
 
     var weightFieldTitle: String {
@@ -801,6 +793,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     // MARK: - Progress Persistence
 
     private func persistProgress() {
+        guard entryContext == .authenticated else { return }
         guard !isRestoringProgress else { return }
         guard !OnboardingStateManager.shared.hasCompletedCurrentVersion else {
             progressPersistenceWorkItem?.cancel()
@@ -840,6 +833,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     private func restorePersistedProgressIfNeeded() {
+        guard entryContext == .authenticated else { return }
         guard let userId = AuthManager.shared.currentUser?.id else { return }
         guard !OnboardingStateManager.shared.hasCompletedCurrentVersion else {
             progressStore.clearProgress(for: userId)
@@ -866,6 +860,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     private func clearPersistedProgress() {
+        guard entryContext == .authenticated else { return }
         progressPersistenceWorkItem?.cancel()
         guard let userId = AuthManager.shared.currentUser?.id else { return }
         progressStore.clearProgress(for: userId)
@@ -886,7 +881,8 @@ private extension OnboardingFlowViewModel.Step {
             .bodyFatVisual,
             .bodyScore,
             .emailCapture,
-            .account
+            .account,
+            .profileDetails
         ]
     }
 
@@ -902,6 +898,7 @@ private extension OnboardingFlowViewModel.Step {
         case .bodyScore: return "Your Score"
         case .emailCapture: return "Save Progress"
         case .account: return "Account"
+        case .profileDetails: return "Profile"
         case .loading: return "Loading"
         case .paywall: return "Upgrade"
         }
@@ -925,6 +922,37 @@ private struct OnboardingProgressSnapshot: Codable {
     let didRequestHealthSync: Bool
     let emailAddress: String
     let lastUpdated: Date
+}
+
+struct OnboardingProfileUpdateBuilder {
+    static func buildUpdates(
+        bodyScoreInput: BodyScoreInput,
+        heightUnit: HeightUnit
+    ) -> [String: Any] {
+        var updates: [String: Any] = [:]
+
+        if let sex = bodyScoreInput.sex {
+            updates["gender"] = sex.description
+        }
+
+        if let heightCm = bodyScoreInput.height.inCentimeters {
+            updates["height"] = heightCm
+
+            let preferredHeightUnit: String
+            switch heightUnit {
+            case .centimeters:
+                preferredHeightUnit = "cm"
+            case .inches:
+                preferredHeightUnit = "in"
+            }
+
+            updates["heightUnit"] = preferredHeightUnit
+        }
+
+        updates["onboardingCompleted"] = true
+
+        return updates
+    }
 }
 
 final class OnboardingProgressStore {

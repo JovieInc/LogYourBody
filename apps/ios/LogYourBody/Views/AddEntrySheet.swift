@@ -403,6 +403,8 @@ struct AddEntrySheet: View {
                 await WidgetDataManager.shared.updateWidgetData()
 
                 RealtimeSyncManager.shared.syncIfNeeded()
+
+                BodyScoreRecalculationService.shared.scheduleRecalculation()
             }
 
             dismiss()
@@ -429,6 +431,8 @@ struct AddEntrySheet: View {
                 await WidgetDataManager.shared.updateWidgetData()
 
                 RealtimeSyncManager.shared.syncIfNeeded()
+
+                BodyScoreRecalculationService.shared.scheduleRecalculation()
             }
 
             dismiss()

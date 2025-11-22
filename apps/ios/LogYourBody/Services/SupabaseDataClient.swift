@@ -120,7 +120,7 @@ class SupabaseClient {
 
 // MARK: - Error Types
 
-enum SupabaseError: LocalizedError {
+enum SupabaseError: LocalizedError, Equatable {
     case notAuthenticated
     case tokenGenerationFailed
     case invalidResponse

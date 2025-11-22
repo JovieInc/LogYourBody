@@ -41,6 +41,9 @@ struct BodyScoreOnboardingFlowView: View {
             case .account:
                 BodyScoreAccountCreationView(viewModel: viewModel)
                     .environmentObject(authManager)
+            case .profileDetails:
+                BodyScoreProfileDetailsView(viewModel: viewModel)
+                    .environmentObject(authManager)
             case .paywall:
                 PaywallView()
                     .environmentObject(authManager)

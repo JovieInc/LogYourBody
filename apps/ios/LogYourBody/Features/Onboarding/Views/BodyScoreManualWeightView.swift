@@ -4,6 +4,7 @@ struct BodyScoreManualWeightView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var weightFieldFocused: Bool
     @State private var weightError: String?
+    @State private var showWhyWeAsk = false
 
     var body: some View {
         OnboardingPageTemplate(
@@ -44,30 +45,78 @@ struct BodyScoreManualWeightView: View {
                                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                                     .stroke(weightFieldBorderColor)
                             )
+                            .overlay(
+                                HStack {
+                                    Spacer()
+                                    Text(viewModel.weightUnit == .kilograms ? "kg" : "lb")
+                                        .font(OnboardingTypography.caption)
+                                        .foregroundStyle(Color.appTextSecondary)
+                                        .padding(.trailing, 20)
+                                }
+                            )
+
+                            HStack(spacing: 12) {
+                                Button {
+                                    nudgeWeight(by: -stepAmount)
+                                } label: {
+                                    Image(systemName: "minus")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(Color.appText)
+                                        .frame(width: 32, height: 32)
+                                        .background(
+                                            Circle()
+                                                .fill(Color.appCard.opacity(0.8))
+                                        )
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    nudgeWeight(by: stepAmount)
+                                } label: {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(Color.appText)
+                                        .frame(width: 32, height: 32)
+                                        .background(
+                                            Circle()
+                                                .fill(Color.appCard.opacity(0.8))
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
 
                         if let error = weightError {
                             Text(error)
                                 .font(OnboardingTypography.caption)
                                 .foregroundStyle(Color.red)
-                        } else {
-                            OnboardingCaptionText(text: viewModel.weightHelperText, alignment: .leading)
-                                .foregroundStyle(Color.appTextSecondary)
                         }
-                    }
 
-                    OnboardingCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Why we ask")
-                                .font(OnboardingTypography.headline)
-                                .foregroundStyle(Color.appText)
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showWhyWeAsk.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "questionmark.circle")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text("Why we ask")
+                                    .font(OnboardingTypography.caption)
+                            }
+                            .foregroundStyle(Color.appPrimary)
+                        }
+                        .buttonStyle(.plain)
 
-                            Text("Weight plus body fat unlocks lean-mass insights for your Body Score.")
-                                .font(OnboardingTypography.body)
-                                .foregroundStyle(Color.appTextSecondary)
+                        if showWhyWeAsk {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Weight plus body fat unlocks lean-mass insights for your Body Score.")
+                                    .font(OnboardingTypography.body)
+                                    .foregroundStyle(Color.appTextSecondary)
 
-                            FFMIInfoLink()
-                                .padding(.top, 4)
+                                FFMIInfoLink()
+                                    .padding(.top, 2)
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
                 }
@@ -110,6 +159,10 @@ struct BodyScoreManualWeightView: View {
         viewModel.canContinueWeight ? 1 : 0.4
     }
 
+    private var stepAmount: Double {
+        viewModel.weightUnit == .kilograms ? 0.5 : 1
+    }
+
     private func validateWeight(_ value: String) {
         guard !value.isEmpty else {
             weightError = nil
@@ -144,6 +197,30 @@ struct BodyScoreManualWeightView: View {
             return Color.appPrimary
         }
         return Color.appBorder.opacity(0.4)
+    }
+
+    private func nudgeWeight(by amount: Double) {
+        let currentText = viewModel.manualWeightText
+        let existingFromInput = Double(currentText)
+        let existingFromModel: Double?
+        if viewModel.weightUnit == .kilograms {
+            existingFromModel = viewModel.bodyScoreInput.weight.inKilograms
+        } else {
+            existingFromModel = viewModel.bodyScoreInput.weight.inPounds
+        }
+
+        let baseline = existingFromInput ?? existingFromModel ?? 0
+        let newValue = max(0, baseline + amount)
+
+        let formatted: String
+        if newValue == floor(newValue) {
+            formatted = String(format: "%.0f", newValue)
+        } else {
+            formatted = String(format: "%.1f", newValue)
+        }
+
+        viewModel.updateManualWeightText(formatted)
+        validateWeight(formatted)
     }
 }
 

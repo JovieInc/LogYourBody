@@ -26,10 +26,10 @@ class RealtimeSyncManager: ObservableObject {
     @Published var error: String?
 
     // MARK: - Private Properties
-    nonisolated let coreDataManager = CoreDataManager.shared
-    nonisolated let authManager = AuthManager.shared
-    nonisolated let supabaseManager = SupabaseManager.shared
-    private let networkMonitor = NWPathMonitor()
+    nonisolated let coreDataManager: CoreDataManager
+    nonisolated let authManager: AuthManager
+    nonisolated let supabaseManager: SupabaseManager
+    private let networkMonitor: NWPathMonitor
 
     private var syncTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
@@ -71,10 +71,27 @@ class RealtimeSyncManager: ObservableObject {
 
     // MARK: - Initialization
     private init() {
+        coreDataManager = CoreDataManager.shared
+        authManager = AuthManager.shared
+        supabaseManager = SupabaseManager.shared
+        networkMonitor = NWPathMonitor()
+
         setupNetworkMonitoring()
         setupAuthListener()
         observeAppLifecycle()
         loadPendingOperations()
+    }
+
+    init(
+        coreDataManager: CoreDataManager,
+        authManager: AuthManager,
+        supabaseManager: SupabaseManager,
+        networkMonitor: NWPathMonitor = NWPathMonitor()
+    ) {
+        self.coreDataManager = coreDataManager
+        self.authManager = authManager
+        self.supabaseManager = supabaseManager
+        self.networkMonitor = networkMonitor
     }
 
     // MARK: - Network Monitoring
@@ -304,6 +321,12 @@ class RealtimeSyncManager: ObservableObject {
                     onCompletion?()
                 }
             } catch {
+                if let supabaseError = error as? SupabaseError {
+                    if case .unauthorized = supabaseError {
+                        await self.authManager.handleSupabaseUnauthorized()
+                    }
+                }
+
                 await MainActor.run {
                     if !operationsNeedingRetry.isEmpty {
                         self.pendingOperations.insert(contentsOf: operationsNeedingRetry, at: 0)
@@ -334,7 +357,7 @@ class RealtimeSyncManager: ObservableObject {
         }
     }
 
-    nonisolated private func syncLocalChanges(token: String) async throws {
+    nonisolated func syncLocalChanges(token: String) async throws {
         let unsynced = await coreDataManager.fetchUnsyncedEntries()
 
         // Batch sync for efficiency
@@ -353,28 +376,39 @@ class RealtimeSyncManager: ObservableObject {
 
     nonisolated private func syncBodyMetricsBatch(_ metrics: [CachedBodyMetrics], token: String) async throws {
         let batchSize = 50 // Sync in batches to avoid timeouts
+        let formatter = ISO8601DateFormatter()
 
         for batch in metrics.chunked(into: batchSize) {
             let metricsData = batch.compactMap { metric -> [String: Any]? in
+                let id = metric.id ?? UUID().uuidString
+                let date = metric.date ?? Date()
+                let createdAt = metric.createdAt ?? date
+                let updatedAt = metric.updatedAt ?? createdAt
+
                 return [
-                    "id": metric.id ?? UUID().uuidString,
+                    "id": id,
                     "user_id": metric.userId ?? "",
+                    "date": formatter.string(from: date),
                     "weight": metric.weight,
+                    "weight_unit": metric.weightUnit ?? "kg",
                     "body_fat_percentage": metric.bodyFatPercentage as Any,
-                    // "muscle_mass_percentage": metric.muscleMassPercentage as Any, // Field doesn't exist
-                    "logged_at": ISO8601DateFormatter().string(from: metric.date ?? Date()),
-                    "notes": metric.notes as Any
-                    // "source": metric.source as Any // Field doesn't exist
+                    "body_fat_method": metric.bodyFatMethod as Any,
+                    "muscle_mass": metric.muscleMass as Any,
+                    "bone_mass": metric.boneMass as Any,
+                    "photo_url": metric.photoUrl as Any,
+                    "notes": metric.notes as Any,
+                    "created_at": formatter.string(from: createdAt),
+                    "updated_at": formatter.string(from: updatedAt)
                 ]
             }
 
             let response = try await supabaseManager.upsertBodyMetricsBatch(metricsData, token: token)
+            let syncedIds = Set(response.compactMap { $0["id"] as? String })
 
-            // Mark as synced
-            for (index, metric) in batch.enumerated() {
-                if index < response.count {
+            for metric in batch {
+                if let id = metric.id, syncedIds.contains(id) {
                     metric.syncStatus = "synced"
-                    // metric.lastSyncedAt = Date() // Field doesn't exist
+                    metric.isSynced = true
                 }
             }
 
@@ -385,24 +419,33 @@ class RealtimeSyncManager: ObservableObject {
     nonisolated private func syncDailyMetricsBatch(_ metrics: [CachedDailyMetrics], token: String) async throws {
         // Similar batch implementation for daily metrics
         let batchSize = 50
+        let formatter = ISO8601DateFormatter()
 
         for batch in metrics.chunked(into: batchSize) {
             let metricsData = batch.compactMap { metric -> [String: Any]? in
+                let id = metric.id ?? UUID().uuidString
+                let date = metric.date ?? Date()
+                let createdAt = metric.createdAt ?? date
+                let updatedAt = metric.updatedAt ?? createdAt
+
                 return [
-                    "id": metric.id ?? UUID().uuidString,
+                    "id": id,
                     "user_id": metric.userId ?? "",
-                    "date": ISO8601DateFormatter().string(from: metric.date ?? Date()),
+                    "date": formatter.string(from: date),
                     "steps": metric.steps,
-                    "notes": metric.notes as Any
+                    "notes": metric.notes as Any,
+                    "created_at": formatter.string(from: createdAt),
+                    "updated_at": formatter.string(from: updatedAt)
                 ]
             }
 
             let response = try await supabaseManager.upsertDailyMetricsBatch(metricsData, token: token)
+            let syncedIds = Set(response.compactMap { $0["id"] as? String })
 
-            for (index, metric) in batch.enumerated() {
-                if index < response.count {
+            for metric in batch {
+                if let id = metric.id, syncedIds.contains(id) {
                     metric.syncStatus = "synced"
-                    // metric.lastSyncedAt = Date() // Field doesn't exist
+                    metric.isSynced = true
                 }
             }
 

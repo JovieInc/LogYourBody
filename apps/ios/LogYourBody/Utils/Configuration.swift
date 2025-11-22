@@ -108,6 +108,54 @@ enum Configuration {
         }
     }
 
+    // MARK: - BodySpec Configuration
+
+    static var bodySpecClientId: String {
+        do {
+            return try Configuration.value(for: "BODYSPEC_CLIENT_ID")
+        } catch {
+            #if DEBUG
+            // print("⚠️ BODYSPEC_CLIENT_ID not configured in Config.xcconfig")
+            #endif
+            return ""
+        }
+    }
+
+    static var bodySpecRedirectURI: String {
+        do {
+            return try Configuration.value(for: "BODYSPEC_REDIRECT_URI")
+        } catch {
+            #if DEBUG
+            // print("⚠️ BODYSPEC_REDIRECT_URI not configured in Config.xcconfig")
+            #endif
+            return ""
+        }
+    }
+
+    static var sentryDSN: String {
+        do {
+            return try Configuration.value(for: "SENTRY_DSN")
+        } catch {
+            return ""
+        }
+    }
+
+    static var sentryEnvironment: String {
+        do {
+            return try Configuration.value(for: "SENTRY_ENVIRONMENT")
+        } catch {
+            return "development"
+        }
+    }
+
+    static var sentryTracesSampleRate: Double {
+        do {
+            return try Configuration.value(for: "SENTRY_TRACES_SAMPLE_RATE")
+        } catch {
+            return 0
+        }
+    }
+
     // MARK: - Validation
 
     static var isClerkConfigured: Bool {

@@ -104,7 +104,7 @@ class PhotoUploadManager: ObservableObject {
             // Step 2: Prepare image for upload (PNG to preserve transparency)
             updateUploadStatus(.preparing, progress: 0.2)
             // print("📸 PhotoUploadManager: Preparing image for upload")
-            guard let imageData = BackgroundRemovalService.shared.prepareForUpload(orientedProcessedImage) else {
+            guard let imageData = await BackgroundRemovalService.shared.prepareForUpload(orientedProcessedImage) else {
                 // print("❌ PhotoUploadManager: Failed to prepare image")
                 throw PhotoError.imageConversionFailed
             }

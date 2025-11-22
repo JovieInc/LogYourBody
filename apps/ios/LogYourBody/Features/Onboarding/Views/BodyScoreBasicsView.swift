@@ -2,14 +2,6 @@ import SwiftUI
 
 struct BodyScoreBasicsView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
-
-    private var birthYearBinding: Binding<Int> {
-        Binding<Int>(
-            get: { viewModel.bodyScoreInput.birthYear ?? viewModel.defaultBirthYear },
-            set: { viewModel.updateBirthYear($0) }
-        )
-    }
-
     private var continueButtonOpacity: Double {
         viewModel.canContinueBasics ? 1 : 0.4
     }
@@ -22,36 +14,22 @@ struct BodyScoreBasicsView: View {
             progress: viewModel.progress(for: .basics),
             content: {
                 VStack(spacing: 28) {
-                    OnboardingFormSection(title: "Biological Sex", caption: "Keeps your Body Score precise.") {
-                        VStack(spacing: 16) {
+                    OnboardingFormSection(title: "Sex at birth", caption: "For accurate benchmarks only.") {
+                        HStack(spacing: 16) {
                             ForEach(BiologicalSex.allCases, id: \.self) { sex in
                                 OnboardingOptionButton(
                                     title: sex.description,
                                     subtitle: nil,
                                     isSelected: viewModel.bodyScoreInput.sex == sex,
                                     action: {
-                                        viewModel.updateSex(sex)
+                                        handleSexSelection(sex)
                                     }
                                 )
+                                .frame(maxWidth: .infinity)
                             }
                         }
-                    }
 
-                    OnboardingFormSection(title: "Birth Year", caption: "We use age ranges to benchmark your metrics.") {
-                        VStack(spacing: 16) {
-                            Picker("Birth Year", selection: birthYearBinding) {
-                                ForEach(viewModel.birthYearOptions, id: \.self) { year in
-                                    Text("\(year)").tag(year)
-                                }
-                            }
-                            .pickerStyle(.wheel)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 150)
-                            .clipped()
-                            .onChange(of: viewModel.bodyScoreInput.birthYear) { _ in
-                                HapticManager.shared.selection()
-                            }
-                        }
+                        OnboardingInfoRow(text: "We use sex at birth only to match you to the right comparison group—never for marketing.")
                     }
                 }
             },
@@ -71,9 +49,18 @@ struct BodyScoreBasicsView: View {
                 }
             }
         )
-        .onAppear {
-            if viewModel.bodyScoreInput.birthYear == nil {
-                viewModel.updateBirthYear(viewModel.defaultBirthYear)
+    }
+
+    private func handleSexSelection(_ sex: BiologicalSex) {
+        let previousSex = viewModel.bodyScoreInput.sex
+        viewModel.updateSex(sex)
+
+        guard previousSex != sex else { return }
+
+        let delay: TimeInterval = 0.35
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            if viewModel.canContinueBasics && viewModel.currentStep == .basics {
+                viewModel.goToNextStep()
             }
         }
     }
