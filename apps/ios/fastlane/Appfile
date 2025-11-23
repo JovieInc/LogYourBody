@@ -7,8 +7,10 @@
 
 # Default values
 app_identifier ENV["APP_IDENTIFIER"] || "LogYourBody.LogYourBody"
-apple_id ENV["APPLE_ID_EMAIL"] || ""
 team_id ENV["APPLE_TEAM_ID"] || ""
+
+# Using App Store Connect API Key authentication - no apple_id needed
+# API key is configured in Fastfile via setup_app_store_connect_api lane
 
 # You can uncomment the lines below and add your own 
 # team selection in case you're in multiple teams

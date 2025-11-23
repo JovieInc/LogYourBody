@@ -7,7 +7,7 @@ storage_mode("git")
 
 type("development") # The default type, can be: appstore, adhoc, enterprise or development
 
-app_identifier(["LogYourBody.LogYourBody"])
+app_identifier(["com.logyourbody.app"])
 
 # API key authentication is required - no username/password fallback
 # Set these environment variables:

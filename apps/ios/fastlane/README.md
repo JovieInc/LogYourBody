@@ -95,6 +95,14 @@ PR verification - lint, build, and test
 
 Build for development
 
+### ios sentry_upload_symbols
+
+```sh
+[bundle exec] fastlane ios sentry_upload_symbols
+```
+
+Upload dSYMs to Sentry using sentry-cli
+
 ### ios alpha
 
 ```sh
@@ -198,6 +206,14 @@ Force regenerate all provisioning profiles with Match
 ```
 
 Post-build success actions
+
+### ios debug_env
+
+```sh
+[bundle exec] fastlane ios debug_env
+```
+
+Debug environment variables
 
 ----
 

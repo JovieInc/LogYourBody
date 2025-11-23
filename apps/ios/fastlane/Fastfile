@@ -93,14 +93,24 @@ platform :ios do
     else
       # Local development - try API key if available
       if ENV["APP_STORE_CONNECT_API_KEY_ID"]
-        UI.message("Using App Store Connect API key for local development")
-        app_store_connect_api_key(
-          key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-          issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
-          key_filepath: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
-          duration: 1200,
-          in_house: false
-        )
+        begin
+          UI.message("Using App Store Connect API key for local development")
+          app_store_connect_api_key(
+            key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+            issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+            key_filepath: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
+            duration: 1200,
+            in_house: false
+          )
+          UI.success("✅ App Store Connect API key configured successfully")
+        rescue => e
+          if e.message.include?("invalid curve name") || e.message.include?("OpenSSL")
+            UI.important("⚠️  OpenSSL curve compatibility issue - API key will be passed directly to Match")
+            # Don't set the API key in lane context - Match will use it directly via env vars
+          else
+            raise e
+          end
+        end
       end
     end
   end
@@ -446,29 +456,53 @@ platform :ios do
       UI.message("APPLE_TEAM_ID: #{ENV["APPLE_TEAM_ID"]}")
       UI.message("=================================")
       
-      if ENV["sigh_LogYourBody.LogYourBody_appstore_profile-name"]
-        profile_name = ENV["sigh_LogYourBody.LogYourBody_appstore_profile-name"]
-        build_options[:xcargs] = " PROVISIONING_PROFILE_SPECIFIER='#{profile_name}'"
-        build_options[:xcargs] += " CODE_SIGN_IDENTITY='iPhone Distribution'"
+      # Check for sigh-generated profile from lane context
+      app_id = ENV["APP_IDENTIFIER"] || "com.logyourbody.app"
+      sigh_uuid = Actions.lane_context[:SIGH_UUID]
+      sigh_name = Actions.lane_context[:SIGH_NAME]
+
+      if sigh_uuid && sigh_name
+        UI.message("Using sigh profile: #{sigh_name} (#{sigh_uuid})")
+        build_options[:xcargs] = " CODE_SIGN_STYLE=Manual"
+        build_options[:xcargs] += " CODE_SIGN_IDENTITY='Apple Distribution'"
         build_options[:xcargs] += " DEVELOPMENT_TEAM='#{ENV["APPLE_TEAM_ID"]}'"
-      else
-        UI.important("Match environment variables not available - using automatic provisioning profile selection")
-        # Use automatic signing which will select the correct profile based on capabilities
-        # The profile was installed by Match, so Xcode should find it
+        # Don't set PROVISIONING_PROFILE as xcarg - it applies to all targets including SwiftPM packages
+        # The provisioning profile is already configured via update_code_signing_settings
         build_options[:export_options] ||= {}
-        build_options[:export_options][:signingStyle] = "automatic"
+        build_options[:export_options][:signingStyle] = "manual"
         build_options[:export_options][:teamID] = ENV["APPLE_TEAM_ID"]
+        build_options[:export_options][:provisioningProfiles] = {
+          app_id => sigh_uuid
+        }
+      else
+        UI.important("No sigh profile - skipping manual signing configuration")
+        UI.important("Will rely on automatic code signing if enabled in project")
+        # Don't configure manual signing - let Xcode handle it automatically
       end
     end
     
     UI.header("🔧 Build options:")
     UI.message(build_options.map { |k, v| "#{k}: #{v}" }.join("\n"))
-    
+
     # Clean build artifacts if requested
     if options[:clean_artifacts] != false
       clean_build_artifacts
     end
-    
+
+    # Update code signing settings for manual control
+    if export_method == "app-store" && sigh_uuid
+      UI.message("Updating code signing settings to use manual profile")
+      update_code_signing_settings(
+        path: build_options[:project],
+        use_automatic_signing: false,
+        team_id: ENV["APPLE_TEAM_ID"],
+        bundle_identifier: app_id,
+        profile_name: sigh_name,
+        profile_uuid: sigh_uuid,
+        code_sign_identity: "Apple Distribution"
+      )
+    end
+
     # Build the app
     build_app(build_options)
     
@@ -551,16 +585,39 @@ platform :ios do
 
   desc "Build and upload Alpha to TestFlight (dev branch - rapid)"
   lane :alpha do |options|
-    # Ensure distribution certificates and provisioning profiles are available (Match)
-    setup_provisioning(type: "appstore")
-    
+    # Setup API key
+    setup_app_store_connect_api
+
+    # Use sigh to create/fetch App Store provisioning profile
+    # This avoids Match + OpenSSL curve issues
+    profile = sigh(
+      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
+      team_id: ENV["APPLE_TEAM_ID"]
+    )
+
+    # Use manual signing with the sigh profile
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      team_id: ENV["APPLE_TEAM_ID"],
+      bundle_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
+      profile_name: lane_context[SharedValues::SIGH_NAME],
+      code_sign_identity: "Apple Distribution",
+      path: "./LogYourBody.xcodeproj"
+    )
+
     # Use the shared build lane
     build_result = build(
       configuration: "Release",
       export_method: "app-store",
       build_number: options[:build_number],
       output_directory: "./build",
-      clean_artifacts: true
+      clean_artifacts: true,
+      export_options: {
+        method: "app-store",
+        provisioningProfiles: {
+          (ENV["APP_IDENTIFIER"] || "com.logyourbody.app") => lane_context[SharedValues::SIGH_NAME]
+        }
+      }
     )
     
     # Read release notes if provided
@@ -771,13 +828,13 @@ platform :ios do
         # Build match parameters
         match_params = {
           type: match_type,
-          app_identifier: ["LogYourBody.LogYourBody"],
+          app_identifier: [ENV["APP_IDENTIFIER"] || "com.logyourbody.app"],
           readonly: readonly,
           git_url: ENV["MATCH_GIT_URL"],
           git_branch: ENV["MATCH_GIT_BRANCH"] || "main",
           git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
           team_id: ENV["APPLE_TEAM_ID"],
-          generate_apple_certs: !readonly,
+          generate_apple_certs: false, # Never generate certs due to OpenSSL issues and cert limits
           skip_provisioning_profiles: false,
           platform: "ios",
           verbose: true,
@@ -786,9 +843,28 @@ platform :ios do
         }
         
         # Add API key if available
-        if lane_context[SharedValues::APP_STORE_CONNECT_API_KEY]
+        # Handle OpenSSL curve compatibility issues by passing API key directly
+        if ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_API_ISSUER_ID"]
+          if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+            match_params[:api_key_path] = ENV["APP_STORE_CONNECT_API_KEY_PATH"]
+            UI.message("Using App Store Connect API key from file: #{ENV["APP_STORE_CONNECT_API_KEY_PATH"]}")
+          elsif ENV["APP_STORE_CONNECT_API_KEY"]
+            # Pass API key directly to Match to bypass OpenSSL curve issues
+            match_params[:api_key] = {
+              key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+              issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+              key: ENV["APP_STORE_CONNECT_API_KEY"],
+              is_key_content_base64: false,
+              duration: 1200,
+              in_house: false
+            }
+            UI.message("Using App Store Connect API key from environment (content)")
+          end
+        elsif lane_context[SharedValues::APP_STORE_CONNECT_API_KEY]
           # API key is already configured via setup_app_store_connect_api
           UI.message("Using App Store Connect API key from lane context")
+        else
+          UI.important("⚠️  No App Store Connect API key found - Match may fall back to Apple ID authentication")
         end
         
         # Use match instead of sync_code_signing
@@ -861,8 +937,11 @@ platform :ios do
       skip_confirmation: true
     }
     
-    # In CI, we need to handle API key authentication differently
-    if ENV["CI"] && ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_API_KEY"]
+    # Pass API key directly to avoid OpenSSL issues
+    if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+      match_params[:api_key_path] = ENV["APP_STORE_CONNECT_API_KEY_PATH"]
+      UI.message("Using App Store Connect API key from file for nuke operation")
+    elsif ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_API_KEY"]
       match_params[:api_key] = {
         key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
         issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
@@ -871,6 +950,7 @@ platform :ios do
         duration: 1200,
         in_house: false
       }
+      UI.message("Using App Store Connect API key from environment for nuke operation")
     end
     
     # Nuke app store certificates
@@ -939,6 +1019,22 @@ platform :ios do
   lane :notify_success do |options|
     UI.success("🎉 Build succeeded for #{options[:context] || 'unknown context'}")
     # Add Slack or Discord integration here if desired
+  end
+
+  desc "Debug environment variables"
+  lane :debug_env do
+    UI.header("Environment Variables")
+    UI.message("APP_STORE_CONNECT_API_KEY_ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID']}")
+    UI.message("APP_STORE_CONNECT_API_ISSUER_ID: #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']}")
+    UI.message("APP_STORE_CONNECT_API_KEY_PATH: #{ENV['APP_STORE_CONNECT_API_KEY_PATH']}")
+    UI.message("APPLE_TEAM_ID: #{ENV['APPLE_TEAM_ID']}")
+    UI.message("MATCH_GIT_URL: #{ENV['MATCH_GIT_URL']}")
+
+    if File.exist?(ENV['APP_STORE_CONNECT_API_KEY_PATH'] || "")
+      UI.success("✅ API Key file exists at: #{ENV['APP_STORE_CONNECT_API_KEY_PATH']}")
+    else
+      UI.error("❌ API Key file not found")
+    end
   end
 
 end

@@ -50,7 +50,7 @@
 		AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872322EB405C00041C426 /* BackgroundTaskType.swift */; };
 		AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */; };
 		AD8872372EB406430041C426 /* BackgroundTaskDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */; };
-		AD8872402EB87EF80041C426 /* (null) in Sources */ = {isa = PBXBuildFile; };
+		AD8872402EB87EF80041C426 /* BuildFile in Sources */ = {isa = PBXBuildFile; };
 		AD8872412EB87EF80041C426 /* DashboardViewLiquid.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */; };
 		AD8872432EB87F290041C426 /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872422EB87F290041C426 /* ProgressRing.swift */; };
 		AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872442EB87F480041C426 /* LiquidGlassCard.swift */; };
@@ -125,7 +125,6 @@
 		ADA600242ED2596700088042 /* BodyScoreProfileDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600232ED2596700088042 /* BodyScoreProfileDetailsView.swift */; };
 		ADA600262ED259A700088042 /* BodyScoreShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600252ED259A700088042 /* BodyScoreShareCard.swift */; };
 		ADA600282ED259DB00088042 /* BodyScoreRecalculationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */; };
-		ADA6002A2ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600292ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift */; };
 		ADA6002C2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002B2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift */; };
 		ADA600302ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */; };
 		ADA600312ED25F6700088042 /* BodySpecIntegrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */; };
@@ -217,8 +216,8 @@
 		ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B0E2E15FA5C002376C6 /* ContentView.swift */; };
 		ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B122E15FA5C002376C6 /* LogYourBodyApp.swift */; };
 		ADDC47F72E2D89F3003C97E7 /* AnimatedTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D38B2E24A948001F82A8 /* AnimatedTabView.swift */; };
-		ADDC47F82E2D89F3003C97E7 /* Components/DashboardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */; };
-		ADDC47F92E2D89F3003C97E7 /* Components/DashboardMetricCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B022E25B10200123456 /* Components/DashboardMetricCards.swift */; };
+		ADDC47F82E2D89F3003C97E7 /* DashboardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B002E25B10100123456 /* DashboardComponents.swift */; };
+		ADDC47F92E2D89F3003C97E7 /* DashboardMetricCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */; };
 		ADDC47FA2E2D89F3003C97E7 /* DietPhaseCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D38C2E24A948001F82A8 /* DietPhaseCard.swift */; };
 		ADDC47FE2E2D89F3003C97E7 /* SkeletonLoaders.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */; };
 		ADDC47FF2E2D89F3003C97E7 /* UIComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA923002E22EF4600B82C49 /* UIComponents.swift */; };
@@ -343,8 +342,8 @@
 		AD435B582EC79EEB0084E5C5 /* MetricSummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSummaryCard.swift; sourceTree = "<group>"; };
 		AD4B1C7D2FFC0A4E00A3B9E1 /* LRUCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRUCache.swift; sourceTree = "<group>"; };
 		AD4F5E7A2E18C23400456789 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
-		AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardComponents.swift; sourceTree = "<group>"; };
-		AD5C4B022E25B10200123456 /* Components/DashboardMetricCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardMetricCards.swift; sourceTree = "<group>"; };
+		AD5C4B002E25B10100123456 /* DashboardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardComponents.swift; sourceTree = "<group>"; };
+		AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardMetricCards.swift; sourceTree = "<group>"; };
 		AD722F0E2E15FA5A002376C6 /* delete_files.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = delete_files.sh; sourceTree = "<group>"; };
 		AD722F0F2E15FA5A002376C6 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		AD722F102E15FA5A002376C6 /* icon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "icon-1024.png"; sourceTree = "<group>"; };
@@ -713,10 +712,10 @@
 				AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */,
 				AD050C442EBFFEF60082A313 /* MetricChartView.swift */,
 				ADE6D38B2E24A948001F82A8 /* AnimatedTabView.swift */,
-				AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */,
+				AD5C4B002E25B10100123456 /* DashboardComponents.swift */,
 				AD8872422EB87F290041C426 /* ProgressRing.swift */,
 				AD8872442EB87F480041C426 /* LiquidGlassCard.swift */,
-				AD5C4B022E25B10200123456 /* Components/DashboardMetricCards.swift */,
+				AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */,
 				ADE6D38C2E24A948001F82A8 /* DietPhaseCard.swift */,
 				C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */,
 				ADA923012E22EF4600B82C49 /* Common */,
@@ -1418,10 +1417,14 @@
 					};
 					AD7D30A12E1490810072AA5B = {
 						CreatedOnToolsVersion = 15.4;
+						DevelopmentTeam = G24T327LXT;
+						ProvisioningStyle = Manual;
 						TestTargetID = AD7D30912E14907F0072AA5B;
 					};
 					AD7D30AB2E1490810072AA5B = {
 						CreatedOnToolsVersion = 15.4;
+						DevelopmentTeam = G24T327LXT;
+						ProvisioningStyle = Manual;
 						TestTargetID = AD7D30912E14907F0072AA5B;
 					};
 				};
@@ -1552,7 +1555,6 @@
 				ADDC48822E2D8A6B003C97E7 /* OTPInputView.swift in Sources */,
 				ADDC48832E2D8A6B003C97E7 /* LegalConsentView.swift in Sources */,
 				ADDC48842E2D8A6B003C97E7 /* WhatsNewView.swift in Sources */,
-				ADA6002A2ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift in Sources */,
 				ADDC48852E2D8A6B003C97E7 /* BiometricLockView.swift in Sources */,
 				ADDC48862E2D8A6B003C97E7 /* HealthDisclaimerView.swift in Sources */,
 				ADDC48872E2D8A6B003C97E7 /* ProgressPhotoCutoutView.swift in Sources */,
@@ -1622,9 +1624,9 @@
 				ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */,
 				ADDC47F72E2D89F3003C97E7 /* AnimatedTabView.swift in Sources */,
 				ADA600262ED259A700088042 /* BodyScoreShareCard.swift in Sources */,
-				ADDC47F82E2D89F3003C97E7 /* Components/DashboardComponents.swift in Sources */,
+				ADDC47F82E2D89F3003C97E7 /* DashboardComponents.swift in Sources */,
 				ADA4B7452ECFE0F300F4262A /* FullMetricChartView.swift in Sources */,
-				ADDC47F92E2D89F3003C97E7 /* Components/DashboardMetricCards.swift in Sources */,
+				ADDC47F92E2D89F3003C97E7 /* DashboardMetricCards.swift in Sources */,
 				ADDC47FA2E2D89F3003C97E7 /* DietPhaseCard.swift in Sources */,
 				ADDC47FE2E2D89F3003C97E7 /* SkeletonLoaders.swift in Sources */,
 				ADDC47FF2E2D89F3003C97E7 /* UIComponents.swift in Sources */,
@@ -1724,7 +1726,7 @@
 				AD8872D32EB946BE0041C426 /* DSTrendIndicator.swift in Sources */,
 				ADA4B73B2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift in Sources */,
 				AD8872372EB406430041C426 /* BackgroundTaskDetailsSheet.swift in Sources */,
-				AD8872402EB87EF80041C426 /* (null) in Sources */,
+				AD8872402EB87EF80041C426 /* BuildFile in Sources */,
 				AD8872412EB87EF80041C426 /* DashboardViewLiquid.swift in Sources */,
 				ADA4B7492ECFE59C00F4262A /* DashboardMetricsList.swift in Sources */,
 				AD435B592EC79EEB0084E5C5 /* MetricSummaryCard.swift in Sources */,
@@ -1882,9 +1884,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = LogYourBody/LogYourBody.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251120220025;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 20251123110645;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
+				DEVELOPMENT_TEAM = G24T327LXT;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = G24T327LXT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -1904,7 +1910,9 @@
 				NEW_SETTING = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PROVISIONING_PROFILE = "e19d10db-52d6-4ec5-b291-fdf73970869c";
+				PROVISIONING_PROFILE_SPECIFIER = "e19d10db-52d6-4ec5-b291-fdf73970869c";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "e19d10db-52d6-4ec5-b291-fdf73970869c";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1918,9 +1926,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = LogYourBody/LogYourBody.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251120220025;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 20251123110645;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
+				DEVELOPMENT_TEAM = G24T327LXT;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = G24T327LXT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -1940,7 +1952,9 @@
 				NEW_SETTING = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PROVISIONING_PROFILE = "e19d10db-52d6-4ec5-b291-fdf73970869c";
+				PROVISIONING_PROFILE_SPECIFIER = "e19d10db-52d6-4ec5-b291-fdf73970869c";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "e19d10db-52d6-4ec5-b291-fdf73970869c";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1951,14 +1965,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251120220025;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 20251123110645;
+				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = LogYourBody.LogYourBodyTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "e19d10db-52d6-4ec5-b291-fdf73970869c";
+				PROVISIONING_PROFILE_SPECIFIER = "e19d10db-52d6-4ec5-b291-fdf73970869c";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1970,14 +1988,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251120220025;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 20251123110645;
+				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = LogYourBody.LogYourBodyTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "e19d10db-52d6-4ec5-b291-fdf73970869c";
+				PROVISIONING_PROFILE_SPECIFIER = "e19d10db-52d6-4ec5-b291-fdf73970869c";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1988,14 +2010,18 @@
 		AD7D30BD2E1490810072AA5B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251120220025;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 20251123110645;
+				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = LogYourBody.LogYourBodyUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "e19d10db-52d6-4ec5-b291-fdf73970869c";
+				PROVISIONING_PROFILE_SPECIFIER = "e19d10db-52d6-4ec5-b291-fdf73970869c";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -2006,14 +2032,18 @@
 		AD7D30BE2E1490810072AA5B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20251120220025;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 20251123110645;
+				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = LogYourBody.LogYourBodyUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "e19d10db-52d6-4ec5-b291-fdf73970869c";
+				PROVISIONING_PROFILE_SPECIFIER = "e19d10db-52d6-4ec5-b291-fdf73970869c";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
