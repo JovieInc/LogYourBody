@@ -70,8 +70,8 @@ extension DashboardViewLiquid {
         guard let weight = weight else { return "–" }
         let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
         let converted = convertWeight(weight, to: system) ?? weight
-        // Apple Health-style: no decimals for displayed weight
-        return String(format: "%.0f", converted)
+        // Display with a single decimal place for consistency across views
+        return String(format: "%.1f", converted)
     }
 
     func formatBodyFatValue(_ bodyFat: Double?) -> String {
@@ -144,6 +144,10 @@ extension DashboardViewLiquid {
             return ffmiEntriesPayload()
         case .steps:
             return stepsEntriesPayload()
+        case .glp1:
+            return glp1EntriesPayload()
+        case .bodyScore:
+            return bodyScoreEntriesPayload()
         }
     }
 
@@ -287,6 +291,66 @@ extension DashboardViewLiquid {
             unitLabel: "",
             secondaryUnitLabel: nil,
             primaryFormatter: formatter,
+            secondaryFormatter: nil
+        )
+
+        return MetricEntriesPayload(config: config, entries: entries)
+    }
+
+    func glp1EntriesPayload() -> MetricEntriesPayload? {
+        guard !glp1DoseLogs.isEmpty else { return nil }
+
+        let logs = glp1DoseLogs.sorted { $0.takenAt < $1.takenAt }
+        let primaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 1, maxFractionDigits: 1)
+
+        let entries: [MetricHistoryEntry] = logs.compactMap { log in
+            guard let dose = log.doseAmount else { return nil }
+            return MetricHistoryEntry(
+                id: log.id,
+                date: log.takenAt,
+                primaryValue: dose,
+                secondaryValue: nil,
+                source: .manual
+            )
+        }
+
+        guard !entries.isEmpty else { return nil }
+
+        let unitLabel = logs.first?.doseUnit ?? "mg"
+
+        let config = MetricEntriesConfiguration(
+            metricType: .glp1,
+            unitLabel: unitLabel,
+            secondaryUnitLabel: nil,
+            primaryFormatter: primaryFormatter,
+            secondaryFormatter: nil
+        )
+
+        return MetricEntriesPayload(config: config, entries: entries)
+    }
+
+    func bodyScoreEntriesPayload() -> MetricEntriesPayload? {
+        let primaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 0)
+
+        let entries = sortedBodyMetricsAscending
+            .compactMap { metric -> MetricHistoryEntry? in
+                guard let result = bodyScoreResult(for: metric) else { return nil }
+                return MetricHistoryEntry(
+                    id: metric.id,
+                    date: metric.date,
+                    primaryValue: Double(result.score),
+                    secondaryValue: nil,
+                    source: metricEntrySourceType(from: metric.dataSource)
+                )
+            }
+
+        guard !entries.isEmpty else { return nil }
+
+        let config = MetricEntriesConfiguration(
+            metricType: .bodyScore,
+            unitLabel: "",
+            secondaryUnitLabel: nil,
+            primaryFormatter: primaryFormatter,
             secondaryFormatter: nil
         )
 
@@ -631,6 +695,37 @@ extension DashboardViewLiquid {
             }
     }
 
+    func generateFullScreenGlp1ChartData() -> [MetricChartDataPoint] {
+        guard !glp1DoseLogs.isEmpty else { return [] }
+
+        return glp1DoseLogs
+            .sorted { $0.takenAt < $1.takenAt }
+            .compactMap { log in
+                guard let dose = log.doseAmount else { return nil }
+                return MetricChartDataPoint(
+                    date: log.takenAt,
+                    value: dose
+                )
+            }
+    }
+
+    func generateFullScreenBodyScoreChartData() -> [MetricChartDataPoint] {
+        guard !sortedBodyMetricsAscending.isEmpty else { return [] }
+
+        return sortedBodyMetricsAscending
+            .compactMap { metric in
+                guard let result = bodyScoreResult(for: metric) else {
+                    return nil
+                }
+
+                return MetricChartDataPoint(
+                    date: metric.date,
+                    value: Double(result.score),
+                    isEstimated: false
+                )
+            }
+    }
+
     func convertHeightToInches(height: Double?, heightUnit: String?) -> Double? {
         guard let height, height > 0 else { return nil }
         return height / 2.54
@@ -642,6 +737,21 @@ extension DashboardViewLiquid {
             return weight
         case .imperial:
             return weight * 2.20462
+        }
+    }
+
+    @MainActor
+    func loadGlp1DoseLogs() async {
+        guard let userId = authManager.currentUser?.id else {
+            glp1DoseLogs = []
+            return
+        }
+
+        do {
+            let logs = try await SupabaseManager.shared.fetchGlp1DoseLogs(userId: userId, limit: 200)
+            glp1DoseLogs = logs.sorted { $0.takenAt < $1.takenAt }
+        } catch {
+            // Ignore errors for now; GLP-1 data is optional for dashboard
         }
     }
 }

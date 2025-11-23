@@ -16,6 +16,10 @@ extension DashboardViewLiquid {
             weightValue: heroWeightValue(),
             weightCaption: heroWeightCaption(),
             deltaText: heroBodyScoreDeltaText(),
+            onTapBodyScore: bodyScore.score > 0 ? {
+                selectedMetricType = .bodyScore
+                isMetricDetailActive = true
+            } : nil,
             onTapFFMI: {
                 selectedMetricType = .ffmi
                 isMetricDetailActive = true
@@ -86,7 +90,14 @@ extension DashboardViewLiquid {
                 let genderString = authManager.currentUser?.profile?.gender?.lowercased() ?? ""
                 let isFemale = genderString.contains("female") || genderString.contains("woman")
                 let sex: BiologicalSex = isFemale ? .female : .male
-                return descriptiveHeroFFMIStatus(ffmiData.value, sex: sex)
+                let status = descriptiveHeroFFMIStatus(ffmiData.value, sex: sex)
+
+                if let delta = heroFFMIDelta30d() {
+                    let trend = heroTrendCaption(delta: delta, unit: "")
+                    return "\(trend) · \(status)"
+                }
+
+                return status
             }
         }
 
@@ -129,19 +140,30 @@ extension DashboardViewLiquid {
     }
 
     func heroBodyFatValue() -> String {
-        formatBodyFatValue(currentMetric?.bodyFatPercentage)
+        let base = formatBodyFatValue(currentMetric?.bodyFatPercentage)
+        guard base != "–" else { return base }
+        return "\(base)%"
     }
 
     func heroBodyFatCaption() -> String {
-        "%"
+        if let delta = heroBodyFatDelta30d() {
+            return heroTrendCaption(delta: delta, unit: "%")
+        }
+        return "%"
     }
 
     func heroWeightValue() -> String {
-        formatWeightValue(currentMetric?.weight)
+        let base = formatWeightValue(currentMetric?.weight)
+        guard base != "–" else { return base }
+        return "\(base) \(weightUnit)"
     }
 
     func heroWeightCaption() -> String {
-        weightUnit
+        if let delta = heroWeightDelta30d() {
+            let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+            return heroTrendCaption(delta: delta, unit: system.weightUnit)
+        }
+        return weightUnit
     }
 
     func latestBodyScoreResult() -> BodyScoreResult? {
@@ -149,8 +171,15 @@ extension DashboardViewLiquid {
     }
 
     private func dynamicBodyScoreResult() -> BodyScoreResult? {
-        guard let metric = currentMetric,
-              let profile = authManager.currentUser?.profile else {
+        guard let metric = currentMetric else {
+            return nil
+        }
+
+        return bodyScoreResult(for: metric)
+    }
+
+    func bodyScoreResult(for metric: BodyMetrics) -> BodyScoreResult? {
+        guard let profile = authManager.currentUser?.profile else {
             return nil
         }
 
@@ -242,6 +271,88 @@ extension DashboardViewLiquid {
             return nil
         }
         return "+0.0 last 30d"
+    }
+
+    // MARK: - Hero Tile 30d Trends
+
+    private func heroTrendCaption(delta: Double, unit: String) -> String {
+        if abs(delta) < 0.001 {
+            return "No change last 30d"
+        }
+
+        let directionSymbol = delta > 0 ? "↑" : "↓"
+        let formatted = formatDelta(delta: delta, unit: unit)
+        return "\(directionSymbol) \(formatted) last 30d"
+    }
+
+    private func heroWeightDelta30d() -> Double? {
+        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        let recentMetrics = filteredMetrics(for: .month1)
+
+        let stats = computeRangeStats(
+            metrics: recentMetrics,
+            valueProvider: { metric in
+                guard let weight = metric.weight else { return nil }
+                return convertWeight(weight, to: system) ?? weight
+            }
+        )
+
+        guard let stats else {
+            return nil
+        }
+
+        return stats.delta
+    }
+
+    private func heroBodyFatDelta30d() -> Double? {
+        let interpolationContext = MetricsInterpolationService.shared
+            .makeBodyFatInterpolationContext(for: bodyMetrics)
+        let recentMetrics = filteredMetrics(for: .month1)
+
+        let stats = computeRangeStats(
+            metrics: recentMetrics,
+            valueProvider: { metric in
+                if let value = metric.bodyFatPercentage {
+                    return value
+                }
+                return interpolationContext?.estimate(for: metric.date)?.value
+            }
+        )
+
+        guard let stats else {
+            return nil
+        }
+
+        return stats.delta
+    }
+
+    private func heroFFMIDelta30d() -> Double? {
+        let heightInches = convertHeightToInches(
+            height: authManager.currentUser?.profile?.height,
+            heightUnit: authManager.currentUser?.profile?.heightUnit
+        )
+
+        guard let heightInches else { return nil }
+
+        guard let interpolationContext = MetricsInterpolationService.shared
+            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
+            return nil
+        }
+
+        let recentMetrics = filteredMetrics(for: .month1)
+
+        let stats = computeRangeStats(
+            metrics: recentMetrics,
+            valueProvider: { metric in
+                interpolationContext.estimate(for: metric.date)?.value
+            }
+        )
+
+        guard let stats else {
+            return nil
+        }
+
+        return stats.delta
     }
 
     // MARK: - Primary Metric Card

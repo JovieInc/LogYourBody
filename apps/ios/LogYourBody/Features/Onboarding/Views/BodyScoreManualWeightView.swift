@@ -122,9 +122,14 @@ struct BodyScoreManualWeightView: View {
                 }
             },
             footer: {
-                Button("Continue") {
+                Button {
                     viewModel.persistManualWeightEntry()
                     viewModel.goToNextStep()
+                } label: {
+                    Text("Continue")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueWeight)

@@ -28,11 +28,6 @@ final class DashboardViewModel: ObservableObject {
             return
         }
 
-        let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
-        let allMetrics = fetchedMetrics
-            .compactMap { $0.toBodyMetrics() }
-            .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
-
         let todayMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: Date())
         let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
         let recentDailyCached = await CoreDataManager.shared.fetchDailyMetrics(
@@ -43,13 +38,19 @@ final class DashboardViewModel: ObservableObject {
         let recentDaily = recentDailyCached.map { $0.toDailyMetrics() }
 
         if loadOnlyNewest {
-            if let newest = allMetrics.first {
+            if let latestCached = await CoreDataManager.shared.fetchLatestBodyMetric(for: userId),
+               let newest = latestCached.toBodyMetrics() {
                 bodyMetrics = [newest]
                 sortedBodyMetricsAscending = [newest]
                 hasLoadedInitialData = true
 
                 // Defer full list assignment to a follow-up task so the UI can show something quickly
-                Task { @MainActor [allMetrics] in
+                Task { @MainActor in
+                    let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+                    let allMetrics = fetchedMetrics
+                        .compactMap { $0.toBodyMetrics() }
+                        .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
+
                     if self.bodyMetrics.count == 1 {
                         self.bodyMetrics = allMetrics
                         self.sortedBodyMetricsAscending = allMetrics.sorted {
@@ -59,6 +60,11 @@ final class DashboardViewModel: ObservableObject {
                 }
             }
         } else {
+            let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+            let allMetrics = fetchedMetrics
+                .compactMap { $0.toBodyMetrics() }
+                .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
+
             bodyMetrics = allMetrics
             sortedBodyMetricsAscending = allMetrics.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
             if !bodyMetrics.isEmpty {
@@ -102,7 +108,7 @@ final class DashboardViewModel: ObservableObject {
             }
         }
 
-        realtimeSyncManager.syncAll()
+        realtimeSyncManager.syncIfNeeded()
 
         try? await Task.sleep(nanoseconds: 1_500_000_000)
 

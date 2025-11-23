@@ -44,6 +44,18 @@ struct AddEntrySheet: View {
     @State private var processedCount = 0
     @State private var photoIdentifiers: [String] = []  // Store PHAsset identifiers for deletion
 
+    // GLP-1 entry
+    @State private var glp1Dose: String = ""
+    @State private var glp1DoseUnit: String = "mg/week"
+    @State private var glp1Error: String?
+    @State private var glp1Medications: [Glp1Medication] = []
+    @State private var selectedGlp1MedicationId: String?
+    @State private var selectedGlp1DoseIndex: Int = 0
+    @State private var glp1IsLoadingMedications = false
+    @State private var isPresentingGlp1AddMedication = false
+    @State private var glp1UseCustomDose = false
+    @State private var glp1UserId: String?
+
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var showDeletePhotosPrompt = false
@@ -58,6 +70,7 @@ struct AddEntrySheet: View {
                     Label("Weight", systemImage: "scalemass").tag(0)
                     Label("Body Fat", systemImage: "percent").tag(1)
                     Label("Photos", systemImage: "photo.fill").tag(2)
+                    Label("GLP-1", systemImage: "syringe").tag(3)
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
@@ -90,6 +103,8 @@ struct AddEntrySheet: View {
                         bodyFatEntryView
                     case 2:
                         photoEntryView
+                    case 3:
+                        glp1EntryView
                     default:
                         EmptyView()
                     }
@@ -150,6 +165,192 @@ struct AddEntrySheet: View {
                 // Set default weight unit based on user preference
                 if weightUnit.isEmpty {
                     weightUnit = currentSystem.weightUnit
+                }
+
+                glp1UserId = authManager.currentUser?.id
+                if let userId = glp1UserId {
+                    Task {
+                        await loadGlp1Medications(userId: userId)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - GLP-1 Entry View
+
+    private var glp1EntryView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Log GLP-1 dose")
+                .font(.appHeadline)
+                .padding(.top)
+
+            if glp1IsLoadingMedications {
+                HStack {
+                    ProgressView()
+                        .tint(.appPrimary)
+                    Text("Loading medications…")
+                        .font(.appBodySmall)
+                        .foregroundColor(.appTextSecondary)
+                }
+                .padding(.top, 8)
+            } else if glp1Medications.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Add your GLP-1 medication")
+                        .font(.appBody)
+
+                    Text("Select the medication you're taking so logging is just a quick dose pick.")
+                        .font(.appBodySmall)
+                        .foregroundColor(.appTextSecondary)
+
+                    Button {
+                        isPresentingGlp1AddMedication = true
+                    } label: {
+                        Text("Add medication")
+                            .font(.appBody)
+                            .fontWeight(.semibold)
+                            .frame(height: 44)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.appPrimary)
+                            .foregroundColor(.white)
+                            .cornerRadius(Constants.cornerRadius)
+                    }
+                    .padding(.top, 4)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Medication")
+                        .font(.appBodySmall)
+                        .foregroundColor(.appTextSecondary)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(glp1Medications) { medication in
+                                let isSelected = medication.id == selectedGlp1MedicationId
+
+                                Button {
+                                    selectGlp1Medication(medication)
+                                } label: {
+                                    Text(medication.displayName)
+                                        .font(.appBodySmall)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            isSelected ? Color.appPrimary : Color.appSurfaceSecondary
+                                        )
+                                        .foregroundColor(isSelected ? .black : .appTextPrimary)
+                                        .cornerRadius(999)
+                                }
+                            }
+
+                            Button {
+                                isPresentingGlp1AddMedication = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "plus")
+                                    Text("Add")
+                                }
+                                .font(.appBodySmall)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.appSurfaceSecondary)
+                                .foregroundColor(.appTextPrimary)
+                                .cornerRadius(999)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+
+                    if let medication = glp1SelectedMedication {
+                        let options = glp1DoseOptions
+                        let unit = glp1UnitForSelectedMedication ?? glp1DoseUnit
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Dose")
+                                .font(.appBodySmall)
+                                .foregroundColor(.appTextSecondary)
+
+                            if !options.isEmpty {
+                                Picker("Dose", selection: $selectedGlp1DoseIndex) {
+                                    ForEach(options.indices, id: \.self) { index in
+                                        Text(String(format: "%.2f", options[index]))
+                                            .tag(index)
+                                    }
+                                }
+                                .pickerStyle(WheelPickerStyle())
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 140)
+                                .clipped()
+                                .onChange(of: selectedGlp1DoseIndex) { _, _ in
+                                    updateGlp1DoseFromSelection()
+                                }
+
+                                HStack {
+                                    Text(unit)
+                                        .font(.appBodySmall)
+                                        .foregroundColor(.appTextSecondary)
+                                    Spacer()
+                                }
+                            }
+
+                            Toggle("Custom dose", isOn: $glp1UseCustomDose)
+                                .font(.appBodySmall)
+                                .foregroundColor(.appTextSecondary)
+                                .onChange(of: glp1UseCustomDose) { _, isCustom in
+                                    if !isCustom {
+                                        updateGlp1DoseFromSelection()
+                                    }
+                                }
+
+                            if glp1UseCustomDose {
+                                HStack(spacing: 12) {
+                                    TextField("0.0", text: $glp1Dose)
+                                        .keyboardType(.decimalPad)
+                                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                                        .multilineTextAlignment(.center)
+                                        .frame(maxWidth: .infinity)
+                                        .modernTextFieldStyle()
+                                        .accessibilityLabel("GLP-1 custom dose value")
+                                        .submitLabel(.done)
+                                        .onChange(of: glp1Dose) { _, newValue in
+                                            validateGlp1Dose(newValue)
+                                        }
+
+                                    Text(unit)
+                                        .font(.appBodySmall)
+                                        .foregroundColor(.appTextSecondary)
+                                }
+                            }
+
+                            if let error = glp1Error {
+                                Text(error)
+                                    .font(.appBodySmall)
+                                    .foregroundColor(.error)
+                            } else {
+                                Text("Pick your dose from the wheel or enter a custom dose if needed.")
+                                    .font(.appBodySmall)
+                                    .foregroundColor(.appTextTertiary)
+                            }
+                        }
+                        .onAppear {
+                            if glp1Dose.isEmpty {
+                                updateGlp1DoseFromSelection()
+                            }
+                            glp1DoseUnit = unit
+                        }
+                    }
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal)
+        .sheet(isPresented: $isPresentingGlp1AddMedication) {
+            if let userId = glp1UserId {
+                Glp1AddMedicationView(userId: userId) { medication in
+                    glp1Medications.append(medication)
+                    selectedGlp1MedicationId = medication.id
+                    applyDefaultDoseConfig(for: medication)
                 }
             }
         }
@@ -349,6 +550,8 @@ struct AddEntrySheet: View {
             return !bodyFat.isEmpty && Double(bodyFat) != nil && bodyFatError == nil
         case 2:
             return !selectedPhotos.isEmpty
+        case 3:
+            return glp1SelectedMedication != nil && !glp1Dose.isEmpty && Double(glp1Dose) != nil && glp1Error == nil
         default:
             return false
         }
@@ -362,6 +565,8 @@ struct AddEntrySheet: View {
             return "Save Body Fat"
         case 2:
             return selectedPhotos.count > 1 ? "Upload \(selectedPhotos.count) Photos" : "Upload Photo"
+        case 3:
+            return "Save GLP-1"
         default:
             return "Save"
         }
@@ -380,6 +585,8 @@ struct AddEntrySheet: View {
             Task {
                 await savePhotos(userId: userId)
             }
+        case 3:
+            saveGlp1Dose(userId: userId)
         default:
             break
         }
@@ -440,6 +647,58 @@ struct AddEntrySheet: View {
             handleValidationError(error, for: .bodyFat)
         } catch {
             handleValidationError(.invalidBodyFat("Please enter a valid percentage"), for: .bodyFat)
+        }
+    }
+
+    private func saveGlp1Dose(userId: String) {
+        do {
+            guard let medication = glp1SelectedMedication else {
+                glp1Error = "Select a medication first"
+                return
+            }
+
+            guard let dose = Double(glp1Dose) else {
+                glp1Error = "Please enter a valid number"
+                return
+            }
+
+            if dose <= 0 {
+                glp1Error = "Dose must be greater than zero"
+                return
+            }
+
+            glp1Error = nil
+
+            let now = Date()
+            let calendar = Calendar.current
+            let takenDate = calendar.startOfDay(for: selectedDate)
+            let log = Glp1DoseLog(
+                id: UUID().uuidString,
+                userId: userId,
+                takenAt: takenDate,
+                medicationId: medication.id,
+                doseAmount: dose,
+                doseUnit: medication.doseUnit ?? glp1DoseUnit,
+                drugClass: medication.drugClass,
+                brand: medication.brand ?? medication.displayName,
+                isCompounded: medication.isCompounded,
+                supplierType: nil,
+                supplierName: nil,
+                notes: nil,
+                createdAt: now,
+                updatedAt: now
+            )
+
+            Task {
+                do {
+                    try await SupabaseManager.shared.saveGlp1DoseLog(log)
+                    RealtimeSyncManager.shared.syncIfNeeded()
+                    dismiss()
+                } catch {
+                    errorMessage = "Unable to save GLP-1 entry. Please try again."
+                    showError = true
+                }
+            }
         }
     }
 
@@ -556,6 +815,192 @@ struct AddEntrySheet: View {
             bodyFatError = error.errorDescription
         } catch {
             bodyFatError = "Please enter a valid number"
+        }
+    }
+
+    private func validateGlp1Dose(_ value: String) {
+        guard !value.isEmpty else {
+            glp1Error = nil
+            return
+        }
+
+        guard let dose = Double(value) else {
+            glp1Error = "Please enter a valid number"
+            return
+        }
+
+        if dose <= 0 {
+            glp1Error = "Dose must be greater than zero"
+        } else {
+            glp1Error = nil
+        }
+    }
+
+    // MARK: - GLP-1 Helpers
+
+    private var glp1SelectedMedication: Glp1Medication? {
+        guard let id = selectedGlp1MedicationId else { return nil }
+        return glp1Medications.first(where: { $0.id == id })
+    }
+
+    private var glp1DoseOptions: [Double] {
+        guard let medication = glp1SelectedMedication else { return [] }
+        let config = Glp1MedicationCatalog.doseConfig(for: medication)
+        return config.doses
+    }
+
+    private var glp1UnitForSelectedMedication: String? {
+        guard let medication = glp1SelectedMedication else { return nil }
+        let config = Glp1MedicationCatalog.doseConfig(for: medication)
+        return config.unit
+    }
+
+    @MainActor
+    private func loadGlp1Medications(userId: String) async {
+        glp1IsLoadingMedications = true
+
+        do {
+            let medications = try await SupabaseManager.shared.fetchGlp1Medications(userId: userId)
+            glp1Medications = medications.sorted(by: { $0.startedAt < $1.startedAt })
+
+            if selectedGlp1MedicationId == nil,
+               let active = glp1Medications.last(where: { $0.endedAt == nil }) ?? glp1Medications.last {
+                selectedGlp1MedicationId = active.id
+                applyDefaultDoseConfig(for: active)
+            }
+        } catch {
+            // Ignore errors for now; GLP-1 is optional
+        }
+
+        glp1IsLoadingMedications = false
+    }
+
+    private func applyDefaultDoseConfig(for medication: Glp1Medication) {
+        let config = Glp1MedicationCatalog.doseConfig(for: medication)
+        glp1DoseUnit = config.unit
+        selectedGlp1DoseIndex = 0
+        glp1UseCustomDose = false
+
+        if let first = config.doses.first {
+            glp1Dose = String(first)
+        } else {
+            glp1Dose = ""
+        }
+
+        glp1Error = nil
+    }
+
+    private func selectGlp1Medication(_ medication: Glp1Medication) {
+        selectedGlp1MedicationId = medication.id
+        applyDefaultDoseConfig(for: medication)
+    }
+
+    private func updateGlp1DoseFromSelection() {
+        guard !glp1UseCustomDose else { return }
+        let options = glp1DoseOptions
+
+        guard selectedGlp1DoseIndex >= 0,
+              selectedGlp1DoseIndex < options.count else { return }
+
+        glp1Dose = String(options[selectedGlp1DoseIndex])
+        glp1Error = nil
+    }
+}
+
+private struct Glp1AddMedicationView: View {
+    let userId: String
+    let onCreated: (Glp1Medication) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private var presets: [Glp1MedicationPreset] {
+        Glp1MedicationCatalog.allPresets
+    }
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section("Choose medication") {
+                    ForEach(presets, id: \.displayName) { preset in
+                        Button {
+                            createMedication(from: preset)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(preset.displayName)
+                                    .font(.appBody)
+                                Text("\(preset.genericName) • \(preset.frequency)")
+                                    .font(.appCaption)
+                                    .foregroundColor(.appTextSecondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .disabled(isSaving)
+                    }
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .font(.appBodySmall)
+                            .foregroundColor(.error)
+                    }
+                }
+            }
+            .navigationTitle("Select GLP-1")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .disabled(isSaving)
+                }
+            }
+        }
+    }
+
+    private func createMedication(from preset: Glp1MedicationPreset) {
+        guard !isSaving else { return }
+        isSaving = true
+
+        let now = Date()
+        let medication = Glp1Medication(
+            id: UUID().uuidString,
+            userId: userId,
+            displayName: preset.displayName,
+            genericName: preset.genericName,
+            drugClass: preset.drugClass,
+            brand: preset.brand,
+            route: preset.route,
+            frequency: preset.frequency,
+            doseUnit: preset.doseUnit,
+            isCompounded: preset.isCompounded,
+            hkIdentifier: preset.hkIdentifier,
+            startedAt: now,
+            endedAt: nil,
+            notes: nil,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        Task {
+            do {
+                let manager = SupabaseManager.shared
+                // End any active GLP-1 courses for this user before starting a new one.
+                try await manager.endActiveGlp1Medications(userId: userId, endedAt: now)
+                try await manager.saveGlp1Medication(medication)
+                await MainActor.run {
+                    onCreated(medication)
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Unable to save medication. Please try again."
+                    isSaving = false
+                }
+            }
         }
     }
 }

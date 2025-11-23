@@ -45,6 +45,8 @@
 	<string>LogYourBody uses the camera to capture progress photos for tracking your fitness journey.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>LogYourBody needs access to scan your photo library for progress photos to import.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>LogYourBody saves your shared body score images to your photo library.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>healthkit</string>

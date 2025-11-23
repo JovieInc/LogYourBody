@@ -4,8 +4,9 @@ import Foundation
 extension DashboardViewLiquid {
     // MARK: - Compact Header
 
-    var compactHeader: some View {
+    func compactHeader(scrollProgress: CGFloat) -> some View {
         DashboardHeaderCompact(
+            scrollProgress: scrollProgress,
             avatarURL: avatarURL,
             userFirstName: userFirstName,
             hasAge: hasAge,
@@ -14,8 +15,13 @@ extension DashboardViewLiquid {
             syncStatusDetail: syncStatusDetail,
             syncStatusColor: syncStatusColor,
             isSyncError: isSyncError,
-            onShowSyncDetails: { showSyncDetails = true }
+            onShowSyncDetails: { showSyncDetails = true },
+            onAddEntry: { showAddEntrySheet = true }
         )
+    }
+
+    var compactHeader: some View {
+        compactHeader(scrollProgress: 0)
     }
 
     var avatarURL: URL? {

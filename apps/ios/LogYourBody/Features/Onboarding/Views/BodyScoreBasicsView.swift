@@ -35,17 +35,21 @@ struct BodyScoreBasicsView: View {
             },
             footer: {
                 VStack(spacing: 12) {
-                    Button("Continue") {
+                    Button {
                         viewModel.goToNextStep()
+                    } label: {
+                        Text("Continue")
+                            .font(.system(size: 18, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
                     }
                     .buttonStyle(OnboardingPrimaryButtonStyle())
                     .disabled(!viewModel.canContinueBasics)
                     .opacity(continueButtonOpacity)
 
-                    Button("Back") {
+                    OnboardingTextButton(title: "Back") {
                         viewModel.goBack()
                     }
-                    .buttonStyle(OnboardingSecondaryButtonStyle())
                 }
             }
         )

@@ -86,7 +86,7 @@ struct AllMetricsRow: View {
                         isButtonContext: true
                     )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .buttonStyle(MetricCardButtonStyle())
             } else {
                 MetricSummaryCard(
                     icon: "figure.walk",

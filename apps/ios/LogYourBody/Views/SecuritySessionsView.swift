@@ -147,7 +147,7 @@ struct SecuritySessionsView: View {
         }
 
         do {
-            let fetchedSessions = try await authManager.fetchActiveSessions()
+            let fetchedSessions = try await AuthManager.shared.fetchActiveSessions()
             await MainActor.run {
                 self.sessions = fetchedSessions.sorted { session1, session2 in
                     // Current session first, then by last active

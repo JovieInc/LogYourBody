@@ -135,6 +135,12 @@
 		ADA600392ED2602F00088042 /* ErrorTrackingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600362ED2602F00088042 /* ErrorTrackingService.swift */; };
 		ADA6003A2ED2602F00088042 /* BodySpecAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600342ED2602F00088042 /* BodySpecAuthManager.swift */; };
 		ADA6003C2ED27D0000088042 /* PreAuthOnboardingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */; };
+		ADA6003E2ED2BC9100088042 /* Glp1DoseLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6003D2ED2BC9100088042 /* Glp1DoseLog.swift */; };
+		ADA600402ED2D32C00088042 /* DashboardViewLiquid+HeroAndActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6003F2ED2D32C00088042 /* DashboardViewLiquid+HeroAndActions.swift */; };
+		ADA600432ED35D8700088042 /* PreAuthBodyScoreOnboardingContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600412ED35D8700088042 /* PreAuthBodyScoreOnboardingContainer.swift */; };
+		ADA600442ED35D8700088042 /* ProfileCompletionGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600422ED35D8700088042 /* ProfileCompletionGateView.swift */; };
+		ADA600472ED375EE00088042 /* GlobalTimelineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600452ED375EE00088042 /* GlobalTimelineModels.swift */; };
+		ADA600482ED375EE00088042 /* Glp1Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600462ED375EE00088042 /* Glp1Medication.swift */; };
 		ADB2F6A12FFD12C500EF7A4B /* EditEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB2F6A02FFD12C500EF7A4B /* EditEntrySheet.swift */; };
 		ADBAF04E2ECAD88A00A95F98 /* BodyScoreHeightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF0442ECAD88A00A95F98 /* BodyScoreHeightView.swift */; };
 		ADBAF04F2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF03B2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift */; };
@@ -511,6 +517,12 @@
 		ADA600352ED2602F00088042 /* BodySpecDexaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecDexaImporter.swift; sourceTree = "<group>"; };
 		ADA600362ED2602F00088042 /* ErrorTrackingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorTrackingService.swift; sourceTree = "<group>"; };
 		ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreAuthOnboardingStore.swift; sourceTree = "<group>"; };
+		ADA6003D2ED2BC9100088042 /* Glp1DoseLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Glp1DoseLog.swift; sourceTree = "<group>"; };
+		ADA6003F2ED2D32C00088042 /* DashboardViewLiquid+HeroAndActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HeroAndActions.swift"; sourceTree = "<group>"; };
+		ADA600412ED35D8700088042 /* PreAuthBodyScoreOnboardingContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreAuthBodyScoreOnboardingContainer.swift; sourceTree = "<group>"; };
+		ADA600422ED35D8700088042 /* ProfileCompletionGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileCompletionGateView.swift; sourceTree = "<group>"; };
+		ADA600452ED375EE00088042 /* GlobalTimelineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalTimelineModels.swift; sourceTree = "<group>"; };
+		ADA600462ED375EE00088042 /* Glp1Medication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Glp1Medication.swift; sourceTree = "<group>"; };
 		ADA922EA2E22E7A600B82C49 /* BackgroundPhotoUploadService+Processing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackgroundPhotoUploadService+Processing.swift"; sourceTree = "<group>"; };
 		ADA922EB2E22E7A600B82C49 /* ImageProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessingService.swift; sourceTree = "<group>"; };
 		ADA922EC2E22E7A600B82C49 /* VisionOrientationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionOrientationService.swift; sourceTree = "<group>"; };
@@ -816,6 +828,9 @@
 		AD723ADC2E15FA5C002376C6 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				ADA600452ED375EE00088042 /* GlobalTimelineModels.swift */,
+				ADA600462ED375EE00088042 /* Glp1Medication.swift */,
+				ADA6003D2ED2BC9100088042 /* Glp1DoseLog.swift */,
 				ADA600212ED2594200088042 /* DexaResult.swift */,
 				AD050C422EBFFEE50082A313 /* DashboardDisplayMode.swift */,
 				ADDC48642E2D8A33003C97E7 /* LogYourBody.xcdatamodeld */,
@@ -921,6 +936,7 @@
 		AD723B0A2E15FA5C002376C6 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				ADA6003F2ED2D32C00088042 /* DashboardViewLiquid+HeroAndActions.swift */,
 				ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */,
 				ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */,
 				ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */,
@@ -1206,6 +1222,8 @@
 		ADBAF0492ECAD88A00A95F98 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				ADA600412ED35D8700088042 /* PreAuthBodyScoreOnboardingContainer.swift */,
+				ADA600422ED35D8700088042 /* ProfileCompletionGateView.swift */,
 				ADA600232ED2596700088042 /* BodyScoreProfileDetailsView.swift */,
 				ADBAF03D2ECAD88A00A95F98 /* BodyScoreAccountCreationView.swift */,
 				ADBAF03E2ECAD88A00A95F98 /* BodyScoreBasicsView.swift */,
@@ -1514,6 +1532,7 @@
 				ADBAF04E2ECAD88A00A95F98 /* BodyScoreHeightView.swift in Sources */,
 				ADBAF04F2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift in Sources */,
 				ADBAF0502ECAD88A00A95F98 /* BodyScoreCalculator.swift in Sources */,
+				ADA600402ED2D32C00088042 /* DashboardViewLiquid+HeroAndActions.swift in Sources */,
 				ADBAF0512ECAD88A00A95F98 /* BodyScoreLoadingView.swift in Sources */,
 				ADBAF0522ECAD88A00A95F98 /* BodyScoreModels.swift in Sources */,
 				ADBAF0532ECAD88A00A95F98 /* BodyScoreManualWeightView.swift in Sources */,
@@ -1574,6 +1593,8 @@
 				ADDC47D12E2D89F3003C97E7 /* ProfileSettingsViewV2.swift in Sources */,
 				ADDC47D82E2D89F3003C97E7 /* AppleSignInButton.swift in Sources */,
 				ADA6003C2ED27D0000088042 /* PreAuthOnboardingStore.swift in Sources */,
+				ADA600472ED375EE00088042 /* GlobalTimelineModels.swift in Sources */,
+				ADA600482ED375EE00088042 /* Glp1Medication.swift in Sources */,
 				ADDC47DD2E2D89F3003C97E7 /* SyncStatusView.swift in Sources */,
 				ADDC47DE2E2D89F3003C97E7 /* IntegrationsView.swift in Sources */,
 				ADDC47DF2E2D89F3003C97E7 /* LegalView.swift in Sources */,
@@ -1619,6 +1640,8 @@
 				F0451813784DE99328797E5F /* DSText.swift in Sources */,
 				ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */,
 				4DF78B8A5B5E0DBAF777CBC1 /* DSLogo.swift in Sources */,
+				ADA600432ED35D8700088042 /* PreAuthBodyScoreOnboardingContainer.swift in Sources */,
+				ADA600442ED35D8700088042 /* ProfileCompletionGateView.swift in Sources */,
 				CCE3FEEC83AAC1B3F1F82BF6 /* DSProgressBar.swift in Sources */,
 				4C2DA948F919366D436CEF26 /* DSIcon.swift in Sources */,
 				5B2F64647650AAF5937280BD /* DSDivider.swift in Sources */,
@@ -1629,6 +1652,7 @@
 				AD8872952EB946BE0041C426 /* CoreMetricsRow.swift in Sources */,
 				ADA4B75D2ED1183900F4262A /* DashboardViewModel.swift in Sources */,
 				AD8872962EB946BE0041C426 /* Theme.swift in Sources */,
+				ADA6003E2ED2BC9100088042 /* Glp1DoseLog.swift in Sources */,
 				AD8872972EB946BE0041C426 /* ErrorStateView.swift in Sources */,
 				AD8872982EB946BE0041C426 /* LiquidGlassTabBar.swift in Sources */,
 				AD8872992EB946BE0041C426 /* DSAuthDivider.swift in Sources */,
@@ -1931,7 +1955,7 @@
 				CURRENT_PROJECT_VERSION = 20251120220025;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = LogYourBody.LogYourBodyTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1950,7 +1974,7 @@
 				CURRENT_PROJECT_VERSION = 20251120220025;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = LogYourBody.LogYourBodyTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1968,7 +1992,7 @@
 				CURRENT_PROJECT_VERSION = 20251120220025;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = LogYourBody.LogYourBodyUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1986,7 +2010,7 @@
 				CURRENT_PROJECT_VERSION = 20251120220025;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = LogYourBody.LogYourBodyUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";

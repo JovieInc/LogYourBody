@@ -94,8 +94,13 @@ struct BodyScoreBodyFatVisualView: View {
                 }
             },
             footer: {
-                Button("Continue") {
+                Button {
                     viewModel.goToNextStep()
+                } label: {
+                    Text("Continue")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueBodyFatVisual)

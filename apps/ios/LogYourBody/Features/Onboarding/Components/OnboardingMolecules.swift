@@ -29,6 +29,8 @@ struct OnboardingOptionButton: View {
                     Text(title)
                         .font(OnboardingTypography.headline)
                         .foregroundStyle(Color.appText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.9)
 
                     if let subtitle {
                         Text(subtitle)

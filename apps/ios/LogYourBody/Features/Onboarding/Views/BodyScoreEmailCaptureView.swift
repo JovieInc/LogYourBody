@@ -70,9 +70,14 @@ struct BodyScoreEmailCaptureView: View {
                 }
             },
             footer: {
-                Button("Continue") {
+                Button {
                     viewModel.persistEmailCapture()
                     viewModel.goToNextStep()
+                } label: {
+                    Text("Continue")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueEmailCapture)

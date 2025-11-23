@@ -107,6 +107,26 @@ struct LoginView: View {
         }
     }
 
+    private var preAuthOnboardingCTA: some View {
+        Button {
+            showPreAuthOnboarding = true
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Preview body score onboarding")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.appText)
+
+                Text("Walk through the body score setup before you create an account.")
+                    .font(.system(size: 13))
+                    .foregroundColor(.appTextSecondary)
+            }
+            .padding(16)
+            .background(Color.black.opacity(0.25))
+            .cornerRadius(12)
+        }
+        .buttonStyle(.plain)
+    }
+
     private var sessionStatusBanner: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.circle")

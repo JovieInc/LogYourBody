@@ -320,6 +320,98 @@ class SupabaseManager: ObservableObject {
         }
     }
 
+    func endActiveGlp1Medications(userId: String, endedAt: Date) async throws {
+        let jwt = try await getSupabaseJWT()
+
+        // Only affects GLP-1 medications; future non-GLP-1 medication tables are untouched.
+        let url = URL(string: "\(supabaseURL)/rest/v1/glp1_medications?user_id=eq.\(userId)&ended_at=is.null")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let formatter = ISO8601DateFormatter()
+        let body: [String: Any] = ["ended_at": formatter.string(from: endedAt)]
+        let data = try JSONSerialization.data(withJSONObject: body)
+        request.httpBody = data
+
+        let (_, response) = try await self.session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseError.networkError
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw SupabaseError.unauthorized
+        }
+
+        if httpResponse.statusCode != 200 && httpResponse.statusCode != 204 {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+    }
+
+    // MARK: - GLP-1 Medications Operations
+
+    func fetchGlp1Medications(userId: String) async throws -> [Glp1Medication] {
+        let jwt = try await getSupabaseJWT()
+
+        let url = URL(string: "\(supabaseURL)/rest/v1/glp1_medications?user_id=eq.\(userId)&order=started_at.asc")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await self.session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseError.networkError
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw SupabaseError.unauthorized
+        }
+
+        if httpResponse.statusCode != 200 {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([Glp1Medication].self, from: data)
+    }
+
+    func saveGlp1Medication(_ medication: Glp1Medication) async throws {
+        let jwt = try await getSupabaseJWT()
+
+        let url = URL(string: "\(supabaseURL)/rest/v1/glp1_medications")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("return=minimal,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        request.httpBody = try encoder.encode(medication)
+
+        let (_, response) = try await self.session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseError.networkError
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw SupabaseError.unauthorized
+        }
+
+        if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+    }
+
     func fetchDexaResults(userId: String, limit: Int = 50) async throws -> [DexaResult] {
         let jwt = try await getSupabaseJWT()
 
@@ -575,6 +667,67 @@ class SupabaseManager: ObservableObject {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         request.httpBody = try encoder.encode(metrics)
+
+        let (_, response) = try await self.session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseError.networkError
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw SupabaseError.unauthorized
+        }
+
+        if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+    }
+
+    // MARK: - GLP-1 Dose Logs Operations
+
+    func fetchGlp1DoseLogs(userId: String, limit: Int = 100) async throws -> [Glp1DoseLog] {
+        let jwt = try await getSupabaseJWT()
+
+        let url = URL(string: "\(supabaseURL)/rest/v1/glp1_dose_logs?user_id=eq.\(userId)&order=taken_at.desc&limit=\(limit)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await self.session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseError.networkError
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw SupabaseError.unauthorized
+        }
+
+        if httpResponse.statusCode != 200 {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([Glp1DoseLog].self, from: data)
+    }
+
+    func saveGlp1DoseLog(_ log: Glp1DoseLog) async throws {
+        let jwt = try await getSupabaseJWT()
+
+        let url = URL(string: "\(supabaseURL)/rest/v1/glp1_dose_logs")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("return=minimal,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        request.httpBody = try encoder.encode(log)
 
         let (_, response) = try await self.session.data(for: request)
 

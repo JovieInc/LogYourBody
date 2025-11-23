@@ -43,10 +43,8 @@ struct ContentView: View {
         // Check all required fields exist
         let hasName = profile.fullName != nil && !(profile.fullName?.isEmpty ?? true)
         let hasDOB = profile.dateOfBirth != nil
-        let hasHeight = profile.height != nil && profile.height ?? 0 > 0
-        let hasGender = profile.gender != nil && !(profile.gender?.isEmpty ?? true)
 
-        return hasName && hasDOB && hasHeight && hasGender
+        return hasName && hasDOB
     }
 
     private var shouldShowOnboarding: Bool {
@@ -62,6 +60,8 @@ struct ContentView: View {
                 if authManager.isAuthenticated {
                     if shouldShowOnboarding {
                         BodyScoreOnboardingFlowView()
+                    } else if !isProfileComplete {
+                        ProfileCompletionGateView()
                     } else if !revenueCatManager.isSubscribed {
                         PaywallView()
                             .environmentObject(authManager)

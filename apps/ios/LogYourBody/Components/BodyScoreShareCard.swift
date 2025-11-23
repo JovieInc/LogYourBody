@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Photos
 
 struct BodyScoreSharePayload {
     let score: Int
@@ -59,24 +60,27 @@ struct BodyScoreShareCardView: View {
                 endPoint: .bottom
             )
 
-            VStack(spacing: 24) {
-                DSLogo(size: 44, textSize: 20)
+            VStack(spacing: 28) {
+                HStack(spacing: 12) {
+                    DSLogo(size: 44, textSize: 20)
 
-                DashboardBodyScoreHeroCard(
-                    score: payload.score,
-                    scoreText: payload.scoreText,
-                    tagline: payload.tagline,
-                    ffmiValue: payload.ffmiValue,
-                    ffmiCaption: payload.ffmiCaption,
-                    bodyFatValue: payload.bodyFatValue,
-                    bodyFatCaption: payload.bodyFatCaption,
-                    weightValue: payload.weightValue,
-                    weightCaption: payload.weightCaption,
-                    deltaText: payload.deltaText,
-                    onTapFFMI: nil,
-                    onTapBodyFat: nil,
-                    onTapWeight: nil
-                )
+                    Text("Body Score")
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Spacer()
+                }
+
+                VStack(spacing: 20) {
+                    BodyScoreGaugeView(score: payload.score)
+                        .frame(maxWidth: .infinity)
+
+                    Text(payload.scoreText)
+                        .font(.system(size: 72, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .monospacedDigit()
+                        .frame(maxWidth: .infinity)
+                }
 
                 Spacer(minLength: 0)
 
@@ -87,7 +91,7 @@ struct BodyScoreShareCardView: View {
                     .padding(.bottom, 16)
             }
             .padding(.horizontal, 24)
-            .padding(.top, 24)
+            .padding(.top, 32)
             .padding(.bottom, 24)
         }
         .aspectRatio(aspectRatioValue, contentMode: .fit)
@@ -143,8 +147,20 @@ struct BodyScoreShareSheet: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
+                .disabled(isRendering)
             }
             .background(Color.appBackground.ignoresSafeArea())
+            .overlay {
+                if isRendering {
+                    ZStack {
+                        Color.black.opacity(0.35)
+                            .ignoresSafeArea()
+
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                }
+            }
             .navigationTitle("Share Body Score")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -159,6 +175,15 @@ struct BodyScoreShareSheet: View {
                     ShareSheet(items: [image])
                         .ignoresSafeArea()
                 }
+            }
+            .onAppear {
+                if renderedImage == nil {
+                    renderImage()
+                }
+            }
+            .onChange(of: selectedAspect) { _, _ in
+                renderedImage = nil
+                renderImage()
             }
         }
     }
@@ -203,6 +228,30 @@ struct BodyScoreShareSheet: View {
             renderImage()
         }
         guard let image = renderedImage else { return }
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+
+        let status = PHPhotoLibrary.authorizationStatus()
+
+        switch status {
+        case .authorized:
+            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+        case .notDetermined:
+            let newStatus = await withCheckedContinuation { continuation in
+                PHPhotoLibrary.requestAuthorization { authStatus in
+                    continuation.resume(returning: authStatus)
+                }
+            }
+
+            if newStatus == .authorized {
+                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+            } else if #available(iOS 14, *), newStatus == .limited {
+                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+            }
+        case .limited:
+            if #available(iOS 14, *) {
+                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+            }
+        default:
+            return
+        }
     }
 }

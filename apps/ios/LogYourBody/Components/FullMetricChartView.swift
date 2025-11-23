@@ -276,9 +276,6 @@ struct FullMetricChartView: View {
                 }
             }
         }
-        .overlay(alignment: .bottomTrailing) {
-            addEntryFloatingButton
-        }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: chartDataFingerprint) {
@@ -311,8 +308,8 @@ struct FullMetricChartView: View {
     }
 
     private var headlineBlock: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(headlineValueText)
                     .font(.system(size: 62, weight: .regular, design: .default))
                     .foregroundColor(.white)
@@ -320,8 +317,8 @@ struct FullMetricChartView: View {
 
                 if !unit.isEmpty {
                     Text(unit)
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.75))
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(Color.metricTextSecondary)
                 }
             }
 
@@ -330,32 +327,106 @@ struct FullMetricChartView: View {
                 .foregroundColor(Color.white.opacity(0.65))
 
             if let stats = computeSeriesStats(for: displayedSeries) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("\(selectedTimeRange.rawValue) avg \(formatStatValue(stats.average))")
-                            .foregroundColor(Color.metricTextSecondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 16) {
+                        statsCell(
+                            title: "Avg (\(selectedTimeRange.rawValue))",
+                            value: formatStatValue(stats.average),
+                            alignRight: false
+                        )
 
-                        Spacer()
+                        Spacer(minLength: 12)
 
-                        Text("Change \(formatDeltaValue(stats.delta))")
-                            .foregroundColor(deltaColor(for: stats.delta))
+                        statsCell(
+                            title: changeCaptionText,
+                            value: formatDeltaValueCompact(stats.delta),
+                            valueColor: deltaColor(for: stats.delta),
+                            alignRight: true
+                        )
                     }
 
                     if let bounds = minMaxTexts(for: displayedSeries) {
-                        HStack {
-                            Text("Low \(bounds.min)")
-                                .foregroundColor(Color.metricTextSecondary)
+                        HStack(alignment: .top, spacing: 16) {
+                            statsCell(
+                                title: "Low",
+                                value: bounds.min,
+                                alignRight: false
+                            )
 
-                            Spacer()
+                            Spacer(minLength: 12)
 
-                            Text("High \(bounds.max)")
-                                .foregroundColor(Color.metricTextSecondary)
+                            statsCell(
+                                title: "High",
+                                value: bounds.max,
+                                alignRight: true
+                            )
                         }
                     }
                 }
-                .font(.system(size: 13, weight: .medium))
             }
         }
+    }
+
+    @ViewBuilder
+    private func statsCell(
+        title: String,
+        value: String,
+        valueColor: Color = .white,
+        alignRight: Bool
+    ) -> some View {
+        VStack(
+            alignment: alignRight ? .trailing : .leading,
+            spacing: 2
+        ) {
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Color.metricTextSecondary)
+
+            Text(value)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(valueColor)
+                .multilineTextAlignment(alignRight ? .trailing : .leading)
+        }
+    }
+
+    private var changeCaptionText: String {
+        switch selectedTimeRange {
+        case .week1:
+            return "Change vs 1 week ago"
+        case .month1:
+            return "Change vs 1 month ago"
+        case .month3:
+            return "Change vs 3 months ago"
+        case .month6:
+            return "Change vs 6 months ago"
+        case .year1:
+            return "Change vs 1 year ago"
+        case .all:
+            return "Change over time"
+        }
+    }
+
+    private func formatDeltaValueCompact(_ delta: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+
+        if unit == "%" {
+            formatter.maximumFractionDigits = 1
+            formatter.minimumFractionDigits = 0
+        } else if isStepsMetric {
+            formatter.maximumFractionDigits = 0
+            formatter.minimumFractionDigits = 0
+        } else {
+            formatter.maximumFractionDigits = 1
+            formatter.minimumFractionDigits = 0
+        }
+
+        let absoluteValue = abs(delta)
+        let formatted = formatter.string(from: NSNumber(value: absoluteValue))
+            ?? String(format: unit == "%" ? "%.1f" : "%.1f", absoluteValue)
+
+        let prefix = delta > 0 ? "+" : "–"
+        return "\(prefix)\(formatted)"
     }
 
     private var historySections: [HistorySection] {
@@ -431,9 +502,11 @@ struct FullMetricChartView: View {
                             Text(range.rawValue)
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(
-                                    selectedTimeRange == range ? Color.black : Color.metricTextSecondary
+                                    selectedTimeRange == range ? Color.black : Color.metricTextPrimary
                                 )
-                                .frame(minWidth: 44, minHeight: 26)
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 14)
+                                .frame(minWidth: 44, minHeight: 36)
                                 .background(
                                     Capsule()
                                         .fill(selectedTimeRange == range ? Color.white : Color.clear)
@@ -442,14 +515,14 @@ struct FullMetricChartView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 6)
                 .background(
                     Capsule()
                         .fill(Color.white.opacity(0.08))
                 )
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 6)
         }
     }
 
@@ -520,8 +593,9 @@ struct FullMetricChartView: View {
                         .foregroundColor(
                             chartMode == mode ? Color.metricAccent : Color.metricTextSecondary
                         )
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 14)
+                        .frame(minWidth: 44, minHeight: 36)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(chartMode == mode ? Color.metricAccent.opacity(0.18) : Color.clear)
@@ -531,18 +605,24 @@ struct FullMetricChartView: View {
             }
         }
     }
+
     private var chartView: some View {
         Chart {
             let series = activeSeries
 
             if isStepsMetric {
                 ForEach(series) { point in
+                    let isToday = Calendar.current.isDateInToday(point.date)
                     BarMark(
                         x: .value("Date", point.date),
                         y: .value("Value", point.value),
                         width: selectedTimeRange == .week1 ? .fixed(18) : .automatic
                     )
-                    .foregroundStyle(Color.metricChartLine)
+                    .foregroundStyle(
+                        isToday
+                            ? Color.metricChartLine
+                            : Color.metricChartLine.opacity(0.6)
+                    )
                 }
             } else {
                 ForEach(series) { point in
@@ -576,6 +656,28 @@ struct FullMetricChartView: View {
                 RuleMark(y: .value("Goal", goalValue))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     .foregroundStyle(Color.metricAccent.opacity(0.45))
+                    .annotation(position: .topTrailing, alignment: .trailing) {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.metricAccent.opacity(0.7))
+                                .frame(width: 6, height: 6)
+                            Text("Goal")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Color.metricTextSecondary)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.black.opacity(0.35))
+                        )
+                    }
+            }
+
+            if let stats = computeSeriesStats(for: activeSeries) {
+                RuleMark(y: .value("Average", stats.average))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                    .foregroundStyle(Color.metricGridMajor.opacity(0.6))
             }
 
             if let focus = activePoint {
@@ -598,22 +700,35 @@ struct FullMetricChartView: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 3)) { _ in
-                AxisValueLabel()
-                    .foregroundStyle(Color.metricTextSecondary)
-                    .font(.system(size: 11, weight: .medium))
+            if selectedTimeRange == .week1 {
+                AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisValueLabel()
+                        .foregroundStyle(Color.metricTextSecondary)
+                        .font(.system(size: 10, weight: .medium))
+                }
+            } else {
+                AxisMarks(values: .automatic(desiredCount: xAxisTickCount)) { _ in
+                    AxisValueLabel()
+                        .foregroundStyle(Color.metricTextSecondary)
+                        .font(.system(size: 10, weight: .medium))
+                }
             }
         }
         .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { _ in
-                AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(Color.metricGridMajor.opacity(0.45))
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
                 AxisValueLabel()
                     .foregroundStyle(Color.metricTextSecondary)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10, weight: .medium))
+            }
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { _ in
+                AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 0.5))
+                    .foregroundStyle(Color.metricGridMajor.opacity(0.4))
+                AxisValueLabel()
+                    .foregroundStyle(Color.metricTextSecondary)
+                    .font(.system(size: 10, weight: .medium))
             }
         }
-        .chartYScale(domain: .automatic(includesZero: isStepsMetric))
+        .chartYScale(domain: .automatic(includesZero: false))
         .chartOverlay { proxy in
             GeometryReader { geo in
                 Rectangle().fill(Color.clear).contentShape(Rectangle())
@@ -671,9 +786,28 @@ struct FullMetricChartView: View {
                 .background(Color.metricGridMinor.opacity(0.55))
                 .padding(.bottom, 8)
 
-            Text("History")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(.white)
+            HStack(alignment: .center, spacing: 8) {
+                Text("History")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Button {
+                    HapticManager.shared.selection()
+                    onAdd()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(Color.metricAccent)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
 
             if let payload = metricEntries,
                !payload.entries.isEmpty,
@@ -840,26 +974,6 @@ struct FullMetricChartView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
-    }
-
-    private var addEntryFloatingButton: some View {
-        Button {
-            HapticManager.shared.selection()
-            onAdd()
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(.black)
-                .frame(width: 54, height: 54)
-                .background(
-                    Circle()
-                        .fill(Color.metricAccent)
-                        .shadow(color: Color.black.opacity(0.45), radius: 16, x: 0, y: 10)
-                )
-        }
-        .buttonStyle(.plain)
-        .padding(.trailing, 24)
-        .padding(.bottom, 28)
     }
 
     private func historyScrubber(proxy: ScrollViewProxy) -> some View {
@@ -1115,6 +1229,21 @@ struct FullMetricChartView: View {
 
     private var isStepsMetric: Bool {
         unit.lowercased() == "steps"
+    }
+
+    private var xAxisTickCount: Int {
+        switch selectedTimeRange {
+        case .week1:
+            return 7
+        case .month1:
+            return 8
+        case .month3:
+            return 6
+        case .month6:
+            return 6
+        case .year1, .all:
+            return 6
+        }
     }
 
     @MainActor

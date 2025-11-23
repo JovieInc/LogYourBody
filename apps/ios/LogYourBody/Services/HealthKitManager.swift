@@ -140,6 +140,7 @@ class HealthKitManager: ObservableObject {
         Task.detached(priority: .background) { [weak self] in
             guard let self = self else { return }
             guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else { return }
+            var rawSamples: [HKRawSample] = []
 
             for sample in samples {
                 let metadata = self.metadataDictionary(from: sample.metadata)
@@ -166,8 +167,10 @@ class HealthKitManager: ObservableObject {
                     updatedAt: Date()
                 )
 
-                await CoreDataManager.shared.saveHKSample(hkSample)
+                rawSamples.append(hkSample)
             }
+
+            await CoreDataManager.shared.saveHKSamples(rawSamples)
         }
     }
 
@@ -1423,6 +1426,26 @@ class HealthKitManager: ObservableObject {
 
         CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
         await RealtimeSyncManager.shared.syncIfNeeded()
+    }
+}
+
+// MARK: - GLP-1 HealthKit Mapping
+
+extension HealthKitManager {
+    /// Returns the app's canonical HealthKit identifier string for a given GLP-1 medication, if known.
+    /// This does not perform any HealthKit writes on its own; it simply exposes mapping metadata
+    /// so future HealthKit medication integrations can align with our GLP-1 catalog.
+    func glp1HealthKitIdentifier(for medication: Glp1Medication) -> String? {
+        if let identifier = medication.hkIdentifier {
+            return identifier
+        }
+
+        if let brand = medication.brand,
+           let preset = Glp1MedicationCatalog.preset(forBrand: brand) {
+            return preset.hkIdentifier
+        }
+
+        return nil
     }
 }
 

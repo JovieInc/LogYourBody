@@ -609,6 +609,19 @@ class AuthManager: NSObject, ObservableObject {
                     heightCm = nil
                 }
 
+                let remoteGoalWeight = profile.goalWeight ?? 0
+                let remoteGoalUnit = profile.goalWeightUnit?.lowercased()
+                let goalWeightKg: Double?
+                if remoteGoalWeight > 0 {
+                    if remoteGoalUnit == "lbs" {
+                        goalWeightKg = remoteGoalWeight * 0.45359237
+                    } else {
+                        goalWeightKg = remoteGoalWeight
+                    }
+                } else {
+                    goalWeightKg = nil
+                }
+
                 let user = LocalUser(
                     id: profile.id,
                     email: profile.email,
@@ -624,7 +637,7 @@ class AuthManager: NSObject, ObservableObject {
                         heightUnit: profile.heightUnit ?? "cm",
                         gender: profile.gender,
                         activityLevel: profile.activityLevel,
-                        goalWeight: profile.goalWeight,
+                        goalWeight: goalWeightKg,
                         goalWeightUnit: profile.goalWeightUnit ?? "kg",
                         onboardingCompleted: profile.onboardingCompleted
                     )
@@ -1293,78 +1306,124 @@ class AuthManager: NSObject, ObservableObject {
             user.onboardingCompleted = onboardingCompleted
             // Sync onboarding status to UserDefaults
             UserDefaults.standard.set(onboardingCompleted, forKey: Constants.hasCompletedOnboardingKey)
-            // print("✅ AuthManager: Synced onboarding status to UserDefaults: \(onboardingCompleted)")
+        }
+
+        // Save updated user locally
+        self.currentUser = user
+        if let encoded = try? JSONEncoder().encode(user) {
+            userDefaults.set(encoded, forKey: userKey)
+        }
+
+        // Sync to Supabase
+        await createOrUpdateSupabaseProfile(user: user)
+
+        // Schedule background body score recalculation when profile inputs change.
+        BodyScoreRecalculationService.shared.scheduleRecalculation()
+    }
+
+    func applyPreAuthOnboardingIfNeeded() async {
+        guard let user = currentUser else { return }
+        guard let (input, result) = PreAuthOnboardingStore.shared.load() else { return }
+
+        var updates = OnboardingProfileUpdateBuilder.buildUpdates(
+            bodyScoreInput: input,
+            heightUnit: input.height.unit
+        )
+
+        updates["onboardingCompleted"] = true
+
+        await updateProfile(updates)
+        OnboardingStateManager.shared.markCompleted()
+
+        let weightKg = input.weight.inKilograms
+        let bodyFatPercentage = input.bodyFat.percentage
+
+        if weightKg != nil || bodyFatPercentage != nil {
+            let now = Date()
+            let metrics = BodyMetrics(
+                id: UUID().uuidString,
+                userId: user.id,
+                date: now,
+                weight: weightKg,
+                weightUnit: weightKg != nil ? "kg" : nil,
+                bodyFatPercentage: bodyFatPercentage,
+                bodyFatMethod: bodyFatMethodString(from: input.bodyFat.source),
+                muscleMass: nil,
+                boneMass: nil,
+                notes: nil,
+                photoUrl: nil,
+                dataSource: "Onboarding",
+                createdAt: now,
+                updatedAt: now
+            )
+
+            SyncManager.shared.logBodyMetrics(metrics)
+        }
+
+        BodyScoreCache.shared.store(result, for: user.id)
+        PreAuthOnboardingStore.shared.clear()
+    }
+
+    private func bodyFatMethodString(from source: BodyFatInputSource) -> String? {
+        switch source {
+        case .manualValue:
+            return "Manual"
+        case .visualEstimate:
+            return "Visual estimate"
+        case .healthKit:
+            return "HealthKit"
+        case .unspecified:
+            return nil
         }
     }
 
-    if let dateOfBirth = updates["dateOfBirth"] as? Date {
-        updatedProfile = UserProfile(
-            id: updatedProfile.id,
-            email: updatedProfile.email,
-            username: updatedProfile.username,
-            fullName: updatedProfile.fullName,
-            dateOfBirth: dateOfBirth,
-            height: updatedProfile.height,
-            heightUnit: updatedProfile.heightUnit,
-            gender: updatedProfile.gender,
-            activityLevel: updatedProfile.activityLevel,
-            goalWeight: updatedProfile.goalWeight,
-            goalWeightUnit: updatedProfile.goalWeightUnit,
-            onboardingCompleted: updatedProfile.onboardingCompleted
-        )
+    func fetchActiveSessions() async throws -> [SessionInfo] {
+        guard let clerkUser = clerk.user else {
+            throw AuthError.clerkNotInitialized
+        }
 
         do {
-            // Get all sessions from Clerk
             let sessions = try await clerkUser.getSessions()
+            let currentSessionId = clerkSession?.id
 
-            // Map Clerk sessions to our SessionInfo model
-            return sessions.compactMap { clerkSession in
-                // Use Mirror to access session properties
-                let mirror = Mirror(reflecting: clerkSession)
+            return sessions.map { session in
+                let mirror = Mirror(reflecting: session)
 
-                var sessionId = ""
+                var id: String = ""
                 var lastActiveAt = Date()
                 var createdAt = Date()
-                var status = ""
 
                 for child in mirror.children {
                     switch child.label {
                     case "id":
-                        sessionId = child.value as? String ?? ""
+                        id = child.value as? String ?? ""
                     case "lastActiveAt":
-                        if let timestamp = child.value as? TimeInterval {
-                            lastActiveAt = Date(timeIntervalSince1970: timestamp / 1_000)
+                        if let date = child.value as? Date {
+                            lastActiveAt = date
                         }
                     case "createdAt":
-                        if let timestamp = child.value as? TimeInterval {
-                            createdAt = Date(timeIntervalSince1970: timestamp / 1_000)
+                        if let date = child.value as? Date {
+                            createdAt = date
                         }
-                    case "status":
-                        status = child.value as? String ?? ""
                     default:
                         break
                     }
                 }
 
-                // Only include active sessions
-                guard status == "active" else { return nil }
-
-                // Parse user agent and location (this is simplified - in production you'd parse the actual data)
-                let deviceInfo = parseDeviceInfo(from: clerkSession)
+                let deviceInfo = parseDeviceInfo(from: session)
 
                 return SessionInfo(
-                    id: sessionId,
+                    id: id,
                     deviceName: deviceInfo.deviceName,
                     deviceType: deviceInfo.deviceType,
                     location: deviceInfo.location,
                     ipAddress: deviceInfo.ipAddress,
                     lastActiveAt: lastActiveAt,
                     createdAt: createdAt,
-                    isCurrentSession: sessionId == self.clerkSession?.id
+                    isCurrentSession: id == currentSessionId
                 )
             }
         } catch {
-            // print("❌ Failed to fetch sessions: \(error)")
             throw error
         }
     }

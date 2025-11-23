@@ -38,6 +38,7 @@ struct DashboardViewLiquid: View {
     @State private var coreDataReloadTask: Task<Void, Never>?
     @State var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
     @State var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
+    @State var glp1DoseLogs: [Glp1DoseLog] = []
 
     // Animated metric values for tweening
     @State var animatedWeight: Double = 0
@@ -82,6 +83,8 @@ struct DashboardViewLiquid: View {
         case weight
         case bodyFat
         case ffmi
+        case glp1
+        case bodyScore
     }
 
     enum DashboardMetricKind {
@@ -162,6 +165,7 @@ struct DashboardViewLiquid: View {
                     if !viewModel.bodyMetrics.isEmpty {
                         updateAnimatedValues(for: selectedIndex)
                     }
+                    await loadGlp1DoseLogs()
                 }
             }
 
@@ -235,6 +239,7 @@ struct DashboardViewLiquid: View {
             }
         }
         .onScreenshot {
+            guard selectedTab == .home else { return }
             guard let payload = makeBodyScoreSharePayload() else { return }
             bodyScoreSharePayload = payload
             isBodyScoreSharePresented = true
@@ -243,8 +248,8 @@ struct DashboardViewLiquid: View {
 
     private var homeTab: some View {
         DashboardHomeTab(
-            header: {
-                compactHeader
+            header: { progress in
+                compactHeader(scrollProgress: progress)
             },
             syncBanner: {
                 syncStatusBanner
@@ -264,6 +269,7 @@ struct DashboardViewLiquid: View {
                 if !viewModel.bodyMetrics.isEmpty {
                     updateAnimatedValues(for: selectedIndex)
                 }
+                await loadGlp1DoseLogs()
             }
         )
     }
@@ -327,24 +333,28 @@ struct DashboardViewLiquid: View {
                 syncStatusBanner
             },
             titleBlock: {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Your Metrics")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(Color.liquidTextPrimary)
                     Text("Reorder and tap any card to drill in.")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 13, weight: .regular))
                         .foregroundColor(Color.liquidTextPrimary.opacity(0.6))
                 }
                 .padding(.horizontal, 20)
             },
             metricsContent: {
-                metricsView
+                VStack(spacing: 16) {
+                    metricsView
+                    glp1MetricCard
+                }
             },
             onRefresh: {
                 await viewModel.refreshData(
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
+                await loadGlp1DoseLogs()
             }
         )
     }
@@ -367,7 +377,30 @@ struct DashboardViewLiquid: View {
     // MARK: - Metrics View
 
     private var metricsView: some View {
-        DashboardMetricsSection(
+        let stepsGoalText: String? = {
+            let formatted = FormatterCache.stepsFormatter.string(from: NSNumber(value: stepGoal)) ?? "\(stepGoal)"
+            return "Goal \(formatted) steps"
+        }()
+
+        let weightGoalText: String? = {
+            guard let goal = weightGoal else { return nil }
+            let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+            let converted = convertWeight(goal, to: system) ?? goal
+            let formatted = String(format: "%.1f", converted)
+            return "Target \(formatted) \(weightUnit)"
+        }()
+
+        let bodyFatGoalText: String? = {
+            let formatted = String(format: "%.1f%%", bodyFatGoal)
+            return "Target \(formatted)"
+        }()
+
+        let ffmiGoalText: String? = {
+            let formatted = String(format: "%.1f", ffmiGoal)
+            return "Target \(formatted)"
+        }()
+
+        return DashboardMetricsSection(
             metricsOrder: $metricsOrder,
             draggedMetric: $draggedMetric,
             onReorder: saveMetricsOrder,
@@ -378,6 +411,10 @@ struct DashboardViewLiquid: View {
             bodyMetrics: bodyMetrics,
             dailyMetrics: dailyMetrics,
             weightUnit: weightUnit,
+            stepsGoalText: stepsGoalText,
+            weightGoalText: weightGoalText,
+            bodyFatGoalText: bodyFatGoalText,
+            ffmiGoalText: ffmiGoalText,
             generateStepsChartData: generateStepsChartData,
             generateWeightChartData: generateWeightChartData,
             generateBodyFatChartData: generateBodyFatChartData,
@@ -470,6 +507,46 @@ struct DashboardViewLiquid: View {
                 },
                 metricEntries: cachedMetricEntries(for: .ffmi),
                 goalValue: ffmiGoal,
+                selectedTimeRange: $selectedRange
+            )
+        case .bodyScore:
+            let bodyScore = bodyScoreText()
+            FullMetricChartView(
+                title: "Body Score",
+                icon: "star.fill",
+                iconColor: Color.metricAccent,
+                currentValue: bodyScore.scoreText,
+                unit: "",
+                currentDate: formatDate(currentMetric?.date ?? Date()),
+                chartData: cachedChartData(for: .bodyScore, generator: generateFullScreenBodyScoreChartData),
+                onAdd: {
+                    showAddEntrySheet = true
+                },
+                metricEntries: cachedMetricEntries(for: .bodyScore),
+                goalValue: nil,
+                selectedTimeRange: $selectedRange
+            )
+        case .glp1:
+            let sortedLogs = glp1DoseLogs.sorted { $0.takenAt < $1.takenAt }
+            let latestLog = sortedLogs.last
+            let currentDose = latestLog?.doseAmount
+            let currentValue = currentDose.map { String(format: "%.1f", $0) } ?? "–"
+            let unit = latestLog?.doseUnit ?? "mg"
+            let currentDate = latestLog.map { formatDate($0.takenAt) } ?? formatDate(Date())
+
+            FullMetricChartView(
+                title: "GLP-1 Dose",
+                icon: "syringe",
+                iconColor: Color.metricAccent,
+                currentValue: currentValue,
+                unit: unit,
+                currentDate: currentDate,
+                chartData: cachedChartData(for: .glp1, generator: generateFullScreenGlp1ChartData),
+                onAdd: {
+                    showAddEntrySheet = true
+                },
+                metricEntries: nil,
+                goalValue: nil,
                 selectedTimeRange: $selectedRange
             )
         }

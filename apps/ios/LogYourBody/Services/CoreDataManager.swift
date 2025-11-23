@@ -365,6 +365,9 @@ class CoreDataManager: ObservableObject {
                 cached.date = metrics.date
                 cached.weight = metrics.weight ?? 0
                 cached.weightUnit = metrics.weightUnit
+                cached.waistCircumference = metrics.waistCm ?? 0
+                cached.hipCircumference = metrics.hipCm ?? 0
+                cached.waistUnit = metrics.waistUnit
                 cached.bodyFatPercentage = metrics.bodyFatPercentage ?? 0
                 cached.bodyFatMethod = metrics.bodyFatMethod
                 cached.muscleMass = metrics.muscleMass ?? 0
@@ -437,6 +440,31 @@ class CoreDataManager: ObservableObject {
         }
     }
 
+    func fetchLatestBodyMetric(for userId: String) async -> CachedBodyMetrics? {
+        let context = viewContext
+
+        return await context.perform {
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+
+            var predicates = [NSPredicate]()
+            predicates.append(NSPredicate(format: "userId == %@", userId))
+            predicates.append(NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false)))
+
+            fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+            fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+            fetchRequest.fetchLimit = 1
+
+            do {
+                return try context.fetch(fetchRequest).first
+            } catch {
+                #if DEBUG
+                // print("Failed to fetch latest body metric: \(error)")
+                #endif
+                return nil
+            }
+        }
+    }
+
     func fetchDisplayableBodyMetrics(
         for userId: String,
         from startDate: Date? = nil,
@@ -478,46 +506,54 @@ class CoreDataManager: ObservableObject {
     }
 
     func saveHKSample(_ sample: HKRawSample) async {
-        let context = viewContext
+        await saveHKSamples([sample])
+    }
+
+    func saveHKSamples(_ samples: [HKRawSample]) async {
+        guard !samples.isEmpty else { return }
+
+        let context = persistentContainer.newBackgroundContext()
 
         await context.perform {
-            let request: NSFetchRequest<CachedHKSample> = CachedHKSample.fetchRequest()
-            request.predicate = NSPredicate(format: "hkUUID == %@", sample.hkUUID)
-            request.fetchLimit = 1
+            for sample in samples {
+                let request: NSFetchRequest<CachedHKSample> = CachedHKSample.fetchRequest()
+                request.predicate = NSPredicate(format: "hkUUID == %@", sample.hkUUID)
+                request.fetchLimit = 1
 
-            let cached: CachedHKSample
+                let cached: CachedHKSample
 
-            if let existing = try? context.fetch(request).first {
-                cached = existing
-            } else {
-                cached = CachedHKSample(context: context)
-                cached.id = sample.id
-                cached.hkUUID = sample.hkUUID
-                cached.createdAt = sample.createdAt
-            }
+                if let existing = try? context.fetch(request).first {
+                    cached = existing
+                } else {
+                    cached = CachedHKSample(context: context)
+                    cached.id = sample.id
+                    cached.hkUUID = sample.hkUUID
+                    cached.createdAt = sample.createdAt
+                }
 
-            cached.userId = sample.userId
-            cached.quantityType = sample.quantityType
-            cached.value = sample.value
-            cached.unit = sample.unit
-            cached.startDate = sample.startDate
-            cached.endDate = sample.endDate
-            cached.sourceName = sample.sourceName
-            cached.sourceBundleId = sample.sourceBundleId
-            cached.deviceManufacturer = sample.deviceManufacturer
-            cached.deviceModel = sample.deviceModel
-            cached.deviceHardwareVersion = sample.deviceHardwareVersion
-            cached.deviceFirmwareVersion = sample.deviceFirmwareVersion
-            cached.deviceSoftwareVersion = sample.deviceSoftwareVersion
-            cached.deviceLocalIdentifier = sample.deviceLocalIdentifier
-            cached.deviceUDI = sample.deviceUDI
-            cached.updatedAt = sample.updatedAt
+                cached.userId = sample.userId
+                cached.quantityType = sample.quantityType
+                cached.value = sample.value
+                cached.unit = sample.unit
+                cached.startDate = sample.startDate
+                cached.endDate = sample.endDate
+                cached.sourceName = sample.sourceName
+                cached.sourceBundleId = sample.sourceBundleId
+                cached.deviceManufacturer = sample.deviceManufacturer
+                cached.deviceModel = sample.deviceModel
+                cached.deviceHardwareVersion = sample.deviceHardwareVersion
+                cached.deviceFirmwareVersion = sample.deviceFirmwareVersion
+                cached.deviceSoftwareVersion = sample.deviceSoftwareVersion
+                cached.deviceLocalIdentifier = sample.deviceLocalIdentifier
+                cached.deviceUDI = sample.deviceUDI
+                cached.updatedAt = sample.updatedAt
 
-            if let metadata = sample.metadata,
-               let data = try? JSONEncoder().encode(metadata) {
-                cached.metadataJSON = data
-            } else {
-                cached.metadataJSON = nil
+                if let metadata = sample.metadata,
+                   let data = try? JSONEncoder().encode(metadata) {
+                    cached.metadataJSON = data
+                } else {
+                    cached.metadataJSON = nil
+                }
             }
 
             do {
@@ -526,7 +562,7 @@ class CoreDataManager: ObservableObject {
                 }
             } catch {
                 #if DEBUG
-                // print("Failed to save HK sample: \(error)")
+                // print("Failed to save HK samples: \\(error)")
                 #endif
             }
         }
@@ -936,8 +972,53 @@ class CoreDataManager: ObservableObject {
                 // Update fields
                 metric.id = id
                 metric.userId = data["user_id"] as? String
-                metric.weight = data["weight"] as? Double ?? 0
-                metric.weightUnit = data["weight_unit"] as? String
+
+                let rawWeight = data["weight"] as? Double ?? 0
+                let rawWeightUnit = data["weight_unit"] as? String
+                let weightUnitLower = rawWeightUnit?.lowercased()
+                let weightKg: Double
+                if rawWeight > 0 {
+                    if weightUnitLower == "lbs" {
+                        weightKg = rawWeight * 0.45359237
+                    } else {
+                        weightKg = rawWeight
+                    }
+                } else {
+                    weightKg = 0
+                }
+
+                let rawWaistValue = (data["waist_circumference"] ?? data["waist"]) as? Double ?? 0
+                let rawHipValue = (data["hip_circumference"] ?? data["hip"]) as? Double ?? 0
+                let rawWaistUnit = data["waist_unit"] as? String
+                let waistUnitLower = rawWaistUnit?.lowercased()
+
+                let waistCm: Double
+                if rawWaistValue > 0 {
+                    if waistUnitLower == "in" {
+                        waistCm = rawWaistValue * 2.54
+                    } else {
+                        waistCm = rawWaistValue
+                    }
+                } else {
+                    waistCm = 0
+                }
+
+                let hipCm: Double
+                if rawHipValue > 0 {
+                    if waistUnitLower == "in" {
+                        hipCm = rawHipValue * 2.54
+                    } else {
+                        hipCm = rawHipValue
+                    }
+                } else {
+                    hipCm = 0
+                }
+
+                metric.weight = weightKg
+                metric.weightUnit = rawWeightUnit
+                metric.waistCircumference = waistCm
+                metric.hipCircumference = hipCm
+                metric.waistUnit = rawWaistUnit
                 metric.bodyFatPercentage = data["body_fat_percentage"] as? Double ?? 0
                 metric.bodyFatMethod = data["body_fat_method"] as? String
                 metric.muscleMass = data["muscle_mass"] as? Double ?? 0
@@ -1371,6 +1452,9 @@ extension CachedBodyMetrics {
             bodyFatMethod: bodyFatMethod,
             muscleMass: muscleMass > 0 ? muscleMass : nil,
             boneMass: boneMass > 0 ? boneMass : nil,
+            waistCm: waistCircumference > 0 ? waistCircumference : nil,
+            hipCm: hipCircumference > 0 ? hipCircumference : nil,
+            waistUnit: waistUnit,
             notes: notes,
             photoUrl: photoUrl,
             dataSource: dataSource ?? "Manual",

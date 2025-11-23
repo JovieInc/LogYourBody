@@ -61,14 +61,33 @@ struct MetricSeriesStats {
 }
 
 func makeTrend(delta: Double, unit: String, range: TimeRange) -> MetricSummaryCard.Trend? {
+    let caption = range.shortRelativeLabel
+
     guard abs(delta) > 0.001 else {
-        return MetricSummaryCard.Trend(direction: .flat, valueText: "No change", caption: range.rawValue)
+        return MetricSummaryCard.Trend(direction: .flat, valueText: "No change", caption: caption)
     }
 
     let direction: MetricSummaryCard.Trend.Direction = delta > 0 ? .up : .down
-    let formattedDelta = formatDelta(delta: delta, unit: unit)
-    let caption = "vs \(range.rawValue)"
-    return MetricSummaryCard.Trend(direction: direction, valueText: formattedDelta, caption: caption)
+
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    formatter.maximumFractionDigits = unit == "%" ? 1 : 1
+    formatter.minimumFractionDigits = 0
+
+    let magnitude = abs(delta)
+    let formattedMagnitude = formatter.string(from: NSNumber(value: magnitude))
+        ?? String(format: "%.1f", magnitude)
+
+    let valueText: String
+    if unit.isEmpty {
+        valueText = formattedMagnitude
+    } else if unit == "%" {
+        valueText = "\(formattedMagnitude)\(unit)"
+    } else {
+        valueText = "\(formattedMagnitude) \(unit)"
+    }
+
+    return MetricSummaryCard.Trend(direction: direction, valueText: valueText, caption: caption)
 }
 
 func formatDelta(delta: Double, unit: String) -> String {
@@ -96,6 +115,25 @@ func formatAverageFootnote(value: Double, unit: String) -> String {
         return "\(formatted) average"
     }
     return "\(formatted) \(unit) average"
+}
+
+extension TimeRange {
+    var shortRelativeLabel: String {
+        switch self {
+        case .week1:
+            return "7d"
+        case .month1:
+            return "1M"
+        case .month3:
+            return "3M"
+        case .month6:
+            return "6M"
+        case .year1:
+            return "1Y"
+        case .all:
+            return "All"
+        }
+    }
 }
 
 enum FormatterCache {

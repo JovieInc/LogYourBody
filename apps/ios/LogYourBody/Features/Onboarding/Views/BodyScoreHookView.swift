@@ -41,13 +41,27 @@ struct BodyScoreHookView: View {
                 )
 
                 VStack(spacing: 16) {
-                    Button("Start my 60-sec check") {
+                    Button {
                         viewModel.goToNextStep()
+                    } label: {
+                        Text("Start my 60-sec Body Score")
+                            .font(.system(size: 18, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
                     }
                     .buttonStyle(OnboardingPrimaryButtonStyle())
 
+                    OnboardingCaptionText(
+                        text: "Takes under a minute. No account needed to see your score.",
+                        alignment: .center
+                    )
+                    .foregroundStyle(Color.appTextSecondary)
+
                     OnboardingTextButton(title: "I already have an account") {
-                        NotificationCenter.default.post(name: Notification.Name("showLoginFromOnboarding"), object: nil)
+                        NotificationCenter.default.post(
+                            name: Notification.Name("showLoginFromOnboarding"),
+                            object: nil
+                        )
                     }
                 }
             }

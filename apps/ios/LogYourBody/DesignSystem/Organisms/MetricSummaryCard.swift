@@ -115,14 +115,15 @@ public struct MetricSummaryCard: View {
     @ScaledMetric(relativeTo: .body) private var headerIconSize: CGFloat = 18
 
     private let horizontalPadding: CGFloat = 16
-    private let verticalPadding: CGFloat = 12
+    private let verticalPadding: CGFloat = 11
+    private let cardCornerRadius: CGFloat = 20
 
     private var isAccessibilityCategory: Bool {
         dynamicTypeSize >= .accessibility1
     }
 
     public var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
 
         return ZStack {
             // Solid background layer
@@ -163,11 +164,11 @@ public struct MetricSummaryCard: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: headerIconSize, weight: .semibold))
-                    .foregroundStyle(accentColor.opacity(0.9))
+                    .foregroundStyle(accentColor.opacity(0.8))
 
                 Text(titleText)
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(accentColor.opacity(0.9))
+                    .foregroundStyle(accentColor.opacity(0.8))
                     .lineLimit(1)
             }
 
@@ -256,7 +257,7 @@ public struct MetricSummaryCard: View {
                 Text(footnote)
                     .font(.system(.footnote, design: .rounded))
                     .foregroundStyle(
-                        colorScheme == .dark ? Color.metricTextTertiary : secondaryTextColor.opacity(0.8)
+                        colorScheme == .dark ? Color.metricTextSecondary : secondaryTextColor
                     )
             }
         }
@@ -305,19 +306,21 @@ public struct MetricSummaryCard: View {
             Image(systemName: trendIcon(for: trend.direction))
                 .font(.system(size: 12, weight: .bold))
 
-            Text(trend.valueText)
-                .font(.system(.footnote, design: .rounded).weight(.semibold))
+            HStack(spacing: 4) {
+                Text(trend.valueText)
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
 
-            if let caption = trend.caption {
-                Text(caption)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.metricTextTertiary)
+                if let caption = trend.caption, !caption.isEmpty {
+                    Text("· \(caption)")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.metricTextSecondary)
+                }
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(trendBackground(for: trend.direction))
-        .cornerRadius(14)
+        .cornerRadius(cardCornerRadius)
         .foregroundStyle(trendForeground(for: trend.direction))
     }
 
@@ -328,15 +331,24 @@ public struct MetricSummaryCard: View {
     private func chart(for content: Content) -> some View {
         let lineColor = Color.metricChartLine
         let isSteps = isStepsContent(content)
+        let minPoint = content.dataPoints.min(by: { $0.value < $1.value })
+        let maxPoint = content.dataPoints.max(by: { $0.value < $1.value })
+        let lastIndex = content.dataPoints.map(\.index).max()
 
         return Chart {
             if isSteps {
                 ForEach(content.dataPoints) { point in
+                    let isToday = lastIndex != nil && point.index == lastIndex
+
                     BarMark(
                         x: .value("Index", point.index),
                         y: .value("Value", point.value)
                     )
-                    .foregroundStyle(lineColor)
+                    .foregroundStyle(
+                        isToday
+                            ? lineColor
+                            : lineColor.opacity(0.55)
+                    )
                 }
             } else {
                 ForEach(content.dataPoints) { point in
@@ -356,6 +368,24 @@ public struct MetricSummaryCard: View {
                     )
                     .symbolSize(9)
                     .foregroundStyle(lineColor)
+                }
+
+                if let minPoint {
+                    PointMark(
+                        x: .value("Index", minPoint.index),
+                        y: .value("Value", minPoint.value)
+                    )
+                    .symbolSize(6)
+                    .foregroundStyle(lineColor.opacity(0.7))
+                }
+
+                if let maxPoint {
+                    PointMark(
+                        x: .value("Index", maxPoint.index),
+                        y: .value("Value", maxPoint.value)
+                    )
+                    .symbolSize(6)
+                    .foregroundStyle(lineColor.opacity(0.9))
                 }
             }
         }
@@ -549,6 +579,17 @@ public struct MetricSummaryCard: View {
         case .flat:
             return "No change \(trend.valueText)"
         }
+    }
+}
+
+// MARK: - Metric Card Button Style
+
+struct MetricCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .brightness(configuration.isPressed ? 0.06 : 0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 

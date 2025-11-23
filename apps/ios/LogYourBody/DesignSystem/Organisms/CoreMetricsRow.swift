@@ -63,7 +63,7 @@ struct CoreMetricsRow: View {
                     )
                 }
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(MetricCardButtonStyle())
 
             // Weight Card - Tappable
             Button {

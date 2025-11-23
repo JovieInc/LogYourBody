@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct DashboardHeaderCompact: View {
+    let scrollProgress: CGFloat
     let avatarURL: URL?
     let userFirstName: String
     let hasAge: Bool
@@ -10,8 +11,13 @@ struct DashboardHeaderCompact: View {
     let syncStatusColor: Color
     let isSyncError: Bool
     let onShowSyncDetails: () -> Void
+    let onAddEntry: () -> Void
 
     @State private var isSyncIndicatorExpanded = false
+
+    private var clampedScrollProgress: CGFloat {
+        min(max(scrollProgress, 0), 1)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -24,18 +30,37 @@ struct DashboardHeaderCompact: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Welcome back")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.7))
+                        .foregroundColor(
+                            Color.liquidTextPrimary.opacity(0.7 - 0.2 * clampedScrollProgress)
+                        )
                         .lineLimit(1)
 
                     Text(userFirstName)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(Color.liquidTextPrimary)
                         .lineLimit(1)
+                        .offset(y: -3 * clampedScrollProgress)
                 }
+                .animation(.easeOut(duration: 0.2), value: clampedScrollProgress)
 
                 Spacer(minLength: 8)
 
                 syncIndicator
+
+                Button {
+                    onAddEntry()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(Color.white)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            Circle()
+                                .fill(Color.appPrimary)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityLabel("New Entry")
             }
 
             if !hasAge || !hasHeight {

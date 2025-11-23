@@ -300,8 +300,20 @@ class SyncManager: ObservableObject {
         let updatedAt = (dict["updated_at"] as? String).flatMap { dateFormatter.date(from: $0) } ?? Date()
 
         // Parse optional fields, handling NSNull
-        let weight = dict["weight"] as? Double
-        let weightUnit = dict["weight_unit"] as? String ?? "kg"
+        let rawWeight = dict["weight"] as? Double ?? 0
+        let rawWeightUnit = dict["weight_unit"] as? String
+        let weightUnitLower = rawWeightUnit?.lowercased()
+        let weightKg: Double?
+        if rawWeight > 0 {
+            if weightUnitLower == "lbs" {
+                weightKg = rawWeight * 0.45359237
+            } else {
+                weightKg = rawWeight
+            }
+        } else {
+            weightKg = nil
+        }
+        let weightUnit = rawWeightUnit ?? "kg"
         let bodyFatPercentage = dict["body_fat_percentage"] as? Double
         let bodyFatMethod = dict["body_fat_method"] as? String
         let muscleMass = dict["muscle_mass"] as? Double
@@ -314,7 +326,7 @@ class SyncManager: ObservableObject {
             id: id,
             userId: userId,
             date: date,
-            weight: weight,
+            weight: weightKg,
             weightUnit: weightUnit,
             bodyFatPercentage: bodyFatPercentage,
             bodyFatMethod: bodyFatMethod,

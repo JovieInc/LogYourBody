@@ -78,7 +78,7 @@ struct SecondaryMetricsRow: View {
                         .stroke(displayMode == .ffmiChart ? Color.liquidAccent : Color.clear, lineWidth: 2)
                 )
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(MetricCardButtonStyle())
 
             // Lean Mass
             MetricSummaryCard(

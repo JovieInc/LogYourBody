@@ -59,30 +59,91 @@ struct DashboardHeroSection<HeroCard: View, StepsCard: View>: View {
 // MARK: - Home / Photos / Metrics Tabs
 
 struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, QuickActions: View>: View {
-    let header: () -> Header
+    let header: (CGFloat) -> Header
     let syncBanner: () -> SyncBanner
     let metricContent: () -> MetricContent
     let quickActions: () -> QuickActions
     let onRefresh: () async -> Void
 
+    @State private var scrollOffset: CGFloat = 0
+    @State private var headerStackHeight: CGFloat = 0
+
+    private var scrollProgress: CGFloat {
+        let rawOffset = -scrollOffset
+        let threshold: CGFloat = 12
+        let span: CGFloat = 40
+
+        guard rawOffset > threshold else { return 0 }
+        let adjusted = min((rawOffset - threshold) / span, 1)
+        return max(adjusted, 0)
+    }
+
+    private var headerHeight: CGFloat {
+        max(headerStackHeight, 64 + safeAreaTop)
+    }
+
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 16) {
-                header()
-                    .padding(.horizontal, 20)
+        ZStack(alignment: .top) {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    metricContent()
 
-                syncBanner()
-                    .padding(.horizontal, 20)
-
-                metricContent()
-
-                quickActions()
-                Spacer(minLength: 160)
+                    quickActions()
+                    Spacer(minLength: 160)
+                }
+                .padding(.top, headerHeight + 16)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear
+                            .preference(
+                                key: ScrollOffsetPreferenceKey.self,
+                                value: geo.frame(in: .named("dashboardHomeScroll")).minY
+                            )
+                    }
+                )
             }
-            .padding(.top, 8)
-        }
-        .refreshable {
-            await onRefresh()
+            .coordinateSpace(name: "dashboardHomeScroll")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                scrollOffset = value
+            }
+            .refreshable {
+                await onRefresh()
+            }
+
+            VStack(spacing: 16) {
+                header(scrollProgress)
+                syncBanner()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, safeAreaTop + 8)
+            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear {
+                            headerStackHeight = geo.size.height
+                        }
+                        .onChange(of: geo.size.height) { newValue in
+                            headerStackHeight = newValue
+                        }
+                }
+            )
+            .background(
+                Color.black.opacity(0.9)
+                    .ignoresSafeArea(edges: .top)
+                    .overlay(
+                        .ultraThinMaterial
+                            .opacity(0.2 * scrollProgress)
+                            .ignoresSafeArea(edges: .top)
+                    )
+            )
+            .shadow(
+                color: Color.black.opacity(0.18 * scrollProgress),
+                radius: 18,
+                x: 0,
+                y: 10
+            )
         }
     }
 }
@@ -122,24 +183,27 @@ struct DashboardMetricsTab<Header: View, SyncBanner: View, TitleBlock: View, Met
     let onRefresh: () async -> Void
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
+        VStack(spacing: 0) {
             VStack(spacing: 16) {
                 header()
-                    .padding(.horizontal, 20)
-
                 syncBanner()
-                    .padding(.horizontal, 20)
-
-                titleBlock()
-
-                metricsContent()
-
-                Spacer(minLength: 160)
             }
+            .padding(.horizontal, 20)
             .padding(.top, 8)
-        }
-        .refreshable {
-            await onRefresh()
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    titleBlock()
+
+                    metricsContent()
+
+                    Spacer(minLength: 160)
+                }
+                .padding(.top, 16)
+            }
+            .refreshable {
+                await onRefresh()
+            }
         }
     }
 }
@@ -205,101 +269,6 @@ struct DashboardStepsCard<ProgressView: View>: View {
     }
 }
 
-// MARK: - Bottom Tab Bar
-
-struct DashboardBottomTabBar: View {
-    @Binding var selectedTab: DashboardViewLiquid.DashboardTab
-
-    var body: some View {
-        LiquidGlassCard(
-            cornerRadius: 24,
-            blurRadius: 24,
-            padding: 3,
-            showShadow: false,
-            showHighlight: true
-        ) {
-            HStack(spacing: 4) {
-                tabButton(
-                    tab: .home,
-                    icon: "house.fill",
-                    title: "Home"
-                )
-                tabButton(
-                    tab: .metrics,
-                    icon: "chart.bar.fill",
-                    title: "Metrics"
-                )
-            }
-        }
-    }
-
-    private func tabButton(
-        tab: DashboardViewLiquid.DashboardTab,
-        icon: String,
-        title: String
-    ) -> some View {
-        let isSelected = selectedTab == tab
-
-        return Button(
-            action: {
-                guard selectedTab != tab else { return }
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    selectedTab = tab
-                }
-            },
-            label: {
-                VStack(spacing: 0) {
-                    Image(systemName: icon)
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundColor(
-                            isSelected ?
-                                Color.white :
-                                Color.white.opacity(0.65)
-                        )
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(
-                            isSelected ?
-                                Color.white.opacity(0.18) :
-                                Color.white.opacity(0.06)
-                        )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .strokeBorder(
-                            Color.white.opacity(isSelected ? 0.25 : 0.10),
-                            lineWidth: 1
-                        )
-                )
-                .contentShape(Rectangle())
-            }
-        )
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-    }
-}
-
-// MARK: - Lazy Tab Loader
-
-struct LazyTabView<Content: View>: View {
-    @Binding var selectedTab: DashboardViewLiquid.DashboardTab
-    var tab: DashboardViewLiquid.DashboardTab = .home
-    let content: () -> Content
-
-    var body: some View {
-        if selectedTab == tab {
-            content()
-        } else {
-            Color.clear
-        }
-    }
-}
-
 // MARK: - Metrics Section Wrapper
 
 struct DashboardMetricsSection: View {
@@ -319,6 +288,10 @@ struct DashboardMetricsSection: View {
     let bodyMetrics: [BodyMetrics]
     let dailyMetrics: DailyMetrics?
     let weightUnit: String
+    let stepsGoalText: String?
+    let weightGoalText: String?
+    let bodyFatGoalText: String?
+    let ffmiGoalText: String?
 
     let generateStepsChartData: () -> [MetricDataPoint]
     let generateWeightChartData: () -> [MetricDataPoint]
@@ -379,17 +352,21 @@ struct DashboardMetricsSection: View {
                         chartAccessibilityLabel: "Steps trend for the past week",
                         chartAccessibilityValue: "Latest value \(formatSteps(latestSteps.value)) steps",
                         trend: nil,
-                        footnote: nil
+                        footnote: stepsGoalText
                     )),
                     isButtonContext: true
                 )
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(MetricCardButtonStyle())
 
         case .weight:
             if let currentMetric {
                 let stats = weightRangeStats()
-                ZStack(alignment: .topTrailing) {
+                let averageText = stats.map { formatAverageFootnote($0.average, weightUnit) }
+                Button {
+                    selectedMetricType = .weight
+                    isMetricDetailActive = true
+                } label: {
                     MetricSummaryCard(
                         icon: "figure.stand",
                         accentColor: Color.metricAccentWeight,
@@ -404,39 +381,18 @@ struct DashboardMetricsSection: View {
                             chartAccessibilityLabel: "Weight trend for the past week",
                             chartAccessibilityValue: "Latest value \(formatTrendWeightHeadline(currentMetric, weightUsesTrend)) \(weightUnit)",
                             trend: stats.flatMap { makeTrend($0.delta, weightUnit, selectedRange) },
-                            footnote: stats.map { formatAverageFootnote($0.average, weightUnit) }
+                            footnote: combinedAverageAndGoal(averageText, weightGoalText)
                         )),
                         isButtonContext: true
                     )
-
-                    Button {
-                        weightUsesTrend.toggle()
-                    } label: {
-                        Text(weightUsesTrend ? "Trend" : "Raw")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(Color.metricTextSecondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(Color.white.opacity(0.08))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 10)
-                    .padding(.trailing, 12)
-                    .accessibilityLabel("Toggle weight display mode")
-                    .accessibilityHint("Switch between trend and raw weight")
                 }
-                .onTapGesture {
-                    selectedMetricType = .weight
-                    isMetricDetailActive = true
-                }
+                .buttonStyle(MetricCardButtonStyle())
             }
 
         case .bodyFat:
             if let currentMetric {
                 let stats = bodyFatRangeStats()
+                let averageText = stats.map { formatAverageFootnote($0.average, "%") }
                 Button {
                     selectedMetricType = .bodyFat
                     isMetricDetailActive = true
@@ -455,17 +411,18 @@ struct DashboardMetricsSection: View {
                             chartAccessibilityLabel: "Body fat percentage trend for the past week",
                             chartAccessibilityValue: "Latest value \(formatBodyFatValue(currentMetric.bodyFatPercentage))%",
                             trend: stats.flatMap { makeTrend($0.delta, "%", selectedRange) },
-                            footnote: stats.map { formatAverageFootnote($0.average, "%") }
+                            footnote: combinedAverageAndGoal(averageText, bodyFatGoalText)
                         )),
                         isButtonContext: true
                     )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .buttonStyle(MetricCardButtonStyle())
             }
 
         case .ffmi:
             if let currentMetric {
                 let stats = ffmiRangeStats()
+                let averageText = stats.map { formatAverageFootnote($0.average, "") }
                 Button {
                     selectedMetricType = .ffmi
                     isMetricDetailActive = true
@@ -484,13 +441,73 @@ struct DashboardMetricsSection: View {
                             chartAccessibilityLabel: "FFMI trend for the past week",
                             chartAccessibilityValue: "Latest value \(formatFFMIValue(currentMetric))",
                             trend: stats.flatMap { makeTrend($0.delta, "", selectedRange) },
-                            footnote: stats.map { formatAverageFootnote($0.average, "") }
+                            footnote: combinedAverageAndGoal(averageText, ffmiGoalText)
                         )),
                         isButtonContext: true
                     )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .buttonStyle(MetricCardButtonStyle())
             }
+        }
+    }
+}
+
+private func combinedAverageAndGoal(_ averageText: String?, _ goalText: String?) -> String? {
+    switch (averageText, goalText) {
+    case let (avg?, goal?):
+        return "\(avg) · \(goal)"
+    case let (avg?, nil):
+        return avg
+    case let (nil, goal?):
+        return goal
+    default:
+        return nil
+    }
+}
+
+// MARK: - GLP-1 Metric Card
+
+extension DashboardViewLiquid {
+    @ViewBuilder
+    var glp1MetricCard: some View {
+        let sortedLogs = glp1DoseLogs.sorted { $0.takenAt < $1.takenAt }
+
+        if let latestLog = sortedLogs.last,
+           let latestDose = latestLog.doseAmount {
+            let unit = latestLog.doseUnit ?? "mg"
+            let dataPoints: [MetricSummaryCard.DataPoint] = Array(sortedLogs.suffix(7))
+                .enumerated()
+                .compactMap { index, log in
+                    guard let value = log.doseAmount else { return nil }
+                    return MetricSummaryCard.DataPoint(index: index, value: value)
+                }
+
+            Button {
+                selectedMetricType = .glp1
+                isMetricDetailActive = true
+            } label: {
+                MetricSummaryCard(
+                    icon: "syringe",
+                    accentColor: Color.metricAccent,
+                    state: .data(
+                        MetricSummaryCard.Content(
+                            title: "GLP-1 Dose",
+                            value: String(format: "%.1f", latestDose),
+                            unit: unit,
+                            timestamp: formatCardDateOnly(latestLog.takenAt),
+                            dataPoints: dataPoints,
+                            chartAccessibilityLabel: "GLP-1 dose history",
+                            chartAccessibilityValue: "Latest dose \(String(format: "%.1f", latestDose)) \(unit)",
+                            trend: nil,
+                            footnote: nil
+                        )
+                    ),
+                    isButtonContext: true
+                )
+            }
+            .buttonStyle(MetricCardButtonStyle())
+        } else {
+            EmptyView()
         }
     }
 }

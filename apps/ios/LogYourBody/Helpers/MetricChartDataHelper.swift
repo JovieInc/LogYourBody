@@ -221,8 +221,8 @@ struct MetricChartDataHelper {
                 hasher.combine(metric.bodyFatPercentage != nil)
                 if let bodyFat = metric.bodyFatPercentage { hasher.combine(bodyFat) }
             case .waist:
-                hasher.combine(metric.muscleMass != nil)
-                if let muscleMass = metric.muscleMass { hasher.combine(muscleMass) }
+                hasher.combine(metric.waistCm != nil)
+                if let waist = metric.waistCm { hasher.combine(waist) }
             }
         }
 
@@ -544,7 +544,14 @@ struct MetricChartDataHelper {
                 }
                 return SparklineDataPoint(index: index, value: ffmi.value, isEstimated: ffmi.isInterpolated)
             case .waist:
-                return nil
+                guard let waistCm = metric.waistCm else { return nil }
+                let value: Double
+                if context.useMetric {
+                    value = waistCm
+                } else {
+                    value = waistCm / 2.54
+                }
+                return SparklineDataPoint(index: index, value: value)
             }
         }
 
