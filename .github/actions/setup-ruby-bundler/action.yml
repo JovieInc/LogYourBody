@@ -32,12 +32,24 @@ runs:
       shell: bash
       run: echo "version=$(ruby -v | awk '{print $2}')" >> $GITHUB_OUTPUT
 
+    - name: Get Gemfile.lock hash
+      id: gemfile-hash
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -f Gemfile.lock ]; then
+          HASH=$(shasum Gemfile.lock | awk '{print $1}')
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+        else
+          echo "hash=none" >> $GITHUB_OUTPUT
+        fi
+
     - name: Cache Ruby dependencies
       uses: actions/cache@v4
       id: bundler-cache
       with:
         path: ${{ inputs.working-directory }}/vendor/bundle
-        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ hashFiles(format('{0}/Gemfile.lock', inputs.working-directory)) }}
+        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ steps.gemfile-hash.outputs.hash }}
         restore-keys: |
           ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-
 
