@@ -26,7 +26,7 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 5
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Setup iOS Build Environment
       uses: ./.github/actions/setup-ios-build
@@ -47,7 +47,7 @@ jobs:
     outputs:
       cache-key: ${{ steps.cache-key.outputs.key }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Setup iOS Build Environment
       uses: ./.github/actions/setup-ios-build
@@ -109,7 +109,7 @@ jobs:
     
     name: ${{ matrix.test-type.name }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Setup iOS Build Environment
       uses: ./.github/actions/setup-ios-build
@@ -192,7 +192,7 @@ jobs:
     
     name: ${{ matrix.sanitizer.name }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Setup iOS Build Environment
       uses: ./.github/actions/setup-ios-build
@@ -247,7 +247,7 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 20
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Setup iOS Build Environment
       uses: ./.github/actions/setup-ios-build
@@ -311,7 +311,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Download all test results
       uses: actions/download-artifact@v4

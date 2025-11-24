@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 5
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -75,7 +75,7 @@ jobs:
   #     url: ${{ steps.deploy.outputs.url }}
   #   
   #   steps:
-  #   - uses: actions/checkout@v4
+  #   - uses: actions/checkout@v6
   #   
   #   - name: Install Vercel CLI
   #     run: npm install --global vercel@latest

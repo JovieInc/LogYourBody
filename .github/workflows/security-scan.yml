@@ -19,7 +19,7 @@ jobs:
       security-events: write
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0  # Full history for comprehensive scanning
     
@@ -45,7 +45,7 @@ jobs:
       contents: read
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Dependency Review
       uses: actions/dependency-review-action@v4
@@ -60,7 +60,7 @@ jobs:
       contents: write
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Generate SBOM with CycloneDX
       uses: CycloneDX/gh-node-module-generatebom@v1
