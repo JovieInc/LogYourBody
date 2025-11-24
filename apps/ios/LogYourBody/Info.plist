@@ -30,7 +30,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>20251123110645</string>
+	<string>20251123162428</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
@@ -47,10 +47,6 @@
 	<string>LogYourBody needs access to scan your photo library for progress photos to import.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>LogYourBody saves your shared body score images to your photo library.</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>healthkit</string>
-	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
