@@ -35,7 +35,7 @@ runs:
           /usr/local/Cellar/xcbeautify
           /opt/homebrew/Cellar/swiftlint
           /opt/homebrew/Cellar/xcbeautify
-        key: ${{ runner.os }}-homebrew-swiftlint-xcbeautify-${{ hashFiles('.github/actions/setup-ios-build/action.yml') }}
+        key: ${{ runner.os }}-homebrew-swiftlint-xcbeautify-v1
         restore-keys: |
           ${{ runner.os }}-homebrew-swiftlint-xcbeautify-
 
