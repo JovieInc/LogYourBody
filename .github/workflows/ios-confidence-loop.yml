@@ -168,7 +168,7 @@ jobs:
     
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ${{ matrix.test-type.name }}-results
         path: |
@@ -235,7 +235,7 @@ jobs:
     
     - name: Upload sanitizer results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ${{ matrix.sanitizer.name }}-results
         path: apps/ios/sanitizer_output/
@@ -297,7 +297,7 @@ jobs:
     
     - name: Upload performance results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: performance-profiling-results
         path: |
