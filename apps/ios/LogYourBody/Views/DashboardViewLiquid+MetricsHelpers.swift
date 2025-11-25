@@ -23,7 +23,7 @@ extension DashboardViewLiquid {
                     for: metric.date,
                     metrics: viewModel.bodyMetrics
                 ) {
-                let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+                let system = currentMeasurementSystem
                 animatedWeight = convertWeight(weightResult.value, to: system) ?? weightResult.value
             }
 
@@ -68,7 +68,7 @@ extension DashboardViewLiquid {
 
     func formatWeightValue(_ weight: Double?) -> String {
         guard let weight = weight else { return "–" }
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        let system = currentMeasurementSystem
         let converted = convertWeight(weight, to: system) ?? weight
         // Display with a single decimal place for consistency across views
         return String(format: "%.1f", converted)
@@ -105,7 +105,7 @@ extension DashboardViewLiquid {
 
     /// Headline formatter for the weight metric card using trend-weight when enabled.
     func formatTrendWeightHeadline(_ metric: BodyMetrics, usesTrend: Bool) -> String {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        let system = currentMeasurementSystem
 
         if usesTrend,
            let trendResult = MetricsInterpolationService.shared.estimateTrendWeight(
@@ -181,7 +181,7 @@ extension DashboardViewLiquid {
     }
 
     func weightEntriesPayload() -> MetricEntriesPayload? {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        let system = currentMeasurementSystem
         let primaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
         let secondaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
 
@@ -212,7 +212,7 @@ extension DashboardViewLiquid {
     }
 
     func bodyFatEntriesPayload() -> MetricEntriesPayload? {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        let system = currentMeasurementSystem
         let primaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 1, maxFractionDigits: 1)
         let secondaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
 
@@ -394,10 +394,12 @@ extension DashboardViewLiquid {
             return "Yesterday"
         }
 
-        let formatter = DateFormatter()
         let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: today)
-        formatter.dateFormat = sameYear ? "MMM d" : "MMM yyyy"
-        return formatter.string(from: date)
+        if sameYear {
+            return FormatterCache.monthDayFormatter.string(from: date)
+        } else {
+            return FormatterCache.monthYearFormatter.string(from: date)
+        }
     }
 
     func formatCardDate(_ date: Date) -> String {
@@ -413,10 +415,12 @@ extension DashboardViewLiquid {
             return "Yesterday"
         }
 
-        let formatter = DateFormatter()
         let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: today)
-        formatter.dateFormat = sameYear ? "MMM d" : "MMM yyyy"
-        return formatter.string(from: date)
+        if sameYear {
+            return FormatterCache.monthDayFormatter.string(from: date)
+        } else {
+            return FormatterCache.monthYearFormatter.string(from: date)
+        }
     }
 
     func generateStepsChartData() -> [MetricDataPoint] {
@@ -465,7 +469,16 @@ extension DashboardViewLiquid {
     }
 
     func dailyMetricsLookup() -> [Date: DailyMetrics] {
-        var lookup: [Date: DailyMetrics] = [:]
+        if !dailyMetricsLookupCache.isEmpty || recentDailyMetrics.isEmpty {
+            return dailyMetricsLookupCache
+        }
+
+        rebuildDailyMetricsLookupCache()
+        return dailyMetricsLookupCache
+    }
+
+    func rebuildDailyMetricsLookupCache() {
+        var lookup = Dictionary<Date, DailyMetrics>(minimumCapacity: recentDailyMetrics.count)
         let calendar = Calendar.current
 
         for metric in recentDailyMetrics {
@@ -479,11 +492,11 @@ extension DashboardViewLiquid {
             }
         }
 
-        return lookup
+        dailyMetricsLookupCache = lookup
     }
 
     func generateWeightChartData() -> [MetricDataPoint] {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        let system = currentMeasurementSystem
 
         let allPoints: [Double] = sortedBodyMetricsAscending.compactMap { metric in
             guard let weight = metric.weight else { return nil }
@@ -573,7 +586,7 @@ extension DashboardViewLiquid {
     }
 
     func weightRangeStats() -> MetricRangeStats? {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        let system = currentMeasurementSystem
         return computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
             guard let weight = metric.weight else { return nil }
             return convertWeight(weight, to: system) ?? weight
@@ -614,58 +627,21 @@ extension DashboardViewLiquid {
     // so that time ranges (W/M/6M/Y) can filter by date window.
 
     func generateFullScreenStepsChartData() -> [MetricChartDataPoint] {
-        guard !recentDailyMetrics.isEmpty else { return [] }
-
-        return recentDailyMetrics
-            .sorted { $0.date < $1.date }
-            .compactMap { metric in
-                guard let steps = metric.steps else { return nil }
-                return MetricChartDataPoint(
-                    date: metric.date,
-                    value: Double(max(steps, 0)),
-                    isEstimated: false
-                )
-            }
+        buildFullScreenStepsChartData(from: recentDailyMetrics)
     }
 
     func generateFullScreenWeightChartData() -> [MetricChartDataPoint] {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-
-        return sortedBodyMetricsAscending
-            .compactMap { metric in
-                guard let weight = metric.weight else { return nil }
-                let converted = convertWeight(weight, to: system) ?? weight
-                return MetricChartDataPoint(
-                    date: metric.date,
-                    value: converted
-                )
-            }
+        buildFullScreenWeightChartData(
+            from: sortedBodyMetricsAscending,
+            measurementSystem: currentMeasurementSystem
+        )
     }
 
     func generateFullScreenBodyFatChartData() -> [MetricChartDataPoint] {
-        let interpolationContext = MetricsInterpolationService.shared
-            .makeBodyFatInterpolationContext(for: bodyMetrics)
-
-        return sortedBodyMetricsAscending
-            .compactMap { metric in
-                if let bf = metric.bodyFatPercentage {
-                    return MetricChartDataPoint(
-                        date: metric.date,
-                        value: bf,
-                        isEstimated: false
-                    )
-                }
-
-                if let estimated = interpolationContext?.estimate(for: metric.date) {
-                    return MetricChartDataPoint(
-                        date: metric.date,
-                        value: estimated.value,
-                        isEstimated: true
-                    )
-                }
-
-                return nil
-            }
+        buildFullScreenBodyFatChartData(
+            sortedBodyMetrics: sortedBodyMetricsAscending,
+            bodyMetrics: bodyMetrics
+        )
     }
 
     func generateFullScreenFFMIChartData() -> [MetricChartDataPoint] {
@@ -676,23 +652,11 @@ extension DashboardViewLiquid {
 
         guard let heightInches else { return [] }
 
-        guard let interpolationContext = MetricsInterpolationService.shared
-            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
-            return []
-        }
-
-        return sortedBodyMetricsAscending
-            .compactMap { metric in
-                guard let ffmiResult = interpolationContext.estimate(for: metric.date) else {
-                    return nil
-                }
-
-                return MetricChartDataPoint(
-                    date: metric.date,
-                    value: ffmiResult.value,
-                    isEstimated: ffmiResult.isInterpolated
-                )
-            }
+        return buildFullScreenFFMIChartData(
+            sortedBodyMetrics: sortedBodyMetricsAscending,
+            bodyMetrics: bodyMetrics,
+            heightInches: heightInches
+        )
     }
 
     func generateFullScreenGlp1ChartData() -> [MetricChartDataPoint] {
@@ -741,17 +705,344 @@ extension DashboardViewLiquid {
     }
 
     @MainActor
+    func prewarmMetricCaches() async {
+        guard !sortedBodyMetricsAscending.isEmpty || !recentDailyMetrics.isEmpty || !glp1DoseLogs.isEmpty else {
+            fullChartCache = [:]
+            metricEntriesCache = [:]
+            return
+        }
+
+        fullChartCache = [:]
+        metricEntriesCache = [:]
+
+        let sortedMetrics = sortedBodyMetricsAscending
+        let bodyMetricsSnapshot = bodyMetrics
+        let recentDailySnapshot = recentDailyMetrics
+        let measurementSystemSnapshot = currentMeasurementSystem
+        let profileSnapshot = authManager.currentUser?.profile
+        let heightSnapshot = authManager.currentUser?.profile?.height
+        let heightUnitSnapshot = authManager.currentUser?.profile?.heightUnit
+        let heightInchesSnapshot = convertHeightToInches(
+            height: heightSnapshot,
+            heightUnit: heightUnitSnapshot
+        )
+
+        let (chartCache, bodyScoreEntries) = await Task.detached(
+            priority: .utility
+        ) { () -> ([MetricType: [MetricChartDataPoint]], MetricEntriesPayload?) in
+            var cache: [MetricType: [MetricChartDataPoint]] = [:]
+            var bodyScoreEntries: MetricEntriesPayload?
+
+            let stepsData = buildFullScreenStepsChartData(from: recentDailySnapshot)
+            if !stepsData.isEmpty {
+                cache[.steps] = stepsData
+            }
+
+            let weightData = buildFullScreenWeightChartData(
+                from: sortedMetrics,
+                measurementSystem: measurementSystemSnapshot
+            )
+            if !weightData.isEmpty {
+                cache[.weight] = weightData
+            }
+
+            let bodyFatData = buildFullScreenBodyFatChartData(
+                sortedBodyMetrics: sortedMetrics,
+                bodyMetrics: bodyMetricsSnapshot
+            )
+            if !bodyFatData.isEmpty {
+                cache[.bodyFat] = bodyFatData
+            }
+
+            if let heightInchesSnapshot {
+                let ffmiData = buildFullScreenFFMIChartData(
+                    sortedBodyMetrics: sortedMetrics,
+                    bodyMetrics: bodyMetricsSnapshot,
+                    heightInches: heightInchesSnapshot
+                )
+                if !ffmiData.isEmpty {
+                    cache[.ffmi] = ffmiData
+                }
+            }
+
+            if let profileSnapshot {
+                let bodyScoreResult = buildBodyScoreChartAndEntriesData(
+                    sortedBodyMetrics: sortedMetrics,
+                    bodyMetrics: bodyMetricsSnapshot,
+                    profile: profileSnapshot,
+                    measurementSystem: measurementSystemSnapshot
+                )
+
+                if !bodyScoreResult.chartPoints.isEmpty {
+                    cache[.bodyScore] = bodyScoreResult.chartPoints
+                }
+
+                bodyScoreEntries = bodyScoreResult.entriesPayload
+            }
+
+            return (cache, bodyScoreEntries)
+        }.value
+
+        fullChartCache = chartCache
+
+        if let bodyScoreEntries {
+            metricEntriesCache[.bodyScore] = bodyScoreEntries
+        }
+    }
+
+    @MainActor
     func loadGlp1DoseLogs() async {
         guard let userId = authManager.currentUser?.id else {
             glp1DoseLogs = []
+            await prewarmMetricCaches()
             return
         }
 
         do {
+            // Load from local cache first for offline support
+            let cachedLogs = await CoreDataManager.shared.fetchGlp1DoseLogs(for: userId)
+            if !cachedLogs.isEmpty {
+                glp1DoseLogs = cachedLogs.sorted { $0.takenAt < $1.takenAt }
+            }
+
+            // Always attempt a remote refresh when possible
             let logs = try await SupabaseManager.shared.fetchGlp1DoseLogs(userId: userId, limit: 200)
             glp1DoseLogs = logs.sorted { $0.takenAt < $1.takenAt }
+            CoreDataManager.shared.saveGlp1DoseLogs(logs, userId: userId)
         } catch {
-            // Ignore errors for now; GLP-1 data is optional for dashboard
+            // Ignore errors; fall back to cached logs if available
         }
+
+        await prewarmMetricCaches()
     }
+}
+
+private func buildFullScreenStepsChartData(from recentDailyMetrics: [DailyMetrics]) -> [MetricChartDataPoint] {
+    guard !recentDailyMetrics.isEmpty else { return [] }
+
+    return recentDailyMetrics
+        .sorted { $0.date < $1.date }
+        .compactMap { metric in
+            guard let steps = metric.steps else { return nil }
+            return MetricChartDataPoint(
+                date: metric.date,
+                value: Double(max(steps, 0)),
+                isEstimated: false
+            )
+        }
+}
+
+private func buildFullScreenWeightChartData(
+    from sortedBodyMetricsAscending: [BodyMetrics],
+    measurementSystem: MeasurementSystem
+) -> [MetricChartDataPoint] {
+    return sortedBodyMetricsAscending
+        .compactMap { metric in
+            guard let weight = metric.weight else { return nil }
+
+            let converted: Double
+            switch measurementSystem {
+            case .metric:
+                converted = weight
+            case .imperial:
+                converted = weight * 2.20462
+            }
+
+            return MetricChartDataPoint(
+                date: metric.date,
+                value: converted
+            )
+        }
+}
+
+private func buildFullScreenBodyFatChartData(
+    sortedBodyMetrics: [BodyMetrics],
+    bodyMetrics: [BodyMetrics]
+) -> [MetricChartDataPoint] {
+    let interpolationContext = MetricsInterpolationService.shared
+        .makeBodyFatInterpolationContext(for: bodyMetrics)
+
+    return sortedBodyMetrics
+        .compactMap { metric in
+            if let bf = metric.bodyFatPercentage {
+                return MetricChartDataPoint(
+                    date: metric.date,
+                    value: bf,
+                    isEstimated: false
+                )
+            }
+
+            if let estimated = interpolationContext?.estimate(for: metric.date) {
+                return MetricChartDataPoint(
+                    date: metric.date,
+                    value: estimated.value,
+                    isEstimated: true
+                )
+            }
+
+            return nil
+        }
+}
+
+private func buildFullScreenFFMIChartData(
+    sortedBodyMetrics: [BodyMetrics],
+    bodyMetrics: [BodyMetrics],
+    heightInches: Double
+) -> [MetricChartDataPoint] {
+    guard let interpolationContext = MetricsInterpolationService.shared
+        .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
+        return []
+    }
+
+    return sortedBodyMetrics
+        .compactMap { metric in
+            guard let ffmiResult = interpolationContext.estimate(for: metric.date) else {
+                return nil
+            }
+
+            return MetricChartDataPoint(
+                date: metric.date,
+                value: ffmiResult.value,
+                isEstimated: ffmiResult.isInterpolated
+            )
+        }
+}
+
+private func buildBodyScoreChartAndEntriesData(
+    sortedBodyMetrics: [BodyMetrics],
+    bodyMetrics: [BodyMetrics],
+    profile: UserProfile,
+    measurementSystem: MeasurementSystem
+) -> (chartPoints: [MetricChartDataPoint], entriesPayload: MetricEntriesPayload?) {
+    guard !sortedBodyMetrics.isEmpty else {
+        return ([], nil)
+    }
+
+    let genderString = profile.gender?.lowercased() ?? ""
+    let sex: BiologicalSex
+    if genderString.contains("female") || genderString.contains("woman") {
+        sex = .female
+    } else if genderString.contains("male") || genderString.contains("man") {
+        sex = .male
+    } else {
+        return ([], nil)
+    }
+
+    let calendar = Calendar.current
+    guard let dateOfBirth = profile.dateOfBirth else {
+        return ([], nil)
+    }
+    let birthYear = calendar.component(.year, from: dateOfBirth)
+
+    guard let heightCm = profile.height, heightCm > 0 else {
+        return ([], nil)
+    }
+
+    let heightValue = HeightValue(value: heightCm, unit: .centimeters)
+
+    let interpolationService = MetricsInterpolationService.shared
+    let weightContext = interpolationService.makeWeightInterpolationContext(for: bodyMetrics)
+    let bodyFatContext = interpolationService.makeBodyFatInterpolationContext(for: bodyMetrics)
+
+    let calculator = BodyScoreCalculator()
+
+    var chartPoints: [MetricChartDataPoint] = []
+    var entries: [MetricHistoryEntry] = []
+
+    for metric in sortedBodyMetrics {
+        let bodyFat: Double
+        if let direct = metric.bodyFatPercentage {
+            bodyFat = direct
+        } else if let estimated = bodyFatContext?.estimate(for: metric.date)?.value {
+            bodyFat = estimated
+        } else {
+            continue
+        }
+
+        let trendWeightValue = weightContext?.trendWeight(for: metric.date)?.value
+        let weightKg: Double
+        if let trend = trendWeightValue {
+            weightKg = trend
+        } else if let raw = metric.weight {
+            weightKg = raw
+        } else {
+            continue
+        }
+
+        let weightValue = WeightValue(value: weightKg, unit: .kilograms)
+        let bodyFatValue = BodyFatValue(percentage: bodyFat, source: .manualValue)
+        let healthSnapshot = HealthImportSnapshot(
+            heightCm: heightCm,
+            weightKg: weightKg,
+            bodyFatPercentage: bodyFat,
+            birthYear: birthYear
+        )
+
+        let input = BodyScoreInput(
+            sex: sex,
+            birthYear: birthYear,
+            height: heightValue,
+            weight: weightValue,
+            bodyFat: bodyFatValue,
+            measurementPreference: measurementSystem,
+            healthSnapshot: healthSnapshot
+        )
+
+        guard input.isReadyForCalculation else {
+            continue
+        }
+
+        let context = BodyScoreCalculationContext(input: input, calculationDate: metric.date)
+
+        guard let result = try? calculator.calculateScore(context: context) else {
+            continue
+        }
+
+        let scoreValue = Double(result.score)
+
+        chartPoints.append(
+            MetricChartDataPoint(
+                date: metric.date,
+                value: scoreValue,
+                isEstimated: false
+            )
+        )
+
+        let normalizedSource = metric.dataSource?.lowercased() ?? ""
+        let sourceType: MetricEntrySourceType
+        if normalizedSource.contains("healthkit") || normalizedSource.contains("health") {
+            sourceType = .healthKit
+        } else if normalizedSource.isEmpty || normalizedSource == "manual" {
+            sourceType = .manual
+        } else {
+            sourceType = .integration(id: metric.dataSource)
+        }
+
+        let entry = MetricHistoryEntry(
+            id: metric.id,
+            date: metric.date,
+            primaryValue: scoreValue,
+            secondaryValue: nil,
+            source: sourceType
+        )
+        entries.append(entry)
+    }
+
+    guard !chartPoints.isEmpty else {
+        return ([], nil)
+    }
+
+    let primaryFormatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 0)
+
+    let config = MetricEntriesConfiguration(
+        metricType: .bodyScore,
+        unitLabel: "",
+        secondaryUnitLabel: nil,
+        primaryFormatter: primaryFormatter,
+        secondaryFormatter: nil
+    )
+
+    let payload: MetricEntriesPayload? = entries.isEmpty ? nil : MetricEntriesPayload(config: config, entries: entries)
+
+    return (chartPoints, payload)
 }

@@ -31,5 +31,6 @@ extension AppLogger {
     static let supabase = AppLogger(category: "supabase")
     static let photos = AppLogger(category: "photos")
     static let coreData = AppLogger(category: "coreData")
+    static let billing = AppLogger(category: "billing")
     static let ui = AppLogger(category: "ui")
 }

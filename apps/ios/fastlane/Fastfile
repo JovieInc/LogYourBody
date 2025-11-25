@@ -126,6 +126,15 @@ platform :ios do
     )
   end
   
+  desc "Automatically fix Swift style issues using SwiftLint auto-corrections"
+  lane :fix_style do
+    ios_dir = File.expand_path("..", Dir.pwd.end_with?("/fastlane") ? Dir.pwd : "#{Dir.pwd}/fastlane")
+
+    Dir.chdir(ios_dir) do
+      sh("swiftlint --fix")
+    end
+  end
+  
   desc "Validate provisioning profile"
   lane :validate_profile do |options|
     # Get profile path from environment or parameter

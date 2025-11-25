@@ -6,17 +6,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { PostgrestError } from '@supabase/supabase-js'
+import type { BodyMetrics } from '@/types/body-metrics'
 
 type ProfileRow = Record<string, unknown> & { id?: string; email?: string | null }
-interface WeightLog {
-  id?: string
-  user_id: string
-  weight?: number
-  weight_unit?: 'kg' | 'lbs'
-  notes?: string | null
-  logged_at?: string
-  [key: string]: unknown
-}
+type WeightLog = BodyMetrics
 
 export default function TestClerkSupabasePage() {
   const { user, isLoaded } = useUser()
@@ -28,7 +21,7 @@ export default function TestClerkSupabasePage() {
 
   const fetchData = useCallback(async () => {
     if (!user) return
-    
+
     setLoading(true)
     setError(null)
 
@@ -47,12 +40,12 @@ export default function TestClerkSupabasePage() {
         setProfile(profileData as ProfileRow | null)
       }
 
-      // Test fetching weights
+      // Test fetching latest body metrics with weight entries
       const { data: weightsData, error: weightsError } = await supabase
-        .from('weight_logs')
+        .from('body_metrics')
         .select('*')
         .eq('user_id', user.id)
-        .order('logged_at', { ascending: false })
+        .order('date', { ascending: false })
         .limit(5)
 
       if (weightsError) {
@@ -115,13 +108,13 @@ export default function TestClerkSupabasePage() {
 
     try {
       const { error } = await supabase
-        .from('weight_logs')
+        .from('body_metrics')
         .insert({
           user_id: user.id,
+          date: new Date().toISOString(),
           weight: 70 + Math.random() * 10,
           weight_unit: 'kg',
-          notes: 'Test weight entry',
-          logged_at: new Date().toISOString()
+          notes: 'Test weight entry'
         })
         .select()
         .single()
@@ -149,7 +142,7 @@ export default function TestClerkSupabasePage() {
   return (
     <div className="container mx-auto p-8">
       <h1 className="text-2xl font-bold mb-6">Clerk-Supabase Integration Test</h1>
-      
+
       <div className="grid gap-6">
         <Card>
           <CardHeader>

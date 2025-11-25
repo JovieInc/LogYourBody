@@ -160,12 +160,12 @@ struct OnboardingCard<Content: View>: View {
         content
             .padding(20)
             .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(.ultraThinMaterial)
-                    .shadow(color: Color.black.opacity(0.25), radius: 20, x: 0, y: 10)
+                    .shadow(color: Color.black.opacity(0.18), radius: 14, x: 0, y: 8)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.white.opacity(0.06))
             )
     }

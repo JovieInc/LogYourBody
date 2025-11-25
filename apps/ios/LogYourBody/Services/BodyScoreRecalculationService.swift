@@ -15,16 +15,20 @@ final class BodyScoreRecalculationService {
     /// Schedule a background recalculation. Multiple calls in quick succession
     /// are coalesced to avoid redundant work.
     func scheduleRecalculation() {
-        let now = Date()
-        if let last = lastScheduledAt, now.timeIntervalSince(last) < debounceInterval {
-            lastScheduledAt = now
-            return
-        }
+        queue.async { [weak self] in
+            guard let self else { return }
 
-        lastScheduledAt = now
+            let now = Date()
+            if let last = self.lastScheduledAt, now.timeIntervalSince(last) < self.debounceInterval {
+                self.lastScheduledAt = now
+                return
+            }
 
-        Task.detached(priority: .userInitiated) {
-            await self.recalculateIfPossible()
+            self.lastScheduledAt = now
+
+            Task.detached(priority: .userInitiated) {
+                await self.recalculateIfPossible()
+            }
         }
     }
 
@@ -85,9 +89,7 @@ final class BodyScoreRecalculationService {
         }
 
         // Resolve measurement preference from UserDefaults
-        let systemRaw = UserDefaults.standard.string(forKey: Constants.preferredMeasurementSystemKey)
-            ?? PreferencesView.defaultMeasurementSystem
-        let measurementSystem = MeasurementSystem(rawValue: systemRaw) ?? .imperial
+        let measurementSystem = MeasurementSystem.preferredFromDefaults
 
         let weightValue = WeightValue(value: weightKg, unit: .kilograms)
         let bodyFatValue = BodyFatValue(percentage: bodyFat, source: .manualValue)

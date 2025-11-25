@@ -160,7 +160,7 @@ extension DashboardViewLiquid {
 
     func heroWeightCaption() -> String {
         if let delta = heroWeightDelta30d() {
-            let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+            let system = currentMeasurementSystem
             return heroTrendCaption(delta: delta, unit: system.weightUnit)
         }
         return weightUnit
@@ -179,6 +179,47 @@ extension DashboardViewLiquid {
     }
 
     func bodyScoreResult(for metric: BodyMetrics) -> BodyScoreResult? {
+        guard let sexAndBirthYear = resolveSexAndBirthYear(),
+              let heightCm = resolveHeightCm(),
+              let bodyFat = resolveBodyFat(for: metric),
+              let weightKg = resolveWeightKg(for: metric) else {
+            return nil
+        }
+
+        let heightValue = HeightValue(value: heightCm, unit: .centimeters)
+        let weightValue = WeightValue(value: weightKg, unit: .kilograms)
+        let bodyFatValue = BodyFatValue(percentage: bodyFat, source: .manualValue)
+        let healthSnapshot = HealthImportSnapshot(
+            heightCm: heightCm,
+            weightKg: weightKg,
+            bodyFatPercentage: bodyFat,
+            birthYear: sexAndBirthYear.birthYear
+        )
+
+        let system = currentMeasurementSystem
+        let input = BodyScoreInput(
+            sex: sexAndBirthYear.sex,
+            birthYear: sexAndBirthYear.birthYear,
+            height: heightValue,
+            weight: weightValue,
+            bodyFat: bodyFatValue,
+            measurementPreference: system,
+            healthSnapshot: healthSnapshot
+        )
+
+        guard input.isReadyForCalculation else { return nil }
+
+        let context = BodyScoreCalculationContext(input: input, calculationDate: metric.date)
+        let calculator = BodyScoreCalculator()
+
+        guard let result = try? calculator.calculateScore(context: context) else {
+            return nil
+        }
+
+        return result
+    }
+
+    private func resolveSexAndBirthYear() -> (sex: BiologicalSex, birthYear: Int)? {
         guard let profile = authManager.currentUser?.profile else {
             return nil
         }
@@ -205,65 +246,46 @@ extension DashboardViewLiquid {
             return nil
         }
 
-        guard let heightCm = profile.height, heightCm > 0 else { return nil }
-        let heightValue = HeightValue(value: heightCm, unit: .centimeters)
+        return (sex: sex, birthYear: resolvedBirthYear)
+    }
 
-        let bodyFat: Double
+    private func resolveHeightCm() -> Double? {
+        guard let heightCm = authManager.currentUser?.profile?.height, heightCm > 0 else {
+            return nil
+        }
+        return heightCm
+    }
+
+    private func resolveBodyFat(for metric: BodyMetrics) -> Double? {
         if let direct = metric.bodyFatPercentage {
-            bodyFat = direct
-        } else if let estimated = MetricsInterpolationService.shared.estimateBodyFat(
+            return direct
+        }
+
+        if let estimated = MetricsInterpolationService.shared.estimateBodyFat(
             for: metric.date,
             metrics: bodyMetrics
         )?.value {
-            bodyFat = estimated
-        } else {
-            return nil
+            return estimated
         }
 
+        return nil
+    }
+
+    private func resolveWeightKg(for metric: BodyMetrics) -> Double? {
         let trendWeightResult = MetricsInterpolationService.shared.estimateTrendWeight(
             for: metric.date,
             metrics: bodyMetrics
         )
 
-        let weightKg: Double
         if let trend = trendWeightResult?.value {
-            weightKg = trend
-        } else if let raw = metric.weight {
-            weightKg = raw
-        } else {
-            return nil
+            return trend
         }
 
-        let weightValue = WeightValue(value: weightKg, unit: .kilograms)
-        let bodyFatValue = BodyFatValue(percentage: bodyFat, source: .manualValue)
-        let healthSnapshot = HealthImportSnapshot(
-            heightCm: heightCm,
-            weightKg: weightKg,
-            bodyFatPercentage: bodyFat,
-            birthYear: resolvedBirthYear
-        )
-
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-        let input = BodyScoreInput(
-            sex: sex,
-            birthYear: resolvedBirthYear,
-            height: heightValue,
-            weight: weightValue,
-            bodyFat: bodyFatValue,
-            measurementPreference: system,
-            healthSnapshot: healthSnapshot
-        )
-
-        guard input.isReadyForCalculation else { return nil }
-
-        let context = BodyScoreCalculationContext(input: input, calculationDate: metric.date)
-        let calculator = BodyScoreCalculator()
-
-        guard let result = try? calculator.calculateScore(context: context) else {
-            return nil
+        if let raw = metric.weight {
+            return raw
         }
 
-        return result
+        return nil
     }
 
     func heroBodyScoreDeltaText() -> String? {
@@ -286,7 +308,7 @@ extension DashboardViewLiquid {
     }
 
     private func heroWeightDelta30d() -> Double? {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        let system = currentMeasurementSystem
         let recentMetrics = filteredMetrics(for: .month1)
 
         let stats = computeRangeStats(

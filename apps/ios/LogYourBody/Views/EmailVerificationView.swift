@@ -72,6 +72,9 @@ struct EmailVerificationView: View {
             }
         }
         .navigationBarHidden(true)
+        .onAppear {
+            AnalyticsService.shared.track(event: "email_verification_view")
+        }
     }
 
     private func verifyCode() {
@@ -86,9 +89,12 @@ struct EmailVerificationView: View {
                 try await authManager.verifyEmail(code: verificationCode)
                 successMessage = "Email verified successfully!"
                 // Navigation will be handled by AuthManager
+                AnalyticsService.shared.track(event: "email_verified")
             } catch {
                 errorMessage = "Invalid verification code. Please try again."
                 isLoading = false
+
+                AnalyticsService.shared.track(event: "email_verification_failed")
             }
         }
     }
@@ -101,8 +107,10 @@ struct EmailVerificationView: View {
             do {
                 try await authManager.resendVerificationEmail()
                 successMessage = "A new verification code has been sent to your email."
+                AnalyticsService.shared.track(event: "email_verification_resent")
             } catch {
                 errorMessage = "Failed to resend code. Please try again."
+                AnalyticsService.shared.track(event: "email_verification_resend_failed")
             }
         }
     }

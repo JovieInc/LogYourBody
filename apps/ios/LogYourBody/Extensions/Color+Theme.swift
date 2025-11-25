@@ -61,7 +61,9 @@ public extension Color {
     static let appCard = linearCard
     static let appBorder = linearBorder
     static let appPrimary = metricAccent  // Note: linearPurple is the canonical name
+    static let appSurfaceSecondary = linearCard
     static let appText = linearText
+    static let appTextPrimary = linearText
     static let appTextSecondary = linearTextSecondary
     static let appTextTertiary = linearTextTertiary
     static let appDisabled = linearDisabled

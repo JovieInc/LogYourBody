@@ -8,6 +8,38 @@
 
 import Foundation
 
+enum MeasurementSystem: String, Codable, CaseIterable {
+    case imperial = "Imperial"
+    case metric = "Metric"
+
+    var weightUnit: String {
+        switch self {
+        case .imperial:
+            return "lbs"
+        case .metric:
+            return "kg"
+        }
+    }
+
+    var heightUnit: String {
+        switch self {
+        case .imperial:
+            return "ft"
+        case .metric:
+            return "cm"
+        }
+    }
+
+    var heightDisplay: String {
+        switch self {
+        case .imperial:
+            return "feet & inches"
+        case .metric:
+            return "centimeters"
+        }
+    }
+}
+
 // MARK: - Unit Conversion Helper
 
 struct UnitConversion {
@@ -235,6 +267,20 @@ struct UnitConversion {
 }
 
 // MARK: - Extensions for Convenience
+
+extension MeasurementSystem {
+    static func fromStored(rawValue: String?) -> MeasurementSystem {
+        if let rawValue, let system = MeasurementSystem(rawValue: rawValue) {
+            return system
+        }
+        return .imperial
+    }
+
+    static var preferredFromDefaults: MeasurementSystem {
+        let rawValue = UserDefaults.standard.string(forKey: Constants.preferredMeasurementSystemKey)
+        return fromStored(rawValue: rawValue)
+    }
+}
 
 extension Double {
     /// Convert this value from kg to lbs

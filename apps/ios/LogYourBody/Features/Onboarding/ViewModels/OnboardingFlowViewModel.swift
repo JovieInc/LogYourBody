@@ -43,6 +43,15 @@ final class OnboardingFlowViewModel: ObservableObject {
     enum EntryContext {
         case authenticated
         case preAuth
+
+        var analyticsContext: String {
+            switch self {
+            case .authenticated:
+                return "authenticated"
+            case .preAuth:
+                return "pre_auth"
+            }
+        }
     }
 
     struct ProgressContext: Equatable {
@@ -123,7 +132,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     @Published var accountCreationError: String?
     @Published private(set) var accountCreationStage: AccountCreationStage = .idle
 
-    private let entryContext: EntryContext
+    let entryContext: EntryContext
     private let healthKitManager: HealthKitManager
     private let calculator: BodyScoreCalculating
     private var hasMarkedOnboardingComplete = false
@@ -139,6 +148,12 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     private var hasBodyFatEntry: Bool {
         bodyScoreInput.bodyFat.percentage != nil
+    }
+
+    private var hasAuthenticatedAccountEmail: Bool {
+        guard entryContext == .authenticated else { return false }
+        guard let email = AuthManager.shared.currentUser?.email else { return false }
+        return !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     init(
@@ -163,45 +178,54 @@ final class OnboardingFlowViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Flow Control
-
     func goToNextStep() {
+        let previousStep = currentStep
+
         switch currentStep {
-        case .hook: currentStep = .basics
-        case .basics: currentStep = .height
-        case .height: currentStep = .healthConnect
-        case .healthConnect: currentStep = healthKitManager.isAuthorized ? .healthConfirmation : .manualWeight
-        case .healthConfirmation: advanceAfterHealthConfirmation()
+        case .hook:
+            currentStep = .basics
+        case .basics:
+            currentStep = .height
+        case .height:
+            currentStep = .healthConnect
+        case .healthConnect:
+            currentStep = healthKitManager.isAuthorized ? .healthConfirmation : .manualWeight
+        case .healthConfirmation:
+            advanceAfterHealthConfirmation()
         case .manualWeight:
             currentStep = nextStepAfterWeightEntry()
         case .bodyFatChoice:
-            switch bodyScoreInput.bodyFat.source {
-            case .manualValue: currentStep = .bodyFatNumeric
-            case .visualEstimate: currentStep = .bodyFatVisual
-            default: currentStep = hasBodyFatEntry ? .loading : .bodyFatChoice
-            }
-        case .bodyFatNumeric, .bodyFatVisual: currentStep = .loading
-        case .loading: currentStep = .bodyScore
+            advanceFromBodyFatChoice()
+        case .bodyFatNumeric, .bodyFatVisual:
+            currentStep = .loading
+        case .loading:
+            currentStep = .bodyScore
         case .bodyScore:
+            advanceFromBodyScore()
+        case .emailCapture:
+            advanceFromEmailCapture()
+        case .account:
             if entryContext == .preAuth {
-                if let result = bodyScoreResult {
-                    PreAuthOnboardingStore.shared.save(input: bodyScoreInput, result: result)
-                }
+                AnalyticsService.shared.track(
+                    event: "onboarding_pre_auth_completed"
+                )
 
                 NotificationCenter.default.post(
-                    name: Notification.Name("preAuthOnboardingCompleted"),
+                    name: .preAuthOnboardingCompleted,
                     object: nil
                 )
             } else {
-                currentStep = .emailCapture
+                currentStep = .profileDetails
             }
-        case .emailCapture: currentStep = .account
-        case .account: currentStep = .profileDetails
         case .profileDetails:
             completeOnboardingIfNeeded()
             currentStep = .paywall
-        case .paywall: break
+        case .paywall:
+            break
         }
+
+        let newStep = currentStep
+        trackStepTransition(from: previousStep, to: newStep)
     }
 
     func goBack() {
@@ -224,10 +248,52 @@ final class OnboardingFlowViewModel: ObservableObject {
             isLoading = false
             errorMessage = nil
             currentStep = .bodyFatChoice
-        case .emailCapture: currentStep = .bodyScore
-        case .account: currentStep = .emailCapture
-        case .profileDetails: currentStep = .account
+        case .emailCapture:
+            currentStep = .bodyScore
+        case .account:
+            currentStep = hasAuthenticatedAccountEmail ? .bodyScore : .emailCapture
+        case .profileDetails:
+            currentStep = hasAuthenticatedAccountEmail ? .bodyScore : .account
         case .paywall: currentStep = .profileDetails
+        }
+    }
+
+    private func advanceFromBodyFatChoice() {
+        switch bodyScoreInput.bodyFat.source {
+        case .manualValue: currentStep = .bodyFatNumeric
+        case .visualEstimate: currentStep = .bodyFatVisual
+        default: currentStep = hasBodyFatEntry ? .loading : .bodyFatChoice
+        }
+    }
+
+    private func advanceFromBodyScore() {
+        if entryContext == .preAuth {
+            if let result = bodyScoreResult {
+                PreAuthOnboardingStore.shared.save(input: bodyScoreInput, result: result)
+            }
+            currentStep = .emailCapture
+        } else {
+            if hasAuthenticatedAccountEmail {
+                if emailAddress.isEmpty {
+                    emailAddress = AuthManager.shared.currentUser?.email ?? ""
+                }
+                currentStep = .profileDetails
+            } else {
+                currentStep = .emailCapture
+            }
+        }
+    }
+
+    private func advanceFromEmailCapture() {
+        if entryContext == .preAuth {
+            currentStep = .account
+        } else if hasAuthenticatedAccountEmail {
+            if emailAddress.isEmpty {
+                emailAddress = AuthManager.shared.currentUser?.email ?? ""
+            }
+            currentStep = .profileDetails
+        } else {
+            currentStep = .account
         }
     }
 
@@ -258,6 +324,19 @@ final class OnboardingFlowViewModel: ObservableObject {
         hasBodyFatEntry ? .loading : .bodyFatChoice
     }
 
+    private func trackStepTransition(from: Step, to: Step) {
+        guard from != to else { return }
+
+        AnalyticsService.shared.track(
+            event: "onboarding_step_advanced",
+            properties: [
+                "from_step": from.rawValue,
+                "to_step": to.rawValue,
+                "entry_context": entryContext.analyticsContext
+            ]
+        )
+    }
+
     func progress(for step: Step) -> ProgressContext? {
         let steps = activeProgressSteps
         guard let index = steps.firstIndex(of: step) else { return nil }
@@ -274,8 +353,10 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     private func shouldIncludeInProgress(_ step: Step) -> Bool {
         switch step {
-        case .hook, .basics, .height, .healthConnect, .bodyScore, .emailCapture, .account, .profileDetails:
+        case .hook, .basics, .height, .healthConnect, .bodyScore, .profileDetails:
             return true
+        case .emailCapture, .account:
+            return !hasAuthenticatedAccountEmail
         case .healthConfirmation:
             return healthKitManager.isAuthorized
         case .manualWeight:
@@ -294,7 +375,14 @@ final class OnboardingFlowViewModel: ObservableObject {
     // MARK: - HealthKit
 
     func attemptHealthImport() async {
+        AnalyticsService.shared.track(
+            event: "onboarding_health_import_attempt"
+        )
+
         guard healthKitManager.isHealthKitAvailable else {
+            AnalyticsService.shared.track(
+                event: "onboarding_health_import_unavailable"
+            )
             currentStep = .manualWeight
             return
         }
@@ -302,9 +390,15 @@ final class OnboardingFlowViewModel: ObservableObject {
         let granted = await healthKitManager.requestAuthorization()
         if granted {
             didRequestHealthSync = true
+            AnalyticsService.shared.track(
+                event: "onboarding_health_import_authorized"
+            )
             currentStep = .healthConfirmation
             await fetchHealthMetrics()
         } else {
+            AnalyticsService.shared.track(
+                event: "onboarding_health_import_denied"
+            )
             currentStep = .manualWeight
         }
     }
@@ -358,6 +452,13 @@ final class OnboardingFlowViewModel: ObservableObject {
             return
         }
 
+        AnalyticsService.shared.track(
+            event: "onboarding_body_score_calculation_attempt",
+            properties: [
+                "entry_context": entryContext.analyticsContext
+            ]
+        )
+
         isLoading = true
         currentStep = .loading
 
@@ -365,6 +466,14 @@ final class OnboardingFlowViewModel: ObservableObject {
             let context = BodyScoreCalculationContext(input: bodyScoreInput)
             let result = try calculator.calculateScore(context: context)
             BodyScoreCache.shared.store(result, for: AuthManager.shared.currentUser?.id)
+
+            AnalyticsService.shared.track(
+                event: "onboarding_body_score_calculation_succeeded",
+                properties: [
+                    "entry_context": entryContext.analyticsContext
+                ]
+            )
+
             await MainActor.run {
                 self.bodyScoreResult = result
                 self.currentStep = .bodyScore
@@ -372,6 +481,13 @@ final class OnboardingFlowViewModel: ObservableObject {
                 self.errorMessage = nil
             }
         } catch {
+            AnalyticsService.shared.track(
+                event: "onboarding_body_score_calculation_failed",
+                properties: [
+                    "entry_context": entryContext.analyticsContext
+                ]
+            )
+
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
@@ -466,6 +582,10 @@ final class OnboardingFlowViewModel: ObservableObject {
         bodyScoreInput.sex = sex
     }
 
+    func updateBirthYear(_ year: Int) {
+        bodyScoreInput.birthYear = year
+    }
+
     func setHeightUnit(_ unit: HeightUnit) {
         guard heightUnit != unit else { return }
 
@@ -534,11 +654,17 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     func persistEmailCapture() {
         emailAddress = trimmedEmailAddress
-        // Placeholder for future analytics/backend hook
+        AnalyticsService.shared.track(
+            event: "onboarding_email_captured",
+            properties: [
+                "entry_context": entryContext.analyticsContext
+            ]
+        )
     }
 
     func createAccount(authManager: AuthManager) async {
         guard canContinueAccountCreation else { return }
+
         await MainActor.run {
             isCreatingAccount = true
             accountCreationError = nil
@@ -565,6 +691,13 @@ final class OnboardingFlowViewModel: ObservableObject {
                 name: ""
             )
 
+            AnalyticsService.shared.track(
+                event: "onboarding_account_created",
+                properties: [
+                    "entry_context": entryContext.analyticsContext
+                ]
+            )
+
             await MainActor.run {
                 accountCreationStage = .finalizing
             }
@@ -575,6 +708,13 @@ final class OnboardingFlowViewModel: ObservableObject {
                 self.goToNextStep()
             }
         } catch {
+            AnalyticsService.shared.track(
+                event: "onboarding_account_creation_failed",
+                properties: [
+                    "entry_context": entryContext.analyticsContext
+                ]
+            )
+
             await MainActor.run {
                 self.isCreatingAccount = false
                 self.accountCreationStage = .idle
@@ -598,19 +738,22 @@ final class OnboardingFlowViewModel: ObservableObject {
         }
         clearPersistedProgress()
 
-        if didRequestHealthSync {
+        if didRequestHealthSync, UserDefaults.standard.bool(forKey: "healthKitSyncEnabled") {
             scheduleDeferredHealthSync()
         }
     }
 
     private func scheduleDeferredHealthSync() {
-        Task.detached(priority: .background) {
-            guard await MainActor.run(body: { self.didRequestHealthSync }) else { return }
-            do {
-                try await self.healthKitManager.syncWeightFromHealthKit()
-            } catch {
-                // Intentionally swallow errors; user can sync later from settings.
+        Task.detached(priority: .background) { [weak self] in
+            guard let self else { return }
+
+            let shouldSync = await MainActor.run {
+                self.didRequestHealthSync
             }
+
+            guard shouldSync else { return }
+
+            await HealthSyncCoordinator.shared.runDeferredOnboardingWeightSync()
         }
     }
 
@@ -856,6 +999,10 @@ final class OnboardingFlowViewModel: ObservableObject {
         selectedVisualBodyFat = snapshot.selectedVisualBodyFat
         didRequestHealthSync = snapshot.didRequestHealthSync
         emailAddress = snapshot.emailAddress
+        if hasAuthenticatedAccountEmail,
+           currentStep == .emailCapture || currentStep == .account {
+            currentStep = .profileDetails
+        }
         isRestoringProgress = false
     }
 

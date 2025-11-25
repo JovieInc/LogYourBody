@@ -23,7 +23,7 @@ import { getAvatarUrl } from '@/utils/avatar-utils'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import { useNetworkStatus } from '@/hooks/use-network-status'
-import { ensurePublicUrl } from '@/utils/storage-utils'
+import { getFilePathFromUrl } from '@/utils/storage-utils'
 import { getProfile } from '@/lib/supabase/profile'
 import { createClient } from '@/lib/supabase/client'
 import { createTimelineData, getTimelineDisplayValues, TimelineEntry } from '@/utils/data-interpolation'
@@ -43,6 +43,53 @@ import { SyncStatus } from '@/components/SyncStatus'
 import { useSync } from '@/hooks/use-sync'
 import { syncManager } from '@/lib/sync/sync-manager'
 import { indexedDB } from '@/lib/db/indexed-db'
+
+function isSupabasePhotosUrl(url: string | null | undefined): boolean {
+  if (!url) return false
+  return url.includes('/storage/v1/object') && url.includes('/photos/')
+}
+
+async function getSignedPhotoUrlIfNeeded(
+  supabase: ReturnType<typeof createClient>,
+  url: string | null,
+): Promise<string | null> {
+  if (!url) return url
+  if (!isSupabasePhotosUrl(url)) {
+    return url
+  }
+
+  const path = getFilePathFromUrl(url, 'photos')
+  if (!path) {
+    return url
+  }
+
+  const { data: signedData, error: signedError } = await supabase
+    .storage
+    .from('photos')
+    .createSignedUrl(path, 60 * 10)
+
+  if (signedError || !signedData || !signedData.signedUrl) {
+    console.error('Failed to create signed URL for dashboard photo', signedError)
+    return url
+  }
+
+  let signedUrl = signedData.signedUrl as string
+
+  if (!signedUrl.startsWith('http')) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (supabaseUrl) {
+      const base = supabaseUrl.endsWith('/')
+        ? supabaseUrl.slice(0, -1)
+        : supabaseUrl
+      const pathPart = signedUrl.startsWith('/')
+        ? signedUrl
+        : `/${signedUrl}`
+      signedUrl = `${base}${pathPart}`
+    }
+  }
+
+  return signedUrl
+}
 
 // Lazy load heavy components for better performance
 const PhaseIndicator = dynamic(() => import('./components/PhaseIndicator').then(mod => ({ default: mod.PhaseIndicator })), {
@@ -601,11 +648,25 @@ export default function DashboardPage() {
         if (metricsResult.error) {
           console.error('Error loading metrics:', metricsResult.error)
         } else if (metricsResult.data && metricsResult.data.length > 0) {
-          setLatestMetrics(metricsResult.data[0])
-          setMetricsHistory(metricsResult.data.reverse()) // Reverse to have oldest first for timeline
+          const metricsWithUrls = await Promise.all(
+            metricsResult.data.map(async (metric) => {
+              if (!metric.photo_url) {
+                return metric
+              }
+
+              const signedUrl = await getSignedPhotoUrlIfNeeded(supabase, metric.photo_url)
+              return {
+                ...metric,
+                photo_url: signedUrl ?? metric.photo_url,
+              }
+            }),
+          )
+
+          setLatestMetrics(metricsWithUrls[0])
+          setMetricsHistory(metricsWithUrls.slice().reverse()) // Reverse to have oldest first for timeline
 
           // Save to local storage
-          metricsResult.data.forEach(metric => {
+          metricsWithUrls.forEach(metric => {
             indexedDB.saveBodyMetrics(metric, user.id)
           })
         }
@@ -614,7 +675,20 @@ export default function DashboardPage() {
         if (photosResult.error) {
           console.error('Error loading photos:', photosResult.error)
         } else if (photosResult.data) {
-          setPhotosHistory(photosResult.data.reverse()) // Reverse to have oldest first for timeline
+          const photosWithUrls = await Promise.all(
+            photosResult.data.map(async (photo) => {
+              const signedPhotoUrl = await getSignedPhotoUrlIfNeeded(supabase, photo.photo_url)
+              const signedThumbUrl = await getSignedPhotoUrlIfNeeded(supabase, photo.thumbnail_url ?? null)
+
+              return {
+                ...photo,
+                photo_url: signedPhotoUrl ?? photo.photo_url,
+                thumbnail_url: signedThumbUrl ?? photo.thumbnail_url,
+              } as ProgressPhoto
+            }),
+          )
+
+          setPhotosHistory(photosWithUrls.slice().reverse()) // Reverse to have oldest first for timeline
         }
 
         // Trigger sync to ensure we have latest data
@@ -741,10 +815,10 @@ export default function DashboardPage() {
   // Get photo URL for current entry
   const currentPhotoUrl = useMemo(() => {
     if (currentEntry?.photo?.photo_url) {
-      return ensurePublicUrl(currentEntry.photo.photo_url)
+      return currentEntry.photo.photo_url
     }
     if (currentEntry?.metrics?.photo_url) {
-      return ensurePublicUrl(currentEntry.metrics.photo_url)
+      return currentEntry.metrics.photo_url
     }
     return undefined
   }, [currentEntry])

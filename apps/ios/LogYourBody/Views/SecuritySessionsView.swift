@@ -124,11 +124,7 @@ struct SecuritySessionsView: View {
                 Text("Are you sure you want to revoke this session? The device will be signed out immediately.")
             }
         }
-        .alert("Error", isPresented: $showError) {
-            Button("OK") {}
-        } message: {
-            Text(errorMessage)
-        }
+        .standardErrorAlert(isPresented: $showError, message: errorMessage)
         .overlay(
             SuccessOverlay(
                 isShowing: $showSuccessToast,

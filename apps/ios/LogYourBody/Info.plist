@@ -30,7 +30,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>20251123162428</string>
+	<string>20251125150517</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
@@ -89,6 +89,10 @@
 	<string>$(SENTRY_ENVIRONMENT)</string>
 	<key>SENTRY_TRACES_SAMPLE_RATE</key>
 	<string>$(SENTRY_TRACES_SAMPLE_RATE)</string>
+	<key>POSTHOG_API_KEY</key>
+	<string>$(POSTHOG_API_KEY)</string>
+	<key>POSTHOG_HOST</key>
+	<string>$(POSTHOG_HOST)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

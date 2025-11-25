@@ -9,6 +9,7 @@ struct ExportDataView: View {
     @Environment(\.dismiss)
     private var dismiss
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.openURL) private var openURL
     @State private var isExporting = false
     @State private var exportProgress: Double = 0
     @State private var showShareSheet = false
@@ -291,17 +292,26 @@ struct ExportDataView: View {
                         .padding(.top, 8)
 
                         // Privacy Note
-                        Text(
-                            exportMethod == .email
-                                ? "A secure download link will be sent to your registered email address. "
-                                + "The link will expire after 24 hours."
-                                : "Your data export will be prepared and saved to your device. You can then "
-                                + "share it or save it to your preferred location."
-                        )
-                        .font(.caption)
-                        .foregroundColor(.appTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                        VStack(spacing: 8) {
+                            Text(
+                                exportMethod == .email
+                                    ? "A secure download link will be sent to your registered email address. "
+                                    + "The link will expire after 24 hours."
+                                    : "Your data export will be prepared and saved to your device. You can then "
+                                    + "share it or save it to your preferred location."
+                            )
+                            .font(.caption)
+                            .foregroundColor(.appTextSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+
+                            Button(action: requestExportViaEmail) {
+                                Text("Or email support to request a data export")
+                                    .font(.caption)
+                                    .foregroundColor(.appPrimary)
+                                    .underline()
+                            }
+                        }
                         .padding(.bottom, 20)
                     }
                 }
@@ -364,6 +374,30 @@ struct ExportDataView: View {
         Task {
             await performExport()
         }
+    }
+
+    private func requestExportViaEmail() {
+        let recipient = "support@logyourbody.com"
+        let subject = "LogYourBody Data Export Request"
+        let body = """
+        Hello LogYourBody Support,
+
+        I would like to request an export of my LogYourBody account data associated with this email address.
+
+        Thank you,
+        """
+
+        let allowed = CharacterSet.urlQueryAllowed
+
+        guard
+            let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: allowed),
+            let encodedBody = body.addingPercentEncoding(withAllowedCharacters: allowed),
+            let url = URL(string: "mailto:\(recipient)?subject=\(encodedSubject)&body=\(encodedBody)")
+        else {
+            return
+        }
+
+        openURL(url)
     }
 
     @MainActor

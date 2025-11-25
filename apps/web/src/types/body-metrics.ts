@@ -45,6 +45,8 @@ export interface UserProfile {
   email: string
   username?: string
   full_name?: string
+  first_name?: string | null
+  last_name?: string | null
   avatar_url?: string
   bio?: string
   date_of_birth?: string

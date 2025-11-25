@@ -5,6 +5,7 @@ struct BodyScoreOnboardingFlowView: View {
     @StateObject private var viewModel: OnboardingFlowViewModel
     @EnvironmentObject private var authManager: AuthManager
     @EnvironmentObject private var revenueCatManager: RevenueCatManager
+    @State private var hasTrackedOnboardingStart = false
 
     @MainActor
     init(viewModel: OnboardingFlowViewModel? = nil) {
@@ -51,6 +52,16 @@ struct BodyScoreOnboardingFlowView: View {
             }
         }
         .environmentObject(authManager)
+        .onAppear {
+            guard !hasTrackedOnboardingStart else { return }
+            hasTrackedOnboardingStart = true
+            AnalyticsService.shared.track(
+                event: "onboarding_started",
+                properties: [
+                    "entry_context": viewModel.entryContext.analyticsContext
+                ]
+            )
+        }
     }
 }
 

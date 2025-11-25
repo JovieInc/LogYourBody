@@ -49,7 +49,9 @@ class ImageProcessingService: ObservableObject {
         await showProcessingNotification(for: imageId)
 
         do {
-            let result = try await Task.detached(priority: .userInitiated) { [image, taskId = task.id, weak self] () async throws -> ProcessedImageResult in
+            let result = try await Task.detached(
+                priority: .userInitiated
+            ) { [image, taskId = task.id, weak self] () async throws -> ProcessedImageResult in
                 guard let self else {
                     throw ProcessingError.processingFailed
                 }

@@ -30,6 +30,8 @@ struct UserProfile: Codable {
     let goalWeight: Double?
     let goalWeightUnit: String?
     let onboardingCompleted: Bool?
+    let firstName: String? = nil
+    let lastName: String? = nil
 
     var age: Int? {
         guard let dateOfBirth = dateOfBirth else { return nil }
@@ -51,5 +53,7 @@ struct UserProfile: Codable {
         case goalWeight = "goal_weight"
         case goalWeightUnit = "goal_weight_unit"
         case onboardingCompleted = "onboarding_completed"
+        case firstName = "first_name"
+        case lastName = "last_name"
     }
 }

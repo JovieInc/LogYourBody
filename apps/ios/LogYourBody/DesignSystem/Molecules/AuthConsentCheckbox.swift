@@ -10,7 +10,24 @@ struct AuthConsentCheckbox: View {
     @Binding var isChecked: Bool
     let text: String
     let linkText: String
-    let url: URL
+    let url: URL?
+    let onLinkTap: (() -> Void)?
+
+    @Environment(\.openURL) private var openURL
+
+    init(
+        isChecked: Binding<Bool>,
+        text: String,
+        linkText: String,
+        url: URL? = nil,
+        onLinkTap: (() -> Void)? = nil
+    ) {
+        _isChecked = isChecked
+        self.text = text
+        self.linkText = linkText
+        self.url = url
+        self.onLinkTap = onLinkTap
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -29,10 +46,13 @@ struct AuthConsentCheckbox: View {
                         .font(.system(size: 14))
                         .foregroundColor(.appTextSecondary)
 
-                    Link(linkText, destination: url)
-                        .font(.system(size: 14))
-                        .foregroundColor(.appPrimary)
-                        .underline()
+                    Button(action: handleLinkTap) {
+                        Text(linkText)
+                            .font(.system(size: 14))
+                            .foregroundColor(.appPrimary)
+                            .underline()
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 .multilineTextAlignment(.leading)
 
@@ -45,6 +65,14 @@ struct AuthConsentCheckbox: View {
             Spacer()
         }
     }
+
+    private func handleLinkTap() {
+        if let onLinkTap {
+            onLinkTap()
+        } else if let url {
+            openURL(url)
+        }
+    }
 }
 
 // MARK: - Preview
@@ -55,21 +83,21 @@ struct AuthConsentCheckbox: View {
             isChecked: .constant(true),
             text: "LogYourBody's terms of service",
             linkText: "Terms of Service",
-            url: URL(string: "https://logyourbody.com/terms")!
+            url: nil
         )
 
         AuthConsentCheckbox(
             isChecked: .constant(false),
             text: "How we handle your data",
             linkText: "Privacy Policy",
-            url: URL(string: "https://logyourbody.com/privacy")!
+            url: nil
         )
 
         AuthConsentCheckbox(
             isChecked: .constant(false),
             text: "Important health information",
             linkText: "Health Disclaimer",
-            url: URL(string: "https://logyourbody.com/health-disclaimer")!
+            url: nil
         )
     }
     .padding()

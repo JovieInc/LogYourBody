@@ -2,19 +2,20 @@ import SwiftUI
 
 struct BodyScoreBasicsView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
+    @State private var showWhyWeAsk = false
     private var continueButtonOpacity: Double {
         viewModel.canContinueBasics ? 1 : 0.4
     }
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Let’s dial in basics.",
-            subtitle: "Keep it simple—these power your Body Score.",
+            title: "Sex at birth",
+            subtitle: "For accurate comparisons only.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .basics),
             content: {
-                VStack(spacing: 28) {
-                    OnboardingFormSection(title: "Sex at birth", caption: "For accurate benchmarks only.") {
+                VStack(spacing: 24) {
+                    OnboardingFormSection {
                         HStack(spacing: 16) {
                             ForEach(BiologicalSex.allCases, id: \.self) { sex in
                                 OnboardingOptionButton(
@@ -29,28 +30,40 @@ struct BodyScoreBasicsView: View {
                             }
                         }
 
-                        OnboardingInfoRow(text: "We use sex at birth only to match you to the right comparison group—never for marketing.")
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showWhyWeAsk.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "questionmark.circle")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text("Why we ask")
+                                    .font(OnboardingTypography.caption)
+                            }
+                            .foregroundStyle(Color.appPrimary)
+                        }
+                        .buttonStyle(.plain)
+
+                        if showWhyWeAsk {
+                            OnboardingInfoRow(
+                                text: "We use sex at birth only to match you to the right comparison group—never for marketing."
+                            )
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
                     }
                 }
             },
             footer: {
-                VStack(spacing: 12) {
-                    Button {
-                        viewModel.goToNextStep()
-                    } label: {
-                        Text("Continue")
-                            .font(.system(size: 18, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                    }
-                    .buttonStyle(OnboardingPrimaryButtonStyle())
-                    .disabled(!viewModel.canContinueBasics)
-                    .opacity(continueButtonOpacity)
-
-                    OnboardingTextButton(title: "Back") {
-                        viewModel.goBack()
-                    }
+                Button {
+                    viewModel.goToNextStep()
+                } label: {
+                    Text("Continue")
+                        .font(.system(size: 18, weight: .semibold))
                 }
+                .buttonStyle(OnboardingPrimaryButtonStyle())
+                .disabled(!viewModel.canContinueBasics)
+                .opacity(continueButtonOpacity)
             }
         )
     }

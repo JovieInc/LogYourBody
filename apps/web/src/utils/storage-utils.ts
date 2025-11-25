@@ -7,10 +7,12 @@ import { createClient } from '@/lib/supabase/client'
  */
 export function ensurePublicUrl(url: string): string {
   if (!url) return url
-  
+
+  if (!url.includes('/storage/v1/object/')) return url
+
   // If it's already a public URL, return as-is
   if (url.includes('/public/')) return url
-  
+
   // Fix the URL to include /public/ in the path
   return url.replace('/storage/v1/object/', '/storage/v1/object/public/')
 }
@@ -26,7 +28,7 @@ export function getStoragePublicUrl(bucketName: string, filePath: string): strin
   const { data: { publicUrl } } = supabase.storage
     .from(bucketName)
     .getPublicUrl(filePath)
-  
+
   return ensurePublicUrl(publicUrl)
 }
 
@@ -48,7 +50,7 @@ export async function uploadToStorage(
   }
 ) {
   const supabase = createClient()
-  
+
   // Log upload attempt
   console.log('Attempting to upload file:', {
     bucketName,
@@ -56,14 +58,14 @@ export async function uploadToStorage(
     fileSize: file.size,
     fileType: file.type
   })
-  
+
   const { data, error } = await supabase.storage
     .from(bucketName)
     .upload(filePath, file, {
       contentType: options?.contentType || file.type,
       upsert: options?.upsert || false
     })
-  
+
   if (error) {
     console.error('Storage upload error:', {
       error,
@@ -74,10 +76,10 @@ export async function uploadToStorage(
     })
     throw error
   }
-  
+
   const publicUrl = getStoragePublicUrl(bucketName, filePath)
   console.log('Upload successful, public URL:', publicUrl)
-  
+
   return {
     data,
     publicUrl,
@@ -92,15 +94,15 @@ export async function uploadToStorage(
  */
 export async function deleteFromStorage(bucketName: string, filePath: string) {
   const supabase = createClient()
-  
+
   const { error } = await supabase.storage
     .from(bucketName)
     .remove([filePath])
-  
+
   if (error) {
     throw error
   }
-  
+
   return { error: null }
 }
 
@@ -112,19 +114,19 @@ export async function deleteFromStorage(bucketName: string, filePath: string) {
  */
 export function getFilePathFromUrl(url: string, bucketName: string): string | null {
   if (!url) return null
-  
+
   // Pattern to match Supabase storage URLs
   const patterns = [
     `/storage/v1/object/public/${bucketName}/`,
     `/storage/v1/object/${bucketName}/`,
   ]
-  
+
   for (const pattern of patterns) {
     const index = url.indexOf(pattern)
     if (index !== -1) {
       return url.substring(index + pattern.length)
     }
   }
-  
+
   return null
 }

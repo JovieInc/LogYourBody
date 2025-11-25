@@ -136,9 +136,10 @@ struct LegalDocumentView: View {
 
             **Last Updated: July 11, 2025**
 
-            Please visit our website for the full Terms of Service.
+            We couldn't load the full Terms of Service on this device.
 
             By using LogYourBody, you agree to our terms and conditions.
+            If you need a full copy of the latest Terms, contact support@logyourbody.com.
             """
         case .privacy:
             documentContent = """
@@ -146,9 +147,10 @@ struct LegalDocumentView: View {
 
             **Last Updated: July 11, 2025**
 
-            Please visit our website for the full Privacy Policy.
+            We couldn't load the full Privacy Policy on this device.
 
             We are committed to protecting your privacy and personal data.
+            If you need a full copy of the latest Privacy Policy, contact support@logyourbody.com.
             """
         case .healthDisclosure:
             documentContent = """
@@ -156,9 +158,10 @@ struct LegalDocumentView: View {
 
             **Last Updated: July 11, 2025**
 
-            Please visit our website for the full Health Disclosure.
+            We couldn't load the full Health Disclosure on this device.
 
             LogYourBody is not a medical service and does not provide medical advice.
+            If you need a full copy of the latest Health Disclosure, contact support@logyourbody.com.
             """
         case .gdprCompliance:
             documentContent = """
@@ -166,9 +169,10 @@ struct LegalDocumentView: View {
 
             **Last Updated: July 14, 2025**
 
-            Please visit our website for the full GDPR Compliance information.
+            We couldn't load the full GDPR Compliance information on this device.
 
             We comply with the General Data Protection Regulation for EU users.
+            If you need a full copy of the latest GDPR compliance document, contact support@logyourbody.com.
             """
         case .ccpaCompliance:
             documentContent = """
@@ -176,9 +180,10 @@ struct LegalDocumentView: View {
 
             **Last Updated: July 14, 2025**
 
-            Please visit our website for the full CCPA Compliance information.
+            We couldn't load the full CCPA Compliance information on this device.
 
             We respect the privacy rights of California residents.
+            If you need a full copy of the latest CCPA compliance document, contact support@logyourbody.com.
             """
         case .openSourceLicenses:
             documentContent = """
@@ -186,9 +191,10 @@ struct LegalDocumentView: View {
 
             **Last Updated: July 14, 2025**
 
-            Please visit our website for the full list of open source licenses.
+            We couldn't load the full list of open source licenses on this device.
 
             LogYourBody is built with amazing open source software.
+            If you need a full copy of the latest license list, contact support@logyourbody.com.
             """
         }
         isLoading = false

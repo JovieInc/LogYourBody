@@ -51,3 +51,11 @@ The `photos` bucket is configured with:
 - 50MB file size limit
 - Allowed types: JPEG, PNG, HEIC, HEIF, WebP
 - RLS policies ensure users can only access their own photos
+
+## Unified Weight Model
+
+- Both iOS and web now read and write weight data via the `body_metrics` table.
+- Historical data from the legacy `weight_logs` table is backfilled into `body_metrics` by the `20250705000000_backfill_weight_logs_into_body_metrics.sql` migration.
+- The `weight_logs` identifier is preserved as a read-only compatibility view over `body_metrics` by the `20250705000001_convert_weight_logs_to_view.sql` migration. New writes must target `body_metrics`, not `weight_logs`.
+
+**Canonical source of truth for weight:** `public.body_metrics`.

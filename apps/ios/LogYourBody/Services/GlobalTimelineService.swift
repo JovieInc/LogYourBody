@@ -234,7 +234,7 @@ final class GlobalTimelineService {
         let count = sortedValues.count
         let middleIndex = count / 2
 
-        if count % 2 == 0 {
+        if count.isMultiple(of: 2) {
             let lower = sortedValues[middleIndex - 1]
             let upper = sortedValues[middleIndex]
             return (lower + upper) / 2.0

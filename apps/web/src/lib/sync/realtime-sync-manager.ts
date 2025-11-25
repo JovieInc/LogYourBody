@@ -17,15 +17,9 @@ interface SyncState {
   error?: string;
 }
 
-type SyncTable = 'body_metrics' | 'user_profiles' | 'daily_metrics' | 'weight_logs';
+type SyncTable = 'body_metrics' | 'user_profiles' | 'daily_metrics';
 
-interface WeightLogRecord {
-  id: string;
-  user_id: string;
-  [key: string]: unknown;
-}
-
-type SyncableRecord = BodyMetrics | UserProfile | DailyMetrics | WeightLogRecord | Record<string, unknown>;
+type SyncableRecord = BodyMetrics | UserProfile | DailyMetrics | Record<string, unknown>;
 
 interface QueuedChange {
   id: string;
@@ -140,16 +134,6 @@ export class RealtimeSyncManager {
             filter: `user_id=eq.${this.userId}`,
           },
           (payload) => this.handleRealtimeChange('daily_metrics', payload)
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'weight_logs',
-            filter: `user_id=eq.${this.userId}`,
-          },
-          (payload) => this.handleRealtimeChange('weight_logs', payload)
         )
         .subscribe((status) => {
           this.updateState({ realtimeConnected: status === 'SUBSCRIBED' });

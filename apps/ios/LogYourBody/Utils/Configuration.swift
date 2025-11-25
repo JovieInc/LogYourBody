@@ -108,6 +108,24 @@ enum Configuration {
         }
     }
 
+    // MARK: - PostHog Analytics Configuration
+
+    static var posthogAPIKey: String {
+        do {
+            return try Configuration.value(for: "POSTHOG_API_KEY")
+        } catch {
+            return ""
+        }
+    }
+
+    static var posthogHost: String {
+        do {
+            return try Configuration.value(for: "POSTHOG_HOST")
+        } catch {
+            return "https://us.i.posthog.com"
+        }
+    }
+
     // MARK: - BodySpec Configuration
 
     static var bodySpecClientId: String {

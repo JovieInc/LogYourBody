@@ -172,11 +172,7 @@ struct ChangePasswordView: View {
         .scrollDismissesKeyboard(.interactively)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isLoading)
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage)
-        }
+        .standardErrorAlert(isPresented: $showError, message: errorMessage)
         .overlay(
             SuccessOverlay(
                 isShowing: $showSuccess,

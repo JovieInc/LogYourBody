@@ -33,7 +33,7 @@ struct DeleteAccountView: View {
                             .font(.title2)
                             .fontWeight(.bold)
 
-                        Text("This action cannot be undone. All your data will be permanently deleted.")
+                        Text("This action cannot be undone. Your LogYourBody data will be permanently deleted. Data in Apple Health stays in the Health app.")
                             .font(.body)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -62,7 +62,7 @@ struct DeleteAccountView: View {
 
                             DataInfoRow(
                                 icon: "heart.fill",
-                                title: "Health data",
+                                title: "Health data stored in LogYourBody",
                                 iconColor: .red
                             )
 
@@ -130,11 +130,7 @@ struct DeleteAccountView: View {
         }
         .navigationTitle("Delete Account")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Error", isPresented: $showError) {
-            Button("OK") { }
-        } message: {
-            Text(errorMessage)
-        }
+        .standardErrorAlert(isPresented: $showError, message: errorMessage)
         .confirmationDialog("Delete Account?", isPresented: $showConfirmation) {
             Button("Delete", role: .destructive) {
                 performDeletion()
@@ -167,6 +163,11 @@ struct DeleteAccountView: View {
                 // RevenueCat webhooks will handle backend cleanup
                 await RevenueCatManager.shared.logoutUser()
 
+                await HealthSyncCoordinator.shared.resetForCurrentUser()
+
+                // Best-effort call to backend pipeline to delete Supabase data and assets
+                await authManager.notifyBackendOfAccountDeletion()
+
                 // Delete from Clerk
                 try await deleteClerkAccount()
 
@@ -179,9 +180,29 @@ struct DeleteAccountView: View {
                     UserDefaults.standard.removeObject(forKey: Constants.currentUserKey)
                     UserDefaults.standard.removeObject(forKey: Constants.authTokenKey)
                     UserDefaults.standard.removeObject(forKey: Constants.hasCompletedOnboardingKey)
+                    UserDefaults.standard.removeObject(forKey: Constants.onboardingCompletedVersionKey)
                     UserDefaults.standard.removeObject(forKey: Constants.preferredWeightUnitKey)
                     UserDefaults.standard.removeObject(forKey: Constants.preferredMeasurementSystemKey)
+                    UserDefaults.standard.removeObject(forKey: Constants.goalWeightKey)
+                    UserDefaults.standard.removeObject(forKey: Constants.goalBodyFatPercentageKey)
+                    UserDefaults.standard.removeObject(forKey: Constants.goalFFMIKey)
+                    UserDefaults.standard.removeObject(forKey: Constants.timelineModeKey)
+                    UserDefaults.standard.removeObject(forKey: Constants.deletePhotosAfterImportKey)
+                    UserDefaults.standard.removeObject(forKey: Constants.hasPromptedDeletePhotosKey)
+                    UserDefaults.standard.removeObject(forKey: "stepGoal")
+                    UserDefaults.standard.removeObject(forKey: "metricsOrder")
+                    UserDefaults.standard.removeObject(forKey: "dashboard_selected_time_range")
+                    UserDefaults.standard.removeObject(forKey: "dashboard_weight_uses_trend")
+                    UserDefaults.standard.removeObject(forKey: "biometricLockEnabled")
+                    UserDefaults.standard.removeObject(forKey: "revenuecat_isSubscribed")
+                    UserDefaults.standard.removeObject(forKey: "revenuecat_lastFetchTimestamp")
                     UserDefaults.standard.removeObject(forKey: "healthKitSyncEnabled")
+                    UserDefaults.standard.removeObject(forKey: "HasSyncedHistoricalSteps")
+                    UserDefaults.standard.removeObject(forKey: "lastSupabaseSyncDate")
+                    UserDefaults.standard.removeObject(forKey: "lastHealthKitWeightSyncDate")
+                    UserDefaults.standard.removeObject(forKey: "appleSignInName")
+                    UserDefaults.standard.removeObject(forKey: "lastSyncDate")
+                    UserDefaults.standard.removeObject(forKey: "hasSeenWhatsNew")
 
                     // Sign out
                     Task {

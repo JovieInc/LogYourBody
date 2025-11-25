@@ -6,7 +6,6 @@
 //
 import SwiftUI
 import AuthenticationServices
-import SafariServices
 
 struct SignUpView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -26,98 +25,117 @@ struct SignUpView: View {
 
     var body: some View {
         ZStack {
-            // Atom: Background
-            Color.appBackground
-                .ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Navigation Bar
-                    HStack {
-                        Button(action: { dismiss() }, label: {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 20))
-                                .foregroundColor(.appText)
-                                .frame(width: 44, height: 44)
-                        })
-
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-
-                    // Show Clerk initialization status banner
-                    if !authManager.isClerkLoaded {
-                        clerkStatusBanner
-                            .padding(.horizontal, 24)
-                            .padding(.top, 12)
-                    }
-
-                    // Molecule: Auth Header
-                    AuthHeader(
-                        title: "Create Account",
-                        subtitle: "Start tracking your fitness progress"
-                    )
-                    .padding(.top, authManager.isClerkLoaded ? 20 : 12)
-                    .padding(.bottom, 40)
-
-                    // Organism: Sign Up Form
-                    SignUpForm(
-                        email: $email,
-                        password: $password,
-                        isLoading: $isLoading,
-                        agreedToTerms: $agreedToTerms,
-                        agreedToPrivacy: $agreedToPrivacy,
-                        agreedToHealthDisclaimer: $agreedToHealthDisclaimer,
-                        onSignUp: signUp,
-                        onAppleSignIn: {
-                            Task {
-                                await authManager.handleAppleSignIn()
-                            }
-                        },
-                        termsURL: URL(string: "https://logyourbody.com/terms")!,
-                        privacyURL: URL(string: "https://logyourbody.com/privacy")!,
-                        healthDisclaimerURL: URL(string: "https://logyourbody.com/health-disclaimer")!
-                    )
-                    .padding(.horizontal, 24)
-
-                    // Sign In Link
-                    HStack(spacing: 4) {
-                        Text("Already have an account?")
-                            .font(.system(size: 15))
-                            .foregroundColor(.appTextSecondary)
-
-                        Button("Sign in") {
-                            dismiss()
-                        }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.appPrimary)
-                    }
-                    .padding(.top, 8)
-
-                    Spacer(minLength: 40)
-                }
-            }
-            .scrollDismissesKeyboard(.interactively)
+            background
+            scrollContent
         }
         .navigationBarHidden(true)
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage)
-        }
+        .standardErrorAlert(isPresented: $showError, message: errorMessage)
         .sheet(isPresented: $showTermsSheet) {
-            SafariView(url: URL(string: "https://logyourbody.com/terms")!)
-                .ignoresSafeArea()
+            NavigationView {
+                LegalDocumentView(documentType: .terms)
+            }
         }
         .sheet(isPresented: $showPrivacySheet) {
-            SafariView(url: URL(string: "https://logyourbody.com/privacy")!)
-                .ignoresSafeArea()
+            NavigationView {
+                LegalDocumentView(documentType: .privacy)
+            }
         }
         .sheet(isPresented: $showHealthDisclaimerSheet) {
-            SafariView(url: URL(string: "https://logyourbody.com/health-disclaimer")!)
-                .ignoresSafeArea()
+            NavigationView {
+                LegalDocumentView(documentType: .healthDisclosure)
+            }
         }
+        .onAppear {
+            AnalyticsService.shared.track(event: "signup_view")
+        }
+    }
+
+    private var background: some View {
+        // Atom: Background
+        Color.appBackground
+            .ignoresSafeArea()
+    }
+
+    private var scrollContent: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                navigationBar
+
+                // Show Clerk initialization status banner
+                if !authManager.isClerkLoaded {
+                    clerkStatusBanner
+                        .padding(.horizontal, 24)
+                        .padding(.top, 12)
+                }
+
+                // Molecule: Auth Header
+                AuthHeader(
+                    title: "Create Account",
+                    subtitle: "Start tracking your fitness progress"
+                )
+                .padding(.top, authManager.isClerkLoaded ? 20 : 12)
+                .padding(.bottom, 40)
+
+                // Organism: Sign Up Form
+                SignUpForm(
+                    email: $email,
+                    password: $password,
+                    isLoading: $isLoading,
+                    agreedToTerms: $agreedToTerms,
+                    agreedToPrivacy: $agreedToPrivacy,
+                    agreedToHealthDisclaimer: $agreedToHealthDisclaimer,
+                    onSignUp: signUp,
+                    onAppleSignIn: {
+                        Task {
+                            await authManager.handleAppleSignIn()
+                        }
+                    },
+                    onTapTerms: {
+                        showTermsSheet = true
+                    },
+                    onTapPrivacy: {
+                        showPrivacySheet = true
+                    },
+                    onTapHealthDisclaimer: {
+                        showHealthDisclaimerSheet = true
+                    }
+                )
+                .padding(.horizontal, 24)
+
+                // Sign In Link
+                HStack(spacing: 4) {
+                    Text("Already have an account?")
+                        .font(.system(size: 15))
+                        .foregroundColor(.appTextSecondary)
+
+                    Button("Sign in") {
+                        dismiss()
+                    }
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.appPrimary)
+                }
+                .padding(.top, 8)
+
+                Spacer(minLength: 40)
+            }
+        }
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var navigationBar: some View {
+        // Navigation Bar
+        HStack {
+            Button(action: { dismiss() }, label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 20))
+                    .foregroundColor(.appText)
+                    .frame(width: 44, height: 44)
+            })
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
     }
 
     // Clerk status banner (same as LoginView)
@@ -201,7 +219,7 @@ struct SignUpView: View {
     private func signUp() {
         // Check if Clerk is ready
         guard authManager.isClerkLoaded else {
-            errorMessage = "Authentication service is not ready. Please wait or tap retry."
+            errorMessage = authManager.authServiceNotReadyMessage
             showError = true
             return
         }
@@ -210,6 +228,13 @@ struct SignUpView: View {
         guard !isLoading else { return }
 
         isLoading = true
+
+        AnalyticsService.shared.track(
+            event: "signup_attempt",
+            properties: [
+                "method": "password"
+            ]
+        )
 
         Task { @MainActor in
             do {
@@ -222,41 +247,19 @@ struct SignUpView: View {
                 if authManager.needsEmailVerification {
                     // Email verification screen will show automatically
                 } else {
-                    // Check if it's a password strength error
-                    if error.localizedDescription.contains("not strong enough") {
-                        errorMessage = (
-                            "Please choose a stronger password. Use at least 8 characters " +
-                                "with a mix of uppercase, lowercase, and numbers or symbols."
-                        )
-                    } else {
-                        errorMessage = error.localizedDescription
-                    }
+                    errorMessage = authManager.signUpErrorMessage(for: error)
                     showError = true
                 }
+
+                AnalyticsService.shared.track(
+                    event: "signup_failed",
+                    properties: [
+                        "method": "password"
+                    ]
+                )
             }
         }
     }
-}
-
-// MARK: - Safari View Wrapper
-
-struct SafariView: UIViewControllerRepresentable {
-    let url: URL
-
-    func makeUIViewController(context: Context) -> SFSafariViewController {
-        let config = SFSafariViewController.Configuration()
-        config.entersReaderIfAvailable = false
-        config.barCollapsingEnabled = true
-
-        let controller = SFSafariViewController(url: url, configuration: config)
-        controller.preferredControlTintColor = .white
-        controller.preferredBarTintColor = UIColor(Color.appBackground)
-        controller.dismissButtonStyle = .close
-
-        return controller
-    }
-
-    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 
 // MARK: - Preview

@@ -4,6 +4,7 @@ struct BodyScoreBodyFatNumericView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var percentageFieldFocused: Bool
     @State private var bodyFatError: String?
+    @State private var showHelp = false
 
     var body: some View {
         OnboardingPageTemplate(
@@ -12,7 +13,7 @@ struct BodyScoreBodyFatNumericView: View {
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .bodyFatNumeric),
             content: {
-                VStack(spacing: 28) {
+                VStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Body fat %")
                             .font(OnboardingTypography.caption)
@@ -54,15 +55,27 @@ struct BodyScoreBodyFatNumericView: View {
                         }
                     }
 
-                    OnboardingCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Need help?")
-                                .font(OnboardingTypography.headline)
-                                .foregroundStyle(Color.appText)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showHelp.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "questionmark.circle")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text("Not sure your %?")
+                                    .font(OnboardingTypography.caption)
+                            }
+                            .foregroundStyle(Color.appPrimary)
+                        }
+                        .buttonStyle(.plain)
 
-                            Text("Not sure? Hop back and choose visual estimate. We’ll guide you through reference photos.")
+                        if showHelp {
+                            Text("You can go back and choose visual estimate instead. We’ll guide you with reference photos.")
                                 .font(OnboardingTypography.body)
                                 .foregroundStyle(Color.appTextSecondary)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
                 }
@@ -74,8 +87,6 @@ struct BodyScoreBodyFatNumericView: View {
                 } label: {
                     Text("Continue")
                         .font(.system(size: 18, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueBodyFatNumeric)

@@ -20,7 +20,7 @@ struct AddEntrySheet: View {
     }
 
     var currentSystem: MeasurementSystem {
-        MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        MeasurementSystem.fromStored(rawValue: measurementSystem)
     }
 
     private var resolvedWeightUnit: String {
@@ -141,11 +141,7 @@ struct AddEntrySheet: View {
                     }
                 }
             }
-            .alert("Error", isPresented: $showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage)
-            }
+            .standardErrorAlert(isPresented: $showError, message: errorMessage)
             .alert("Delete Photos After Import?", isPresented: $showDeletePhotosPrompt) {
                 Button("Keep Photos", role: .cancel) {
                     deletePhotosAfterImport = false
@@ -173,6 +169,8 @@ struct AddEntrySheet: View {
                         await loadGlp1Medications(userId: userId)
                     }
                 }
+
+                AnalyticsService.shared.track(event: "add_entry_view")
             }
         }
     }
@@ -225,8 +223,8 @@ struct AddEntrySheet: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(glp1Medications) { medication in
-                                let isSelected = medication.id == selectedGlp1MedicationId
+                            ForEach(glp1Medications, id: \.id) { medication in
+                                let isSelected = selectedGlp1MedicationId == medication.id
 
                                 Button {
                                     selectGlp1Medication(medication)
@@ -236,9 +234,9 @@ struct AddEntrySheet: View {
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)
                                         .background(
-                                            isSelected ? Color.appPrimary : Color.appSurfaceSecondary
+                                            isSelected ? Color.appPrimary : Color.appCard
                                         )
-                                        .foregroundColor(isSelected ? .black : .appTextPrimary)
+                                        .foregroundColor(isSelected ? .black : .appText)
                                         .cornerRadius(999)
                                 }
                             }
@@ -253,8 +251,8 @@ struct AddEntrySheet: View {
                                 .font(.appBodySmall)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
-                                .background(Color.appSurfaceSecondary)
-                                .foregroundColor(.appTextPrimary)
+                                .background(Color.appCard)
+                                .foregroundColor(.appText)
                                 .cornerRadius(999)
                             }
                         }
@@ -595,7 +593,7 @@ struct AddEntrySheet: View {
     private func saveWeight(userId: String) {
         do {
             let validatedWeight = try ValidationService.shared.validateWeight(weight, unit: resolvedWeightUnit)
-            let weightInKg = resolvedWeightUnit == "lbs" ? validatedWeight * 0.453592 : validatedWeight
+            let weightInKg = resolvedWeightUnit == "lbs" ? validatedWeight.lbsToKg : validatedWeight
 
             weightError = nil
 
@@ -613,6 +611,14 @@ struct AddEntrySheet: View {
 
                 BodyScoreRecalculationService.shared.scheduleRecalculation()
             }
+
+            AnalyticsService.shared.track(
+                event: "entry_saved",
+                properties: [
+                    "type": "weight",
+                    "unit": resolvedWeightUnit
+                ]
+            )
 
             dismiss()
         } catch let error as ValidationError {
@@ -690,15 +696,20 @@ struct AddEntrySheet: View {
             )
 
             Task {
-                do {
-                    try await SupabaseManager.shared.saveGlp1DoseLog(log)
-                    RealtimeSyncManager.shared.syncIfNeeded()
-                    dismiss()
-                } catch {
-                    errorMessage = "Unable to save GLP-1 entry. Please try again."
-                    showError = true
-                }
+                CoreDataManager.shared.saveGlp1DoseLogs([log], userId: userId, markAsSynced: false)
+                RealtimeSyncManager.shared.updatePendingSyncCount()
+                RealtimeSyncManager.shared.syncIfNeeded()
+                dismiss()
             }
+
+            AnalyticsService.shared.track(
+                event: "entry_saved",
+                properties: [
+                    "type": "glp1",
+                    "medication_id": medication.id,
+                    "dose_unit": medication.doseUnit ?? glp1DoseUnit
+                ]
+            )
         }
     }
 
@@ -739,7 +750,13 @@ struct AddEntrySheet: View {
                 processedCount = index + 1
                 photoProgress = Double(processedCount) / Double(selectedPhotos.count)
             } catch {
-                // print("Failed to process photo \(index): \(error)")
+                let context = ErrorContext(
+                    feature: "photos",
+                    operation: "savePhotos",
+                    screen: "AddEntrySheet",
+                    userId: userId
+                )
+                ErrorReporter.shared.captureNonFatal(error, context: context)
             }
         }
 
@@ -751,6 +768,14 @@ struct AddEntrySheet: View {
         isProcessingPhotos = false
         RealtimeSyncManager.shared.syncIfNeeded()
         dismiss()
+
+        AnalyticsService.shared.track(
+            event: "entry_saved",
+            properties: [
+                "type": "photos",
+                "count": String(selectedPhotos.count)
+            ]
+        )
     }
 
     private func deletePhotosFromLibrary() async {
@@ -765,8 +790,13 @@ struct AddEntrySheet: View {
                 PHAssetChangeRequest.deleteAssets(fetchResult)
             }
         } catch {
-            // Silently fail - don't interrupt the user flow if deletion fails
-            // print("Failed to delete photos: \(error)")
+            let context = ErrorContext(
+                feature: "photos",
+                operation: "deleteImportedPhotos",
+                screen: "AddEntrySheet",
+                userId: nil
+            )
+            ErrorReporter.shared.captureNonFatal(error, context: context)
         }
     }
 
@@ -858,10 +888,21 @@ struct AddEntrySheet: View {
     @MainActor
     private func loadGlp1Medications(userId: String) async {
         glp1IsLoadingMedications = true
+        let cached = await CoreDataManager.shared.fetchGlp1Medications(for: userId)
+        if !cached.isEmpty {
+            glp1Medications = cached.sorted { $0.startedAt < $1.startedAt }
+
+            if selectedGlp1MedicationId == nil,
+               let active = glp1Medications.last(where: { $0.endedAt == nil }) ?? glp1Medications.last {
+                selectedGlp1MedicationId = active.id
+                applyDefaultDoseConfig(for: active)
+            }
+        }
 
         do {
             let medications = try await SupabaseManager.shared.fetchGlp1Medications(userId: userId)
             glp1Medications = medications.sorted(by: { $0.startedAt < $1.startedAt })
+            CoreDataManager.shared.saveGlp1Medications(medications, userId: userId)
 
             if selectedGlp1MedicationId == nil,
                let active = glp1Medications.last(where: { $0.endedAt == nil }) ?? glp1Medications.last {
@@ -869,7 +910,6 @@ struct AddEntrySheet: View {
                 applyDefaultDoseConfig(for: active)
             }
         } catch {
-            // Ignore errors for now; GLP-1 is optional
         }
 
         glp1IsLoadingMedications = false
@@ -914,6 +954,9 @@ private struct Glp1AddMedicationView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var searchText: String = ""
+    @State private var selectedPreset: Glp1MedicationPreset?
+    @State private var activeFilters: Set<Glp1Filter> = []
 
     private var presets: [Glp1MedicationPreset] {
         Glp1MedicationCatalog.allPresets
@@ -921,32 +964,180 @@ private struct Glp1AddMedicationView: View {
 
     var body: some View {
         NavigationView {
-            List {
-                Section("Choose medication") {
-                    ForEach(presets, id: \.displayName) { preset in
-                        Button {
-                            createMedication(from: preset)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(preset.displayName)
-                                    .font(.appBody)
-                                Text("\(preset.genericName) • \(preset.frequency)")
-                                    .font(.appCaption)
-                                    .foregroundColor(.appTextSecondary)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        .disabled(isSaving)
-                    }
-                }
-
-                if let errorMessage {
+            VStack(spacing: 0) {
+                List {
                     Section {
-                        Text(errorMessage)
-                            .font(.appBodySmall)
-                            .foregroundColor(.error)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Select the medication you're currently using.")
+                                .font(.appBodySmall)
+                                .foregroundColor(.appTextSecondary)
+
+                            SearchField(text: $searchText, placeholder: "Search brand or generic")
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(Glp1Filter.allCases) { filter in
+                                        let isSelected = activeFilters.contains(filter)
+
+                                        Button {
+                                            toggleFilter(filter)
+                                        } label: {
+                                            Text(filter.label)
+                                                .font(.appBodySmall)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 6)
+                                                .background(isSelected ? Color.appPrimary : Color.appCard)
+                                                .foregroundColor(isSelected ? .black : .appText)
+                                                .cornerRadius(999)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    }
+
+                    ForEach(groupedPresets, id: \.title) { group in
+                        if !group.items.isEmpty {
+                            Section(header: Text(group.title)
+                                .font(.appCaption)
+                                .foregroundColor(.appTextSecondary)
+                                .textCase(nil)
+                            ) {
+                                ForEach(group.items, id: \.displayName) { preset in
+                                    let isSelected = selectedPreset?.displayName == preset.displayName
+
+                                    Button {
+                                        selectedPreset = preset
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                                brandIcon(for: preset)
+
+                                                Text(preset.displayName)
+                                                    .font(.appBody)
+                                                    .fontWeight(.semibold)
+
+                                                if preset.isCompounded {
+                                                    Text("Compounded")
+                                                        .font(.appCaption)
+                                                        .foregroundColor(.orange)
+                                                }
+
+                                                Spacer()
+
+                                                HStack(spacing: 6) {
+                                                    Image(
+                                                        systemName: preset.route.lowercased() == "oral" ? "pills.fill" : "syringe"
+                                                    )
+                                                    .font(.system(size: 14, weight: .medium))
+                                                    .foregroundColor(.appTextSecondary)
+
+                                                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                                        .font(.system(size: 16, weight: .semibold))
+                                                        .foregroundColor(isSelected ? .appPrimary : .appBorder)
+                                                }
+                                            }
+
+                                            Text(preset.genericName)
+                                                .font(.appCaption)
+                                                .foregroundColor(.appTextSecondary)
+
+                                            HStack(spacing: 8) {
+                                                Text("\(formattedRoute(for: preset)) • \(preset.frequency)")
+                                                    .font(.appCaption)
+                                                    .foregroundColor(.appTextSecondary)
+
+                                                Spacer(minLength: 0)
+                                            }
+                                        }
+                                        .padding(.vertical, 6)
+                                        .contentShape(Rectangle())
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(isSelected ? Color.appCard.opacity(0.7) : Color.clear)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(isSaving)
+                                }
+                            }
+                        }
                     }
                 }
+                .listStyle(.insetGrouped)
+
+                VStack(spacing: 8) {
+                    if errorMessage != nil {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.error)
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Couldn't save. Check connection and try again.")
+                                    .font(.appBodySmall)
+
+                                HStack(spacing: 12) {
+                                    Button("Try again") {
+                                        if let preset = selectedPreset {
+                                            createMedication(from: preset)
+                                        }
+                                    }
+                                    .font(.appBodySmall)
+
+                                    Button("Discard", role: .destructive) {
+                                        errorMessage = nil
+                                        isSaving = false
+                                    }
+                                    .font(.appBodySmall)
+                                }
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+                        .padding(12)
+                        .background(Color.black.opacity(0.9))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.error.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+
+                    HStack(spacing: 12) {
+                        Button {
+                            if let preset = selectedPreset {
+                                createMedication(from: preset)
+                            }
+                        } label: {
+                            HStack {
+                                if isSaving {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                } else {
+                                    Text("Save medication")
+                                        .font(.appBody)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .frame(height: 44)
+                        .background(selectedPreset != nil ? Color.appPrimary : Color.appBorder)
+                        .foregroundColor(selectedPreset != nil ? .black : .white)
+                        .cornerRadius(Constants.cornerRadius)
+                        .disabled(selectedPreset == nil || isSaving)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+                .background(
+                    Color.black.opacity(0.9)
+                )
             }
             .navigationTitle("Select GLP-1")
             .navigationBarTitleDisplayMode(.inline)
@@ -961,8 +1152,208 @@ private struct Glp1AddMedicationView: View {
         }
     }
 
+    private var filteredPresets: [Glp1MedicationPreset] {
+        presets.filter { preset in
+            matchesSearch(preset) && matchesFilters(preset)
+        }
+    }
+
+    private var groupedPresets: [Glp1Group] {
+        let commonBrands: Set<String> = ["Wegovy", "Zepbound", "Ozempic", "Mounjaro"]
+        let oralBrands: Set<String> = ["Rybelsus"]
+        let compoundedBrands: Set<String> = ["Compounded semaglutide", "Compounded tirzepatide"]
+
+        let filtered = filteredPresets
+
+        let newestCommon = filtered.filter { commonBrands.contains($0.brand) }
+        let oral = filtered.filter { oralBrands.contains($0.brand) }
+        let compounded = filtered.filter { compoundedBrands.contains($0.brand) }
+        let other = filtered.filter { preset in
+            !commonBrands.contains(preset.brand)
+                && !oralBrands.contains(preset.brand)
+                && !compoundedBrands.contains(preset.brand)
+        }
+
+        var groups: [Glp1Group] = []
+
+        if !newestCommon.isEmpty {
+            groups.append(Glp1Group(title: "Newest & most common", items: newestCommon))
+        }
+
+        if !other.isEmpty {
+            groups.append(Glp1Group(title: "Other branded GLP-1s", items: other))
+        }
+
+        if !oral.isEmpty {
+            groups.append(Glp1Group(title: "Oral (Rybelsus)", items: oral))
+        }
+
+        if !compounded.isEmpty {
+            groups.append(Glp1Group(title: "Compounded (not FDA-approved)", items: compounded))
+        }
+
+        return groups
+    }
+
+    private func matchesSearch(_ preset: Glp1MedicationPreset) -> Bool {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return true }
+
+        let lowercased = query.lowercased()
+        return preset.displayName.lowercased().contains(lowercased)
+            || preset.genericName.lowercased().contains(lowercased)
+            || preset.brand.lowercased().contains(lowercased)
+    }
+
+    private func matchesFilters(_ preset: Glp1MedicationPreset) -> Bool {
+        guard !activeFilters.isEmpty else { return true }
+
+        let generic = preset.genericName.lowercased()
+        let route = preset.route.lowercased()
+        let frequency = preset.frequency.lowercased()
+
+        if hasDrugFilter(), !matchesDrugFilter(forGenericName: generic) {
+            return false
+        }
+
+        if activeFilters.contains(.injectable) && route != "subcutaneous" {
+            return false
+        }
+
+        if activeFilters.contains(.oral) && route != "oral" {
+            return false
+        }
+
+        if activeFilters.contains(.weekly) && !frequency.contains("weekly") {
+            return false
+        }
+
+        if activeFilters.contains(.daily) && !frequency.contains("daily") {
+            return false
+        }
+
+        return true
+    }
+
+    private func hasDrugFilter() -> Bool {
+        activeFilters.contains(.semaglutide)
+            || activeFilters.contains(.tirzepatide)
+            || activeFilters.contains(.liraglutide)
+            || activeFilters.contains(.exenatide)
+            || activeFilters.contains(.lixisenatide)
+    }
+
+    private func matchesDrugFilter(forGenericName generic: String) -> Bool {
+        var matchesDrug = false
+
+        if activeFilters.contains(.semaglutide) && generic.contains("semaglutide") {
+            matchesDrug = true
+        }
+
+        if activeFilters.contains(.tirzepatide) && generic.contains("tirzepatide") {
+            matchesDrug = true
+        }
+
+        if activeFilters.contains(.liraglutide) && generic.contains("liraglutide") {
+            matchesDrug = true
+        }
+
+        if activeFilters.contains(.exenatide) && generic.contains("exenatide") {
+            matchesDrug = true
+        }
+
+        if activeFilters.contains(.lixisenatide) && generic.contains("lixisenatide") {
+            matchesDrug = true
+        }
+
+        return matchesDrug
+    }
+
+    private func toggleFilter(_ filter: Glp1Filter) {
+        if activeFilters.contains(filter) {
+            activeFilters.remove(filter)
+        } else {
+            activeFilters.insert(filter)
+        }
+    }
+
+    private func formattedRoute(for preset: Glp1MedicationPreset) -> String {
+        let route = preset.route.lowercased()
+
+        switch route {
+        case "subcutaneous":
+            return "Injection"
+        case "oral":
+            return "Oral"
+        default:
+            return preset.route
+        }
+    }
+
+    @ViewBuilder
+    private func brandIcon(for preset: Glp1MedicationPreset) -> some View {
+        let brand = preset.brand
+        let topBrands: Set<String> = ["Wegovy", "Ozempic", "Mounjaro", "Zepbound"]
+        if topBrands.contains(brand) {
+            let initial = String(brand.prefix(1))
+
+            ZStack {
+                Circle()
+                    .fill(Color.appPrimary.opacity(0.22))
+                    .frame(width: 22, height: 22)
+
+                Text(initial)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+        }
+    }
+
+    private enum Glp1Filter: String, CaseIterable, Identifiable, Hashable {
+        case semaglutide
+        case tirzepatide
+        case liraglutide
+        case exenatide
+        case lixisenatide
+        case injectable
+        case oral
+        case weekly
+        case daily
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .semaglutide:
+                return "Semaglutide"
+            case .tirzepatide:
+                return "Tirzepatide"
+            case .liraglutide:
+                return "Liraglutide"
+            case .exenatide:
+                return "Exenatide"
+            case .lixisenatide:
+                return "Lixisenatide"
+            case .injectable:
+                return "Injectable"
+            case .oral:
+                return "Oral"
+            case .weekly:
+                return "Weekly"
+            case .daily:
+                return "Daily"
+            }
+        }
+    }
+
+    private struct Glp1Group {
+        let title: String
+        let items: [Glp1MedicationPreset]
+    }
+
     private func createMedication(from preset: Glp1MedicationPreset) {
         guard !isSaving else { return }
+        errorMessage = nil
         isSaving = true
 
         let now = Date()
@@ -986,21 +1377,17 @@ private struct Glp1AddMedicationView: View {
         )
 
         Task {
-            do {
-                let manager = SupabaseManager.shared
-                // End any active GLP-1 courses for this user before starting a new one.
-                try await manager.endActiveGlp1Medications(userId: userId, endedAt: now)
-                try await manager.saveGlp1Medication(medication)
-                await MainActor.run {
-                    onCreated(medication)
-                    dismiss()
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Unable to save medication. Please try again."
-                    isSaving = false
-                }
+            CoreDataManager.shared.endActiveGlp1Medications(for: userId, endedAt: now)
+            CoreDataManager.shared.saveGlp1Medications([medication], userId: userId, markAsSynced: false)
+
+            await MainActor.run {
+                onCreated(medication)
+                isSaving = false
+                dismiss()
             }
+
+            RealtimeSyncManager.shared.updatePendingSyncCount()
+            RealtimeSyncManager.shared.syncIfNeeded()
         }
     }
 }

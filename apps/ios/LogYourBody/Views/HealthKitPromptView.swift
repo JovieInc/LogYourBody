@@ -165,31 +165,30 @@ struct HealthKitPromptView: View {
         Task {
             let authorized = await healthKitManager.requestAuthorization()
 
-            await MainActor.run {
-                isConnecting = false
-
-                if authorized {
+            if authorized {
+                await MainActor.run {
+                    isConnecting = false
                     // Successfully connected
                     isPresented = false
+                }
 
-                    // Try to sync immediately
-                    Task {
-                        do {
-                            // Setup background delivery for weight and body fat
-                            try await healthKitManager.setupBackgroundDelivery()
-
-                            // Setup background delivery for step count
-                            try await healthKitManager.setupStepCountBackgroundDelivery()
-
-                            // Sync weight and body fat data from HealthKit
-                            try await healthKitManager.syncWeightFromHealthKit()
-
-                            // Fetch today's step count
-                            _ = try await healthKitManager.fetchTodayStepCount()
-                        } catch {
-                            // print("Initial HealthKit sync failed: \(error)")
-                        }
+                // Try to sync immediately
+                Task {
+                    do {
+                        try await HealthSyncCoordinator.shared.performInitialConnectSync()
+                    } catch {
+                        let context = ErrorContext(
+                            feature: "healthKit",
+                            operation: "initialSyncAfterConnect",
+                            screen: "HealthKitPromptView",
+                            userId: nil
+                        )
+                        ErrorReporter.shared.captureNonFatal(error, context: context)
                     }
+                }
+            } else {
+                await MainActor.run {
+                    isConnecting = false
                 }
             }
         }

@@ -23,7 +23,7 @@ struct LogWeightView: View {
     }
 
     var currentSystem: MeasurementSystem {
-        MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        MeasurementSystem.fromStored(rawValue: measurementSystem)
     }
 
     var body: some View {
@@ -176,14 +176,11 @@ struct LogWeightView: View {
                                 if !weight.isEmpty || !bodyFat.isEmpty {
                                     VStack(spacing: 8) {
                                         if !weight.isEmpty, let weightValue = Double(weight) {
-                                            let convertedWeight = currentSystem.weightUnit == "lbs"
-                                                ? weightValue * 0.453592
-                                                : weightValue
                                             HStack {
                                                 Text("Weight:")
                                                     .foregroundColor(.appTextSecondary)
                                                 Spacer()
-                                                Text("\(convertedWeight, specifier: "%.1f") kg")
+                                                Text("\(weightValue, specifier: "%.1f") \(currentSystem.weightUnit)")
                                                     .foregroundColor(.appText)
                                             }
                                             .font(.system(size: 14))
@@ -263,11 +260,7 @@ struct LogWeightView: View {
             .onTapGesture {
                 hideKeyboard()
             }
-            .alert("Error", isPresented: $showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage)
-            }
+            .standardErrorAlert(isPresented: $showError, message: errorMessage)
         }
         .onAppear {
             // Auto-focus on weight field when view appears
@@ -296,7 +289,7 @@ struct LogWeightView: View {
             if let latest = recentMetrics.first {
                 await MainActor.run {
                     if weight.isEmpty, let latestWeight = latest.weight {
-                        let displayWeight = currentSystem.weightUnit == "lbs" ? latestWeight * 2.20462 : latestWeight
+                        let displayWeight = currentSystem.weightUnit == "lbs" ? latestWeight.kgToLbs : latestWeight
                         weight = String(format: "%.1f", displayWeight)
                     }
                     if bodyFat.isEmpty, let latestBodyFat = latest.bodyFatPercentage {
@@ -356,7 +349,7 @@ struct LogWeightView: View {
                 let weightInKg = weightValue != nil
                     ? (
                         currentSystem.weightUnit == "lbs"
-                            ? weightValue! * 0.453592
+                            ? weightValue!.lbsToKg
                             : weightValue!
                     )
                     : nil
@@ -365,7 +358,7 @@ struct LogWeightView: View {
                 if healthKitManager.isAuthorized {
                     if let w = weightValue {
                         let weightInLbs = currentSystem.weightUnit == "kg"
-                            ? w * 2.20462
+                            ? w.kgToLbs
                             : w
                         try await healthKitManager.saveWeight(weightInLbs, date: Date())
                     }

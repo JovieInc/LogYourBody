@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 interface RequestBody {
-  originalUrl: string
+  storagePath: string
   metricsId: string
 }
 
@@ -19,10 +19,10 @@ serve(async (req) => {
 
   try {
     // Skip JWT validation - we'll validate by checking if the user owns the metrics record
-    const { originalUrl, metricsId } = await req.json() as RequestBody
+    const { storagePath, metricsId } = await req.json() as RequestBody
 
     // Validate inputs
-    if (!originalUrl || !metricsId) {
+    if (!metricsId) {
       throw new Error('Missing required parameters')
     }
 
@@ -34,6 +34,11 @@ serve(async (req) => {
     if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
       throw new Error('Cloudinary credentials not configured')
     }
+
+    // Get Supabase credentials from environment
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Build Cloudinary transformation URL
     // PNG with transparency already has background removed on device
@@ -59,10 +64,13 @@ serve(async (req) => {
       'z_0.85'                // Zoom out slightly to ensure full body is captured
     ].join(',')
 
+    // Resolve the original Supabase Storage URL from the storage path
+    const originalUrl = `${supabaseUrl}/storage/v1/object/public/photos/${storagePath}`
+
     // Create Cloudinary upload URL
     const timestamp = Math.round(Date.now() / 1000)
     const publicId = `progress-photos/${metricsId}_${timestamp}`
-    
+
     // Parameters that need to be included in the signature (in alphabetical order)
     const params = {
       eager: transformations,
@@ -72,22 +80,43 @@ serve(async (req) => {
       timestamp: timestamp,
       transformation: transformations
     }
-    
+
     // Generate signature - all parameters except api_key, file, and resource_type
     const sortedParams = Object.keys(params).sort()
     const stringToSign = sortedParams
       .map(key => `${key}=${params[key]}`)
       .join('&') + CLOUDINARY_API_SECRET
-    
+
     const encoder = new TextEncoder()
     const data = encoder.encode(stringToSign)
     const hashBuffer = await crypto.subtle.digest('SHA-256', data)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 
-    // Upload to Cloudinary
+    // Create a signed URL for the original photo in Supabase Storage
+    const { data: signedData, error: signedError } = await supabase
+      .storage
+      .from('photos')
+      .createSignedUrl(storagePath, 60 * 10)
+
+    if (signedError || !signedData || !signedData.signedUrl) {
+      throw new Error('Failed to create signed URL for original photo')
+    }
+
+    let cloudinarySourceUrl = signedData.signedUrl as string
+    if (!cloudinarySourceUrl.startsWith('http')) {
+      const base = supabaseUrl.endsWith('/')
+        ? supabaseUrl.slice(0, -1)
+        : supabaseUrl
+      const path = cloudinarySourceUrl.startsWith('/')
+        ? cloudinarySourceUrl
+        : `/${cloudinarySourceUrl}`
+      cloudinarySourceUrl = `${base}${path}`
+    }
+
+    // Upload to Cloudinary using the signed Supabase URL
     const formData = new FormData()
-    formData.append('file', originalUrl)
+    formData.append('file', cloudinarySourceUrl)
     formData.append('public_id', publicId)
     formData.append('api_key', CLOUDINARY_API_KEY)
     formData.append('timestamp', timestamp.toString())
@@ -111,20 +140,16 @@ serve(async (req) => {
     }
 
     const uploadResult = await uploadResponse.json()
-    
+
     // Get the transformed URL
     const processedUrl = uploadResult.eager?.[0]?.secure_url || uploadResult.secure_url
 
-    // Update the body_metrics record with the processed URL
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
+    // Update the body_metrics record with the processed URL and storage path
     const { error: updateError } = await supabase
       .from('body_metrics')
-      .update({ 
+      .update({
         photo_url: processedUrl,
-        original_photo_url: originalUrl,
+        original_photo_url: storagePath,
         photo_processed_at: new Date().toISOString()
       })
       .eq('id', metricsId)
@@ -135,16 +160,16 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         processedUrl,
         publicId,
         originalUrl
       }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+      {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
       }
     )
 
@@ -152,12 +177,12 @@ serve(async (req) => {
     console.error('Error processing image:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
+      {
         status: 500,
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
       }
     )
   }

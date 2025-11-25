@@ -129,7 +129,8 @@ enum Glp1MedicationCatalog {
             frequency: "once weekly",
             doseUnit: "mg/week",
             doses: [2.5, 5, 7.5, 10, 12.5, 15],
-            isCompounded: false
+            isCompounded: false,
+            hkIdentifier: "hk.glp1.tirzepatide.zepbound.weekly"
         ),
         // Liraglutide (daily)
         Glp1MedicationPreset(

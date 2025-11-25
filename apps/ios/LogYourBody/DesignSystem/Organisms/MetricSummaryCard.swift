@@ -585,7 +585,7 @@ public struct MetricSummaryCard: View {
 // MARK: - Metric Card Button Style
 
 struct MetricCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .brightness(configuration.isPressed ? 0.06 : 0)

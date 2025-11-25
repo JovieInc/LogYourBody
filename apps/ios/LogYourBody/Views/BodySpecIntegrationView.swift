@@ -58,9 +58,12 @@ struct BodySpecIntegrationView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundColor(.appText)
 
-            Text("Connect your BodySpec account to import DEXA scans into LogYourBody. This feature is currently in early internal testing.")
-                .font(.subheadline)
-                .foregroundColor(.appTextSecondary)
+            Text(
+                "Connect your BodySpec account to import DEXA scans into LogYourBody. " +
+                    "This feature is currently in early internal testing."
+            )
+            .font(.subheadline)
+            .foregroundColor(.appTextSecondary)
         }
     }
 
@@ -191,9 +194,12 @@ struct BodySpecIntegrationView: View {
                 .foregroundColor(.appText)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Manually import your DEXA scans from BodySpec. New scans will be added as body metrics and linked to your account.")
-                    .font(.subheadline)
-                    .foregroundColor(.appTextSecondary)
+                Text(
+                    "Manually import your DEXA scans from BodySpec. " +
+                        "New scans will be added as body metrics and linked to your account."
+                )
+                .font(.subheadline)
+                .foregroundColor(.appTextSecondary)
 
                 Button(action: syncTapped) {
                     HStack {
@@ -248,12 +254,20 @@ struct BodySpecIntegrationView: View {
         isLoadingScans = true
         recentScansError = nil
 
+        let cached = await CoreDataManager.shared.fetchDexaResults(for: userId, limit: 10)
+        if !cached.isEmpty {
+            recentScans = cached
+        }
+
         do {
             let scans = try await SupabaseManager.shared.fetchDexaResults(userId: userId, limit: 10)
             recentScans = scans
+            CoreDataManager.shared.saveDexaResults(scans, userId: userId)
         } catch {
-            recentScans = []
-            recentScansError = "Unable to load recent scans."
+            if recentScans.isEmpty {
+                recentScans = []
+                recentScansError = "Unable to load recent scans."
+            }
         }
 
         isLoadingScans = false

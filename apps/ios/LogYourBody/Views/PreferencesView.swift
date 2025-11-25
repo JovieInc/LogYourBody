@@ -8,33 +8,6 @@ import LocalAuthentication
 import PhotosUI
 import UIKit
 
-// MARK: - Measurement System Enum (Global)
-enum MeasurementSystem: String, Codable, CaseIterable {
-    case imperial = "Imperial"
-    case metric = "Metric"
-
-    var weightUnit: String {
-        switch self {
-        case .imperial: return "lbs"
-        case .metric: return "kg"
-        }
-    }
-
-    var heightUnit: String {
-        switch self {
-        case .imperial: return "ft"
-        case .metric: return "cm"
-        }
-    }
-
-    var heightDisplay: String {
-        switch self {
-        case .imperial: return "feet & inches"
-        case .metric: return "centimeters"
-        }
-    }
-}
-
 struct PreferencesView: View {
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var revenueCatManager = RevenueCatManager.shared
@@ -42,15 +15,15 @@ struct PreferencesView: View {
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
     @AppStorage(Constants.deletePhotosAfterImportKey) private var deletePhotosAfterImport = false
+    @AppStorage("stepGoal") private var stepGoal: Int = 10_000
+    @AppStorage(Constants.goalWeightKey) private var customWeightGoal: Double?
+    @AppStorage(Constants.goalBodyFatPercentageKey) private var customBodyFatGoal: Double?
+    @AppStorage(Constants.goalFFMIKey) private var customFFMIGoal: Double?
     @State private var biometricType: LABiometryType = .none
     @ObservedObject private var healthKitManager = HealthKitManager.shared
     @State private var showingRestoreAlert = false
     @State private var restoreAlertMessage = ""
 
-    // Goals - Optional values, nil means use gender-based default
-    @AppStorage(Constants.goalWeightKey) private var customWeightGoal: Double?
-    @AppStorage(Constants.goalBodyFatPercentageKey) private var customBodyFatGoal: Double?
-    @AppStorage(Constants.goalFFMIKey) private var customFFMIGoal: Double?
 
     // Local state for editing goals
     @State private var editingWeightGoal: String = ""
@@ -68,6 +41,7 @@ struct PreferencesView: View {
     @State private var profileImageURL: String?
 
     @State private var scrollOffset: CGFloat = 0
+    @State private var stepGoalRepeatDelta: Int = 0
     @State private var showingLogoutConfirmation = false
     @State private var isTriggeringHealthResync = false
     @State private var isHealthSyncSetupInProgress = false
@@ -86,7 +60,7 @@ struct PreferencesView: View {
     }
 
     var currentSystem: MeasurementSystem {
-        MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+        MeasurementSystem.fromStored(rawValue: measurementSystem)
     }
 
     private func checkBiometricAvailability() {
@@ -138,6 +112,11 @@ struct PreferencesView: View {
         customWeightGoal = nil
         customBodyFatGoal = nil
         customFFMIGoal = nil
+    }
+
+    private func changeStepGoal(by delta: Int) {
+        let newValue = stepGoal + delta
+        stepGoal = max(newValue, 0)
     }
 
     private func showTextInputAlert(
@@ -299,139 +278,174 @@ struct PreferencesView: View {
     private var accountSection: some View {
         SettingsSection(header: "Account") {
             VStack(spacing: 0) {
-                SettingsRow(
-                    icon: "envelope.fill",
-                    title: "Email",
-                    value: userEmail,
-                    showChevron: false,
-                    tintColor: .appText
-                )
+                accountEmailRow
 
                 DSDivider().insetted(16)
 
-                Button {
-                    showingPhotoPicker = true
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "person.crop.circle")
-                            .font(.system(size: 20))
-                            .foregroundColor(.appPrimary)
-                            .frame(width: 30)
-
-                        Text("Change profile photo")
-                            .font(SettingsDesign.titleFont)
-                            .foregroundColor(.appText)
-
-                        Spacer()
-
-                        if isUploadingPhoto {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                        } else {
-                            Image(systemName: "chevron.right")
-                                .font(.caption2)
-                                .foregroundColor(Color(.tertiaryLabel))
-                        }
-                    }
-                    .padding(.horizontal, SettingsDesign.horizontalPadding)
-                    .padding(.vertical, SettingsDesign.verticalPadding)
-                }
-                .disabled(isUploadingPhoto)
-                .accessibilityLabel("Change profile photo")
-                .accessibilityHint("Choose a new photo for your profile.")
+                changeProfilePhotoRow
 
                 DSDivider().insetted(16)
 
-                SettingsButtonRow(
-                    icon: "rectangle.portrait.and.arrow.right",
-                    title: "Log out",
-                    role: .destructive
-                ) {
-                    HapticManager.shared.notification(type: .warning)
-                    showingLogoutConfirmation = true
-                }
-                .accessibilityLabel("Log out")
-                .accessibilityHint("Signs you out of LogYourBody on this device.")
+                logoutRow
             }
         }
+    }
+
+    private var accountEmailRow: some View {
+        SettingsRow(
+            icon: "envelope.fill",
+            title: "Email",
+            value: userEmail,
+            showChevron: false,
+            tintColor: .appText
+        )
+    }
+
+    private var changeProfilePhotoRow: some View {
+        Button {
+            showingPhotoPicker = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 20))
+                    .foregroundColor(.appPrimary)
+                    .frame(width: 30)
+
+                Text("Change profile photo")
+                    .font(SettingsDesign.titleFont)
+                    .foregroundColor(.appText)
+
+                Spacer()
+
+                if isUploadingPhoto {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundColor(Color(.tertiaryLabel))
+                }
+            }
+            .padding(.horizontal, SettingsDesign.horizontalPadding)
+            .padding(.vertical, SettingsDesign.verticalPadding)
+        }
+        .disabled(isUploadingPhoto)
+        .accessibilityLabel("Change profile photo")
+        .accessibilityHint("Choose a new photo for your profile.")
+    }
+
+    private var logoutRow: some View {
+        SettingsButtonRow(
+            icon: "rectangle.portrait.and.arrow.right",
+            title: "Log out",
+            role: .destructive
+        ) {
+            HapticManager.shared.notification(type: .warning)
+            showingLogoutConfirmation = true
+        }
+        .accessibilityLabel("Log out")
+        .accessibilityHint("Signs you out of LogYourBody on this device.")
     }
 
     private var subscriptionSection: some View {
         SettingsSection(header: "Subscription") {
             VStack(spacing: 0) {
-                SettingsRow(
-                    icon: revenueCatManager.isSubscribed ? "checkmark.seal.fill" : "exclamationmark.triangle.fill",
-                    title: revenueCatManager.isSubscribed ? "Active" : "Inactive",
-                    subtitle: subscriptionPlanDisplay,
-                    showChevron: false,
-                    tintColor: revenueCatManager.isSubscribed ? .appPrimary : .orange
-                )
+                subscriptionStatusRow
 
                 if let renewal = subscriptionRenewalText {
                     DSDivider().insetted(16)
-
-                    SettingsRow(
-                        icon: "calendar",
-                        title: revenueCatManager.isInTrialPeriod ? "Trial ends" : "Renews on",
-                        value: renewal,
-                        showChevron: false,
-                        tintColor: .appText
-                    )
+                    subscriptionRenewalRow(renewal: renewal)
                 }
 
                 DSDivider().insetted(16)
 
-                Button {
-                    HapticManager.shared.selection()
-                    if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
-                        UIApplication.shared.open(url)
-                    }
-                } label: {
-                    SettingsRow(
-                        icon: "arrow.up.right.square",
-                        title: "Manage subscription",
-                        subtitle: "Opens App Store",
-                        showChevron: false,
-                        tintColor: .appText
-                    )
-                }
-                .accessibilityLabel("Manage subscription")
-                .accessibilityHint("Opens the App Store to manage your subscription.")
+                manageSubscriptionRow
             }
         }
+    }
+
+    private var subscriptionStatusRow: some View {
+        SettingsRow(
+            icon: revenueCatManager.isSubscribed ? "checkmark.seal.fill" : "exclamationmark.triangle.fill",
+            title: revenueCatManager.isSubscribed ? "Active" : "Inactive",
+            subtitle: subscriptionPlanDisplay,
+            showChevron: false,
+            tintColor: revenueCatManager.isSubscribed ? .appPrimary : .orange
+        )
+    }
+
+    private func subscriptionRenewalRow(renewal: String) -> some View {
+        SettingsRow(
+            icon: "calendar",
+            title: revenueCatManager.isInTrialPeriod ? "Trial ends" : "Renews on",
+            value: renewal,
+            showChevron: false,
+            tintColor: .appText
+        )
+    }
+
+    private var manageSubscriptionRow: some View {
+        Button {
+            HapticManager.shared.selection()
+            if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                UIApplication.shared.open(url)
+            }
+        } label: {
+            SettingsRow(
+                icon: "arrow.up.right.square",
+                title: "Manage subscription",
+                subtitle: "Opens App Store",
+                showChevron: false,
+                tintColor: .appText
+            )
+        }
+        .accessibilityLabel("Manage subscription")
+        .accessibilityHint("Opens the App Store to manage your subscription.")
     }
 
     private var profileSection: some View {
         SettingsSection(header: "Profile") {
             VStack(spacing: 0) {
-                profileRow(
-                    icon: "person.fill",
-                    title: "Full name",
-                    value: authManager.currentUser?.profile?.fullName ?? authManager.currentUser?.name ?? "Not set"
-                ) {
-                    isShowingProfileSettings = true
-                }
+                profileFullNameRow
 
                 DSDivider().insetted(16)
 
-                profileRow(
-                    icon: "calendar",
-                    title: "Date of birth",
-                    value: dateOfBirthDisplay
-                ) {
-                    isShowingProfileSettings = true
-                }
+                profileDateOfBirthRow
 
                 DSDivider().insetted(16)
 
-                profileRow(
-                    icon: "ruler",
-                    title: "Height",
-                    value: heightDisplayText
-                ) {
-                    isShowingProfileSettings = true
-                }
+                profileHeightRow
             }
+        }
+    }
+
+    private var profileFullNameRow: some View {
+        profileRow(
+            icon: "person.fill",
+            title: "Full name",
+            value: authManager.currentUser?.profile?.fullName ?? authManager.currentUser?.name ?? "Not set"
+        ) {
+            isShowingProfileSettings = true
+        }
+    }
+
+    private var profileDateOfBirthRow: some View {
+        profileRow(
+            icon: "calendar",
+            title: "Date of birth",
+            value: dateOfBirthDisplay
+        ) {
+            isShowingProfileSettings = true
+        }
+    }
+
+    private var profileHeightRow: some View {
+        profileRow(
+            icon: "ruler",
+            title: "Height",
+            value: heightDisplayText
+        ) {
+            isShowingProfileSettings = true
         }
     }
 
@@ -441,29 +455,8 @@ struct PreferencesView: View {
             footer: "Set custom targets or use defaults."
         ) {
             VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Measurement system")
-                        .font(SettingsDesign.titleFont)
-                        .foregroundColor(.appText)
-
-                    Picker("Measurement System", selection: $measurementSystem) {
-                        Text("Imperial").tag(MeasurementSystem.imperial.rawValue)
-                        Text("Metric").tag(MeasurementSystem.metric.rawValue)
-                    }
-                    .pickerStyle(.segmented)
-                }
-                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                .padding(.vertical, SettingsDesign.verticalPadding)
-
-                DSDivider().insetted(16)
-
-                SettingsRow(
-                    icon: "scalemass",
-                    title: "Units",
-                    subtitle: "Weight in \(currentSystem.weightUnit) • Height in \(currentSystem.heightDisplay)",
-                    showChevron: false,
-                    tintColor: .appText
-                )
+                measurementSystemSection
+                stepGoalRow
 
                 DSDivider().insetted(16)
 
@@ -548,6 +541,56 @@ struct PreferencesView: View {
         }
     }
 
+    private var measurementSystemSection: some View {
+        SettingsRow(
+            icon: "globe",
+            title: "Units",
+            subtitle: currentSystem == .metric ? "Metric (kg, cm)" : "Imperial (lbs, ft)",
+            showChevron: false,
+            tintColor: .appText
+        )
+        .overlay(
+            HStack {
+                Spacer()
+                Picker("Units", selection: $measurementSystem) {
+                    Text("Metric").tag(MeasurementSystem.metric.rawValue)
+                    Text("Imperial").tag(MeasurementSystem.imperial.rawValue)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+            }
+            .padding(.trailing, SettingsDesign.horizontalPadding)
+        )
+    }
+
+    private var stepGoalRow: some View {
+        SettingsRow(
+            icon: "figure.walk",
+            title: "Daily step goal",
+            subtitle: FormatterCache.stepsFormatter.string(from: NSNumber(value: stepGoal)) ?? "\(stepGoal) steps",
+            showChevron: false,
+            tintColor: .appText
+        )
+        .overlay(
+            HStack(spacing: 12) {
+                Spacer()
+                Button {
+                    changeStepGoal(by: -1_000)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .foregroundColor(.appTextSecondary)
+                }
+                Button {
+                    changeStepGoal(by: 1_000)
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.appPrimary)
+                }
+            }
+            .padding(.trailing, SettingsDesign.horizontalPadding)
+        )
+    }
+
     private var integrationsSection: some View {
         SettingsSection(header: "Integrations") {
             SettingsNavigationLink(
@@ -563,24 +606,32 @@ struct PreferencesView: View {
     private var securitySection: some View {
         SettingsSection(header: "Security") {
             VStack(spacing: 0) {
-                SettingsNavigationLink(
-                    icon: "lock.rotation",
-                    title: "Change password",
-                    subtitle: "Update your password."
-                ) {
-                    ChangePasswordView()
-                }
+                changePasswordRow
 
                 DSDivider().insetted(16)
 
-                SettingsNavigationLink(
-                    icon: "desktopcomputer",
-                    title: "Active sessions",
-                    subtitle: "Review devices signed in to your account."
-                ) {
-                    SecuritySessionsView()
-                }
+                activeSessionsRow
             }
+        }
+    }
+
+    private var changePasswordRow: some View {
+        SettingsNavigationLink(
+            icon: "lock.rotation",
+            title: "Change password",
+            subtitle: "Update your password."
+        ) {
+            ChangePasswordView()
+        }
+    }
+
+    private var activeSessionsRow: some View {
+        SettingsNavigationLink(
+            icon: "desktopcomputer",
+            title: "Active sessions",
+            subtitle: "Review devices signed in to your account."
+        ) {
+            SecuritySessionsView()
         }
     }
 
@@ -1006,18 +1057,7 @@ struct PreferencesView: View {
             }
         }
 
-        healthKitManager.observeWeightChanges()
-        healthKitManager.observeStepChanges()
-
-        do {
-            try await healthKitManager.setupStepCountBackgroundDelivery()
-        } catch {
-            // Optional: surface failure to user later
-        }
-
-        Task.detached(priority: .background) {
-            try? await healthKitManager.syncWeightFromHealthKit()
-        }
+        await HealthSyncCoordinator.shared.configureSyncPipelineAfterAuthorizationAndRunInitialWeightSync()
     }
 
     private func convertHeightToCurrentSystem(height: Double, fromUnit: String) -> String {

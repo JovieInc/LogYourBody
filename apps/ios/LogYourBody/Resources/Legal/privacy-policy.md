@@ -80,6 +80,8 @@ We do not sell, trade, or rent your personal information. We may share your info
    - Clerk (authentication)
    - Supabase (database hosting)
    - Vercel (web hosting)
+   - RevenueCat (subscription and purchase entitlements)
+   - Sentry (error tracking and crash reporting)
 3. **Legal Requirements**: If required by law or to protect rights and safety
 4. **Business Transfers**: In connection with a merger or acquisition (with notice)
 
@@ -91,6 +93,7 @@ You have the right to:
 - Update or correct your information
 - Delete your account and all associated data
 - Download a copy of your data in JSON format
+ - Email support@logyourbody.com to request a data export if you cannot access in-app export tools
 
 ### Communication Preferences
 - Opt out of marketing emails via unsubscribe link

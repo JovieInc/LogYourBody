@@ -14,68 +14,66 @@ struct BodyScoreHealthConfirmationView: View {
     var body: some View {
         OnboardingPageTemplate(
             title: "Health data synced",
-            subtitle: "We grabbed the latest stats from Apple Health. Confirm or edit anything before continuing.",
+            subtitle: "Review what we imported from Apple Health.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .healthConfirmation),
             content: {
                 VStack(spacing: 24) {
-                    OnboardingCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            if let status = viewModel.healthKitConnectionStatusText {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(Color.green)
+                    VStack(alignment: .leading, spacing: 16) {
+                        if let status = viewModel.healthKitConnectionStatusText {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.green)
 
-                                    Text(status)
+                                Text(status)
+                                    .font(OnboardingTypography.caption)
+                                    .foregroundStyle(Color.appTextSecondary)
+
+                                Spacer()
+                            }
+
+                            Divider()
+                                .overlay(Color.appBorder.opacity(0.4))
+                        }
+
+                        ForEach(metrics) { metric in
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: metric.icon)
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(Color.appPrimary)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(metric.title.uppercased())
                                         .font(OnboardingTypography.caption)
                                         .foregroundStyle(Color.appTextSecondary)
 
-                                    Spacer()
+                                    Text(metric.value)
+                                        .font(.system(.title2, design: .rounded).weight(.semibold))
+                                        .foregroundStyle(Color.appText)
+
+                                    Text(metric.subtitle)
+                                        .font(OnboardingTypography.body)
+                                        .foregroundStyle(Color.appTextSecondary)
                                 }
 
-                                Divider()
-                                    .overlay(Color.appBorder.opacity(0.4))
+                                Spacer()
+
+                                if metric.title != "No data" {
+                                    Button {
+                                        edit(metric: metric)
+                                    } label: {
+                                        Image(systemName: "square.and.pencil")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundStyle(Color.appPrimary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
 
-                            ForEach(metrics) { metric in
-                                HStack(alignment: .top, spacing: 12) {
-                                    Image(systemName: metric.icon)
-                                        .font(.system(size: 20, weight: .semibold))
-                                        .foregroundStyle(Color.appPrimary)
-
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(metric.title.uppercased())
-                                            .font(OnboardingTypography.caption)
-                                            .foregroundStyle(Color.appTextSecondary)
-
-                                        Text(metric.value)
-                                            .font(.system(.title2, design: .rounded).weight(.semibold))
-                                            .foregroundStyle(Color.appText)
-
-                                        Text(metric.subtitle)
-                                            .font(OnboardingTypography.body)
-                                            .foregroundStyle(Color.appTextSecondary)
-                                    }
-
-                                    Spacer()
-
-                                    if metric.title != "No data" {
-                                        Button {
-                                            edit(metric: metric)
-                                        } label: {
-                                            Image(systemName: "square.and.pencil")
-                                                .font(.system(size: 16, weight: .medium))
-                                                .foregroundStyle(Color.appPrimary)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-
-                                if metric.id != metrics.last?.id {
-                                    Divider()
-                                        .overlay(Color.appBorder.opacity(0.4))
-                                }
+                            if metric.id != metrics.last?.id {
+                                Divider()
+                                    .overlay(Color.appBorder.opacity(0.4))
                             }
                         }
                     }
@@ -93,8 +91,6 @@ struct BodyScoreHealthConfirmationView: View {
                     } label: {
                         Text("Continue")
                             .font(.system(size: 18, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
                     }
                     .buttonStyle(OnboardingPrimaryButtonStyle())
 

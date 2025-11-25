@@ -208,7 +208,7 @@ final class BodySpecAuthManager: NSObject, ASWebAuthenticationPresentationContex
         let decoder = JSONDecoder()
         let tokenResponse = try decoder.decode(TokenResponse.self, from: data)
 
-        let expiresIn = tokenResponse.expiresIn ?? 3600
+        let expiresIn = tokenResponse.expiresIn ?? 3_600
         let expiryDate = Date().addingTimeInterval(TimeInterval(expiresIn))
 
         return Token(

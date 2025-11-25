@@ -14,6 +14,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
 
+    const trimmedName = (name || '').trim()
+    const nameParts = trimmedName ? trimmedName.split(/\s+/) : []
+    const firstName = nameParts[0] || ''
+    const lastName = nameParts.slice(1).join(' ') || ''
+
     // Sign up the user
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -45,6 +50,8 @@ export async function POST(request: NextRequest) {
       .insert({
         id: data.user.id,
         full_name: name,
+        first_name: firstName || null,
+        last_name: lastName || null,
         username: email.split('@')[0],
       })
 

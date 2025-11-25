@@ -11,9 +11,9 @@ class LoadingManager: ObservableObject {
     @Published var isLoading: Bool = true
 
     private let authManager: AuthManager
-    private let healthKitManager = HealthKitManager.shared
     private let coreDataManager = CoreDataManager.shared
     private let syncManager = RealtimeSyncManager.shared
+    private let healthSyncCoordinator: HealthSyncCoordinating
 
     // Loading steps with their weights
     private enum LoadingStep {
@@ -52,20 +52,45 @@ class LoadingManager: ObservableObject {
 
     private var completedWeight: Double = 0.0
 
-    init(authManager: AuthManager) {
+    init(
+        authManager: AuthManager,
+        healthSyncCoordinator: HealthSyncCoordinating = HealthSyncCoordinator.shared
+    ) {
         self.authManager = authManager
+        self.healthSyncCoordinator = healthSyncCoordinator
     }
 
     func startLoading() async {
-        isLoading = true
-        progress = 0.0
-        completedWeight = 0.0
+        resetLoadingState()
 
         // Step 1: Initialize
-        await updateProgress(for: .initialize)
+        await performInitializationStep()
         // Removed artificial 0.2s delay
 
         // Step 2: Check Authentication
+        await performAuthStep()
+
+        // Step 3: Load Profile (if authenticated)
+        await performProfileStepIfNeeded()
+
+        // Step 4: Complete blocking phase
+        await completeBlockingPhase()
+
+        // Step 5: Warm-up tasks (HealthKit, local data, sync) in background
+        scheduleWarmUpTasksIfNeeded()
+    }
+
+    private func resetLoadingState() {
+        isLoading = true
+        progress = 0.0
+        completedWeight = 0.0
+    }
+
+    private func performInitializationStep() async {
+        await updateProgress(for: .initialize)
+    }
+
+    private func performAuthStep() async {
         await updateProgress(for: .checkAuth, partial: 0.5)
 
         // Skip Clerk loading wait if using mock auth
@@ -87,8 +112,9 @@ class LoadingManager: ObservableObject {
         }
 
         await updateProgress(for: .checkAuth)
+    }
 
-        // Step 3: Load Profile (if authenticated)
+    private func performProfileStepIfNeeded() async {
         if authManager.isAuthenticated {
             await updateProgress(for: .loadProfile, partial: 0.3)
 
@@ -108,9 +134,9 @@ class LoadingManager: ObservableObject {
                         )
                         authManager.currentUser = updatedUser
 
-                        // Sync onboarding state to UserDefaults
+                        // Sync onboarding state to UserDefaults via OnboardingStateManager
                         if let onboardingCompleted = profile.onboardingCompleted {
-                            UserDefaults.standard.set(onboardingCompleted, forKey: Constants.hasCompletedOnboardingKey)
+                            OnboardingStateManager.shared.syncCompletionFlagFromProfile(onboardingCompleted)
                             // print("✅ LoadingManager: Synced onboarding status from profile: \(onboardingCompleted)")
                         }
                     }
@@ -125,8 +151,9 @@ class LoadingManager: ObservableObject {
             completedWeight += LoadingStep.loadProfile.weight
             progress = completedWeight
         }
+    }
 
-        // Step 4: Complete blocking phase
+    private func completeBlockingPhase() async {
         await updateProgress(for: .complete)
         progress = 1.0
         loadingStatus = "Ready!"
@@ -134,8 +161,9 @@ class LoadingManager: ObservableObject {
         // Minimal delay just for UI transition
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
         isLoading = false
+    }
 
-        // Step 5: Warm-up tasks (HealthKit, local data, sync) in background
+    private func scheduleWarmUpTasksIfNeeded() {
         if authManager.isAuthenticated {
             Task { @MainActor [weak self] in
                 await self?.runWarmUpTasks()
@@ -143,22 +171,14 @@ class LoadingManager: ObservableObject {
         }
     }
 
-    private func runWarmUpTasks() async {
+    func runWarmUpTasks() async {
         guard authManager.isAuthenticated else { return }
 
         await withTaskGroup(of: Void.self) { group in
             // Setup HealthKit
             group.addTask { @MainActor [weak self] in
                 guard let self else { return }
-                self.healthKitManager.checkAuthorizationStatus()
-
-                if self.healthKitManager.isAuthorized {
-                    // Request fresh data from HealthKit in background
-                    Task.detached { [weak self] in
-                        guard let self else { return }
-                        try? await self.healthKitManager.fetchTodayStepCount()
-                    }
-                }
+                await self.healthSyncCoordinator.warmUpAfterLoginIfNeeded()
             }
 
             // Load local data / pending sync counts

@@ -17,7 +17,7 @@ You have the right to request that we disclose:
 - Categories of third parties with whom we share information
 - Specific pieces of personal information collected
 
-**How to Exercise:** Submit a request through Settings → Privacy → CCPA Request
+**How to Exercise:** Submit a request by emailing privacy@logyourbody.com with "CCPA Request" in the subject line
 
 ### 2. Right to Delete Personal Information
 
@@ -26,6 +26,7 @@ You can request deletion of personal information we collected from you, subject 
 **How to Exercise:** 
 - Use "Delete Account" in Settings → Account
 - Or email privacy@logyourbody.com with deletion request
+ - For a copy of your data (export), you may also email support@logyourbody.com with a data export request
 
 **Exceptions:** We may retain information for:
 - Completing transactions
@@ -66,7 +67,7 @@ Sensitive information we collect:
 - Account credentials
 
 **Your Control:** You can limit use through:
-- Privacy Settings in the app
+- In-app Settings (for example by disabling certain features or integrations)
 - Disabling specific features
 - Data export and deletion options
 
@@ -153,6 +154,8 @@ Sensitive information we collect:
 - **Supabase**: Database and authentication
 - **AWS**: Cloud infrastructure
 - **Clerk**: Authentication services
+ - **RevenueCat**: Subscription and purchase entitlements
+ - **Sentry**: Error tracking and crash reports
 
 ### What We Share
 - Only minimum necessary for service operation
@@ -190,11 +193,9 @@ To protect your privacy, we verify identity for requests:
 
 ## How to Submit Requests
 
-### Online Form
-Settings → Privacy → CCPA Request
+### Online Request
 
-### Email
-privacy@logyourbody.com
+Email privacy@logyourbody.com with "CCPA Request" in the subject line
 
 ### Response Timeline
 - Acknowledgment: Within 10 business days

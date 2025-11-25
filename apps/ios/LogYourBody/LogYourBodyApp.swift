@@ -56,7 +56,7 @@ struct LogYourBodyApp: App {
                     // App entering foreground - refresh data
                     Task {
                         if healthKitManager.isAuthorized {
-                            try? await healthKitManager.syncStepsFromHealthKit()
+                            try? await HealthSyncCoordinator.shared.syncStepsFromHealthKit()
                         }
                         // Update widget with latest data
                         await widgetDataManager.updateWidgetData()
@@ -73,12 +73,19 @@ struct LogYourBodyApp: App {
 
         ErrorTrackingService.shared.start()
 
+        AnalyticsService.shared.start()
+        AnalyticsService.shared.track(event: "app_open")
+
         let clerkInitializationTask = authManager.ensureClerkInitializationTask(priority: .userInitiated)
 
-        async let revenueCatPipeline: Void = configureRevenueCat(waitingFor: clerkInitializationTask)
-        async let healthKitPipeline: Void = bootstrapHealthKit()
+        Task { @MainActor in
+            await configureRevenueCat(waitingFor: clerkInitializationTask)
+        }
 
-        _ = await (revenueCatPipeline, healthKitPipeline)
+        Task { @MainActor in
+            await bootstrapHealthKit()
+        }
+
         await clerkInitializationTask.value
     }
 
@@ -89,8 +96,6 @@ struct LogYourBodyApp: App {
 
         revenueCatManager.configure(apiKey: apiKey)
 
-        async let offeringsTask: Void = revenueCatManager.fetchOfferings()
-
         await clerkTask.value
 
         if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
@@ -98,24 +103,12 @@ struct LogYourBodyApp: App {
         } else {
             await revenueCatManager.refreshCustomerInfo()
         }
-
-        _ = await offeringsTask
     }
 
     @MainActor
     private func bootstrapHealthKit() async {
-        healthKitManager.checkAuthorizationStatus()
-
-        guard UserDefaults.standard.bool(forKey: "healthKitSyncEnabled") else { return }
-
-        guard healthKitManager.isAuthorized else { return }
-
-        healthKitManager.observeWeightChanges()
-        healthKitManager.observeStepChanges()
-
-        Task {
-            try? await healthKitManager.setupStepCountBackgroundDelivery()
-        }
+        let syncEnabled = UserDefaults.standard.bool(forKey: "healthKitSyncEnabled")
+        HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: syncEnabled)
     }
 
     @MainActor
@@ -135,7 +128,8 @@ struct LogYourBodyApp: App {
 
         widgetDataManager.setupAutomaticUpdates()
 
-        Task {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
             await widgetDataManager.updateWidgetData()
         }
     }

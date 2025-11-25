@@ -17,6 +17,7 @@ struct Constants {
 
     // MARK: - Feature Flags
     static let isBodySpecEnabled = true
+    static let photosTabFlagKey = "photos_tab"
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)
     static var baseURL: String {
@@ -32,7 +33,11 @@ struct Constants {
         Configuration.clerkFrontendAPI
     }
 
-    static let useMockAuth = false  // Clerk authentication enabled
+    #if DEBUG
+    static let useMockAuth = false  // Set to true only for local mock testing in debug builds
+    #else
+    static let useMockAuth = false  // Always disabled in non-debug builds
+    #endif
 
     static var isClerkConfigured: Bool {
         Configuration.isClerkConfigured
@@ -50,6 +55,15 @@ struct Constants {
     // MARK: - RevenueCat Configuration (from Config.xcconfig via Info.plist)
     static var revenueCatAPIKey: String {
         Configuration.revenueCatAPIKey
+    }
+
+    // MARK: - Analytics Configuration (from Config.xcconfig via Info.plist)
+    static var posthogAPIKey: String {
+        Configuration.posthogAPIKey
+    }
+
+    static var posthogHost: String {
+        Configuration.posthogHost
     }
 
     // RevenueCat Entitlement ID (must match RevenueCat dashboard)

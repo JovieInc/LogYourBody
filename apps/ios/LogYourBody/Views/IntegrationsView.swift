@@ -21,256 +21,10 @@ struct IntegrationsView: View {
 
             ScrollView {
                 VStack(spacing: 20) {
-                    // Health & Fitness Section
-                    SettingsSection(
-                        header: "Health & Fitness",
-                        footer: "Connect your favorite health apps to sync data automatically"
-                    ) {
-                        VStack(spacing: 0) {
-                            // Apple Health
-                            if healthKitManager.isHealthKitAvailable {
-                                HStack {
-                                    Image(systemName: "heart.fill")
-                                        .foregroundColor(.red)
-                                        .font(.system(size: SettingsDesign.iconSize))
-                                        .frame(width: SettingsDesign.iconFrame)
-
-                                    Text("Apple Health")
-                                        .font(SettingsDesign.titleFont)
-
-                                    Spacer()
-
-                                    if healthKitManager.isAuthorized {
-                                        Label("Connected", systemImage: "checkmark.circle.fill")
-                                            .font(SettingsDesign.valueFont)
-                                            .foregroundColor(.green)
-                                            .labelStyle(.titleAndIcon)
-                                    } else {
-                                        Button("Connect") {
-                                            Task {
-                                                let authorized = await healthKitManager.requestAuthorization()
-                                                if !authorized {
-                                                    showHealthKitConnect = true
-                                                }
-                                            }
-                                        }
-                                        .font(SettingsDesign.valueFont)
-                                        .foregroundColor(.appPrimary)
-                                    }
-                                }
-                                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                                .padding(.vertical, SettingsDesign.verticalPadding)
-
-                                if healthKitManager.isAuthorized {
-                                    Divider()
-
-                                    // Enable Sync Toggle
-                                    SettingsToggleRow(
-                                        icon: "arrow.triangle.2.circlepath",
-                                        title: "Enable Sync",
-                                        isOn: $healthKitSyncEnabled
-                                    )
-                                    .onChange(of: healthKitSyncEnabled) { _, newValue in
-                                        if newValue {
-                                            Task {
-                                                let authorized = await healthKitManager.requestAuthorization()
-                                                if authorized {
-                                                    healthKitManager.observeWeightChanges()
-                                                    healthKitManager.observeStepChanges()
-                                                    try? await healthKitManager.syncWeightFromHealthKit()
-                                                    try? await healthKitManager.syncStepsFromHealthKit()
-                                                } else {
-                                                    await MainActor.run {
-                                                        healthKitSyncEnabled = false
-                                                        showHealthKitConnect = true
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Divider()
-
-                                    // Manual Sync Button
-                                    SettingsButtonRow(
-                                        icon: "arrow.triangle.2.circlepath",
-                                        title: "Sync All Historical Data",
-                                        action: {
-                                            Task {
-                                                await healthKitManager.forceFullHealthKitSync()
-                                            }
-                                        }
-                                    )
-                                }
-                            } else {
-                                // HealthKit Not Available
-                                DataInfoRow(
-                                    icon: "exclamationmark.triangle",
-                                    title: "Apple Health Not Available",
-                                    description: "Apple Health is not available on this device",
-                                    iconColor: .orange
-                                )
-                            }
-
-                            Divider()
-
-                            // Google Fit (Coming Soon)
-                            HStack {
-                                Image(systemName: "figure.run")
-                                    .foregroundColor(.green)
-                                    .font(.system(size: SettingsDesign.iconSize))
-                                    .frame(width: SettingsDesign.iconFrame)
-
-                                Text("Google Fit")
-                                    .font(SettingsDesign.titleFont)
-
-                                Spacer()
-
-                                Text("Coming Soon")
-                                    .font(SettingsDesign.valueFont)
-                                    .foregroundColor(.appTextSecondary)
-                            }
-                            .padding(.horizontal, SettingsDesign.horizontalPadding)
-                            .padding(.vertical, SettingsDesign.verticalPadding)
-                            .opacity(0.6)
-
-                            Divider()
-
-                            if Constants.isBodySpecEnabled {
-                                NavigationLink(
-                                    destination: BodySpecIntegrationView()
-                                        .environmentObject(authManager)
-                                ) {
-                                    HStack {
-                                        Image(systemName: "waveform.path.ecg")
-                                            .foregroundColor(.blue)
-                                            .font(.system(size: SettingsDesign.iconSize))
-                                            .frame(width: SettingsDesign.iconFrame)
-
-                                        Text("BodySpec")
-                                            .font(SettingsDesign.titleFont)
-
-                                        Spacer()
-
-                                        if isLoadingBodySpecLastSynced {
-                                            Text("Checking…")
-                                                .font(SettingsDesign.valueFont)
-                                                .foregroundColor(.appTextSecondary)
-                                        } else if let bodySpecLastSyncedText {
-                                            Text(bodySpecLastSyncedText)
-                                                .font(SettingsDesign.valueFont)
-                                                .foregroundColor(.appTextSecondary)
-                                        } else {
-                                            Text("Not synced yet")
-                                                .font(SettingsDesign.valueFont)
-                                                .foregroundColor(.appTextSecondary)
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                                .padding(.vertical, SettingsDesign.verticalPadding)
-                            } else {
-                                // BodySpec (Coming Soon)
-                                HStack {
-                                    Image(systemName: "waveform.path.ecg")
-                                        .foregroundColor(.blue)
-                                        .font(.system(size: SettingsDesign.iconSize))
-                                        .frame(width: SettingsDesign.iconFrame)
-
-                                    Text("BodySpec")
-                                        .font(SettingsDesign.titleFont)
-
-                                    Spacer()
-
-                                    Text("Coming Soon")
-                                        .font(SettingsDesign.valueFont)
-                                        .foregroundColor(.appTextSecondary)
-                                }
-                                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                                .padding(.vertical, SettingsDesign.verticalPadding)
-                                .opacity(0.6)
-                            }
-                        }
-                    }
-
-                    // Photo Import Section
-                    SettingsSection(
-                        header: "Photo Import",
-                        footer: "Import progress photos from your photo library"
-                    ) {
-                        NavigationLink(destination: BulkPhotoImportView().environmentObject(authManager)) {
-                            SettingsRow(
-                                icon: "photo.stack",
-                                title: "Import Progress Photos",
-                                value: "Scan library",
-                                showChevron: true
-                            )
-                        }
-                    }
-
-                    // Data Export Section
-                    SettingsSection(
-                        header: "Data Export",
-                        footer: "Export your data to other platforms"
-                    ) {
-                        VStack(spacing: 0) {
-                            // CSV Export
-                            NavigationLink(destination: ExportDataView()) {
-                                SettingsRow(
-                                    icon: "doc.text",
-                                    title: "Export as CSV",
-                                    showChevron: true
-                                )
-                            }
-
-                            Divider()
-
-                            // JSON Export (Coming Soon)
-                            HStack {
-                                Image(systemName: "doc.badge.gearshape")
-                                    .foregroundColor(.appTextSecondary)
-                                    .font(.system(size: SettingsDesign.iconSize))
-                                    .frame(width: SettingsDesign.iconFrame)
-
-                                Text("Export as JSON")
-                                    .font(SettingsDesign.titleFont)
-
-                                Spacer()
-
-                                Text("Coming Soon")
-                                    .font(SettingsDesign.valueFont)
-                                    .foregroundColor(.appTextSecondary)
-                            }
-                            .padding(.horizontal, SettingsDesign.horizontalPadding)
-                            .padding(.vertical, SettingsDesign.verticalPadding)
-                            .opacity(0.6)
-                        }
-                    }
-
-                    // API Access Section (Future)
-                    SettingsSection(
-                        header: "Developer Access",
-                        footer: "API access for third-party developers will be available in the future"
-                    ) {
-                        HStack {
-                            Image(systemName: "network")
-                                .foregroundColor(.appTextSecondary)
-                                .font(.system(size: SettingsDesign.iconSize))
-                                .frame(width: SettingsDesign.iconFrame)
-
-                            Text("API Access")
-                                .font(SettingsDesign.titleFont)
-
-                            Spacer()
-
-                            Text("Coming Soon")
-                                .font(SettingsDesign.valueFont)
-                                .foregroundColor(.appTextSecondary)
-                        }
-                        .padding(.horizontal, SettingsDesign.horizontalPadding)
-                        .padding(.vertical, SettingsDesign.verticalPadding)
-                        .opacity(0.6)
-                    }
+                    healthAndFitnessSection
+                    photoImportSection
+                    dataExportSection
+                    developerAccessSection
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
@@ -298,6 +52,258 @@ struct IntegrationsView: View {
             }
         }
     }
+
+    private var healthAndFitnessSection: some View {
+        SettingsSection(
+            header: "Health & Fitness",
+            footer: "Connect your favorite health apps to sync data automatically"
+        ) {
+            VStack(spacing: 0) {
+                // Apple Health
+                if healthKitManager.isHealthKitAvailable {
+                    HStack {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.red)
+                            .font(.system(size: SettingsDesign.iconSize))
+                            .frame(width: SettingsDesign.iconFrame)
+
+                        Text("Apple Health")
+                            .font(SettingsDesign.titleFont)
+
+                        Spacer()
+
+                        if healthKitManager.isAuthorized {
+                            Label("Connected", systemImage: "checkmark.circle.fill")
+                                .font(SettingsDesign.valueFont)
+                                .foregroundColor(.green)
+                                .labelStyle(.titleAndIcon)
+                        } else {
+                            Button("Connect") {
+                                Task {
+                                    let authorized = await healthKitManager.requestAuthorization()
+                                    if !authorized {
+                                        showHealthKitConnect = true
+                                    }
+                                }
+                            }
+                            .font(SettingsDesign.valueFont)
+                            .foregroundColor(.appPrimary)
+                        }
+                    }
+                    .padding(.horizontal, SettingsDesign.horizontalPadding)
+                    .padding(.vertical, SettingsDesign.verticalPadding)
+
+                    if healthKitManager.isAuthorized {
+                        Divider()
+
+                        // Enable Sync Toggle
+                        SettingsToggleRow(
+                            icon: "arrow.triangle.2.circlepath",
+                            title: "Enable Sync",
+                            isOn: $healthKitSyncEnabled
+                        )
+                        .onChange(of: healthKitSyncEnabled) { _, newValue in
+                            if newValue {
+                                Task {
+                                    let authorized = await healthKitManager.requestAuthorization()
+                                    if authorized {
+                                        await HealthSyncCoordinator.shared.configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
+                                    } else {
+                                        await MainActor.run {
+                                            healthKitSyncEnabled = false
+                                            showHealthKitConnect = true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        // Manual Sync Button
+                        SettingsButtonRow(
+                            icon: "arrow.triangle.2.circlepath",
+                            title: "Sync All Historical Data",
+                            action: {
+                                Task {
+                                    await HealthSyncCoordinator.shared.forceFullHealthKitSync()
+                                }
+                            }
+                        )
+                    }
+                } else {
+                    // HealthKit Not Available
+                    DataInfoRow(
+                        icon: "exclamationmark.triangle",
+                        title: "Apple Health Not Available",
+                        description: "Apple Health is not available on this device",
+                        iconColor: .orange
+                    )
+                }
+
+                Divider()
+
+                // Google Fit (Coming Soon)
+                HStack {
+                    Image(systemName: "figure.run")
+                        .foregroundColor(.green)
+                        .font(.system(size: SettingsDesign.iconSize))
+                        .frame(width: SettingsDesign.iconFrame)
+
+                    Text("Google Fit")
+                        .font(SettingsDesign.titleFont)
+
+                    Spacer()
+
+                    Text("Coming Soon")
+                        .font(SettingsDesign.valueFont)
+                        .foregroundColor(.appTextSecondary)
+                }
+                .padding(.horizontal, SettingsDesign.horizontalPadding)
+                .padding(.vertical, SettingsDesign.verticalPadding)
+                .opacity(0.6)
+
+                Divider()
+
+                if Constants.isBodySpecEnabled {
+                    NavigationLink(
+                        destination: BodySpecIntegrationView()
+                            .environmentObject(authManager)
+                    ) {
+                        HStack {
+                            Image(systemName: "waveform.path.ecg")
+                                .foregroundColor(.blue)
+                                .font(.system(size: SettingsDesign.iconSize))
+                                .frame(width: SettingsDesign.iconFrame)
+
+                            Text("BodySpec")
+                                .font(SettingsDesign.titleFont)
+
+                            Spacer()
+
+                            if isLoadingBodySpecLastSynced {
+                                Text("Checking…")
+                                    .font(SettingsDesign.valueFont)
+                                    .foregroundColor(.appTextSecondary)
+                            } else if let bodySpecLastSyncedText {
+                                Text(bodySpecLastSyncedText)
+                                    .font(SettingsDesign.valueFont)
+                                    .foregroundColor(.appTextSecondary)
+                            } else {
+                                Text("Not synced yet")
+                                    .font(SettingsDesign.valueFont)
+                                    .foregroundColor(.appTextSecondary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, SettingsDesign.horizontalPadding)
+                    .padding(.vertical, SettingsDesign.verticalPadding)
+                } else {
+                    // BodySpec (Coming Soon)
+                    HStack {
+                        Image(systemName: "waveform.path.ecg")
+                            .foregroundColor(.blue)
+                            .font(.system(size: SettingsDesign.iconSize))
+                            .frame(width: SettingsDesign.iconFrame)
+
+                        Text("BodySpec")
+                            .font(SettingsDesign.titleFont)
+
+                        Spacer()
+
+                        Text("Coming Soon")
+                            .font(SettingsDesign.valueFont)
+                            .foregroundColor(.appTextSecondary)
+                    }
+                    .padding(.horizontal, SettingsDesign.horizontalPadding)
+                    .padding(.vertical, SettingsDesign.verticalPadding)
+                    .opacity(0.6)
+                }
+            }
+        }
+    }
+
+    private var photoImportSection: some View {
+        SettingsSection(
+            header: "Photo Import",
+            footer: "Import progress photos from your photo library"
+        ) {
+            NavigationLink(destination: BulkPhotoImportView().environmentObject(authManager)) {
+                SettingsRow(
+                    icon: "photo.stack",
+                    title: "Import Progress Photos",
+                    value: "Scan library",
+                    showChevron: true
+                )
+            }
+        }
+    }
+
+    private var dataExportSection: some View {
+        SettingsSection(
+            header: "Data Export",
+            footer: "Export your data to other platforms"
+        ) {
+            VStack(spacing: 0) {
+                // CSV Export
+                NavigationLink(destination: ExportDataView()) {
+                    SettingsRow(
+                        icon: "doc.text",
+                        title: "Export as CSV",
+                        showChevron: true
+                    )
+                }
+
+                Divider()
+
+                // JSON Export (Coming Soon)
+                HStack {
+                    Image(systemName: "doc.badge.gearshape")
+                        .foregroundColor(.appTextSecondary)
+                        .font(.system(size: SettingsDesign.iconSize))
+                        .frame(width: SettingsDesign.iconFrame)
+
+                    Text("Export as JSON")
+                        .font(SettingsDesign.titleFont)
+
+                    Spacer()
+
+                    Text("Coming Soon")
+                        .font(SettingsDesign.valueFont)
+                        .foregroundColor(.appTextSecondary)
+                }
+                .padding(.horizontal, SettingsDesign.horizontalPadding)
+                .padding(.vertical, SettingsDesign.verticalPadding)
+                .opacity(0.6)
+            }
+        }
+    }
+
+    private var developerAccessSection: some View {
+        SettingsSection(
+            header: "Developer Access",
+            footer: "API access for third-party developers will be available in the future"
+        ) {
+            HStack {
+                Image(systemName: "network")
+                    .foregroundColor(.appTextSecondary)
+                    .font(.system(size: SettingsDesign.iconSize))
+                    .frame(width: SettingsDesign.iconFrame)
+
+                Text("API Access")
+                    .font(SettingsDesign.titleFont)
+
+                Spacer()
+
+                Text("Coming Soon")
+                    .font(SettingsDesign.valueFont)
+                    .foregroundColor(.appTextSecondary)
+            }
+            .padding(.horizontal, SettingsDesign.horizontalPadding)
+            .padding(.vertical, SettingsDesign.verticalPadding)
+            .opacity(0.6)
+        }
+    }
 }
 
 #Preview {
@@ -321,6 +327,14 @@ extension IntegrationsView {
 
         isLoadingBodySpecLastSynced = true
 
+        let cached = await CoreDataManager.shared.fetchDexaResults(for: userId, limit: 1)
+        if let latest = cached.first {
+            let date = latest.acquireTime ?? latest.updatedAt
+            bodySpecLastSyncedText = formatBodySpecLastSynced(date: date)
+        } else {
+            bodySpecLastSyncedText = "Not synced yet"
+        }
+
         do {
             let results = try await SupabaseManager.shared.fetchDexaResults(userId: userId, limit: 1)
 
@@ -330,8 +344,9 @@ extension IntegrationsView {
             } else {
                 bodySpecLastSyncedText = "Not synced yet"
             }
+
+            CoreDataManager.shared.saveDexaResults(results, userId: userId)
         } catch {
-            bodySpecLastSyncedText = nil
         }
 
         isLoadingBodySpecLastSynced = false

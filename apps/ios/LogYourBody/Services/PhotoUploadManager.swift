@@ -49,10 +49,10 @@ class PhotoUploadManager: ObservableObject {
                 return "Please log in to upload photos"
             case .imageConversionFailed:
                 return "Failed to process the image"
-            case .uploadFailed(let message):
-                return "Upload failed: \(message)"
-            case .processingFailed(let message):
-                return "Processing failed: \(message)"
+            case .uploadFailed:
+                return "Photo upload failed. Please try again."
+            case .processingFailed:
+                return "Photo processing failed. Please try again."
             case .networkError:
                 return "Network connection error"
             }
@@ -73,6 +73,16 @@ class PhotoUploadManager: ObservableObject {
         // print("📸 PhotoUploadManager: Current user ID: \(userId)")
         let userEmail = authManager.currentUser?.email ?? "nil"
         // print("📸 PhotoUploadManager: Current user email: \(userEmail)")
+
+        ErrorTrackingService.shared.addBreadcrumb(
+            message: "Starting photo upload",
+            category: "photos",
+            data: [
+                "operation": "uploadProgressPhoto",
+                "metricsId": metrics.id,
+                "userId": userId
+            ]
+        )
 
         self.isUploading = true
         self.uploadProgress = 0.0
@@ -114,8 +124,9 @@ class PhotoUploadManager: ObservableObject {
             updateUploadStatus(.uploading, progress: 0.3)
             let fileName = "\(userId)/\(metrics.id)_\(Date().timeIntervalSince1970).png"
             // print("📸 PhotoUploadManager: Uploading to Supabase Storage with fileName: \(fileName)")
-            let originalUrl = try await uploadToSupabase(imageData: imageData, fileName: fileName)
-            // print("✅ PhotoUploadManager: Upload complete, URL: \(originalUrl)")
+            _ = try await uploadToSupabase(imageData: imageData, fileName: fileName)
+            let storagePath = fileName
+            // print("✅ PhotoUploadManager: Upload complete, storage path: \(storagePath)")
 
             updateUploadStatus(.uploading, progress: 0.5)
 
@@ -123,7 +134,7 @@ class PhotoUploadManager: ObservableObject {
             updateUploadStatus(.processing, progress: 0.6)
             // print("📸 PhotoUploadManager: Calling edge function for Cloudinary optimization")
             let processedUrl = try await processImageWithCloudinary(
-                originalUrl: originalUrl,
+                storagePath: storagePath,
                 metricsId: metrics.id
             )
             // print("✅ PhotoUploadManager: Processing complete, URL: \(processedUrl)")
@@ -133,11 +144,20 @@ class PhotoUploadManager: ObservableObject {
             // Step 4: Update local and remote records
             try await updateMetricsWithPhoto(
                 metricsId: metrics.id,
-                originalUrl: originalUrl,
+                storagePath: storagePath,
                 processedUrl: processedUrl
             )
 
             updateUploadStatus(.completed, progress: 1.0)
+
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "Photo upload completed",
+                category: "photos",
+                data: [
+                    "operation": "uploadProgressPhoto",
+                    "metricsId": metrics.id
+                ]
+            )
 
             return processedUrl
         } catch {
@@ -158,6 +178,16 @@ class PhotoUploadManager: ObservableObject {
                 userId: userId
             )
             ErrorReporter.shared.capture(appError, context: context)
+
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "Photo upload failed: \(error.localizedDescription)",
+                category: "photos",
+                level: .error,
+                data: [
+                    "operation": "uploadProgressPhoto",
+                    "metricsId": metrics.id
+                ]
+            )
             self.currentUploadTask = UploadTask(
                 id: uploadId,
                 metricsId: metrics.id,
@@ -209,6 +239,16 @@ class PhotoUploadManager: ObservableObject {
             throw PhotoError.notAuthenticated
         }
 
+        ErrorTrackingService.shared.addBreadcrumb(
+            message: "Starting photo upload (data)",
+            category: "photos",
+            data: [
+                "operation": "uploadProgressPhotoData",
+                "metricsId": metrics.id,
+                "userId": userId
+            ]
+        )
+
         self.isUploading = true
         self.uploadProgress = 0.0
         self.uploadError = nil
@@ -255,7 +295,8 @@ class PhotoUploadManager: ObservableObject {
             // Step 2: Upload to Supabase Storage
             updateUploadStatus(.uploading, progress: 0.2)
             let fileName = "\(userId)/\(metrics.id)_\(Date().timeIntervalSince1970).jpg"
-            let originalUrl = try await uploadToSupabase(imageData: finalImageData, fileName: fileName)
+            _ = try await uploadToSupabase(imageData: finalImageData, fileName: fileName)
+            let storagePath = fileName
 
             updateUploadStatus(.uploading, progress: 0.5)
 
@@ -263,7 +304,7 @@ class PhotoUploadManager: ObservableObject {
             updateUploadStatus(.processing, progress: 0.6)
             // print("📸 PhotoUploadManager: Calling edge function for Cloudinary optimization")
             let processedUrl = try await processImageWithCloudinary(
-                originalUrl: originalUrl,
+                storagePath: storagePath,
                 metricsId: metrics.id
             )
             // print("✅ PhotoUploadManager: Processing complete, URL: \(processedUrl)")
@@ -273,11 +314,20 @@ class PhotoUploadManager: ObservableObject {
             // Step 4: Update local and remote records
             try await updateMetricsWithPhoto(
                 metricsId: metrics.id,
-                originalUrl: originalUrl,
+                storagePath: storagePath,
                 processedUrl: processedUrl
             )
 
             updateUploadStatus(.completed, progress: 1.0)
+
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "Photo upload (data) completed",
+                category: "photos",
+                data: [
+                    "operation": "uploadProgressPhotoData",
+                    "metricsId": metrics.id
+                ]
+            )
 
             return processedUrl
         } catch {
@@ -289,6 +339,17 @@ class PhotoUploadManager: ObservableObject {
                 progress: self.uploadProgress,
                 error: error.localizedDescription
             )
+
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "Photo upload (data) failed: \(error.localizedDescription)",
+                category: "photos",
+                level: .error,
+                data: [
+                    "operation": "uploadProgressPhotoData",
+                    "metricsId": metrics.id
+                ]
+            )
+
             throw error
         }
     }
@@ -336,11 +397,11 @@ class PhotoUploadManager: ObservableObject {
             throw PhotoError.uploadFailed(errorMessage)
         }
 
-        // Return the public URL for the uploaded image
-        return "\(Constants.supabaseURL)/storage/v1/object/public/photos/\(fileName)"
+        // Return the storage path; callers can construct URLs or use it for signed URLs
+        return fileName
     }
 
-    private func processImageWithCloudinary(originalUrl: String, metricsId: String) async throws -> String {
+    private func processImageWithCloudinary(storagePath: String, metricsId: String) async throws -> String {
         // Edge functions can be called with just the anon key
         // print("📸 PhotoUploadManager: Calling edge function with anon key")
 
@@ -351,8 +412,8 @@ class PhotoUploadManager: ObservableObject {
         request.setValue("Bearer \(Constants.supabaseAnonKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body = [
-            "originalUrl": originalUrl,
+        let body: [String: Any] = [
+            "storagePath": storagePath,
             "metricsId": metricsId
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -382,13 +443,13 @@ class PhotoUploadManager: ObservableObject {
         return processedUrl
     }
 
-    private func updateMetricsWithPhoto(metricsId: String, originalUrl: String, processedUrl: String) async throws {
+    private func updateMetricsWithPhoto(metricsId: String, storagePath: String, processedUrl: String) async throws {
         // Update local CoreData
         guard let userId = authManager.currentUser?.id else { return }
         if let cachedMetrics = await coreDataManager.fetchBodyMetrics(for: userId)
             .first(where: { $0.id == metricsId }) {
             cachedMetrics.photoUrl = processedUrl
-            cachedMetrics.originalPhotoUrl = originalUrl
+            cachedMetrics.originalPhotoUrl = storagePath
             cachedMetrics.lastModified = Date()
             cachedMetrics.isSynced = false
             coreDataManager.save()

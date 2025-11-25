@@ -43,7 +43,7 @@ struct BiometricAuthView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.linearTextSecondary)
 
-                Text("\(biometricType.title) fell back to your passcode")
+                Text("\(biometricType.title) didn’t complete")
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(.linearText)
             }
@@ -113,13 +113,13 @@ struct BiometricAuthView: View {
             )
 
             VStack(spacing: 8) {
-                Text("Use your passcode if Face ID still doesn't recognize you.")
+                Text("If \(biometricType.title) keeps failing, you can continue without it.")
                     .font(.system(size: 13))
                     .foregroundColor(.linearTextTertiary)
                     .multilineTextAlignment(.center)
 
                 DSAuthLink(
-                    title: "Use Password Instead",
+                    title: "Continue without \(biometricType.title)",
                     action: onUsePassword
                 )
             }

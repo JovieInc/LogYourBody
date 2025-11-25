@@ -106,7 +106,15 @@ class RevenueCatManager: NSObject, ObservableObject {
             }
             // print("💰 User identified successfully")
         } catch {
-            // print("❌ Failed to identify user: \(error.localizedDescription)")
+            let appError = AppError.billing(operation: "identifyUser", underlying: error)
+            let context = ErrorContext(
+                feature: "billing",
+                operation: "identifyUser",
+                screen: nil,
+                userId: userId
+            )
+            ErrorReporter.shared.capture(appError, context: context)
+
             await MainActor.run {
                 self.errorMessage = "Failed to link account: \(error.localizedDescription)"
             }
@@ -126,7 +134,14 @@ class RevenueCatManager: NSObject, ObservableObject {
                 self.currentOffering = nil
             }
         } catch {
-            // print("❌ Failed to log out user: \(error.localizedDescription)")
+            let appError = AppError.billing(operation: "logoutUser", underlying: error)
+            let context = ErrorContext(
+                feature: "billing",
+                operation: "logoutUser",
+                screen: nil,
+                userId: nil
+            )
+            ErrorReporter.shared.capture(appError, context: context)
         }
     }
 
@@ -148,7 +163,15 @@ class RevenueCatManager: NSObject, ObservableObject {
                 // print("💰 Subscription status: \(self.isSubscribed ? "Active" : "Inactive")")
             }
         } catch {
-            // print("❌ Failed to refresh customer info: \(error.localizedDescription)")
+            let appError = AppError.billing(operation: "refreshCustomerInfo", underlying: error)
+            let context = ErrorContext(
+                feature: "billing",
+                operation: "refreshCustomerInfo",
+                screen: nil,
+                userId: nil
+            )
+            ErrorReporter.shared.capture(appError, context: context)
+
             await MainActor.run {
                 self.isSubscribed = false
             }
@@ -212,7 +235,15 @@ class RevenueCatManager: NSObject, ObservableObject {
                 }
             }
         } catch {
-            // print("❌ Failed to fetch offerings: \(error.localizedDescription)")
+            let appError = AppError.billing(operation: "fetchOfferings", underlying: error)
+            let context = ErrorContext(
+                feature: "billing",
+                operation: "fetchOfferings",
+                screen: nil,
+                userId: nil
+            )
+            ErrorReporter.shared.capture(appError, context: context)
+
             await MainActor.run {
                 self.errorMessage = "Failed to load subscription options"
             }
@@ -239,6 +270,17 @@ class RevenueCatManager: NSObject, ObservableObject {
             // print("💰 Purchase successful!")
             return true
         } catch let error as ErrorCode {
+            if error != .purchaseCancelledError {
+                let appError = AppError.billing(operation: "purchase", underlying: error)
+                let context = ErrorContext(
+                    feature: "billing",
+                    operation: "purchase",
+                    screen: "PaywallView",
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: context)
+            }
+
             await MainActor.run {
                 self.isPurchasing = false
 
@@ -261,6 +303,15 @@ class RevenueCatManager: NSObject, ObservableObject {
             }
             return false
         } catch {
+            let appError = AppError.billing(operation: "purchase", underlying: error)
+            let context = ErrorContext(
+                feature: "billing",
+                operation: "purchase",
+                screen: "PaywallView",
+                userId: nil
+            )
+            ErrorReporter.shared.capture(appError, context: context)
+
             await MainActor.run {
                 self.isPurchasing = false
                 self.errorMessage = "An unexpected error occurred"
@@ -297,6 +348,15 @@ class RevenueCatManager: NSObject, ObservableObject {
                 return false
             }
         } catch {
+            let appError = AppError.billing(operation: "restorePurchases", underlying: error)
+            let context = ErrorContext(
+                feature: "billing",
+                operation: "restorePurchases",
+                screen: "PaywallView",
+                userId: nil
+            )
+            ErrorReporter.shared.capture(appError, context: context)
+
             await MainActor.run {
                 self.isPurchasing = false
                 self.errorMessage = "Failed to restore purchases"

@@ -56,60 +56,9 @@ struct ContentView: View {
             Color.appBackground
                 .ignoresSafeArea()
 
-            Group {
-                if authManager.isAuthenticated {
-                    if shouldShowOnboarding {
-                        BodyScoreOnboardingFlowView()
-                    } else if !isProfileComplete {
-                        ProfileCompletionGateView()
-                    } else if !revenueCatManager.isSubscribed {
-                        PaywallView()
-                            .environmentObject(authManager)
-                            .environmentObject(revenueCatManager)
-                            .onAppear {
-                                // print("💰 Showing PaywallView")
-                            }
-                    } else {
-                        MainTabView()
-                            .onAppear {
-                                // print("🏠 Showing MainTabView (Dashboard)")
-                            }
-                    }
-                } else if authManager.needsEmailVerification {
-                    NavigationStack {
-                        EmailVerificationView()
-                    }
-                    .onAppear {
-                        // print("📧 Showing EmailVerificationView")
-                    }
-                } else {
-                    NavigationStack {
-                        LoginView()
-                    }
-                    .onAppear {
-                        // print("🔐 Showing LoginView")
-                    }
-                }
-            }
-            .transition(.opacity)
-
-            if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked {
-                BiometricLockView(isUnlocked: $isUnlocked)
-                    .transition(AnyTransition.opacity)
-            }
-
-            if !isLoadingComplete {
-                LoadingView(
-                    progress: $loadingManager.progress,
-                    loadingStatus: $loadingManager.loadingStatus,
-                    onComplete: {
-                        withAnimation(.easeInOut(duration: 0.4)) {
-                            isLoadingComplete = true
-                        }
-                    }
-                )
-                .transition(.opacity)
-            }
+            mainContent
+            biometricLockOverlay
+            loadingOverlay
         }
         .preferredColorScheme(.dark)
         // Toast presenter removed - handle notifications at view level
@@ -183,6 +132,79 @@ struct ContentView: View {
         }
         .onChange(of: authManager.needsLegalConsent) { _, newValue in
             showLegalConsent = newValue
+        }
+    }
+
+    private var mainContent: some View {
+        Group {
+            if authManager.isAuthenticated {
+                authenticatedContent
+            } else if authManager.needsEmailVerification {
+                emailVerificationContent
+            } else {
+                loginContent
+            }
+        }
+        .transition(.opacity)
+    }
+
+    private var authenticatedContent: some View {
+        Group {
+            if shouldShowOnboarding {
+                BodyScoreOnboardingFlowView()
+                    .onAppear {
+                        AnalyticsService.shared.track(event: "onboarding_view")
+                    }
+            } else if !isProfileComplete {
+                ProfileCompletionGateView()
+            } else if !revenueCatManager.isSubscribed {
+                PaywallView()
+                    .environmentObject(authManager)
+                    .environmentObject(revenueCatManager)
+            } else {
+                MainTabView()
+                    .onAppear {
+                        AnalyticsService.shared.track(event: "dashboard_view")
+                    }
+            }
+        }
+    }
+
+    private var emailVerificationContent: some View {
+        NavigationStack {
+            EmailVerificationView()
+        }
+    }
+
+    private var loginContent: some View {
+        NavigationStack {
+            LoginView()
+        }
+    }
+
+    private var biometricLockOverlay: some View {
+        Group {
+            if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked {
+                BiometricLockView(isUnlocked: $isUnlocked)
+                    .transition(AnyTransition.opacity)
+            }
+        }
+    }
+
+    private var loadingOverlay: some View {
+        Group {
+            if !isLoadingComplete {
+                LoadingView(
+                    progress: $loadingManager.progress,
+                    loadingStatus: $loadingManager.loadingStatus,
+                    onComplete: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            isLoadingComplete = true
+                        }
+                    }
+                )
+                .transition(.opacity)
+            }
         }
     }
 }

@@ -2,7 +2,9 @@
 // View+Styles.swift
 // LogYourBody
 //
+//
 import SwiftUI
+import UIKit
 
 struct ModernTextFieldModifier: ViewModifier {
     @FocusState private var isFocused: Bool
@@ -148,6 +150,24 @@ struct SubtleShadow: ViewModifier {
     }
 }
 
+struct StandardErrorAlert: ViewModifier {
+    let isPresented: Binding<Bool>
+    let message: String
+
+    func body(content: Content) -> some View {
+        content.alert(
+            "Something went wrong",
+            isPresented: isPresented
+        ) {
+            Button("OK") {
+                isPresented.wrappedValue = false
+            }
+        } message: {
+            Text(message)
+        }
+    }
+}
+
 extension View {
     func modernPrimaryButtonStyle() -> some View {
         self.modifier(ModernPrimaryButtonModifier())
@@ -171,6 +191,10 @@ extension View {
 
     func subtleShadow() -> some View {
         modifier(SubtleShadow())
+    }
+
+    func standardErrorAlert(isPresented: Binding<Bool>, message: String) -> some View {
+        modifier(StandardErrorAlert(isPresented: isPresented, message: message))
     }
 
     // Haptic feedback helper

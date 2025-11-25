@@ -21,6 +21,15 @@ class CoreDataManager: ObservableObject {
     lazy var persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "LogYourBody")
 
+        for description in container.persistentStoreDescriptions {
+            description.setOption(
+                FileProtectionType.completeUntilFirstUserAuthentication as NSObject,
+                forKey: NSPersistentStoreFileProtectionKey
+            )
+            description.shouldMigrateStoreAutomatically = true
+            description.shouldInferMappingModelAutomatically = true
+        }
+
         container.loadPersistentStores { description, error in
             if let error = error {
                 let appError = AppError.coreData(operation: "loadPersistentStores", underlying: error)
@@ -237,6 +246,121 @@ class CoreDataManager: ObservableObject {
                 // print("Failed to fetch daily metrics: \(error)")
                 #endif
                 return []
+            }
+        }
+    }
+
+    func fetchUnsyncedDexaResults() async -> [CachedDexaResult] {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
+            request.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+
+            do {
+                return try context.fetch(request)
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "fetchUnsyncedDexaResults", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchUnsyncedDexaResults",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return []
+            }
+        }
+    }
+
+    func fetchDexaResults(for userId: String, limit: Int) async -> [DexaResult] {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
+            request.predicate = NSPredicate(format: "userId == %@", userId)
+            request.sortDescriptors = [
+                NSSortDescriptor(key: "acquireTime", ascending: false),
+                NSSortDescriptor(key: "createdAt", ascending: false)
+            ]
+            request.fetchLimit = limit
+
+            do {
+                let cached = try context.fetch(request)
+                return cached.compactMap { $0.toDexaResult() }
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "fetchDexaResults", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchDexaResults",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return []
+            }
+        }
+    }
+
+    func saveDexaResults(_ results: [DexaResult], userId: String, markAsSynced: Bool = false) {
+        guard !results.isEmpty else { return }
+
+        let context = viewContext
+
+        context.perform {
+            let fetchRequest: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
+
+            for result in results {
+                fetchRequest.predicate = NSPredicate(format: "id == %@", result.id)
+                fetchRequest.fetchLimit = 1
+
+                let cached: CachedDexaResult
+                if let existing = try? context.fetch(fetchRequest).first {
+                    cached = existing
+                } else {
+                    cached = CachedDexaResult(context: context)
+                    cached.id = result.id
+                    cached.createdAt = result.createdAt
+                }
+
+                cached.userId = userId
+                cached.bodyMetricsId = result.bodyMetricsId
+                cached.externalSource = result.externalSource
+                cached.externalResultId = result.externalResultId
+                cached.externalUpdateTime = result.externalUpdateTime
+                cached.scannerModel = result.scannerModel
+                cached.locationId = result.locationId
+                cached.locationName = result.locationName
+                cached.acquireTime = result.acquireTime
+                cached.analyzeTime = result.analyzeTime
+                cached.vatMassKg = result.vatMassKg ?? 0
+                cached.vatVolumeCm3 = result.vatVolumeCm3 ?? 0
+                cached.resultPdfUrl = result.resultPdfUrl
+                cached.resultPdfName = result.resultPdfName
+                cached.updatedAt = result.updatedAt
+                cached.isSynced = markAsSynced
+                cached.syncStatus = markAsSynced ? "synced" : "pending"
+            }
+
+            do {
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "saveDexaResults", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "saveDexaResults",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
             }
         }
     }
@@ -791,6 +915,56 @@ class CoreDataManager: ObservableObject {
         }
     }
 
+    func fetchUnsyncedGlp1DoseLogs() async -> [CachedGlp1DoseLog] {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+            request.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+
+            do {
+                return try context.fetch(request)
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "fetchUnsyncedGlp1DoseLogs", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchUnsyncedGlp1DoseLogs",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return []
+            }
+        }
+    }
+
+    func fetchUnsyncedGlp1Medications() async -> [CachedGlp1Medication] {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+            request.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+
+            do {
+                return try context.fetch(request)
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "fetchUnsyncedGlp1Medications", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchUnsyncedGlp1Medications",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return []
+            }
+        }
+    }
+
     @available(*, unavailable, message: "Use async fetchUnsyncedEntries() instead")
     func fetchUnsyncedEntriesSync() -> (
         bodyMetrics: [CachedBodyMetrics],
@@ -927,6 +1101,29 @@ class CoreDataManager: ObservableObject {
             if let dailyMetrics = try? context.fetch(dailyMetricsRequest) {
                 for metric in dailyMetrics {
                     context.delete(metric)
+                }
+            }
+
+            // Delete all GLP-1 dose logs
+            let glp1Request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+            if let glp1Logs = try? context.fetch(glp1Request) {
+                for log in glp1Logs {
+                    context.delete(log)
+                }
+            }
+
+            // Delete all GLP-1 medications
+            let medicationRequest: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+            if let medications = try? context.fetch(medicationRequest) {
+                for medication in medications {
+                    context.delete(medication)
+                }
+            }
+
+            let dexaRequest: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
+            if let dexaResults = try? context.fetch(dexaRequest) {
+                for result in dexaResults {
+                    context.delete(result)
                 }
             }
 
@@ -1426,6 +1623,295 @@ class CoreDataManager: ObservableObject {
             }
         }
     }
+
+    func saveGlp1DoseLogs(
+        _ logs: [Glp1DoseLog],
+        userId: String,
+        markAsSynced: Bool = true
+    ) {
+        guard !logs.isEmpty else { return }
+
+        let context = viewContext
+
+        context.perform {
+            for log in logs {
+                let request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+                request.predicate = NSPredicate(format: "id == %@", log.id)
+                request.fetchLimit = 1
+
+                let cached: CachedGlp1DoseLog
+
+                if let existing = try? context.fetch(request).first {
+                    cached = existing
+                } else {
+                    cached = CachedGlp1DoseLog(context: context)
+                    cached.id = log.id
+                    cached.createdAt = log.createdAt
+                }
+
+                cached.userId = userId
+                cached.takenAt = log.takenAt
+                cached.medicationId = log.medicationId
+                cached.doseAmount = log.doseAmount ?? 0
+                cached.doseUnit = log.doseUnit
+                cached.drugClass = log.drugClass
+                cached.brand = log.brand
+                cached.isCompounded = log.isCompounded
+                cached.supplierType = log.supplierType
+                cached.supplierName = log.supplierName
+                cached.notes = log.notes
+                cached.updatedAt = log.updatedAt
+                cached.isSynced = markAsSynced
+                cached.syncStatus = markAsSynced ? "synced" : "pending"
+            }
+
+            do {
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "saveGlp1DoseLogs", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "saveGlp1DoseLogs",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+            }
+        }
+    }
+
+    func fetchGlp1DoseLogs(for userId: String) async -> [Glp1DoseLog] {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+            request.predicate = NSPredicate(format: "userId == %@", userId)
+            request.sortDescriptors = [NSSortDescriptor(key: "takenAt", ascending: true)]
+
+            do {
+                let cachedLogs = try context.fetch(request)
+                return cachedLogs.compactMap { $0.toGlp1DoseLog() }
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "fetchGlp1DoseLogs", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchGlp1DoseLogs",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return []
+            }
+        }
+    }
+
+    func fetchGlp1Medications(for userId: String) async -> [Glp1Medication] {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+            request.predicate = NSPredicate(format: "userId == %@", userId)
+            request.sortDescriptors = [NSSortDescriptor(key: "startedAt", ascending: true)]
+
+            do {
+                let cached = try context.fetch(request)
+                return cached.compactMap { $0.toGlp1Medication() }
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "fetchGlp1Medications", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchGlp1Medications",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return []
+            }
+        }
+    }
+
+    func saveGlp1Medications(
+        _ medications: [Glp1Medication],
+        userId: String,
+        markAsSynced: Bool = true
+    ) {
+        guard !medications.isEmpty else { return }
+
+        let context = viewContext
+
+        context.perform {
+            for medication in medications {
+                let request: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+                request.predicate = NSPredicate(format: "id == %@", medication.id)
+                request.fetchLimit = 1
+
+                let cached: CachedGlp1Medication
+
+                if let existing = try? context.fetch(request).first {
+                    cached = existing
+                } else {
+                    cached = CachedGlp1Medication(context: context)
+                    cached.id = medication.id
+                    cached.createdAt = medication.createdAt
+                }
+
+                cached.userId = userId
+                cached.displayName = medication.displayName
+                cached.genericName = medication.genericName
+                cached.drugClass = medication.drugClass
+                cached.brand = medication.brand
+                cached.route = medication.route
+                cached.frequency = medication.frequency
+                cached.doseUnit = medication.doseUnit
+                cached.isCompounded = medication.isCompounded
+                cached.hkIdentifier = medication.hkIdentifier
+                cached.startedAt = medication.startedAt
+                cached.endedAt = medication.endedAt
+                cached.notes = medication.notes
+                cached.updatedAt = medication.updatedAt
+                cached.isSynced = markAsSynced
+                cached.syncStatus = markAsSynced ? "synced" : "pending"
+            }
+
+            do {
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "saveGlp1Medications", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "saveGlp1Medications",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+            }
+        }
+    }
+
+    func endActiveGlp1Medications(for userId: String, endedAt: Date) {
+        let context = viewContext
+
+        context.perform {
+            let request: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+            request.predicate = NSPredicate(format: "userId == %@ AND endedAt == nil", userId)
+
+            do {
+                let medications = try context.fetch(request)
+                for medication in medications {
+                    medication.endedAt = endedAt
+                    medication.updatedAt = endedAt
+                    medication.isSynced = false
+                    medication.syncStatus = "pending"
+                }
+
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "endActiveGlp1Medications", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "endActiveGlp1Medications",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+            }
+        }
+    }
+}
+
+extension CachedGlp1Medication {
+    func toGlp1Medication() -> Glp1Medication? {
+        guard let id = id,
+              let userId = userId,
+              let displayName = displayName,
+              let startedAt = startedAt,
+              let createdAt = createdAt,
+              let updatedAt = updatedAt else {
+            return nil
+        }
+
+        return Glp1Medication(
+            id: id,
+            userId: userId,
+            displayName: displayName,
+            genericName: genericName,
+            drugClass: drugClass,
+            brand: brand,
+            route: route,
+            frequency: frequency,
+            doseUnit: doseUnit,
+            isCompounded: isCompounded,
+            hkIdentifier: hkIdentifier,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            notes: notes,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+extension CachedDexaResult {
+    func toDexaResult() -> DexaResult? {
+        guard let id = id,
+              let userId = userId,
+              let externalSource = externalSource,
+              let externalResultId = externalResultId,
+              let createdAt = createdAt,
+              let updatedAt = updatedAt else {
+            return nil
+        }
+
+        let resolvedVatMass: Double?
+        if vatMassKg > 0 {
+            resolvedVatMass = vatMassKg
+        } else {
+            resolvedVatMass = nil
+        }
+
+        let resolvedVatVolume: Double?
+        if vatVolumeCm3 > 0 {
+            resolvedVatVolume = vatVolumeCm3
+        } else {
+            resolvedVatVolume = nil
+        }
+
+        return DexaResult(
+            id: id,
+            userId: userId,
+            bodyMetricsId: bodyMetricsId,
+            externalSource: externalSource,
+            externalResultId: externalResultId,
+            externalUpdateTime: externalUpdateTime,
+            scannerModel: scannerModel,
+            locationId: locationId,
+            locationName: locationName,
+            acquireTime: acquireTime,
+            analyzeTime: analyzeTime,
+            vatMassKg: resolvedVatMass,
+            vatVolumeCm3: resolvedVatVolume,
+            resultPdfUrl: resultPdfUrl,
+            resultPdfName: resultPdfName,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
 }
 
 // MARK: - Model Extensions for Conversion
@@ -1513,6 +1999,42 @@ extension CachedProfile {
             goalWeight: goalWeight > 0 ? goalWeight : nil,
             goalWeightUnit: goalWeightUnit,
             onboardingCompleted: nil
+        )
+    }
+}
+
+extension CachedGlp1DoseLog {
+    func toGlp1DoseLog() -> Glp1DoseLog? {
+        guard let id = id,
+              let userId = userId,
+              let takenAt = takenAt,
+              let createdAt = createdAt,
+              let updatedAt = updatedAt else {
+            return nil
+        }
+
+        let resolvedDoseAmount: Double?
+        if doseAmount > 0 {
+            resolvedDoseAmount = doseAmount
+        } else {
+            resolvedDoseAmount = nil
+        }
+
+        return Glp1DoseLog(
+            id: id,
+            userId: userId,
+            takenAt: takenAt,
+            medicationId: medicationId,
+            doseAmount: resolvedDoseAmount,
+            doseUnit: doseUnit,
+            drugClass: drugClass,
+            brand: brand,
+            isCompounded: isCompounded,
+            supplierType: supplierType,
+            supplierName: supplierName,
+            notes: notes,
+            createdAt: createdAt,
+            updatedAt: updatedAt
         )
     }
 }

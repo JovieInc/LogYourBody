@@ -29,6 +29,7 @@ struct OnboardingOptionButton: View {
                     Text(title)
                         .font(OnboardingTypography.headline)
                         .foregroundStyle(Color.appText)
+                        .multilineTextAlignment(.leading)
                         .lineLimit(1)
                         .minimumScaleFactor(0.9)
 
@@ -245,17 +246,9 @@ struct OnboardingProgressIndicator: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Step \(context.currentIndex) of \(context.totalCount)")
-                    .font(.system(.caption, design: .rounded).weight(.medium))
-                    .foregroundStyle(Color.appTextSecondary)
-
-                Spacer()
-
-                Text(context.label)
-                    .font(OnboardingTypography.caption)
-                    .foregroundStyle(Color.appTextSecondary)
-            }
+            Text("Step \(context.currentIndex) of \(context.totalCount)")
+                .font(.system(.caption, design: .rounded).weight(.medium))
+                .foregroundStyle(Color.appTextSecondary)
 
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
@@ -272,7 +265,7 @@ struct OnboardingProgressIndicator: View {
                         )
                 }
             }
-            .frame(height: 6)
+            .frame(height: 3)
         }
     }
 }
@@ -287,6 +280,8 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
     var content: Content
     var footer: Footer
     var progress: OnboardingFlowViewModel.ProgressContext?
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(
         title: String,
@@ -311,20 +306,31 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
             LinearGradient(colors: [Color.appBackground, Color.black], startPoint: .topLeading, endPoint: .bottomTrailing)
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    header
-
-                    content
-
-                    footer
+            Group {
+                if dynamicTypeSize >= .accessibility1 {
+                    ScrollView {
+                        contentStack
+                    }
+                } else {
+                    contentStack
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                .padding(.bottom, 40)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+    }
+
+    private var contentStack: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            header
+
+            content
+
+            footer
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
+        .padding(.bottom, 40)
     }
 
     private var header: some View {

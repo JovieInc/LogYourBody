@@ -67,6 +67,13 @@ actor BodySpecDexaImporter {
 
                 page += 1
             } catch {
+                let context = ErrorContext(
+                    feature: "sync",
+                    operation: "bodySpecImportPage\(page)",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.captureNonFatal(error, context: context)
                 break
             }
         }
@@ -153,14 +160,21 @@ actor BodySpecDexaImporter {
                 updatedAt: now
             )
 
-            do {
-                try await SupabaseManager.shared.upsertDexaResult(dexaResult)
-            } catch {
-                // Best-effort only: keep local metrics even if remote metadata upsert fails
+            await MainActor.run {
+                CoreDataManager.shared.saveDexaResults([dexaResult], userId: userId, markAsSynced: false)
+                RealtimeSyncManager.shared.updatePendingSyncCount()
+                RealtimeSyncManager.shared.syncIfNeeded()
             }
 
             return true
         } catch {
+            let context = ErrorContext(
+                feature: "sync",
+                operation: "bodySpecImportSingle",
+                screen: nil,
+                userId: userId
+            )
+            ErrorReporter.shared.captureNonFatal(error, context: context)
             return false
         }
     }

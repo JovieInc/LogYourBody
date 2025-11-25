@@ -30,9 +30,12 @@ extension DashboardViewLiquid {
         customWeightGoal
     }
 
+    var currentMeasurementSystem: MeasurementSystem {
+        MeasurementSystem.fromStored(rawValue: measurementSystem)
+    }
+
     var weightUnit: String {
-        let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
-        return system.weightUnit
+        currentMeasurementSystem.weightUnit
     }
 
     var bodyMetrics: [BodyMetrics] {

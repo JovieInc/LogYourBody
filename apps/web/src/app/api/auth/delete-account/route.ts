@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 export async function DELETE(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
         { error: 'Missing or invalid authorization header' },
@@ -25,9 +25,41 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // Best-effort deletion of Supabase storage objects and Cloudinary assets
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.error('Missing Supabase environment variables for delete-user-assets function')
+      } else {
+        const response = await fetch(
+          `${supabaseUrl}/functions/v1/delete-user-assets`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: supabaseAnonKey,
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        )
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '')
+          console.error('delete-user-assets function failed', {
+            status: response.status,
+            body: text,
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error calling delete-user-assets function', error)
+    }
+
     // Delete user's data from various tables
     // Note: Order matters due to foreign key constraints
-    
+
     // Delete body metrics
     await supabase
       .from('body_metrics')

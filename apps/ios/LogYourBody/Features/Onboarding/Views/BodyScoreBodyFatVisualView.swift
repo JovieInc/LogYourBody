@@ -51,45 +51,44 @@ struct BodyScoreBodyFatVisualView: View {
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .bodyFatVisual),
             content: {
-                VStack(spacing: 16) {
+                VStack(spacing: 8) {
                     ForEach(Self.visualEstimates) { estimate in
                         Button {
                             handleSelection(estimate)
                         } label: {
-                            HStack(spacing: 16) {
-                                Image(systemName: estimate.imageName)
-                                    .font(.system(size: 30, weight: .semibold))
-                                    .foregroundStyle(iconColor(for: estimate))
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 8) {
+                                    Text("\(Int(estimate.percentage))% \(estimate.label)")
+                                        .font(OnboardingTypography.headline)
+                                        .foregroundStyle(Color.appText)
 
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        Text(estimate.label)
-                                            .font(OnboardingTypography.headline)
-                                            .foregroundStyle(Color.appText)
-                                        Spacer()
-                                        Text("\(Int(estimate.percentage))%")
-                                            .font(OnboardingTypography.caption)
-                                            .foregroundStyle(Color.appTextSecondary)
-                                    }
+                                    Spacer()
 
+                                    Image(
+                                        systemName: isSelected(estimate) ? "largecircle.fill.circle" : "circle"
+                                    )
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(
+                                        isSelected(estimate)
+                                            ? Color.appPrimary
+                                            : Color.appTextSecondary.opacity(0.6)
+                                    )
+                                }
+
+                                if isSelected(estimate) {
                                     Text(estimate.description)
                                         .font(OnboardingTypography.caption)
                                         .foregroundStyle(Color.appTextSecondary)
-                                        .multilineTextAlignment(.leading)
                                 }
                             }
-                            .padding(20)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                    .fill(tileFillColor(for: estimate))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                    .stroke(tileStrokeColor(for: estimate), lineWidth: 2)
-                            )
+                            .padding(.vertical, 8)
                         }
                         .buttonStyle(.plain)
+
+                        if estimate.percentage != Self.visualEstimates.last?.percentage {
+                            Divider()
+                                .overlay(Color.appBorder.opacity(0.4))
+                        }
                     }
                 }
             },
@@ -99,8 +98,6 @@ struct BodyScoreBodyFatVisualView: View {
                 } label: {
                     Text("Continue")
                         .font(.system(size: 18, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueBodyFatVisual)
@@ -116,27 +113,6 @@ extension BodyScoreBodyFatVisualView {
             return 1
         }
         return 0.4
-    }
-
-    private func iconColor(for estimate: VisualEstimate) -> Color {
-        if isSelected(estimate) {
-            return Color.appPrimary
-        }
-        return Color.appTextSecondary
-    }
-
-    private func tileFillColor(for estimate: VisualEstimate) -> Color {
-        if isSelected(estimate) {
-            return Color.appPrimary.opacity(0.15)
-        }
-        return Color.appCard.opacity(0.6)
-    }
-
-    private func tileStrokeColor(for estimate: VisualEstimate) -> Color {
-        if isSelected(estimate) {
-            return Color.appPrimary
-        }
-        return Color.appBorder.opacity(0.4)
     }
 
     private func isSelected(_ estimate: VisualEstimate) -> Bool {

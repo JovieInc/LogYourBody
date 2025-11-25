@@ -25,6 +25,7 @@ final class ErrorReporter {
         let logger = loggerForFeature(context.feature)
         let message = contextDescription(context: context)
         logger.error("Error: \(error.localizedDescription). \(message)")
+        ErrorTrackingService.shared.capture(appError: error, context: context)
     }
 
     private func loggerForFeature(_ feature: String) -> AppLogger {
@@ -39,6 +40,8 @@ final class ErrorReporter {
             return .photos
         case "coreData":
             return .coreData
+        case "billing":
+            return .billing
         default:
             return .ui
         }

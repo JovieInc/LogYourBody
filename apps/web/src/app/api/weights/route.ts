@@ -5,7 +5,7 @@ import { createClerkSupabaseClient } from '@/lib/supabase/clerk-client'
 export async function GET(_request: NextRequest) {
   try {
     const { userId, getToken } = await auth()
-    
+
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -15,12 +15,12 @@ export async function GET(_request: NextRequest) {
 
     const supabase = await createClerkSupabaseClient(() => getToken())
 
-    // Fetch weight entries
+    // Fetch latest body metrics with weight entries
     const { data: weights, error } = await supabase
-      .from('weight_logs')
+      .from('body_metrics')
       .select('*')
       .eq('user_id', userId)
-      .order('logged_at', { ascending: false })
+      .order('date', { ascending: false })
       .limit(30)
 
     if (error) {
@@ -42,7 +42,7 @@ export async function GET(_request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { userId, getToken } = await auth()
-    
+
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -67,15 +67,15 @@ export async function POST(request: NextRequest) {
       weightInKg = weightInKg * 0.453592
     }
 
-    // Insert weight entry
+    // Insert body metrics weight entry
     const { data, error } = await supabase
-      .from('weight_logs')
+      .from('body_metrics')
       .insert({
         user_id: userId,
+        date: new Date().toISOString(),
         weight: weightInKg,
         weight_unit: 'kg',
         notes,
-        logged_at: new Date().toISOString(),
       })
       .select()
       .single()

@@ -23,6 +23,14 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 Run SwiftLint
 
+### ios fix_style
+
+```sh
+[bundle exec] fastlane ios fix_style
+```
+
+Automatically fix Swift style issues using SwiftLint auto-corrections
+
 ### ios validate_profile
 
 ```sh

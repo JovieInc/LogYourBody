@@ -178,7 +178,7 @@ struct BiometricLockView: View {
             }
             .opacity(isAuthenticating ? 1 : 0.4)
 
-            Text("Your data stays encrypted, even if someone finds your phone.")
+            Text("Your data stays encrypted on this device. Face ID adds another lock on LogYourBody.")
                 .font(.system(size: 14))
                 .multilineTextAlignment(.center)
                 .foregroundColor(.linearTextTertiary)

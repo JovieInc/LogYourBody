@@ -39,6 +39,7 @@ struct DashboardViewLiquid: View {
     @State var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
     @State var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
     @State var glp1DoseLogs: [Glp1DoseLog] = []
+    @State var dailyMetricsLookupCache: [Date: DailyMetrics] = [:]
 
     // Animated metric values for tweening
     @State var animatedWeight: Double = 0
@@ -64,6 +65,7 @@ struct DashboardViewLiquid: View {
 
     // Navigation state
     @State private var selectedTab: DashboardTab = .home
+    @State private var isPhotosTabEnabled = true
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
     @State private var chartMode: ChartMode = .trend
@@ -105,145 +107,85 @@ struct DashboardViewLiquid: View {
     }
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [.black, .black.opacity(0.85)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            if viewModel.bodyMetrics.isEmpty && !viewModel.hasLoadedInitialData {
-                DashboardSkeleton()
-            } else if viewModel.bodyMetrics.isEmpty {
-                emptyState
-            } else {
-                TabView(selection: $selectedTab) {
-                    homeTab
-                        .tag(DashboardTab.home)
-                        .tabItem {
-                            Image(systemName: "house.fill")
-                            Text("Home")
-                        }
-
-                    metricsTab
-                        .tag(DashboardTab.metrics)
-                        .tabItem {
-                            Image(systemName: "chart.bar.fill")
-                            Text("Metrics")
-                        }
-                }
-                .tint(Color.appPrimary)
-            }
+        let base = ZStack {
+            dashboardBackground
+            dashboardContent
         }
-        .onAppear {
-            // Load saved metrics order from AppStorage
-            loadMetricsOrder()
 
-            selectedRange = TimeRange(rawValue: storedTimeRangeRawValue) ?? .month1
-            if !viewModel.hasLoadedInitialData {
-                Task {
-                    await viewModel.loadData(
-                        authManager: authManager,
-                        loadOnlyNewest: true,
-                        selectedIndex: selectedIndex
-                    )
-                    if !viewModel.bodyMetrics.isEmpty {
-                        updateAnimatedValues(for: selectedIndex)
-                    }
-                }
+        let withLifecycle = base
+            .onAppear {
+                // Load saved metrics order from AppStorage
+                handleOnAppear()
+            }
+            .onDisappear {
+                syncBannerDismissTask?.cancel()
             }
 
-            // Then refresh async (loads all data in background) once per dashboard lifecycle
-            if !hasPerformedInitialRefresh {
-                hasPerformedInitialRefresh = true
-                Task {
-                    await viewModel.refreshData(
-                        authManager: authManager,
-                        realtimeSyncManager: realtimeSyncManager
-                    )
-                    if !viewModel.bodyMetrics.isEmpty {
-                        updateAnimatedValues(for: selectedIndex)
-                    }
-                    await loadGlp1DoseLogs()
+        let withSyncAndState = withLifecycle
+            .onChange(of: realtimeSyncManager.syncStatus) { oldStatus, newStatus in
+                previousSyncStatus = oldStatus
+                handleSyncStatusChange(from: oldStatus, to: newStatus)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)) { notification in
+                handleCoreDataContextChange(notification)
+            }
+            .onReceive(viewModel.$recentDailyMetrics) { _ in
+                rebuildDailyMetricsLookupCache()
+            }
+            .onChange(of: selectedRange) { _, newValue in
+                storedTimeRangeRawValue = newValue.rawValue
+            }
+            .onChange(of: selectedIndex) { _, newIndex in
+                updateAnimatedValues(for: newIndex)
+            }
+            .onChange(of: selectedTab) { _, newTab in
+                if newTab == .photos {
+                    AnalyticsService.shared.track(event: "photos_tab_opened")
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .bodyScoreUpdated)) { _ in
+                bodyScoreRefreshToken = UUID()
+            }
 
-            previousSyncStatus = realtimeSyncManager.syncStatus
-            handleSyncStatusChange(from: realtimeSyncManager.syncStatus, to: realtimeSyncManager.syncStatus)
-        }
-        .onDisappear {
-            syncBannerDismissTask?.cancel()
-        }
-        .onChange(of: realtimeSyncManager.syncStatus) { oldStatus, newStatus in
-            previousSyncStatus = oldStatus
-            handleSyncStatusChange(from: oldStatus, to: newStatus)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)) { notification in
-            guard !viewModel.isSyncingData else { return }
-
-            coreDataReloadTask?.cancel()
-            coreDataReloadTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 400_000_000) // 0.4s debounce
-                guard !Task.isCancelled else { return }
-
-                if let updated = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject>, updated.isEmpty {
-                    return
-                }
-
-                await viewModel.loadData(
-                    authManager: authManager,
-                    selectedIndex: selectedIndex
+        let withSheetsAndNavigation = withSyncAndState
+            .sheet(isPresented: $showAddEntrySheet) {
+                AddEntrySheet(isPresented: $showAddEntrySheet)
+                    .environmentObject(authManager)
+            }
+            .sheet(isPresented: $showSyncDetails) {
+                DashboardSyncDetailsSheet(
+                    isPresented: $showSyncDetails,
+                    syncManager: realtimeSyncManager
                 )
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
+            }
+            .background(
+                NavigationLink(
+                    isActive: $isMetricDetailActive,
+                    destination: {
+                        fullMetricChartView
+                    },
+                    label: {
+                        EmptyView()
+                    }
+                )
+                .hidden()
+            )
+            .toolbarBackground(Material.ultraThinMaterial, for: ToolbarPlacement.tabBar)
+            .toolbarBackground(Visibility.visible, for: ToolbarPlacement.tabBar)
+            .sheet(isPresented: $isBodyScoreSharePresented) {
+                if let payload = bodyScoreSharePayload {
+                    BodyScoreShareSheet(payload: payload)
                 }
             }
-        }
-        .onChange(of: selectedRange) { _, newValue in
-            storedTimeRangeRawValue = newValue.rawValue
-        }
-        .onChange(of: selectedIndex) { _, newIndex in
-            updateAnimatedValues(for: newIndex)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .bodyScoreUpdated)) { _ in
-            bodyScoreRefreshToken = UUID()
-        }
-        .sheet(isPresented: $showAddEntrySheet) {
-            AddEntrySheet(isPresented: $showAddEntrySheet)
-                .environmentObject(authManager)
-        }
-        .sheet(isPresented: $showSyncDetails) {
-            DashboardSyncDetailsSheet(
-                isPresented: $showSyncDetails,
-                syncManager: realtimeSyncManager
-            )
-        }
-        .background(
-            NavigationLink(
-                isActive: $isMetricDetailActive,
-                destination: {
-                    fullMetricChartView
-                },
-                label: {
-                    EmptyView()
-                }
-            )
-            .hidden()
-        )
-        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
-        .sheet(isPresented: $isBodyScoreSharePresented) {
-            if let payload = bodyScoreSharePayload {
-                BodyScoreShareSheet(payload: payload)
+            .onScreenshot {
+                guard selectedTab == .home else { return }
+                guard !isMetricDetailActive else { return }
+                guard let payload = makeBodyScoreSharePayload() else { return }
+                bodyScoreSharePayload = payload
+                isBodyScoreSharePresented = true
             }
-        }
-        .onScreenshot {
-            guard selectedTab == .home else { return }
-            guard let payload = makeBodyScoreSharePayload() else { return }
-            bodyScoreSharePayload = payload
-            isBodyScoreSharePresented = true
-        }
+
+        return withSheetsAndNavigation
     }
 
     private var homeTab: some View {
@@ -272,6 +214,81 @@ struct DashboardViewLiquid: View {
                 await loadGlp1DoseLogs()
             }
         )
+    }
+
+    private func handleOnAppear() {
+        loadMetricsOrder()
+
+        selectedRange = TimeRange(rawValue: storedTimeRangeRawValue) ?? .month1
+        if !viewModel.hasLoadedInitialData {
+            Task {
+                await viewModel.loadData(
+                    authManager: authManager,
+                    loadOnlyNewest: true,
+                    selectedIndex: selectedIndex
+                )
+                if !viewModel.bodyMetrics.isEmpty {
+                    updateAnimatedValues(for: selectedIndex)
+                }
+            }
+        }
+
+        // Then refresh async (loads all data in background) once per dashboard lifecycle
+        if !hasPerformedInitialRefresh {
+            hasPerformedInitialRefresh = true
+            Task {
+                await viewModel.refreshData(
+                    authManager: authManager,
+                    realtimeSyncManager: realtimeSyncManager
+                )
+                if !viewModel.bodyMetrics.isEmpty {
+                    updateAnimatedValues(for: selectedIndex)
+                }
+                await loadGlp1DoseLogs()
+            }
+        }
+
+        previousSyncStatus = realtimeSyncManager.syncStatus
+        handleSyncStatusChange(from: realtimeSyncManager.syncStatus, to: realtimeSyncManager.syncStatus)
+
+        _ = AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.photosTabFlagKey)
+        isPhotosTabEnabled = true
+    }
+
+    private func handleCoreDataContextChange(_ notification: Notification) {
+        guard !viewModel.isSyncingData else { return }
+
+        let hasRelevantChange: Bool = {
+            guard let userInfo = notification.userInfo else { return false }
+            let keys = [NSInsertedObjectsKey, NSUpdatedObjectsKey, NSDeletedObjectsKey]
+
+            for key in keys {
+                if let objects = userInfo[key] as? Set<NSManagedObject> {
+                    if objects.contains(where: { $0 is CachedBodyMetrics || $0 is CachedDailyMetrics }) {
+                        return true
+                    }
+                }
+            }
+
+            return false
+        }()
+
+        guard hasRelevantChange else { return }
+
+        coreDataReloadTask?.cancel()
+        coreDataReloadTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+
+            await viewModel.loadData(
+                authManager: authManager,
+                loadOnlyNewest: true,
+                selectedIndex: selectedIndex
+            )
+            if !viewModel.bodyMetrics.isEmpty {
+                updateAnimatedValues(for: selectedIndex)
+            }
+        }
     }
 
     private var heroSection: some View {
@@ -384,7 +401,7 @@ struct DashboardViewLiquid: View {
 
         let weightGoalText: String? = {
             guard let goal = weightGoal else { return nil }
-            let system = MeasurementSystem(rawValue: measurementSystem) ?? .imperial
+            let system = currentMeasurementSystem
             let converted = convertWeight(goal, to: system) ?? goal
             let formatted = String(format: "%.1f", converted)
             return "Target \(formatted) \(weightUnit)"
@@ -560,6 +577,50 @@ struct DashboardViewLiquid: View {
             selectedIndex: $selectedIndex,
             timelineMode: $timelineMode
         )
+    }
+
+    private var dashboardBackground: some View {
+        LinearGradient(
+            colors: [.black, .black.opacity(0.85)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+    }
+
+    @ViewBuilder
+    private var dashboardContent: some View {
+        if viewModel.bodyMetrics.isEmpty && !viewModel.hasLoadedInitialData {
+            DashboardSkeleton()
+        } else if viewModel.bodyMetrics.isEmpty {
+            emptyState
+        } else {
+            TabView(selection: $selectedTab) {
+                homeTab
+                    .tag(DashboardTab.home)
+                    .tabItem {
+                        Image(systemName: "house.fill")
+                        Text("Home")
+                    }
+
+                if isPhotosTabEnabled {
+                    photosTab
+                        .tag(DashboardTab.photos)
+                        .tabItem {
+                            Image(systemName: "camera.fill")
+                            Text("Photos")
+                        }
+                }
+
+                metricsTab
+                    .tag(DashboardTab.metrics)
+                    .tabItem {
+                        Image(systemName: "chart.bar.fill")
+                        Text("Metrics")
+                    }
+            }
+            .tint(Color.appPrimary)
+        }
     }
 
     // MARK: - Empty State

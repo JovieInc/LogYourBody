@@ -4,67 +4,57 @@ struct BodyScoreEmailCaptureView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var emailFieldFocused: Bool
     @State private var emailError: String?
+    @State private var showWhyEmail = false
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Want to save your score?",
-            subtitle: "Drop your email to sync progress across devices.",
+            title: "Save your score?",
+            subtitle: "Enter email to sync across devices.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .emailCapture),
             content: {
-                VStack(spacing: 28) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Email address")
-                            .font(OnboardingTypography.caption)
-                            .foregroundStyle(Color.appTextSecondary)
-
-                        TextField("you@domain.com", text: Binding(
-                            get: { viewModel.emailAddress },
-                            set: { viewModel.emailAddress = $0 }
-                        ))
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
-                        .autocorrectionDisabled(true)
+                VStack(spacing: 24) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        OnboardingTextFieldRow(
+                            title: "Email address",
+                            placeholder: "you@domain.com",
+                            text: Binding(
+                                get: { viewModel.emailAddress },
+                                set: { viewModel.emailAddress = $0 }
+                            ),
+                            keyboardType: .emailAddress
+                        )
                         .focused($emailFieldFocused)
-                        .submitLabel(.done)
-                        .onSubmit {
-                            emailFieldFocused = false
-                        }
                         .onChange(of: viewModel.emailAddress) { _, _ in
                             updateEmailError()
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(Color.appCard.opacity(0.65))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .stroke(emailFieldStrokeColor)
-                        )
 
                         if let error = emailError {
                             Text(error)
                                 .font(OnboardingTypography.caption)
                                 .foregroundStyle(Color.red)
                         } else {
-                            OnboardingCaptionText(
-                                text: "We’ll send your Body Score and keep progress synced.",
-                                alignment: .leading
-                            )
-                        }
-                    }
-
-                    OnboardingCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Privacy first")
-                                .font(OnboardingTypography.headline)
-                                .foregroundStyle(Color.appText)
-
-                            Text("No spam. Unsubscribe anytime. Used only to save your Body Score journey.")
-                                .font(OnboardingTypography.body)
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showWhyEmail.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "info.circle")
+                                        .font(.system(size: 13, weight: .semibold))
+                                    Text("No spam. Only to save your progress.")
+                                        .font(OnboardingTypography.caption)
+                                }
                                 .foregroundStyle(Color.appTextSecondary)
+                            }
+                            .buttonStyle(.plain)
+
+                            if showWhyEmail {
+                                Text("We'll only use this email to save your Body Score and keep progress in sync.")
+                                    .font(OnboardingTypography.body)
+                                    .foregroundStyle(Color.appTextSecondary)
+                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
                         }
                     }
                 }
@@ -76,8 +66,6 @@ struct BodyScoreEmailCaptureView: View {
                 } label: {
                     Text("Continue")
                         .font(.system(size: 18, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueEmailCapture)
@@ -106,13 +94,6 @@ struct BodyScoreEmailCaptureView: View {
 private extension BodyScoreEmailCaptureView {
     var continueButtonOpacity: Double {
         viewModel.canContinueEmailCapture ? 1 : 0.4
-    }
-
-    var emailFieldStrokeColor: Color {
-        if emailFieldFocused {
-            return Color.appPrimary
-        }
-        return Color.appBorder.opacity(0.4)
     }
 
     private func updateEmailError() {

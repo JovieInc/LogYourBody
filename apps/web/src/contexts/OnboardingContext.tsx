@@ -121,13 +121,20 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
       const normalizedGender: 'male' | 'female' = data.gender === 'female' ? 'female' : 'male'
 
+      const fullName = (data.fullName || '').trim()
+      const nameParts = fullName ? fullName.split(/\s+/) : []
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts.slice(1).join(' ') || ''
+
       // Update user profile
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
           id: user.id,
           email: primaryEmail || '', // Include email from auth user
-          full_name: data.fullName,
+          full_name: fullName || null,
+          first_name: firstName || null,
+          last_name: lastName || null,
           date_of_birth: data.dateOfBirth,
           height: data.height,
           height_unit: 'ft', // Heights in inches use 'ft' unit per database constraint

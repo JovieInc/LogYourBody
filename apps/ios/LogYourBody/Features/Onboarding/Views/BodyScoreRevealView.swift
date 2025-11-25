@@ -28,17 +28,17 @@ struct BodyScoreRevealView: View {
                     progress: viewModel.progress(for: .bodyScore)
                 ) {
                     VStack(spacing: 20) {
-                        scoreCard(result: result)
+                        scoreHero(result: result)
                             .scaleEffect(animateScore ? 1 : 0.9)
                             .opacity(animateScore ? 1 : 0)
                             .animation(.spring(response: 0.6, dampingFraction: 0.75), value: animateScore)
 
-                        statGrid(result: result, groupLabel: percentileGroupLabel)
+                        statRow(result: result, groupLabel: percentileGroupLabel)
                             .opacity(animateScore ? 1 : 0)
                             .offset(y: animateScore ? 0 : 12)
                             .animation(.easeOut(duration: 0.4).delay(0.1), value: animateScore)
 
-                        targetCard(result: result)
+                        targetPill(result: result)
                             .opacity(animateScore ? 1 : 0)
                             .offset(y: animateScore ? 0 : 16)
                             .animation(.easeOut(duration: 0.4).delay(0.15), value: animateScore)
@@ -50,16 +50,14 @@ struct BodyScoreRevealView: View {
                         }
                         .buttonStyle(OnboardingPrimaryButtonStyle())
 
-                        Button("Retake inputs") {
+                        OnboardingTextButton(title: "Retake inputs") {
                             viewModel.goBack()
                         }
-                        .buttonStyle(OnboardingSecondaryButtonStyle())
 
-                        Button("Share my score") {
+                        OnboardingTextButton(title: "Share my score") {
                             sharePayload = makeSharePayload(from: result)
                             isSharePresented = sharePayload != nil
                         }
-                        .buttonStyle(OnboardingSecondaryButtonStyle())
                     }
                 }
             } else {
@@ -84,108 +82,53 @@ struct BodyScoreRevealView: View {
         }
     }
 
-    private func scoreCard(result: BodyScoreResult) -> some View {
-        VStack(spacing: 10) {
-            Text("Starting point")
-                .font(.system(.subheadline, design: .rounded).weight(.medium))
-                .foregroundStyle(Color.white.opacity(0.9))
-
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("\(result.score)")
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.white)
-
-                Text("/ 100")
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
-                    .foregroundStyle(Color.white.opacity(0.9))
-            }
-
-            OnboardingCaptionText(
-                text: "We'll raise this as you log training and nutrition.",
-                alignment: .center
-            )
-            .foregroundStyle(Color.white.opacity(0.9))
-
-            OnboardingCaptionText(
-                text: "Based on FFMI, body fat %, and progress trends.",
-                alignment: .center
-            )
-            .foregroundStyle(Color.white.opacity(0.9))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(24)
-        .background(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.appPrimary,
-                            Color.appPrimary.opacity(0.6)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        )
-    }
-
-    private func statGrid(result: BodyScoreResult, groupLabel: String) -> some View {
-        HStack(spacing: 16) {
-            statTile(
-                title: "FFMI",
-                value: String(format: "%.1f", result.ffmi),
-                message: "\(result.ffmiStatus) vs \(groupLabel)"
-            )
-            statTile(
-                title: "Lean %ile",
-                value: String(format: "%.0f", result.leanPercentile),
-                message: "vs \(groupLabel)"
-            )
-        }
-    }
-
-    private func statTile(title: String, value: String, message: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased())
-                .font(.system(.caption2, design: .rounded))
-                .foregroundStyle(Color.appTextSecondary)
-
-            Text(value)
-                .font(.system(.largeTitle, design: .rounded).weight(.bold))
+    private func scoreHero(result: BodyScoreResult) -> some View {
+        VStack(spacing: 8) {
+            Text("\(result.score)")
+                .font(.system(size: 56, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.appText)
 
-            Text(message)
+            Text("Starting point")
+                .font(.system(.subheadline, design: .rounded).weight(.medium))
+                .foregroundStyle(Color.appTextSecondary)
+
+            Text("Based on FFMI, body fat %, and trends.")
                 .font(OnboardingTypography.caption)
                 .foregroundStyle(Color.appTextSecondary)
         }
-        .padding(20)
         .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.appCard.opacity(0.6))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.appBorder.opacity(0.4))
-        )
     }
 
-    private func targetCard(result: BodyScoreResult) -> some View {
-        OnboardingCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Optional target range (advanced)")
-                    .font(OnboardingTypography.headline)
-                    .foregroundStyle(Color.appText)
+    private func statRow(result: BodyScoreResult, groupLabel _: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            Text("FFMI \(String(format: "%.1f", result.ffmi)) — \(result.ffmiStatus)")
+                .font(OnboardingTypography.body)
+                .foregroundStyle(Color.appText)
 
-                Text("\(Int(result.targetBodyFat.lowerBound))% - \(Int(result.targetBodyFat.upperBound))% • \(result.targetBodyFat.label)")
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
-                    .foregroundStyle(Color.appPrimary)
+            Spacer()
 
-                Text("We'll adjust this over time based on your progress.")
-                    .font(OnboardingTypography.body)
-                    .foregroundStyle(Color.appTextSecondary)
-            }
+            Text("Lean %ile \(String(format: "%.0f", result.leanPercentile))")
+                .font(OnboardingTypography.body)
+                .foregroundStyle(Color.appTextSecondary)
         }
+    }
+
+    private func targetPill(result: BodyScoreResult) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.appPrimary)
+
+            Text("Target: \(Int(result.targetBodyFat.lowerBound))–\(Int(result.targetBodyFat.upperBound))% (\(result.targetBodyFat.label))")
+                .font(OnboardingTypography.caption)
+                .foregroundStyle(Color.appTextSecondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.appCard.opacity(0.6))
+        )
     }
 
     private func makeSharePayload(from result: BodyScoreResult) -> BodyScoreSharePayload? {

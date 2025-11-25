@@ -14,6 +14,8 @@ struct PaywallView: View {
     @State private var showRestoreSuccess = false
     @State private var showRestoreError = false
     @State private var showPurchaseError = false
+    @State private var showTermsSheet = false
+    @State private var showPrivacySheet = false
 
     var body: some View {
         ZStack {
@@ -103,6 +105,18 @@ struct PaywallView: View {
                 Task {
                     await loadOfferings()
                 }
+            }
+
+            AnalyticsService.shared.track(event: "paywall_view")
+        }
+        .sheet(isPresented: $showTermsSheet) {
+            NavigationView {
+                LegalDocumentView(documentType: .terms)
+            }
+        }
+        .sheet(isPresented: $showPrivacySheet) {
+            NavigationView {
+                LegalDocumentView(documentType: .privacy)
             }
         }
     }
@@ -268,6 +282,13 @@ struct PaywallView: View {
                 if !success && revenueCatManager.errorMessage != nil {
                     showPurchaseError = true
                 }
+
+                AnalyticsService.shared.track(
+                    event: success ? "purchase_success" : "purchase_failed",
+                    properties: [
+                        "package_id": package.identifier
+                    ]
+                )
             }
         } label: {
             HStack(spacing: 12) {
@@ -304,6 +325,10 @@ struct PaywallView: View {
                 } else if revenueCatManager.errorMessage != nil {
                     showRestoreError = true
                 }
+
+                AnalyticsService.shared.track(
+                    event: success ? "restore_success" : "restore_failed"
+                )
             }
         } label: {
             Text("Restore Purchases")
@@ -315,16 +340,24 @@ struct PaywallView: View {
 
     private var legalLinks: some View {
         HStack(spacing: 16) {
-            Link("Terms of Service", destination: URL(string: "https://www.logyourbody.com/terms")!)
-                .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.5))
+            Button {
+                showTermsSheet = true
+            } label: {
+                Text("Terms of Service")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.5))
+            }
 
             Text("•")
                 .foregroundColor(.white.opacity(0.3))
 
-            Link("Privacy Policy", destination: URL(string: "https://www.logyourbody.com/privacy")!)
-                .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.5))
+            Button {
+                showPrivacySheet = true
+            } label: {
+                Text("Privacy Policy")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.5))
+            }
         }
     }
 

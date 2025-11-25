@@ -113,6 +113,8 @@ export default function ProfileSettingsPage() {
           setProfile({
             email: profileData.email,
             full_name: profileData.full_name || '',
+            first_name: profileData.first_name ?? null,
+            last_name: profileData.last_name ?? null,
             username: profileData.username || '',
             height: profileData.height || 71,
             height_unit: profileData.height_unit || 'ft',
@@ -133,6 +135,14 @@ export default function ProfileSettingsPage() {
 
     const clerkUser = user as { firstName?: string; lastName?: string; email?: string } | null
 
+    const profileFirst = (profile.first_name || '').trim()
+    const profileLast = (profile.last_name || '').trim()
+
+    if (profileFirst || profileLast) {
+      setNameFields({ firstName: profileFirst, lastName: profileLast })
+      return
+    }
+
     const existingFullName = (profile.full_name || '').trim()
     const clerkFirstName = (clerkUser?.firstName || '').trim()
     const clerkLastName = (clerkUser?.lastName || '').trim()
@@ -152,7 +162,7 @@ export default function ProfileSettingsPage() {
     const lastName = parts.slice(1).join(' ')
 
     setNameFields({ firstName, lastName })
-  }, [profile.full_name, profile.email, user])
+  }, [profile.full_name, profile.first_name, profile.last_name, profile.email, user])
 
   // Initialize height in cm from profile
   useEffect(() => {
@@ -373,7 +383,11 @@ export default function ProfileSettingsPage() {
                         onChange={(e) => {
                           const updated = { ...nameFields, firstName: e.target.value }
                           setNameFields(updated)
-                          updateLocalProfile({ full_name: `${updated.firstName} ${updated.lastName}`.trim() })
+                          updateLocalProfile({
+                            full_name: `${updated.firstName} ${updated.lastName}`.trim(),
+                            first_name: updated.firstName || null,
+                            last_name: updated.lastName || null,
+                          })
                         }}
                         className="bg-linear-bg border-linear-border text-linear-text focus:border-linear-text-tertiary"
                         placeholder="John"
@@ -387,7 +401,11 @@ export default function ProfileSettingsPage() {
                         onChange={(e) => {
                           const updated = { ...nameFields, lastName: e.target.value }
                           setNameFields(updated)
-                          updateLocalProfile({ full_name: `${updated.firstName} ${updated.lastName}`.trim() })
+                          updateLocalProfile({
+                            full_name: `${updated.firstName} ${updated.lastName}`.trim(),
+                            first_name: updated.firstName || null,
+                            last_name: updated.lastName || null,
+                          })
                         }}
                         className="bg-linear-bg border-linear-border text-linear-text focus:border-linear-text-tertiary"
                         placeholder="Doe"

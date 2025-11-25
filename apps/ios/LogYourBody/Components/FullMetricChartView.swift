@@ -192,7 +192,7 @@ enum MetricEntrySourceType: Equatable {
     case integration(id: String?)
 }
 
-struct MetricHistoryEntry: Identifiable {
+struct MetricHistoryEntry: Identifiable, Sendable {
     let id: String
     let date: Date
     let primaryValue: Double
@@ -217,7 +217,7 @@ func makeMetricFormatter(minFractionDigits: Int = 0, maxFractionDigits: Int = 1)
     MetricFormatterCache.formatter(minFractionDigits: minFractionDigits, maxFractionDigits: maxFractionDigits)
 }
 
-private struct HistorySection: Identifiable {
+private struct HistorySection: Identifiable, Sendable {
     let id: String
     let title: String
     let showsHeader: Bool
@@ -265,7 +265,6 @@ struct FullMetricChartView: View {
                         headlineBlock
                         chartCard
                         historyBlock
-                        addEntryButton
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 32)
@@ -278,8 +277,26 @@ struct FullMetricChartView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(false)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    HapticManager.shared.selection()
+                    onAdd()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(Color.metricAccent)
+                }
+                .accessibilityLabel("Add Entry")
+            }
+        }
+        .toolbar(.visible, for: .navigationBar)
         .task(id: chartDataFingerprint) {
             await preprocessChartDataIfNeeded()
+        }
+        .task(id: metricEntries?.entries.count ?? 0) {
+            await preprocessHistorySectionsIfNeeded()
         }
         .onChange(of: selectedTimeRange) { _, _ in
             activePoint = nil
@@ -407,18 +424,14 @@ struct FullMetricChartView: View {
     }
 
     private func formatDeltaValueCompact(_ delta: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
+        let formatter: NumberFormatter
 
         if unit == "%" {
-            formatter.maximumFractionDigits = 1
-            formatter.minimumFractionDigits = 0
+            formatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
         } else if isStepsMetric {
-            formatter.maximumFractionDigits = 0
-            formatter.minimumFractionDigits = 0
+            formatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 0)
         } else {
-            formatter.maximumFractionDigits = 1
-            formatter.minimumFractionDigits = 0
+            formatter = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
         }
 
         let absoluteValue = abs(delta)
@@ -431,64 +444,14 @@ struct FullMetricChartView: View {
 
     private var historySections: [HistorySection] {
         guard let payload = metricEntries, !payload.entries.isEmpty else { return [] }
-
-        let calendar = Calendar.current
-        // Use newest-first ordering for a more natural ledger feel
-        let entries = payload.entries.sorted { $0.date > $1.date }
-
-        var groups: [(key: String, date: Date, entries: [MetricHistoryEntry])] = []
-        var indexByKey: [String: Int] = [:]
-
-        for entry in entries {
-            let components = calendar.dateComponents([.year, .month], from: entry.date)
-            guard let year = components.year, let month = components.month else { continue }
-            let key = "\(year)-\(month)"
-
-            if let index = indexByKey[key] {
-                groups[index].entries.append(entry)
-            } else {
-                groups.append((key: key, date: entry.date, entries: [entry]))
-                indexByKey[key] = groups.count - 1
-            }
-        }
-
-        guard !groups.isEmpty else { return [] }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM yyyy"
-
-        let totalGroups = groups.count
-        var sections: [HistorySection] = []
-
-        for (index, group) in groups.enumerated() {
-            let title = formatter.string(from: group.date)
-            let entryCount = group.entries.count
-
-            // Avoid a wall of headers for very sparse histories.
-            // Always show headers when there are only a few groups,
-            // and otherwise require a minimum entry count or boundary month.
-            let showsHeader: Bool
-            if totalGroups <= 4 {
-                showsHeader = true
-            } else {
-                showsHeader = entryCount >= 3 || index == 0 || index == totalGroups - 1
-            }
-
-            sections.append(
-                HistorySection(
-                    id: group.key,
-                    title: title,
-                    showsHeader: showsHeader,
-                    entries: group.entries
-                )
-            )
-        }
-
-        return sections
+        return makeHistorySections(from: payload.entries)
     }
 
     private var displayedHistorySections: [HistorySection] {
-        localHistorySections ?? historySections
+        if let cached = localHistorySections {
+            return cached
+        }
+        return historySections
     }
 
     private var timeRangeSelector: some View {
@@ -812,7 +775,7 @@ struct FullMetricChartView: View {
             if let payload = metricEntries,
                !payload.entries.isEmpty,
                !displayedHistorySections.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(displayedHistorySections.enumerated()), id: \
                         .element.id
                     ) { index, section in
@@ -960,29 +923,13 @@ struct FullMetricChartView: View {
         }
     }
 
-    private var addEntryButton: some View {
-        Button {
-            HapticManager.shared.selection()
-            onAdd()
-        } label: {
-            Label("Add Entry", systemImage: "plus")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.metricAccent.opacity(0.25))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-    }
-
     private func historyScrubber(proxy: ScrollViewProxy) -> some View {
         Group {
-            if historySections.isEmpty {
+            if displayedHistorySections.isEmpty {
                 Color.clear.frame(width: 0, height: 0)
             } else {
                 GeometryReader { geometry in
-                    let sectionCount = historySections.count
+                    let sectionCount = displayedHistorySections.count
                     let height = geometry.size.height
                     let thumbWidth: CGFloat = 3
                     let minThumbHeight: CGFloat = 36
@@ -1019,7 +966,7 @@ struct FullMetricChartView: View {
                                     if !isHistoryScrubbing {
                                         isHistoryScrubbing = true
                                     }
-                                    let sectionId = historySections[index].id
+                                    let sectionId = displayedHistorySections[index].id
                                     withAnimation(.easeInOut(duration: 0.15)) {
                                         proxy.scrollTo(sectionId, anchor: .top)
                                     }
@@ -1039,7 +986,15 @@ struct FullMetricChartView: View {
     // MARK: - Computed Data
 
     private var displayedSeries: [MetricChartDataPoint] {
-        cachedSeries[selectedTimeRange] ?? chartData
+        if let cached = cachedSeries[selectedTimeRange], !cached.isEmpty {
+            return cached
+        }
+
+        if chartData.count > 120 {
+            return Array(chartData.suffix(120))
+        }
+
+        return chartData
     }
 
     private var smoothedSeries: [MetricChartDataPoint] {
@@ -1275,4 +1230,88 @@ struct FullMetricChartView: View {
 
         isLoadingData = false
     }
+
+    @MainActor
+    private func preprocessHistorySectionsIfNeeded() async {
+        guard let payload = metricEntries, !payload.entries.isEmpty else {
+            localHistorySections = nil
+            return
+        }
+
+        // If we already have sections matching the entry count, skip recomputation.
+        if let existing = localHistorySections {
+            let existingCount = existing.reduce(0) { $0 + $1.entries.count }
+            if existingCount == payload.entries.count {
+                return
+            }
+        }
+
+        let entries = payload.entries
+
+        let sections = await Task.detached(priority: .utility) {
+            makeHistorySections(from: entries)
+        }.value
+
+        // Guard against races if the payload changed while work was in-flight.
+        if metricEntries?.entries.count == entries.count {
+            localHistorySections = sections
+        }
+    }
+}
+
+private func makeHistorySections(from entries: [MetricHistoryEntry]) -> [HistorySection] {
+    let calendar = Calendar.current
+
+    // Use newest-first ordering for a more natural ledger feel
+    let sortedEntries = entries.sorted { $0.date > $1.date }
+
+    var groups: [(key: String, date: Date, entries: [MetricHistoryEntry])] = []
+    var indexByKey: [String: Int] = [:]
+
+    for entry in sortedEntries {
+        let components = calendar.dateComponents([.year, .month], from: entry.date)
+        guard let year = components.year, let month = components.month else { continue }
+        let key = "\(year)-\(month)"
+
+        if let index = indexByKey[key] {
+            groups[index].entries.append(entry)
+        } else {
+            groups.append((key: key, date: entry.date, entries: [entry]))
+            indexByKey[key] = groups.count - 1
+        }
+    }
+
+    guard !groups.isEmpty else { return [] }
+
+    let formatter = DateFormatter()
+    formatter.dateFormat = "MMM yyyy"
+
+    let totalGroups = groups.count
+    var sections: [HistorySection] = []
+
+    for (index, group) in groups.enumerated() {
+        let title = formatter.string(from: group.date)
+        let entryCount = group.entries.count
+
+        // Avoid a wall of headers for very sparse histories.
+        // Always show headers when there are only a few groups,
+        // and otherwise require a minimum entry count or boundary month.
+        let showsHeader: Bool
+        if totalGroups <= 4 {
+            showsHeader = true
+        } else {
+            showsHeader = entryCount >= 3 || index == 0 || index == totalGroups - 1
+        }
+
+        sections.append(
+            HistorySection(
+                id: group.key,
+                title: title,
+                showsHeader: showsHeader,
+                entries: group.entries
+            )
+        )
+    }
+
+    return sections
 }

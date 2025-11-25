@@ -276,10 +276,29 @@ class SupabaseManager: ObservableObject {
         }
 
         if httpResponse.statusCode == 401 {
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "Profile fetch unauthorized",
+                category: "supabase",
+                level: .error,
+                data: [
+                    "operation": "fetchProfile",
+                    "userId": userId
+                ]
+            )
             throw SupabaseError.unauthorized
         }
 
         if httpResponse.statusCode != 200 {
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "Profile fetch HTTP error",
+                category: "supabase",
+                level: .error,
+                data: [
+                    "operation": "fetchProfile",
+                    "userId": userId,
+                    "statusCode": String(httpResponse.statusCode)
+                ]
+            )
             throw SupabaseError.httpError(httpResponse.statusCode)
         }
 
@@ -370,10 +389,29 @@ class SupabaseManager: ObservableObject {
         }
 
         if httpResponse.statusCode == 401 {
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "GLP-1 dose logs fetch unauthorized",
+                category: "supabase",
+                level: .error,
+                data: [
+                    "operation": "fetchGlp1DoseLogs",
+                    "userId": userId
+                ]
+            )
             throw SupabaseError.unauthorized
         }
 
         if httpResponse.statusCode != 200 {
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "GLP-1 dose logs fetch HTTP error",
+                category: "supabase",
+                level: .error,
+                data: [
+                    "operation": "fetchGlp1DoseLogs",
+                    "userId": userId,
+                    "statusCode": String(httpResponse.statusCode)
+                ]
+            )
             throw SupabaseError.httpError(httpResponse.statusCode)
         }
 
@@ -404,10 +442,29 @@ class SupabaseManager: ObservableObject {
         }
 
         if httpResponse.statusCode == 401 {
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "GLP-1 medication save unauthorized",
+                category: "supabase",
+                level: .error,
+                data: [
+                    "operation": "saveGlp1Medication",
+                    "userId": medication.userId
+                ]
+            )
             throw SupabaseError.unauthorized
         }
 
         if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "GLP-1 medication save HTTP error",
+                category: "supabase",
+                level: .error,
+                data: [
+                    "operation": "saveGlp1Medication",
+                    "userId": medication.userId,
+                    "statusCode": String(httpResponse.statusCode)
+                ]
+            )
             throw SupabaseError.httpError(httpResponse.statusCode)
         }
     }
@@ -469,91 +526,6 @@ class SupabaseManager: ObservableObject {
         }
 
         if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
-    }
-
-    // MARK: - Weight Operations
-
-    func fetchWeights(userId: String, limit: Int = 30) async throws -> [WeightEntry] {
-        let jwt = try await getSupabaseJWT()
-
-        let url = URL(string: "\(supabaseURL)/rest/v1/weight_logs?user_id=eq.\(userId)&order=logged_at.desc&limit=\(limit)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 200 {
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-
-        // Decode from Supabase format
-        let weightLogs = try decoder.decode([WeightLog].self, from: data)
-
-        // Convert to WeightEntry format
-        return weightLogs.map { log in
-            WeightEntry(
-                id: log.id,
-                userId: log.userId,
-                weight: log.weight,
-                weightUnit: log.weightUnit,
-                notes: log.notes,
-                loggedAt: log.loggedAt
-            )
-        }
-    }
-
-    func saveWeight(_ entry: WeightEntry) async throws {
-        let jwt = try await getSupabaseJWT()
-
-        let url = URL(string: "\(supabaseURL)/rest/v1/weight_logs")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=minimal", forHTTPHeaderField: "Prefer")
-
-        // Convert to Supabase format
-        let weightLog = WeightLog(
-            id: entry.id,
-            userId: entry.userId,
-            weight: entry.weight,
-            weightUnit: entry.weightUnit,
-            notes: entry.notes,
-            loggedAt: entry.loggedAt
-        )
-
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        request.httpBody = try encoder.encode(weightLog)
-
-        let (_, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 201 {
             throw SupabaseError.httpError(httpResponse.statusCode)
         }
     }
@@ -736,31 +708,30 @@ class SupabaseManager: ObservableObject {
         }
 
         if httpResponse.statusCode == 401 {
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "GLP-1 dose log save unauthorized",
+                category: "supabase",
+                level: .error,
+                data: [
+                    "operation": "saveGlp1DoseLog",
+                    "userId": log.userId
+                ]
+            )
             throw SupabaseError.unauthorized
         }
 
         if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "GLP-1 dose log save HTTP error",
+                category: "supabase",
+                level: .error,
+                data: [
+                    "operation": "saveGlp1DoseLog",
+                    "userId": log.userId,
+                    "statusCode": String(httpResponse.statusCode)
+                ]
+            )
             throw SupabaseError.httpError(httpResponse.statusCode)
         }
-    }
-}
-
-// MARK: - Supabase Models
-
-private struct WeightLog: Codable {
-    let id: String
-    let userId: String
-    let weight: Double
-    let weightUnit: String
-    let notes: String?
-    let loggedAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case userId = "user_id"
-        case weight
-        case weightUnit = "weight_unit"
-        case notes
-        case loggedAt = "logged_at"
     }
 }

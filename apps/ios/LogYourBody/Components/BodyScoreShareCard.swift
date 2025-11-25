@@ -36,11 +36,11 @@ enum BodyScoreShareAspect: String, CaseIterable, Identifiable {
     var pixelSize: CGSize {
         switch self {
         case .square:
-            return CGSize(width: 1080, height: 1080)
+            return CGSize(width: 1_080, height: 1_080)
         case .portrait:
-            return CGSize(width: 1080, height: 1350)
+            return CGSize(width: 1_080, height: 1_350)
         case .story:
-            return CGSize(width: 1080, height: 1920)
+            return CGSize(width: 1_080, height: 1_920)
         }
     }
 }
@@ -176,14 +176,8 @@ struct BodyScoreShareSheet: View {
                         .ignoresSafeArea()
                 }
             }
-            .onAppear {
-                if renderedImage == nil {
-                    renderImage()
-                }
-            }
             .onChange(of: selectedAspect) { _, _ in
                 renderedImage = nil
-                renderImage()
             }
         }
     }

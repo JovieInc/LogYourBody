@@ -21,11 +21,6 @@ enum BodyScoreCompleteness: String, Codable {
 struct GlobalTimelineMetricValue: Codable, Equatable {
     let value: Double?
     let presence: MetricPresence
-
-    init(value: Double?, presence: MetricPresence) {
-        self.value = value
-        self.presence = presence
-    }
 }
 
 struct GlobalTimelineMetricsSnapshot: Codable, Equatable {

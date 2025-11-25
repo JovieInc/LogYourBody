@@ -82,3 +82,7 @@ private struct PreAuthBodyScoreResultCodable: Codable {
         )
     }
 }
+
+extension Notification.Name {
+    static let preAuthOnboardingCompleted = Notification.Name("preAuthOnboardingCompleted")
+}

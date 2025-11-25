@@ -165,11 +165,14 @@ struct ProfileSettingsViewV2: View {
 
             Picker("Biological Sex", selection: $editableGender) {
                 ForEach(BiologicalSex.allCases, id: \.self) { gender in
-                    Text(gender.description).tag(gender)
+                    Text(gender.description)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.9)
+                        .tag(gender)
                 }
             }
             .pickerStyle(SegmentedPickerStyle())
-            .frame(width: 140)
+            .frame(width: 160)
             .scaleEffect(0.95) // Slightly smaller for better fit
             .onChange(of: editableGender) { _, _ in
                 hasChanges = true
@@ -458,7 +461,6 @@ struct ProfileSettingsViewV2: View {
             }
         }
     }
-
 }
 
 // MARK: - Height Picker Sheet

@@ -186,7 +186,6 @@
 		ADDC47C42E2D89F3003C97E7 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AE72E15FA5C002376C6 /* HealthKitManager.swift */; };
 		ADDC47C52E2D89F3003C97E7 /* LoadingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AE82E15FA5C002376C6 /* LoadingManager.swift */; };
 		ADDC47C62E2D89F3003C97E7 /* SupabaseDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */; };
-		ADDC47C72E2D89F3003C97E7 /* SyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AEC2E15FA5C002376C6 /* SyncManager.swift */; };
 		ADDC47C82E2D89F3003C97E7 /* LiquidGlassComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D39B2E24AD30001F82A8 /* LiquidGlassComponents.swift */; };
 		ADDC47C92E2D89F3003C97E7 /* ShakeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D3962E24A96A001F82A8 /* ShakeDetector.swift */; };
 		ADDC47CA2E2D89F3003C97E7 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3304BF2E241FE80043C4AC /* AppVersion.swift */; };
@@ -243,6 +242,11 @@
 		ADE1464E2EBF0BDF00B64DA0 /* TimelineZoomLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE1464B2EBF0BDF00B64DA0 /* TimelineZoomLevel.swift */; };
 		ADE1464F2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE1464A2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift */; };
 		ADF0A8B12FFD0A0E007C0A5C /* OnboardingStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF0A8B02FFD0A0E007C0A5C /* OnboardingStateManager.swift */; };
+		ADF1F6B62ED4C61400745F33 /* GlobalTimelineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF1F6B52ED4C61400745F33 /* GlobalTimelineService.swift */; };
+		ADF1F6B82ED4C63900745F33 /* GlobalTimelineHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF1F6B72ED4C63900745F33 /* GlobalTimelineHeader.swift */; };
+		ADF1F6BA2ED4C66400745F33 /* GlobalTimelineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF1F6B92ED4C66400745F33 /* GlobalTimelineStore.swift */; };
+		ADF1F6BC2ED4C69F00745F33 /* UnitConversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF1F6BB2ED4C69F00745F33 /* UnitConversion.swift */; };
+		ADF1F6BE2ED58E3F00745F33 /* HealthSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */; };
 		ADFC6A2D2E188FD5004FCE40 /* HKRawSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */; };
 		ADFF001E313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF001D313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift */; };
 		C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED9F05E697F00813F824903 /* LogoutButton.swift */; };
@@ -364,7 +368,6 @@
 		AD723AE72E15FA5C002376C6 /* HealthKitManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
 		AD723AE82E15FA5C002376C6 /* LoadingManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingManager.swift; sourceTree = "<group>"; };
 		AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseDataClient.swift; sourceTree = "<group>"; };
-		AD723AEC2E15FA5C002376C6 /* SyncManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SyncManager.swift; sourceTree = "<group>"; };
 		AD723AEE2E15FA5C002376C6 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		AD723AEF2E15FA5C002376C6 /* Constants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		AD723AFC2E15FA5C002376C6 /* AppleSignInButton.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
@@ -522,6 +525,7 @@
 		ADA600422ED35D8700088042 /* ProfileCompletionGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileCompletionGateView.swift; sourceTree = "<group>"; };
 		ADA600452ED375EE00088042 /* GlobalTimelineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalTimelineModels.swift; sourceTree = "<group>"; };
 		ADA600462ED375EE00088042 /* Glp1Medication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Glp1Medication.swift; sourceTree = "<group>"; };
+		ADA6004A2FFDAAAA00ABCDEF /* AnalyticsService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
 		ADA922EA2E22E7A600B82C49 /* BackgroundPhotoUploadService+Processing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackgroundPhotoUploadService+Processing.swift"; sourceTree = "<group>"; };
 		ADA922EB2E22E7A600B82C49 /* ImageProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessingService.swift; sourceTree = "<group>"; };
 		ADA922EC2E22E7A600B82C49 /* VisionOrientationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionOrientationService.swift; sourceTree = "<group>"; };
@@ -585,6 +589,11 @@
 		ADE6D39E2E24ADB5001F82A8 /* IntegrationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationsView.swift; sourceTree = "<group>"; };
 		ADE6D39F2E24ADB5001F82A8 /* LegalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalView.swift; sourceTree = "<group>"; };
 		ADF0A8B02FFD0A0E007C0A5C /* OnboardingStateManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OnboardingStateManager.swift; sourceTree = "<group>"; };
+		ADF1F6B52ED4C61400745F33 /* GlobalTimelineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalTimelineService.swift; sourceTree = "<group>"; };
+		ADF1F6B72ED4C63900745F33 /* GlobalTimelineHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GlobalTimelineHeader.swift; path = Components/GlobalTimelineHeader.swift; sourceTree = "<group>"; };
+		ADF1F6B92ED4C66400745F33 /* GlobalTimelineStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalTimelineStore.swift; sourceTree = "<group>"; };
+		ADF1F6BB2ED4C69F00745F33 /* UnitConversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitConversion.swift; sourceTree = "<group>"; };
+		ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSyncCoordinator.swift; sourceTree = "<group>"; };
 		ADF287A72E14AFA900198D6F /* LogYourBody.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LogYourBody.entitlements; sourceTree = "<group>"; };
 		ADF287A82E14AFB000198D6F /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		ADF287AA2E15045900198D6F /* Supabase.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Supabase.xcconfig; sourceTree = "<group>"; };
@@ -701,6 +710,7 @@
 		60C9D5106098C441A5EF3D53 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				ADF1F6B72ED4C63900745F33 /* GlobalTimelineHeader.swift */,
 				ADA600252ED259A700088042 /* BodyScoreShareCard.swift */,
 				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
 				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
@@ -869,6 +879,8 @@
 		AD723AED2E15FA5C002376C6 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */,
+				ADF1F6B52ED4C61400745F33 /* GlobalTimelineService.swift */,
 				ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */,
 				ADA600332ED2602F00088042 /* BodySpecAPI.swift */,
 				ADA600342ED2602F00088042 /* BodySpecAuthManager.swift */,
@@ -902,7 +914,7 @@
 				AD723AE82E15FA5C002376C6 /* LoadingManager.swift */,
 				ADF0A8B02FFD0A0E007C0A5C /* OnboardingStateManager.swift */,
 				AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */,
-				AD723AEC2E15FA5C002376C6 /* SyncManager.swift */,
+				ADA6004A2FFDAAAA00ABCDEF /* AnalyticsService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -910,6 +922,7 @@
 		AD723AF02E15FA5C002376C6 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
+				ADF1F6BB2ED4C69F00745F33 /* UnitConversion.swift */,
 				ADA4B7502ED0E61600F4262A /* AppError.swift */,
 				ADA4B7512ED0E61600F4262A /* AppLogger.swift */,
 				ADA4B7522ED0E61600F4262A /* ErrorReporter.swift */,
@@ -927,6 +940,7 @@
 		AD723AF22E15FA5C002376C6 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				ADF1F6B92ED4C66400745F33 /* GlobalTimelineStore.swift */,
 				ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */,
 			);
 			path = ViewModels;
@@ -1531,6 +1545,7 @@
 				ADDC487D2E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift in Sources */,
 				AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */,
 				ADDC487F2E2D8A6B003C97E7 /* CameraView.swift in Sources */,
+				ADF1F6BA2ED4C66400745F33 /* GlobalTimelineStore.swift in Sources */,
 				ADDC48802E2D8A6B003C97E7 /* ChangePasswordView.swift in Sources */,
 				ADBAF04E2ECAD88A00A95F98 /* BodyScoreHeightView.swift in Sources */,
 				ADBAF04F2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift in Sources */,
@@ -1545,6 +1560,7 @@
 				ADBAF0572ECAD88A00A95F98 /* BodyScoreBodyFatChoiceView.swift in Sources */,
 				ADBAF0582ECAD88A00A95F98 /* BodyScoreBodyFatNumericView.swift in Sources */,
 				ADBAF0592ECAD88A00A95F98 /* BodyScoreBasicsView.swift in Sources */,
+				ADF1F6B62ED4C61400745F33 /* GlobalTimelineService.swift in Sources */,
 				ADFF001E313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift in Sources */,
 				ADBAF05A2ECAD88A00A95F98 /* OnboardingMolecules.swift in Sources */,
 				ADBAF05B2ECAD88A00A95F98 /* BodyScoreBodyFatVisualView.swift in Sources */,
@@ -1584,7 +1600,6 @@
 				ADDC47C52E2D89F3003C97E7 /* LoadingManager.swift in Sources */,
 				ADF0A8B12FFD0A0E007C0A5C /* OnboardingStateManager.swift in Sources */,
 				ADDC47C62E2D89F3003C97E7 /* SupabaseDataClient.swift in Sources */,
-				ADDC47C72E2D89F3003C97E7 /* SyncManager.swift in Sources */,
 				ADDC47C82E2D89F3003C97E7 /* LiquidGlassComponents.swift in Sources */,
 				ADDC47C92E2D89F3003C97E7 /* ShakeDetector.swift in Sources */,
 				ADDC47CA2E2D89F3003C97E7 /* AppVersion.swift in Sources */,
@@ -1599,9 +1614,11 @@
 				ADA600482ED375EE00088042 /* Glp1Medication.swift in Sources */,
 				ADDC47DD2E2D89F3003C97E7 /* SyncStatusView.swift in Sources */,
 				ADDC47DE2E2D89F3003C97E7 /* IntegrationsView.swift in Sources */,
+				ADF1F6BE2ED58E3F00745F33 /* HealthSyncCoordinator.swift in Sources */,
 				ADDC47DF2E2D89F3003C97E7 /* LegalView.swift in Sources */,
 				ADDC47E02E2D89F3003C97E7 /* BulkPhotoImportView.swift in Sources */,
 				ADDC47E12E2D89F3003C97E7 /* DeleteAccountView.swift in Sources */,
+				ADF1F6BC2ED4C69F00745F33 /* UnitConversion.swift in Sources */,
 				ADB2F6A12FFD12C500EF7A4B /* EditEntrySheet.swift in Sources */,
 				ADDC47E22E2D89F3003C97E7 /* LegalDocumentView.swift in Sources */,
 				ADDC47E32E2D89F3003C97E7 /* DietPhaseHistoryView.swift in Sources */,
@@ -1672,6 +1689,7 @@
 				AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */,
 				AD8872A52EB946BE0041C426 /* LoginForm.swift in Sources */,
 				AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */,
+				ADF1F6B82ED4C63900745F33 /* GlobalTimelineHeader.swift in Sources */,
 				AD8872AB2EB946BE0041C426 /* DSAvatar.swift in Sources */,
 				AD8872AC2EB946BE0041C426 /* StepsIndicator.swift in Sources */,
 				AD8872AD2EB946BE0041C426 /* DashboardHeader.swift in Sources */,
@@ -1887,7 +1905,7 @@
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251123110645;
+				CURRENT_PROJECT_VERSION = 20251125150517;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
 				DEVELOPMENT_TEAM = G24T327LXT;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = G24T327LXT;
@@ -1929,7 +1947,7 @@
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251123110645;
+				CURRENT_PROJECT_VERSION = 20251125150517;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
 				DEVELOPMENT_TEAM = G24T327LXT;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = G24T327LXT;
@@ -1967,7 +1985,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251123110645;
+				CURRENT_PROJECT_VERSION = 20251125150517;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -1990,7 +2008,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251123110645;
+				CURRENT_PROJECT_VERSION = 20251125150517;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -2012,7 +2030,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251123110645;
+				CURRENT_PROJECT_VERSION = 20251125150517;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -2034,7 +2052,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251123110645;
+				CURRENT_PROJECT_VERSION = 20251125150517;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;

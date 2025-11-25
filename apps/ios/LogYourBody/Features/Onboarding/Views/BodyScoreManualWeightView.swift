@@ -35,14 +35,14 @@ struct BodyScoreManualWeightView: View {
                             .onChange(of: viewModel.manualWeightText) { _, newValue in
                                 validateWeight(newValue)
                             }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
                             .background(
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    .fill(Color.appCard.opacity(0.65))
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(Color.appCard.opacity(0.6))
                             )
                             .overlay(
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .stroke(weightFieldBorderColor)
                             )
                             .overlay(
@@ -65,7 +65,7 @@ struct BodyScoreManualWeightView: View {
                                         .frame(width: 32, height: 32)
                                         .background(
                                             Circle()
-                                                .fill(Color.appCard.opacity(0.8))
+                                                .fill(Color.appCard.opacity(0.6))
                                         )
                                 }
                                 .buttonStyle(.plain)
@@ -128,8 +128,6 @@ struct BodyScoreManualWeightView: View {
                 } label: {
                     Text("Continue")
                         .font(.system(size: 18, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueWeight)

@@ -16,7 +16,7 @@ struct PreAuthBodyScoreOnboardingContainer: View {
                 viewModel: OnboardingFlowViewModel(entryContext: .preAuth)
             )
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("preAuthOnboardingCompleted"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .preAuthOnboardingCompleted)) { _ in
             dismiss()
             onCompleted()
         }

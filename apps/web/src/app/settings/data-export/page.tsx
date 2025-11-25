@@ -18,6 +18,17 @@ export default function DataExportPage() {
   const [exportStatus, setExportStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [statusMessage, setStatusMessage] = useState('')
 
+  const dataExportMailto =
+    'mailto:support@logyourbody.com' +
+    '?subject=' +
+    encodeURIComponent('LogYourBody Data Export Request') +
+    '&body=' +
+    encodeURIComponent(
+      'Hello LogYourBody Support,\n\n' +
+      'I would like to request an export of my LogYourBody account data associated with this email address.\n\n' +
+      'Thank you,'
+    )
+
   const handleExport = async () => {
     if (!user) return
 
@@ -214,12 +225,23 @@ export default function DataExportPage() {
             </Button>
 
             {/* Privacy Note */}
-            <p className="text-sm text-linear-text-secondary text-center">
-              {exportMethod === 'email'
-                ? "A secure download link will be sent to your registered email address. The link will expire after 24 hours for security."
-                : "Your data will be prepared and downloaded directly to this device."
-              }
-            </p>
+            <div className="text-sm text-linear-text-secondary text-center space-y-2">
+              <p>
+                {exportMethod === 'email'
+                  ? 'A secure download link will be sent to your registered email address. The link will expire after 24 hours for security.'
+                  : 'Your data will be prepared and downloaded directly to this device.'}
+              </p>
+              <p>
+                Or you can{' '}
+                <a
+                  href={dataExportMailto}
+                  className="text-linear-accent underline"
+                >
+                  email support to request a data export
+                </a>
+                .
+              </p>
+            </div>
           </CardContent>
         </Card>
       </main>

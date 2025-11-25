@@ -202,6 +202,24 @@ Never “fix” this by swapping to legacy classes (for example `DashboardOld.sw
 - Favor minimal diffs. Touch the fewest files/lines necessary and avoid unrelated formatting churn. Document in explanations which files changed, how they are used, and whether any previous files became obsolete.
 - On Xcode projects, honor target membership: ensure new files are added to the correct targets, avoid reintroducing files that the project no longer references, and never leave “floating” alternative implementations disconnected from the app.
 
+## Vendor Adapter Rule (Platform Boundary)
+
+NEVER call third-party vendor SDKs/APIs directly from product/domain/UI code.
+All external services (feature flags, analytics, email/notifications, payments, auth, logging, etc.) MUST be accessed only through our internal Platform Ports (protocol/interface) with vendor-specific Adapters.
+
+### Requirements
+
+- Product/Domain/UI layers import only Platform modules (ports + types).
+- Vendor SDK imports are allowed only inside adapters.
+- Ports define stable app-level IDs/schemas (event names, flag keys, template IDs).
+- Swapping vendors must require changes only in adapters + DI wiring, not call sites.
+- New vendor integration = add adapter, do not add new direct calls.
+
+### Example
+
+- ✅ `Analytics.track(AppEvent.signup_completed)`
+- ❌ `posthog.capture("signup_completed")` in product code
+
 ## Security Considerations
 
 ### Secrets Management

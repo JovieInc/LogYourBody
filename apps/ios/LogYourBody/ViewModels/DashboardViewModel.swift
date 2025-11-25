@@ -13,9 +13,15 @@ final class DashboardViewModel: ObservableObject {
     @Published var isSyncingData = false
 
     private let healthKitManager: HealthKitManager
+    private let healthSyncCoordinator: HealthSyncCoordinating
+    private var historicalLoadTask: Task<Void, Never>?
 
-    init(healthKitManager: HealthKitManager = .shared) {
+    init(
+        healthKitManager: HealthKitManager = .shared,
+        healthSyncCoordinator: HealthSyncCoordinating = HealthSyncCoordinator.shared
+    ) {
         self.healthKitManager = healthKitManager
+        self.healthSyncCoordinator = healthSyncCoordinator
     }
 
     func loadData(
@@ -45,19 +51,7 @@ final class DashboardViewModel: ObservableObject {
                 hasLoadedInitialData = true
 
                 // Defer full list assignment to a follow-up task so the UI can show something quickly
-                Task { @MainActor in
-                    let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
-                    let allMetrics = fetchedMetrics
-                        .compactMap { $0.toBodyMetrics() }
-                        .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
-
-                    if self.bodyMetrics.count == 1 {
-                        self.bodyMetrics = allMetrics
-                        self.sortedBodyMetricsAscending = allMetrics.sorted {
-                            ($0.date ?? .distantPast) < ($1.date ?? .distantPast)
-                        }
-                    }
-                }
+                scheduleHistoricalLoadIfNeeded(for: userId)
             }
         } else {
             let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
@@ -81,6 +75,32 @@ final class DashboardViewModel: ObservableObject {
         recentDailyMetrics = recentDaily
     }
 
+    private func scheduleHistoricalLoadIfNeeded(for userId: String) {
+        if historicalLoadTask != nil {
+            return
+        }
+
+        historicalLoadTask = Task.detached(priority: .background) {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+
+            let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+            let allMetrics = fetchedMetrics
+                .compactMap { $0.toBodyMetrics() }
+                .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
+
+            await MainActor.run {
+                self.historicalLoadTask = nil
+                guard self.bodyMetrics.count <= 1 else { return }
+
+                self.bodyMetrics = allMetrics
+                self.sortedBodyMetricsAscending = allMetrics.sorted {
+                    ($0.date ?? .distantPast) < ($1.date ?? .distantPast)
+                }
+            }
+        }
+    }
+
     func refreshData(
         authManager: AuthManager,
         realtimeSyncManager: RealtimeSyncManager
@@ -89,7 +109,11 @@ final class DashboardViewModel: ObservableObject {
         if let lastRefresh = lastRefreshDate {
             let timeSinceLastRefresh = Date().timeIntervalSince(lastRefresh)
             if timeSinceLastRefresh < 180 {
-                await loadData(authManager: authManager, selectedIndex: 0)
+                await loadData(
+                    authManager: authManager,
+                    loadOnlyNewest: true,
+                    selectedIndex: 0
+                )
                 return
             }
         }
@@ -101,7 +125,7 @@ final class DashboardViewModel: ObservableObject {
         // Sync from HealthKit if authorized
         if healthKitManager.isAuthorized {
             do {
-                try await healthKitManager.syncWeightFromHealthKit()
+                try await healthSyncCoordinator.syncWeightFromHealthKit()
                 await syncStepsFromHealthKit(authManager: authManager, realtimeSyncManager: realtimeSyncManager)
             } catch {
                 hasErrors = true
@@ -114,7 +138,11 @@ final class DashboardViewModel: ObservableObject {
 
         isSyncingData = false
 
-        await loadData(authManager: authManager, selectedIndex: 0)
+        await loadData(
+            authManager: authManager,
+            loadOnlyNewest: true,
+            selectedIndex: 0
+        )
 
         lastRefreshDate = Date()
 
@@ -140,7 +168,13 @@ final class DashboardViewModel: ObservableObject {
                 realtimeSyncManager: realtimeSyncManager
             )
         } catch {
-            // Silently fail - HealthKit sync is optional
+            let context = ErrorContext(
+                feature: "healthKit",
+                operation: "fetchTodayStepCount",
+                screen: "Dashboard",
+                userId: authManager.currentUser?.id
+            )
+            ErrorReporter.shared.captureNonFatal(error, context: context)
         }
     }
 

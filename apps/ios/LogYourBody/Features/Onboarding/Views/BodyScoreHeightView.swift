@@ -4,6 +4,7 @@ struct BodyScoreHeightView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var centimetersFocused: Bool
     @State private var heightError: String?
+    @State private var showWhyWeAsk = false
 
     var body: some View {
         OnboardingPageTemplate(
@@ -12,7 +13,7 @@ struct BodyScoreHeightView: View {
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .height),
             content: {
-                VStack(spacing: 28) {
+                VStack(spacing: 24) {
                     OnboardingSegmentedControl(options: HeightUnit.allCases, selection: heightUnitBinding)
 
                     if viewModel.heightUnit == .centimeters {
@@ -31,8 +32,6 @@ struct BodyScoreHeightView: View {
                 } label: {
                     Text("Continue")
                         .font(.system(size: 18, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueHeight)
@@ -98,11 +97,11 @@ struct BodyScoreHeightView: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.appCard.opacity(0.7))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(centimetersFocused ? Color.appPrimary : Color.appBorder.opacity(0.5))
             )
             .onAppear {
@@ -156,11 +155,11 @@ struct BodyScoreHeightView: View {
             }
             .frame(height: 160)
             .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(Color.appCard.opacity(0.6))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.appBorder.opacity(0.5))
             )
 
@@ -172,18 +171,32 @@ struct BodyScoreHeightView: View {
     }
 
     private var helperCard: some View {
-        OnboardingCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Why we ask")
-                    .font(OnboardingTypography.headline)
-                    .foregroundStyle(Color.appText)
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showWhyWeAsk.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Why we ask")
+                        .font(OnboardingTypography.caption)
+                }
+                .foregroundStyle(Color.appPrimary)
+            }
+            .buttonStyle(.plain)
 
-                Text("Height anchors lean mass so taller frames stay comparable.")
-                    .font(OnboardingTypography.body)
-                    .foregroundStyle(Color.appTextSecondary)
+            if showWhyWeAsk {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Height anchors lean mass so taller frames stay comparable.")
+                        .font(OnboardingTypography.body)
+                        .foregroundStyle(Color.appTextSecondary)
 
-                FFMIInfoLink()
-                    .padding(.top, 4)
+                    FFMIInfoLink()
+                        .padding(.top, 2)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }

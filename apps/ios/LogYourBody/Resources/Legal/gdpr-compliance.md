@@ -14,6 +14,7 @@ As a data subject under GDPR, you have the following rights:
 - You can request a copy of all personal data we hold about you
 - We provide this information free of charge within 30 days
 - Access your data anytime through Settings → Data Export
+ - If you cannot access Settings, you may also email support@logyourbody.com to request a data export
 
 ### 2. Right to Rectification (Article 16)
 - You can correct any inaccurate personal data
@@ -38,7 +39,7 @@ As a data subject under GDPR, you have the following rights:
 ### 6. Right to Object (Article 21)
 - You can object to certain types of processing
 - We don't use your data for direct marketing
-- Analytics can be disabled in Settings → Privacy
+- If you object to analytics or profiling, contact privacy@logyourbody.com and we will honor your request where technically feasible
 
 ## Legal Basis for Processing
 
@@ -110,7 +111,7 @@ While not required for our organization size, we have designated a privacy conta
 
 ### Analytics and Cookies
 - Only essential cookies for authentication
-- Analytics can be disabled in Privacy Settings
+- Where available, you can manage analytics preferences in in-app settings or by contacting privacy@logyourbody.com
 - No third-party tracking cookies
 
 ## Supervisory Authority

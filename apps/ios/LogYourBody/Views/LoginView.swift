@@ -20,91 +20,96 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            // Atom: Background
-            Color.appBackground
-                .ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Show Clerk initialization status banner
-                    if !authManager.isClerkLoaded {
-                        clerkStatusBanner
-                            .padding(.top, 20)
-                            .padding(.horizontal, 24)
-                    }
-
-                    if authManager.lastExitReason == .sessionExpired {
-                        sessionStatusBanner
-                            .padding(.top, 16)
-                            .padding(.horizontal, 24)
-                    }
-
-                    // Molecule: Auth Header
-                    AuthHeader(
-                        title: "LogYourBody",
-                        subtitle: "Track your fitness journey"
-                    )
-                    .padding(.top, authManager.isClerkLoaded ? 80 : 20)
-                    .padding(.bottom, 24)
-
-                    preAuthOnboardingCTA
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 26)
-
-                    // Organism: Login Form
-                    LoginForm(
-                        email: $email,
-                        password: $password,
-                        isLoading: $isLoading,
-                        onLogin: login,
-                        onForgotPassword: {
-                            // Navigate to forgot password
-                        },
-                        onAppleSignIn: {
-                            Task {
-                                await authManager.handleAppleSignIn()
-                            }
-                        }
-                    )
-                    .padding(.horizontal, 24)
-
-                    // Molecule: Sign Up Link
-                    HStack(spacing: 4) {
-                        Text("Don't have an account?")
-                            .font(.system(size: 15))
-                            .foregroundColor(.appTextSecondary)
-
-                        DSAuthNavigationLink(
-                            title: "Sign up",
-                            destination: SignUpView()
-                        )
-                    }
-                    .padding(.top, 20)
-
-                    NavigationLink(
-                        destination: SignUpView(),
-                        isActive: $navigateToSignUp
-                    ) {
-                        EmptyView()
-                    }
-                    .hidden()
-
-                    Spacer(minLength: 40)
-                }
-            }
-            .scrollDismissesKeyboard(.interactively)
+            background
+            scrollContent
         }
         .navigationBarHidden(true)
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage)
-        }
+        .standardErrorAlert(isPresented: $showError, message: errorMessage)
         .fullScreenCover(isPresented: $showPreAuthOnboarding) {
             PreAuthBodyScoreOnboardingContainer {
-                navigateToSignUp = true
             }
         }
+        .onAppear {
+            AnalyticsService.shared.track(event: "login_view")
+        }
+    }
+
+    private var background: some View {
+        // Atom: Background
+        Color.appBackground
+            .ignoresSafeArea()
+    }
+
+    private var scrollContent: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // Show Clerk initialization status banner
+                if !authManager.isClerkLoaded {
+                    clerkStatusBanner
+                        .padding(.top, 20)
+                        .padding(.horizontal, 24)
+                }
+
+                if authManager.lastExitReason == .sessionExpired {
+                    sessionStatusBanner
+                        .padding(.top, 16)
+                        .padding(.horizontal, 24)
+                }
+
+                // Molecule: Auth Header
+                AuthHeader(
+                    title: "LogYourBody",
+                    subtitle: "Track your fitness journey"
+                )
+                .padding(.top, authManager.isClerkLoaded ? 80 : 20)
+                .padding(.bottom, 24)
+
+                preAuthOnboardingCTA
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 26)
+
+                // Organism: Login Form
+                LoginForm(
+                    email: $email,
+                    password: $password,
+                    isLoading: $isLoading,
+                    onLogin: login,
+                    onForgotPassword: {
+                        // Navigate to forgot password
+                    },
+                    onAppleSignIn: {
+                        Task {
+                            await authManager.handleAppleSignIn()
+                        }
+                    }
+                )
+                .padding(.horizontal, 24)
+
+                // Molecule: Sign Up Link
+                HStack(spacing: 4) {
+                    Text("Don't have an account?")
+                        .font(.system(size: 15))
+                        .foregroundColor(.appTextSecondary)
+
+                    DSAuthNavigationLink(
+                        title: "Sign up",
+                        destination: SignUpView()
+                    )
+                }
+                .padding(.top, 20)
+
+                NavigationLink(
+                    destination: SignUpView(),
+                    isActive: $navigateToSignUp
+                ) {
+                    EmptyView()
+                }
+                .hidden()
+
+                Spacer(minLength: 40)
+            }
+        }
+        .scrollDismissesKeyboard(.interactively)
     }
 
     private var preAuthOnboardingCTA: some View {
@@ -230,7 +235,7 @@ struct LoginView: View {
     private func login() {
         // Check if Clerk is ready
         guard authManager.isClerkLoaded else {
-            errorMessage = "Authentication service is not ready. Please wait or tap retry."
+            errorMessage = authManager.authServiceNotReadyMessage
             showError = true
             return
         }
@@ -239,6 +244,13 @@ struct LoginView: View {
         guard !isLoading else { return }
 
         isLoading = true
+
+        AnalyticsService.shared.track(
+            event: "login_attempt",
+            properties: [
+                "method": "password"
+            ]
+        )
 
         Task { @MainActor in
             do {
@@ -249,9 +261,16 @@ struct LoginView: View {
                 // Reset loading state on success
                 isLoading = false
             } catch {
-                errorMessage = "Invalid email or password. Please try again."
+                errorMessage = authManager.loginErrorMessage(for: error)
                 showError = true
                 isLoading = false
+
+                AnalyticsService.shared.track(
+                    event: "login_failed",
+                    properties: [
+                        "method": "password"
+                    ]
+                )
             }
         }
     }

@@ -25,6 +25,12 @@ final class OnboardingStateManager {
         let versionToPersist = version ?? currentOnboardingVersion
         defaults.set(true, forKey: Constants.hasCompletedOnboardingKey)
         defaults.set(versionToPersist, forKey: Constants.onboardingCompletedVersionKey)
+        AnalyticsService.shared.track(
+            event: "onboarding_completed",
+            properties: [
+                "version": String(versionToPersist)
+            ]
+        )
         notifyChange()
     }
 
@@ -36,6 +42,10 @@ final class OnboardingStateManager {
             defaults.removeObject(forKey: Constants.onboardingCompletedVersionKey)
             notifyChange()
         }
+    }
+
+    func syncCompletionFlagFromProfile(_ isCompleted: Bool) {
+        defaults.set(isCompleted, forKey: Constants.hasCompletedOnboardingKey)
     }
 
     func resetForNextVersion(newVersion: Int) {

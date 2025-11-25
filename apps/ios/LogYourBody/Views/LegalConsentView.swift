@@ -12,6 +12,8 @@ struct LegalConsentView: View {
     @State private var acceptedTerms = false
     @State private var acceptedPrivacy = false
     @State private var isLoading = false
+    @State private var showTermsSheet = false
+    @State private var showPrivacySheet = false
 
     private var canContinue: Bool {
         acceptedTerms && acceptedPrivacy && !isLoading
@@ -45,14 +47,20 @@ struct LegalConsentView: View {
                             isChecked: $acceptedTerms,
                             text: "I accept the ",
                             linkText: "Terms of Service",
-                            url: URL(string: "https://logyourbody.com/terms")!
+                            url: nil,
+                            onLinkTap: {
+                                showTermsSheet = true
+                            }
                         )
 
                         ConsentCheckbox(
                             isChecked: $acceptedPrivacy,
                             text: "I accept the ",
                             linkText: "Privacy Policy",
-                            url: URL(string: "https://logyourbody.com/privacy")!
+                            url: nil,
+                            onLinkTap: {
+                                showPrivacySheet = true
+                            }
                         )
                     }
                     .padding(.horizontal, 24)
@@ -100,6 +108,16 @@ struct LegalConsentView: View {
             }
         }
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
+        .sheet(isPresented: $showTermsSheet) {
+            NavigationView {
+                LegalDocumentView(documentType: .terms)
+            }
+        }
+        .sheet(isPresented: $showPrivacySheet) {
+            NavigationView {
+                LegalDocumentView(documentType: .privacy)
+            }
+        }
     }
 }
 
@@ -107,7 +125,10 @@ struct ConsentCheckbox: View {
     @Binding var isChecked: Bool
     let text: String
     let linkText: String
-    let url: URL
+    let url: URL?
+    let onLinkTap: (() -> Void)?
+
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -142,13 +163,24 @@ struct ConsentCheckbox: View {
                     .font(.system(size: 15))
                     .foregroundColor(.white.opacity(0.9))
 
-                Link(linkText, destination: url)
-                    .font(.system(size: 15))
-                    .foregroundColor(.white)
-                    .underline()
+                Button(action: handleLinkTap) {
+                    Text(linkText)
+                        .font(.system(size: 15))
+                        .foregroundColor(.white)
+                        .underline()
+                }
+                .buttonStyle(PlainButtonStyle())
             }
 
             Spacer()
+        }
+    }
+
+    private func handleLinkTap() {
+        if let onLinkTap {
+            onLinkTap()
+        } else if let url {
+            openURL(url)
         }
     }
 }

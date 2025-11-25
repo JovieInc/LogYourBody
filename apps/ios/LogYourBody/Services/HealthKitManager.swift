@@ -57,6 +57,7 @@ class HealthKitManager: ObservableObject {
     }
 
     // Sync management
+    private let syncStateQueue = DispatchQueue(label: "com.logyourbody.healthkit.sync.state")
     private var isSyncingWeight = false
     private var syncDebounceTimer: Timer?
     private var weightObserverQuery: HKObserverQuery?
@@ -64,10 +65,29 @@ class HealthKitManager: ObservableObject {
     private var activeQueries: [HKQuery] = []
     private var activeUserId: String?
 
+    private func beginWeightSyncIfPossible() -> Bool {
+        var canStart = false
+        syncStateQueue.sync {
+            if !isSyncingWeight {
+                isSyncingWeight = true
+                canStart = true
+            }
+        }
+        return canStart
+    }
+
+    private func endWeightSync() {
+        syncStateQueue.sync {
+            isSyncingWeight = false
+        }
+    }
+
     // Check if HealthKit is available
     var isHealthKitAvailable: Bool {
         return HKHealthStore.isHealthDataAvailable()
     }
+
+    // MARK: - Bootstrap & Authorization
 
     // Check authorization status
     func checkAuthorizationStatus() {
@@ -216,19 +236,11 @@ class HealthKitManager: ObservableObject {
 
             return isAuthorized
         } catch {
-            let appError: AppError
-            if let hkError = error as? HealthKitError {
-                appError = .healthKit(hkError)
-            } else {
-                appError = .unexpected(context: "requestAuthorization", underlying: error)
-            }
-            let context = ErrorContext(
-                feature: "healthKit",
+            await captureHealthKitError(
+                error,
                 operation: "requestAuthorization",
-                screen: nil,
-                userId: await MainActor.run { AuthManager.shared.currentUser?.id }
+                contextDescription: "requestAuthorization"
             )
-            ErrorReporter.shared.capture(appError, context: context)
             // print("HealthKit authorization failed: \(error)")
             return false
         }
@@ -241,7 +253,7 @@ class HealthKitManager: ObservableObject {
         }
 
         // Convert to kg (HealthKit uses kg internally)
-        let weightInKg = weight * 0.453592 // Convert lbs to kg
+        let weightInKg = weight.lbsToKg
         let quantity = HKQuantity(unit: HKUnit.gramUnit(with: .kilo), doubleValue: weightInKg)
 
         let sample = HKQuantitySample(
@@ -276,7 +288,7 @@ class HealthKitManager: ObservableObject {
 
                 if let sample = samples?.first as? HKQuantitySample {
                     let weightInKg = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
-                    let weightInLbs = weightInKg * 2.20462 // Convert kg to lbs
+                    let weightInLbs = weightInKg.kgToLbs
 
                     Task {
                         await MainActor.run {
@@ -473,39 +485,60 @@ class HealthKitManager: ObservableObject {
         )
     }
 
-    // Sync weight data with backend
-    func syncWeightWithBackend(weight: Double, date: Date) async throws {
-        guard let url = URL(string: "\(Constants.baseURL)/api/weight") else {
-            throw HealthKitError.syncFailed
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    func resetForCurrentUser() async {
+        syncDebounceTimer?.invalidate()
+        syncDebounceTimer = nil
 
-        guard await AuthManager.shared.isAuthenticated,
-              let token = await AuthManager.shared.getAccessToken() else {
-            throw HealthKitError.notAuthorized
+        if let weightObserverQuery {
+            healthStore.stop(weightObserverQuery)
+            self.weightObserverQuery = nil
         }
 
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
-        // Convert weight to kg for backend (matching web app)
-        let weightInKg = weight * 0.453592
-
-        let body: [String: Any] = [
-            "weight": weightInKg,
-            "unit": "kg",
-            "date": ISO8601DateFormatter().string(from: date)
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw HealthKitError.syncFailed
+        if let stepObserverQuery {
+            healthStore.stop(stepObserverQuery)
+            self.stepObserverQuery = nil
         }
+
+        if !activeQueries.isEmpty {
+            for query in activeQueries {
+                healthStore.stop(query)
+            }
+            activeQueries.removeAll()
+        }
+
+        do {
+            try await healthStore.disableAllBackgroundDelivery()
+        } catch {
+            await captureHealthKitError(
+                error,
+                operation: "resetForCurrentUser.disableAllBackgroundDelivery",
+                contextDescription: "resetForCurrentUser.disableAllBackgroundDelivery"
+            )
+        }
+
+        let userId = await MainActor.run { AuthManager.shared.currentUser?.id }
+        let lastObserverKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: userId)
+        let fullSyncKey = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: userId)
+        userDefaults.removeObject(forKey: lastObserverKey)
+        userDefaults.removeObject(forKey: fullSyncKey)
+
+        await MainActor.run {
+            self.isAuthorized = false
+            self.latestWeight = nil
+            self.latestWeightDate = nil
+            self.latestBodyFatPercentage = nil
+            self.latestBodyFatDate = nil
+            self.todayStepCount = 0
+            self.latestStepCount = nil
+            self.latestStepCountDate = nil
+
+            self.isImporting = false
+            self.importProgress = 0.0
+            self.importStatus = ""
+            self.importedCount = 0
+            self.totalToImport = 0
+        }
+
     }
 
     // Fetch user's height from HealthKit
@@ -654,92 +687,24 @@ class HealthKitManager: ObservableObject {
         }
     }
 
-    // Fetch weight data from HealthKit
-    func fetchWeightData(days: Int = 30) async throws -> [WeightEntry] {
-        guard isAuthorized else {
-            throw HealthKitError.notAuthorized
-        }
-
-        let endDate = Date()
-        let startDate = Calendar.current.date(byAdding: .day, value: -days, to: endDate)!
-
-        let predicate = HKQuery.predicateForSamples(
-            withStart: startDate,
-            end: endDate,
-            options: .strictStartDate
-        )
-
-        return try await withCheckedThrowingContinuation { [weak self] continuation in
-            guard let self else {
-                continuation.resume(returning: [])
-                return
-            }
-
-            let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
-            let query = HKSampleQuery(
-                sampleType: weightType,
-                predicate: predicate,
-                limit: HKObjectQueryNoLimit,
-                sortDescriptors: [sortDescriptor]
-            ) { [weak self] _, samples, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-
-                var weightEntries: [WeightEntry] = []
-
-                if let samples = samples as? [HKQuantitySample], let self {
-                    let storageUnit = HKUnit.gramUnit(with: .kilo)
-                    self.persistHealthKitSamples(samples, unit: storageUnit)
-
-                    for sample in samples {
-                        let usesMetric = UserDefaults.standard.string(forKey: Constants.preferredWeightUnitKey) == "kg"
-                        let preferredUnit = usesMetric ? HKUnit.gramUnit(with: .kilo) : HKUnit.pound()
-                        let weight = sample.quantity.doubleValue(for: preferredUnit)
-                        let entry = WeightEntry(
-                            id: UUID().uuidString,
-                            userId: "", // Will be filled by SyncManager
-                            weight: weight,
-                            weightUnit: UserDefaults.standard.string(forKey: Constants.preferredWeightUnitKey) ?? "lbs",
-                            notes: nil,
-                            loggedAt: sample.startDate
-                        )
-                        weightEntries.append(entry)
-                    }
-                }
-
-                continuation.resume(returning: weightEntries)
-            }
-
-            healthStore.execute(query)
-        }
-    }
-
     // Sync ALL weight and body fat data from HealthKit to app
     func syncWeightFromHealthKit() async throws {
         // Prevent concurrent syncs
-        guard !isSyncingWeight else {
+        guard beginWeightSyncIfPossible() else {
             // print("⚠️ Weight sync already in progress, skipping")
             return
         }
 
         // print("📊 Starting comprehensive weight sync from HealthKit...")
-        isSyncingWeight = true
         defer {
-            isSyncingWeight = false
+            endWeightSync()
             // print("✅ Weight sync completed")
         }
 
         // First, do a quick sync of recent data (last 30 days) for immediate UI update
-        let endDate = Date()
-        let recentStartDate = Calendar.current.date(byAdding: .day, value: -30, to: endDate)!
-
         // print("📅 Phase 1: Fetching recent data (30 days)")
 
-        // Fetch recent weight and body fat data
-        let recentWeightHistory = try await fetchWeightHistory(days: 30)
-        let recentBodyFatHistory = try await fetchBodyFatHistory(startDate: recentStartDate)
+        let (recentWeightHistory, recentBodyFatHistory) = try await fetchRecentWeightAndBodyFatHistory()
 
         // print("📈 Found \(recentWeightHistory.count) weight entries and \(recentBodyFatHistory.count) body fat entries")
 
@@ -761,6 +726,25 @@ class HealthKitManager: ObservableObject {
         // print("📊 Recent sync: \(imported) imported, \(skipped) skipped")
 
         // Only trigger full historical sync if this is truly the first time and we have very little data
+        await triggerFullHealthKitSyncIfNeeded(imported: imported)
+    }
+
+    private func fetchRecentWeightAndBodyFatHistory() async throws
+    -> (
+        weightHistory: [(weight: Double, date: Date)],
+        bodyFatHistory: [(percentage: Double, date: Date)]
+    ) {
+        let endDate = Date()
+        let recentStartDate = Calendar.current.date(byAdding: .day, value: -30, to: endDate)!
+
+        // Fetch recent weight and body fat data
+        let recentWeightHistory = try await fetchWeightHistory(days: 30)
+        let recentBodyFatHistory = try await fetchBodyFatHistory(startDate: recentStartDate)
+
+        return (weightHistory: recentWeightHistory, bodyFatHistory: recentBodyFatHistory)
+    }
+
+    private func triggerFullHealthKitSyncIfNeeded(imported: Int) async {
         let currentUserId = await MainActor.run { AuthManager.shared.currentUser?.id }
         let fullSyncKey = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: currentUserId)
         let hasPerformedFullSync = userDefaults.bool(forKey: fullSyncKey)
@@ -775,7 +759,8 @@ class HealthKitManager: ObservableObject {
         if !hasPerformedFullSync {
             // print("📊 First time sync detected, scheduling full historical sync...")
             // print("📊 Current cached entries: \(totalCachedEntries)")
-            Task.detached(priority: .background) {
+            Task.detached(priority: .background) { [weak self] in
+                guard let self else { return }
                 await self.syncAllHistoricalHealthKitData()
                 let userId = await MainActor.run { AuthManager.shared.currentUser?.id }
                 let key = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: userId)
@@ -784,7 +769,8 @@ class HealthKitManager: ObservableObject {
         } else if totalCachedEntries < 50 && imported > 0 {
             // Also trigger if we have very few entries despite having done a sync before
             // print("📊 Low entry count detected (\(totalCachedEntries)), triggering full sync...")
-            Task.detached(priority: .background) {
+            Task.detached(priority: .background) { [weak self] in
+                guard let self else { return }
                 await self.syncAllHistoricalHealthKitData()
             }
         }
@@ -793,15 +779,14 @@ class HealthKitManager: ObservableObject {
     // Background incremental sync for longer time periods (30 days at a time)
     func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) async throws {
         // Prevent concurrent syncs
-        guard !isSyncingWeight else {
+        guard beginWeightSyncIfPossible() else {
             // print("⚠️ Weight sync already in progress, skipping incremental sync")
             return
         }
 
         // print("📊 Starting incremental weight sync from HealthKit (\(days) days)...")
-        isSyncingWeight = true
         defer {
-            isSyncingWeight = false
+            endWeightSync()
             // print("✅ Incremental weight sync completed")
         }
 
@@ -853,6 +838,14 @@ class HealthKitManager: ObservableObject {
             totalToImport = 0
         }
 
+        ErrorTrackingService.shared.addBreadcrumb(
+            message: "Starting HealthKit full history import",
+            category: "healthKit",
+            data: [
+                "operation": "syncAllHistoricalHealthKitData"
+            ]
+        )
+
         do {
             // Get the earliest available weight data date
             let defaultHistoricalRange = TimeInterval(10 * 365 * 24 * 60 * 60)
@@ -860,65 +853,10 @@ class HealthKitManager: ObservableObject {
                 ?? Date().addingTimeInterval(-defaultHistoricalRange) // Default to 10 years ago
             let endDate = Date()
 
-            // Calculate total months to process
-            let calendar = Calendar.current
-            let components = calendar.dateComponents([.month], from: earliestDate, to: endDate)
-            let totalMonths = Double(components.month ?? 0)
-
-            await MainActor.run {
-                importStatus = "Preparing to import \(Int(totalMonths)) months of data..."
-            }
-
-            // Process in larger batches (3 months at a time) for faster sync
-            var currentDate = earliestDate
-            var totalImported = 0
-            var totalSkipped = 0
-            var processedMonths = 0.0
-            let batchSizeMonths = 3  // Process 3 months at a time
-
-            while currentDate < endDate {
-                let batchEndDate = calendar.date(byAdding: .month, value: batchSizeMonths, to: currentDate) ?? endDate
-                let actualBatchEndDate = min(batchEndDate, endDate)
-
-                // Update status
-                let year = calendar.component(.year, from: currentDate)
-                let month = calendar.component(.month, from: currentDate)
-                await MainActor.run {
-                    importStatus = "Importing \(year)/\(month)..."
-                }
-
-                // Fetch weight and body fat data for this batch
-                let weightBatch = try await fetchWeightHistoryInRange(startDate: currentDate, endDate: actualBatchEndDate)
-                let bodyFatBatch = try await fetchBodyFatHistory(startDate: currentDate)
-                    .filter { $0.date < actualBatchEndDate }
-
-                // Process this batch
-                let (imported, skipped) = await processBatchHealthKitData(
-                    weightHistory: weightBatch,
-                    bodyFatHistory: bodyFatBatch
-                )
-
-                totalImported += imported
-                totalSkipped += skipped
-
-                // Update progress
-                processedMonths += Double(batchSizeMonths)
-                let progress = totalMonths > 0 ? min(processedMonths / totalMonths, 1.0) : 1.0
-                await MainActor.run {
-                    importProgress = progress
-                    importedCount = totalImported
-                    if totalMonths > 0 {
-                        let remaining = max(0, Int(totalMonths - processedMonths))
-                        importStatus = remaining > 0 ? "Importing... \(remaining) months remaining" : "Finalizing..."
-                    }
-                }
-
-                // Move to next batch
-                currentDate = actualBatchEndDate
-
-                // Very small delay to avoid overwhelming the system
-                try? await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
-            }
+            let (totalImported, totalSkipped) = try await processHistoricalHealthKitBatches(
+                earliestDate: earliestDate,
+                endDate: endDate
+            )
 
             // Complete
             await MainActor.run {
@@ -933,26 +871,102 @@ class HealthKitManager: ObservableObject {
                     }
                 }
             }
-        } catch {
-            let appError: AppError
-            if let hkError = error as? HealthKitError {
-                appError = .healthKit(hkError)
-            } else {
-                appError = .unexpected(context: "syncAllHistoricalHealthKitData", underlying: error)
-            }
-            let context = ErrorContext(
-                feature: "healthKit",
-                operation: "syncAllHistoricalHealthKitData",
-                screen: nil,
-                userId: await MainActor.run { AuthManager.shared.currentUser?.id }
+
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "HealthKit full history import complete",
+                category: "healthKit",
+                data: [
+                    "operation": "syncAllHistoricalHealthKitData",
+                    "imported": String(totalImported),
+                    "skipped": String(totalSkipped)
+                ]
             )
-            ErrorReporter.shared.capture(appError, context: context)
+        } catch {
+            await captureHealthKitError(
+                error,
+                operation: "syncAllHistoricalHealthKitData",
+                contextDescription: "syncAllHistoricalHealthKitData"
+            )
+
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "HealthKit full history import failed: \(error.localizedDescription)",
+                category: "healthKit",
+                level: .error,
+                data: [
+                    "operation": "syncAllHistoricalHealthKitData"
+                ]
+            )
             await MainActor.run {
                 importProgress = 0.0
                 importStatus = "Import failed: \(error.localizedDescription)"
                 isImporting = false
             }
         }
+    }
+
+    private func processHistoricalHealthKitBatches(
+        earliestDate: Date,
+        endDate: Date
+    ) async throws -> (imported: Int, skipped: Int) {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.month], from: earliestDate, to: endDate)
+        let totalMonths = Double(components.month ?? 0)
+
+        await MainActor.run {
+            importStatus = "Preparing to import \(Int(totalMonths)) months of data..."
+        }
+
+        var currentDate = earliestDate
+        var totalImported = 0
+        var totalSkipped = 0
+        var processedMonths = 0.0
+        let batchSizeMonths = 3  // Process 3 months at a time
+
+        while currentDate < endDate {
+            let batchEndDate = calendar.date(byAdding: .month, value: batchSizeMonths, to: currentDate) ?? endDate
+            let actualBatchEndDate = min(batchEndDate, endDate)
+
+            // Update status
+            let year = calendar.component(.year, from: currentDate)
+            let month = calendar.component(.month, from: currentDate)
+            await MainActor.run {
+                importStatus = "Importing \(year)/\(month)..."
+            }
+
+            // Fetch weight and body fat data for this batch
+            let weightBatch = try await fetchWeightHistoryInRange(startDate: currentDate, endDate: actualBatchEndDate)
+            let bodyFatBatch = try await fetchBodyFatHistory(startDate: currentDate)
+                .filter { $0.date < actualBatchEndDate }
+
+            // Process this batch
+            let (imported, skipped) = await processBatchHealthKitData(
+                weightHistory: weightBatch,
+                bodyFatHistory: bodyFatBatch
+            )
+
+            totalImported += imported
+            totalSkipped += skipped
+
+            // Update progress
+            processedMonths += Double(batchSizeMonths)
+            let progress = totalMonths > 0 ? min(processedMonths / totalMonths, 1.0) : 1.0
+            await MainActor.run {
+                importProgress = progress
+                importedCount = totalImported
+                if totalMonths > 0 {
+                    let remaining = max(0, Int(totalMonths - processedMonths))
+                    importStatus = remaining > 0 ? "Importing... \(remaining) months remaining" : "Finalizing..."
+                }
+            }
+
+            // Move to next batch
+            currentDate = actualBatchEndDate
+
+            // Very small delay to avoid overwhelming the system
+            try? await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
+        }
+
+        return (imported: totalImported, skipped: totalSkipped)
     }
 
     func forceFullHealthKitSync() async {
@@ -987,7 +1001,7 @@ class HealthKitManager: ObservableObject {
     }
 
     // Process a batch of HealthKit data and return (imported, skipped) counts
-    private func processBatchHealthKitData(
+    func processBatchHealthKitData(
         weightHistory: [(weight: Double, date: Date)],
         bodyFatHistory: [(percentage: Double, date: Date)]
     ) async -> (imported: Int, skipped: Int) {
@@ -1058,19 +1072,12 @@ class HealthKitManager: ObservableObject {
                     imported += 1
                     existingEntriesByHour.insert(hourKey) // Add to set to prevent duplicates in same batch
                 } catch {
-                    let appError: AppError
-                    if let hkError = error as? HealthKitError {
-                        appError = .healthKit(hkError)
-                    } else {
-                        appError = .unexpected(context: "processBatchHealthKitData.saveBodyMetrics", underlying: error)
-                    }
-                    let context = ErrorContext(
-                        feature: "healthKit",
+                    await captureHealthKitError(
+                        error,
                         operation: "processBatchHealthKitData",
-                        screen: nil,
-                        userId: userId
+                        contextDescription: "processBatchHealthKitData.saveBodyMetrics",
+                        userIdOverride: userId
                     )
-                    ErrorReporter.shared.capture(appError, context: context)
                     // print("Failed to save entry: \(error)")
                 }
             } else {
@@ -1120,19 +1127,28 @@ class HealthKitManager: ObservableObject {
         let stepHistory = try await fetchStepCountHistory(days: 365) // Get last year of data
 
         for (stepCount, date) in stepHistory {
-            // Only sync if steps > 0 and entry doesn't exist
-            if stepCount > 0 {
-                let exists = await dailyMetricsExists(for: date)
-                if !exists {
-                    try await saveDailySteps(steps: stepCount, date: date)
-                }
-            }
+            try await syncSingleStepFromHistory(stepCount: stepCount, date: date)
+        }
+    }
+
+    private func syncSingleStepFromHistory(stepCount: Int, date: Date) async throws {
+        // Only sync if steps > 0 and entry doesn't exist
+        guard stepCount > 0 else { return }
+
+        let exists = await dailyMetricsExists(for: date)
+        if !exists {
+            try await saveDailySteps(steps: stepCount, date: date)
         }
     }
 
     // Setup observer for new weight entries in HealthKit
     func observeWeightChanges() {
         guard isAuthorized else { return }
+
+        if let existingQuery = weightObserverQuery {
+            healthStore.stop(existingQuery)
+            weightObserverQuery = nil
+        }
 
         let query = HKObserverQuery(sampleType: weightType, predicate: nil) { [weak self] _, completionHandler, error in
             if error == nil {
@@ -1164,7 +1180,9 @@ class HealthKitManager: ObservableObject {
             completionHandler()
         }
 
+        weightObserverQuery = query
         healthStore.execute(query)
+        activeQueries.append(query)
     }
 
     // Setup observer for new step count entries in HealthKit
@@ -1172,6 +1190,11 @@ class HealthKitManager: ObservableObject {
         guard isAuthorized else { return }
 
         // Stop any existing step observer queries
+        if let existingQuery = stepObserverQuery {
+            healthStore.stop(existingQuery)
+            stepObserverQuery = nil
+        }
+
         activeQueries.filter { $0 is HKObserverQuery && ($0 as? HKObserverQuery)?.sampleType == stepCountType }.forEach {
             healthStore.stop($0)
         }
@@ -1195,6 +1218,7 @@ class HealthKitManager: ObservableObject {
             completionHandler()
         }
 
+        stepObserverQuery = query
         healthStore.execute(query)
         activeQueries.append(query)
 
@@ -1215,14 +1239,11 @@ class HealthKitManager: ObservableObject {
             )
             // print("✅ Enabled background step delivery")
         } catch {
-            let appError = AppError.unexpected(context: "enableBackgroundStepDelivery", underlying: error)
-            let context = ErrorContext(
-                feature: "healthKit",
+            await captureHealthKitError(
+                error,
                 operation: "enableBackgroundStepDelivery",
-                screen: nil,
-                userId: await MainActor.run { AuthManager.shared.currentUser?.id }
+                contextDescription: "enableBackgroundStepDelivery"
             )
-            ErrorReporter.shared.capture(appError, context: context)
             // print("❌ Failed to enable background step delivery: \(error)")
         }
     }
@@ -1302,24 +1323,18 @@ class HealthKitManager: ObservableObject {
 
         if metrics == nil {
             // Create new daily metrics
-            metrics = DailyMetrics(
-                id: UUID().uuidString,
+            metrics = makeNewDailyMetrics(
                 userId: userId,
                 date: today,
                 steps: todaySteps,
-                notes: nil,
                 createdAt: today,
-                updatedAt: today
+                notes: nil
             )
         } else if let existingMetrics = metrics {
             // Update existing metrics with new step count
-            metrics = DailyMetrics(
-                id: existingMetrics.id,
-                userId: existingMetrics.userId,
-                date: existingMetrics.date,
+            metrics = makeUpdatedDailyMetrics(
+                from: existingMetrics,
                 steps: todaySteps,
-                notes: existingMetrics.notes,
-                createdAt: existingMetrics.createdAt,
                 updatedAt: Date()
             )
         }
@@ -1349,24 +1364,18 @@ class HealthKitManager: ObservableObject {
 
             if metrics == nil {
                 // Create new daily metrics for historical date
-                metrics = DailyMetrics(
-                    id: UUID().uuidString,
+                metrics = makeNewDailyMetrics(
                     userId: userId,
                     date: date,
                     steps: stepCount,
-                    notes: nil,
                     createdAt: Date(),
-                    updatedAt: Date()
+                    notes: nil
                 )
             } else if let existingMetrics = metrics, existingMetrics.steps != stepCount {
                 // Update if step count is different
-                metrics = DailyMetrics(
-                    id: existingMetrics.id,
-                    userId: existingMetrics.userId,
-                    date: existingMetrics.date,
+                metrics = makeUpdatedDailyMetrics(
+                    from: existingMetrics,
                     steps: stepCount,
-                    notes: existingMetrics.notes,
-                    createdAt: existingMetrics.createdAt,
                     updatedAt: Date()
                 )
             } else {
@@ -1384,6 +1393,40 @@ class HealthKitManager: ObservableObject {
         Task.detached {
             await RealtimeSyncManager.shared.syncAll()
         }
+    }
+
+    private func makeNewDailyMetrics(
+        userId: String,
+        date: Date,
+        steps: Int,
+        createdAt: Date,
+        notes: String?
+    ) -> DailyMetrics {
+        DailyMetrics(
+            id: UUID().uuidString,
+            userId: userId,
+            date: date,
+            steps: steps,
+            notes: notes,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+    }
+
+    private func makeUpdatedDailyMetrics(
+        from existingMetrics: DailyMetrics,
+        steps: Int,
+        updatedAt: Date
+    ) -> DailyMetrics {
+        DailyMetrics(
+            id: existingMetrics.id,
+            userId: existingMetrics.userId,
+            date: existingMetrics.date,
+            steps: steps,
+            notes: existingMetrics.notes,
+            createdAt: existingMetrics.createdAt,
+            updatedAt: updatedAt
+        )
     }
 
     // MARK: - Local existence helpers
@@ -1426,6 +1469,36 @@ class HealthKitManager: ObservableObject {
 
         CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
         await RealtimeSyncManager.shared.syncIfNeeded()
+    }
+
+    private func captureHealthKitError(
+        _ error: Error,
+        operation: String,
+        contextDescription: String,
+        userIdOverride: String? = nil
+    ) async {
+        let appError: AppError
+        if let hkError = error as? HealthKitError {
+            appError = .healthKit(hkError)
+        } else {
+            appError = .unexpected(context: contextDescription, underlying: error)
+        }
+
+        let resolvedUserId: String?
+        if let userIdOverride {
+            resolvedUserId = userIdOverride
+        } else {
+            resolvedUserId = await MainActor.run { AuthManager.shared.currentUser?.id }
+        }
+
+        let context = ErrorContext(
+            feature: "healthKit",
+            operation: operation,
+            screen: nil,
+            userId: resolvedUserId
+        )
+
+        ErrorReporter.shared.capture(appError, context: context)
     }
 }
 

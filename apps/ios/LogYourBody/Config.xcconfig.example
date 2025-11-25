@@ -10,3 +10,7 @@ SUPABASE_ANON_KEY = your-anon-key-here
 // API Base URL - Change this for different environments
 API_BASE_URL_DEBUG = http:/$()/localhost:3000
 API_BASE_URL_RELEASE = https:/$()/your-production-url.com
+
+// PostHog Analytics
+POSTHOG_API_KEY = your-posthog-api-key-here
+POSTHOG_HOST = https:/$()/us.i.posthog.com
