@@ -16,6 +16,8 @@ jobs:
     name: Rapid Checks
     runs-on: macos-14  # Use Apple Silicon for better performance
     timeout-minutes: 15
+    permissions:
+      contents: read
     
     steps:
     - uses: actions/checkout@v6

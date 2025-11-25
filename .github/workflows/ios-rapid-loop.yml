@@ -17,6 +17,8 @@ jobs:
     name: Rapid Checks
     runs-on: macos-14
     timeout-minutes: 15
+    permissions:
+      contents: read
     outputs:
       short_sha: ${{ steps.build-info.outputs.short_sha }}
       timestamp: ${{ steps.build-info.outputs.timestamp }}
@@ -63,3 +65,58 @@ jobs:
         cd apps/ios
         # Use Fastlane for consistent build process with automatic log collation
         bundle exec fastlane build_check
+
+  deploy-alpha:
+    name: Deploy Alpha to TestFlight
+    needs: rapid-checks
+    runs-on: macos-14
+    timeout-minutes: 30
+    if: needs.rapid-checks.result == 'success'
+    permissions:
+      contents: read
+    environment:
+      name: development
+      url: https://testflight.apple.com
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup iOS build environment
+      uses: ./.github/actions/setup-ios-build
+      with:
+        xcode-version: '16.1'
+        working-directory: apps/ios
+        setup-ruby: 'true'
+        create-config-files: 'true'
+
+    - name: Setup App Store Connect API key
+      run: |
+        cd apps/ios
+        mkdir -p fastlane
+        cat > fastlane/api_key.json << 'EOFKEY'
+        {
+          "key_id": "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}",
+          "issuer_id": "${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}",
+          "key": "${{ secrets.APP_STORE_CONNECT_API_KEY }}",
+          "duration": 1200,
+          "in_house": false
+        }
+        EOFKEY
+
+        echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> $GITHUB_ENV
+        echo "APP_STORE_CONNECT_API_KEY_ID=${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}" >> $GITHUB_ENV
+        echo "APP_STORE_CONNECT_API_KEY_ISSUER_ID=${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}" >> $GITHUB_ENV
+        echo "APP_STORE_CONNECT_API_ISSUER_ID=${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}" >> $GITHUB_ENV
+
+    - name: Set environment variables
+      run: |
+        echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+        echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> $GITHUB_ENV
+
+    - name: Build and upload Alpha to TestFlight
+      run: |
+        cd apps/ios
+        bundle exec fastlane alpha build_number:${{ needs.rapid-checks.outputs.build_number }}
+      env:
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}

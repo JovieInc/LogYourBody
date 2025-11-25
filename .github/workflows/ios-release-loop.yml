@@ -26,6 +26,8 @@ jobs:
     name: Validate Release
     runs-on: macos-14
     timeout-minutes: 5
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
