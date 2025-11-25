@@ -24,7 +24,7 @@ jobs:
       infra: ${{ steps.filter.outputs.infra }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -107,7 +107,7 @@ jobs:
     if: needs.detect-changes.outputs.web == 'true' && needs.determine-strategy.outputs.strategy == 'pr'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -125,7 +125,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '16.1'

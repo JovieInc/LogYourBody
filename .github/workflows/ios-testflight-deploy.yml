@@ -59,7 +59,7 @@ jobs:
       url: https://testflight.apple.com
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Download build artifact
       uses: actions/download-artifact@v4

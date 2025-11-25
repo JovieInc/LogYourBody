@@ -19,7 +19,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Validate preview checks
       env:
@@ -55,7 +55,7 @@ jobs:
       url: https://logyourbody.com
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Setup deployment info
       id: deploy-info
@@ -168,7 +168,7 @@ jobs:
     timeout-minutes: 5
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Run smoke tests
       run: |

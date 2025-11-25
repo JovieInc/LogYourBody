@@ -23,7 +23,7 @@ jobs:
       pr_number: ${{ steps.pr.outputs.number }}
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     
@@ -69,7 +69,7 @@ jobs:
       pr_number: ${{ steps.pr.outputs.number }}
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         ref: dev
         fetch-depth: 0
@@ -137,7 +137,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Wait for checks
       if: github.event.inputs.skip_checks != 'true'
