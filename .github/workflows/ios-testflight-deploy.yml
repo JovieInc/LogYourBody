@@ -225,7 +225,7 @@ jobs:
     
     - name: Post deployment notification
       if: success()
-      uses: actions/github-script@v7
+      uses: actions/github-script@v8
       with:
         script: |
           const group = '${{ inputs.distribution_group }}';
