@@ -87,11 +87,10 @@ jest.mock('@/components/ui/dropdown-menu', () => ({
 
 // Stub DashboardPage with a simple component matching test expectations
 jest.mock('../page', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const React = require('react') as typeof import('react');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   const { useRouter } = require('next/navigation') as typeof import('next/navigation');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   const { useAuth } =
     require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
 

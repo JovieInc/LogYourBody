@@ -18,7 +18,6 @@ jest.mock('@/lib/supabase/client', () => ({
 jest.mock('@/components/MobileNavbar', () => {
   return {
     MobileNavbar: () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { usePathname } = require('next/navigation');
       const pathname = usePathname();
       if (pathname === '/log' || pathname.startsWith('/settings')) {
@@ -30,14 +29,13 @@ jest.mock('@/components/MobileNavbar', () => {
 });
 
 jest.mock('../page', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const React = require('react') as typeof import('react');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   const { useRouter, usePathname } = require('next/navigation') as typeof import('next/navigation');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   const { useAuth } =
     require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   const { MobileNavbar } =
     require('@/components/MobileNavbar') as typeof import('@/components/MobileNavbar');
 

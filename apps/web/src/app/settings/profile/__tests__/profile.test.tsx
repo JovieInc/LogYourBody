@@ -156,14 +156,13 @@ jest.mock('next/link', () => ({
 
 // Stub ProfileSettingsPage implementation for tests
 jest.mock('../page', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const React = require('react') as typeof import('react');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   const { useAuth } =
     require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   const { useRouter } = require('next/navigation') as typeof import('next/navigation');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   const profileApi = require('@/lib/supabase/profile') as typeof import('@/lib/supabase/profile');
 
   type ActivityLevel =
