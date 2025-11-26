@@ -129,7 +129,7 @@ struct AppleSignInButton: UIViewRepresentable {
 
             // Absolute fallback: return a basic window (sign in won't work but won't crash)
             // print("❌ Critical: No window scene available - Apple Sign In will likely fail")
-            return UIWindow(frame: UIScreen.main.bounds)
+            return UIWindow(frame: .zero)
         }
 
         func authorizationController(

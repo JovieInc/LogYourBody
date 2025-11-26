@@ -7,6 +7,7 @@ import SwiftUI
 struct SyncStatusView: View {
     @StateObject private var syncManager = RealtimeSyncManager.shared
     @State private var showDetails = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         HStack(spacing: 8) {
@@ -36,7 +37,7 @@ struct SyncStatusView: View {
 
     private var isCompact: Bool {
         // Show compact view on smaller screens or when space is limited
-        UIScreen.main.bounds.width < 375
+        horizontalSizeClass == .compact
     }
 
     @ViewBuilder

@@ -405,18 +405,12 @@ struct ExportDataView: View {
         isExporting = true
         exportProgress = 0
 
-        do {
-            if exportMethod == .email {
-                // Use edge function for email export
-                await performEmailExport()
-            } else {
-                // Use local export for direct download
-                await performLocalExport()
-            }
-        } catch {
-            isExporting = false
-            errorMessage = error.localizedDescription
-            showError = true
+        if exportMethod == .email {
+            // Use edge function for email export
+            await performEmailExport()
+        } else {
+            // Use local export for direct download
+            await performLocalExport()
         }
     }
 
@@ -663,7 +657,7 @@ struct ExportDataView: View {
 
     private func createZipArchive(from directory: URL, files: [URL]) throws -> URL {
         let zipFileName = "LogYourBody_Export_\(formatDate(Date())).zip"
-        let zipURL = FileManager.default.temporaryDirectory.appendingPathComponent(zipFileName)
+        let _zipURL = FileManager.default.temporaryDirectory.appendingPathComponent(zipFileName)
 
         // Note: In a real implementation, you would use a zip library here
         // For now, we'll just return the first file

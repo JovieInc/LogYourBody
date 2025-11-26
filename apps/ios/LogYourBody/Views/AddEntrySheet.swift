@@ -259,7 +259,7 @@ struct AddEntrySheet: View {
                         .padding(.vertical, 4)
                     }
 
-                    if let medication = glp1SelectedMedication {
+                    if glp1SelectedMedication != nil {
                         let options = glp1DoseOptions
                         let unit = glp1UnitForSelectedMedication ?? glp1DoseUnit
 

@@ -203,7 +203,8 @@ struct BodyScoreShareSheet: View {
                 .frame(width: size.width, height: size.height)
                 .environment(\.colorScheme, .dark)
         )
-        renderer.scale = UIScreen.main.scale
+        // Use 3x scale for high quality images (suitable for sharing)
+        renderer.scale = 3.0
         renderedImage = renderer.uiImage
     }
 

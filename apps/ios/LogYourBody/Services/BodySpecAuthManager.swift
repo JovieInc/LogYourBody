@@ -250,8 +250,9 @@ final class BodySpecAuthManager: NSObject, ASWebAuthenticationPresentationContex
             if let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
                 return window
             }
+            return UIWindow(windowScene: windowScene)
         }
 
-        return UIWindow()
+        return UIWindow(frame: .zero)
     }
 }

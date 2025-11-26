@@ -434,7 +434,7 @@ extension DashboardViewLiquid {
 
         for offset in stride(from: 6, through: 0, by: -1) {
             guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
-            let stepsValue = lookup[date]?.steps ?? 0
+            let stepsValue = lookup[date]?.steps
             chartData.append(
                 MetricDataPoint(index: 6 - offset, value: Double(max(stepsValue ?? 0, 0)))
             )
@@ -445,7 +445,7 @@ extension DashboardViewLiquid {
 
     func latestStepsSnapshot() -> (value: Int?, date: Date?) {
         // Prefer Core Data so we can fall back to the most recent day with data
-        guard let userId = authManager.currentUser?.id else {
+        guard authManager.currentUser?.id != nil else {
             return (dailyMetrics?.steps, dailyMetrics?.date)
         }
 

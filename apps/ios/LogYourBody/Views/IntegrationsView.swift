@@ -38,7 +38,7 @@ struct IntegrationsView: View {
             Text("")
                 .onAppear {
                     Task {
-                        await healthKitManager.requestAuthorization()
+                        _ = await healthKitManager.requestAuthorization()
                         showHealthKitConnect = false
                     }
                 }

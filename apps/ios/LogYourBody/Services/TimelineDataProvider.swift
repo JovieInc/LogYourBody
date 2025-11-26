@@ -230,7 +230,6 @@ class TimelineDataProvider: ObservableObject {
 
         if date >= thirtyDaysAgo {
             // Last 30 days: 0.3 to 1.0 (70% of space)
-            let rangeStart = thirtyDaysAgo.timeIntervalSince(startDate)
             let rangeSize = now.timeIntervalSince(thirtyDaysAgo)
             let offset = date.timeIntervalSince(thirtyDaysAgo)
             return 0.3 + (offset / rangeSize) * 0.7

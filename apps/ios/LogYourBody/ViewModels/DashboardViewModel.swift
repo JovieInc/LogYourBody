@@ -57,10 +57,10 @@ final class DashboardViewModel: ObservableObject {
             let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
             let allMetrics = fetchedMetrics
                 .compactMap { $0.toBodyMetrics() }
-                .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
+                .sorted { $0.date > $1.date }
 
             bodyMetrics = allMetrics
-            sortedBodyMetricsAscending = allMetrics.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
+            sortedBodyMetricsAscending = allMetrics.sorted { $0.date < $1.date }
             if !bodyMetrics.isEmpty {
                 // DashboardViewLiquid will handle updating its own animated values
                 _ = selectedIndex
@@ -87,7 +87,7 @@ final class DashboardViewModel: ObservableObject {
             let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
             let allMetrics = fetchedMetrics
                 .compactMap { $0.toBodyMetrics() }
-                .sorted { $0.date ?? Date.distantPast > $1.date ?? Date.distantPast }
+                .sorted { $0.date > $1.date }
 
             await MainActor.run {
                 self.historicalLoadTask = nil
@@ -95,7 +95,7 @@ final class DashboardViewModel: ObservableObject {
 
                 self.bodyMetrics = allMetrics
                 self.sortedBodyMetricsAscending = allMetrics.sorted {
-                    ($0.date ?? .distantPast) < ($1.date ?? .distantPast)
+                    $0.date < $1.date
                 }
             }
         }

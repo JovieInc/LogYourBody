@@ -225,7 +225,7 @@ class RevenueCatManager: NSObject, ObservableObject {
                 if let current = offerings.current {
                     // print("💰 Current offering: \(current.identifier)")
                     // print("💰 Available packages: \(current.availablePackages.count)")
-                    for package in current.availablePackages {
+                    for _ in current.availablePackages {
                         // print("  📦 Package: \(package.identifier)")
                         // print("     Price: \(package.localizedPriceString)")
                         // print("     Product: \(package.storeProduct.productIdentifier)")

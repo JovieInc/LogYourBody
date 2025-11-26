@@ -27,6 +27,23 @@ struct InteractiveScale: ViewModifier {
     }
 }
 
+// MARK: - Fade In Modifier
+
+struct FadeInModifier: ViewModifier {
+    @State private var opacity: Double = 0
+    let delay: Double
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(opacity)
+            .onAppear {
+                withAnimation(.easeIn(duration: 0.3).delay(delay)) {
+                    opacity = 1
+                }
+            }
+    }
+}
+
 // MARK: - Shake Modifier
 
 struct Shake: ViewModifier {
@@ -278,12 +295,7 @@ extension View {
 
     // Common animations
     func fadeIn(delay: Double = 0) -> some View {
-        opacity(0)
-            .onAppear {
-                withAnimation(.easeIn(duration: 0.3).delay(delay)) {
-                    opacity(1)
-                }
-            }
+        modifier(FadeInModifier(delay: delay))
     }
 
     func slideIn(from edge: Edge = .bottom, delay: Double = 0) -> some View {
