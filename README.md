@@ -2,6 +2,8 @@
 
 A comprehensive body metrics tracking platform with native iOS and web applications for monitoring health and fitness progress.
 
+> **Note:** As of 2025-01-25, the default branch has been changed from `dev` to `main`. Please update your local repositories and any references accordingly.
+
 ## Overview
 
 LogYourBody helps users track their body composition changes over time through manual logging and automated data imports from DEXA scans, InBody analyses, and other body composition measurement devices.
@@ -9,6 +11,7 @@ LogYourBody helps users track their body composition changes over time through m
 ## AI Issue Triage
 
 This repository uses an intelligent AI-powered issue triage system. When you create a new issue, it will automatically:
+
 - Analyze the content and recommend the best AI tool (Sweep, Copilot, or Claude)
 - Add appropriate labels
 - Comment with instructions
@@ -22,6 +25,7 @@ This monorepo contains two main applications:
 ### 📱 iOS App (`/apps/ios`)
 
 Native SwiftUI application for iPhone that provides:
+
 - **HealthKit Integration**: Syncs steps data with Apple Health
 - **Body Metrics Tracking**: Log weight, body fat %, muscle mass, and measurements
 - **Photo Progress**: Capture and compare progress photos
@@ -29,6 +33,7 @@ Native SwiftUI application for iPhone that provides:
 - **Real-time Sync**: Automatic synchronization with Supabase backend
 
 **Tech Stack:**
+
 - SwiftUI
 - HealthKit
 - Core Data
@@ -38,6 +43,7 @@ Native SwiftUI application for iPhone that provides:
 ### 🌐 Web App (`/apps/web`)
 
 Modern web application built with Next.js that offers:
+
 - **Dashboard**: Visualize trends and progress with interactive charts
 - **PDF Import**: Extract data from DEXA/InBody scan PDFs using AI
 - **Manual Entry**: Log body metrics with an intuitive interface
@@ -45,6 +51,7 @@ Modern web application built with Next.js that offers:
 - **Real-time Updates**: Live synchronization across devices
 
 **Tech Stack:**
+
 - Next.js 14 (App Router)
 - TypeScript
 - Tailwind CSS
@@ -55,6 +62,7 @@ Modern web application built with Next.js that offers:
 ## Features
 
 ### Core Features
+
 - ✅ Multi-platform support (iOS & Web)
 - ✅ Real-time data synchronization
 - ✅ Secure authentication with Clerk
@@ -64,6 +72,7 @@ Modern web application built with Next.js that offers:
 - ✅ Apple Health integration (iOS)
 
 ### Coming Soon
+
 - 🚧 Android app
 - 🚧 Wearable device integrations
 - 🚧 AI-powered insights
@@ -72,6 +81,7 @@ Modern web application built with Next.js that offers:
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 20+
 - pnpm (recommended for this monorepo)
 - Xcode 15+ (for iOS development)
@@ -81,12 +91,14 @@ Modern web application built with Next.js that offers:
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/itstimwhite/LogYourBody.git
 cd LogYourBody
 ```
 
 2. Install dependencies (from the repo root):
+
 ```bash
 pnpm install
 ```
@@ -96,6 +108,7 @@ pnpm install
    - Add your Supabase and Clerk credentials
 
 4. Run the web app:
+
 ```bash
 cd apps/web
 pnpm dev
@@ -109,6 +122,7 @@ pnpm dev
 ## Database Schema
 
 The application uses Supabase with PostgreSQL. Key tables include:
+
 - `profiles`: User profile information
 - `body_metrics`: Weight, body fat %, muscle mass records
 - `body_measurements`: Detailed body measurements
@@ -136,13 +150,16 @@ You can still run app-specific scripts directly, for example:
 ## Deployment
 
 ### Web App
+
 The web app is configured for deployment on Vercel:
+
 ```bash
 cd apps/web
 pnpm build
 ```
 
 ### iOS App
+
 The iOS app can be distributed via TestFlight or the App Store.
 
 ## Contributing

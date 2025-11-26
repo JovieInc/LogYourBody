@@ -2,9 +2,9 @@ name: CI/CD Orchestrator
 
 on:
   push:
-    branches: [main, preview, dev]
+    branches: [main, preview]
   pull_request:
-    branches: [main, preview, dev]
+    branches: [main, preview]
   workflow_dispatch:
     inputs:
       force_deploy:
@@ -56,21 +56,18 @@ jobs:
     steps:
       - id: strategy
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "type=rapid" >> $GITHUB_OUTPUT
             echo "should_deploy=true" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == "refs/heads/preview" ]]; then
             echo "type=confidence" >> $GITHUB_OUTPUT
-            echo "should_deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "type=release" >> $GITHUB_OUTPUT
             echo "should_deploy=true" >> $GITHUB_OUTPUT
           else
             echo "type=pr" >> $GITHUB_OUTPUT
             echo "should_deploy=false" >> $GITHUB_OUTPUT
           fi
 
-  # RAPID LOOP - Dev branch only
+  # RAPID LOOP - Main branch only
   rapid-web:
     name: Rapid Web
     needs: [detect-changes, determine-strategy]
@@ -137,7 +134,7 @@ jobs:
           fi
           swiftlint lint --strict --reporter github-actions-logging
 
-  # RELEASE LOOP - Main branch
+  # RELEASE LOOP - Production (not currently used)
   release-web:
     name: Release Web
     needs: [detect-changes, determine-strategy]

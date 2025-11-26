@@ -3,7 +3,7 @@ name: Promote to Preview
 on:
   workflow_run:
     workflows: ["CI/CD Orchestrator"]
-    branches: [dev]
+    branches: [main]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -27,20 +27,20 @@ jobs:
       with:
         fetch-depth: 0
     
-    - name: Check if dev is ahead of preview
+    - name: Check if main is ahead of preview
       id: check
       run: |
-        git fetch origin dev preview
-        
-        # Check if dev has new commits
-        COMMITS_AHEAD=$(git rev-list --count origin/preview..origin/dev)
+        git fetch origin main preview
+
+        # Check if main has new commits
+        COMMITS_AHEAD=$(git rev-list --count origin/preview..origin/main)
         echo "Commits ahead: $COMMITS_AHEAD"
-        
+
         if [[ $COMMITS_AHEAD -gt 0 ]]; then
           echo "should_promote=true" >> $GITHUB_OUTPUT
         else
           echo "should_promote=false" >> $GITHUB_OUTPUT
-          echo "✅ Preview is already up to date with dev"
+          echo "✅ Preview is already up to date with main"
         fi
     
     - name: Check for existing PR
@@ -50,7 +50,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         # Check if there's already an open PR
-        PR_NUMBER=$(gh pr list --base preview --head dev --state open --json number -q '.[0].number')
+        PR_NUMBER=$(gh pr list --base preview --head main --state open --json number -q '.[0].number')
         
         if [[ -n "$PR_NUMBER" ]]; then
           echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
@@ -71,7 +71,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
       with:
-        ref: dev
+        ref: main
         fetch-depth: 0
     
     - name: Generate PR body
@@ -91,7 +91,7 @@ jobs:
         # Add workflow run info
         if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
           echo "### CI Results" >> pr_body.md
-          echo "- ✅ All CI checks passed on dev branch" >> pr_body.md
+          echo "- ✅ All CI checks passed on main branch" >> pr_body.md
           echo "- 🔗 [View workflow run](${{ github.event.workflow_run.html_url }})" >> pr_body.md
           echo "" >> pr_body.md
         fi
@@ -118,7 +118,7 @@ jobs:
           # Create new PR
           PR_URL=$(gh pr create \
             --base preview \
-            --head dev \
+            --head main \
             --title "🚀 Deploy to Preview" \
             --body-file pr_body.md \
             --label "auto-promotion" \
@@ -201,13 +201,13 @@ jobs:
             repo: context.repo.repo,
             issue_number: pr_number,
             body: `🤖 **Auto-promotion initiated**
-            
+
             This PR will be automatically merged once all checks pass.
-            
-            - ✅ Dev branch CI passed
+
+            - ✅ Main branch CI passed
             - ⏳ Waiting for preview branch checks
             - 🔄 Auto-merge enabled
-            
+
             @itstimwhite - FYI, promoting latest changes to preview.`
           });
 

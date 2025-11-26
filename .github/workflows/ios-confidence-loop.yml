@@ -3,7 +3,7 @@ name: iOS Confidence Loop
 on:
   workflow_run:
     workflows: ["iOS Rapid Loop"]
-    branches: [dev]
+    branches: [main]
     types: [completed]
   push:
     branches: [preview]

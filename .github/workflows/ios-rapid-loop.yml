@@ -2,7 +2,7 @@ name: iOS Rapid Loop
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
     paths:
       - 'apps/ios/**'
       - '.github/workflows/ios-rapid-loop.yml'
