@@ -1,11 +1,6 @@
 {
   "extends": "next/core-web-vitals",
-  "overrides": [
-    {
-      "files": ["**/__tests__/**/*.{ts,tsx}", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
-      "rules": {
-        "@typescript-eslint/no-require-imports": "off"
-      }
-    }
-  ]
+  "rules": {
+    "@typescript-eslint/no-require-imports": "off"
+  }
 }

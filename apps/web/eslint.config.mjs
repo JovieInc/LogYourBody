@@ -24,12 +24,13 @@ const eslintConfig = [
         "depth": 3
       }],
       // Less strict rules for build
-      "@typescript-eslint/no-unused-vars": ["error", { 
+      "@typescript-eslint/no-unused-vars": ["error", {
         "argsIgnorePattern": "^_",
         "varsIgnorePattern": "^_",
         "ignoreRestSiblings": true
       }],
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-require-imports": "off",
       "react/no-unescaped-entities": "off",
       "jsx-a11y/no-autofocus": "off",
       "@next/next/no-img-element": "off",
