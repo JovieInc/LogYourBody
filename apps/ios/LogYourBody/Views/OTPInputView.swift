@@ -57,7 +57,7 @@ struct OTPInputView: View {
                 }
                 .store(in: &cancellables)
         }
-        .onChange(of: digits) { _ in
+        .onChange(of: digits) { _, _ in
             // Update the bound otpCode
             otpCode = digits.joined()
 

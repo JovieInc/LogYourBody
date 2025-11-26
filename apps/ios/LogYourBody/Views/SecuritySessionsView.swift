@@ -120,7 +120,7 @@ struct SecuritySessionsView: View {
                 }
             }
         } message: {
-            if let session = sessionToRevoke {
+            if sessionToRevoke != nil {
                 Text("Are you sure you want to revoke this session? The device will be signed out immediately.")
             }
         }

@@ -210,8 +210,7 @@ class AuthManager: NSObject, ObservableObject {
             // print("🔧 Attempting to load Clerk...")
             let startTime = Date()
             try await clerk.load()
-            let duration = Date().timeIntervalSince(startTime)
-            // print("✅ Clerk SDK loaded successfully in \(String(format: "%.2f", duration))s")
+            // print("✅ Clerk SDK loaded successfully in \(String(format: "%.2f", Date().timeIntervalSince(startTime)))s")
 
             await MainActor.run {
                 self.isClerkLoaded = true
@@ -389,8 +388,6 @@ class AuthManager: NSObject, ObservableObject {
         // Extract properties using Mirror
         var userId = ""
         var emailAddresses: [Any] = []
-        var firstName: String?
-        var lastName: String?
         var username: String?
         var imageUrl: String?
 
@@ -400,10 +397,6 @@ class AuthManager: NSObject, ObservableObject {
                 userId = child.value as? String ?? ""
             case "emailAddresses":
                 emailAddresses = child.value as? [Any] ?? []
-            case "firstName":
-                firstName = child.value as? String
-            case "lastName":
-                lastName = child.value as? String
             case "username":
                 username = child.value as? String
             case "imageUrl":
@@ -1011,6 +1004,6 @@ private class AppleSignInDelegate: NSObject,
 
         // Absolute fallback: return a basic window (sign in won't work but won't crash)
         // print("❌ Critical: No window scene available - Apple Sign In will likely fail")
-        return UIWindow(frame: UIScreen.main.bounds)
+        return UIWindow(frame: .zero)
     }
 }

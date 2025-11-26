@@ -104,7 +104,7 @@ class LoadingManager: ObservableObject {
 
             if clerkReady {
                 // print("✅ LoadingManager: Clerk loaded successfully")
-            } else if let error = authManager.clerkInitError {
+            } else if authManager.clerkInitError != nil {
                 // print("⚠️ LoadingManager: Clerk failed to load: \(error)")
             } else {
                 // print("⚠️ LoadingManager: Clerk loading timed out after \(Double(maxWaitTimeNanoseconds) / 1_000_000_000)s")

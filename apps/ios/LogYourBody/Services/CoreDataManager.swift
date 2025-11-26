@@ -1403,7 +1403,7 @@ class CoreDataManager: ObservableObject {
                     let logId: String = log.id ?? UUID().uuidString
                     let logUserId: String = log.userId ?? ""
                     let logDate: Date = log.date ?? Date()
-                    let logStepCount: Int? = log.steps != nil ? Int(log.steps) : nil
+                    let logStepCount: Int? = Int(log.steps)
                     let logCreatedAt: Date = log.createdAt ?? Date()
                     let logUpdatedAt: Date = log.updatedAt ?? Date()
 
@@ -1449,12 +1449,10 @@ class CoreDataManager: ObservableObject {
         do {
             let allMetrics = try viewContext.fetch(fetchRequest)
             // print("🔍 DEBUG: Total body metrics in Core Data: \(allMetrics.count)")
-            for (index, metric) in allMetrics.enumerated() {
+            for (_, _) in allMetrics.enumerated() {
                 // print("  [\(index)] ID: \(metric.id ?? "nil"), UserId: \(metric.userId ?? "nil"), Weight: \(metric.weight), Date: \(metric.date ?? Date()), isSynced: \(metric.isSynced), syncStatus: \(metric.syncStatus ?? "nil")")
-                if index >= 5 {
-                    // print("  ... and \(allMetrics.count - 5) more")
-                    break
-                }
+                // Commented out - only first 5 metrics would be logged
+                break
             }
         } catch {
             // print("Failed to fetch all body metrics: \(error)")
@@ -1474,7 +1472,7 @@ class CoreDataManager: ObservableObject {
         deleteRequest.resultType = .resultTypeCount
 
         do {
-            let result = try viewContext.execute(deleteRequest) as? NSBatchDeleteResult
+            _ = try viewContext.execute(deleteRequest) as? NSBatchDeleteResult
             // print("Deleted \(result?.result ?? 0) old body metrics")
         } catch {
             // print("Error cleaning up old data: \(error)")

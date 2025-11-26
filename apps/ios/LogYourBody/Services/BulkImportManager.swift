@@ -67,7 +67,7 @@ class BulkImportManager: ObservableObject {
         }
 
         currentTask = Task {
-            for (index, photo) in photos.enumerated() {
+            for (index, _) in photos.enumerated() {
                 if Task.isCancelled { break }
 
                 await importPhoto(at: index)

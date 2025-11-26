@@ -825,7 +825,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     private func configureMeasurementPreference() {
         let storedSystemRaw = UserDefaults.standard.string(forKey: Constants.preferredMeasurementSystemKey)
         let storedWeightUnitRaw = UserDefaults.standard.string(forKey: Constants.preferredWeightUnitKey)
-        let localePrefersMetric = Locale.current.usesMetricSystem
+        let localePrefersMetric = Locale.current.measurementSystem == .metric
 
         let measurementSystem: MeasurementSystem
         if let raw = storedSystemRaw, let system = MeasurementSystem(rawValue: raw) {

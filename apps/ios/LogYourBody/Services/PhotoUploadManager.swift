@@ -71,8 +71,7 @@ class PhotoUploadManager: ObservableObject {
 
         // print("📸 PhotoUploadManager: Starting upload for metrics \(metrics.id)")
         // print("📸 PhotoUploadManager: Current user ID: \(userId)")
-        let userEmail = authManager.currentUser?.email ?? "nil"
-        // print("📸 PhotoUploadManager: Current user email: \(userEmail)")
+        // print("📸 PhotoUploadManager: Current user email: \(authManager.currentUser?.email ?? "nil")")
 
         ErrorTrackingService.shared.addBreadcrumb(
             message: "Starting photo upload",
@@ -435,8 +434,7 @@ class PhotoUploadManager: ObservableObject {
 
         guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let processedUrl = result["processedUrl"] as? String else {
-            let responseString = String(data: data, encoding: .utf8) ?? "No response data"
-            // print("❌ PhotoUploadManager: Invalid edge function response format: \(responseString)")
+            // print("❌ PhotoUploadManager: Invalid edge function response format: \(String(data: data, encoding: .utf8) ?? "No response data")")
             throw PhotoError.processingFailed("Invalid response format")
         }
 

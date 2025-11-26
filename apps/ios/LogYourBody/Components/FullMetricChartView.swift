@@ -699,9 +699,8 @@ struct FullMetricChartView: View {
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
                                 let plotFrame = proxy.plotFrame
-                                let frame = geo[plotFrame]
-                                let origin = frame.origin
-                                let width = frame.size.width
+                                let origin = plotFrame.origin
+                                let width = plotFrame.size.width
                                 let locationX = value.location.x - origin.x
                                 guard locationX >= 0, locationX <= width else { return }
                                 if let date: Date = proxy.value(atX: locationX) {

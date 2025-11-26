@@ -710,15 +710,15 @@ class HealthKitManager: ObservableObject {
 
         if !recentWeightHistory.isEmpty {
             // print("  📅 Weight entries date range: \(recentWeightHistory.first?.date ?? Date()) to \(recentWeightHistory.last?.date ?? Date())")
-            for (index, (weight, date)) in recentWeightHistory.enumerated() {
-                if index < 5 {  // Show first 5 entries
-                    // print("    - \(date): \(weight)kg")
-                }
+            for (_, _) in recentWeightHistory.enumerated() {
+                // Show first 5 entries
+                // print("    - \(date): \(weight)kg")
+                break
             }
         }
 
         // Process recent data for immediate UI update
-        let (imported, skipped) = await processBatchHealthKitData(
+        let (imported, _) = await processBatchHealthKitData(
             weightHistory: recentWeightHistory,
             bodyFatHistory: recentBodyFatHistory
         )
@@ -807,10 +807,10 @@ class HealthKitManager: ObservableObject {
 
         if !weightHistory.isEmpty {
             // print("  📅 Weight entries date range: \(weightHistory.first?.date ?? Date()) to \(weightHistory.last?.date ?? Date())")
-            for (index, (weight, date)) in weightHistory.enumerated() {
-                if index < 5 {  // Show first 5 entries
-                    // print("    - \(date): \(weight)kg")
-                }
+            for (_, _) in weightHistory.enumerated() {
+                // Show first 5 entries
+                // print("    - \(date): \(weight)kg")
+                break
             }
         }
 
@@ -1195,10 +1195,10 @@ class HealthKitManager: ObservableObject {
             stepObserverQuery = nil
         }
 
-        activeQueries.filter { $0 is HKObserverQuery && ($0 as? HKObserverQuery)?.sampleType == stepCountType }.forEach {
+        activeQueries.filter { $0 is HKObserverQuery && ($0 as? HKObserverQuery)?.objectType == stepCountType }.forEach {
             healthStore.stop($0)
         }
-        activeQueries.removeAll { $0 is HKObserverQuery && ($0 as? HKObserverQuery)?.sampleType == stepCountType }
+        activeQueries.removeAll { $0 is HKObserverQuery && ($0 as? HKObserverQuery)?.objectType == stepCountType }
 
         let query = HKObserverQuery(sampleType: stepCountType, predicate: nil) { [weak self] _, completionHandler, error in
             if error == nil {

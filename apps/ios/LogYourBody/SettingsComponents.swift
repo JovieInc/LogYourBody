@@ -251,7 +251,7 @@ struct SettingsToggleRow: View {
         }
         .padding(.horizontal, SettingsDesign.horizontalPadding)
         .padding(.vertical, SettingsDesign.verticalPadding)
-        .onChange(of: isOn) { newValue in
+        .onChange(of: isOn) { _, newValue in
             onToggle?(newValue)
         }
     }

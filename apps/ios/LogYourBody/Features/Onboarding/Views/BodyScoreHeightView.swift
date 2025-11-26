@@ -135,7 +135,7 @@ struct BodyScoreHeightView: View {
                 }
                 .pickerStyle(.wheel)
                 .frame(maxWidth: .infinity)
-                .onChange(of: viewModel.heightFeet) { _ in
+                .onChange(of: viewModel.heightFeet) { _, _ in
                     HapticManager.shared.selection()
                 }
 
@@ -149,7 +149,7 @@ struct BodyScoreHeightView: View {
                 }
                 .pickerStyle(.wheel)
                 .frame(maxWidth: .infinity)
-                .onChange(of: viewModel.heightInches) { _ in
+                .onChange(of: viewModel.heightInches) { _, _ in
                     HapticManager.shared.selection()
                 }
             }

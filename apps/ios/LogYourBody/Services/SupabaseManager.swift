@@ -58,7 +58,7 @@ class SupabaseManager: ObservableObject {
         request.httpBody = jsonData
 
         // print("📤 Sending \(metrics.count) body metrics to Supabase")
-        if let jsonString = String(data: jsonData, encoding: .utf8) {
+        if String(data: jsonData, encoding: .utf8) != nil {
             // print("📄 Request body preview: \(String(jsonString.prefix(500)))")
         }
 
@@ -71,7 +71,7 @@ class SupabaseManager: ObservableObject {
         // print("📡 Supabase body_metrics response: Status \(httpResponse.statusCode)")
 
         if !(200...299).contains(httpResponse.statusCode) {
-            if let errorData = String(data: data, encoding: .utf8) {
+            if String(data: data, encoding: .utf8) != nil {
                 // print("❌ Supabase body_metrics error: \(errorData)")
             }
             throw SupabaseError.requestFailed
@@ -95,7 +95,7 @@ class SupabaseManager: ObservableObject {
         request.httpBody = jsonData
 
         // Debug: Print exactly what we're sending
-        if let jsonString = String(data: jsonData, encoding: .utf8) {
+        if String(data: jsonData, encoding: .utf8) != nil {
             // print("📤 Sending to Supabase body_metrics:")
             // print("   URL: \(url)")
             // print("   Method: POST")
