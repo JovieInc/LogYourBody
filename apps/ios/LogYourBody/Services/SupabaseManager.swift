@@ -213,7 +213,31 @@ class SupabaseManager: ObservableObject {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let jsonData = try JSONSerialization.data(withJSONObject: profile)
+        let isoFormatter = ISO8601DateFormatter()
+        let sanitizedProfile: [String: Any] = profile.reduce(into: [:]) { result, element in
+            let (key, value) = element
+
+            if let dateValue = value as? Date {
+                result[key] = isoFormatter.string(from: dateValue)
+            } else {
+                result[key] = value
+            }
+        }
+
+        guard JSONSerialization.isValidJSONObject(sanitizedProfile) else {
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "Invalid profile payload for JSON serialization",
+                category: "supabase",
+                level: .error,
+                data: [
+                    "operation": "updateProfile",
+                    "userId": userId
+                ]
+            )
+            throw SupabaseError.invalidData
+        }
+
+        let jsonData = try JSONSerialization.data(withJSONObject: sanitizedProfile)
         request.httpBody = jsonData
 
         let (_, response) = try await self.session.data(for: request)

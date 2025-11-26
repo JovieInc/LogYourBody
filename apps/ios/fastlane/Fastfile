@@ -529,9 +529,16 @@ platform :ios do
       scheme: options[:scheme] || scheme,
       configuration: "Debug",
       export_method: "development",
+      clean: false,
       clean_artifacts: false,
       xcargs: "#{options[:xcargs]} CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO"
     )
+  end
+  
+  desc "CI lane: lint + quick build check"
+  lane :ci_ios do
+    lint
+    build_check
   end
   
   desc "PR verification - lint, build, and test"
