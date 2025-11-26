@@ -3,25 +3,12 @@
  * Generates Swift code from design tokens
  */
 
-module.exports = {
-  source: [
-    'tokens/core/**/*.json',
-    'tokens/semantic/**/*.json',
-    'tokens/platform/ios.json'
-  ],
+export default {
+  source: ['tokens/core/**/*.json', 'tokens/semantic/**/*.json', 'tokens/platform/ios.json'],
   platforms: {
     ios: {
       transformGroup: 'ios',
       buildPath: 'build/ios/',
-      transforms: [
-        'attribute/cti',
-        'name/ti/camel',
-        'color/UIColor',
-        'content/swift/literal',
-        'asset/swift/literal',
-        'size/swift/remToCGFloat',
-        'font/swift/literal'
-      ],
       files: [
         {
           destination: 'DesignTokens.swift',
@@ -30,10 +17,9 @@ module.exports = {
           filter: (token) => {
             // Filter out tokens that don't make sense for iOS
             return !token.path.includes('easing') || token.value !== 'linear';
-          }
-        }
+          },
+        },
       ],
-      actions: ['copy_assets']
     },
     'ios-swift': {
       transformGroup: 'ios-swift',
@@ -44,29 +30,29 @@ module.exports = {
           format: 'custom/swift/colors',
           filter: {
             attributes: {
-              category: 'color'
-            }
-          }
+              category: 'color',
+            },
+          },
         },
         {
           destination: 'DesignTokens+Spacing.swift',
           format: 'custom/swift/spacing',
           filter: {
             attributes: {
-              category: 'spacing'
-            }
-          }
+              category: 'spacing',
+            },
+          },
         },
         {
           destination: 'DesignTokens+Typography.swift',
           format: 'custom/swift/typography',
           filter: {
             attributes: {
-              category: 'font'
-            }
-          }
-        }
-      ]
-    }
-  }
+              category: 'font',
+            },
+          },
+        },
+      ],
+    },
+  },
 };

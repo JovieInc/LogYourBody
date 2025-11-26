@@ -5,18 +5,21 @@
  * Generates Swift code from design tokens using Style Dictionary
  */
 
-const StyleDictionary = require('style-dictionary');
-const path = require('path');
+import StyleDictionary from 'style-dictionary';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import config from '../config/style-dictionary.ios.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 console.log('🍎 Building design tokens for iOS (SwiftUI)...\n');
-
-// Load iOS configuration
-const config = require('../config/style-dictionary.ios');
 
 // Register custom format for Swift colors
 StyleDictionary.registerFormat({
   name: 'custom/swift/colors',
-  formatter: function({ dictionary }) {
+  format: function ({ dictionary }) {
     const tokens = dictionary.allTokens;
 
     return `//
@@ -28,8 +31,8 @@ import SwiftUI
 extension DesignTokens {
     public struct Color {
 ${tokens
-  .filter(token => token.type === 'color')
-  .map(token => {
+  .filter((token) => token.type === 'color')
+  .map((token) => {
     const name = token.name.replace(/^color-/, '').replace(/-/g, '_');
     return `        public static let ${name} = SwiftUI.Color(hex: "${token.value}")`;
   })
@@ -64,13 +67,13 @@ extension SwiftUI.Color {
     }
 }
 `;
-  }
+  },
 });
 
 // Register custom format for Swift spacing
 StyleDictionary.registerFormat({
   name: 'custom/swift/spacing',
-  formatter: function({ dictionary }) {
+  format: function ({ dictionary }) {
     const tokens = dictionary.allTokens;
 
     return `//
@@ -82,8 +85,8 @@ import SwiftUI
 extension DesignTokens {
     public struct Spacing {
 ${tokens
-  .filter(token => token.attributes.category === 'spacing')
-  .map(token => {
+  .filter((token) => token.attributes.category === 'spacing')
+  .map((token) => {
     const name = token.name.replace(/^spacing-/, '').replace(/-/g, '_');
     return `        public static let ${name}: CGFloat = ${token.value}`;
   })
@@ -91,12 +94,39 @@ ${tokens
     }
 }
 `;
-  }
+  },
+});
+
+// Register custom format for Swift typography
+StyleDictionary.registerFormat({
+  name: 'custom/swift/typography',
+  format: function ({ dictionary }) {
+    const tokens = dictionary.allTokens;
+
+    return `//
+// DesignTokens+Typography.swift
+// Generated from design tokens - DO NOT EDIT
+//
+import SwiftUI
+
+extension DesignTokens {
+    public struct Typography {
+${tokens
+  .filter((token) => token.attributes.category === 'font')
+  .map((token) => {
+    const name = token.name.replace(/^font-/, '').replace(/-/g, '_');
+    return `        public static let ${name}: Font = .system(size: ${token.value})`;
+  })
+  .join('\n')}
+    }
+}
+`;
+  },
 });
 
 // Build iOS tokens
-const sd = StyleDictionary.extend(config);
-sd.buildAllPlatforms();
+const sd = new StyleDictionary(config);
+await sd.buildAllPlatforms();
 
 console.log('\n✅ iOS design tokens built successfully!');
 console.log(`📦 Output: ${path.resolve(__dirname, '../build/ios/')}\n`);
