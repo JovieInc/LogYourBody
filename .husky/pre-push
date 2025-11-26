@@ -1,5 +1,10 @@
-# Auto-version before push
+#!/usr/bin/env sh
+. "$(dirname "$0")/_/husky.sh"
+
 echo "🔄 Running auto-versioning..."
 node apps/web/scripts/version-manager.cjs --skip-tag
 
 # The tag will be created by the GitHub Action to avoid conflicts
+
+echo "Husky: running pre-push (turbo lint/typecheck/test since origin/main)..."
+pnpm prepush

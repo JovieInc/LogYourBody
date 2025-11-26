@@ -73,7 +73,7 @@ Modern web application built with Next.js that offers:
 
 ### Prerequisites
 - Node.js 20+
-- npm or yarn
+- pnpm (recommended for this monorepo)
 - Xcode 15+ (for iOS development)
 - Supabase account
 - Clerk account
@@ -86,9 +86,9 @@ git clone https://github.com/itstimwhite/LogYourBody.git
 cd LogYourBody
 ```
 
-2. Install dependencies:
+2. Install dependencies (from the repo root):
 ```bash
-npm install
+pnpm install
 ```
 
 3. Set up environment variables:
@@ -98,7 +98,7 @@ npm install
 4. Run the web app:
 ```bash
 cd apps/web
-npm run dev
+pnpm dev
 ```
 
 5. Run the iOS app:
@@ -118,12 +118,20 @@ Row Level Security (RLS) ensures users can only access their own data.
 
 ## Development Scripts
 
-- `npm run dev` - Start web development server
-- `npm run build` - Build web app for production
-- `npm run test` - Run tests
-- `npm run lint` - Lint code
-- `npm run typecheck` - TypeScript type checking
-- `npm run ios` - Open iOS project in Xcode
+The monorepo is managed with **pnpm workspaces** and **Turborepo**. Run these from the repo root:
+
+- `pnpm dev` – Start the web dev server (apps/web)
+- `pnpm build` – Run the Turborepo build pipeline
+- `pnpm test` – Run tests across workspaces
+- `pnpm test:ci` – Run tests in CI mode (`--runInBand`)
+- `pnpm lint` – Run all linters across workspaces
+- `pnpm typecheck` – TypeScript type checking across workspaces
+- `pnpm ios` – Open the iOS project in Xcode
+
+You can still run app-specific scripts directly, for example:
+
+- `cd apps/web && pnpm dev`
+- `cd apps/web && pnpm test`
 
 ## Deployment
 
@@ -131,7 +139,7 @@ Row Level Security (RLS) ensures users can only access their own data.
 The web app is configured for deployment on Vercel:
 ```bash
 cd apps/web
-npm run build
+pnpm build
 ```
 
 ### iOS App

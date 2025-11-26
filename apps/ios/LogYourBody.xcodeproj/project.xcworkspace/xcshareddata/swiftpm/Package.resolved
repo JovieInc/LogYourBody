@@ -1,5 +1,5 @@
 {
-  "originHash" : "7f21082865a5f5670d369ad5169876d372ce86eb361f3a049da507f7d133360f",
+  "originHash" : "65784391d8729a45d3513d45987ad76fa8aa17d26ce0f95365a1417786ba6144",
   "pins" : [
     {
       "identity" : "clerk-ios",
@@ -38,12 +38,30 @@
       }
     },
     {
+      "identity" : "sentry-cocoa",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/getsentry/sentry-cocoa.git",
+      "state" : {
+        "revision" : "8627bbc0e663238d516b541d8fc7edd62a627fde",
+        "version" : "8.57.3"
+      }
+    },
+    {
       "identity" : "simplekeychain",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/auth0/SimpleKeychain",
       "state" : {
         "revision" : "776c4a6db74d5c6c143974be91c383680d468630",
         "version" : "1.3.0"
+      }
+    },
+    {
+      "identity" : "statsig-kit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/statsig-io/statsig-kit.git",
+      "state" : {
+        "revision" : "fec1247f8d2fbd1ee11fcdf0d0f715c5b6c1934e",
+        "version" : "1.55.1"
       }
     }
   ],

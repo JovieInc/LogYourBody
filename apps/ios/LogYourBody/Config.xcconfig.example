@@ -11,6 +11,6 @@ SUPABASE_ANON_KEY = your-anon-key-here
 API_BASE_URL_DEBUG = http:/$()/localhost:3000
 API_BASE_URL_RELEASE = https:/$()/your-production-url.com
 
-// PostHog Analytics
-POSTHOG_API_KEY = your-posthog-api-key-here
-POSTHOG_HOST = https:/$()/us.i.posthog.com
+// Statsig Analytics
+STATSIG_CLIENT_SDK_KEY = your-statsig-ios-client-sdk-key-here
+STATSIG_ENVIRONMENT_TIER = development

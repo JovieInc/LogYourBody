@@ -108,21 +108,21 @@ enum Configuration {
         }
     }
 
-    // MARK: - PostHog Analytics Configuration
+    // MARK: - Statsig Analytics Configuration
 
-    static var posthogAPIKey: String {
+    static var statsigClientSDKKey: String {
         do {
-            return try Configuration.value(for: "POSTHOG_API_KEY")
+            return try Configuration.value(for: "STATSIG_CLIENT_SDK_KEY")
         } catch {
             return ""
         }
     }
 
-    static var posthogHost: String {
+    static var statsigEnvironmentTier: String {
         do {
-            return try Configuration.value(for: "POSTHOG_HOST")
+            return try Configuration.value(for: "STATSIG_ENVIRONMENT_TIER")
         } catch {
-            return "https://us.i.posthog.com"
+            return "development"
         }
     }
 

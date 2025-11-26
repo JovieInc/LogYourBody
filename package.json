@@ -3,23 +3,60 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspace=apps/web",
+    "build": "turbo run build",
     "start": "npm run start --workspace=apps/web",
-    "lint": "npm run lint --workspace=apps/web",
-    "test": "npm run test --workspace=apps/web",
-    "typecheck": "npm run typecheck --workspace=apps/web",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:ci": "turbo run test -- --runInBand",
     "web": "npm run dev --workspace=apps/web",
-    "ios": "cd apps/ios && open LogYourBody.xcodeproj"
+    "ios": "cd apps/ios && open LogYourBody.xcodeproj",
+    "prepush": "turbo run lint typecheck test --since=origin/main",
+    "prepare": "husky install",
+    "check": "npm run check --workspace=apps/web",
+    "format": "prettier --write .",
+    "lint:swift": "cd apps/ios && swiftlint lint --strict"
   },
   "devDependencies": {
-    "turbo": "^2.5.4"
+    "turbo": "^2.5.4",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "prettier": "^3.4.0",
+    "typescript": "^5.8.3",
+    "eslint": "^9.31.0",
+    "@typescript-eslint/parser": "^8.16.0",
+    "@typescript-eslint/eslint-plugin": "^8.16.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-config-prettier": "^9.1.0",
+    "vitest": "^2.1.4"
   },
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
+  },
+  "lint-staged": {
+    "apps/web/**/*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "packages/**/*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,scss}": [
+      "prettier --write"
+    ],
+    "apps/ios/**/*.{swift}": [
+      "cd apps/ios && swiftlint"
+    ]
   }
 }

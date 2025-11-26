@@ -75,12 +75,14 @@ final class ErrorTrackingService {
         breadcrumb.message = message
 
         if let data = data {
+            var breadcrumbData: [String: Any] = breadcrumb.data ?? [:]
             for (key, value) in data {
-                breadcrumb.setData(value: value, key: key)
+                breadcrumbData[key] = value
             }
+            breadcrumb.data = breadcrumbData
         }
 
-        SentrySDK.addBreadcrumb(crumb: breadcrumb)
+        SentrySDK.addBreadcrumb(breadcrumb)
         #endif
     }
 

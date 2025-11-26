@@ -102,6 +102,8 @@
 		AD8872D12EB946BE0041C426 /* StandardCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872612EB946BE0041C426 /* StandardCard.swift */; };
 		AD8872D22EB946BE0041C426 /* LiquidGlassCTAButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872732EB946BE0041C426 /* LiquidGlassCTAButton.swift */; };
 		AD8872D32EB946BE0041C426 /* DSTrendIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725C2EB946BE0041C426 /* DSTrendIndicator.swift */; };
+		AD8F12E62ED678D6003C4559 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = AD8F12E52ED678D6003C4559 /* Sentry */; };
+		AD8F12E92ED6A489003C4559 /* Statsig in Frameworks */ = {isa = PBXBuildFile; productRef = AD8F12E82ED6A489003C4559 /* Statsig */; };
 		ADA4B7372ECC3A7A00F4262A /* EntryVisibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */; };
 		ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */; };
 		ADA4B73B2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B73A2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift */; };
@@ -647,8 +649,10 @@
 				AD050C4F2EC135360082A313 /* RevenueCat in Frameworks */,
 				AD050C4D2EC135360082A313 /* ReceiptParser in Frameworks */,
 				AD25A7822E17439500611A56 /* Clerk in Frameworks */,
+				AD8F12E92ED6A489003C4559 /* Statsig in Frameworks */,
 				AD050C512EC135360082A313 /* RevenueCatUI in Frameworks */,
 				AD3E4F652E17A12300345678 /* HealthKit.framework in Frameworks */,
+				AD8F12E62ED678D6003C4559 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1375,6 +1379,8 @@
 				AD050C4C2EC135360082A313 /* ReceiptParser */,
 				AD050C4E2EC135360082A313 /* RevenueCat */,
 				AD050C502EC135360082A313 /* RevenueCatUI */,
+				AD8F12E52ED678D6003C4559 /* Sentry */,
+				AD8F12E82ED6A489003C4559 /* Statsig */,
 			);
 			productName = LogYourBody;
 			productReference = AD7D30922E14907F0072AA5B /* LogYourBody.app */;
@@ -1455,6 +1461,8 @@
 			packageReferences = (
 				AD25A7802E17439500611A56 /* XCRemoteSwiftPackageReference "clerk-ios" */,
 				AD050C472EC061040082A313 /* XCRemoteSwiftPackageReference "purchases-ios" */,
+				AD8F12E42ED678D6003C4559 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
+				AD8F12E72ED6A489003C4559 /* XCRemoteSwiftPackageReference "statsig-kit" */,
 			);
 			productRefGroup = AD7D30932E14907F0072AA5B /* Products */;
 			projectDirPath = "";
@@ -1905,7 +1913,7 @@
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251125150517;
+				CURRENT_PROJECT_VERSION = 20251125190359;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
 				DEVELOPMENT_TEAM = G24T327LXT;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = G24T327LXT;
@@ -1947,7 +1955,7 @@
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251125150517;
+				CURRENT_PROJECT_VERSION = 20251125190359;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
 				DEVELOPMENT_TEAM = G24T327LXT;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = G24T327LXT;
@@ -1985,7 +1993,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251125150517;
+				CURRENT_PROJECT_VERSION = 20251125190359;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -2008,7 +2016,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251125150517;
+				CURRENT_PROJECT_VERSION = 20251125190359;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -2030,7 +2038,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251125150517;
+				CURRENT_PROJECT_VERSION = 20251125190359;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -2052,7 +2060,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251125150517;
+				CURRENT_PROJECT_VERSION = 20251125190359;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -2127,6 +2135,22 @@
 				minimumVersion = 0.59.0;
 			};
 		};
+		AD8F12E42ED678D6003C4559 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.57.3;
+			};
+		};
+		AD8F12E72ED6A489003C4559 /* XCRemoteSwiftPackageReference "statsig-kit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/statsig-io/statsig-kit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.55.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -2149,6 +2173,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AD25A7802E17439500611A56 /* XCRemoteSwiftPackageReference "clerk-ios" */;
 			productName = Clerk;
+		};
+		AD8F12E52ED678D6003C4559 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AD8F12E42ED678D6003C4559 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
+		};
+		AD8F12E82ED6A489003C4559 /* Statsig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AD8F12E72ED6A489003C4559 /* XCRemoteSwiftPackageReference "statsig-kit" */;
+			productName = Statsig;
 		};
 /* End XCSwiftPackageProductDependency section */
 

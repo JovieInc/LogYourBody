@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Git pre-commit hook
+# Runs lint-staged on staged files before commit
+
+echo " Running lint-staged..."
+
+npx lint-staged
+
+if [ $? -ne 0 ]; then
+	echo ""
+	echo " Lint-staged checks failed. Commit aborted."
+	echo " Fix the issues above and try again."
+	exit 1
+fi
+
+echo " Lint-staged checks passed. Proceeding with commit."

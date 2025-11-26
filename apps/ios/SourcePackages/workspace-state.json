@@ -1,7 +1,106 @@
 {
   "object" : {
     "artifacts" : [
+      {
+        "kind" : {
+          "xcframework" : {
 
+          }
+        },
+        "packageRef" : {
+          "identity" : "sentry-cocoa",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/getsentry/sentry-cocoa.git",
+          "name" : "sentry-cocoa"
+        },
+        "path" : "/Users/timwhite/Documents/GitHub/TBF/LogYourBody/apps/ios/SourcePackages/artifacts/sentry-cocoa/Sentry-Dynamic-WithARM64e/Sentry-Dynamic-WithARM64e.xcframework",
+        "source" : {
+          "checksum" : "dea4d4eaa98eaf9598d132094a9208ea84a5455c949b1f757f44058921abea31",
+          "type" : "remote",
+          "url" : "https://github.com/getsentry/sentry-cocoa/releases/download/8.57.3/Sentry-Dynamic-WithARM64e.xcframework.zip"
+        },
+        "targetName" : "Sentry-Dynamic-WithARM64e"
+      },
+      {
+        "kind" : {
+          "xcframework" : {
+
+          }
+        },
+        "packageRef" : {
+          "identity" : "sentry-cocoa",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/getsentry/sentry-cocoa.git",
+          "name" : "sentry-cocoa"
+        },
+        "path" : "/Users/timwhite/Documents/GitHub/TBF/LogYourBody/apps/ios/SourcePackages/artifacts/sentry-cocoa/Sentry-WithoutUIKitOrAppKit/Sentry-WithoutUIKitOrAppKit.xcframework",
+        "source" : {
+          "checksum" : "cada693debab4b1b41a19b71da404e6c0542d84225d21784a145f59bd43f8ce8",
+          "type" : "remote",
+          "url" : "https://github.com/getsentry/sentry-cocoa/releases/download/8.57.3/Sentry-WithoutUIKitOrAppKit.xcframework.zip"
+        },
+        "targetName" : "Sentry-WithoutUIKitOrAppKit"
+      },
+      {
+        "kind" : {
+          "xcframework" : {
+
+          }
+        },
+        "packageRef" : {
+          "identity" : "sentry-cocoa",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/getsentry/sentry-cocoa.git",
+          "name" : "sentry-cocoa"
+        },
+        "path" : "/Users/timwhite/Documents/GitHub/TBF/LogYourBody/apps/ios/SourcePackages/artifacts/sentry-cocoa/Sentry-Dynamic/Sentry-Dynamic.xcframework",
+        "source" : {
+          "checksum" : "540fca1ed90437429c25c01509956d246f3ae175b8474ac584a8812d2a91c207",
+          "type" : "remote",
+          "url" : "https://github.com/getsentry/sentry-cocoa/releases/download/8.57.3/Sentry-Dynamic.xcframework.zip"
+        },
+        "targetName" : "Sentry-Dynamic"
+      },
+      {
+        "kind" : {
+          "xcframework" : {
+
+          }
+        },
+        "packageRef" : {
+          "identity" : "sentry-cocoa",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/getsentry/sentry-cocoa.git",
+          "name" : "sentry-cocoa"
+        },
+        "path" : "/Users/timwhite/Documents/GitHub/TBF/LogYourBody/apps/ios/SourcePackages/artifacts/sentry-cocoa/Sentry-WithoutUIKitOrAppKit-WithARM64e/Sentry-WithoutUIKitOrAppKit-WithARM64e.xcframework",
+        "source" : {
+          "checksum" : "bddce2e4a79b49606dd9e3a76448486813e7d3a2565de7c334a4010541ea0989",
+          "type" : "remote",
+          "url" : "https://github.com/getsentry/sentry-cocoa/releases/download/8.57.3/Sentry-WithoutUIKitOrAppKit-WithARM64e.xcframework.zip"
+        },
+        "targetName" : "Sentry-WithoutUIKitOrAppKit-WithARM64e"
+      },
+      {
+        "kind" : {
+          "xcframework" : {
+
+          }
+        },
+        "packageRef" : {
+          "identity" : "sentry-cocoa",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/getsentry/sentry-cocoa.git",
+          "name" : "sentry-cocoa"
+        },
+        "path" : "/Users/timwhite/Documents/GitHub/TBF/LogYourBody/apps/ios/SourcePackages/artifacts/sentry-cocoa/Sentry/Sentry.xcframework",
+        "source" : {
+          "checksum" : "a752bc463fc7aafbe7530f6e57b3ca3ac7efcf59a5cd96b863fee9d25f1668fa",
+          "type" : "remote",
+          "url" : "https://github.com/getsentry/sentry-cocoa/releases/download/8.57.3/Sentry.xcframework.zip"
+        },
+        "targetName" : "Sentry"
+      }
     ],
     "dependencies" : [
       {
@@ -75,6 +174,23 @@
       {
         "basedOn" : null,
         "packageRef" : {
+          "identity" : "sentry-cocoa",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/getsentry/sentry-cocoa.git",
+          "name" : "sentry-cocoa"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "8627bbc0e663238d516b541d8fc7edd62a627fde",
+            "version" : "8.57.3"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "sentry-cocoa"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
           "identity" : "simplekeychain",
           "kind" : "remoteSourceControl",
           "location" : "https://github.com/auth0/SimpleKeychain",
@@ -88,6 +204,23 @@
           "name" : "sourceControlCheckout"
         },
         "subpath" : "SimpleKeychain"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "statsig-kit",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/statsig-io/statsig-kit.git",
+          "name" : "statsig-kit"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "fec1247f8d2fbd1ee11fcdf0d0f715c5b6c1934e",
+            "version" : "1.55.1"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "statsig-kit"
       }
     ],
     "prebuilts" : [

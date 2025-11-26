@@ -8,7 +8,7 @@ import UIKit
 import CryptoKit
 import Clerk
 
-#if !canImport(PostHog)
+#if !canImport(Statsig)
 final class AnalyticsService {
     static let shared = AnalyticsService()
 

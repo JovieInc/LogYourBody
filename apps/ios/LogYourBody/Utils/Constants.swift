@@ -57,15 +57,6 @@ struct Constants {
         Configuration.revenueCatAPIKey
     }
 
-    // MARK: - Analytics Configuration (from Config.xcconfig via Info.plist)
-    static var posthogAPIKey: String {
-        Configuration.posthogAPIKey
-    }
-
-    static var posthogHost: String {
-        Configuration.posthogHost
-    }
-
     // RevenueCat Entitlement ID (must match RevenueCat dashboard)
     static let proEntitlementID = "Premium"
 

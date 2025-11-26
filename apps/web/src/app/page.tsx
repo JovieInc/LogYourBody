@@ -32,6 +32,7 @@ import { StepTrackerSection } from "@/components/StepTrackerModule";
 import { LandingPredictionSection } from "@/components/LandingPredictionSection";
 import { Prefooter } from "@/components/Prefooter";
 import { APP_CONFIG } from "@/constants/app";
+import { analytics } from "@/lib/analytics";
 
 export default function HomePage() {
   const [isAnnual, setIsAnnual] = useState(true);
@@ -43,6 +44,10 @@ export default function HomePage() {
       router.push('/dashboard');
     }
   }, [user, router]);
+
+  useEffect(() => {
+    analytics.track('web_landing_viewed');
+  }, []);
 
   const pricing = APP_CONFIG.pricing;
 
@@ -133,7 +138,7 @@ export default function HomePage() {
                   <br />
                   Transform your life.
                 </h1>
-                
+
                 <p className="text-xl md:text-2xl text-white/60 mb-10 max-w-2xl mx-auto leading-[1.5] font-normal">
                   Professional body composition tracking that shows you exactly how you're transforming.
                 </p>
@@ -144,6 +149,7 @@ export default function HomePage() {
                     <Button
                       size="lg"
                       className="bg-white text-black px-8 py-6 text-base font-medium rounded-full hover:bg-white/90 transition-all shadow-2xl"
+                      onClick={() => analytics.track('web_cta_clicked', { id: 'download_ios' })}
                     >
                       Download for iOS
                     </Button>
@@ -153,6 +159,7 @@ export default function HomePage() {
                       size="lg"
                       variant="outline"
                       className="border-white/10 text-white hover:bg-white/5 px-8 py-6 text-base rounded-full"
+                      onClick={() => analytics.track('web_cta_clicked', { id: 'see_it_in_action' })}
                     >
                       See it in action
                     </Button>
@@ -249,7 +256,7 @@ export default function HomePage() {
             <div className="mb-12 text-center">
               <p className="text-sm text-white/50 mb-6">Trusted by fitness professionals and aesthetic athletes worldwide</p>
             </div>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
               <div className="group">
                 <div className="text-4xl md:text-5xl font-bold mb-2 text-white">
@@ -293,8 +300,8 @@ export default function HomePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {appFeatures.map((feature, index) => (
-                <Card 
-                  key={index} 
+                <Card
+                  key={index}
                   className="bg-[#0f1011] border-[#1a1b1e] hover:border-[#2a2b2e] transition-all group"
                 >
                   <CardHeader>
@@ -317,8 +324,8 @@ export default function HomePage() {
         </section>
 
         {/* Interactive Demo Section */}
-        <section 
-          id="timeline-feature" 
+        <section
+          id="timeline-feature"
           className="py-20 bg-gradient-to-b from-transparent to-[#0f1011]"
           aria-labelledby="timeline-heading"
         >
@@ -355,26 +362,24 @@ export default function HomePage() {
               <p className="text-xl text-white/60 max-w-2xl mx-auto mb-8">
                 Join thousands achieving their ideal physique with professional tracking.
               </p>
-              
+
               {/* Pricing Toggle */}
               <div className="inline-flex items-center gap-4 p-1 bg-[#1a1b1e] rounded-full">
                 <button
                   onClick={() => setIsAnnual(false)}
-                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
-                    !isAnnual 
-                      ? 'bg-white text-black' 
+                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${!isAnnual
+                      ? 'bg-white text-black'
                       : 'text-white/60 hover:text-white'
-                  }`}
+                    }`}
                 >
                   Monthly
                 </button>
                 <button
                   onClick={() => setIsAnnual(true)}
-                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
-                    isAnnual 
-                      ? 'bg-white text-black' 
+                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${isAnnual
+                      ? 'bg-white text-black'
                       : 'text-white/60 hover:text-white'
-                  }`}
+                    }`}
                 >
                   Annual
                   {isAnnual && (
@@ -416,14 +421,14 @@ export default function HomePage() {
                       </li>
                     ))}
                   </ul>
-                  
+
                   <Link href="/download/ios" className="block">
                     <Button className="w-full bg-white text-black hover:bg-white/90 py-6 text-base font-medium">
                       Start Free Trial
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
-                  
+
                   <p className="text-center text-sm text-white/50">
                     {APP_CONFIG.trialLengthText}. Cancel anytime.
                   </p>
