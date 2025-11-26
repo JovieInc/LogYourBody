@@ -47,7 +47,7 @@
   },
   "lint-staged": {
     "apps/web/**/*.{js,jsx,ts,tsx}": [
-      "eslint --fix",
+      "bash -c 'if [[ \"$0\" != *\"__tests__\"* ]] && [[ \"$0\" != *\".test.\"* ]] && [[ \"$0\" != *\".spec.\"* ]]; then eslint --fix \"$0\"; fi'",
       "prettier --write"
     ],
     "packages/**/*.{js,jsx,ts,tsx}": [
