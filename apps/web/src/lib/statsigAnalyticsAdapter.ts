@@ -3,8 +3,8 @@
 import { StatsigClient } from '@statsig/js-client';
 
 export interface StatsigAnalyticsConfig {
-    clientKey: string;
-    environmentTier?: string;
+  clientKey: string;
+  environmentTier?: string;
 }
 
 export type AnalyticsProperties = Record<string, string | number | boolean | null | undefined>;
@@ -14,110 +14,137 @@ let initialized = false;
 let initPromise: Promise<void> | null = null;
 
 function getOrInitClient(config: StatsigAnalyticsConfig): StatsigClient | null {
-    if (typeof window === 'undefined') {
-        return null;
-    }
+  if (typeof window === 'undefined') {
+    return null;
+  }
 
-    if (!config.clientKey) {
-        return null;
-    }
+  if (!config.clientKey) {
+    return null;
+  }
 
-    if (!client) {
-        client = new StatsigClient(
-            config.clientKey,
-            {},
-            {
-                environment: {
-                    tier: config.environmentTier ?? 'development',
-                },
-            },
-        );
-    }
+  if (!client) {
+    client = new StatsigClient(
+      config.clientKey,
+      {},
+      {
+        environment: {
+          tier: config.environmentTier ?? 'development',
+        },
+      },
+    );
+  }
 
-    if (!initialized && !initPromise) {
-        initPromise = client
-            .initializeAsync()
-            .then(() => {
-                initialized = true;
-            })
-            .catch(() => {
-                // Swallow initialization errors for now; caller methods will no-op on failure.
-            })
-            .finally(() => {
-                initPromise = null;
-            });
-    }
+  if (!initialized && !initPromise) {
+    initPromise = client
+      .initializeAsync()
+      .then(() => {
+        initialized = true;
+      })
+      .catch(() => {
+        // Swallow initialization errors for now; caller methods will no-op on failure.
+      })
+      .finally(() => {
+        initPromise = null;
+      });
+  }
 
-    return client;
+  return client;
 }
 
 export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
-    const safeConfig: StatsigAnalyticsConfig = {
-        clientKey: config.clientKey,
-        environmentTier: config.environmentTier ?? 'development',
-    };
+  const safeConfig: StatsigAnalyticsConfig = {
+    clientKey: config.clientKey,
+    environmentTier: config.environmentTier ?? 'development',
+  };
 
-    return {
-        identify(userId: string | null, traits?: Record<string, string | number | boolean | null | undefined>): void {
-            const c = getOrInitClient(safeConfig);
-            if (!c) {
-                return;
+  return {
+    identify(
+      userId: string | null,
+      traits?: Record<string, string | number | boolean | null | undefined>,
+    ): void {
+      const c = getOrInitClient(safeConfig);
+      if (!c) {
+        return;
+      }
+
+      const user: { userID?: string; custom?: Record<string, string | number | boolean> } = {};
+
+      if (userId && userId.trim().length > 0) {
+        user.userID = userId;
+      }
+
+      if (traits && Object.keys(traits).length > 0) {
+        // Filter out null and undefined values as Statsig doesn't accept them
+        const filteredTraits = Object.entries(traits).reduce(
+          (acc, [key, value]) => {
+            if (value !== null && value !== undefined) {
+              acc[key] = value;
             }
+            return acc;
+          },
+          {} as Record<string, string | number | boolean>,
+        );
 
-            const user: { userID?: string; custom?: Record<string, string | number | boolean | null | undefined> } = {};
+        if (Object.keys(filteredTraits).length > 0) {
+          user.custom = filteredTraits;
+        }
+      }
 
-            if (userId && userId.trim().length > 0) {
-                user.userID = userId;
-            }
+      void c.updateUserAsync(user).catch(() => {
+        // Ignore user update errors.
+      });
+    },
 
-            if (traits && Object.keys(traits).length > 0) {
-                user.custom = traits;
-            }
+    track(event: string, properties?: AnalyticsProperties): void {
+      const c = getOrInitClient(safeConfig);
+      if (!c) {
+        return;
+      }
 
-            void c.updateUserAsync(user).catch(() => {
-                // Ignore user update errors.
-            });
+      if (!properties || Object.keys(properties).length === 0) {
+        c.logEvent(String(event));
+        return;
+      }
+
+      // Filter and convert properties to match Statsig's expected type
+      const metadata = Object.entries(properties).reduce(
+        (acc, [key, value]) => {
+          if (value !== null && value !== undefined) {
+            acc[key] = String(value);
+          }
+          return acc;
         },
+        {} as Record<string, string>,
+      );
 
-        track(event: string, properties?: AnalyticsProperties): void {
-            const c = getOrInitClient(safeConfig);
-            if (!c) {
-                return;
-            }
+      c.logEvent({
+        eventName: String(event),
+        metadata,
+      });
+    },
 
-            if (!properties || Object.keys(properties).length === 0) {
-                c.logEvent(String(event));
-                return;
-            }
+    reset(): void {
+      const c = getOrInitClient(safeConfig);
+      if (!c) {
+        return;
+      }
 
-            c.logEvent({
-                eventName: String(event),
-                metadata: properties,
-            });
-        },
+      void c.updateUserAsync({ userID: undefined }).catch(() => {
+        // Ignore reset errors.
+      });
+    },
 
-        reset(): void {
-            const c = getOrInitClient(safeConfig);
-            if (!c) {
-                return;
-            }
+    isFeatureEnabled(flagKey: string): boolean {
+      const c = getOrInitClient(safeConfig);
+      if (!c) {
+        return false;
+      }
 
-            void c.updateUserAsync({ userID: undefined }).catch(() => {
-                // Ignore reset errors.
-            });
-        },
-
-        isFeatureEnabled(flagKey: string): boolean {
-            const c = getOrInitClient(safeConfig);
-            if (!c) {
-                return false;
-            }
-
-            try {
-                return c.checkGate(flagKey);
-            } catch {
-                return false;
-            }
-        },
-    };
+      try {
+        return c.checkGate(flagKey);
+      } catch {
+        return false;
+      }
+    },
+  };
 }
