@@ -98,6 +98,7 @@ apps/ios/SourcePackages/
 apps/ios/test_output/
 apps/ios/test_results/
 apps/ios/sanitizer_output/
+apps/ios/buildlog/
 apps/ios/*.log
 apps/ios/**/*.xcresult
 *.pbxproj.backup*
