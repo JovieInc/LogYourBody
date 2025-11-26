@@ -698,11 +698,13 @@ struct FullMetricChartView: View {
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
-                                let plotFrame = proxy.plotFrame
-                                let origin = plotFrame.origin
-                                let width = plotFrame.size.width
-                                let locationX = value.location.x - origin.x
-                                guard locationX >= 0, locationX <= width else { return }
+                                guard let plotFrame = proxy.plotFrame else {
+                                    return
+                                }
+
+                                let frame = geo[plotFrame]
+                                let locationX = value.location.x - frame.origin.x
+                                guard locationX >= 0, locationX <= frame.size.width else { return }
                                 if let date: Date = proxy.value(atX: locationX) {
                                     if !isScrubbing {
                                         isScrubbing = true

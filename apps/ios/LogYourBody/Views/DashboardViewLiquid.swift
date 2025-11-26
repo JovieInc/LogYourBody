@@ -251,8 +251,7 @@ struct DashboardViewLiquid: View {
         previousSyncStatus = realtimeSyncManager.syncStatus
         handleSyncStatusChange(from: realtimeSyncManager.syncStatus, to: realtimeSyncManager.syncStatus)
 
-        _ = AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.photosTabFlagKey)
-        isPhotosTabEnabled = true
+        isPhotosTabEnabled = AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.photosTabFlagKey)
     }
 
     private func handleCoreDataContextChange(_ notification: Notification) {

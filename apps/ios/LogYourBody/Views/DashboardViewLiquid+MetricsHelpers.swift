@@ -478,7 +478,7 @@ extension DashboardViewLiquid {
     }
 
     func rebuildDailyMetricsLookupCache() {
-        var lookup = Dictionary<Date, DailyMetrics>(minimumCapacity: recentDailyMetrics.count)
+        var lookup = [Date: DailyMetrics](minimumCapacity: recentDailyMetrics.count)
         let calendar = Calendar.current
 
         for metric in recentDailyMetrics {

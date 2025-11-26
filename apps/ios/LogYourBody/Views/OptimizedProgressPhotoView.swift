@@ -176,7 +176,7 @@ struct OptimizedProgressPhotoView: View {
         // Optimize for display
         // Use fixed dimensions for typical device screens to avoid UIScreen.main deprecation
         // Assumes iPhone width ~390-430pt with 3x scale = ~1170-1290px
-        let maxDimension: CGFloat = 1200.0
+        let maxDimension: CGFloat = 1_200.0
         let size = orientedImage.size
 
         guard size.width > maxDimension || size.height > maxDimension else {

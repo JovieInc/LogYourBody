@@ -1449,10 +1449,10 @@ class CoreDataManager: ObservableObject {
         do {
             let allMetrics = try viewContext.fetch(fetchRequest)
             // print("🔍 DEBUG: Total body metrics in Core Data: \(allMetrics.count)")
-            for (_, _) in allMetrics.enumerated() {
-                // print("  [\(index)] ID: \(metric.id ?? "nil"), UserId: \(metric.userId ?? "nil"), Weight: \(metric.weight), Date: \(metric.date ?? Date()), isSynced: \(metric.isSynced), syncStatus: \(metric.syncStatus ?? "nil")")
+            if let metric = allMetrics.first {
+                _ = metric
+                // print("  [\(index)] ID: \(metric.id ?? \"nil\"), UserId: \(metric.userId ?? \"nil\"), Weight: \(metric.weight), Date: \(metric.date ?? Date()), isSynced: \(metric.isSynced), syncStatus: \(metric.syncStatus ?? \"nil\")")
                 // Commented out - only first 5 metrics would be logged
-                break
             }
         } catch {
             // print("Failed to fetch all body metrics: \(error)")

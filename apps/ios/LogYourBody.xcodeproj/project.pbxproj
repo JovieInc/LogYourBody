@@ -50,7 +50,7 @@
 		AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872322EB405C00041C426 /* BackgroundTaskType.swift */; };
 		AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */; };
 		AD8872372EB406430041C426 /* BackgroundTaskDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */; };
-		AD8872402EB87EF80041C426 /* BuildFile in Sources */ = {isa = PBXBuildFile; };
+		AD8872402EB87EF80041C426 /* (null) in Sources */ = {isa = PBXBuildFile; };
 		AD8872412EB87EF80041C426 /* DashboardViewLiquid.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */; };
 		AD8872432EB87F290041C426 /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872422EB87F290041C426 /* ProgressRing.swift */; };
 		AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872442EB87F480041C426 /* LiquidGlassCard.swift */; };
@@ -105,6 +105,8 @@
 		AD8F12E62ED678D6003C4559 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = AD8F12E52ED678D6003C4559 /* Sentry */; };
 		AD8F12E92ED6A489003C4559 /* Statsig in Frameworks */ = {isa = PBXBuildFile; productRef = AD8F12E82ED6A489003C4559 /* Statsig */; };
 		AD8F12EA2ED6AA76003C4559 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6004A2FFDAAAA00ABCDEF /* AnalyticsService.swift */; };
+		AD8F12F32ED7C97B003C4559 /* BugReportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8F12F22ED7C97B003C4559 /* BugReportViews.swift */; };
+		AD8F12F52ED7C987003C4559 /* BugReportManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8F12F42ED7C987003C4559 /* BugReportManager.swift */; };
 		ADA4B7372ECC3A7A00F4262A /* EntryVisibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */; };
 		ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */; };
 		ADA4B73B2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B73A2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift */; };
@@ -218,8 +220,8 @@
 		ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B0E2E15FA5C002376C6 /* ContentView.swift */; };
 		ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B122E15FA5C002376C6 /* LogYourBodyApp.swift */; };
 		ADDC47F72E2D89F3003C97E7 /* AnimatedTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D38B2E24A948001F82A8 /* AnimatedTabView.swift */; };
-		ADDC47F82E2D89F3003C97E7 /* DashboardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B002E25B10100123456 /* DashboardComponents.swift */; };
-		ADDC47F92E2D89F3003C97E7 /* DashboardMetricCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */; };
+		ADDC47F82E2D89F3003C97E7 /* Components/DashboardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */; };
+		ADDC47F92E2D89F3003C97E7 /* Components/DashboardMetricCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5C4B022E25B10200123456 /* Components/DashboardMetricCards.swift */; };
 		ADDC47FA2E2D89F3003C97E7 /* DietPhaseCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D38C2E24A948001F82A8 /* DietPhaseCard.swift */; };
 		ADDC47FE2E2D89F3003C97E7 /* SkeletonLoaders.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */; };
 		ADDC47FF2E2D89F3003C97E7 /* UIComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA923002E22EF4600B82C49 /* UIComponents.swift */; };
@@ -349,8 +351,8 @@
 		AD435B582EC79EEB0084E5C5 /* MetricSummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSummaryCard.swift; sourceTree = "<group>"; };
 		AD4B1C7D2FFC0A4E00A3B9E1 /* LRUCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRUCache.swift; sourceTree = "<group>"; };
 		AD4F5E7A2E18C23400456789 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
-		AD5C4B002E25B10100123456 /* DashboardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardComponents.swift; sourceTree = "<group>"; };
-		AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardMetricCards.swift; sourceTree = "<group>"; };
+		AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardComponents.swift; sourceTree = "<group>"; };
+		AD5C4B022E25B10200123456 /* Components/DashboardMetricCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DashboardMetricCards.swift; sourceTree = "<group>"; };
 		AD722F0E2E15FA5A002376C6 /* delete_files.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = delete_files.sh; sourceTree = "<group>"; };
 		AD722F0F2E15FA5A002376C6 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		AD722F102E15FA5A002376C6 /* icon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "icon-1024.png"; sourceTree = "<group>"; };
@@ -483,6 +485,8 @@
 		AD88728D2EB946BE0041C426 /* UserHeaderSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserHeaderSection.swift; sourceTree = "<group>"; };
 		AD88728E2EB946BE0041C426 /* VerificationForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerificationForm.swift; sourceTree = "<group>"; };
 		AD8872912EB946BE0041C426 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		AD8F12F22ED7C97B003C4559 /* BugReportViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugReportViews.swift; sourceTree = "<group>"; };
+		AD8F12F42ED7C987003C4559 /* BugReportManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugReportManager.swift; sourceTree = "<group>"; };
 		AD933DFA2E24328A00801078 /* DietPhaseHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietPhaseHistoryView.swift; sourceTree = "<group>"; };
 		AD933DFC2E249DAD00801078 /* BulkPhotoImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkPhotoImportView.swift; sourceTree = "<group>"; };
 		AD933DFE2E249EA000801078 /* BulkImportManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkImportManager.swift; sourceTree = "<group>"; };
@@ -727,10 +731,10 @@
 				AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */,
 				AD050C442EBFFEF60082A313 /* MetricChartView.swift */,
 				ADE6D38B2E24A948001F82A8 /* AnimatedTabView.swift */,
-				AD5C4B002E25B10100123456 /* DashboardComponents.swift */,
+				AD5C4B002E25B10100123456 /* Components/DashboardComponents.swift */,
 				AD8872422EB87F290041C426 /* ProgressRing.swift */,
 				AD8872442EB87F480041C426 /* LiquidGlassCard.swift */,
-				AD5C4B022E25B10200123456 /* DashboardMetricCards.swift */,
+				AD5C4B022E25B10200123456 /* Components/DashboardMetricCards.swift */,
 				ADE6D38C2E24A948001F82A8 /* DietPhaseCard.swift */,
 				C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */,
 				ADA923012E22EF4600B82C49 /* Common */,
@@ -884,6 +888,7 @@
 		AD723AED2E15FA5C002376C6 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				AD8F12F42ED7C987003C4559 /* BugReportManager.swift */,
 				ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */,
 				ADF1F6B52ED4C61400745F33 /* GlobalTimelineService.swift */,
 				ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */,
@@ -954,6 +959,7 @@
 		AD723B0A2E15FA5C002376C6 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				AD8F12F22ED7C97B003C4559 /* BugReportViews.swift */,
 				ADA6003F2ED2D32C00088042 /* DashboardViewLiquid+HeroAndActions.swift */,
 				ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */,
 				ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */,
@@ -1561,6 +1567,7 @@
 				ADBAF04F2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift in Sources */,
 				ADBAF0502ECAD88A00A95F98 /* BodyScoreCalculator.swift in Sources */,
 				ADA600402ED2D32C00088042 /* DashboardViewLiquid+HeroAndActions.swift in Sources */,
+				AD8F12F32ED7C97B003C4559 /* BugReportViews.swift in Sources */,
 				ADBAF0512ECAD88A00A95F98 /* BodyScoreLoadingView.swift in Sources */,
 				ADBAF0522ECAD88A00A95F98 /* BodyScoreModels.swift in Sources */,
 				ADBAF0532ECAD88A00A95F98 /* BodyScoreManualWeightView.swift in Sources */,
@@ -1651,9 +1658,9 @@
 				ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */,
 				ADDC47F72E2D89F3003C97E7 /* AnimatedTabView.swift in Sources */,
 				ADA600262ED259A700088042 /* BodyScoreShareCard.swift in Sources */,
-				ADDC47F82E2D89F3003C97E7 /* DashboardComponents.swift in Sources */,
+				ADDC47F82E2D89F3003C97E7 /* Components/DashboardComponents.swift in Sources */,
 				ADA4B7452ECFE0F300F4262A /* FullMetricChartView.swift in Sources */,
-				ADDC47F92E2D89F3003C97E7 /* DashboardMetricCards.swift in Sources */,
+				ADDC47F92E2D89F3003C97E7 /* Components/DashboardMetricCards.swift in Sources */,
 				ADDC47FA2E2D89F3003C97E7 /* DietPhaseCard.swift in Sources */,
 				ADDC47FE2E2D89F3003C97E7 /* SkeletonLoaders.swift in Sources */,
 				ADDC47FF2E2D89F3003C97E7 /* UIComponents.swift in Sources */,
@@ -1747,6 +1754,7 @@
 				AD050C412EBFD8160082A313 /* HapticManager.swift in Sources */,
 				AD4B1C7E2FFC0A4E00A3B9E1 /* LRUCache.swift in Sources */,
 				AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */,
+				AD8F12F52ED7C987003C4559 /* BugReportManager.swift in Sources */,
 				AD8872D02EB946BE0041C426 /* MarkdownView.swift in Sources */,
 				AD8872D12EB946BE0041C426 /* StandardCard.swift in Sources */,
 				ADA600282ED259DB00088042 /* BodyScoreRecalculationService.swift in Sources */,
@@ -1754,7 +1762,7 @@
 				AD8872D32EB946BE0041C426 /* DSTrendIndicator.swift in Sources */,
 				ADA4B73B2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift in Sources */,
 				AD8872372EB406430041C426 /* BackgroundTaskDetailsSheet.swift in Sources */,
-				AD8872402EB87EF80041C426 /* BuildFile in Sources */,
+				AD8872402EB87EF80041C426 /* (null) in Sources */,
 				AD8872412EB87EF80041C426 /* DashboardViewLiquid.swift in Sources */,
 				ADA4B7492ECFE59C00F4262A /* DashboardMetricsList.swift in Sources */,
 				AD435B592EC79EEB0084E5C5 /* MetricSummaryCard.swift in Sources */,
@@ -1915,7 +1923,7 @@
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251126095553;
+				CURRENT_PROJECT_VERSION = 20251126153935;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
 				DEVELOPMENT_TEAM = G24T327LXT;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = G24T327LXT;
@@ -1957,7 +1965,7 @@
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251126095553;
+				CURRENT_PROJECT_VERSION = 20251126153935;
 				DEVELOPMENT_ASSET_PATHS = "\"LogYourBody/Preview Content\"";
 				DEVELOPMENT_TEAM = G24T327LXT;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = G24T327LXT;
@@ -1995,7 +2003,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251126095553;
+				CURRENT_PROJECT_VERSION = 20251126153935;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -2018,7 +2026,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251126095553;
+				CURRENT_PROJECT_VERSION = 20251126153935;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -2040,7 +2048,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251126095553;
+				CURRENT_PROJECT_VERSION = 20251126153935;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;
@@ -2062,7 +2070,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20251126095553;
+				CURRENT_PROJECT_VERSION = 20251126153935;
 				DEVELOPMENT_TEAM = G24T327LXT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LogYourBody/Info.plist;

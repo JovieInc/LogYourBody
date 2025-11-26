@@ -74,4 +74,3 @@ enum AppError: LocalizedError {
         }
     }
 }
-

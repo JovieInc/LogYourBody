@@ -7,6 +7,7 @@ struct ContentView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     @EnvironmentObject var revenueCatManager: RevenueCatManager
+    @EnvironmentObject var bugReportManager: BugReportManager
     @StateObject private var loadingManager: LoadingManager
     private let onboardingStateManager = OnboardingStateManager.shared
     @State private var currentUserId: String?
@@ -132,6 +133,9 @@ struct ContentView: View {
         }
         .onChange(of: authManager.needsLegalConsent) { _, newValue in
             showLegalConsent = newValue
+        }
+        .onShake {
+            bugReportManager.handleShakeGesture()
         }
     }
 

@@ -12,6 +12,7 @@ struct LogYourBodyApp: App {
     @StateObject private var healthKitManager = HealthKitManager.shared
     @StateObject private var realtimeSyncManager = RealtimeSyncManager.shared
     @StateObject private var widgetDataManager = WidgetDataManager.shared
+    @StateObject private var bugReportManager = BugReportManager.shared
     @State private var clerk = Clerk.shared
     @State private var showAddEntrySheet = false
     @State private var selectedEntryTab = 0
@@ -25,7 +26,16 @@ struct LogYourBodyApp: App {
                 .environmentObject(authManager)
                 .environmentObject(realtimeSyncManager)
                 .environmentObject(revenueCatManager)
+                .environmentObject(bugReportManager)
                 .environment(clerk)
+                .sheet(isPresented: $bugReportManager.isPromptPresented) {
+                    BugReportPromptSheet()
+                        .environmentObject(bugReportManager)
+                }
+                .fullScreenCover(isPresented: $bugReportManager.isFormPresented) {
+                    BugReportFormView()
+                        .environmentObject(bugReportManager)
+                }
                 .sheet(isPresented: $showAddEntrySheet) {
                     AddEntrySheet(isPresented: $showAddEntrySheet)
                         .environmentObject(authManager)
