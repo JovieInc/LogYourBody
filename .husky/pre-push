@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname "$0")/_/husky.sh"
-
 echo "🔄 Running auto-versioning..."
 node apps/web/scripts/version-manager.cjs --skip-tag
 
