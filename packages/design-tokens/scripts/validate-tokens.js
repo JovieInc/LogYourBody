@@ -5,9 +5,14 @@
  * Checks token structure and values for common issues
  */
 
-const fs = require('fs');
-const path = require('path');
-const chroma = require('chroma-js');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import chroma from 'chroma-js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 console.log('🔍 Validating design tokens...\n');
 
@@ -19,7 +24,7 @@ const tokenFiles = [];
 
 function findTokenFiles(dir) {
   const files = fs.readdirSync(dir);
-  files.forEach(file => {
+  files.forEach((file) => {
     const fullPath = path.join(dir, file);
     if (fs.statSync(fullPath).isDirectory()) {
       findTokenFiles(fullPath);
@@ -34,7 +39,7 @@ findTokenFiles(tokensDir);
 console.log(`Found ${tokenFiles.length} token files\n`);
 
 // Validate each file
-tokenFiles.forEach(file => {
+tokenFiles.forEach((file) => {
   try {
     const content = JSON.parse(fs.readFileSync(file, 'utf8'));
     console.log(`✅ ${path.relative(tokensDir, file)}`);
@@ -70,13 +75,13 @@ function validateColorContrast(tokens) {
             if (!meetsAA) {
               console.error(`    ⚠️  Warning: ${name} does not meet WCAG AA standards (4.5:1)`);
             }
-          } catch (e) {
+          } catch {
             // Skip invalid colors
           }
         }
       });
     }
-  } catch (error) {
+  } catch {
     // Skip contrast validation if chroma fails
   }
 }

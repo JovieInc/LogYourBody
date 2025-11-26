@@ -13,7 +13,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:ci": "turbo run test -- --runInBand",
+    "test:ci": "turbo run test",
     "web": "pnpm --filter apps/web dev",
     "ios": "cd apps/ios && open LogYourBody.xcodeproj",
     "prepush": "turbo run lint typecheck test --filter='...[origin/main]'",
