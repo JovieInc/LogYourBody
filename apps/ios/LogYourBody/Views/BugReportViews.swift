@@ -20,18 +20,21 @@ struct BugReportPromptSheet: View {
                 .foregroundColor(.appTextSecondary)
                 .multilineTextAlignment(.center)
 
-            Button(action: {
-                HapticManager.shared.buttonTap()
-                bugReportManager.presentFormFromPrompt()
-            }) {
-                Text("Report bug")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.white)
-                    .foregroundColor(.black)
-                    .clipShape(Capsule())
-            }
+            Button(
+                action: {
+                    HapticManager.shared.buttonTap()
+                    bugReportManager.presentFormFromPrompt()
+                },
+                label: {
+                    Text("Report bug")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.white)
+                        .foregroundColor(.black)
+                        .clipShape(Capsule())
+                }
+            )
 
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -119,18 +122,21 @@ struct BugReportFormView: View {
 
             Spacer()
 
-            Button(action: {
-                HapticManager.shared.selection()
-                bugReportManager.cancel()
-                dismiss()
-            }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.primary)
-                    .padding(8)
-                    .background(Color.white.opacity(0.15))
-                    .clipShape(Circle())
-            }
+            Button(
+                action: {
+                    HapticManager.shared.selection()
+                    bugReportManager.cancel()
+                    dismiss()
+                },
+                label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .padding(8)
+                        .background(Color.white.opacity(0.15))
+                        .clipShape(Circle())
+                }
+            )
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
@@ -181,8 +187,10 @@ struct BugReportFormView: View {
     }
 
     private var infoText: some View {
-        let combined = Text("Any information you share may be reviewed to help improve LogYourBody. If you have additional questions, ") +
-            Text("contact support.")
+        let combined = Text(
+            "Any information you share may be reviewed to help improve LogYourBody. " +
+                "If you have additional questions, "
+        ) + Text("contact support.")
             .foregroundColor(.appPrimary)
 
         return combined
@@ -227,19 +235,22 @@ struct BugReportFormView: View {
 
     private var bottomBar: some View {
         VStack(spacing: 12) {
-            Button(action: {
-                HapticManager.shared.buttonTap()
-                bugReportManager.submit()
-                dismiss()
-            }) {
-                Text("Send")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(bugReportManager.canSubmit ? Color.white : Color.white.opacity(0.3))
-                    .foregroundColor(.black)
-                    .clipShape(Capsule())
-            }
+            Button(
+                action: {
+                    HapticManager.shared.buttonTap()
+                    bugReportManager.submit()
+                    dismiss()
+                },
+                label: {
+                    Text("Send")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(bugReportManager.canSubmit ? Color.white : Color.white.opacity(0.3))
+                        .foregroundColor(.black)
+                        .clipShape(Capsule())
+                }
+            )
             .disabled(!bugReportManager.canSubmit)
             .padding(.horizontal, 24)
             .padding(.top, 8)

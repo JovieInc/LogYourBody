@@ -25,7 +25,7 @@ extension BackgroundPhotoUploadService {
         await ImageProcessingService.shared.processBatchImages(imagesToProcess)
 
         // Upload processed images
-        for (_, (_, imageId)) in imagesToProcess.enumerated() {
+        for (_, imageId) in imagesToProcess {
             // Get processed image from service
             if let task = ImageProcessingService.shared.processingTasks.first(where: { $0.imageId == imageId }),
                let processedImage = task.resultImage {

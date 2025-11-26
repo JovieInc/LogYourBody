@@ -9,7 +9,7 @@ import Sentry
 final class BugReportManager: ObservableObject {
     static let shared = BugReportManager()
 
-    static let maxMessageLength = 2000
+    static let maxMessageLength = 2_000
 
     @Published var isPromptPresented = false
     @Published var isFormPresented = false
@@ -157,7 +157,7 @@ final class BugReportManager: ObservableObject {
         format.scale = window.screen.scale
 
         let renderer = UIGraphicsImageRenderer(size: bounds.size, format: format)
-        let image = renderer.image { context in
+        let image = renderer.image { _ in
             window.drawHierarchy(in: bounds, afterScreenUpdates: false)
         }
 

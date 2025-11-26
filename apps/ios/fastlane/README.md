@@ -1,5 +1,4 @@
-fastlane documentation
-----
+## fastlane documentation
 
 # Installation
 
@@ -86,6 +85,14 @@ Generic build lane with configurable parameters
 ```
 
 Quick build check for CI rapid validation
+
+### ios ci_ios
+
+```sh
+[bundle exec] fastlane ios ci_ios
+```
+
+CI lane: lint + quick build check
 
 ### ios pr_verify
 
@@ -223,7 +230,7 @@ Post-build success actions
 
 Debug environment variables
 
-----
+---
 
 This README.md is auto-generated and will be re-generated every time [_fastlane_](https://fastlane.tools) is run.
 

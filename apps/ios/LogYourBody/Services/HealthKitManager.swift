@@ -538,7 +538,6 @@ class HealthKitManager: ObservableObject {
             self.importedCount = 0
             self.totalToImport = 0
         }
-
     }
 
     // Fetch user's height from HealthKit
@@ -710,10 +709,10 @@ class HealthKitManager: ObservableObject {
 
         if !recentWeightHistory.isEmpty {
             // print("  📅 Weight entries date range: \(recentWeightHistory.first?.date ?? Date()) to \(recentWeightHistory.last?.date ?? Date())")
-            for (_, _) in recentWeightHistory.enumerated() {
+            if let firstEntry = recentWeightHistory.first {
+                _ = firstEntry
                 // Show first 5 entries
                 // print("    - \(date): \(weight)kg")
-                break
             }
         }
 
@@ -807,10 +806,10 @@ class HealthKitManager: ObservableObject {
 
         if !weightHistory.isEmpty {
             // print("  📅 Weight entries date range: \(weightHistory.first?.date ?? Date()) to \(weightHistory.last?.date ?? Date())")
-            for (_, _) in weightHistory.enumerated() {
+            if let firstEntry = weightHistory.first {
+                _ = firstEntry
                 // Show first 5 entries
                 // print("    - \(date): \(weight)kg")
-                break
             }
         }
 
