@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, production, preview]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      ios: ${{ steps.filter.outputs.ios }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+            ios:
+              - 'apps/ios/**'
+
+  js:
+    name: JavaScript/TypeScript
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.web == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test:ci
+
+  ios:
+    name: iOS
+    runs-on: macos-14
+    needs: detect-changes
+    if: needs.detect-changes.outputs.ios == 'true'
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.1'
+
+      - name: Setup iOS build environment
+        uses: ./.github/actions/setup-ios-build
+        with:
+          xcode-version: '16.1'
+          working-directory: apps/ios
+          setup-ruby: 'true'
+          create-config-files: 'true'
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/ios/.build
+            ~/Library/Developer/Xcode/DerivedData
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-xcode-16.1-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-xcode-16.1-
+            ${{ runner.os }}-spm-
+
+      - name: Lint
+        run: |
+          cd apps/ios
+          bundle exec fastlane lint
+
+      - name: Build check
+        run: |
+          cd apps/ios
+          bundle exec fastlane build_check
+
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [detect-changes, js, ios]
+    steps:
+      - name: Check results
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Web changed: ${{ needs.detect-changes.outputs.web }}" >> $GITHUB_STEP_SUMMARY
+          echo "- iOS changed: ${{ needs.detect-changes.outputs.ios }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check if any required jobs failed
+          if [[ "${{ needs.js.result }}" == "failure" ]] || \
+             [[ "${{ needs.ios.result }}" == "failure" ]]; then
+            echo "❌ One or more CI jobs failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "✅ All CI checks passed!" >> $GITHUB_STEP_SUMMARY

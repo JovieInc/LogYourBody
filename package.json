@@ -7,18 +7,18 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/web",
+    "dev": "pnpm --filter apps/web dev",
     "build": "turbo run build",
-    "start": "npm run start --workspace=apps/web",
+    "start": "pnpm --filter apps/web start",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:ci": "turbo run test -- --runInBand",
-    "web": "npm run dev --workspace=apps/web",
+    "web": "pnpm --filter apps/web dev",
     "ios": "cd apps/ios && open LogYourBody.xcodeproj",
     "prepush": "turbo run lint typecheck test --filter='...[origin/main]'",
     "prepare": "husky install",
-    "check": "npm run check --workspace=apps/web",
+    "check": "pnpm --filter apps/web check",
     "format": "prettier --write .",
     "lint:swift": "cd apps/ios && swiftlint lint --strict"
   },
@@ -40,10 +40,10 @@
     "typescript": "^5.8.3",
     "vitest": "^4.0.14"
   },
-  "packageManager": "npm@10.9.2",
+  "packageManager": "pnpm@9.0.0",
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
   },
   "lint-staged": {
     "apps/web/**/*.{js,jsx,ts,tsx}": [

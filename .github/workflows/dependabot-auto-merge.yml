@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_run:
-    workflows: ["CI/CD Orchestrator"]
+    workflows: ["CI"]
     types: [completed]
 
 permissions:
@@ -33,8 +33,8 @@ jobs:
           else
             sleep 30
             PR_SHA="${{ github.event.pull_request.head.sha }}"
-            # Check for CI/CD Orchestrator workflow run or PR checks
-            CHECKS=$(gh api repos/${{ github.repository }}/commits/${PR_SHA}/check-runs --jq '.check_runs[] | select(.name == "PR iOS Checks" or .name == "PR Web Checks" or .name == "ci-summary") | .conclusion')
+            # Check for CI workflow run or PR checks
+            CHECKS=$(gh api repos/${{ github.repository }}/commits/${PR_SHA}/check-runs --jq '.check_runs[] | select(.name == "JavaScript/TypeScript" or .name == "iOS" or .name == "CI Summary") | .conclusion')
             
             # If any required check passed, consider tests as passed
             if echo "$CHECKS" | grep -q "success"; then
