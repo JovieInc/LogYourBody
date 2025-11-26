@@ -23,7 +23,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 ### 2. Verify Vercel GitHub Integration
 
 1. Go to **Settings** → **Git** in your Vercel project
-2. Ensure the repository `itstimwhite/LogYourBody` is connected
+2. Ensure the repository `JovieInc/LogYourBody` is connected
 3. Make sure **"Create deployments for every push"** is enabled
 4. Verify that the Vercel bot has access to create deployments and comments
 

@@ -68,7 +68,7 @@ base64 -i "LogYourBody_App_Store.mobileprovision" -o profile.txt
 ```
 
 ### Manual Method
-1. Go to https://github.com/itstimwhite/LogYourBody/settings/environments
+1. Go to https://github.com/JovieInc/LogYourBody/settings/environments
 2. Select an environment (e.g., `development`)
 3. Add each secret:
    - `IOS_P12_BASE64` - Contents of certificate.txt

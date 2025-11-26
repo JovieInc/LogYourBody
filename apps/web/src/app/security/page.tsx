@@ -471,7 +471,7 @@ export default function SecurityPage() {
                       <div className="flex items-center gap-2">
                         <Github className="h-4 w-4 text-linear-text-secondary" />
                         <a 
-                          href="https://github.com/itstimwhite/LogYourBody/security"
+                          href="https://github.com/JovieInc/LogYourBody/security"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-linear-purple hover:underline"

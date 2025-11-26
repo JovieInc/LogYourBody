@@ -2,7 +2,7 @@
 
 echo "🔍 Checking migration status..."
 echo ""
-echo "GitHub Actions: https://github.com/itstimwhite/LogYourBody/actions"
+echo "GitHub Actions: https://github.com/JovieInc/LogYourBody/actions"
 echo ""
 echo "Look for the 'CI' workflow that just started running."
 echo "It should show migration steps if migrations were detected."

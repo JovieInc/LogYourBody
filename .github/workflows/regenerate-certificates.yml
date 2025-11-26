@@ -98,7 +98,7 @@ jobs:
           AUTH_HEADER=$(echo $MATCH_GIT_BASIC_AUTHORIZATION | base64 -d)
           
           # Clone with authentication
-          git clone https://${AUTH_HEADER}@github.com/itstimwhite/certificates.git certificates-temp
+          git clone https://${AUTH_HEADER}@github.com/JovieInc/certificates.git certificates-temp
           cd certificates-temp
           git checkout $MATCH_GIT_BRANCH || git checkout -b $MATCH_GIT_BRANCH
           

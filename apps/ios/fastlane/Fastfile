@@ -588,7 +588,7 @@ platform :ios do
       dsym_dir = options[:dsym_dir] || "./build"
 
       UI.message("Uploading dSYMs from #{dsym_dir} to Sentry project #{org}/#{project}")
-      sh("SENTRY_AUTH_TOKEN=#{auth_token} SENTRY_ORG=#{org} SENTRY_PROJECT=#{project} sentry-cli upload-dif #{dsym_dir}")
+      sh("SENTRY_AUTH_TOKEN=#{auth_token} SENTRY_ORG=#{org} SENTRY_PROJECT=#{project} sentry-cli upload-dif \"#{dsym_dir}\"")
     end
   end
 
@@ -649,7 +649,9 @@ platform :ios do
       distribute_external: false
     )
 
-    sentry_upload_symbols(dsym_dir: "./build")
+    archive_path = lane_context[SharedValues::XCODEBUILD_ARCHIVE]
+    dsym_dir = archive_path ? File.join(archive_path, "dSYMs") : "./build"
+    sentry_upload_symbols(dsym_dir: dsym_dir)
 
     # Clean up
     clean_build_artifacts
@@ -690,7 +692,9 @@ platform :ios do
       distribute_external: true # Beta includes external testers
     )
 
-    sentry_upload_symbols(dsym_dir: "./build")
+    archive_path = lane_context[SharedValues::XCODEBUILD_ARCHIVE]
+    dsym_dir = archive_path ? File.join(archive_path, "dSYMs") : "./build"
+    sentry_upload_symbols(dsym_dir: dsym_dir)
 
     # Clean up
     clean_build_artifacts
@@ -884,7 +888,7 @@ platform :ios do
           UI.error("Instructions:")
           UI.error("1. Clone this repository locally")
           UI.error("2. cd apps/ios")
-          UI.error("3. export MATCH_GIT_URL='https://github.com/itstimwhite/certificates.git'")
+          UI.error("3. export MATCH_GIT_URL='https://github.com/JovieInc/certificates.git'")
           UI.error("4. export MATCH_READONLY=false")
           UI.error("5. bundle exec fastlane setup_provisioning type:appstore")
           raise e

@@ -74,7 +74,7 @@ export default function ChangelogPage() {
     try {
       // Try to fetch from GitHub API
       const response = await fetch(
-        "https://api.github.com/repos/itstimwhite/LogYourBody/commits?per_page=50",
+        "https://api.github.com/repos/JovieInc/LogYourBody/commits?per_page=50",
       );
 
       if (response.ok) {
@@ -119,8 +119,8 @@ export default function ChangelogPage() {
         email: "noreply@anthropic.com",
         date: new Date().toISOString(),
       },
-      url: "https://github.com/itstimwhite/LogYourBody/commit/3a20798",
-      html_url: "https://github.com/itstimwhite/LogYourBody/commit/3a20798",
+      url: "https://github.com/JovieInc/LogYourBody/commit/3a20798",
+      html_url: "https://github.com/JovieInc/LogYourBody/commit/3a20798",
     },
     {
       sha: "8a343e5",
@@ -136,8 +136,8 @@ export default function ChangelogPage() {
         email: "noreply@anthropic.com",
         date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
       },
-      url: "https://github.com/itstimwhite/LogYourBody/commit/8a343e5",
-      html_url: "https://github.com/itstimwhite/LogYourBody/commit/8a343e5",
+      url: "https://github.com/JovieInc/LogYourBody/commit/8a343e5",
+      html_url: "https://github.com/JovieInc/LogYourBody/commit/8a343e5",
     },
     {
       sha: "800a15d",
@@ -153,8 +153,8 @@ export default function ChangelogPage() {
         email: "noreply@anthropic.com",
         date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
       },
-      url: "https://github.com/itstimwhite/LogYourBody/commit/800a15d",
-      html_url: "https://github.com/itstimwhite/LogYourBody/commit/800a15d",
+      url: "https://github.com/JovieInc/LogYourBody/commit/800a15d",
+      html_url: "https://github.com/JovieInc/LogYourBody/commit/800a15d",
     },
   ];
 
@@ -465,7 +465,7 @@ export default function ChangelogPage() {
               size="sm"
               onClick={() =>
                 window.open(
-                  "https://github.com/itstimwhite/LogYourBody/commits/main",
+                  "https://github.com/JovieInc/LogYourBody/commits/main",
                   "_blank",
                 )
               }

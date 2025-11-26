@@ -25,7 +25,7 @@ fi
 
 # Check repository
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "")
-if [ "$REPO" != "itstimwhite/LogYourBody" ]; then
+if [ "$REPO" != "JovieInc/LogYourBody" ]; then
     echo -e "${RED}❌ This script should be run from the LogYourBody repository.${NC}"
     exit 1
 fi

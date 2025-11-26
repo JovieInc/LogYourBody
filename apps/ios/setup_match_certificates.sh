@@ -10,7 +10,7 @@ cd "$(dirname "$0")"
 # Set up authentication if basic auth is provided
 if [ -n "$MATCH_GIT_BASIC_AUTHORIZATION" ]; then
     echo "Using basic authorization for authentication..."
-    export MATCH_GIT_URL="https://github.com/itstimwhite/certificates.git"
+    export MATCH_GIT_URL="https://github.com/JovieInc/certificates.git"
 else
     echo "No MATCH_GIT_BASIC_AUTHORIZATION found. You may need to authenticate manually."
     echo "Set it with: export MATCH_GIT_BASIC_AUTHORIZATION=\$(echo -n 'username:token' | base64)"

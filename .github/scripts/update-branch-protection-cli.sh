@@ -5,7 +5,7 @@
 
 set -e
 
-REPO="itstimwhite/LogYourBody"
+REPO="JovieInc/LogYourBody"
 
 echo "🔄 Updating branch protection rules for three-loop CI/CD system..."
 echo "Repository: $REPO"

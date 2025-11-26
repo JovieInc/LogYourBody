@@ -3,7 +3,7 @@
 # Script to update branch protection rules using direct API calls
 set -e
 
-REPO="itstimwhite/LogYourBody"
+REPO="JovieInc/LogYourBody"
 
 echo "🔄 Updating branch protection rules for three-loop CI/CD system..."
 echo ""

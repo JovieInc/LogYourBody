@@ -28,7 +28,7 @@ The following secrets need to be added to EACH environment:
 You need to add secrets to EACH environment that uses them:
 
 #### For the `dev` environment:
-1. Go to your repository: https://github.com/itstimwhite/LogYourBody
+1. Go to your repository: https://github.com/JovieInc/LogYourBody
 2. Click on **Settings** tab
 3. In the left sidebar, click **Environments**
 4. Click on **dev**

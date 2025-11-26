@@ -5,7 +5,7 @@
 
 set -e
 
-REPO="itstimwhite/LogYourBody"
+REPO="JovieInc/LogYourBody"
 TOKEN="${GITHUB_TOKEN:-$GH_TOKEN}"
 
 if [ -z "$TOKEN" ]; then

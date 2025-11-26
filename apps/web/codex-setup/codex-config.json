@@ -3,7 +3,7 @@
     "name": "LogYourBody",
     "description": "A modern, privacy-focused body composition tracking app built with Next.js, TypeScript, and Supabase",
     "version": "2025.06.37",
-    "repository": "https://github.com/itstimwhite/LogYourBody"
+    "repository": "https://github.com/JovieInc/LogYourBody"
   },
   "framework": {
     "type": "next.js",

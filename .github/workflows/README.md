@@ -74,7 +74,7 @@ Automatic promotion from dev → preview:
 - Triggers when dev CI passes
 - Creates/updates PR automatically
 - Enables auto-merge when checks pass
-- Mentions @itstimwhite for visibility
+- Mentions @JovieInc for visibility
 
 ### dependabot-auto-merge.yml
 Handles dependency updates:
@@ -182,7 +182,7 @@ gh run watch <run-id>
 
 ```bash
 # Check branch protection
-gh api repos/itstimwhite/LogYourBody/branches/{branch}/protection
+gh api repos/JovieInc/LogYourBody/branches/{branch}/protection
 
 # View workflow logs
 gh run view <run-id> --log

@@ -24,7 +24,7 @@ fi
 
 # Check if we're in the right repository
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "")
-if [ "$REPO" != "itstimwhite/LogYourBody" ]; then
+if [ "$REPO" != "JovieInc/LogYourBody" ]; then
     echo -e "${RED}❌ This script should be run from the LogYourBody repository.${NC}"
     echo "Current repo: $REPO"
     exit 1

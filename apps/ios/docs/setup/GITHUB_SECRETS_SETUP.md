@@ -26,7 +26,7 @@ For certificate and provisioning profile management:
 - **`MATCH_PASSWORD`**: `Xuwa8gLaHbj3UCC3eC7M`
   - Password to decrypt certificates stored in Match repository
   
-- **`MATCH_GIT_URL`**: `https://github.com/itstimwhite/certificates.git`
+- **`MATCH_GIT_URL`**: `https://github.com/JovieInc/certificates.git`
   - Your private git repository for storing certificates
   
 - **`MATCH_GIT_BASIC_AUTHORIZATION`**: 

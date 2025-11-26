@@ -7,7 +7,7 @@ Once you've configured the Clerk secrets in the appropriate GitHub environments,
 1. **Verify secrets are configured**:
    ```bash
    # Check development environment has Clerk secrets
-   gh api repos/itstimwhite/LogYourBody/environments/development/secrets --jq '.secrets[].name' | grep CLERK
+   gh api repos/JovieInc/LogYourBody/environments/development/secrets --jq '.secrets[].name' | grep CLERK
    ```
 
 2. **Edit the web-rapid-loop.yml file**:

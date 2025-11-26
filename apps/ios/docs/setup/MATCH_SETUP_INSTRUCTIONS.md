@@ -22,7 +22,7 @@ Since Match requires interactive mode for initial setup, please run these comman
 Since we're having password issues, let's completely start over:
 
 1. **Delete the certificates repository on GitHub**:
-   - Go to https://github.com/itstimwhite/certificates
+   - Go to https://github.com/JovieInc/certificates
    - Settings → Delete this repository
 
 2. **Create a new empty repository**:
@@ -33,7 +33,7 @@ Since we're having password issues, let's completely start over:
    ```bash
    cd /Users/timwhite/Documents/GitHub/TBF/LogYourBody/apps/ios
    export MATCH_PASSWORD="Xuwa8gLaHbj3UCC3eC7M"
-   export MATCH_GIT_URL="https://github.com/itstimwhite/certificates.git"
+   export MATCH_GIT_URL="https://github.com/JovieInc/certificates.git"
    export MATCH_GIT_BASIC_AUTHORIZATION="YOUR_BASE64_AUTH_STRING"
    export APP_STORE_CONNECT_API_KEY_PATH="$(pwd)/fastlane/api_key.json"
    ```
@@ -62,7 +62,7 @@ If you want to keep the existing certificates repo:
 1. **Clone the repo locally** (outside this project):
    ```bash
    cd ~/Desktop
-   git clone https://github.com/itstimwhite/certificates.git
+   git clone https://github.com/JovieInc/certificates.git
    cd certificates
    ```
 

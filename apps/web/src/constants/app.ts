@@ -34,7 +34,7 @@ export const APP_CONFIG = {
   // Social Media URLs
   social: {
     twitter: 'https://twitter.com/logyourbody',
-    github: 'https://github.com/itstimwhite/LogYourBody',
+    github: 'https://github.com/JovieInc/LogYourBody',
     instagram: 'https://instagram.com/logyourbody',
     youtube: 'https://youtube.com/@logyourbody',
   },

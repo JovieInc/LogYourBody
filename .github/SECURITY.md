@@ -107,6 +107,6 @@ For security-related questions or concerns, please contact:
 
 - **Security Email**: security@logyourbody.com
 - **General Contact**: tim@timwhite.dev
-- **GitHub**: [@itstimwhite](https://github.com/itstimwhite)
+- **GitHub**: [@JovieInc](https://github.com/JovieInc)
 
 Thank you for helping keep LogYourBody and our users safe!

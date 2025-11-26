@@ -23,7 +23,7 @@ Set up these secrets in your GitHub repository settings:
 
 ### 5. Match Git URL (Optional - can be in workflow)
 - **Secret Name**: `MATCH_GIT_URL`
-- **Value**: https://github.com/itstimwhite/certificates.git
+- **Value**: https://github.com/JovieInc/certificates.git
 
 ### 6. Apple Team ID
 - **Secret Name**: `APPLE_TEAM_ID`
@@ -90,7 +90,7 @@ The first time you set up Match, you need to create the certificates locally:
 
 3. Set up environment variables:
    ```bash
-   export MATCH_GIT_URL='https://github.com/itstimwhite/certificates.git'
+   export MATCH_GIT_URL='https://github.com/JovieInc/certificates.git'
    export MATCH_PASSWORD='your-secure-password'
    export MATCH_READONLY=false
    export APP_STORE_CONNECT_API_KEY_ID='V9NW6ZGUK3'

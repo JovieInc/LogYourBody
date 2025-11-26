@@ -33,7 +33,7 @@ The following secrets have been successfully configured:
 2. **APP_STORE_CONNECT_API_KEY_ID** - `V9NW6ZGUK3`
 3. **APP_STORE_CONNECT_API_KEY_ISSUER_ID** - `c195f569-ff16-40fa-aaff-4fe94e8139ad`
 4. **MATCH_PASSWORD** - Match encryption password (special characters removed)
-5. **MATCH_GIT_URL** - `https://github.com/itstimwhite/certificates.git`
+5. **MATCH_GIT_URL** - `https://github.com/JovieInc/certificates.git`
 6. **MATCH_GIT_BASIC_AUTHORIZATION** - Base64 encoded auth header
 7. **MATCH_GIT_BRANCH** - `main`
 8. **APPLE_TEAM_ID** - `G24T327LXT`

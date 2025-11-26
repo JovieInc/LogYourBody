@@ -93,7 +93,7 @@ Modern web application built with Next.js that offers:
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/itstimwhite/LogYourBody.git
+git clone https://github.com/JovieInc/LogYourBody.git
 cd LogYourBody
 ```
 

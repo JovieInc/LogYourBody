@@ -208,7 +208,7 @@ jobs:
             - ⏳ Waiting for preview branch checks
             - 🔄 Auto-merge enabled
 
-            @itstimwhite - FYI, promoting latest changes to preview.`
+            @JovieInc - FYI, promoting latest changes to preview.`
           });
 
   notify-failure:
@@ -235,5 +235,5 @@ jobs:
             title: '❌ Auto-promotion to preview failed',
             body: message,
             labels: ['ci/cd', 'bug'],
-            assignees: ['itstimwhite']
+            assignees: ['JovieInc']
           });
