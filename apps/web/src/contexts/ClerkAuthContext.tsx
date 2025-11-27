@@ -9,7 +9,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useUser, useAuth as useClerkAuth, useSignIn, useClerk } from '@clerk/nextjs';
+import { useUser, useAuth as useClerkAuth, useSignIn } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { processImageFile, validateImageFile } from '@/lib/clerk-avatar-upload';
 import { analytics } from '@/lib/analytics';
@@ -42,7 +42,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoaded } = useUser();
   const { signOut: clerkSignOut, getToken } = useClerkAuth();
-  const { setActive } = useClerk();
   const { signIn: clerkSignIn } = useSignIn();
   const router = useRouter();
 
