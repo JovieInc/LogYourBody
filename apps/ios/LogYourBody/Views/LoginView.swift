@@ -10,7 +10,6 @@ import AuthenticationServices
 struct LoginView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var email = ""
-    @State private var password = ""
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -59,7 +58,7 @@ struct LoginView: View {
                 // Molecule: Auth Header
                 AuthHeader(
                     title: "LogYourBody",
-                    subtitle: "Track your fitness journey"
+                    subtitle: "Sign in with a one-time code sent to your email."
                 )
                 .padding(.top, authManager.isClerkLoaded ? 80 : 20)
                 .padding(.bottom, 24)
@@ -71,12 +70,8 @@ struct LoginView: View {
                 // Organism: Login Form
                 LoginForm(
                     email: $email,
-                    password: $password,
                     isLoading: $isLoading,
                     onLogin: login,
-                    onForgotPassword: {
-                        // Navigate to forgot password
-                    },
                     onAppleSignIn: {
                         Task {
                             await authManager.handleAppleSignIn()
@@ -248,7 +243,7 @@ struct LoginView: View {
         AnalyticsService.shared.track(
             event: "login_attempt",
             properties: [
-                "method": "password"
+                "method": "email_otp"
             ]
         )
 
@@ -256,7 +251,7 @@ struct LoginView: View {
             do {
                 try await AuthManager.shared.login(
                     email: self.email,
-                    password: self.password
+                    password: ""
                 )
                 // Reset loading state on success
                 isLoading = false
@@ -268,7 +263,7 @@ struct LoginView: View {
                 AnalyticsService.shared.track(
                     event: "login_failed",
                     properties: [
-                        "method": "password"
+                        "method": "email_otp"
                     ]
                 )
             }

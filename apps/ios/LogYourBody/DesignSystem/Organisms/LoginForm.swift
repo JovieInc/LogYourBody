@@ -8,21 +8,20 @@ import SwiftUI
 
 struct LoginForm: View {
     @Binding var email: String
-    @Binding var password: String
     @Binding var isLoading: Bool
 
     let onLogin: () -> Void
-    let onForgotPassword: () -> Void
     let onAppleSignIn: () -> Void
 
-    @FocusState private var focusedField: Field?
-
-    enum Field {
-        case email, password
+    private var isValidEmail: Bool {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let pattern = "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+        return trimmed.range(of: pattern, options: .regularExpression) != nil
     }
 
     private var isFormValid: Bool {
-        !email.isEmpty && !password.isEmpty
+        isValidEmail
     }
 
     var body: some View {
@@ -36,29 +35,14 @@ struct LoginForm: View {
                 autocapitalization: .never
             )
             .onSubmit {
-                focusedField = .password
-            }
-
-            // Password Field
-            VStack(alignment: .leading, spacing: 8) {
-                AuthFormField(
-                    label: "Password",
-                    text: $password,
-                    isSecure: true,
-                    textContentType: .password
-                )
-                .onSubmit {
-                    if isFormValid {
-                        onLogin()
-                    }
-                }
-
-                // Forgot Password Link
-                HStack {
-                    Spacer()
-                    DSAuthLink(title: "Forgot password?", action: onForgotPassword)
+                if isFormValid {
+                    onLogin()
                 }
             }
+
+            Text("We'll email you a one-time code to sign you in.")
+                .font(.system(size: 13))
+                .foregroundColor(.appTextSecondary)
 
             // Login Button
             BaseButton(
@@ -97,10 +81,8 @@ struct LoginForm: View {
 
             LoginForm(
                 email: .constant(""),
-                password: .constant(""),
                 isLoading: .constant(false),
                 onLogin: {},
-                onForgotPassword: {},
                 onAppleSignIn: {}
             )
             .padding(.horizontal, 24)
