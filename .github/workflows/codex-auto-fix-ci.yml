@@ -1,0 +1,128 @@
+name: Codex Auto-Fix on Failure
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-fix:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    env:
+      FAILED_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+      FAILED_RUN_URL: ${{ github.event.workflow_run.html_url }}
+      FAILED_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      FAILED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
+    steps:
+      - name: Ensure OpenAI API key is configured
+        run: |
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "OPENAI_API_KEY secret is not set. Skipping auto-fix." >&2
+            exit 1
+          fi
+
+      - name: Get PR metadata
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.workflow_run.pull_requests?.[0];
+            if (!pr) {
+              core.setFailed('No pull request context found for this workflow run.');
+              return;
+            }
+
+            const { data } = await github.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+            });
+
+            const isFork = data.head.repo.fork || data.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`;
+
+            core.setOutput('number', data.number.toString());
+            core.setOutput('base', data.base.ref);
+            core.setOutput('head-ref', data.head.ref);
+            core.setOutput('head-repo', data.head.repo.full_name);
+            core.setOutput('is-fork', isFork.toString());
+
+      - name: Comment and exit for forked pull requests
+        if: steps.pr.outputs.is-fork == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number('${{ steps.pr.outputs.number }}'),
+              body: [
+                '⚠️ Codex auto-fix skipped because this pull request comes from a fork.',
+                'Maintainers can cherry-pick from a branch in this repository to apply fixes manually if desired.',
+              ].join('\n'),
+            });
+
+      - name: Checkout failing ref
+        if: steps.pr.outputs.is-fork != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pr.outputs['head-repo'] }}
+          ref: ${{ env.FAILED_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Use Node.js 20 with pnpm
+        if: steps.pr.outputs.is-fork != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        if: steps.pr.outputs.is-fork != 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Install dependencies
+        if: steps.pr.outputs.is-fork != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Codex
+        if: steps.pr.outputs.is-fork != 'true'
+        uses: openai/codex-action@main
+        id: codex
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: >-
+            You are working in a pnpm + Turborepo monorepo with GitHub Actions CI. Read the repository,
+            run the relevant pnpm scripts, identify the minimal change needed to make all CI checks pass,
+            implement only that change, and stop. Do not refactor unrelated code. Keep changes small and surgical.
+          codex_args: '["--config","sandbox_mode=\"workspace-write\""]'
+
+      - name: Verify tests
+        if: steps.pr.outputs.is-fork != 'true'
+        run: pnpm test
+
+      - name: Create pull request with fixes
+        if: steps.pr.outputs.is-fork != 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "fix(ci): auto-fix failing tests via Codex"
+          branch: codex/auto-fix-${{ github.event.workflow_run.run_id }}
+          base: ${{ env.FAILED_HEAD_BRANCH }}
+          title: "Auto-fix failing CI via Codex"
+          body: |
+            Codex automatically generated this PR in response to a CI failure on workflow `${{ env.FAILED_WORKFLOW_NAME }}`.
+            Failed run: ${{ env.FAILED_RUN_URL }}
+            Head branch: `${{ env.FAILED_HEAD_BRANCH }}`
+            This PR contains minimal changes intended solely to make the CI pass.

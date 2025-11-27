@@ -19,10 +19,12 @@ main branch → Release Loop → Production Deployments (manual)
 **Deployments**: Vercel Alpha, TestFlight Alpha (internal only)
 
 ### Workflows
+
 - `web-rapid-loop.yml`: Lint, type-check, unit tests → Vercel deploy
 - `ios-rapid-loop.yml`: SwiftLint, smoke tests → TestFlight Alpha
 
 ### Features
+
 - Runs on every push to dev branch
 - Minimal test suite (smoke tests only)
 - Timestamp + SHA versioning
@@ -35,10 +37,12 @@ main branch → Release Loop → Production Deployments (manual)
 **Deployments**: Vercel Beta, TestFlight Beta (external testers)
 
 ### Workflows
+
 - `web-confidence-loop.yml`: E2E tests, Lighthouse, accessibility → Vercel Beta
 - `ios-confidence-loop.yml`: Full UI tests, sanitizers, snapshots, performance → TestFlight Beta
 
 ### Features
+
 - Comprehensive test suite
 - Performance profiling
 - Memory leak detection (iOS)
@@ -52,10 +56,12 @@ main branch → Release Loop → Production Deployments (manual)
 **Deployments**: Vercel Production, App Store
 
 ### Workflows
+
 - `web-release-loop.yml`: Validates preview is green → Production deploy
 - `ios-release-loop.yml`: Builds release → TestFlight/App Store
 
 ### Features
+
 - Requires all preview checks passing
 - Creates GitHub releases and tags
 - Supports phased rollouts
@@ -64,23 +70,37 @@ main branch → Release Loop → Production Deployments (manual)
 ## 🔄 Supporting Workflows
 
 ### main-orchestrator.yml
+
 Central dispatcher that:
+
 - Detects which files changed (web/iOS/docs)
 - Routes to appropriate loop based on branch
 - Provides unified `ci-summary` status check
 
 ### promote-preview.yml
+
 Automatic promotion from dev → preview:
+
 - Triggers when dev CI passes
 - Creates/updates PR automatically
 - Enables auto-merge when checks pass
 - Mentions @JovieInc for visibility
 
 ### dependabot-auto-merge.yml
+
 Handles dependency updates:
+
 - Auto-approves minor/patch updates
 - Requires manual review for major updates
 - Runs security checks before merge
+
+### codex-auto-fix-ci.yml
+
+Uses Codex to repair failed PR checks automatically:
+
+- Triggers when the primary `CI` workflow finishes with a failure on a pull request
+- Checks out the failing commit, installs pnpm dependencies, and calls the official `openai/codex-action` to craft a minimal fix
+- Re-runs the test suite and opens a reviewable PR from `codex/auto-fix-<run_id>` back to the contributor branch; forked PRs are skipped with a status comment
 
 ## Branch Protection
 
@@ -92,9 +112,16 @@ All branches use `ci-summary` as the required status check:
 
 ## Configuration
 
+### Codex Auto-Fix prerequisites
+
+- `OPENAI_API_KEY` must be set as a repository or organization secret so Codex can authenticate.
+- The default `GITHUB_TOKEN` needs `contents` and `pull-requests` write permissions (granted in the workflow) so the action can create branches and open PRs.
+- Forked pull requests are skipped automatically; maintainers can cherry-pick from a maintainer branch if Codex needs to be run manually.
+
 ### Environment Variables
 
 #### Web Deployments
+
 - `VERCEL_TOKEN`: Vercel authentication
 - `VERCEL_ORG_ID`: Organization ID
 - `VERCEL_PROJECT_ID`: Project ID
@@ -104,6 +131,7 @@ All branches use `ci-summary` as the required status check:
 - `{ENV}_CLERK_SECRET_KEY`: Clerk secret key
 
 #### iOS Deployments
+
 - `IOS_P12_BASE64`: Code signing certificate
 - `IOS_P12_PASSWORD`: Certificate password
 - `IOS_PROVISIONING_PROFILE_BASE64`: Provisioning profile
@@ -112,6 +140,7 @@ All branches use `ci-summary` as the required status check:
 - `APP_STORE_APP_ID`: App Store app identifier
 
 #### Notifications
+
 - `SLACK_WEBHOOK_URL`: Slack webhook for confidence loop failures
 
 ### GitHub Environments
@@ -141,12 +170,14 @@ All branches use `ci-summary` as the required status check:
 ### Manual Workflows
 
 #### Force iOS Release
+
 ```bash
 gh workflow run ios-release-loop.yml \
   -f release_type=testflight
 ```
 
 #### Run Confidence Tests
+
 ```bash
 gh workflow run web-confidence-loop.yml
 gh workflow run ios-confidence-loop.yml
@@ -155,6 +186,7 @@ gh workflow run ios-confidence-loop.yml
 ## Monitoring
 
 ### Check Workflow Status
+
 ```bash
 # View recent runs
 gh run list --workflow=main-orchestrator.yml
@@ -164,6 +196,7 @@ gh run watch <run-id>
 ```
 
 ### View Deployments
+
 - Web Alpha: https://dev-latest.logyourbody.com
 - Web Beta: https://preview.logyourbody.com
 - Web Production: https://logyourbody.com
