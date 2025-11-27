@@ -127,7 +127,6 @@ final class OnboardingFlowViewModel: ObservableObject {
     @Published var emailAddress: String = "" {
         didSet { persistProgress() }
     }
-    @Published var accountPassword: String = ""
     @Published var isCreatingAccount: Bool = false
     @Published var accountCreationError: String?
     @Published private(set) var accountCreationStage: AccountCreationStage = .idle
@@ -310,6 +309,26 @@ final class OnboardingFlowViewModel: ObservableObject {
         }
     }
 
+    private func firstMissingInputStep() -> Step {
+        if bodyScoreInput.sex == nil {
+            return .basics
+        }
+
+        if bodyScoreInput.height.inCentimeters == nil {
+            return .height
+        }
+
+        if bodyScoreInput.weight.inKilograms == nil {
+            return healthKitManager.isAuthorized ? .healthConfirmation : .manualWeight
+        }
+
+        if bodyScoreInput.bodyFat.percentage == nil {
+            return .bodyFatChoice
+        }
+
+        return .bodyFatChoice
+    }
+
     private func decideManualWeightBack() {
         if bodyScoreInput.weight.value == nil {
             currentStep = .manualWeight
@@ -448,7 +467,7 @@ final class OnboardingFlowViewModel: ObservableObject {
         guard bodyScoreInput.isReadyForCalculation else {
             errorMessage = "Missing inputs for score calculation."
             isLoading = false
-            currentStep = .bodyFatChoice
+            currentStep = firstMissingInputStep()
             return
         }
 
@@ -543,9 +562,6 @@ final class OnboardingFlowViewModel: ObservableObject {
         emailAddress.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var trimmedAccountPassword: String {
-        accountPassword.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 
     var canContinueEmailCapture: Bool {
         let trimmed = trimmedEmailAddress
@@ -555,27 +571,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     var canContinueAccountCreation: Bool {
-        canContinueEmailCapture &&
-            accountPasswordHasMinLength &&
-            accountPasswordHasUpperAndLowercase &&
-            accountPasswordHasNumberOrSymbol
-    }
-
-    var accountPasswordHasMinLength: Bool {
-        trimmedAccountPassword.count >= 8
-    }
-
-    var accountPasswordHasUpperAndLowercase: Bool {
-        guard !trimmedAccountPassword.isEmpty else { return false }
-        let hasUppercase = trimmedAccountPassword.rangeOfCharacter(from: .uppercaseLetters) != nil
-        let hasLowercase = trimmedAccountPassword.rangeOfCharacter(from: .lowercaseLetters) != nil
-        return hasUppercase && hasLowercase
-    }
-
-    var accountPasswordHasNumberOrSymbol: Bool {
-        guard !trimmedAccountPassword.isEmpty else { return false }
-        return trimmedAccountPassword.rangeOfCharacter(from: .decimalDigits) != nil ||
-            trimmedAccountPassword.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil
+        canContinueEmailCapture
     }
 
     func updateSex(_ sex: BiologicalSex) {
@@ -687,14 +683,15 @@ final class OnboardingFlowViewModel: ObservableObject {
             }
             try await authManager.signUp(
                 email: trimmedEmailAddress,
-                password: trimmedAccountPassword,
+                password: "",
                 name: ""
             )
 
             AnalyticsService.shared.track(
                 event: "onboarding_account_created",
                 properties: [
-                    "entry_context": entryContext.analyticsContext
+                    "entry_context": entryContext.analyticsContext,
+                    "method": "email_otp"
                 ]
             )
 

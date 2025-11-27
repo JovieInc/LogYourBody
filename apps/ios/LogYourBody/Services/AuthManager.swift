@@ -121,9 +121,9 @@ class AuthManager: NSObject, ObservableObject {
     @Published var memberSinceDate: Date?
 
     private var currentSignUp: SignUp?
-    private var pendingSignUpCredentials: (email: String, password: String)?
+    private var pendingSignUpEmail: String?
     var pendingVerificationEmail: String? {
-        pendingSignUpCredentials?.email
+        pendingSignUpEmail
     }
     private let clerk = Clerk.shared
     private let supabase = SupabaseClient.shared  // Keep for data operations
@@ -313,7 +313,7 @@ class AuthManager: NSObject, ObservableObject {
 
                 // Clear any remaining sign up state
                 self.currentSignUp = nil
-                self.pendingSignUpCredentials = nil
+                self.pendingSignUpEmail = nil
                 self.needsEmailVerification = false
 
                 // Notify RevenueCat of authenticated user for correct entitlement handling
@@ -688,7 +688,7 @@ class AuthManager: NSObject, ObservableObject {
             self.currentUser = nil
             self.isAuthenticated = false
             self.currentSignUp = nil
-            self.pendingSignUpCredentials = nil
+            self.pendingSignUpEmail = nil
             self.needsEmailVerification = false
         }
 
@@ -766,14 +766,14 @@ extension AuthManager {
         await getSupabaseToken()
     }
 
-    func signUp(email: String, password: String, name: String) async throws {
+    func signUp(email: String, password _: String, name: String) async throws {
         guard isClerkLoaded else {
             throw AuthError.clerkNotInitialized
         }
 
         let strategy = SignUp.CreateStrategy.standard(
             emailAddress: email,
-            password: password,
+            password: nil,
             firstName: name.isEmpty ? nil : name,
             lastName: nil,
             username: nil,
@@ -782,7 +782,7 @@ extension AuthManager {
 
         let signUp = try await SignUp.create(strategy: strategy)
         currentSignUp = signUp
-        pendingSignUpCredentials = (email: email, password: password)
+        pendingSignUpEmail = email
 
         if !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             UserDefaults.standard.set(name, forKey: "appleSignInName")
@@ -803,7 +803,7 @@ extension AuthManager {
         if updated.status == .complete {
             needsEmailVerification = false
             currentSignUp = nil
-            pendingSignUpCredentials = nil
+            pendingSignUpEmail = nil
         } else {
             throw AuthError.invalidCredentials
         }

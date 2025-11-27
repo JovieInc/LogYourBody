@@ -3,13 +3,11 @@ import SwiftUI
 struct BodyScoreAccountCreationView: View {
     @EnvironmentObject var authManager: AuthManager
     @ObservedObject var viewModel: OnboardingFlowViewModel
-    @FocusState private var passwordFieldFocused: Bool
-    @State private var hasEditedPassword: Bool = false
 
     var body: some View {
         OnboardingPageTemplate(
             title: "Create your account",
-            subtitle: "Set a password so you can sign in on any device.",
+            subtitle: "Use your email to create your account. We'll send a verification code to confirm it's you.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .account),
             content: {
@@ -23,41 +21,6 @@ struct BodyScoreAccountCreationView: View {
                         ),
                         keyboardType: .emailAddress
                     )
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Password")
-                            .font(OnboardingTypography.caption)
-                            .foregroundStyle(Color.appTextSecondary)
-
-                        SecureField("••••••••", text: Binding(
-                            get: { viewModel.accountPassword },
-                            set: { newValue in
-                                viewModel.accountPassword = newValue
-                                if !newValue.isEmpty {
-                                    hasEditedPassword = true
-                                }
-                            }
-                        ))
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled(true)
-                        .focused($passwordFieldFocused)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(Color.appCard.opacity(0.6))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(passwordFieldFocused ? Color.appPrimary : Color.appBorder.opacity(0.6))
-                        )
-
-                        if hasEditedPassword {
-                            Text("8+ chars, upper+lower, number/symbol.")
-                                .font(OnboardingTypography.caption)
-                                .foregroundStyle(Color.appTextSecondary)
-                        }
-                    }
                 }
             },
             footer: {
@@ -90,11 +53,6 @@ struct BodyScoreAccountCreationView: View {
                 }
             }
         )
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                passwordFieldFocused = true
-            }
-        }
     }
 
     private func submit() {
