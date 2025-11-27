@@ -9,7 +9,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useUser, useAuth as useClerkAuth, useSignIn, useSignUp, useClerk } from '@clerk/nextjs';
+import { useUser, useAuth as useClerkAuth, useSignIn } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { processImageFile, validateImageFile } from '@/lib/clerk-avatar-upload';
 import { analytics } from '@/lib/analytics';
@@ -27,8 +27,8 @@ interface AuthContextType {
   user: ClerkUserResource | null;
   session: AuthSession | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email?: string) => Promise<{ error: Error | null }>;
+  signUp: (email?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   signInWithProvider: (provider: 'google' | 'apple') => Promise<{ error: Error | null }>;
   uploadProfileImage: (file: File) => Promise<{ imageUrl?: string; error: Error | null }>;
@@ -42,9 +42,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoaded } = useUser();
   const { signOut: clerkSignOut, getToken } = useClerkAuth();
-  const { setActive } = useClerk();
   const { signIn: clerkSignIn } = useSignIn();
-  const { signUp: clerkSignUp } = useSignUp();
   const router = useRouter();
 
   const [exitReason, setExitReason] = useState<AuthExitReason>('none');
@@ -114,58 +112,23 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoaded]);
 
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      try {
-        if (!clerkSignIn) throw new Error('Sign in not available');
+  const signIn = useCallback(async () => {
+    try {
+      router.push('/signin');
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }, [router]);
 
-        const result = await clerkSignIn.create({
-          identifier: email,
-          password,
-        });
-
-        if (result.status === 'complete') {
-          await setActive({ session: result.createdSessionId });
-          router.push('/dashboard');
-          return { error: null };
-        }
-
-        return { error: new Error('Sign in failed') };
-      } catch (error) {
-        return { error: error as Error };
-      }
-    },
-    [clerkSignIn, setActive, router],
-  );
-
-  const signUp = useCallback(
-    async (email: string, password: string) => {
-      try {
-        if (!clerkSignUp) throw new Error('Sign up not available');
-
-        const result = await clerkSignUp.create({
-          emailAddress: email,
-          password,
-        });
-
-        if (result.status === 'complete') {
-          await setActive({ session: result.createdSessionId });
-          return { error: null };
-        }
-
-        // Handle email verification if needed
-        if (result.status === 'missing_requirements') {
-          await result.prepareEmailAddressVerification({ strategy: 'email_code' });
-          // You might want to redirect to email verification page here
-        }
-
-        return { error: null };
-      } catch (error) {
-        return { error: error as Error };
-      }
-    },
-    [clerkSignUp, setActive],
-  );
+  const signUp = useCallback(async () => {
+    try {
+      router.push('/signup');
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }, [router]);
 
   const signOut = useCallback(async () => {
     setExitReason('userInitiated');

@@ -11,7 +11,6 @@ struct SignUpView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss) var dismiss
     @State private var email = ""
-    @State private var password = ""
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -79,7 +78,6 @@ struct SignUpView: View {
                 // Organism: Sign Up Form
                 SignUpForm(
                     email: $email,
-                    password: $password,
                     isLoading: $isLoading,
                     agreedToTerms: $agreedToTerms,
                     agreedToPrivacy: $agreedToPrivacy,
@@ -232,13 +230,13 @@ struct SignUpView: View {
         AnalyticsService.shared.track(
             event: "signup_attempt",
             properties: [
-                "method": "password"
+                "method": "email_otp"
             ]
         )
 
         Task { @MainActor in
             do {
-                try await authManager.signUp(email: email, password: password, name: "")
+                try await authManager.signUp(email: email, password: "", name: "")
                 // Reset loading state on success
                 isLoading = false
             } catch {
@@ -254,7 +252,7 @@ struct SignUpView: View {
                 AnalyticsService.shared.track(
                     event: "signup_failed",
                     properties: [
-                        "method": "password"
+                        "method": "email_otp"
                     ]
                 )
             }

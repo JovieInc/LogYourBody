@@ -8,7 +8,6 @@ import SwiftUI
 
 struct SignUpForm: View {
     @Binding var email: String
-    @Binding var password: String
     @Binding var isLoading: Bool
     @Binding var agreedToTerms: Bool
     @Binding var agreedToPrivacy: Bool
@@ -20,30 +19,18 @@ struct SignUpForm: View {
     let onTapPrivacy: (() -> Void)?
     let onTapHealthDisclaimer: (() -> Void)?
 
-    @FocusState private var focusedField: Field?
-
-    enum Field {
-        case email, password
+    private var isValidEmail: Bool {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let pattern = "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+        return trimmed.range(of: pattern, options: .regularExpression) != nil
     }
 
     private var isFormValid: Bool {
-        !email.isEmpty &&
-            password.count >= 8 &&
-            hasUpperAndLower &&
-            hasNumberOrSymbol &&
+        isValidEmail &&
             agreedToTerms &&
             agreedToPrivacy &&
             agreedToHealthDisclaimer
-    }
-
-    private var hasUpperAndLower: Bool {
-        password.rangeOfCharacter(from: .uppercaseLetters) != nil &&
-            password.rangeOfCharacter(from: .lowercaseLetters) != nil
-    }
-
-    private var hasNumberOrSymbol: Bool {
-        password.rangeOfCharacter(from: .decimalDigits) != nil ||
-            password.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil
     }
 
     var body: some View {
@@ -57,25 +44,9 @@ struct SignUpForm: View {
                 autocapitalization: .never
             )
             .onSubmit {
-                focusedField = .password
-            }
-
-            // Password Field
-            VStack(alignment: .leading, spacing: 8) {
-                AuthFormField(
-                    label: "Password",
-                    text: $password,
-                    placeholder: "••••••••",
-                    isSecure: true,
-                    textContentType: .newPassword
-                )
-                .onSubmit {
-                    if isFormValid {
-                        onSignUp()
-                    }
+                if isFormValid {
+                    onSignUp()
                 }
-
-                PasswordStrengthIndicator(password: password)
             }
 
             // Privacy Consent
@@ -136,10 +107,8 @@ struct SignUpForm: View {
                 subtitle: "Start tracking your fitness journey"
             )
             .padding(.top, 40)
-
             SignUpForm(
                 email: .constant(""),
-                password: .constant(""),
                 isLoading: .constant(false),
                 agreedToTerms: .constant(false),
                 agreedToPrivacy: .constant(false),
