@@ -5,6 +5,7 @@ The Smart Import feature allows users to bulk import their body composition data
 ## Supported File Types
 
 ### 1. Images (Progress Photos)
+
 - **Formats**: JPG, PNG, HEIC
 - **Features**:
   - Automatic date extraction from EXIF metadata
@@ -13,6 +14,7 @@ The Smart Import feature allows users to bulk import their body composition data
   - Creates body metrics entries with photo URLs
 
 ### 2. PDFs (Body Composition Reports)
+
 - **Formats**: PDF files from DEXA scans, InBody, or similar devices
 - **Features**:
   - AI-powered text extraction using OpenAI GPT-4
@@ -28,6 +30,7 @@ The Smart Import feature allows users to bulk import their body composition data
   - Preserves scan type and source information
 
 ### 3. Spreadsheets (Historical Data)
+
 - **Formats**: CSV, Excel (XLSX, XLS)
 - **Features**:
   - Flexible column detection (case-insensitive)
@@ -45,6 +48,7 @@ The Smart Import feature allows users to bulk import their body composition data
 ## Technical Implementation
 
 ### Frontend (`/src/app/import/page.tsx`)
+
 - Drag-and-drop file upload interface
 - Real-time processing status updates
 - Preview of extracted data before import
@@ -52,19 +56,22 @@ The Smart Import feature allows users to bulk import their body composition data
 - Bulk operations support
 
 ### Backend (`/src/app/api/parse-pdf/route.ts`)
+
 - OpenAI API integration for PDF analysis
 - Structured data extraction with JSON response format
 - Error handling and validation
 
 ### Dependencies
+
 - `exifr`: EXIF data extraction from images
 - `openai`: OpenAI API client for PDF analysis
 - `pdf-parse`: PDF text extraction
-- `xlsx`: Excel file parsing
+- `read-excel-file`: Excel file parsing
 
 ## Environment Variables
 
 Required for PDF parsing:
+
 ```env
 OPENAI_API_KEY=your-openai-api-key
 ```
@@ -72,6 +79,7 @@ OPENAI_API_KEY=your-openai-api-key
 ## Database Schema
 
 The import feature works with the existing `body_metrics` table:
+
 - Stores extracted measurements and calculations
 - Links to uploaded photos via `photo_url`
 - Preserves original data source in `notes` field
@@ -79,6 +87,7 @@ The import feature works with the existing `body_metrics` table:
 ## Storage Configuration
 
 Photos are stored in the `photos` bucket in Supabase Storage:
+
 - User-specific folders: `{user_id}/{timestamp}-{filename}.jpg`
 - Public read access for sharing
 - Authenticated write/delete access
