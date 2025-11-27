@@ -1,71 +1,71 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/ClerkAuthContext'
-import DashboardPage from '../page'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/ClerkAuthContext';
+import DashboardPage from '../page';
 
 // Mock dependencies
 jest.mock('next/navigation', () => ({
-  useRouter: jest.fn()
-}))
+  useRouter: jest.fn(),
+}));
 
 jest.mock('@/contexts/ClerkAuthContext', () => ({
-  useAuth: jest.fn()
-}))
+  useAuth: jest.fn(),
+}));
 
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ src, alt, ...props }: { src: string; alt: string;[key: string]: unknown }) =>
+  default: ({ src, alt, ...props }: { src: string; alt: string; [key: string]: unknown }) => (
     <img src={src} alt={alt} {...props} />
-}))
+  ),
+}));
 
 jest.mock('@/hooks/use-network-status', () => ({
-  useNetworkStatus: () => true
-}))
+  useNetworkStatus: () => true,
+}));
 
 jest.mock('@/lib/supabase/profile', () => ({
-  getProfile: jest.fn()
-}))
+  getProfile: jest.fn(),
+}));
 
 jest.mock('@/lib/supabase/client', () => ({
-  createClient: jest.fn()
-}))
+  createClient: jest.fn(),
+}));
 
 // Stub DashboardPage for keyboard navigation tests
 jest.mock('../page', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const React = require('react') as typeof import('react')
+  const React = require('react') as typeof import('react');
 
   const isEditableTarget = (target: EventTarget | null): boolean => {
-    if (!target) return false
-    const el = target as HTMLElement
-    const tag = el.tagName
-    if (!tag) return false
-    const tagUpper = tag.toUpperCase()
-    if (tagUpper === 'INPUT' || tagUpper === 'TEXTAREA') return true
-    if ((el as HTMLElement).isContentEditable) return true
-    return false
-  }
+    if (!target) return false;
+    const el = target as HTMLElement;
+    const tag = el.tagName;
+    if (!tag) return false;
+    const tagUpper = tag.toUpperCase();
+    if (tagUpper === 'INPUT' || tagUpper === 'TEXTAREA') return true;
+    if ((el as HTMLElement).isContentEditable) return true;
+    return false;
+  };
 
   const TestDashboardPage: React.FC = () => {
-    const [index, setIndex] = React.useState(2)
-    const [activeTab] = React.useState<'Avatar' | 'Photo'>('Avatar')
+    const [index, setIndex] = React.useState(2);
+    const [activeTab] = React.useState<'Avatar' | 'Photo'>('Avatar');
 
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
-        if (isEditableTarget(event.target)) return
+        if (isEditableTarget(event.target)) return;
 
         if (event.key === 'ArrowLeft') {
-          setIndex(prev => (prev > 0 ? prev - 1 : 0))
+          setIndex((prev) => (prev > 0 ? prev - 1 : 0));
         } else if (event.key === 'ArrowRight') {
-          setIndex(prev => (prev < 2 ? prev + 1 : 2))
+          setIndex((prev) => (prev < 2 ? prev + 1 : 2));
         }
-      }
+      };
 
-      window.addEventListener('keydown', handleKeyDown)
+      window.addEventListener('keydown', handleKeyDown);
       return () => {
-        window.removeEventListener('keydown', handleKeyDown)
-      }
-    }, [])
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }, []);
 
     return (
       <div>
@@ -73,41 +73,29 @@ jest.mock('../page', () => {
           <h1>LogYourBody</h1>
         </header>
         <main>
-          <input
-            type="range"
-            min={0}
-            max={2}
-            value={index}
-            readOnly
-          />
+          <input type="range" min={0} max={2} value={index} readOnly />
 
           <div role="tablist">
-            <button
-              role="tab"
-              data-state={activeTab === 'Avatar' ? 'active' : 'inactive'}
-            >
+            <button role="tab" data-state={activeTab === 'Avatar' ? 'active' : 'inactive'}>
               Avatar
             </button>
-            <button
-              role="tab"
-              data-state={activeTab === 'Photo' ? 'active' : 'inactive'}
-            >
+            <button role="tab" data-state={activeTab === 'Photo' ? 'active' : 'inactive'}>
               Photo
             </button>
           </div>
         </main>
       </div>
-    )
-  }
+    );
+  };
 
   return {
     __esModule: true,
     default: TestDashboardPage,
-  }
-})
+  };
+});
 
-import { getProfile } from '@/lib/supabase/profile'
-import { createClient } from '@/lib/supabase/client'
+import { getProfile } from '@/lib/supabase/profile';
+import { createClient } from '@/lib/supabase/client';
 
 const mockProfile = {
   id: 'user1',
@@ -124,12 +112,12 @@ const mockProfile = {
     units: {
       weight: 'lbs',
       height: 'in',
-      measurements: 'in'
-    }
+      measurements: 'in',
+    },
   },
   created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString()
-}
+  updated_at: new Date().toISOString(),
+};
 
 const mockMetrics = [
   {
@@ -143,7 +131,7 @@ const mockMetrics = [
     lean_body_mass: 144,
     ffmi: 22.5,
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   },
   {
     id: '2',
@@ -156,7 +144,7 @@ const mockMetrics = [
     lean_body_mass: 144.2,
     ffmi: 22.6,
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   },
   {
     id: '3',
@@ -169,127 +157,129 @@ const mockMetrics = [
     lean_body_mass: 144.32,
     ffmi: 22.7,
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-]
+    updated_at: new Date().toISOString(),
+  },
+];
 
 describe('Dashboard Keyboard Navigation', () => {
-  const mockPush = jest.fn()
-  const mockSignOut = jest.fn()
+  const mockPush = jest.fn();
+  const mockSignOut = jest.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks()
-      ; (useRouter as jest.Mock).mockReturnValue({
-        push: mockPush
-      })
-      ; (getProfile as jest.Mock).mockResolvedValue(mockProfile)
+    jest.clearAllMocks();
+    (useRouter as jest.Mock).mockReturnValue({
+      push: mockPush,
+    });
+    (getProfile as jest.Mock).mockResolvedValue(mockProfile);
 
-      // Mock createClient to return metrics
-      ; (createClient as jest.Mock).mockReturnValue({
-        from: jest.fn((table: string) => ({
-          select: jest.fn(() => ({
-            eq: jest.fn(() => ({
-              order: jest.fn(() => Promise.resolve({
+    // Mock createClient to return metrics
+    (createClient as jest.Mock).mockReturnValue({
+      from: jest.fn((table: string) => ({
+        select: jest.fn(() => ({
+          eq: jest.fn(() => ({
+            order: jest.fn(() =>
+              Promise.resolve({
                 data: table === 'body_metrics' ? mockMetrics : [],
-                error: null
-              }))
-            }))
-          }))
-        }))
-      })
-  })
+                error: null,
+              }),
+            ),
+          })),
+        })),
+      })),
+    });
+  });
 
   it('should navigate timeline with arrow keys without affecting tabs', async () => {
-    ; (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as jest.Mock).mockReturnValue({
       user: { id: 'user1', email: 'test@example.com' },
       loading: false,
-      signOut: mockSignOut
-    })
+      signOut: mockSignOut,
+    });
 
-    const { container } = render(<DashboardPage />)
+    const { container } = render(<DashboardPage />);
 
     // Wait for data to load
     await waitFor(() => {
-      expect(screen.getByText('LogYourBody')).toBeInTheDocument()
-    })
+      expect(screen.getByText('LogYourBody')).toBeInTheDocument();
+    });
 
     // Get the timeline slider
-    const slider = container.querySelector('input[type="range"]')
-    expect(slider).toBeInTheDocument()
-    expect(slider).toHaveAttribute('max', '2') // 3 metrics - 1
-    expect(slider).toHaveValue('2') // Should start at the last entry
+    const slider = container.querySelector('input[type="range"]');
+    expect(slider).toBeInTheDocument();
+    expect(slider).toHaveAttribute('max', '2'); // 3 metrics - 1
+    expect(slider).toHaveValue('2'); // Should start at the last entry
 
     // Check that Avatar tab is active
-    const avatarTab = screen.getByRole('tab', { name: 'Avatar' })
-    const photoTab = screen.getByRole('tab', { name: 'Photo' })
-    expect(avatarTab).toHaveAttribute('data-state', 'active')
-    expect(photoTab).toHaveAttribute('data-state', 'inactive')
+    const avatarTab = screen.getByRole('tab', { name: 'Avatar' });
+    const photoTab = screen.getByRole('tab', { name: 'Photo' });
+    expect(avatarTab).toHaveAttribute('data-state', 'active');
+    expect(photoTab).toHaveAttribute('data-state', 'inactive');
 
     // Press left arrow key
-    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
 
     await waitFor(() => {
-      expect(slider).toHaveValue('1') // Should move to previous entry
-    })
+      expect(slider).toHaveValue('1'); // Should move to previous entry
+    });
 
     // Avatar tab should still be active (not switched to Photo)
-    expect(avatarTab).toHaveAttribute('data-state', 'active')
-    expect(photoTab).toHaveAttribute('data-state', 'inactive')
+    expect(avatarTab).toHaveAttribute('data-state', 'active');
+    expect(photoTab).toHaveAttribute('data-state', 'inactive');
 
     // Press right arrow key
-    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
 
     await waitFor(() => {
-      expect(slider).toHaveValue('2') // Should move back to last entry
-    })
+      expect(slider).toHaveValue('2'); // Should move back to last entry
+    });
 
     // Avatar tab should still be active
-    expect(avatarTab).toHaveAttribute('data-state', 'active')
-    expect(photoTab).toHaveAttribute('data-state', 'inactive')
+    expect(avatarTab).toHaveAttribute('data-state', 'active');
+    expect(photoTab).toHaveAttribute('data-state', 'inactive');
 
     // Press left arrow multiple times to reach the beginning
-    fireEvent.keyDown(window, { key: 'ArrowLeft' })
-    fireEvent.keyDown(window, { key: 'ArrowLeft' })
-    fireEvent.keyDown(window, { key: 'ArrowLeft' }) // Extra press
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    fireEvent.keyDown(window, { key: 'ArrowLeft' }); // Extra press
 
     await waitFor(() => {
-      expect(slider).toHaveValue('0') // Should stop at 0
-    })
+      expect(slider).toHaveValue('0'); // Should stop at 0
+    });
 
     // Tab should still not change
-    expect(avatarTab).toHaveAttribute('data-state', 'active')
-    expect(photoTab).toHaveAttribute('data-state', 'inactive')
-  })
+    expect(avatarTab).toHaveAttribute('data-state', 'active');
+    expect(photoTab).toHaveAttribute('data-state', 'inactive');
+  });
 
   it('should not navigate when typing in an input field', async () => {
-    ; (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as jest.Mock).mockReturnValue({
       user: { id: 'user1', email: 'test@example.com' },
       loading: false,
-      signOut: mockSignOut
-    })
+      signOut: mockSignOut,
+    });
 
-    const { container } = render(<DashboardPage />)
+    const { container } = render(<DashboardPage />);
 
     // Wait for data to load
     await waitFor(() => {
-      expect(screen.getByText('LogYourBody')).toBeInTheDocument()
-    })
+      expect(screen.getByText('LogYourBody')).toBeInTheDocument();
+    });
 
-    const slider = container.querySelector('input[type="range"]')
-    expect(slider).toHaveValue('2')
+    const slider = container.querySelector('input[type="range"]');
+    expect(slider).toHaveValue('2');
 
     // Create a mock input and focus it
-    const mockInput = document.createElement('input')
-    document.body.appendChild(mockInput)
-    mockInput.focus()
+    const mockInput = document.createElement('input');
+    document.body.appendChild(mockInput);
+    mockInput.focus();
 
     // Press arrow key while input is focused
-    fireEvent.keyDown(mockInput, { key: 'ArrowLeft' })
+    fireEvent.keyDown(mockInput, { key: 'ArrowLeft' });
 
     // Slider should not change
-    expect(slider).toHaveValue('2')
+    expect(slider).toHaveValue('2');
 
     // Clean up
-    document.body.removeChild(mockInput)
-  })
-})
+    document.body.removeChild(mockInput);
+  });
+});
