@@ -39,6 +39,9 @@ class RealtimeSyncManager: ObservableObject {
     private var pendingOperations: [SyncOperation] = []
     private var isProcessingQueue = false
     private var pendingCountTask: Task<Void, Never>?
+    private var syncTask: Task<Void, Never>?
+    private var syncRequestPending = false
+    private var syncCompletionHandlers: [() -> Void] = []
 
     // Battery optimization settings
     private var syncInterval: TimeInterval = 300 // 5 minutes default
@@ -237,12 +240,12 @@ class RealtimeSyncManager: ObservableObject {
     func syncIfNeeded() {
         guard isOnline else { return }
         guard authManager.isAuthenticated else { return }
-        guard !isSyncing else { return }
 
         // Check if enough time has passed since last sync attempt
         if let lastAttempt = lastSyncAttempt,
-           Date().timeIntervalSince(lastAttempt) < 30 {
-            return // Prevent too frequent syncs
+           Date().timeIntervalSince(lastAttempt) < 30,
+           !isSyncing {
+            return // Prevent too frequent syncs when idle
         }
 
         // Check for pending changes
@@ -254,100 +257,17 @@ class RealtimeSyncManager: ObservableObject {
     }
 
     func syncAll(onCompletion: (() -> Void)? = nil) {
-        guard !isSyncing else {
-            onCompletion?()
-            return
-        }
-        guard isOnline else {
-            syncStatus = .offline
-            onCompletion?()
-            return
-        }
-        guard authManager.isAuthenticated else {
-            onCompletion?()
-            return
+        if let onCompletion {
+            syncCompletionHandlers.append(onCompletion)
         }
 
-        lastSyncAttempt = Date()
-        isSyncing = true
-        syncStatus = .syncing
-        error = nil
+        syncRequestPending = true
 
-        let operationsToProcess = pendingOperations
-        pendingOperations.removeAll()
-        savePendingOperations()
+        guard syncTask == nil else { return }
 
-        let lastSyncSnapshot = lastSyncDate
-        let userIdSnapshot = authManager.currentUser?.id
-
-        Task.detached(priority: .utility) { [weak self] in
-            guard let self else { return }
-            var operationsNeedingRetry = operationsToProcess
-
-            do {
-                guard let userId = userIdSnapshot else {
-                    throw SyncError.noAuthSession
-                }
-
-                let session = await MainActor.run { self.authManager.clerkSession }
-                guard let session else {
-                    throw SyncError.noAuthSession
-                }
-
-                let tokenResource = try await session.getToken()
-                guard let token = tokenResource?.jwt else {
-                    throw SyncError.tokenGenerationFailed
-                }
-
-                if !operationsNeedingRetry.isEmpty {
-                    let failedOperations = await self.processPendingOperations(operationsNeedingRetry, token: token)
-                    if failedOperations.isEmpty {
-                        operationsNeedingRetry.removeAll()
-                    } else {
-                        operationsNeedingRetry = failedOperations
-                        throw PendingSyncError.failedOperations
-                    }
-                }
-
-                try await self.syncLocalChanges(token: token)
-                try await self.pullLatestData(userId: userId, lastSync: lastSyncSnapshot, token: token)
-                self.coreDataManager.cleanupOldData()
-
-                await MainActor.run {
-                    self.isSyncing = false
-                    self.syncStatus = .success
-                    self.lastSyncDate = Date()
-                    self.consecutiveFailures = 0
-                    self.updatePendingSyncCount()
-                    self.savePendingOperations()
-                    onCompletion?()
-                }
-            } catch {
-                if let supabaseError = error as? SupabaseError {
-                    if case .unauthorized = supabaseError {
-                        await self.authManager.handleSupabaseUnauthorized()
-                    }
-                }
-
-                await MainActor.run {
-                    if !operationsNeedingRetry.isEmpty {
-                        self.pendingOperations.insert(contentsOf: operationsNeedingRetry, at: 0)
-                    }
-                    self.isSyncing = false
-                    self.syncStatus = .error(error.localizedDescription)
-                    self.error = error.localizedDescription
-                    self.consecutiveFailures += 1
-
-                    if self.consecutiveFailures >= self.maxConsecutiveFailures {
-                        self.syncInterval = min(self.syncInterval * 2, 3_600)
-                        self.startAutoSync()
-                    }
-
-                    self.savePendingOperations()
-                    self.updatePendingSyncCount()
-                    onCompletion?()
-                }
-            }
+        syncRequestPending = false
+        syncTask = Task(priority: .utility) { [weak self] in
+            await self?.runSyncCycle()
         }
     }
 
@@ -356,6 +276,143 @@ class RealtimeSyncManager: ObservableObject {
             self.syncAll {
                 continuation.resume()
             }
+        }
+    }
+
+    private func runSyncCycle() async {
+        struct SyncContext {
+            let operationsToProcess: [SyncOperation]
+            let lastSyncSnapshot: Date?
+            let userIdSnapshot: String?
+        }
+
+        guard let context = await MainActor.run({ () -> SyncContext? in
+            guard self.isOnline else {
+                self.syncStatus = .offline
+                return nil
+            }
+
+            guard self.authManager.isAuthenticated else {
+                return nil
+            }
+
+            self.lastSyncAttempt = Date()
+            self.isSyncing = true
+            self.syncStatus = .syncing
+            self.error = nil
+
+            let operationsToProcess = self.pendingOperations
+            self.pendingOperations.removeAll()
+            self.savePendingOperations()
+
+            return SyncContext(
+                operationsToProcess: operationsToProcess,
+                lastSyncSnapshot: self.lastSyncDate,
+                userIdSnapshot: self.authManager.currentUser?.id
+            )
+        }) else {
+            await finalizeSyncCycle(status: isOnline ? .idle : .offline)
+            return
+        }
+
+        var operationsNeedingRetry = context.operationsToProcess
+
+        do {
+            guard let userId = context.userIdSnapshot else {
+                throw SyncError.noAuthSession
+            }
+
+            let session = await MainActor.run { self.authManager.clerkSession }
+            guard let session else {
+                throw SyncError.noAuthSession
+            }
+
+            let tokenResource = try await session.getToken()
+            guard let token = tokenResource?.jwt else {
+                throw SyncError.tokenGenerationFailed
+            }
+
+            if !operationsNeedingRetry.isEmpty {
+                let failedOperations = await self.processPendingOperations(operationsNeedingRetry, token: token)
+                if failedOperations.isEmpty {
+                    operationsNeedingRetry.removeAll()
+                } else {
+                    operationsNeedingRetry = failedOperations
+                    throw PendingSyncError.failedOperations
+                }
+            }
+
+            try await self.syncLocalChanges(token: token)
+            try await self.pullLatestData(userId: userId, lastSync: context.lastSyncSnapshot, token: token)
+            self.coreDataManager.cleanupOldData()
+
+            await finalizeSyncCycle(
+                status: .success,
+                operationsNeedingRetry: operationsNeedingRetry,
+                shouldUpdateLastSync: true
+            )
+        } catch {
+            if let supabaseError = error as? SupabaseError {
+                if case .unauthorized = supabaseError {
+                    await self.authManager.handleSupabaseUnauthorized()
+                }
+            }
+
+            await finalizeSyncCycle(
+                status: .error(error.localizedDescription),
+                operationsNeedingRetry: operationsNeedingRetry,
+                errorDescription: error.localizedDescription
+            )
+        }
+    }
+
+    @MainActor
+    private func finalizeSyncCycle(
+        status: SyncStatus,
+        operationsNeedingRetry: [SyncOperation] = [],
+        shouldUpdateLastSync: Bool = false,
+        errorDescription: String? = nil
+    ) {
+        if !operationsNeedingRetry.isEmpty {
+            pendingOperations.insert(contentsOf: operationsNeedingRetry, at: 0)
+        }
+
+        isSyncing = false
+        syncStatus = status
+        syncTask = nil
+
+        switch status {
+        case .success:
+            error = nil
+            if shouldUpdateLastSync {
+                lastSyncDate = Date()
+            }
+            consecutiveFailures = 0
+        case .error:
+            error = errorDescription
+            consecutiveFailures += 1
+
+            if consecutiveFailures >= maxConsecutiveFailures {
+                syncInterval = min(syncInterval * 2, 3_600)
+                startAutoSync()
+            }
+        default:
+            break
+        }
+
+        savePendingOperations()
+        updatePendingSyncCount()
+
+        let callbacks = syncCompletionHandlers
+        syncCompletionHandlers.removeAll()
+
+        let shouldResync = syncRequestPending && isOnline && authManager.isAuthenticated
+        syncRequestPending = false
+
+        callbacks.forEach { $0() }
+
+        if shouldResync {
+            syncAll()
         }
     }
 
