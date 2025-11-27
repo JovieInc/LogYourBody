@@ -64,6 +64,11 @@ enum EmailRegistrationStatus {
     case registered
 }
 
+enum EmailVerificationFlow: Equatable {
+    case signUp
+    case signIn
+}
+
 // MARK: - AsyncGate Helper
 
 actor AsyncGate {
@@ -122,9 +127,12 @@ class AuthManager: NSObject, ObservableObject {
 
     private var currentSignUp: SignUp?
     private var pendingSignUpEmail: String?
+    private var currentSignIn: SignIn?
+    private var pendingSignInEmail: String?
     var pendingVerificationEmail: String? {
-        pendingSignUpEmail
+        pendingSignUpEmail ?? pendingSignInEmail
     }
+    @Published var emailVerificationFlow: EmailVerificationFlow?
     private let clerk = Clerk.shared
     private let supabase = SupabaseClient.shared  // Keep for data operations
     private let userDefaults = UserDefaults.standard
@@ -311,10 +319,13 @@ class AuthManager: NSObject, ObservableObject {
                 self.updateLocalUser(clerkUser: user)
                 // isAuthenticated will be set by updateLocalUser if successful
 
-                // Clear any remaining sign up state
+                // Clear any remaining sign-up/sign-in state
                 self.currentSignUp = nil
                 self.pendingSignUpEmail = nil
+                self.currentSignIn = nil
+                self.pendingSignInEmail = nil
                 self.needsEmailVerification = false
+                self.emailVerificationFlow = nil
 
                 // Notify RevenueCat of authenticated user for correct entitlement handling
                 if let localUserId = self.currentUser?.id {
@@ -520,9 +531,61 @@ class AuthManager: NSObject, ObservableObject {
             return
         }
 
-        // Real authentication using Clerk SDK is not yet implemented for email/password.
-        // For now, treat any non-mock login as invalid credentials.
-        throw AuthError.invalidCredentials
+        // Real authentication uses an email one-time code via Clerk.
+        try await startEmailCodeSignIn(email: email)
+    }
+
+    func startEmailCodeSignIn(email: String) async throws {
+        guard isClerkLoaded else {
+            throw AuthError.clerkNotInitialized
+        }
+
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedEmail.isEmpty else {
+            throw AuthError.invalidCredentials
+        }
+
+        let signIn = try await SignIn.create(
+            strategy: .identifier(trimmedEmail, strategy: .emailCode())
+        )
+
+        currentSignIn = signIn
+        pendingSignInEmail = trimmedEmail
+        emailVerificationFlow = .signIn
+        needsEmailVerification = true
+    }
+
+    func verifySignInEmail(code: String) async throws {
+        guard let signIn = currentSignIn else {
+            throw AuthError.invalidCredentials
+        }
+
+        let updated = try await signIn.attemptFirstFactor(
+            strategy: .emailCode(code: code)
+        )
+
+        if updated.status == .complete {
+            if let sessionId = updated.createdSessionId {
+                try await clerk.setActive(sessionId: sessionId)
+            }
+
+            updateSessionState()
+
+            needsEmailVerification = false
+            currentSignIn = nil
+            pendingSignInEmail = nil
+            emailVerificationFlow = nil
+        } else {
+            throw AuthError.invalidCredentials
+        }
+    }
+
+    func resendSignInEmailCode() async throws {
+        guard let signIn = currentSignIn else {
+            throw AuthError.invalidCredentials
+        }
+
+        _ = try await signIn.prepareFirstFactor(strategy: .emailCode())
     }
 
     // MARK: - Apple Sign In with OAuth
@@ -690,6 +753,9 @@ class AuthManager: NSObject, ObservableObject {
             self.currentSignUp = nil
             self.pendingSignUpEmail = nil
             self.needsEmailVerification = false
+            self.currentSignIn = nil
+            self.pendingSignInEmail = nil
+            self.emailVerificationFlow = nil
         }
 
         await RevenueCatManager.shared.logoutUser()
@@ -708,7 +774,7 @@ class AuthManager: NSObject, ObservableObject {
         if let authError = error as? AuthError {
             switch authError {
             case .invalidCredentials:
-                return "Invalid email or password. Please try again."
+                return "Invalid email or code. Please try again."
             case .clerkNotInitialized:
                 return authServiceNotReadyMessage
             default:
@@ -716,7 +782,7 @@ class AuthManager: NSObject, ObservableObject {
             }
         }
 
-        return "Invalid email or password. Please try again."
+        return "Invalid email or code. Please try again."
     }
 
     func signUpErrorMessage(for error: Error) -> String {
@@ -783,6 +849,7 @@ extension AuthManager {
         let signUp = try await SignUp.create(strategy: strategy)
         currentSignUp = signUp
         pendingSignUpEmail = email
+        emailVerificationFlow = .signUp
 
         if !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             UserDefaults.standard.set(name, forKey: "appleSignInName")
@@ -804,6 +871,7 @@ extension AuthManager {
             needsEmailVerification = false
             currentSignUp = nil
             pendingSignUpEmail = nil
+            emailVerificationFlow = nil
         } else {
             throw AuthError.invalidCredentials
         }

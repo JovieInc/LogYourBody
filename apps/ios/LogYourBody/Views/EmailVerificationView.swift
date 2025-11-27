@@ -86,15 +86,33 @@ struct EmailVerificationView: View {
 
         Task { @MainActor in
             do {
-                try await authManager.verifyEmail(code: verificationCode)
-                successMessage = "Email verified successfully!"
-                // Navigation will be handled by AuthManager
-                AnalyticsService.shared.track(event: "email_verified")
+                switch authManager.emailVerificationFlow {
+                case .signIn?:
+                    try await authManager.verifySignInEmail(code: verificationCode)
+                    successMessage = "Signed in successfully!"
+                    AnalyticsService.shared.track(event: "login_email_code_verified")
+                case .signUp?:
+                    fallthrough
+                case nil:
+                    try await authManager.verifyEmail(code: verificationCode)
+                    successMessage = "Email verified successfully!"
+                    AnalyticsService.shared.track(event: "email_verified")
+                }
             } catch {
                 errorMessage = "Invalid verification code. Please try again."
                 isLoading = false
 
-                AnalyticsService.shared.track(event: "email_verification_failed")
+                let event: String
+                switch authManager.emailVerificationFlow {
+                case .signIn?:
+                    event = "login_email_code_failed"
+                case .signUp?:
+                    fallthrough
+                case nil:
+                    event = "email_verification_failed"
+                }
+
+                AnalyticsService.shared.track(event: event)
             }
         }
     }
@@ -105,9 +123,18 @@ struct EmailVerificationView: View {
 
         Task { @MainActor in
             do {
-                try await authManager.resendVerificationEmail()
-                successMessage = "A new verification code has been sent to your email."
-                AnalyticsService.shared.track(event: "email_verification_resent")
+                switch authManager.emailVerificationFlow {
+                case .signIn?:
+                    try await authManager.resendSignInEmailCode()
+                    successMessage = "A new sign-in code has been sent to your email."
+                    AnalyticsService.shared.track(event: "login_email_code_resent")
+                case .signUp?:
+                    fallthrough
+                case nil:
+                    try await authManager.resendVerificationEmail()
+                    successMessage = "A new verification code has been sent to your email."
+                    AnalyticsService.shared.track(event: "email_verification_resent")
+                }
             } catch {
                 errorMessage = "Failed to resend code. Please try again."
                 AnalyticsService.shared.track(event: "email_verification_resend_failed")
