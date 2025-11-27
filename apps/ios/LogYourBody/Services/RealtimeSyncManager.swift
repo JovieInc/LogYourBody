@@ -266,7 +266,7 @@ class RealtimeSyncManager: ObservableObject {
         guard syncTask == nil else { return }
 
         syncRequestPending = false
-        syncTask = Task(priority: .utility) { [weak self] in
+        syncTask = Task(priority: .utility) { @MainActor [weak self] in
             await self?.runSyncCycle()
         }
     }
