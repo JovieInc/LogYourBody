@@ -109,20 +109,14 @@ final class BugReportManager: ObservableObject {
         let screenshotToSend = currentScreenshot
 
         Task.detached(priority: .userInitiated) {
-            let attachmentsData: [Data]?
-            if let screenshotToSend {
-                attachmentsData = [screenshotToSend]
-            } else {
-                attachmentsData = nil
-            }
-
+            let attachments = screenshotToSend.map { [$0] }
             let feedback = SentryFeedback(
                 message: messageToSend,
                 name: nameToSend,
                 email: emailToSend,
                 source: .custom,
                 associatedEventId: nil,
-                attachments: attachmentsData
+                attachments: attachments
             )
             SentrySDK.capture(feedback: feedback)
         }

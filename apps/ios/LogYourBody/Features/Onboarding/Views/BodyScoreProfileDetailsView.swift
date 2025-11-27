@@ -291,6 +291,31 @@ struct BodyScoreProfileDetailsView: View {
                 await MainActor.run {
                     isSaving = false
                     HapticManager.shared.successAction()
+
+                    if var currentUser = authManager.currentUser {
+                        let existingProfile = currentUser.profile
+
+                        let updatedProfile = UserProfile(
+                            id: existingProfile?.id ?? currentUser.id,
+                            email: existingProfile?.email ?? currentUser.email,
+                            username: existingProfile?.username,
+                            fullName: fullName.isEmpty ? existingProfile?.fullName ?? currentUser.name : fullName,
+                            dateOfBirth: dateOfBirth,
+                            height: existingProfile?.height,
+                            heightUnit: existingProfile?.heightUnit,
+                            gender: existingProfile?.gender,
+                            activityLevel: existingProfile?.activityLevel,
+                            goalWeight: existingProfile?.goalWeight,
+                            goalWeightUnit: existingProfile?.goalWeightUnit,
+                            onboardingCompleted: true
+                        )
+
+                        currentUser.name = fullName.isEmpty ? currentUser.name : fullName
+                        currentUser.profile = updatedProfile
+                        currentUser.onboardingCompleted = true
+                        authManager.currentUser = currentUser
+                    }
+
                     viewModel.goToNextStep()
                 }
             } catch {

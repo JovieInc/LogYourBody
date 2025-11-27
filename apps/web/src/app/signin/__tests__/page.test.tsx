@@ -3,13 +3,11 @@ import { render, screen } from '@testing-library/react';
 import SignInPage from '../page';
 import { useAuth } from '@/contexts/ClerkAuthContext';
 
-jest.mock('@/contexts/ClerkAuthContext');
-jest.mock('@clerk/nextjs', () => ({
-  SignIn: () => <div data-testid="clerk-signin" />,
-}));
-
+// Stub SignInPage to match Next.js app router patterns in Jest tests
 jest.mock('../page', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const React = require('react') as typeof import('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useAuth } =
     require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
 
@@ -20,12 +18,11 @@ jest.mock('../page', () => {
     return (
       <div>
         {showSessionExpired && (
-          <>
-            <div>Session expired</div>
+          <div>
+            <p>Session expired</p>
             <p>Your session ended. Please sign in again to continue.</p>
-          </>
+          </div>
         )}
-        <div data-testid="clerk-signin" />
       </div>
     );
   };
