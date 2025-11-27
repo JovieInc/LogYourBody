@@ -21,56 +21,10 @@ class CoreDataManager: ObservableObject {
     lazy var persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "LogYourBody")
 
-        for description in container.persistentStoreDescriptions {
-            description.setOption(
-                FileProtectionType.completeUntilFirstUserAuthentication as NSObject,
-                forKey: NSPersistentStoreFileProtectionKey
-            )
-            description.shouldMigrateStoreAutomatically = true
-            description.shouldInferMappingModelAutomatically = true
-        }
+        container.persistentStoreDescriptions.forEach(configureStoreDescription(_:))
+        let storeURL = container.persistentStoreDescriptions.first?.url
 
-        container.loadPersistentStores { description, error in
-            if let error = error {
-                let appError = AppError.coreData(operation: "loadPersistentStores", underlying: error)
-                let contextInfo = ErrorContext(
-                    feature: "coreData",
-                    operation: "loadPersistentStores",
-                    screen: nil,
-                    userId: nil
-                )
-                ErrorReporter.shared.capture(appError, context: contextInfo)
-                // Log the error but don't crash - fallback to in-memory store
-                // print("⚠️ CoreData Error: Unable to load persistent stores: \(error)")
-                // print("⚠️ Falling back to in-memory store. Data will not persist.")
-
-                // Create an in-memory store as fallback
-                let inMemoryDescription = NSPersistentStoreDescription()
-                inMemoryDescription.type = NSInMemoryStoreType
-                container.persistentStoreDescriptions = [inMemoryDescription]
-
-                // Attempt to load in-memory store
-                container.loadPersistentStores { _, inMemoryError in
-                    if let inMemoryError = inMemoryError {
-                        let criticalError = AppError.coreData(operation: "loadInMemoryStore", underlying: inMemoryError)
-                        let criticalContext = ErrorContext(
-                            feature: "coreData",
-                            operation: "loadInMemoryStore",
-                            screen: nil,
-                            userId: nil
-                        )
-                        ErrorReporter.shared.capture(criticalError, context: criticalContext)
-                        // print("❌ CoreData Critical: Even in-memory store failed: \(inMemoryError)")
-                    }
-                }
-            }
-
-            // Enable automatic lightweight migration
-            description.shouldMigrateStoreAutomatically = true
-            description.shouldInferMappingModelAutomatically = true
-        }
-
-        container.viewContext.automaticallyMergesChangesFromParent = true
+        loadPersistentStores(into: container, storeURL: storeURL)
         return container
     }()
 
@@ -79,6 +33,133 @@ class CoreDataManager: ObservableObject {
     }
 
     private init() {}
+
+    private func configureStoreDescription(_ description: NSPersistentStoreDescription) {
+        description.setOption(
+            FileProtectionType.completeUntilFirstUserAuthentication as NSObject,
+            forKey: NSPersistentStoreFileProtectionKey
+        )
+        description.setOption([
+            "journal_mode": "WAL",
+            "auto_vacuum": "FULL"
+        ] as NSDictionary, forKey: NSSQLitePragmasOption)
+        description.shouldMigrateStoreAutomatically = true
+        description.shouldInferMappingModelAutomatically = true
+        description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+    }
+
+    private func configureViewContext(for context: NSManagedObjectContext) {
+        context.automaticallyMergesChangesFromParent = true
+        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        context.shouldDeleteInaccessibleFaults = true
+        context.name = "viewContext"
+    }
+
+    private func loadPersistentStores(into container: NSPersistentContainer, storeURL: URL?) {
+        let semaphore = DispatchSemaphore(value: 0)
+
+        container.loadPersistentStores { [weak self] description, error in
+            defer { semaphore.signal() }
+            guard let self else { return }
+
+            if let error {
+                self.handlePersistentStoreLoadFailure(
+                    error,
+                    for: container,
+                    attemptedStoreURL: storeURL
+                )
+                return
+            }
+
+            description.shouldMigrateStoreAutomatically = true
+            description.shouldInferMappingModelAutomatically = true
+            self.configureViewContext(for: container.viewContext)
+        }
+
+        semaphore.wait()
+    }
+
+    private func handlePersistentStoreLoadFailure(
+        _ error: Error,
+        for container: NSPersistentContainer,
+        attemptedStoreURL: URL?
+    ) {
+        let appError = AppError.coreData(operation: "loadPersistentStores", underlying: error)
+        let contextInfo = ErrorContext(
+            feature: "coreData",
+            operation: "loadPersistentStores",
+            screen: nil,
+            userId: nil
+        )
+        ErrorReporter.shared.capture(appError, context: contextInfo)
+
+        if let attemptedStoreURL, tryRecoverPersistentStore(container: container, storeURL: attemptedStoreURL) {
+            return
+        }
+
+        loadInMemoryFallback(for: container)
+    }
+
+    private func tryRecoverPersistentStore(container: NSPersistentContainer, storeURL: URL) -> Bool {
+        let coordinator = container.persistentStoreCoordinator
+
+        if let existingStore = coordinator.persistentStore(for: storeURL) {
+            try? coordinator.destroyPersistentStore(
+                at: storeURL,
+                ofType: existingStore.type,
+                options: existingStore.options
+            )
+        }
+
+        let fileManager = FileManager.default
+        let potentialSidecarURLs = [storeURL, storeURL.appendingPathExtension("wal"), storeURL.appendingPathExtension("shm")]
+        for url in potentialSidecarURLs where fileManager.fileExists(atPath: url.path) {
+            try? fileManager.removeItem(at: url)
+        }
+
+        let freshDescription = NSPersistentStoreDescription(url: storeURL)
+        configureStoreDescription(freshDescription)
+        container.persistentStoreDescriptions = [freshDescription]
+
+        return loadStoreAndConfigureContext(container: container, operation: "recoverPersistentStore")
+    }
+
+    private func loadInMemoryFallback(for container: NSPersistentContainer) {
+        let inMemoryDescription = NSPersistentStoreDescription()
+        inMemoryDescription.type = NSInMemoryStoreType
+        configureStoreDescription(inMemoryDescription)
+        container.persistentStoreDescriptions = [inMemoryDescription]
+
+        _ = loadStoreAndConfigureContext(container: container, operation: "loadInMemoryStore")
+    }
+
+    private func loadStoreAndConfigureContext(container: NSPersistentContainer, operation: String) -> Bool {
+        var success = false
+        let semaphore = DispatchSemaphore(value: 0)
+
+        container.loadPersistentStores { [weak self] _, error in
+            defer { semaphore.signal() }
+            guard let self else { return }
+
+            if let error {
+                let criticalError = AppError.coreData(operation: operation, underlying: error)
+                let criticalContext = ErrorContext(
+                    feature: "coreData",
+                    operation: operation,
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(criticalError, context: criticalContext)
+                return
+            }
+
+            self.configureViewContext(for: container.viewContext)
+            success = true
+        }
+
+        semaphore.wait()
+        return success
+    }
 
     // MARK: - Save Context
     func save(completion: (() -> Void)? = nil) {
