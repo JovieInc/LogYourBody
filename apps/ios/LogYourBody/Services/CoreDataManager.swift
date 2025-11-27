@@ -17,6 +17,7 @@ class CoreDataManager: ObservableObject {
 
     private let saveQueue = DispatchQueue(label: "com.logyourbody.coredata.save", qos: .utility)
     private var isSaving = false
+    private var hasAttemptedStoreRecovery = false
 
     lazy var persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "LogYourBody")
@@ -32,37 +33,11 @@ class CoreDataManager: ObservableObject {
 
         container.loadPersistentStores { description, error in
             if let error = error {
-                let appError = AppError.coreData(operation: "loadPersistentStores", underlying: error)
-                let contextInfo = ErrorContext(
-                    feature: "coreData",
-                    operation: "loadPersistentStores",
-                    screen: nil,
-                    userId: nil
+                self.handlePersistentStoreLoadFailure(
+                    for: container,
+                    description: description,
+                    error: error
                 )
-                ErrorReporter.shared.capture(appError, context: contextInfo)
-                // Log the error but don't crash - fallback to in-memory store
-                // print("⚠️ CoreData Error: Unable to load persistent stores: \(error)")
-                // print("⚠️ Falling back to in-memory store. Data will not persist.")
-
-                // Create an in-memory store as fallback
-                let inMemoryDescription = NSPersistentStoreDescription()
-                inMemoryDescription.type = NSInMemoryStoreType
-                container.persistentStoreDescriptions = [inMemoryDescription]
-
-                // Attempt to load in-memory store
-                container.loadPersistentStores { _, inMemoryError in
-                    if let inMemoryError = inMemoryError {
-                        let criticalError = AppError.coreData(operation: "loadInMemoryStore", underlying: inMemoryError)
-                        let criticalContext = ErrorContext(
-                            feature: "coreData",
-                            operation: "loadInMemoryStore",
-                            screen: nil,
-                            userId: nil
-                        )
-                        ErrorReporter.shared.capture(criticalError, context: criticalContext)
-                        // print("❌ CoreData Critical: Even in-memory store failed: \(inMemoryError)")
-                    }
-                }
             }
 
             // Enable automatic lightweight migration
@@ -79,6 +54,109 @@ class CoreDataManager: ObservableObject {
     }
 
     private init() {}
+
+    // MARK: - Persistent Store Hardening
+
+    private func handlePersistentStoreLoadFailure(
+        for container: NSPersistentContainer,
+        description: NSPersistentStoreDescription,
+        error: Error
+    ) {
+        let appError = AppError.coreData(operation: "loadPersistentStores", underlying: error)
+        let contextInfo = ErrorContext(
+            feature: "coreData",
+            operation: "loadPersistentStores",
+            screen: nil,
+            userId: nil
+        )
+        ErrorReporter.shared.capture(appError, context: contextInfo)
+
+        guard !hasAttemptedStoreRecovery else {
+            loadInMemoryStore(for: container)
+            return
+        }
+
+        hasAttemptedStoreRecovery = true
+
+        guard let storeURL = description.url else {
+            loadInMemoryStore(for: container)
+            return
+        }
+
+        do {
+            try container.persistentStoreCoordinator.destroyPersistentStore(
+                at: storeURL,
+                ofType: description.type,
+                options: nil
+            )
+            try removeSQLiteSidecars(for: storeURL)
+
+            container.loadPersistentStores { _, recoveryError in
+                if let recoveryError = recoveryError {
+                    let recoveryAppError = AppError.coreData(
+                        operation: "recoverPersistentStore",
+                        underlying: recoveryError
+                    )
+                    let recoveryContext = ErrorContext(
+                        feature: "coreData",
+                        operation: "recoverPersistentStore",
+                        screen: nil,
+                        userId: nil
+                    )
+                    ErrorReporter.shared.capture(recoveryAppError, context: recoveryContext)
+                    self.loadInMemoryStore(for: container)
+                }
+            }
+        } catch {
+            let destroyError = AppError.coreData(operation: "destroyPersistentStore", underlying: error)
+            let destroyContext = ErrorContext(
+                feature: "coreData",
+                operation: "destroyPersistentStore",
+                screen: nil,
+                userId: nil
+            )
+            ErrorReporter.shared.capture(destroyError, context: destroyContext)
+            loadInMemoryStore(for: container)
+        }
+    }
+
+    private func loadInMemoryStore(for container: NSPersistentContainer) {
+        // Log the error but don't crash - fallback to in-memory store
+        // print("⚠️ CoreData Error: Unable to load persistent stores")
+        // print("⚠️ Falling back to in-memory store. Data will not persist.")
+
+        let inMemoryDescription = NSPersistentStoreDescription()
+        inMemoryDescription.type = NSInMemoryStoreType
+        container.persistentStoreDescriptions = [inMemoryDescription]
+
+        container.loadPersistentStores { _, inMemoryError in
+            if let inMemoryError = inMemoryError {
+                let criticalError = AppError.coreData(operation: "loadInMemoryStore", underlying: inMemoryError)
+                let criticalContext = ErrorContext(
+                    feature: "coreData",
+                    operation: "loadInMemoryStore",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(criticalError, context: criticalContext)
+                // print("❌ CoreData Critical: Even in-memory store failed: \(inMemoryError)")
+            }
+        }
+    }
+
+    private func removeSQLiteSidecars(for storeURL: URL) throws {
+        let fileManager = FileManager.default
+        let baseURL = storeURL.deletingPathExtension()
+        let storeExtension = storeURL.pathExtension
+        let sidecarSuffixes = ["shm", "wal"]
+
+        for suffix in sidecarSuffixes {
+            let sidecarURL = baseURL.appendingPathExtension("\(storeExtension)-\(suffix)")
+            if fileManager.fileExists(atPath: sidecarURL.path) {
+                try fileManager.removeItem(at: sidecarURL)
+            }
+        }
+    }
 
     // MARK: - Save Context
     func save(completion: (() -> Void)? = nil) {
