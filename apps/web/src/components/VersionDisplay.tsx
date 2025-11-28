@@ -1,7 +1,7 @@
-'use client'
+'use client';
 
-import React, { useMemo } from "react";
-import { Badge } from "./ui/badge";
+import React, { useMemo } from 'react';
+import { Badge } from '@shared-ui/atoms/badge';
 
 interface VersionDisplayProps {
   className?: string;
@@ -9,12 +9,11 @@ interface VersionDisplayProps {
 }
 
 export const VersionDisplay = React.memo(function VersionDisplay({
-  className = "",
+  className = '',
 }: VersionDisplayProps) {
-
   const versionInfo = useMemo(
     () => ({
-      version: process.env.NEXT_PUBLIC_VERSION || process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0",
+      version: process.env.NEXT_PUBLIC_VERSION || process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
     }),
     [],
   );
@@ -22,7 +21,7 @@ export const VersionDisplay = React.memo(function VersionDisplay({
   return (
     <Badge
       variant="outline"
-      className={`text-xs opacity-50 border-linear-border text-linear-text-tertiary ${className}`}
+      className={`border-linear-border text-linear-text-tertiary text-xs opacity-50 ${className}`}
     >
       v{versionInfo.version}
     </Badge>
