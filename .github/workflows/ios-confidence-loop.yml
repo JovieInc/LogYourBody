@@ -67,7 +67,7 @@ jobs:
     
     - name: Cache test build
       id: cache-test-build
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           apps/ios/DerivedData/Build/Products
@@ -126,7 +126,7 @@ jobs:
         setup-ruby: 'false'
     
     - name: Restore test build
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           apps/ios/DerivedData/Build/Products
@@ -267,7 +267,7 @@ jobs:
         create-config-files: 'true'
     
     - name: Restore test build
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           apps/ios/DerivedData/Build/Products
