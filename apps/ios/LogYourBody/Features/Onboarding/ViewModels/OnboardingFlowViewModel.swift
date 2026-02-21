@@ -353,9 +353,34 @@ final class OnboardingFlowViewModel: ObservableObject {
         return trimmed.range(of: pattern, options: .regularExpression) != nil
     }
 
+    private var trimmedAccountPassword: String {
+        accountPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var accountPasswordMeetsLengthRequirement: Bool {
+        trimmedAccountPassword.count >= 8
+    }
+
+    var accountPasswordHasUpperAndLower: Bool {
+        let hasUpper = trimmedAccountPassword.rangeOfCharacter(from: .uppercaseLetters) != nil
+        let hasLower = trimmedAccountPassword.rangeOfCharacter(from: .lowercaseLetters) != nil
+        return hasUpper && hasLower
+    }
+
+    var accountPasswordHasNumberOrSymbol: Bool {
+        let hasNumber = trimmedAccountPassword.rangeOfCharacter(from: .decimalDigits) != nil
+        let hasSymbol = trimmedAccountPassword.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil
+        return hasNumber || hasSymbol
+    }
+
+    var isAccountPasswordValid: Bool {
+        accountPasswordMeetsLengthRequirement
+            && accountPasswordHasUpperAndLower
+            && accountPasswordHasNumberOrSymbol
+    }
+
     var canContinueAccountCreation: Bool {
-        let password = accountPassword.trimmingCharacters(in: .whitespacesAndNewlines)
-        return canContinueEmailCapture && password.count >= 8
+        canContinueEmailCapture && isAccountPasswordValid
     }
 
     func updateSex(_ sex: BiologicalSex) {
@@ -439,6 +464,8 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     func createAccount(authManager: AuthManager) async {
         guard canContinueAccountCreation else { return }
+        let email = emailAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        let password = trimmedAccountPassword
         await MainActor.run {
             isCreatingAccount = true
             accountCreationError = nil
@@ -450,9 +477,9 @@ final class OnboardingFlowViewModel: ObservableObject {
                 accountCreationStage = .creatingAccount
             }
             try await authManager.signUp(
-                email: emailAddress,
-                password: accountPassword,
-                name: ""
+                email: email,
+                password: password,
+                name: "",
             )
 
             await MainActor.run {

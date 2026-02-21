@@ -444,6 +444,11 @@ class AuthManager: NSObject, ObservableObject {
             throw AuthError.clerkNotInitialized
         }
 
+        if clerk.session != nil {
+            // Clear any existing session so we can create a fresh account
+            await logout()
+        }
+
         do {
             // Create sign up with email and password
             // Note: If your Clerk instance requires legal acceptance,
