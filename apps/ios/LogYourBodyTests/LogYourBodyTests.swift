@@ -1050,6 +1050,103 @@ final class GlobalTimelineServiceCoverageTests: XCTestCase {
         XCTAssertEqual(buckets[2].metrics.bodyFat.value ?? 0, 16, accuracy: 0.01)
     }
 
+    func testWeeklyBucketsIncludeStepOnlyWeeks() {
+        let service = GlobalTimelineService(calendar: Self.calendar)
+        let dailyMetrics = [
+            Self.makeDailyMetric(
+                id: "steps-1",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))!,
+                steps: 8_000
+            ),
+            Self.makeDailyMetric(
+                id: "steps-2",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 10))!,
+                steps: 10_000
+            ),
+            Self.makeDailyMetric(
+                id: "steps-3",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 11))!,
+                steps: 12_000
+            )
+        ]
+
+        let buckets = service.makeBuckets(
+            for: .week,
+            input: GlobalTimelineService.BuildInput(
+                bodyMetrics: [],
+                dailyMetrics: dailyMetrics
+            )
+        )
+
+        XCTAssertEqual(buckets.count, 1)
+        XCTAssertEqual(buckets[0].metrics.steps.value ?? 0, 10_000, accuracy: 0.01)
+        XCTAssertEqual(buckets[0].metrics.steps.presence, .estimated)
+    }
+
+    func testMonthlyBucketsPopulateFFMIAndBodyScoreFromContext() {
+        let service = GlobalTimelineService(calendar: Self.calendar)
+        let metrics = [
+            Self.makeMetric(
+                id: "mar-1",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 5))!,
+                weight: 180,
+                weightUnit: "lbs",
+                bodyFatPercentage: 18
+            ),
+            Self.makeMetric(
+                id: "mar-2",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 18))!,
+                weight: 178,
+                weightUnit: "lbs",
+                bodyFatPercentage: 17
+            )
+        ]
+
+        let buckets = service.makeBuckets(
+            for: .month,
+            input: GlobalTimelineService.BuildInput(
+                bodyMetrics: metrics,
+                bodyScoreContext: Self.makeBodyScoreContext()
+            )
+        )
+
+        XCTAssertEqual(buckets.count, 1)
+        XCTAssertEqual(buckets[0].metrics.ffmi.presence, .present)
+        XCTAssertNotNil(buckets[0].metrics.ffmi.value)
+        XCTAssertNotNil(buckets[0].metrics.bodyScore)
+        XCTAssertEqual(buckets[0].metrics.bodyScoreCompleteness, .full)
+    }
+
+    func testMixedInputsDoNotAppendTrailingStepOnlyBuckets() {
+        let service = GlobalTimelineService(calendar: Self.calendar)
+        let metrics = [
+            Self.makeMetric(
+                id: "body",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 5))!,
+                weight: 180,
+                weightUnit: "lbs"
+            )
+        ]
+        let dailyMetrics = [
+            Self.makeDailyMetric(
+                id: "steps-late",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 24))!,
+                steps: 10_000
+            )
+        ]
+
+        let buckets = service.makeBuckets(
+            for: .week,
+            input: GlobalTimelineService.BuildInput(
+                bodyMetrics: metrics,
+                dailyMetrics: dailyMetrics
+            )
+        )
+
+        XCTAssertEqual(buckets.count, 1)
+        XCTAssertEqual(buckets[0].id, "2026-W10")
+    }
+
     private static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
@@ -1079,6 +1176,31 @@ final class GlobalTimelineServiceCoverageTests: XCTestCase {
             dataSource: "Manual",
             createdAt: date,
             updatedAt: date
+        )
+    }
+
+    private static func makeDailyMetric(
+        id: String,
+        date: Date,
+        steps: Int
+    ) -> DailyMetrics {
+        DailyMetrics(
+            id: id,
+            userId: "user",
+            date: date,
+            steps: steps,
+            notes: nil,
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+
+    private static func makeBodyScoreContext() -> GlobalTimelineService.BodyScoreContext {
+        GlobalTimelineService.BodyScoreContext(
+            sex: .male,
+            birthYear: 1990,
+            heightCm: 180,
+            measurementPreference: .imperial
         )
     }
 }
@@ -1326,6 +1448,39 @@ final class GlobalTimelineHeaderPresentationTests: XCTestCase {
 
 @MainActor
 final class GlobalTimelineStoreTests: XCTestCase {
+    func testUpdateRecomputesBucketSnapshotsWhenBodyScoreContextChanges() {
+        let store = GlobalTimelineStore(service: GlobalTimelineService(calendar: Self.calendar))
+        let metrics = [
+            Self.makeMetric(
+                id: "mar",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 10))!,
+                weight: 180,
+                weightUnit: "lbs",
+                bodyFatPercentage: 18
+            )
+        ]
+
+        store.update(
+            bodyMetrics: metrics,
+            dailyMetrics: [],
+            bodyScoreContext: nil
+        )
+
+        let initialBucket = store.weeklyBuckets.last
+        XCTAssertNil(initialBucket?.metrics.bodyScore)
+        XCTAssertEqual(initialBucket?.metrics.bodyScoreCompleteness, .none)
+
+        store.update(
+            bodyMetrics: metrics,
+            dailyMetrics: [],
+            bodyScoreContext: Self.makeBodyScoreContext()
+        )
+
+        let updatedBucket = store.weeklyBuckets.last
+        XCTAssertNotNil(updatedBucket?.metrics.bodyScore)
+        XCTAssertEqual(updatedBucket?.metrics.bodyScoreCompleteness, .full)
+    }
+
     func testPreviousBucketReturnsPriorBucketAtSameScale() {
         let store = GlobalTimelineStore(service: GlobalTimelineService(calendar: Self.calendar))
         store.updateMetrics([
@@ -1394,7 +1549,8 @@ final class GlobalTimelineStoreTests: XCTestCase {
         id: String,
         date: Date,
         weight: Double? = nil,
-        weightUnit: String? = nil
+        weightUnit: String? = nil,
+        bodyFatPercentage: Double? = nil
     ) -> BodyMetrics {
         BodyMetrics(
             id: id,
@@ -1402,7 +1558,7 @@ final class GlobalTimelineStoreTests: XCTestCase {
             date: date,
             weight: weight,
             weightUnit: weightUnit,
-            bodyFatPercentage: nil,
+            bodyFatPercentage: bodyFatPercentage,
             bodyFatMethod: nil,
             muscleMass: nil,
             boneMass: nil,
@@ -1411,6 +1567,15 @@ final class GlobalTimelineStoreTests: XCTestCase {
             dataSource: "Manual",
             createdAt: date,
             updatedAt: date
+        )
+    }
+
+    private static func makeBodyScoreContext() -> GlobalTimelineService.BodyScoreContext {
+        GlobalTimelineService.BodyScoreContext(
+            sex: .male,
+            birthYear: 1990,
+            heightCm: 180,
+            measurementPreference: .imperial
         )
     }
 }

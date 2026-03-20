@@ -129,11 +129,15 @@ struct DashboardViewLiquid: View {
                 previousSyncStatus = oldStatus
                 handleSyncStatusChange(from: oldStatus, to: newStatus)
             }
+            .onReceive(authManager.$currentUser) { _ in
+                refreshGlobalTimelineStore()
+            }
             .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)) { notification in
                 handleCoreDataContextChange(notification)
             }
             .onReceive(viewModel.$recentDailyMetrics) { _ in
                 rebuildDailyMetricsLookupCache()
+                refreshGlobalTimelineStore()
             }
             .onReceive(viewModel.$bodyMetrics) { metrics in
                 handleBodyMetricsChange(metrics)
@@ -143,6 +147,9 @@ struct DashboardViewLiquid: View {
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
+            }
+            .onChange(of: measurementSystem) { _, _ in
+                refreshGlobalTimelineStore()
             }
             .onChange(of: selectedIndex) { _, newIndex in
                 updateAnimatedValues(for: newIndex)
@@ -229,6 +236,7 @@ struct DashboardViewLiquid: View {
     private func handleOnAppear() {
         updateFeatureFlags()
         loadMetricsOrder()
+        refreshGlobalTimelineStore()
 
         selectedRange = TimeRange(rawValue: storedTimeRangeRawValue) ?? .month1
         if !viewModel.hasLoadedInitialData {
@@ -309,12 +317,22 @@ struct DashboardViewLiquid: View {
 
     private func handleBodyMetricsChange(_ metrics: [BodyMetrics]) {
         guard isGlobalTimelineEnabled else { return }
-
-        globalTimelineStore.updateMetrics(metrics)
+        _ = metrics
+        refreshGlobalTimelineStore()
 
         if let cursor = globalTimelineStore.cursor {
             syncSelectedIndex(for: cursor)
         }
+    }
+
+    private func refreshGlobalTimelineStore() {
+        guard isGlobalTimelineEnabled else { return }
+
+        globalTimelineStore.update(
+            bodyMetrics: bodyMetrics,
+            dailyMetrics: recentDailyMetrics,
+            bodyScoreContext: currentTimelineBodyScoreContext
+        )
     }
 
     private func handleGlobalTimelineCursorChange(_ cursor: GlobalTimelineCursor?) {

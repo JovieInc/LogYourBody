@@ -3,6 +3,29 @@ import Foundation
 /// Service responsible for building weekly, monthly, and yearly buckets
 /// for the global timeline scrubber.
 final class GlobalTimelineService {
+    struct BodyScoreContext {
+        let sex: BiologicalSex
+        let birthYear: Int
+        let heightCm: Double
+        let measurementPreference: MeasurementSystem
+    }
+
+    struct BuildInput {
+        let bodyMetrics: [BodyMetrics]
+        let dailyMetrics: [DailyMetrics]
+        let bodyScoreContext: BodyScoreContext?
+
+        init(
+            bodyMetrics: [BodyMetrics],
+            dailyMetrics: [DailyMetrics] = [],
+            bodyScoreContext: BodyScoreContext? = nil
+        ) {
+            self.bodyMetrics = bodyMetrics
+            self.dailyMetrics = dailyMetrics
+            self.bodyScoreContext = bodyScoreContext
+        }
+    }
+
     private let calendar: Calendar
 
     init(calendar: Calendar = .current) {
@@ -12,22 +35,30 @@ final class GlobalTimelineService {
     // MARK: - Public API
 
     func makeBuckets(for scale: GlobalTimelineScale, metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
-        guard !metrics.isEmpty else { return [] }
+        makeBuckets(for: scale, input: BuildInput(bodyMetrics: metrics))
+    }
+
+    func makeBuckets(for scale: GlobalTimelineScale, input: BuildInput) -> [GlobalTimelineBucket] {
+        guard !input.bodyMetrics.isEmpty || !input.dailyMetrics.isEmpty else { return [] }
 
         switch scale {
         case .week:
-            return makeWeeklyBuckets(from: metrics)
+            return makeWeeklyBuckets(from: input)
         case .month:
-            return makeMonthlyBuckets(from: metrics)
+            return makeMonthlyBuckets(from: input)
         case .year:
-            return makeYearlyBuckets(from: metrics)
+            return makeYearlyBuckets(from: input)
         }
     }
 
     func makeInitialCursor(for metrics: [BodyMetrics]) -> GlobalTimelineCursor? {
-        guard !metrics.isEmpty else { return nil }
+        makeInitialCursor(for: BuildInput(bodyMetrics: metrics))
+    }
 
-        let weeklyBuckets = makeWeeklyBuckets(from: metrics)
+    func makeInitialCursor(for input: BuildInput) -> GlobalTimelineCursor? {
+        guard !input.bodyMetrics.isEmpty || !input.dailyMetrics.isEmpty else { return nil }
+
+        let weeklyBuckets = makeWeeklyBuckets(from: input)
         guard let mostRecentBucket = weeklyBuckets.last else {
             return nil
         }
@@ -41,9 +72,9 @@ final class GlobalTimelineService {
 
     // MARK: - Bucket builders
 
-    private func makeWeeklyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
-        let context = makeAggregationContext(from: metrics)
-        guard let mostRecentDate = context.metrics.last?.date,
+    private func makeWeeklyBuckets(from input: BuildInput) -> [GlobalTimelineBucket] {
+        let context = makeAggregationContext(from: input)
+        guard let mostRecentDate = latestDate(in: context),
               let weekInterval = calendar.dateInterval(of: .weekOfYear, for: mostRecentDate) else {
             return []
         }
@@ -59,9 +90,9 @@ final class GlobalTimelineService {
         )
     }
 
-    private func makeMonthlyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
-        let context = makeAggregationContext(from: metrics)
-        guard let mostRecentDate = context.metrics.last?.date,
+    private func makeMonthlyBuckets(from input: BuildInput) -> [GlobalTimelineBucket] {
+        let context = makeAggregationContext(from: input)
+        guard let mostRecentDate = latestDate(in: context),
               let monthInterval = calendar.dateInterval(of: .month, for: mostRecentDate) else {
             return []
         }
@@ -77,9 +108,9 @@ final class GlobalTimelineService {
         )
     }
 
-    private func makeYearlyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
-        let context = makeAggregationContext(from: metrics)
-        guard let mostRecentDate = context.metrics.last?.date,
+    private func makeYearlyBuckets(from input: BuildInput) -> [GlobalTimelineBucket] {
+        let context = makeAggregationContext(from: input)
+        guard let mostRecentDate = latestDate(in: context),
               let yearInterval = calendar.dateInterval(of: .year, for: mostRecentDate) else {
             return []
         }
@@ -102,7 +133,7 @@ final class GlobalTimelineService {
         previousStartDate: (Date) -> Date?,
         identifier: (Date) -> String
     ) -> [GlobalTimelineBucket] {
-        guard let earliestDate = context.metrics.first?.date else {
+        guard let earliestDate = earliestDate(in: context) else {
             return []
         }
 
@@ -119,7 +150,12 @@ final class GlobalTimelineService {
             }
 
             let rangeMetrics = metrics(in: startDate..<endDate, context: context)
-            if hasAnyData(in: rangeMetrics) {
+            let rangeDailyMetrics = dailyMetrics(in: startDate..<endDate, context: context)
+            if hasAnyData(
+                in: rangeMetrics,
+                dailyMetrics: rangeDailyMetrics,
+                allowDailyOnlyBucket: context.metrics.isEmpty
+            ) {
                 buckets.append(
                     GlobalTimelineBucket(
                         id: identifier(startDate),
@@ -127,8 +163,12 @@ final class GlobalTimelineService {
                         startDate: startDate,
                         endDate: endDate,
                         metrics: makeSnapshot(
+                            scale: scale,
                             rangeMetrics: rangeMetrics,
+                            rangeDailyMetrics: rangeDailyMetrics,
                             allMetrics: context.metrics,
+                            normalizedWeightUnit: context.normalizedWeightUnit,
+                            bodyScoreContext: context.bodyScoreContext,
                             midpoint: midpoint(between: startDate, and: endDate)
                         )
                     )
@@ -163,18 +203,27 @@ final class GlobalTimelineService {
 
     private struct AggregationContext {
         let metrics: [BodyMetrics]
-        let dates: [Date]
+        let metricDates: [Date]
+        let dailyMetrics: [DailyMetrics]
+        let dailyMetricDates: [Date]
+        let normalizedWeightUnit: String
+        let bodyScoreContext: BodyScoreContext?
     }
 
-    private func makeAggregationContext(from metrics: [BodyMetrics]) -> AggregationContext {
-        let targetUnit = resolvedWeightUnit(from: metrics)
-        let normalizedMetrics = metrics
+    private func makeAggregationContext(from input: BuildInput) -> AggregationContext {
+        let targetUnit = resolvedWeightUnit(from: input.bodyMetrics)
+        let normalizedMetrics = input.bodyMetrics
             .sorted { $0.date < $1.date }
             .map { normalizeWeightUnit(for: $0, targetUnit: targetUnit) }
+        let sortedDailyMetrics = input.dailyMetrics.sorted { $0.date < $1.date }
 
         return AggregationContext(
             metrics: normalizedMetrics,
-            dates: normalizedMetrics.map(\.date)
+            metricDates: normalizedMetrics.map(\.date),
+            dailyMetrics: sortedDailyMetrics,
+            dailyMetricDates: sortedDailyMetrics.map(\.date),
+            normalizedWeightUnit: targetUnit,
+            bodyScoreContext: input.bodyScoreContext
         )
     }
 
@@ -217,14 +266,25 @@ final class GlobalTimelineService {
     }
 
     private func metrics(in range: Range<Date>, context: AggregationContext) -> [BodyMetrics] {
-        let startIndex = lowerBound(for: range.lowerBound, in: context.dates)
-        let endIndex = lowerBound(for: range.upperBound, in: context.dates)
+        let startIndex = lowerBound(for: range.lowerBound, in: context.metricDates)
+        let endIndex = lowerBound(for: range.upperBound, in: context.metricDates)
 
         guard startIndex < endIndex else {
             return []
         }
 
         return Array(context.metrics[startIndex..<endIndex])
+    }
+
+    private func dailyMetrics(in range: Range<Date>, context: AggregationContext) -> [DailyMetrics] {
+        let startIndex = lowerBound(for: range.lowerBound, in: context.dailyMetricDates)
+        let endIndex = lowerBound(for: range.upperBound, in: context.dailyMetricDates)
+
+        guard startIndex < endIndex else {
+            return []
+        }
+
+        return Array(context.dailyMetrics[startIndex..<endIndex])
     }
 
     private func lowerBound(for date: Date, in dates: [Date]) -> Int {
@@ -243,31 +303,69 @@ final class GlobalTimelineService {
         return low
     }
 
-    private func hasAnyData(in metrics: [BodyMetrics]) -> Bool {
-        metrics.contains { metric in
+    private func hasAnyData(
+        in metrics: [BodyMetrics],
+        dailyMetrics: [DailyMetrics],
+        allowDailyOnlyBucket: Bool
+    ) -> Bool {
+        let hasBodyMetricData = metrics.contains { metric in
             let hasWeight = metric.weight != nil
             let hasBodyFat = metric.bodyFatPercentage != nil
             let hasPhoto = metric.photoUrl?.isEmpty == false
             return hasWeight || hasBodyFat || hasPhoto
         }
+
+        if hasBodyMetricData {
+            return true
+        }
+
+        guard allowDailyOnlyBucket else {
+            return false
+        }
+
+        return dailyMetrics.contains { ($0.steps ?? 0) > 0 }
     }
 
     private func makeSnapshot(
+        scale: GlobalTimelineScale,
         rangeMetrics: [BodyMetrics],
+        rangeDailyMetrics: [DailyMetrics],
         allMetrics: [BodyMetrics],
+        normalizedWeightUnit: String,
+        bodyScoreContext: BodyScoreContext?,
         midpoint: Date
     ) -> GlobalTimelineMetricsSnapshot {
         let photoSelection = makePhotoSelection(rangeMetrics: rangeMetrics, midpoint: midpoint)
+        let weight = makeWeightValue(rangeMetrics: rangeMetrics, allMetrics: allMetrics, midpoint: midpoint)
+        let bodyFat = makeBodyFatValue(rangeMetrics: rangeMetrics, allMetrics: allMetrics, midpoint: midpoint)
+        let ffmi = makeFFMIValue(
+            weight: weight,
+            bodyFat: bodyFat,
+            normalizedWeightUnit: normalizedWeightUnit,
+            bodyScoreContext: bodyScoreContext
+        )
+        let steps = makeStepsValue(scale: scale, rangeDailyMetrics: rangeDailyMetrics)
+        let bodyScoreResult = makeBodyScoreResult(
+            weight: weight,
+            bodyFat: bodyFat,
+            normalizedWeightUnit: normalizedWeightUnit,
+            bodyScoreContext: bodyScoreContext,
+            midpoint: midpoint
+        )
 
         return GlobalTimelineMetricsSnapshot(
-            weight: makeWeightValue(rangeMetrics: rangeMetrics, allMetrics: allMetrics, midpoint: midpoint),
-            bodyFat: makeBodyFatValue(rangeMetrics: rangeMetrics, allMetrics: allMetrics, midpoint: midpoint),
-            ffmi: GlobalTimelineMetricValue(value: nil, presence: .missing),
-            steps: GlobalTimelineMetricValue(value: nil, presence: .missing),
+            weight: weight,
+            bodyFat: bodyFat,
+            ffmi: ffmi,
+            steps: steps,
             canonicalPhotoId: photoSelection.canonicalPhotoId,
             hasPhotosInRange: photoSelection.hasPhotosInRange,
-            bodyScore: nil,
-            bodyScoreCompleteness: .none
+            bodyScore: bodyScoreResult?.score,
+            bodyScoreCompleteness: bodyScoreCompleteness(
+                weight: weight,
+                bodyFat: bodyFat,
+                bodyScore: bodyScoreResult
+            )
         )
     }
 
@@ -303,6 +401,118 @@ final class GlobalTimelineService {
         }
 
         return GlobalTimelineMetricValue(value: nil, presence: .missing)
+    }
+
+    private func makeFFMIValue(
+        weight: GlobalTimelineMetricValue,
+        bodyFat: GlobalTimelineMetricValue,
+        normalizedWeightUnit: String,
+        bodyScoreContext: BodyScoreContext?
+    ) -> GlobalTimelineMetricValue {
+        guard let bodyScoreResult = makeBodyScoreResult(
+            weight: weight,
+            bodyFat: bodyFat,
+            normalizedWeightUnit: normalizedWeightUnit,
+            bodyScoreContext: bodyScoreContext,
+            midpoint: nil
+        ) else {
+            return GlobalTimelineMetricValue(value: nil, presence: .missing)
+        }
+
+        return GlobalTimelineMetricValue(
+            value: bodyScoreResult.ffmi,
+            presence: combinedPresence(weight.presence, bodyFat.presence)
+        )
+    }
+
+    private func makeStepsValue(
+        scale: GlobalTimelineScale,
+        rangeDailyMetrics: [DailyMetrics]
+    ) -> GlobalTimelineMetricValue {
+        let stepValues = rangeDailyMetrics.compactMap(\.steps).filter { $0 > 0 }
+        guard !stepValues.isEmpty else {
+            return GlobalTimelineMetricValue(value: nil, presence: .missing)
+        }
+
+        let average = Double(stepValues.reduce(0, +)) / Double(stepValues.count)
+        let roundedAverage = round(average)
+
+        if scale == .week, stepValues.count < 5 {
+            return GlobalTimelineMetricValue(value: roundedAverage, presence: .estimated)
+        }
+
+        return GlobalTimelineMetricValue(value: roundedAverage, presence: .present)
+    }
+
+    private func makeBodyScoreResult(
+        weight: GlobalTimelineMetricValue,
+        bodyFat: GlobalTimelineMetricValue,
+        normalizedWeightUnit: String,
+        bodyScoreContext: BodyScoreContext?,
+        midpoint: Date?
+    ) -> BodyScoreResult? {
+        guard let bodyScoreContext,
+              let weightValue = weight.value,
+              let bodyFatValue = bodyFat.value else {
+            return nil
+        }
+
+        let weightKg = MetricsFormatter.convertWeight(
+            value: weightValue,
+            from: normalizedWeightUnit,
+            to: "kg"
+        )
+        let input = BodyScoreInput(
+            sex: bodyScoreContext.sex,
+            birthYear: bodyScoreContext.birthYear,
+            height: HeightValue(value: bodyScoreContext.heightCm, unit: .centimeters),
+            weight: WeightValue(value: weightKg, unit: .kilograms),
+            bodyFat: BodyFatValue(percentage: bodyFatValue, source: .manualValue),
+            measurementPreference: bodyScoreContext.measurementPreference,
+            healthSnapshot: HealthImportSnapshot(
+                heightCm: bodyScoreContext.heightCm,
+                weightKg: weightKg,
+                bodyFatPercentage: bodyFatValue,
+                birthYear: bodyScoreContext.birthYear
+            )
+        )
+
+        guard input.isReadyForCalculation else {
+            return nil
+        }
+
+        let calculationDate = midpoint ?? Date()
+        return try? BodyScoreCalculator().calculateScore(
+            context: BodyScoreCalculationContext(input: input, calculationDate: calculationDate)
+        )
+    }
+
+    private func combinedPresence(_ lhs: MetricPresence, _ rhs: MetricPresence) -> MetricPresence {
+        if lhs == .missing || rhs == .missing {
+            return .missing
+        }
+
+        if lhs == .estimated || rhs == .estimated {
+            return .estimated
+        }
+
+        return .present
+    }
+
+    private func bodyScoreCompleteness(
+        weight: GlobalTimelineMetricValue,
+        bodyFat: GlobalTimelineMetricValue,
+        bodyScore: BodyScoreResult?
+    ) -> BodyScoreCompleteness {
+        guard bodyScore != nil else {
+            return .none
+        }
+
+        if weight.presence == .present && bodyFat.presence == .present {
+            return .full
+        }
+
+        return .partial
     }
 
     private struct PhotoSelectionResult {
@@ -351,6 +561,18 @@ final class GlobalTimelineService {
 
     private func makeYearIdentifier(startDate: Date) -> String {
         String(format: "%04d", calendar.component(.year, from: startDate))
+    }
+
+    private func earliestDate(in context: AggregationContext) -> Date? {
+        [context.metrics.first?.date, context.dailyMetrics.first?.date]
+            .compactMap { $0 }
+            .min()
+    }
+
+    private func latestDate(in context: AggregationContext) -> Date? {
+        [context.metrics.last?.date, context.dailyMetrics.last?.date]
+            .compactMap { $0 }
+            .max()
     }
 
     private func median(_ values: [Double]) -> Double? {

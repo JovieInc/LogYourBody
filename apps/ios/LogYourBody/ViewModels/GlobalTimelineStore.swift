@@ -17,14 +17,32 @@ final class GlobalTimelineStore: ObservableObject {
     // MARK: - Public API
 
     func updateMetrics(_ metrics: [BodyMetrics]) {
-        weeklyBuckets = service.makeBuckets(for: .week, metrics: metrics)
-        monthlyBuckets = service.makeBuckets(for: .month, metrics: metrics)
-        yearlyBuckets = service.makeBuckets(for: .year, metrics: metrics)
+        update(
+            bodyMetrics: metrics,
+            dailyMetrics: [],
+            bodyScoreContext: nil
+        )
+    }
+
+    func update(
+        bodyMetrics: [BodyMetrics],
+        dailyMetrics: [DailyMetrics],
+        bodyScoreContext: GlobalTimelineService.BodyScoreContext?
+    ) {
+        let input = GlobalTimelineService.BuildInput(
+            bodyMetrics: bodyMetrics,
+            dailyMetrics: dailyMetrics,
+            bodyScoreContext: bodyScoreContext
+        )
+
+        weeklyBuckets = service.makeBuckets(for: .week, input: input)
+        monthlyBuckets = service.makeBuckets(for: .month, input: input)
+        yearlyBuckets = service.makeBuckets(for: .year, input: input)
 
         if cursor == nil {
-            cursor = service.makeInitialCursor(for: metrics)
+            cursor = service.makeInitialCursor(for: input)
         } else if let currentCursor = cursor, bucket(for: currentCursor) == nil {
-            cursor = service.makeInitialCursor(for: metrics)
+            cursor = service.makeInitialCursor(for: input)
         }
     }
 

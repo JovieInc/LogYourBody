@@ -309,6 +309,33 @@ extension DashboardViewLiquid {
         )
     }
 
+    var currentTimelineBodyScoreContext: GlobalTimelineService.BodyScoreContext? {
+        guard let profile = authManager.currentUser?.profile,
+              let heightCm = profile.height,
+              heightCm > 0,
+              let dateOfBirth = profile.dateOfBirth else {
+            return nil
+        }
+
+        let genderString = profile.gender?.lowercased() ?? ""
+        let sex: BiologicalSex
+        if genderString.contains("female") || genderString.contains("woman") {
+            sex = .female
+        } else if genderString.contains("male") || genderString.contains("man") {
+            sex = .male
+        } else {
+            return nil
+        }
+
+        let birthYear = Calendar.current.component(.year, from: dateOfBirth)
+        return GlobalTimelineService.BodyScoreContext(
+            sex: sex,
+            birthYear: birthYear,
+            heightCm: heightCm,
+            measurementPreference: currentMeasurementSystem
+        )
+    }
+
     var selectedWeightMetricValueText: String {
         if let selectedTimelineBucket {
             if let value = GlobalTimelineMetricAdapter.displayWeightValue(
