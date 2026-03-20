@@ -421,11 +421,14 @@ extension DashboardViewLiquid {
     // MARK: - Primary Metric Card
 
     var stepsCard: some View {
-        let stepsValue = dailyMetrics?.steps ?? 0
+        let selectedSteps = selectedStepsMetricValue
+        let stepsValue = selectedSteps ?? 0
         let goalValue = max(stepGoal, 1)
-        let formattedSteps = formatSteps(stepsValue)
+        let formattedSteps = selectedStepsMetricValueText
         let formattedGoal = formatSteps(goalValue)
-        let subtext = stepsGoalSubtext(steps: stepsValue, goal: goalValue)
+        let subtext = selectedSteps == nil && selectedTimelineBucket != nil
+            ? "No steps in this range"
+            : stepsGoalSubtext(steps: stepsValue, goal: goalValue)
 
         return DashboardStepsCard(
             formattedSteps: formattedSteps,

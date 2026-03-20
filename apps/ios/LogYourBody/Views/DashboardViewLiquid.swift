@@ -588,9 +588,9 @@ struct DashboardViewLiquid: View {
                 title: "Steps",
                 icon: "flame.fill",
                 iconColor: Color.metricAccentSteps,
-                currentValue: formatSteps(dailyMetrics?.steps),
+                currentValue: selectedStepsMetricValueText,
                 unit: "steps",
-                currentDate: formatDate(dailyMetrics?.updatedAt ?? Date()),
+                currentDate: selectedStepsMetricDateText,
                 chartData: cachedChartData(for: .steps, generator: generateFullScreenStepsChartData),
                 onAdd: {
                     showAddEntrySheet = true

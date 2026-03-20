@@ -1796,6 +1796,15 @@ final class GlobalTimelineMetricAdapterTests: XCTestCase {
         XCTAssertEqual(delta ?? 0, 1.8, accuracy: 0.2)
     }
 
+    func testDisplayStepsValueRoundsSnapshotValue() {
+        let snapshot = GlobalTimelineMetricValue(value: 10_249.6, presence: .present)
+
+        XCTAssertEqual(
+            GlobalTimelineMetricAdapter.displayStepsValue(from: snapshot),
+            10_250
+        )
+    }
+
     func testComparisonCaptionMatchesBucketScale() {
         XCTAssertEqual(GlobalTimelineMetricAdapter.comparisonCaption(for: .week), "last week")
         XCTAssertEqual(GlobalTimelineMetricAdapter.comparisonCaption(for: .month), "last month")

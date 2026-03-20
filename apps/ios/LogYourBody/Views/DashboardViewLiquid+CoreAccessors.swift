@@ -147,6 +147,14 @@ enum GlobalTimelineMetricAdapter {
         return currentValue - previousValue
     }
 
+    static func displayStepsValue(from snapshot: GlobalTimelineMetricValue) -> Int? {
+        guard let value = snapshot.value else {
+            return nil
+        }
+
+        return Int(value.rounded())
+    }
+
     static func comparisonCaption(for scale: GlobalTimelineScale) -> String {
         switch scale {
         case .week:
@@ -362,6 +370,36 @@ extension DashboardViewLiquid {
         }
 
         return currentMetric.flatMap { formatBodyFatValue($0.bodyFatPercentage) } ?? "–"
+    }
+
+    var selectedStepsMetricValue: Int? {
+        if let selectedTimelineBucket {
+            return GlobalTimelineMetricAdapter.displayStepsValue(
+                from: selectedTimelineBucket.metrics.steps
+            )
+        }
+
+        return latestStepsSnapshot().value
+    }
+
+    var selectedStepsMetricValueText: String {
+        formatSteps(selectedStepsMetricValue)
+    }
+
+    var selectedStepsMetricTimestampText: String? {
+        if selectedTimelineBucket != nil {
+            return selectedMetricTimestampText
+        }
+
+        return formatCardDateOnly(latestStepsSnapshot().date)
+    }
+
+    var selectedStepsMetricDateText: String {
+        if selectedTimelineBucket != nil {
+            return selectedMetricDateText
+        }
+
+        return formatDate(latestStepsSnapshot().date ?? Date())
     }
 
     var greeting: String {

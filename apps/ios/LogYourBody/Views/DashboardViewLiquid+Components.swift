@@ -352,21 +352,23 @@ struct DashboardMetricsSection: View {
             selectedMetricType = .steps
             isMetricDetailActive = true
         } label: {
-            let latestSteps = latestStepsSnapshot()
+            let accessibilityValue = selectedStepsMetricValue.map {
+                "Current value \(formatSteps($0)) steps"
+            } ?? "No steps value selected"
 
             MetricSummaryCard(
                 icon: "flame.fill",
                 accentColor: Color.metricAccentSteps,
                 state: .data(MetricSummaryCard.Content(
                     title: "Steps",
-                    value: formatSteps(latestSteps.value),
+                    value: selectedStepsMetricValueText,
                     unit: "steps",
-                    timestamp: formatCardDateOnly(latestSteps.date),
+                    timestamp: selectedStepsMetricTimestampText,
                     dataPoints: generateStepsChartData().map { point in
                         MetricSummaryCard.DataPoint(index: point.index, value: point.value)
                     },
                     chartAccessibilityLabel: "Steps trend for the past week",
-                    chartAccessibilityValue: "Latest value \(formatSteps(latestSteps.value)) steps",
+                    chartAccessibilityValue: accessibilityValue,
                     trend: nil,
                     footnote: stepsGoalText
                 )),
