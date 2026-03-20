@@ -82,6 +82,72 @@ enum GlobalTimelineSelectionResolver {
     }
 }
 
+enum GlobalTimelineMetricAdapter {
+    static func displayWeightValue(
+        from snapshot: GlobalTimelineMetricValue,
+        metrics: [BodyMetrics],
+        preferredUnit: String
+    ) -> Double? {
+        guard let value = snapshot.value else {
+            return nil
+        }
+
+        let sourceUnit = metrics
+            .sorted { $0.date > $1.date }
+            .compactMap { metric in
+                guard metric.weight != nil else { return nil }
+                return metric.weightUnit
+            }
+            .first(where: { $0 == "kg" || $0 == "lbs" }) ?? "kg"
+
+        return MetricsFormatter.convertWeight(value: value, from: sourceUnit, to: preferredUnit)
+    }
+
+    static func displayWeightDelta(
+        current: GlobalTimelineMetricValue,
+        previous: GlobalTimelineMetricValue,
+        metrics: [BodyMetrics],
+        preferredUnit: String
+    ) -> Double? {
+        guard let currentValue = displayWeightValue(
+            from: current,
+            metrics: metrics,
+            preferredUnit: preferredUnit
+        ), let previousValue = displayWeightValue(
+            from: previous,
+            metrics: metrics,
+            preferredUnit: preferredUnit
+        ) else {
+            return nil
+        }
+
+        return currentValue - previousValue
+    }
+
+    static func delta(
+        current: GlobalTimelineMetricValue,
+        previous: GlobalTimelineMetricValue
+    ) -> Double? {
+        guard let currentValue = current.value,
+              let previousValue = previous.value else {
+            return nil
+        }
+
+        return currentValue - previousValue
+    }
+
+    static func comparisonCaption(for scale: GlobalTimelineScale) -> String {
+        switch scale {
+        case .week:
+            return "last week"
+        case .month:
+            return "last month"
+        case .year:
+            return "last year"
+        }
+    }
+}
+
 extension DashboardViewLiquid {
     // MARK: - Goal Helpers
 
@@ -149,6 +215,24 @@ extension DashboardViewLiquid {
         let metrics = viewModel.bodyMetrics
         guard !metrics.isEmpty, selectedIndex >= 0, selectedIndex < metrics.count else { return nil }
         return metrics[selectedIndex]
+    }
+
+    var selectedTimelineBucket: GlobalTimelineBucket? {
+        guard isGlobalTimelineEnabled,
+              let cursor = globalTimelineStore.cursor else {
+            return nil
+        }
+
+        return globalTimelineStore.bucket(for: cursor)
+    }
+
+    var previousTimelineBucket: GlobalTimelineBucket? {
+        guard isGlobalTimelineEnabled,
+              let cursor = globalTimelineStore.cursor else {
+            return nil
+        }
+
+        return globalTimelineStore.previousBucket(for: cursor)
     }
 
     var greeting: String {

@@ -1572,4 +1572,100 @@ final class GlobalTimelineSelectionResolverTests: XCTestCase {
     }
 }
 
+final class GlobalTimelineMetricAdapterTests: XCTestCase {
+    func testDisplayWeightValueConvertsFromMostRecentActualWeightUnit() {
+        let metrics = [
+            Self.makeMetric(
+                id: "older",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 2, day: 1))!,
+                weight: 80,
+                weightUnit: "kg"
+            ),
+            Self.makeMetric(
+                id: "newer",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+                weight: 180,
+                weightUnit: "lbs"
+            )
+        ]
+        let snapshot = GlobalTimelineMetricValue(value: 180, presence: .present)
+
+        let displayValue = GlobalTimelineMetricAdapter.displayWeightValue(
+            from: snapshot,
+            metrics: metrics,
+            preferredUnit: "kg"
+        )
+
+        XCTAssertEqual(displayValue ?? 0, 81.6, accuracy: 0.2)
+    }
+
+    func testDeltaReturnsDifferenceWhenBothValuesExist() {
+        let current = GlobalTimelineMetricValue(value: 180, presence: .present)
+        let previous = GlobalTimelineMetricValue(value: 183, presence: .present)
+
+        XCTAssertEqual(
+            GlobalTimelineMetricAdapter.delta(current: current, previous: previous),
+            -3
+        )
+    }
+
+    func testDisplayWeightDeltaConvertsToPreferredUnitBeforeSubtracting() {
+        let metrics = [
+            Self.makeMetric(
+                id: "older",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 2, day: 1))!,
+                weight: 180,
+                weightUnit: "lbs"
+            )
+        ]
+        let current = GlobalTimelineMetricValue(value: 180, presence: .present)
+        let previous = GlobalTimelineMetricValue(value: 176, presence: .present)
+
+        let delta = GlobalTimelineMetricAdapter.displayWeightDelta(
+            current: current,
+            previous: previous,
+            metrics: metrics,
+            preferredUnit: "kg"
+        )
+
+        XCTAssertEqual(delta ?? 0, 1.8, accuracy: 0.2)
+    }
+
+    func testComparisonCaptionMatchesBucketScale() {
+        XCTAssertEqual(GlobalTimelineMetricAdapter.comparisonCaption(for: .week), "last week")
+        XCTAssertEqual(GlobalTimelineMetricAdapter.comparisonCaption(for: .month), "last month")
+        XCTAssertEqual(GlobalTimelineMetricAdapter.comparisonCaption(for: .year), "last year")
+    }
+
+    private static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        return calendar
+    }()
+
+    private static func makeMetric(
+        id: String,
+        date: Date,
+        weight: Double,
+        weightUnit: String
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: "user",
+            date: date,
+            weight: weight,
+            weightUnit: weightUnit,
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+}
+
 // swiftlint:enable single_test_class

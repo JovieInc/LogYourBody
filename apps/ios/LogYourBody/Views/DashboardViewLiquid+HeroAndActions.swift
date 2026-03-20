@@ -140,12 +140,30 @@ extension DashboardViewLiquid {
     }
 
     func heroBodyFatValue() -> String {
+        if let selectedTimelineBucket,
+           let value = selectedTimelineBucket.metrics.bodyFat.value {
+            return "\(MetricsFormatter.formatDecimal(value))%"
+        }
+
         let base = formatBodyFatValue(currentMetric?.bodyFatPercentage)
         guard base != "–" else { return base }
         return "\(base)%"
     }
 
     func heroBodyFatCaption() -> String {
+        if let selectedTimelineBucket,
+           let previousTimelineBucket,
+           let delta = GlobalTimelineMetricAdapter.delta(
+               current: selectedTimelineBucket.metrics.bodyFat,
+               previous: previousTimelineBucket.metrics.bodyFat
+           ) {
+            return heroTrendCaption(
+                delta: delta,
+                unit: "%",
+                comparison: GlobalTimelineMetricAdapter.comparisonCaption(for: selectedTimelineBucket.scale)
+            )
+        }
+
         if let delta = heroBodyFatDelta30d() {
             return heroTrendCaption(delta: delta, unit: "%")
         }
@@ -153,12 +171,36 @@ extension DashboardViewLiquid {
     }
 
     func heroWeightValue() -> String {
+        if let selectedTimelineBucket,
+           let value = GlobalTimelineMetricAdapter.displayWeightValue(
+               from: selectedTimelineBucket.metrics.weight,
+               metrics: bodyMetrics,
+               preferredUnit: weightUnit
+           ) {
+            return "\(MetricsFormatter.formatWeight(value: value, unit: weightUnit)) \(weightUnit)"
+        }
+
         let base = formatWeightValue(currentMetric?.weight)
         guard base != "–" else { return base }
         return "\(base) \(weightUnit)"
     }
 
     func heroWeightCaption() -> String {
+        if let selectedTimelineBucket,
+           let previousTimelineBucket,
+           let delta = GlobalTimelineMetricAdapter.displayWeightDelta(
+               current: selectedTimelineBucket.metrics.weight,
+               previous: previousTimelineBucket.metrics.weight,
+               metrics: bodyMetrics,
+               preferredUnit: currentMeasurementSystem.weightUnit
+           ) {
+            return heroTrendCaption(
+                delta: delta,
+                unit: currentMeasurementSystem.weightUnit,
+                comparison: GlobalTimelineMetricAdapter.comparisonCaption(for: selectedTimelineBucket.scale)
+            )
+        }
+
         if let delta = heroWeightDelta30d() {
             let system = currentMeasurementSystem
             return heroTrendCaption(delta: delta, unit: system.weightUnit)
@@ -297,14 +339,18 @@ extension DashboardViewLiquid {
 
     // MARK: - Hero Tile 30d Trends
 
-    private func heroTrendCaption(delta: Double, unit: String) -> String {
+    private func heroTrendCaption(
+        delta: Double,
+        unit: String,
+        comparison: String = "last 30d"
+    ) -> String {
         if abs(delta) < 0.001 {
-            return "No change last 30d"
+            return "No change \(comparison)"
         }
 
         let directionSymbol = delta > 0 ? "↑" : "↓"
         let formatted = formatDelta(delta: delta, unit: unit)
-        return "\(directionSymbol) \(formatted) last 30d"
+        return "\(directionSymbol) \(formatted) \(comparison)"
     }
 
     private func heroWeightDelta30d() -> Double? {
