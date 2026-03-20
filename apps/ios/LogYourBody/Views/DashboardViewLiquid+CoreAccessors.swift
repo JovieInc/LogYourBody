@@ -218,6 +218,55 @@ enum DashboardFFMIPresentation {
     }
 }
 
+enum DashboardMetricCardTrendPresentation {
+    static func weightTrend(
+        selectedTimelineBucket: GlobalTimelineBucket?,
+        previousTimelineBucket: GlobalTimelineBucket?,
+        metrics: [BodyMetrics],
+        preferredUnit: String,
+        fallbackTrend: MetricSummaryCard.Trend?
+    ) -> MetricSummaryCard.Trend? {
+        guard let selectedTimelineBucket,
+              let previousTimelineBucket,
+              let delta = GlobalTimelineMetricAdapter.displayWeightDelta(
+                  current: selectedTimelineBucket.metrics.weight,
+                  previous: previousTimelineBucket.metrics.weight,
+                  metrics: metrics,
+                  preferredUnit: preferredUnit
+              ) else {
+            return fallbackTrend
+        }
+
+        return makeTrend(
+            delta: delta,
+            unit: preferredUnit,
+            caption: GlobalTimelineMetricAdapter.comparisonCaption(for: selectedTimelineBucket.scale)
+        )
+    }
+
+    static func metricTrend(
+        current: GlobalTimelineMetricValue,
+        previous: GlobalTimelineMetricValue,
+        selectedTimelineBucket: GlobalTimelineBucket?,
+        unit: String,
+        fallbackTrend: MetricSummaryCard.Trend?
+    ) -> MetricSummaryCard.Trend? {
+        guard let selectedTimelineBucket,
+              let delta = GlobalTimelineMetricAdapter.delta(
+                  current: current,
+                  previous: previous
+              ) else {
+            return fallbackTrend
+        }
+
+        return makeTrend(
+            delta: delta,
+            unit: unit,
+            caption: GlobalTimelineMetricAdapter.comparisonCaption(for: selectedTimelineBucket.scale)
+        )
+    }
+}
+
 extension DashboardViewLiquid {
     // MARK: - Goal Helpers
 
@@ -424,6 +473,58 @@ extension DashboardViewLiquid {
         }
 
         return formatDate(latestStepsSnapshot().date ?? Date())
+    }
+
+    var selectedWeightMetricTrend: MetricSummaryCard.Trend? {
+        let fallbackTrend = weightRangeStats().flatMap {
+            makeTrend($0.delta, weightUnit, selectedRange)
+        }
+
+        return DashboardMetricCardTrendPresentation.weightTrend(
+            selectedTimelineBucket: selectedTimelineBucket,
+            previousTimelineBucket: previousTimelineBucket,
+            metrics: bodyMetrics,
+            preferredUnit: weightUnit,
+            fallbackTrend: fallbackTrend
+        )
+    }
+
+    var selectedBodyFatMetricTrend: MetricSummaryCard.Trend? {
+        let fallbackTrend = bodyFatRangeStats().flatMap {
+            makeTrend($0.delta, "%", selectedRange)
+        }
+
+        guard let selectedTimelineBucket,
+              let previousTimelineBucket else {
+            return fallbackTrend
+        }
+
+        return DashboardMetricCardTrendPresentation.metricTrend(
+            current: selectedTimelineBucket.metrics.bodyFat,
+            previous: previousTimelineBucket.metrics.bodyFat,
+            selectedTimelineBucket: selectedTimelineBucket,
+            unit: "%",
+            fallbackTrend: fallbackTrend
+        )
+    }
+
+    var selectedFFMIMetricTrend: MetricSummaryCard.Trend? {
+        let fallbackTrend = ffmiRangeStats().flatMap {
+            makeTrend($0.delta, "", selectedRange)
+        }
+
+        guard let selectedTimelineBucket,
+              let previousTimelineBucket else {
+            return fallbackTrend
+        }
+
+        return DashboardMetricCardTrendPresentation.metricTrend(
+            current: selectedTimelineBucket.metrics.ffmi,
+            previous: previousTimelineBucket.metrics.ffmi,
+            selectedTimelineBucket: selectedTimelineBucket,
+            unit: "",
+            fallbackTrend: fallbackTrend
+        )
     }
 
     var greeting: String {

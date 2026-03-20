@@ -63,6 +63,10 @@ struct MetricSeriesStats {
 func makeTrend(delta: Double, unit: String, range: TimeRange) -> MetricSummaryCard.Trend? {
     let caption = range.shortRelativeLabel
 
+    return makeTrend(delta: delta, unit: unit, caption: caption)
+}
+
+func makeTrend(delta: Double, unit: String, caption: String) -> MetricSummaryCard.Trend? {
     guard abs(delta) > 0.001 else {
         return MetricSummaryCard.Trend(direction: .flat, valueText: "No change", caption: caption)
     }

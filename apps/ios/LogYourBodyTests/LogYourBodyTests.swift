@@ -2075,4 +2075,174 @@ final class BodyCompositionMetricsNormalizationTests: XCTestCase {
     }
 }
 
+final class DashboardMetricCardTrendPresentationTests: XCTestCase {
+    func testWeightTrendUsesBucketComparisonWhenAvailable() {
+        let metrics = [
+            Self.makeMetric(
+                id: "older",
+                date: Date(timeIntervalSince1970: 0),
+                weight: 180,
+                weightUnit: "lbs"
+            )
+        ]
+        let currentBucket = Self.makeBucket(
+            scale: .month,
+            weightValue: 180,
+            bodyFatValue: nil,
+            ffmiValue: nil
+        )
+        let previousBucket = Self.makeBucket(
+            scale: .month,
+            weightValue: 176,
+            bodyFatValue: nil,
+            ffmiValue: nil
+        )
+
+        let trend = DashboardMetricCardTrendPresentation.weightTrend(
+            selectedTimelineBucket: currentBucket,
+            previousTimelineBucket: previousBucket,
+            metrics: metrics,
+            preferredUnit: "kg",
+            fallbackTrend: nil
+        )
+
+        XCTAssertEqual(trend?.caption, "last month")
+        Self.assertDirection(trend?.direction, matches: .up)
+        XCTAssertEqual(trend?.valueText, "1.8 kg")
+    }
+
+    func testMetricTrendUsesBucketDeltaWhenAvailable() {
+        let currentBucket = Self.makeBucket(
+            scale: .year,
+            weightValue: nil,
+            bodyFatValue: 18,
+            ffmiValue: 20.4
+        )
+        let previousBucket = Self.makeBucket(
+            scale: .year,
+            weightValue: nil,
+            bodyFatValue: 19,
+            ffmiValue: 19.9
+        )
+
+        let bodyFatTrend = DashboardMetricCardTrendPresentation.metricTrend(
+            current: currentBucket.metrics.bodyFat,
+            previous: previousBucket.metrics.bodyFat,
+            selectedTimelineBucket: currentBucket,
+            unit: "%",
+            fallbackTrend: nil
+        )
+        let ffmiTrend = DashboardMetricCardTrendPresentation.metricTrend(
+            current: currentBucket.metrics.ffmi,
+            previous: previousBucket.metrics.ffmi,
+            selectedTimelineBucket: currentBucket,
+            unit: "",
+            fallbackTrend: nil
+        )
+
+        XCTAssertEqual(bodyFatTrend?.caption, "last year")
+        Self.assertDirection(bodyFatTrend?.direction, matches: .down)
+        XCTAssertEqual(bodyFatTrend?.valueText, "1%")
+        XCTAssertEqual(ffmiTrend?.caption, "last year")
+        Self.assertDirection(ffmiTrend?.direction, matches: .up)
+        XCTAssertEqual(ffmiTrend?.valueText, "0.5")
+    }
+
+    func testMetricTrendFallsBackWhenBucketComparisonUnavailable() {
+        let fallbackTrend = MetricSummaryCard.Trend(
+            direction: .flat,
+            valueText: "No change",
+            caption: "1M"
+        )
+
+        let trend = DashboardMetricCardTrendPresentation.metricTrend(
+            current: GlobalTimelineMetricValue(value: 18, presence: .present),
+            previous: GlobalTimelineMetricValue(value: nil, presence: .missing),
+            selectedTimelineBucket: Self.makeBucket(
+                scale: .month,
+                weightValue: nil,
+                bodyFatValue: 18,
+                ffmiValue: nil
+            ),
+            unit: "%",
+            fallbackTrend: fallbackTrend
+        )
+
+        XCTAssertEqual(trend?.caption, "1M")
+        Self.assertDirection(trend?.direction, matches: .flat)
+        XCTAssertEqual(trend?.valueText, "No change")
+    }
+
+    private static func makeMetric(
+        id: String,
+        date: Date,
+        weight: Double,
+        weightUnit: String
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: "user",
+            date: date,
+            weight: weight,
+            weightUnit: weightUnit,
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+
+    private static func makeBucket(
+        scale: GlobalTimelineScale,
+        weightValue: Double?,
+        bodyFatValue: Double?,
+        ffmiValue: Double?
+    ) -> GlobalTimelineBucket {
+        GlobalTimelineBucket(
+            id: "bucket-\(scale)",
+            scale: scale,
+            startDate: Date(timeIntervalSince1970: 0),
+            endDate: Date(timeIntervalSince1970: 86_400),
+            metrics: GlobalTimelineMetricsSnapshot(
+                weight: GlobalTimelineMetricValue(
+                    value: weightValue,
+                    presence: weightValue == nil ? .missing : .present
+                ),
+                bodyFat: GlobalTimelineMetricValue(
+                    value: bodyFatValue,
+                    presence: bodyFatValue == nil ? .missing : .present
+                ),
+                ffmi: GlobalTimelineMetricValue(
+                    value: ffmiValue,
+                    presence: ffmiValue == nil ? .missing : .present
+                ),
+                steps: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                canonicalPhotoId: nil,
+                hasPhotosInRange: false,
+                bodyScore: nil,
+                bodyScoreCompleteness: .none
+            )
+        )
+    }
+
+    private static func assertDirection(
+        _ actual: MetricSummaryCard.Trend.Direction?,
+        matches expected: MetricSummaryCard.Trend.Direction,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        switch (actual, expected) {
+        case (.up?, .up), (.down?, .down), (.flat?, .flat):
+            return
+        default:
+            XCTFail("Unexpected direction", file: file, line: line)
+        }
+    }
+}
+
 // swiftlint:enable single_test_class

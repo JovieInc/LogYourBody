@@ -380,7 +380,7 @@ struct DashboardMetricsSection: View {
 
     @ViewBuilder
     private func weightMetricCard() -> some View {
-        if let currentMetric {
+        if currentMetric != nil {
             let stats = weightRangeStats()
             let averageText = stats.map { formatAverageFootnote($0.average, weightUnit) }
             Button {
@@ -400,7 +400,7 @@ struct DashboardMetricsSection: View {
                         },
                         chartAccessibilityLabel: "Weight trend for the past week",
                         chartAccessibilityValue: "Latest value \(weightDisplayValue) \(weightUnit)",
-                        trend: stats.flatMap { makeTrend($0.delta, weightUnit, selectedRange) },
+                        trend: selectedWeightMetricTrend,
                         footnote: combinedAverageAndGoal(averageText, weightGoalText)
                     )),
                     isButtonContext: true
@@ -412,7 +412,7 @@ struct DashboardMetricsSection: View {
 
     @ViewBuilder
     private func bodyFatMetricCard() -> some View {
-        if let currentMetric {
+        if currentMetric != nil {
             let stats = bodyFatRangeStats()
             let averageText = stats.map { formatAverageFootnote($0.average, "%") }
             Button {
@@ -432,7 +432,7 @@ struct DashboardMetricsSection: View {
                         },
                         chartAccessibilityLabel: "Body fat percentage trend for the past week",
                         chartAccessibilityValue: "Latest value \(bodyFatDisplayValue)%",
-                        trend: stats.flatMap { makeTrend($0.delta, "%", selectedRange) },
+                        trend: selectedBodyFatMetricTrend,
                         footnote: combinedAverageAndGoal(averageText, bodyFatGoalText)
                     )),
                     isButtonContext: true
@@ -444,7 +444,7 @@ struct DashboardMetricsSection: View {
 
     @ViewBuilder
     private func ffmiMetricCard() -> some View {
-        if let currentMetric {
+        if currentMetric != nil {
             let stats = ffmiRangeStats()
             let averageText = stats.map { formatAverageFootnote($0.average, "") }
             Button {
@@ -464,7 +464,7 @@ struct DashboardMetricsSection: View {
                         },
                         chartAccessibilityLabel: "FFMI trend for the past week",
                         chartAccessibilityValue: "Current value \(selectedFFMIMetricValueText)",
-                        trend: stats.flatMap { makeTrend($0.delta, "", selectedRange) },
+                        trend: selectedFFMIMetricTrend,
                         footnote: combinedAverageAndGoal(averageText, ffmiGoalText)
                     )),
                     isButtonContext: true
