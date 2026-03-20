@@ -2305,4 +2305,139 @@ final class DashboardMetricSparklinePresentationTests: XCTestCase {
     }
 }
 
+final class DashboardMetricDetailChangePresentationTests: XCTestCase {
+    func testWeightChangeUsesBucketScaleCaptionAndConvertedDelta() {
+        let metrics = [
+            Self.makeMetric(
+                id: "metric",
+                date: Date(timeIntervalSince1970: 0),
+                weight: 180,
+                weightUnit: "lbs"
+            )
+        ]
+
+        let change = DashboardMetricDetailChangePresentation.weightChange(
+            selectedTimelineBucket: Self.makeBucket(
+                scale: .month,
+                weightValue: 180,
+                bodyFatValue: nil,
+                ffmiValue: nil,
+                bodyScore: nil,
+                stepsValue: nil
+            ),
+            previousTimelineBucket: Self.makeBucket(
+                scale: .month,
+                weightValue: 176,
+                bodyFatValue: nil,
+                ffmiValue: nil,
+                bodyScore: nil,
+                stepsValue: nil
+            ),
+            metrics: metrics,
+            preferredUnit: "kg"
+        )
+
+        XCTAssertEqual(change?.title, "Change vs last month")
+        XCTAssertEqual(change?.delta ?? 0, 1.8, accuracy: 0.2)
+    }
+
+    func testMetricChangeUsesBucketMetricDelta() {
+        let change = DashboardMetricDetailChangePresentation.metricChange(
+            current: GlobalTimelineMetricValue(value: 18, presence: .present),
+            previous: GlobalTimelineMetricValue(value: 19.5, presence: .present),
+            selectedTimelineBucket: Self.makeBucket(
+                scale: .year,
+                weightValue: nil,
+                bodyFatValue: 18,
+                ffmiValue: nil,
+                bodyScore: nil,
+                stepsValue: nil
+            )
+        )
+
+        XCTAssertEqual(change?.title, "Change vs last year")
+        XCTAssertEqual(change?.delta ?? 0, -1.5, accuracy: 0.001)
+    }
+
+    func testBodyScoreChangeUsesIntegerDifference() {
+        let change = DashboardMetricDetailChangePresentation.bodyScoreChange(
+            currentScore: 82,
+            previousScore: 79,
+            selectedTimelineBucket: Self.makeBucket(
+                scale: .week,
+                weightValue: nil,
+                bodyFatValue: nil,
+                ffmiValue: nil,
+                bodyScore: 82,
+                stepsValue: nil
+            )
+        )
+
+        XCTAssertEqual(change?.title, "Change vs last week")
+        XCTAssertEqual(change?.delta, 3)
+    }
+
+    private static func makeMetric(
+        id: String,
+        date: Date,
+        weight: Double,
+        weightUnit: String
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: "user",
+            date: date,
+            weight: weight,
+            weightUnit: weightUnit,
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+
+    private static func makeBucket(
+        scale: GlobalTimelineScale,
+        weightValue: Double?,
+        bodyFatValue: Double?,
+        ffmiValue: Double?,
+        bodyScore: Int?,
+        stepsValue: Double?
+    ) -> GlobalTimelineBucket {
+        GlobalTimelineBucket(
+            id: "bucket-\(scale)",
+            scale: scale,
+            startDate: Date(timeIntervalSince1970: 0),
+            endDate: Date(timeIntervalSince1970: 86_400),
+            metrics: GlobalTimelineMetricsSnapshot(
+                weight: GlobalTimelineMetricValue(
+                    value: weightValue,
+                    presence: weightValue == nil ? .missing : .present
+                ),
+                bodyFat: GlobalTimelineMetricValue(
+                    value: bodyFatValue,
+                    presence: bodyFatValue == nil ? .missing : .present
+                ),
+                ffmi: GlobalTimelineMetricValue(
+                    value: ffmiValue,
+                    presence: ffmiValue == nil ? .missing : .present
+                ),
+                steps: GlobalTimelineMetricValue(
+                    value: stepsValue,
+                    presence: stepsValue == nil ? .missing : .present
+                ),
+                canonicalPhotoId: nil,
+                hasPhotosInRange: false,
+                bodyScore: bodyScore,
+                bodyScoreCompleteness: bodyScore == nil ? .none : .full
+            )
+        )
+    }
+}
+
 // swiftlint:enable single_test_class

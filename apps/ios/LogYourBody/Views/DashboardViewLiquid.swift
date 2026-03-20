@@ -596,6 +596,9 @@ struct DashboardViewLiquid: View {
                     showAddEntrySheet = true
                 },
                 metricEntries: cachedMetricEntries(for: .steps),
+                headlineChangeOverride: selectedStepsHeadlineChange.map {
+                    .init(title: $0.title, delta: $0.delta)
+                },
                 goalValue: Double(stepGoal),
                 selectedTimeRange: $selectedRange
             )
@@ -613,6 +616,9 @@ struct DashboardViewLiquid: View {
                     showAddEntrySheet = true
                 },
                 metricEntries: cachedMetricEntries(for: .weight),
+                headlineChangeOverride: selectedWeightHeadlineChange.map {
+                    .init(title: $0.title, delta: $0.delta)
+                },
                 goalValue: weightGoal,
                 selectedTimeRange: $selectedRange
             )
@@ -630,6 +636,9 @@ struct DashboardViewLiquid: View {
                     showAddEntrySheet = true
                 },
                 metricEntries: cachedMetricEntries(for: .bodyFat),
+                headlineChangeOverride: selectedBodyFatHeadlineChange.map {
+                    .init(title: $0.title, delta: $0.delta)
+                },
                 goalValue: bodyFatGoal,
                 selectedTimeRange: $selectedRange
             )
@@ -647,6 +656,9 @@ struct DashboardViewLiquid: View {
                     showAddEntrySheet = true
                 },
                 metricEntries: cachedMetricEntries(for: .ffmi),
+                headlineChangeOverride: selectedFFMIHeadlineChange.map {
+                    .init(title: $0.title, delta: $0.delta)
+                },
                 goalValue: ffmiGoal,
                 selectedTimeRange: $selectedRange
             )
@@ -664,6 +676,9 @@ struct DashboardViewLiquid: View {
                     showAddEntrySheet = true
                 },
                 metricEntries: cachedMetricEntries(for: .bodyScore),
+                headlineChangeOverride: selectedBodyScoreHeadlineChange.map {
+                    .init(title: $0.title, delta: $0.delta)
+                },
                 goalValue: nil,
                 selectedTimeRange: $selectedRange
             )
@@ -687,6 +702,7 @@ struct DashboardViewLiquid: View {
                     showAddEntrySheet = true
                 },
                 metricEntries: nil,
+                headlineChangeOverride: nil,
                 goalValue: nil,
                 selectedTimeRange: $selectedRange
             )

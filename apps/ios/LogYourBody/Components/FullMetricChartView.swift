@@ -227,6 +227,11 @@ private struct HistorySection: Identifiable, Sendable {
 // MARK: - Full Metric Chart View
 
 struct FullMetricChartView: View {
+    struct HeadlineChangeOverride {
+        let title: String
+        let delta: Double
+    }
+
     let title: String
     let icon: String
     let iconColor: Color
@@ -236,6 +241,7 @@ struct FullMetricChartView: View {
     let chartData: [MetricChartDataPoint]
     let onAdd: () -> Void
     let metricEntries: MetricEntriesPayload?
+    let headlineChangeOverride: HeadlineChangeOverride?
 
     let goalValue: Double?
 
@@ -343,23 +349,30 @@ struct FullMetricChartView: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.65))
 
-            if let stats = computeSeriesStats(for: displayedSeries) {
+            let seriesStats = computeSeriesStats(for: displayedSeries)
+            let changeDelta = headlineChangeOverride?.delta ?? seriesStats?.delta
+
+            if seriesStats != nil || changeDelta != nil {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .top, spacing: 16) {
-                        statsCell(
-                            title: "Avg (\(selectedTimeRange.rawValue))",
-                            value: formatStatValue(stats.average),
-                            alignRight: false
-                        )
+                        if let seriesStats {
+                            statsCell(
+                                title: "Avg (\(selectedTimeRange.rawValue))",
+                                value: formatStatValue(seriesStats.average),
+                                alignRight: false
+                            )
+                        }
 
                         Spacer(minLength: 12)
 
-                        statsCell(
-                            title: changeCaptionText,
-                            value: formatDeltaValueCompact(stats.delta),
-                            valueColor: deltaColor(for: stats.delta),
-                            alignRight: true
-                        )
+                        if let changeDelta {
+                            statsCell(
+                                title: headlineChangeOverride?.title ?? changeCaptionText,
+                                value: formatDeltaValueCompact(changeDelta),
+                                valueColor: deltaColor(for: changeDelta),
+                                alignRight: true
+                            )
+                        }
                     }
 
                     if let bounds = minMaxTexts(for: displayedSeries) {

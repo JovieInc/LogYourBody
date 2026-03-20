@@ -294,6 +294,76 @@ enum DashboardMetricSparklinePresentation {
     }
 }
 
+struct MetricHeadlineChangePresentation: Equatable {
+    let title: String
+    let delta: Double
+}
+
+enum DashboardMetricDetailChangePresentation {
+    static func comparisonTitle(for scale: GlobalTimelineScale) -> String {
+        "Change vs \(GlobalTimelineMetricAdapter.comparisonCaption(for: scale))"
+    }
+
+    static func weightChange(
+        selectedTimelineBucket: GlobalTimelineBucket?,
+        previousTimelineBucket: GlobalTimelineBucket?,
+        metrics: [BodyMetrics],
+        preferredUnit: String
+    ) -> MetricHeadlineChangePresentation? {
+        guard let selectedTimelineBucket,
+              let previousTimelineBucket,
+              let delta = GlobalTimelineMetricAdapter.displayWeightDelta(
+                  current: selectedTimelineBucket.metrics.weight,
+                  previous: previousTimelineBucket.metrics.weight,
+                  metrics: metrics,
+                  preferredUnit: preferredUnit
+              ) else {
+            return nil
+        }
+
+        return MetricHeadlineChangePresentation(
+            title: comparisonTitle(for: selectedTimelineBucket.scale),
+            delta: delta
+        )
+    }
+
+    static func metricChange(
+        current: GlobalTimelineMetricValue,
+        previous: GlobalTimelineMetricValue,
+        selectedTimelineBucket: GlobalTimelineBucket?
+    ) -> MetricHeadlineChangePresentation? {
+        guard let selectedTimelineBucket,
+              let delta = GlobalTimelineMetricAdapter.delta(
+                  current: current,
+                  previous: previous
+              ) else {
+            return nil
+        }
+
+        return MetricHeadlineChangePresentation(
+            title: comparisonTitle(for: selectedTimelineBucket.scale),
+            delta: delta
+        )
+    }
+
+    static func bodyScoreChange(
+        currentScore: Int?,
+        previousScore: Int?,
+        selectedTimelineBucket: GlobalTimelineBucket?
+    ) -> MetricHeadlineChangePresentation? {
+        guard let selectedTimelineBucket,
+              let currentScore,
+              let previousScore else {
+            return nil
+        }
+
+        return MetricHeadlineChangePresentation(
+            title: comparisonTitle(for: selectedTimelineBucket.scale),
+            delta: Double(currentScore - previousScore)
+        )
+    }
+}
+
 extension DashboardViewLiquid {
     // MARK: - Goal Helpers
 
@@ -579,6 +649,62 @@ extension DashboardViewLiquid {
         return DashboardMetricSparklinePresentation.trailingBuckets(
             buckets: bucketsAtSelectedScale,
             currentBucketId: selectedTimelineBucket.id
+        )
+    }
+
+    var selectedWeightHeadlineChange: MetricHeadlineChangePresentation? {
+        DashboardMetricDetailChangePresentation.weightChange(
+            selectedTimelineBucket: selectedTimelineBucket,
+            previousTimelineBucket: previousTimelineBucket,
+            metrics: bodyMetrics,
+            preferredUnit: weightUnit
+        )
+    }
+
+    var selectedBodyFatHeadlineChange: MetricHeadlineChangePresentation? {
+        guard let selectedTimelineBucket,
+              let previousTimelineBucket else {
+            return nil
+        }
+
+        return DashboardMetricDetailChangePresentation.metricChange(
+            current: selectedTimelineBucket.metrics.bodyFat,
+            previous: previousTimelineBucket.metrics.bodyFat,
+            selectedTimelineBucket: selectedTimelineBucket
+        )
+    }
+
+    var selectedFFMIHeadlineChange: MetricHeadlineChangePresentation? {
+        guard let selectedTimelineBucket,
+              let previousTimelineBucket else {
+            return nil
+        }
+
+        return DashboardMetricDetailChangePresentation.metricChange(
+            current: selectedTimelineBucket.metrics.ffmi,
+            previous: previousTimelineBucket.metrics.ffmi,
+            selectedTimelineBucket: selectedTimelineBucket
+        )
+    }
+
+    var selectedStepsHeadlineChange: MetricHeadlineChangePresentation? {
+        guard let selectedTimelineBucket,
+              let previousTimelineBucket else {
+            return nil
+        }
+
+        return DashboardMetricDetailChangePresentation.metricChange(
+            current: selectedTimelineBucket.metrics.steps,
+            previous: previousTimelineBucket.metrics.steps,
+            selectedTimelineBucket: selectedTimelineBucket
+        )
+    }
+
+    var selectedBodyScoreHeadlineChange: MetricHeadlineChangePresentation? {
+        DashboardMetricDetailChangePresentation.bodyScoreChange(
+            currentScore: selectedTimelineBucket?.metrics.bodyScore,
+            previousScore: previousTimelineBucket?.metrics.bodyScore,
+            selectedTimelineBucket: selectedTimelineBucket
         )
     }
 
