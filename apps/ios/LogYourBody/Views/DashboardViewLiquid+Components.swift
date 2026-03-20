@@ -293,6 +293,11 @@ struct DashboardMetricsSection: View {
     let weightGoalText: String?
     let bodyFatGoalText: String?
     let ffmiGoalText: String?
+    let weightDisplayValue: String
+    let weightTimestamp: String?
+    let bodyFatDisplayValue: String
+    let bodyFatTimestamp: String?
+    let ffmiTimestamp: String?
 
     let generateStepsChartData: () -> [MetricDataPoint]
     let generateWeightChartData: () -> [MetricDataPoint]
@@ -304,19 +309,12 @@ struct DashboardMetricsSection: View {
     let ffmiRangeStats: () -> MetricRangeStats?
 
     let formatSteps: (Int?) -> String
-    let formatWeightValue: (Double?) -> String
-    let formatBodyFatValue: (Double?) -> String
     let formatFFMIValue: (BodyMetrics) -> String
 
     let makeTrend: (Double, String, TimeRange) -> MetricSummaryCard.Trend?
     let formatAverageFootnote: (Double, String) -> String
     let formatCardDateOnly: (Date?) -> String?
-    let formatCardDate: (Date) -> String
     let latestStepsSnapshot: () -> (value: Int?, date: Date?)
-
-    @Binding var weightUsesTrend: Bool
-    let formatTrendWeightHeadline: (BodyMetrics, Bool) -> String
-
     var body: some View {
         DashboardMetricsList(
             metricsOrder: $metricsOrder,
@@ -392,14 +390,14 @@ struct DashboardMetricsSection: View {
                     accentColor: Color.metricAccentWeight,
                     state: .data(MetricSummaryCard.Content(
                         title: "Weight",
-                        value: formatTrendWeightHeadline(currentMetric, weightUsesTrend),
+                        value: weightDisplayValue,
                         unit: weightUnit,
-                        timestamp: formatCardDate(currentMetric.date),
+                        timestamp: weightTimestamp,
                         dataPoints: generateWeightChartData().map { point in
                             MetricSummaryCard.DataPoint(index: point.index, value: point.value)
                         },
                         chartAccessibilityLabel: "Weight trend for the past week",
-                        chartAccessibilityValue: "Latest value \(formatTrendWeightHeadline(currentMetric, weightUsesTrend)) \(weightUnit)",
+                        chartAccessibilityValue: "Latest value \(weightDisplayValue) \(weightUnit)",
                         trend: stats.flatMap { makeTrend($0.delta, weightUnit, selectedRange) },
                         footnote: combinedAverageAndGoal(averageText, weightGoalText)
                     )),
@@ -424,14 +422,14 @@ struct DashboardMetricsSection: View {
                     accentColor: Color.metricAccentBodyFat,
                     state: .data(MetricSummaryCard.Content(
                         title: "Body Fat %",
-                        value: formatBodyFatValue(currentMetric.bodyFatPercentage),
+                        value: bodyFatDisplayValue,
                         unit: "%",
-                        timestamp: formatCardDate(currentMetric.date),
+                        timestamp: bodyFatTimestamp,
                         dataPoints: generateBodyFatChartData().map { point in
                             MetricSummaryCard.DataPoint(index: point.index, value: point.value)
                         },
                         chartAccessibilityLabel: "Body fat percentage trend for the past week",
-                        chartAccessibilityValue: "Latest value \(formatBodyFatValue(currentMetric.bodyFatPercentage))%",
+                        chartAccessibilityValue: "Latest value \(bodyFatDisplayValue)%",
                         trend: stats.flatMap { makeTrend($0.delta, "%", selectedRange) },
                         footnote: combinedAverageAndGoal(averageText, bodyFatGoalText)
                     )),
@@ -458,7 +456,7 @@ struct DashboardMetricsSection: View {
                         title: "FFMI",
                         value: formatFFMIValue(currentMetric),
                         unit: "FFMI",
-                        timestamp: formatCardDate(currentMetric.date),
+                        timestamp: ffmiTimestamp,
                         dataPoints: generateFFMIChartData().map { point in
                             MetricSummaryCard.DataPoint(index: point.index, value: point.value)
                         },

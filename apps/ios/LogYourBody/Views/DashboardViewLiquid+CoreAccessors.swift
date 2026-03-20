@@ -83,6 +83,17 @@ enum GlobalTimelineSelectionResolver {
 }
 
 enum GlobalTimelineMetricAdapter {
+    static func bucketDateText(_ bucket: GlobalTimelineBucket) -> String {
+        switch bucket.scale {
+        case .week:
+            return "Week of \(bucket.startDate.formatted(.dateTime.month(.abbreviated).day()))"
+        case .month:
+            return bucket.startDate.formatted(.dateTime.month(.wide).year())
+        case .year:
+            return bucket.startDate.formatted(.dateTime.year())
+        }
+    }
+
     static func displayWeightValue(
         from snapshot: GlobalTimelineMetricValue,
         metrics: [BodyMetrics],
@@ -233,6 +244,50 @@ extension DashboardViewLiquid {
         }
 
         return globalTimelineStore.previousBucket(for: cursor)
+    }
+
+    var selectedMetricTimestampText: String? {
+        if let selectedTimelineBucket {
+            return GlobalTimelineMetricAdapter.bucketDateText(selectedTimelineBucket)
+        }
+
+        return formatCardDateOnly(currentMetric?.date)
+    }
+
+    var selectedMetricDateText: String {
+        if let selectedTimelineBucket {
+            return GlobalTimelineMetricAdapter.bucketDateText(selectedTimelineBucket)
+        }
+
+        return formatDate(currentMetric?.date ?? Date())
+    }
+
+    var selectedWeightMetricValueText: String {
+        if let selectedTimelineBucket {
+            if let value = GlobalTimelineMetricAdapter.displayWeightValue(
+                from: selectedTimelineBucket.metrics.weight,
+                metrics: bodyMetrics,
+                preferredUnit: weightUnit
+            ) {
+                return MetricsFormatter.formatWeight(value: value, unit: weightUnit)
+            }
+
+            return "–"
+        }
+
+        return currentMetric.flatMap { formatWeightValue($0.weight) } ?? "–"
+    }
+
+    var selectedBodyFatMetricValueText: String {
+        if let selectedTimelineBucket {
+            if let value = selectedTimelineBucket.metrics.bodyFat.value {
+                return MetricsFormatter.formatDecimal(value)
+            }
+
+            return "–"
+        }
+
+        return currentMetric.flatMap { formatBodyFatValue($0.bodyFatPercentage) } ?? "–"
     }
 
     var greeting: String {

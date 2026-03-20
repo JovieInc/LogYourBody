@@ -1637,6 +1637,31 @@ final class GlobalTimelineMetricAdapterTests: XCTestCase {
         XCTAssertEqual(GlobalTimelineMetricAdapter.comparisonCaption(for: .year), "last year")
     }
 
+    func testBucketDateTextMatchesScale() {
+        let weekBucket = Self.makeBucket(
+            id: "2026-W11",
+            scale: .week,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 16))!
+        )
+        let monthBucket = Self.makeBucket(
+            id: "2026-03",
+            scale: .month,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 4, day: 1))!
+        )
+        let yearBucket = Self.makeBucket(
+            id: "2026",
+            scale: .year,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2027, month: 1, day: 1))!
+        )
+
+        XCTAssertEqual(GlobalTimelineMetricAdapter.bucketDateText(weekBucket), "Week of Mar 9")
+        XCTAssertEqual(GlobalTimelineMetricAdapter.bucketDateText(monthBucket), "March 2026")
+        XCTAssertEqual(GlobalTimelineMetricAdapter.bucketDateText(yearBucket), "2026")
+    }
+
     private static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
@@ -1664,6 +1689,30 @@ final class GlobalTimelineMetricAdapterTests: XCTestCase {
             dataSource: "Manual",
             createdAt: date,
             updatedAt: date
+        )
+    }
+
+    private static func makeBucket(
+        id: String,
+        scale: GlobalTimelineScale,
+        startDate: Date,
+        endDate: Date
+    ) -> GlobalTimelineBucket {
+        GlobalTimelineBucket(
+            id: id,
+            scale: scale,
+            startDate: startDate,
+            endDate: endDate,
+            metrics: GlobalTimelineMetricsSnapshot(
+                weight: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                bodyFat: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                ffmi: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                steps: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                canonicalPhotoId: nil,
+                hasPhotosInRange: false,
+                bodyScore: nil,
+                bodyScoreCompleteness: .none
+            )
         )
     }
 }

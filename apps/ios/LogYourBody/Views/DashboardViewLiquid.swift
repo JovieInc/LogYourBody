@@ -503,6 +503,11 @@ struct DashboardViewLiquid: View {
             weightGoalText: weightGoalText,
             bodyFatGoalText: bodyFatGoalText,
             ffmiGoalText: ffmiGoalText,
+            weightDisplayValue: selectedWeightMetricValueText,
+            weightTimestamp: selectedMetricTimestampText,
+            bodyFatDisplayValue: selectedBodyFatMetricValueText,
+            bodyFatTimestamp: selectedMetricTimestampText,
+            ffmiTimestamp: selectedMetricTimestampText,
             generateStepsChartData: generateStepsChartData,
             generateWeightChartData: generateWeightChartData,
             generateBodyFatChartData: generateBodyFatChartData,
@@ -511,16 +516,11 @@ struct DashboardViewLiquid: View {
             bodyFatRangeStats: bodyFatRangeStats,
             ffmiRangeStats: ffmiRangeStats,
             formatSteps: formatSteps,
-            formatWeightValue: formatWeightValue,
-            formatBodyFatValue: formatBodyFatValue,
             formatFFMIValue: formatFFMIValue,
             makeTrend: makeTrend,
             formatAverageFootnote: formatAverageFootnote,
             formatCardDateOnly: formatCardDateOnly,
-            formatCardDate: formatCardDate,
-            latestStepsSnapshot: latestStepsSnapshot,
-            weightUsesTrend: $weightUsesTrend,
-            formatTrendWeightHeadline: formatTrendWeightHeadline
+            latestStepsSnapshot: latestStepsSnapshot
         )
         .padding(.horizontal, 20)
     }
@@ -552,9 +552,9 @@ struct DashboardViewLiquid: View {
                 title: "Weight",
                 icon: "figure.stand",
                 iconColor: Color.metricAccentWeight,
-                currentValue: currentMetric.flatMap { formatWeightValue($0.weight) } ?? "–",
+                currentValue: selectedWeightMetricValueText,
                 unit: weightUnit,
-                currentDate: formatDate(currentMetric?.date ?? Date()),
+                currentDate: selectedMetricDateText,
                 chartData: cachedChartData(for: .weight, generator: generateFullScreenWeightChartData),
                 onAdd: {
                     showAddEntrySheet = true
@@ -569,9 +569,9 @@ struct DashboardViewLiquid: View {
                 title: "Body Fat %",
                 icon: "percent",
                 iconColor: Color.metricAccentBodyFat,
-                currentValue: currentMetric.flatMap { formatBodyFatValue($0.bodyFatPercentage) } ?? "–",
+                currentValue: selectedBodyFatMetricValueText,
                 unit: "%",
-                currentDate: formatDate(currentMetric?.date ?? Date()),
+                currentDate: selectedMetricDateText,
                 chartData: cachedChartData(for: .bodyFat, generator: generateFullScreenBodyFatChartData),
                 onAdd: {
                     showAddEntrySheet = true
@@ -588,7 +588,7 @@ struct DashboardViewLiquid: View {
                 iconColor: Color.metricAccentFFMI,
                 currentValue: currentMetric.map { formatFFMIValue($0) } ?? "–",
                 unit: "",
-                currentDate: formatDate(currentMetric?.date ?? Date()),
+                currentDate: selectedMetricDateText,
                 chartData: cachedChartData(for: .ffmi, generator: generateFullScreenFFMIChartData),
                 onAdd: {
                     showAddEntrySheet = true
@@ -605,7 +605,7 @@ struct DashboardViewLiquid: View {
                 iconColor: Color.metricAccent,
                 currentValue: bodyScore.scoreText,
                 unit: "",
-                currentDate: formatDate(currentMetric?.date ?? Date()),
+                currentDate: selectedMetricDateText,
                 chartData: cachedChartData(for: .bodyScore, generator: generateFullScreenBodyScoreChartData),
                 onAdd: {
                     showAddEntrySheet = true
