@@ -181,6 +181,18 @@ enum DashboardPhotosPresentation {
     }
 }
 
+enum DashboardBodyScorePresentation {
+    static func deltaText(
+        currentScore: Int,
+        previousScore: Int,
+        comparison: String
+    ) -> String {
+        let delta = Double(currentScore - previousScore)
+        let prefix = delta > 0 ? "+" : ""
+        return "\(prefix)\(Int(delta)) \(comparison)"
+    }
+}
+
 extension DashboardViewLiquid {
     // MARK: - Goal Helpers
 

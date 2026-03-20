@@ -39,7 +39,7 @@ extension DashboardViewLiquid {
         _ = bodyScoreRefreshToken
         let hasHeight = authManager.currentUser?.profile?.height != nil
 
-        if let dynamic = dynamicBodyScoreResult() {
+        if let dynamic = selectedBodyScoreResult() {
             return (dynamic.score, "\(dynamic.score)", dynamic.statusTagline)
         }
 
@@ -52,19 +52,8 @@ extension DashboardViewLiquid {
     }
 
     func heroFFMIValue() -> String {
-        if let metric = currentMetric {
-            let heightInches = convertHeightToInches(
-                height: authManager.currentUser?.profile?.height,
-                heightUnit: authManager.currentUser?.profile?.heightUnit
-            )
-
-            if let ffmiData = MetricsInterpolationService.shared.estimateFFMI(
-                for: metric.date,
-                metrics: bodyMetrics,
-                heightInches: heightInches
-            ) {
-                return String(format: "%.1f", ffmiData.value)
-            }
+        if let bodyScoreResult = selectedBodyScoreResult() {
+            return String(format: "%.1f", bodyScoreResult.ffmi)
         }
 
         if let result = latestBodyScoreResult() {
@@ -75,30 +64,18 @@ extension DashboardViewLiquid {
     }
 
     func heroFFMICaption() -> String {
-        if let metric = currentMetric {
-            let heightInches = convertHeightToInches(
-                height: authManager.currentUser?.profile?.height,
-                heightUnit: authManager.currentUser?.profile?.heightUnit
-            )
-
-            if let heightInches,
-               let ffmiData = MetricsInterpolationService.shared.estimateFFMI(
-                   for: metric.date,
-                   metrics: bodyMetrics,
-                   heightInches: heightInches
-               ) {
-                let genderString = authManager.currentUser?.profile?.gender?.lowercased() ?? ""
-                let isFemale = genderString.contains("female") || genderString.contains("woman")
-                let sex: BiologicalSex = isFemale ? .female : .male
-                let status = descriptiveHeroFFMIStatus(ffmiData.value, sex: sex)
-
-                if let delta = heroFFMIDelta30d() {
-                    let trend = heroTrendCaption(delta: delta, unit: "")
-                    return "\(trend) · \(status)"
-                }
-
-                return status
+        if let selectedBodyScoreResult = selectedBodyScoreResult() {
+            if let selectedTimelineBucket,
+               let previousBodyScoreResult = previousSelectedBodyScoreResult() {
+                let trend = heroTrendCaption(
+                    delta: selectedBodyScoreResult.ffmi - previousBodyScoreResult.ffmi,
+                    unit: "",
+                    comparison: GlobalTimelineMetricAdapter.comparisonCaption(for: selectedTimelineBucket.scale)
+                )
+                return "\(trend) · \(selectedBodyScoreResult.ffmiStatus)"
             }
+
+            return selectedBodyScoreResult.ffmiStatus
         }
 
         if let result = latestBodyScoreResult() {
@@ -106,37 +83,6 @@ extension DashboardViewLiquid {
         }
 
         return "FFMI"
-    }
-
-    private func descriptiveHeroFFMIStatus(_ ffmi: Double, sex: BiologicalSex) -> String {
-        switch sex {
-        case .male:
-            switch ffmi {
-            case ..<18:
-                return "Developing"
-            case 18..<20:
-                return "Solid base"
-            case 20..<22.5:
-                return "Athletic"
-            case 22.5..<25:
-                return "Advanced"
-            default:
-                return "Elite"
-            }
-        case .female:
-            switch ffmi {
-            case ..<13:
-                return "Developing"
-            case 13..<15:
-                return "Solid base"
-            case 15..<17:
-                return "Athletic"
-            case 17..<19:
-                return "Advanced"
-            default:
-                return "Elite"
-            }
-        }
     }
 
     func heroBodyFatValue() -> String {
@@ -212,6 +158,22 @@ extension DashboardViewLiquid {
         BodyScoreCache.shared.latestResult(for: authManager.currentUser?.id)
     }
 
+    private func selectedBodyScoreResult() -> BodyScoreResult? {
+        if let selectedTimelineBucket {
+            return bodyScoreResult(for: selectedTimelineBucket)
+        }
+
+        return dynamicBodyScoreResult()
+    }
+
+    private func previousSelectedBodyScoreResult() -> BodyScoreResult? {
+        guard let previousTimelineBucket else {
+            return nil
+        }
+
+        return bodyScoreResult(for: previousTimelineBucket)
+    }
+
     private func dynamicBodyScoreResult() -> BodyScoreResult? {
         guard let metric = currentMetric else {
             return nil
@@ -220,11 +182,36 @@ extension DashboardViewLiquid {
         return bodyScoreResult(for: metric)
     }
 
+    func bodyScoreResult(for bucket: GlobalTimelineBucket) -> BodyScoreResult? {
+        guard let bodyFat = bucket.metrics.bodyFat.value,
+              let weightKg = GlobalTimelineMetricAdapter.displayWeightValue(
+                  from: bucket.metrics.weight,
+                  metrics: bodyMetrics,
+                  preferredUnit: "kg"
+              ) else {
+            return nil
+        }
+
+        let calculationDate = bucket.endDate
+        return bodyScoreResult(weightKg: weightKg, bodyFat: bodyFat, calculationDate: calculationDate)
+    }
+
     func bodyScoreResult(for metric: BodyMetrics) -> BodyScoreResult? {
-        guard let sexAndBirthYear = resolveSexAndBirthYear(),
-              let heightCm = resolveHeightCm(),
-              let bodyFat = resolveBodyFat(for: metric),
+        guard let bodyFat = resolveBodyFat(for: metric),
               let weightKg = resolveWeightKg(for: metric) else {
+            return nil
+        }
+
+        return bodyScoreResult(weightKg: weightKg, bodyFat: bodyFat, calculationDate: metric.date)
+    }
+
+    private func bodyScoreResult(
+        weightKg: Double,
+        bodyFat: Double,
+        calculationDate: Date
+    ) -> BodyScoreResult? {
+        guard let sexAndBirthYear = resolveSexAndBirthYear(),
+              let heightCm = resolveHeightCm() else {
             return nil
         }
 
@@ -251,7 +238,7 @@ extension DashboardViewLiquid {
 
         guard input.isReadyForCalculation else { return nil }
 
-        let context = BodyScoreCalculationContext(input: input, calculationDate: metric.date)
+        let context = BodyScoreCalculationContext(input: input, calculationDate: calculationDate)
         let calculator = BodyScoreCalculator()
 
         guard let result = try? calculator.calculateScore(context: context) else {
@@ -331,9 +318,17 @@ extension DashboardViewLiquid {
     }
 
     func heroBodyScoreDeltaText() -> String? {
-        guard latestBodyScoreResult() != nil else {
-            return nil
+        if let selectedTimelineBucket,
+           let selectedBodyScoreResult = selectedBodyScoreResult(),
+           let previousBodyScoreResult = previousSelectedBodyScoreResult() {
+            return DashboardBodyScorePresentation.deltaText(
+                currentScore: selectedBodyScoreResult.score,
+                previousScore: previousBodyScoreResult.score,
+                comparison: GlobalTimelineMetricAdapter.comparisonCaption(for: selectedTimelineBucket.scale)
+            )
         }
+
+        guard latestBodyScoreResult() != nil else { return nil }
         return "+0.0 last 30d"
     }
 

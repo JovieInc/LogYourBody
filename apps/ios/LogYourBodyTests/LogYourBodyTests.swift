@@ -1776,4 +1776,25 @@ final class DashboardPhotosPresentationTests: XCTestCase {
     }
 }
 
+final class DashboardBodyScorePresentationTests: XCTestCase {
+    func testDeltaTextFormatsPositiveAndNegativeComparisons() {
+        XCTAssertEqual(
+            DashboardBodyScorePresentation.deltaText(
+                currentScore: 82,
+                previousScore: 79,
+                comparison: "last month"
+            ),
+            "+3 last month"
+        )
+        XCTAssertEqual(
+            DashboardBodyScorePresentation.deltaText(
+                currentScore: 75,
+                previousScore: 79,
+                comparison: "last year"
+            ),
+            "-4 last year"
+        )
+    }
+}
+
 // swiftlint:enable single_test_class
