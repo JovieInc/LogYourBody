@@ -18,6 +18,7 @@ struct Constants {
     // MARK: - Feature Flags
     static let isBodySpecEnabled = true
     static let photosTabFlagKey = "photos_tab"
+    static let globalTimelineHeaderFlagKey = "global_timeline_header_v1"
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)
     static var baseURL: String {

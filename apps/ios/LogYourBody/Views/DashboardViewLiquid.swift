@@ -16,6 +16,7 @@ struct DashboardViewLiquid: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     @StateObject var viewModel = DashboardViewModel()
+    @StateObject private var globalTimelineStore = GlobalTimelineStore()
 
     // Core data / selection
     @State var selectedIndex: Int = 0
@@ -73,6 +74,8 @@ struct DashboardViewLiquid: View {
     @State var isBodyScoreSharePresented = false
     @State var bodyScoreSharePayload: BodyScoreSharePayload?
     @State private var hasPerformedInitialRefresh = false
+    @State private var isGlobalTimelineEnabled = false
+    @State private var isSynchronizingGlobalTimelineSelection = false
 
     enum DashboardTab: Hashable {
         case home
@@ -132,11 +135,18 @@ struct DashboardViewLiquid: View {
             .onReceive(viewModel.$recentDailyMetrics) { _ in
                 rebuildDailyMetricsLookupCache()
             }
+            .onReceive(viewModel.$bodyMetrics) { metrics in
+                handleBodyMetricsChange(metrics)
+            }
+            .onReceive(globalTimelineStore.$cursor) { cursor in
+                handleGlobalTimelineCursorChange(cursor)
+            }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
             }
             .onChange(of: selectedIndex) { _, newIndex in
                 updateAnimatedValues(for: newIndex)
+                syncGlobalTimelineCursor(for: newIndex)
             }
             .onChange(of: selectedTab) { _, newTab in
                 if newTab == .photos {
@@ -217,6 +227,7 @@ struct DashboardViewLiquid: View {
     }
 
     private func handleOnAppear() {
+        updateFeatureFlags()
         loadMetricsOrder()
 
         selectedRange = TimeRange(rawValue: storedTimeRangeRawValue) ?? .month1
@@ -254,6 +265,12 @@ struct DashboardViewLiquid: View {
         isPhotosTabEnabled = AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.photosTabFlagKey)
     }
 
+    private func updateFeatureFlags() {
+        isGlobalTimelineEnabled = AnalyticsService.shared.isFeatureEnabled(
+            flagKey: Constants.globalTimelineHeaderFlagKey
+        )
+    }
+
     private func handleCoreDataContextChange(_ notification: Notification) {
         guard !viewModel.isSyncingData else { return }
 
@@ -288,6 +305,61 @@ struct DashboardViewLiquid: View {
                 updateAnimatedValues(for: selectedIndex)
             }
         }
+    }
+
+    private func handleBodyMetricsChange(_ metrics: [BodyMetrics]) {
+        guard isGlobalTimelineEnabled else { return }
+
+        globalTimelineStore.updateMetrics(metrics)
+
+        if let cursor = globalTimelineStore.cursor {
+            syncSelectedIndex(for: cursor)
+        }
+    }
+
+    private func handleGlobalTimelineCursorChange(_ cursor: GlobalTimelineCursor?) {
+        guard isGlobalTimelineEnabled, let cursor else { return }
+        syncSelectedIndex(for: cursor)
+    }
+
+    private func syncGlobalTimelineCursor(for index: Int) {
+        guard isGlobalTimelineEnabled,
+              !isSynchronizingGlobalTimelineSelection,
+              index >= 0,
+              index < bodyMetrics.count else {
+            return
+        }
+
+        guard let cursor = GlobalTimelineSelectionResolver.cursor(
+            for: bodyMetrics[index].date,
+            weeklyBuckets: globalTimelineStore.weeklyBuckets,
+            monthlyBuckets: globalTimelineStore.monthlyBuckets,
+            yearlyBuckets: globalTimelineStore.yearlyBuckets
+        ), cursor != globalTimelineStore.cursor else {
+            return
+        }
+
+        isSynchronizingGlobalTimelineSelection = true
+        globalTimelineStore.updateCursor(cursor)
+        isSynchronizingGlobalTimelineSelection = false
+    }
+
+    private func syncSelectedIndex(for cursor: GlobalTimelineCursor) {
+        guard !isSynchronizingGlobalTimelineSelection,
+              let resolvedIndex = GlobalTimelineSelectionResolver.metricIndex(
+                  for: cursor,
+                  metrics: bodyMetrics,
+                  weeklyBuckets: globalTimelineStore.weeklyBuckets,
+                  monthlyBuckets: globalTimelineStore.monthlyBuckets,
+                  yearlyBuckets: globalTimelineStore.yearlyBuckets
+              ),
+              resolvedIndex != selectedIndex else {
+            return
+        }
+
+        isSynchronizingGlobalTimelineSelection = true
+        selectedIndex = resolvedIndex
+        isSynchronizingGlobalTimelineSelection = false
     }
 
     private var heroSection: some View {

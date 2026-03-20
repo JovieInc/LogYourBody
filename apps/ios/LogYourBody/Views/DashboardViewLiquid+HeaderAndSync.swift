@@ -5,19 +5,36 @@ extension DashboardViewLiquid {
     // MARK: - Compact Header
 
     func compactHeader(scrollProgress: CGFloat) -> some View {
-        DashboardHeaderCompact(
-            scrollProgress: scrollProgress,
-            avatarURL: avatarURL,
-            userFirstName: userFirstName,
-            hasAge: hasAge,
-            hasHeight: hasHeight,
-            syncStatusTitle: syncStatusTitle,
-            syncStatusDetail: syncStatusDetail,
-            syncStatusColor: syncStatusColor,
-            isSyncError: isSyncError,
-            onShowSyncDetails: { showSyncDetails = true },
-            onAddEntry: { showAddEntrySheet = true }
-        )
+        VStack(alignment: .leading, spacing: 12) {
+            DashboardHeaderCompact(
+                scrollProgress: scrollProgress,
+                avatarURL: avatarURL,
+                userFirstName: userFirstName,
+                hasAge: hasAge,
+                hasHeight: hasHeight,
+                syncStatusTitle: syncStatusTitle,
+                syncStatusDetail: syncStatusDetail,
+                syncStatusColor: syncStatusColor,
+                isSyncError: isSyncError,
+                onShowSyncDetails: { showSyncDetails = true },
+                onAddEntry: { showAddEntrySheet = true }
+            )
+
+            if isGlobalTimelineEnabled {
+                GlobalTimelineHeader(
+                    weeklyBuckets: globalTimelineStore.weeklyBuckets,
+                    monthlyBuckets: globalTimelineStore.monthlyBuckets,
+                    yearlyBuckets: globalTimelineStore.yearlyBuckets,
+                    cursor: globalTimelineStore.cursor,
+                    onCursorChange: { cursor in
+                        globalTimelineStore.updateCursor(cursor)
+                    },
+                    onTodayTap: {
+                        globalTimelineStore.selectToday()
+                    }
+                )
+            }
+        }
     }
 
     var compactHeader: some View {

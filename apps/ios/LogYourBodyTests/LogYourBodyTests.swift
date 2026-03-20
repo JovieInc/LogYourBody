@@ -1415,4 +1415,161 @@ final class GlobalTimelineStoreTests: XCTestCase {
     }
 }
 
+final class GlobalTimelineSelectionResolverTests: XCTestCase {
+    func testCursorPrefersWeeklyBucketForMetricDate() {
+        let metricDate = Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 10))!
+        let weeklyBucket = Self.makeBucket(
+            id: "2026-W11",
+            scale: .week,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 16))!
+        )
+        let monthlyBucket = Self.makeBucket(
+            id: "2026-03",
+            scale: .month,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 4, day: 1))!
+        )
+
+        let cursor = GlobalTimelineSelectionResolver.cursor(
+            for: metricDate,
+            weeklyBuckets: [weeklyBucket],
+            monthlyBuckets: [monthlyBucket],
+            yearlyBuckets: []
+        )
+
+        XCTAssertEqual(cursor?.scale, .week)
+        XCTAssertEqual(cursor?.bucketId, "2026-W11")
+    }
+
+    func testMetricIndexPrefersCanonicalPhotoMatchWithinBucket() {
+        let cursor = GlobalTimelineCursor(
+            date: Self.calendar.date(from: DateComponents(year: 2026, month: 4, day: 1))!,
+            scale: .month,
+            bucketId: "2026-03"
+        )
+        let monthlyBucket = Self.makeBucket(
+            id: "2026-03",
+            scale: .month,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 4, day: 1))!,
+            canonicalPhotoId: "https://example.com/match.jpg"
+        )
+        let metrics = [
+            Self.makeMetric(
+                id: "newest",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 28))!,
+                photoUrl: "https://example.com/other.jpg"
+            ),
+            Self.makeMetric(
+                id: "match",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 15))!,
+                photoUrl: "https://example.com/match.jpg"
+            )
+        ]
+
+        let resolvedIndex = GlobalTimelineSelectionResolver.metricIndex(
+            for: cursor,
+            metrics: metrics,
+            weeklyBuckets: [],
+            monthlyBuckets: [monthlyBucket],
+            yearlyBuckets: []
+        )
+
+        XCTAssertEqual(resolvedIndex, 1)
+    }
+
+    func testMetricIndexFallsBackToMetricClosestToBucketMidpoint() {
+        let cursor = GlobalTimelineCursor(
+            date: Self.calendar.date(from: DateComponents(year: 2026, month: 4, day: 1))!,
+            scale: .month,
+            bucketId: "2026-03"
+        )
+        let monthlyBucket = Self.makeBucket(
+            id: "2026-03",
+            scale: .month,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 4, day: 1))!
+        )
+        let metrics = [
+            Self.makeMetric(
+                id: "late",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 28))!
+            ),
+            Self.makeMetric(
+                id: "mid",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 16))!
+            ),
+            Self.makeMetric(
+                id: "early",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 2))!
+            )
+        ]
+
+        let resolvedIndex = GlobalTimelineSelectionResolver.metricIndex(
+            for: cursor,
+            metrics: metrics,
+            weeklyBuckets: [],
+            monthlyBuckets: [monthlyBucket],
+            yearlyBuckets: []
+        )
+
+        XCTAssertEqual(resolvedIndex, 1)
+    }
+
+    private static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        return calendar
+    }()
+
+    private static func makeBucket(
+        id: String,
+        scale: GlobalTimelineScale,
+        startDate: Date,
+        endDate: Date,
+        canonicalPhotoId: String? = nil
+    ) -> GlobalTimelineBucket {
+        GlobalTimelineBucket(
+            id: id,
+            scale: scale,
+            startDate: startDate,
+            endDate: endDate,
+            metrics: GlobalTimelineMetricsSnapshot(
+                weight: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                bodyFat: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                ffmi: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                steps: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                canonicalPhotoId: canonicalPhotoId,
+                hasPhotosInRange: canonicalPhotoId != nil,
+                bodyScore: nil,
+                bodyScoreCompleteness: .none
+            )
+        )
+    }
+
+    private static func makeMetric(
+        id: String,
+        date: Date,
+        photoUrl: String? = nil
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: "user",
+            date: date,
+            weight: nil,
+            weightUnit: nil,
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: photoUrl,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+}
+
 // swiftlint:enable single_test_class
