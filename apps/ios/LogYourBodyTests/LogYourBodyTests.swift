@@ -2282,12 +2282,33 @@ final class DashboardMetricSparklinePresentationTests: XCTestCase {
         XCTAssertEqual(points.map(\.value), [10, 30])
     }
 
-    private static func makeBucket(id: String, value: Double?) -> GlobalTimelineBucket {
+    func testChartPointsUseBucketStartDatesAndSkipMissingValues() {
+        let firstDate = Date(timeIntervalSince1970: 0)
+        let secondDate = Date(timeIntervalSince1970: 86_400)
+        let buckets = [
+            Self.makeBucket(id: "a", startDate: firstDate, value: 10),
+            Self.makeBucket(id: "b", startDate: secondDate, value: nil)
+        ]
+
+        let points = DashboardMetricSparklinePresentation.chartPoints(buckets: buckets) {
+            $0.metrics.bodyFat.value
+        }
+
+        XCTAssertEqual(points.count, 1)
+        XCTAssertEqual(points.first?.date, firstDate)
+        XCTAssertEqual(points.first?.value, 10)
+    }
+
+    private static func makeBucket(
+        id: String,
+        startDate: Date = Date(timeIntervalSince1970: 0),
+        value: Double?
+    ) -> GlobalTimelineBucket {
         GlobalTimelineBucket(
             id: id,
             scale: .month,
-            startDate: Date(timeIntervalSince1970: 0),
-            endDate: Date(timeIntervalSince1970: 86_400),
+            startDate: startDate,
+            endDate: startDate.addingTimeInterval(86_400),
             metrics: GlobalTimelineMetricsSnapshot(
                 weight: GlobalTimelineMetricValue(value: nil, presence: .missing),
                 bodyFat: GlobalTimelineMetricValue(

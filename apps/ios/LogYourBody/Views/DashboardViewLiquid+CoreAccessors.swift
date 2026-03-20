@@ -292,6 +292,23 @@ enum DashboardMetricSparklinePresentation {
                 MetricDataPoint(index: index, value: value)
             }
     }
+
+    static func chartPoints(
+        buckets: [GlobalTimelineBucket],
+        valueProvider: (GlobalTimelineBucket) -> Double?
+    ) -> [MetricChartDataPoint] {
+        buckets.compactMap { bucket in
+            guard let value = valueProvider(bucket) else {
+                return nil
+            }
+
+            return MetricChartDataPoint(
+                date: bucket.startDate,
+                value: value,
+                isEstimated: false
+            )
+        }
+    }
 }
 
 struct MetricHeadlineChangePresentation: Equatable {
@@ -650,6 +667,27 @@ extension DashboardViewLiquid {
             buckets: bucketsAtSelectedScale,
             currentBucketId: selectedTimelineBucket.id
         )
+    }
+
+    var selectedScaleBucketsForCharts: [GlobalTimelineBucket]? {
+        guard selectedTimelineBucket != nil else {
+            return nil
+        }
+
+        return bucketsAtSelectedScale
+    }
+
+    func usesSelectedScaleChartData(for metricType: MetricType) -> Bool {
+        guard isGlobalTimelineEnabled, selectedScaleBucketsForCharts != nil else {
+            return false
+        }
+
+        switch metricType {
+        case .steps, .weight, .bodyFat, .ffmi, .bodyScore:
+            return true
+        case .glp1:
+            return false
+        }
     }
 
     var selectedWeightHeadlineChange: MetricHeadlineChangePresentation? {

@@ -667,6 +667,10 @@ extension DashboardViewLiquid {
         for type: MetricType,
         generator: () -> [MetricChartDataPoint]
     ) -> [MetricChartDataPoint] {
+        if usesSelectedScaleChartData(for: type) {
+            return generator()
+        }
+
         if let cached = fullChartCache[type] {
             return cached
         }
@@ -718,10 +722,26 @@ extension DashboardViewLiquid {
     // so that time ranges (W/M/6M/Y) can filter by date window.
 
     func generateFullScreenStepsChartData() -> [MetricChartDataPoint] {
+        if let bucketData = bucketMetricChartData { bucket in
+            bucket.metrics.steps.value
+        }, !bucketData.isEmpty {
+            return bucketData
+        }
+
         buildFullScreenStepsChartData(from: recentDailyMetrics)
     }
 
     func generateFullScreenWeightChartData() -> [MetricChartDataPoint] {
+        if let bucketData = bucketMetricChartData({ bucket in
+            GlobalTimelineMetricAdapter.displayWeightValue(
+                from: bucket.metrics.weight,
+                metrics: bodyMetrics,
+                preferredUnit: currentMeasurementSystem.weightUnit
+            )
+        }), !bucketData.isEmpty {
+            return bucketData
+        }
+
         buildFullScreenWeightChartData(
             from: sortedBodyMetricsAscending,
             measurementSystem: currentMeasurementSystem
@@ -729,6 +749,12 @@ extension DashboardViewLiquid {
     }
 
     func generateFullScreenBodyFatChartData() -> [MetricChartDataPoint] {
+        if let bucketData = bucketMetricChartData({ bucket in
+            bucket.metrics.bodyFat.value
+        }), !bucketData.isEmpty {
+            return bucketData
+        }
+
         buildFullScreenBodyFatChartData(
             sortedBodyMetrics: sortedBodyMetricsAscending,
             bodyMetrics: bodyMetrics
@@ -736,6 +762,12 @@ extension DashboardViewLiquid {
     }
 
     func generateFullScreenFFMIChartData() -> [MetricChartDataPoint] {
+        if let bucketData = bucketMetricChartData({ bucket in
+            bucket.metrics.ffmi.value
+        }), !bucketData.isEmpty {
+            return bucketData
+        }
+
         let heightInches = convertHeightToInches(
             height: authManager.currentUser?.profile?.height,
             heightUnit: authManager.currentUser?.profile?.heightUnit
@@ -765,6 +797,12 @@ extension DashboardViewLiquid {
     }
 
     func generateFullScreenBodyScoreChartData() -> [MetricChartDataPoint] {
+        if let bucketData = bucketMetricChartData({ bucket in
+            bucket.metrics.bodyScore.map(Double.init)
+        }), !bucketData.isEmpty {
+            return bucketData
+        }
+
         guard !sortedBodyMetricsAscending.isEmpty else { return [] }
 
         return sortedBodyMetricsAscending
@@ -797,6 +835,21 @@ extension DashboardViewLiquid {
 
     var bodyMetricsNormalizedToKilograms: [BodyMetrics] {
         BodyCompositionMetricsNormalization.metricsInKilograms(bodyMetrics)
+    }
+
+    func bucketMetricChartData(
+        _ valueProvider: (GlobalTimelineBucket) -> Double?
+    ) -> [MetricChartDataPoint]? {
+        guard let selectedScaleBucketsForCharts else {
+            return nil
+        }
+
+        let points = DashboardMetricSparklinePresentation.chartPoints(
+            buckets: selectedScaleBucketsForCharts,
+            valueProvider: valueProvider
+        )
+
+        return points.isEmpty ? nil : points
     }
 
     @MainActor
