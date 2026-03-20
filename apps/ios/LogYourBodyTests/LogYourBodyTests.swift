@@ -1191,4 +1191,137 @@ final class BodyMetricsValidationTests: XCTestCase {
     }
 }
 
+final class GlobalTimelineHeaderPresentationTests: XCTestCase {
+    func testVisibleZonesExcludeEmptyBucketGroups() {
+        let weeklyBucket = Self.makeBucket(
+            id: "2026-W11",
+            scale: .week,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 16))!
+        )
+
+        let visibleZones = GlobalTimelineHeaderPresentation.visibleZones(
+            weeklyBuckets: [weeklyBucket],
+            monthlyBuckets: [],
+            yearlyBuckets: []
+        )
+
+        XCTAssertEqual(visibleZones.map(\.scale), [.week])
+    }
+
+    func testCurrentLabelUsesSelectedWeekBucketStartDate() {
+        let weeklyBucket = Self.makeBucket(
+            id: "2026-W11",
+            scale: .week,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 16))!
+        )
+        let cursor = GlobalTimelineCursor(
+            date: weeklyBucket.endDate,
+            scale: .week,
+            bucketId: weeklyBucket.id
+        )
+
+        let label = GlobalTimelineHeaderPresentation.currentLabel(
+            cursor: cursor,
+            weeklyBuckets: [weeklyBucket],
+            monthlyBuckets: [],
+            yearlyBuckets: [],
+            calendar: Self.calendar
+        )
+
+        XCTAssertEqual(label, "Week of Mar 9")
+    }
+
+    func testCurrentLabelUsesSelectedMonthBucketStartDate() {
+        let monthlyBucket = Self.makeBucket(
+            id: "2026-03",
+            scale: .month,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 4, day: 1))!
+        )
+        let cursor = GlobalTimelineCursor(
+            date: monthlyBucket.endDate,
+            scale: .month,
+            bucketId: monthlyBucket.id
+        )
+
+        let label = GlobalTimelineHeaderPresentation.currentLabel(
+            cursor: cursor,
+            weeklyBuckets: [],
+            monthlyBuckets: [monthlyBucket],
+            yearlyBuckets: [],
+            calendar: Self.calendar
+        )
+
+        XCTAssertEqual(label, "March 2026")
+    }
+
+    func testCurrentLabelUsesSelectedYearBucketStartDate() {
+        let yearlyBucket = Self.makeBucket(
+            id: "2026",
+            scale: .year,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2027, month: 1, day: 1))!
+        )
+        let cursor = GlobalTimelineCursor(
+            date: yearlyBucket.endDate,
+            scale: .year,
+            bucketId: yearlyBucket.id
+        )
+
+        let label = GlobalTimelineHeaderPresentation.currentLabel(
+            cursor: cursor,
+            weeklyBuckets: [],
+            monthlyBuckets: [],
+            yearlyBuckets: [yearlyBucket],
+            calendar: Self.calendar
+        )
+
+        XCTAssertEqual(label, "2026")
+    }
+
+    func testCurrentLabelShowsEmptyStateCopyWhenNoBucketsExist() {
+        let label = GlobalTimelineHeaderPresentation.currentLabel(
+            cursor: nil,
+            weeklyBuckets: [],
+            monthlyBuckets: [],
+            yearlyBuckets: [],
+            calendar: Self.calendar
+        )
+
+        XCTAssertEqual(label, GlobalTimelineHeaderPresentation.emptyTimelineLabel)
+    }
+
+    private static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        return calendar
+    }()
+
+    private static func makeBucket(
+        id: String,
+        scale: GlobalTimelineScale,
+        startDate: Date,
+        endDate: Date
+    ) -> GlobalTimelineBucket {
+        GlobalTimelineBucket(
+            id: id,
+            scale: scale,
+            startDate: startDate,
+            endDate: endDate,
+            metrics: GlobalTimelineMetricsSnapshot(
+                weight: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                bodyFat: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                ffmi: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                steps: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                canonicalPhotoId: nil,
+                hasPhotosInRange: false,
+                bodyScore: nil,
+                bodyScoreCompleteness: .none
+            )
+        )
+    }
+}
+
 // swiftlint:enable single_test_class
