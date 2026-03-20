@@ -1717,4 +1717,63 @@ final class GlobalTimelineMetricAdapterTests: XCTestCase {
     }
 }
 
+final class DashboardPhotosPresentationTests: XCTestCase {
+    func testStandaloneScrubberHiddenWhenGlobalTimelineEnabled() {
+        XCTAssertFalse(
+            DashboardPhotosPresentation.showsStandaloneScrubber(isGlobalTimelineEnabled: true)
+        )
+        XCTAssertTrue(
+            DashboardPhotosPresentation.showsStandaloneScrubber(isGlobalTimelineEnabled: false)
+        )
+    }
+
+    func testEmptyStateMessageShownForPhotoLessSelectedBucket() {
+        let bucket = Self.makeBucket(hasPhotosInRange: false)
+
+        let message = DashboardPhotosPresentation.emptyStateMessage(
+            isGlobalTimelineEnabled: true,
+            selectedTimelineBucket: bucket
+        )
+
+        XCTAssertEqual(message, DashboardPhotosPresentation.emptyBucketMessage)
+    }
+
+    func testEmptyStateMessageHiddenWhenBucketHasPhotosOrGateDisabled() {
+        let photoBucket = Self.makeBucket(hasPhotosInRange: true)
+        let emptyBucket = Self.makeBucket(hasPhotosInRange: false)
+
+        XCTAssertNil(
+            DashboardPhotosPresentation.emptyStateMessage(
+                isGlobalTimelineEnabled: true,
+                selectedTimelineBucket: photoBucket
+            )
+        )
+        XCTAssertNil(
+            DashboardPhotosPresentation.emptyStateMessage(
+                isGlobalTimelineEnabled: false,
+                selectedTimelineBucket: emptyBucket
+            )
+        )
+    }
+
+    private static func makeBucket(hasPhotosInRange: Bool) -> GlobalTimelineBucket {
+        GlobalTimelineBucket(
+            id: "2026-03",
+            scale: .month,
+            startDate: Date(timeIntervalSince1970: 0),
+            endDate: Date(timeIntervalSince1970: 86_400),
+            metrics: GlobalTimelineMetricsSnapshot(
+                weight: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                bodyFat: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                ffmi: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                steps: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                canonicalPhotoId: hasPhotosInRange ? "photo" : nil,
+                hasPhotosInRange: hasPhotosInRange,
+                bodyScore: nil,
+                bodyScoreCompleteness: .none
+            )
+        )
+    }
+}
+
 // swiftlint:enable single_test_class

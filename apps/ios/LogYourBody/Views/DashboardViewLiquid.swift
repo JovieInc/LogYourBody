@@ -386,16 +386,51 @@ struct DashboardViewLiquid: View {
                 Group {
                     if !bodyMetrics.isEmpty {
                         VStack(spacing: 16) {
-                            ProgressPhotoCarouselView(
-                                currentMetric: currentMetric,
-                                historicalMetrics: bodyMetrics,
-                                selectedMetricsIndex: $selectedIndex,
-                                displayMode: $photoDisplayMode
-                            )
-                            .frame(height: 360)
+                            ZStack {
+                                ProgressPhotoCarouselView(
+                                    currentMetric: currentMetric,
+                                    historicalMetrics: bodyMetrics,
+                                    selectedMetricsIndex: $selectedIndex,
+                                    displayMode: $photoDisplayMode
+                                )
+                                .frame(height: 360)
 
-                            timelineScrubber
-                                .padding(.horizontal, 20)
+                                if let emptyPhotoMessage = selectedTimelineEmptyPhotoMessage {
+                                    VStack(spacing: 12) {
+                                        Text(emptyPhotoMessage)
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(Color.liquidTextPrimary)
+
+                                        Button(DashboardPhotosPresentation.emptyBucketActionTitle) {
+                                            showAddEntrySheet = true
+                                        }
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 18)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.appPrimary)
+                                        )
+                                        .buttonStyle(.plain)
+                                    }
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 20)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 20)
+                                            .fill(Color.black.opacity(0.72))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 20)
+                                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                            )
+                                    )
+                                }
+                            }
+
+                            if shouldShowStandaloneTimelineScrubber {
+                                timelineScrubber
+                                    .padding(.horizontal, 20)
+                            }
                         }
                     }
                 }

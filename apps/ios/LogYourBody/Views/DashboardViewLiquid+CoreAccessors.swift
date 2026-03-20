@@ -159,6 +159,28 @@ enum GlobalTimelineMetricAdapter {
     }
 }
 
+enum DashboardPhotosPresentation {
+    static let emptyBucketMessage = "No photo near this date yet"
+    static let emptyBucketActionTitle = "Add Photo"
+
+    static func showsStandaloneScrubber(isGlobalTimelineEnabled: Bool) -> Bool {
+        !isGlobalTimelineEnabled
+    }
+
+    static func emptyStateMessage(
+        isGlobalTimelineEnabled: Bool,
+        selectedTimelineBucket: GlobalTimelineBucket?
+    ) -> String? {
+        guard isGlobalTimelineEnabled,
+              let selectedTimelineBucket,
+              !selectedTimelineBucket.metrics.hasPhotosInRange else {
+            return nil
+        }
+
+        return emptyBucketMessage
+    }
+}
+
 extension DashboardViewLiquid {
     // MARK: - Goal Helpers
 
@@ -260,6 +282,19 @@ extension DashboardViewLiquid {
         }
 
         return formatDate(currentMetric?.date ?? Date())
+    }
+
+    var shouldShowStandaloneTimelineScrubber: Bool {
+        DashboardPhotosPresentation.showsStandaloneScrubber(
+            isGlobalTimelineEnabled: isGlobalTimelineEnabled
+        )
+    }
+
+    var selectedTimelineEmptyPhotoMessage: String? {
+        DashboardPhotosPresentation.emptyStateMessage(
+            isGlobalTimelineEnabled: isGlobalTimelineEnabled,
+            selectedTimelineBucket: selectedTimelineBucket
+        )
     }
 
     var selectedWeightMetricValueText: String {
