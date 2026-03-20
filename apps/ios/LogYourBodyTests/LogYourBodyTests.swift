@@ -2029,4 +2029,50 @@ final class DashboardFFMIPresentationTests: XCTestCase {
     }
 }
 
+final class BodyCompositionMetricsNormalizationTests: XCTestCase {
+    func testWeightValueInKilogramsConvertsPounds() {
+        let metric = Self.makeMetric(weight: 180, weightUnit: "lbs")
+
+        XCTAssertEqual(
+            BodyCompositionMetricsNormalization.weightValueInKilograms(for: metric) ?? 0,
+            81.6,
+            accuracy: 0.2
+        )
+    }
+
+    func testMetricsInKilogramsRewritesPoundEntriesToKilograms() {
+        let metrics = [
+            Self.makeMetric(weight: 180, weightUnit: "lbs"),
+            Self.makeMetric(weight: 82, weightUnit: "kg")
+        ]
+
+        let normalized = BodyCompositionMetricsNormalization.metricsInKilograms(metrics)
+
+        XCTAssertEqual(normalized[0].weightUnit, "kg")
+        XCTAssertEqual(normalized[0].weight ?? 0, 81.6, accuracy: 0.2)
+        XCTAssertEqual(normalized[1].weightUnit, "kg")
+        XCTAssertEqual(normalized[1].weight ?? 0, 82, accuracy: 0.01)
+    }
+
+    private static func makeMetric(weight: Double, weightUnit: String) -> BodyMetrics {
+        let now = Date()
+        return BodyMetrics(
+            id: UUID().uuidString,
+            userId: "user",
+            date: now,
+            weight: weight,
+            weightUnit: weightUnit,
+            bodyFatPercentage: 18,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: now,
+            updatedAt: now
+        )
+    }
+}
+
 // swiftlint:enable single_test_class

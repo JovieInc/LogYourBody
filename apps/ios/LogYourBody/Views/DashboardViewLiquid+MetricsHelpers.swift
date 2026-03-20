@@ -1,12 +1,57 @@
 import SwiftUI
 import Foundation
 
+enum BodyCompositionMetricsNormalization {
+    static func weightValueInKilograms(for metric: BodyMetrics) -> Double? {
+        guard let weight = metric.weight else {
+            return nil
+        }
+
+        guard let unit = metric.weightUnit, unit == "lbs" else {
+            return weight
+        }
+
+        return MetricsFormatter.convertWeight(value: weight, from: unit, to: "kg")
+    }
+
+    static func metricInKilograms(_ metric: BodyMetrics) -> BodyMetrics {
+        guard let weightInKilograms = weightValueInKilograms(for: metric) else {
+            return metric
+        }
+
+        return BodyMetrics(
+            id: metric.id,
+            userId: metric.userId,
+            date: metric.date,
+            weight: weightInKilograms,
+            weightUnit: "kg",
+            bodyFatPercentage: metric.bodyFatPercentage,
+            bodyFatMethod: metric.bodyFatMethod,
+            muscleMass: metric.muscleMass,
+            boneMass: metric.boneMass,
+            waistCm: metric.waistCm,
+            hipCm: metric.hipCm,
+            waistUnit: metric.waistUnit,
+            notes: metric.notes,
+            photoUrl: metric.photoUrl,
+            dataSource: metric.dataSource,
+            createdAt: metric.createdAt,
+            updatedAt: metric.updatedAt
+        )
+    }
+
+    static func metricsInKilograms(_ metrics: [BodyMetrics]) -> [BodyMetrics] {
+        metrics.map(metricInKilograms)
+    }
+}
+
 extension DashboardViewLiquid {
     // MARK: - Animation Helpers
 
     /// Update animated metric values with 180ms ease-out animation
     func updateAnimatedValues(for index: Int) {
         let metrics = viewModel.bodyMetrics
+        let normalizedMetrics = bodyMetricsNormalizedToKilograms
         guard index >= 0 && index < metrics.count else { return }
         let metric = metrics[index]
 
@@ -51,7 +96,7 @@ extension DashboardViewLiquid {
             if let heightInches,
                let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
                    for: metric.date,
-                   metrics: viewModel.bodyMetrics,
+                   metrics: normalizedMetrics,
                    heightInches: heightInches
                ) {
                 animatedFFMI = ffmiResult.value
@@ -87,6 +132,7 @@ extension DashboardViewLiquid {
     }
 
     func formatFFMIValue(_ metric: BodyMetrics) -> String {
+        let normalizedMetrics = bodyMetricsNormalizedToKilograms
         let heightInches = convertHeightToInches(
             height: authManager.currentUser?.profile?.height,
             heightUnit: authManager.currentUser?.profile?.heightUnit
@@ -94,7 +140,7 @@ extension DashboardViewLiquid {
 
         if let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
             for: metric.date,
-            metrics: bodyMetrics,
+            metrics: normalizedMetrics,
             heightInches: heightInches
         ) {
             // Apple Health-style: no decimals for FFMI headline value
@@ -255,6 +301,7 @@ extension DashboardViewLiquid {
     }
 
     func ffmiEntriesPayload() -> MetricEntriesPayload? {
+        let normalizedMetrics = bodyMetricsNormalizedToKilograms
         let heightInches = convertHeightToInches(
             height: authManager.currentUser?.profile?.height,
             heightUnit: authManager.currentUser?.profile?.heightUnit
@@ -263,7 +310,7 @@ extension DashboardViewLiquid {
         guard let heightInches else { return nil }
 
         guard let interpolationContext = MetricsInterpolationService.shared
-            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
+            .makeFFMIInterpolationContext(for: normalizedMetrics, heightInches: heightInches) else {
             return nil
         }
 
@@ -530,6 +577,7 @@ extension DashboardViewLiquid {
     }
 
     func generateFFMIChartData() -> [MetricDataPoint] {
+        let normalizedMetrics = bodyMetricsNormalizedToKilograms
         let heightInches = convertHeightToInches(
             height: authManager.currentUser?.profile?.height,
             heightUnit: authManager.currentUser?.profile?.heightUnit
@@ -538,7 +586,7 @@ extension DashboardViewLiquid {
         guard let heightInches else { return [] }
 
         guard let interpolationContext = MetricsInterpolationService.shared
-            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
+            .makeFFMIInterpolationContext(for: normalizedMetrics, heightInches: heightInches) else {
             return []
         }
 
@@ -606,6 +654,7 @@ extension DashboardViewLiquid {
     }
 
     func ffmiRangeStats() -> MetricRangeStats? {
+        let normalizedMetrics = bodyMetricsNormalizedToKilograms
         let heightInches = convertHeightToInches(
             height: authManager.currentUser?.profile?.height,
             heightUnit: authManager.currentUser?.profile?.heightUnit
@@ -614,7 +663,7 @@ extension DashboardViewLiquid {
         guard let heightInches else { return nil }
 
         guard let interpolationContext = MetricsInterpolationService.shared
-            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
+            .makeFFMIInterpolationContext(for: normalizedMetrics, heightInches: heightInches) else {
             return nil
         }
 
@@ -654,7 +703,7 @@ extension DashboardViewLiquid {
 
         return buildFullScreenFFMIChartData(
             sortedBodyMetrics: sortedBodyMetricsAscending,
-            bodyMetrics: bodyMetrics,
+            bodyMetrics: bodyMetricsNormalizedToKilograms,
             heightInches: heightInches
         )
     }
@@ -704,6 +753,10 @@ extension DashboardViewLiquid {
         }
     }
 
+    var bodyMetricsNormalizedToKilograms: [BodyMetrics] {
+        BodyCompositionMetricsNormalization.metricsInKilograms(bodyMetrics)
+    }
+
     @MainActor
     func prewarmMetricCaches() async {
         guard !sortedBodyMetricsAscending.isEmpty || !recentDailyMetrics.isEmpty || !glp1DoseLogs.isEmpty else {
@@ -717,6 +770,7 @@ extension DashboardViewLiquid {
 
         let sortedMetrics = sortedBodyMetricsAscending
         let bodyMetricsSnapshot = bodyMetrics
+        let normalizedBodyMetricsSnapshot = bodyMetricsNormalizedToKilograms
         let recentDailySnapshot = recentDailyMetrics
         let measurementSystemSnapshot = currentMeasurementSystem
         let profileSnapshot = authManager.currentUser?.profile
@@ -757,7 +811,7 @@ extension DashboardViewLiquid {
             if let heightInchesSnapshot {
                 let ffmiData = buildFullScreenFFMIChartData(
                     sortedBodyMetrics: sortedMetrics,
-                    bodyMetrics: bodyMetricsSnapshot,
+                    bodyMetrics: normalizedBodyMetricsSnapshot,
                     heightInches: heightInchesSnapshot
                 )
                 if !ffmiData.isEmpty {
@@ -768,7 +822,7 @@ extension DashboardViewLiquid {
             if let profileSnapshot {
                 let bodyScoreResult = buildBodyScoreChartAndEntriesData(
                     sortedBodyMetrics: sortedMetrics,
-                    bodyMetrics: bodyMetricsSnapshot,
+                    bodyMetrics: normalizedBodyMetricsSnapshot,
                     profile: profileSnapshot,
                     measurementSystem: measurementSystemSnapshot
                 )
@@ -963,7 +1017,7 @@ private func buildBodyScoreChartAndEntriesData(
         let weightKg: Double
         if let trend = trendWeightValue {
             weightKg = trend
-        } else if let raw = metric.weight {
+        } else if let raw = BodyCompositionMetricsNormalization.weightValueInKilograms(for: metric) {
             weightKg = raw
         } else {
             continue

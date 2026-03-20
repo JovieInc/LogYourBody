@@ -301,20 +301,17 @@ extension DashboardViewLiquid {
     }
 
     private func resolveWeightKg(for metric: BodyMetrics) -> Double? {
+        let normalizedMetrics = bodyMetricsNormalizedToKilograms
         let trendWeightResult = MetricsInterpolationService.shared.estimateTrendWeight(
             for: metric.date,
-            metrics: bodyMetrics
+            metrics: normalizedMetrics
         )
 
         if let trend = trendWeightResult?.value {
             return trend
         }
 
-        if let raw = metric.weight {
-            return raw
-        }
-
-        return nil
+        return BodyCompositionMetricsNormalization.weightValueInKilograms(for: metric)
     }
 
     func heroBodyScoreDeltaText() -> String? {
@@ -390,6 +387,7 @@ extension DashboardViewLiquid {
     }
 
     private func heroFFMIDelta30d() -> Double? {
+        let normalizedMetrics = bodyMetricsNormalizedToKilograms
         let heightInches = convertHeightToInches(
             height: authManager.currentUser?.profile?.height,
             heightUnit: authManager.currentUser?.profile?.heightUnit
@@ -398,7 +396,7 @@ extension DashboardViewLiquid {
         guard let heightInches else { return nil }
 
         guard let interpolationContext = MetricsInterpolationService.shared
-            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
+            .makeFFMIInterpolationContext(for: normalizedMetrics, heightInches: heightInches) else {
             return nil
         }
 
