@@ -183,6 +183,68 @@ struct MetricFormatterKey: Hashable {
     let maxFractionDigits: Int
 }
 
+enum MetricsFormatter {
+    enum Trend: Equatable {
+        case up
+        case down
+        case flat
+
+        var metricSummaryDirection: MetricSummaryCard.Trend.Direction {
+            switch self {
+            case .up:
+                return .up
+            case .down:
+                return .down
+            case .flat:
+                return .flat
+            }
+        }
+    }
+
+    static func formatWeight(value: Double, unit: String) -> String {
+        formatDecimal(value, minFractionDigits: 1, maxFractionDigits: 1)
+    }
+
+    static func convertWeight(value: Double, from: String, to: String) -> Double {
+        guard from != to else { return value }
+
+        switch (from, to) {
+        case ("kg", "lbs"):
+            return UnitConversion.kgToLbs(value)
+        case ("lbs", "kg"):
+            return UnitConversion.lbsToKg(value)
+        default:
+            return value
+        }
+    }
+
+    static func trendDirection(delta: Double) -> Trend {
+        if delta > 0.001 {
+            return .up
+        }
+
+        if delta < -0.001 {
+            return .down
+        }
+
+        return .flat
+    }
+
+    static func formatDecimal(
+        _ value: Double,
+        minFractionDigits: Int = 1,
+        maxFractionDigits: Int = 1
+    ) -> String {
+        let formatter = MetricFormatterCache.formatter(
+            minFractionDigits: minFractionDigits,
+            maxFractionDigits: maxFractionDigits
+        )
+
+        return formatter.string(from: NSNumber(value: value))
+            ?? String(format: "%.\(maxFractionDigits)f", value)
+    }
+}
+
 enum MetricFormatterCache {
     private static var cache: [MetricFormatterKey: NumberFormatter] = [:]
 

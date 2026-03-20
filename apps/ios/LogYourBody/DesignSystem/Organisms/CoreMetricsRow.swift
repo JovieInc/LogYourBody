@@ -42,8 +42,8 @@ struct CoreMetricsRow: View {
                             chartAccessibilityValue: nil,
                             trend: bodyFatTrend.map { trend in
                                 MetricSummaryCard.Trend(
-                                    direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
-                                    valueText: String(format: "%.1f", abs(trend))
+                                    direction: MetricsFormatter.trendDirection(delta: trend).metricSummaryDirection,
+                                    valueText: MetricsFormatter.formatDecimal(abs(trend))
                                 )
                             },
                             footnote: nil
@@ -88,8 +88,8 @@ struct CoreMetricsRow: View {
                             chartAccessibilityValue: nil,
                             trend: weightTrend.map { trend in
                                 MetricSummaryCard.Trend(
-                                    direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
-                                    valueText: String(format: "%.1f", abs(trend))
+                                    direction: MetricsFormatter.trendDirection(delta: trend).metricSummaryDirection,
+                                    valueText: MetricsFormatter.formatDecimal(abs(trend))
                                 )
                             },
                             footnote: nil
@@ -115,11 +115,7 @@ struct CoreMetricsRow: View {
     }
 
     private func formatWeight(_ weight: Double) -> String {
-        if weightUnit == "lbs" {
-            return String(format: "%.1f", weight)
-        } else {
-            return String(format: "%.2f", weight)
-        }
+        MetricsFormatter.formatWeight(value: weight, unit: weightUnit)
     }
 }
 

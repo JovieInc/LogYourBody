@@ -1,8 +1,7 @@
 import Foundation
 
 /// Service responsible for building weekly, monthly, and yearly buckets
-/// for the global timeline scrubber. Aggregation rules are defined in
-/// TIMELINE_SPEC.md and will be implemented incrementally.
+/// for the global timeline scrubber.
 final class GlobalTimelineService {
     private let calendar: Calendar
 
@@ -40,127 +39,248 @@ final class GlobalTimelineService {
         )
     }
 
-    // MARK: - Bucket builders (stubs)
+    // MARK: - Bucket builders
 
     private func makeWeeklyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
-        let sortedMetrics = metrics.sorted { $0.date < $1.date }
-        guard let mostRecentDate = sortedMetrics.last?.date else {
+        let context = makeAggregationContext(from: metrics)
+        guard let mostRecentDate = context.metrics.last?.date,
+              let weekInterval = calendar.dateInterval(of: .weekOfYear, for: mostRecentDate) else {
             return []
         }
 
-        guard let recentWeekInterval = calendar.dateInterval(of: .weekOfYear, for: mostRecentDate) else {
+        return buildBuckets(
+            scale: .week,
+            context: context,
+            initialStartDate: weekInterval.start,
+            previousStartDate: { [calendar] startDate in
+                calendar.date(byAdding: .day, value: -7, to: startDate)
+            },
+            identifier: makeWeekIdentifier
+        )
+    }
+
+    private func makeMonthlyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
+        let context = makeAggregationContext(from: metrics)
+        guard let mostRecentDate = context.metrics.last?.date,
+              let monthInterval = calendar.dateInterval(of: .month, for: mostRecentDate) else {
             return []
         }
 
-        let interpolationService = MetricsInterpolationService.shared
-        let maxWeeks = 4
+        return buildBuckets(
+            scale: .month,
+            context: context,
+            initialStartDate: monthInterval.start,
+            previousStartDate: { [calendar] startDate in
+                calendar.date(byAdding: .month, value: -1, to: startDate)
+            },
+            identifier: makeMonthIdentifier
+        )
+    }
+
+    private func makeYearlyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
+        let context = makeAggregationContext(from: metrics)
+        guard let mostRecentDate = context.metrics.last?.date,
+              let yearInterval = calendar.dateInterval(of: .year, for: mostRecentDate) else {
+            return []
+        }
+
+        return buildBuckets(
+            scale: .year,
+            context: context,
+            initialStartDate: yearInterval.start,
+            previousStartDate: { [calendar] startDate in
+                calendar.date(byAdding: .year, value: -1, to: startDate)
+            },
+            identifier: makeYearIdentifier
+        )
+    }
+
+    private func buildBuckets(
+        scale: GlobalTimelineScale,
+        context: AggregationContext,
+        initialStartDate: Date,
+        previousStartDate: (Date) -> Date?,
+        identifier: (Date) -> String
+    ) -> [GlobalTimelineBucket] {
+        guard let earliestDate = context.metrics.first?.date else {
+            return []
+        }
+
         var buckets: [GlobalTimelineBucket] = []
+        var startDate = initialStartDate
 
-        let earliestDate = sortedMetrics.first?.date ?? mostRecentDate
-        var weekStart = recentWeekInterval.start
-
-        while buckets.count < maxWeeks {
-            guard let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) else {
+        while true {
+            guard let endDate = bucketEndDate(for: scale, startDate: startDate) else {
                 break
             }
 
-            // Stop if this entire week is before the first metric
-            if weekEnd <= earliestDate {
+            if endDate <= earliestDate {
                 break
             }
 
-            let weekMetrics = sortedMetrics.filter { metric in
-                metric.date >= weekStart && metric.date < weekEnd
+            let rangeMetrics = metrics(in: startDate..<endDate, context: context)
+            if hasAnyData(in: rangeMetrics) {
+                buckets.append(
+                    GlobalTimelineBucket(
+                        id: identifier(startDate),
+                        scale: scale,
+                        startDate: startDate,
+                        endDate: endDate,
+                        metrics: makeSnapshot(
+                            rangeMetrics: rangeMetrics,
+                            allMetrics: context.metrics,
+                            midpoint: midpoint(between: startDate, and: endDate)
+                        )
+                    )
+                )
             }
 
-            let hasAnyData = weekMetrics.contains { metric in
-                let hasWeight = metric.weight != nil
-                let hasBodyFat = metric.bodyFatPercentage != nil
-                let hasPhoto = metric.photoUrl != nil && !(metric.photoUrl?.isEmpty ?? true)
-                return hasWeight || hasBodyFat || hasPhoto
-            }
-
-            if hasAnyData {
-                let midpoint = calendar.date(byAdding: .day, value: 3, to: weekStart) ?? weekStart
-
-                let weight = makeWeeklyWeightValue(
-                    weekMetrics: weekMetrics,
-                    allMetrics: sortedMetrics,
-                    midpoint: midpoint,
-                    interpolationService: interpolationService
-                )
-
-                let bodyFat = makeWeeklyBodyFatValue(
-                    weekMetrics: weekMetrics,
-                    allMetrics: sortedMetrics,
-                    midpoint: midpoint,
-                    interpolationService: interpolationService
-                )
-
-                let ffmi = GlobalTimelineMetricValue(value: nil, presence: .missing)
-                let steps = GlobalTimelineMetricValue(value: nil, presence: .missing)
-
-                let photoSelection = makeWeeklyPhotoSelection(weekMetrics: weekMetrics, midpoint: midpoint)
-
-                let snapshot = GlobalTimelineMetricsSnapshot(
-                    weight: weight,
-                    bodyFat: bodyFat,
-                    ffmi: ffmi,
-                    steps: steps,
-                    canonicalPhotoId: photoSelection.canonicalPhotoId,
-                    hasPhotosInRange: photoSelection.hasPhotosInRange,
-                    bodyScore: nil,
-                    bodyScoreCompleteness: .none
-                )
-
-                let bucketId = makeWeekIdentifier(startDate: weekStart)
-                let bucket = GlobalTimelineBucket(
-                    id: bucketId,
-                    scale: .week,
-                    startDate: weekStart,
-                    endDate: weekEnd,
-                    metrics: snapshot
-                )
-
-                buckets.append(bucket)
-            }
-
-            guard let previousWeekStart = calendar.date(byAdding: .day, value: -7, to: weekStart) else {
+            guard let nextStartDate = previousStartDate(startDate) else {
                 break
             }
-            weekStart = previousWeekStart
+            startDate = nextStartDate
         }
 
         return buckets.sorted { $0.startDate < $1.startDate }
     }
 
-    private func makeMonthlyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
-        // TODO: Implement monthly aggregation rules.
-        _ = metrics
-        return []
+    private func bucketEndDate(for scale: GlobalTimelineScale, startDate: Date) -> Date? {
+        switch scale {
+        case .week:
+            return calendar.date(byAdding: .day, value: 7, to: startDate)
+        case .month:
+            return calendar.date(byAdding: .month, value: 1, to: startDate)
+        case .year:
+            return calendar.date(byAdding: .year, value: 1, to: startDate)
+        }
     }
 
-    private func makeYearlyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
-        // TODO: Implement yearly aggregation rules.
-        _ = metrics
-        return []
+    private func midpoint(between startDate: Date, and endDate: Date) -> Date {
+        startDate.addingTimeInterval(endDate.timeIntervalSince(startDate) / 2.0)
     }
 
-    // MARK: - Weekly helpers
+    // MARK: - Aggregation helpers
 
-    private func makeWeeklyWeightValue(
-        weekMetrics: [BodyMetrics],
+    private struct AggregationContext {
+        let metrics: [BodyMetrics]
+        let dates: [Date]
+    }
+
+    private func makeAggregationContext(from metrics: [BodyMetrics]) -> AggregationContext {
+        let targetUnit = resolvedWeightUnit(from: metrics)
+        let normalizedMetrics = metrics
+            .sorted { $0.date < $1.date }
+            .map { normalizeWeightUnit(for: $0, targetUnit: targetUnit) }
+
+        return AggregationContext(
+            metrics: normalizedMetrics,
+            dates: normalizedMetrics.map(\.date)
+        )
+    }
+
+    private func resolvedWeightUnit(from metrics: [BodyMetrics]) -> String {
+        metrics
+            .sorted { $0.date > $1.date }
+            .compactMap { metric in
+                guard metric.weight != nil else { return nil }
+                return metric.weightUnit
+            }
+            .first(where: { $0 == "kg" || $0 == "lbs" }) ?? "kg"
+    }
+
+    private func normalizeWeightUnit(for metric: BodyMetrics, targetUnit: String) -> BodyMetrics {
+        guard let weight = metric.weight,
+              let sourceUnit = metric.weightUnit,
+              sourceUnit != targetUnit else {
+            return metric
+        }
+
+        return BodyMetrics(
+            id: metric.id,
+            userId: metric.userId,
+            date: metric.date,
+            weight: MetricsFormatter.convertWeight(value: weight, from: sourceUnit, to: targetUnit),
+            weightUnit: targetUnit,
+            bodyFatPercentage: metric.bodyFatPercentage,
+            bodyFatMethod: metric.bodyFatMethod,
+            muscleMass: metric.muscleMass,
+            boneMass: metric.boneMass,
+            waistCm: metric.waistCm,
+            hipCm: metric.hipCm,
+            waistUnit: metric.waistUnit,
+            notes: metric.notes,
+            photoUrl: metric.photoUrl,
+            dataSource: metric.dataSource,
+            createdAt: metric.createdAt,
+            updatedAt: metric.updatedAt
+        )
+    }
+
+    private func metrics(in range: Range<Date>, context: AggregationContext) -> [BodyMetrics] {
+        let startIndex = lowerBound(for: range.lowerBound, in: context.dates)
+        let endIndex = lowerBound(for: range.upperBound, in: context.dates)
+
+        guard startIndex < endIndex else {
+            return []
+        }
+
+        return Array(context.metrics[startIndex..<endIndex])
+    }
+
+    private func lowerBound(for date: Date, in dates: [Date]) -> Int {
+        var low = 0
+        var high = dates.count
+
+        while low < high {
+            let mid = (low + high) / 2
+            if dates[mid] < date {
+                low = mid + 1
+            } else {
+                high = mid
+            }
+        }
+
+        return low
+    }
+
+    private func hasAnyData(in metrics: [BodyMetrics]) -> Bool {
+        metrics.contains { metric in
+            let hasWeight = metric.weight != nil
+            let hasBodyFat = metric.bodyFatPercentage != nil
+            let hasPhoto = metric.photoUrl?.isEmpty == false
+            return hasWeight || hasBodyFat || hasPhoto
+        }
+    }
+
+    private func makeSnapshot(
+        rangeMetrics: [BodyMetrics],
         allMetrics: [BodyMetrics],
-        midpoint: Date,
-        interpolationService: MetricsInterpolationService
-    ) -> GlobalTimelineMetricValue {
-        let weekWeights = weekMetrics.compactMap { $0.weight }
+        midpoint: Date
+    ) -> GlobalTimelineMetricsSnapshot {
+        let photoSelection = makePhotoSelection(rangeMetrics: rangeMetrics, midpoint: midpoint)
 
-        if let directValue = median(weekWeights) {
+        return GlobalTimelineMetricsSnapshot(
+            weight: makeWeightValue(rangeMetrics: rangeMetrics, allMetrics: allMetrics, midpoint: midpoint),
+            bodyFat: makeBodyFatValue(rangeMetrics: rangeMetrics, allMetrics: allMetrics, midpoint: midpoint),
+            ffmi: GlobalTimelineMetricValue(value: nil, presence: .missing),
+            steps: GlobalTimelineMetricValue(value: nil, presence: .missing),
+            canonicalPhotoId: photoSelection.canonicalPhotoId,
+            hasPhotosInRange: photoSelection.hasPhotosInRange,
+            bodyScore: nil,
+            bodyScoreCompleteness: .none
+        )
+    }
+
+    private func makeWeightValue(
+        rangeMetrics: [BodyMetrics],
+        allMetrics: [BodyMetrics],
+        midpoint: Date
+    ) -> GlobalTimelineMetricValue {
+        if let directValue = median(rangeMetrics.compactMap(\.weight)) {
             return GlobalTimelineMetricValue(value: directValue, presence: .present)
         }
 
-        if let interpolated = interpolationService.estimateWeight(for: midpoint, metrics: allMetrics) {
+        if let interpolated = MetricsInterpolationService.shared.estimateWeight(for: midpoint, metrics: allMetrics) {
             let presence: MetricPresence = interpolated.isInterpolated ? .estimated : .present
             return GlobalTimelineMetricValue(value: interpolated.value, presence: presence)
         }
@@ -168,19 +288,16 @@ final class GlobalTimelineService {
         return GlobalTimelineMetricValue(value: nil, presence: .missing)
     }
 
-    private func makeWeeklyBodyFatValue(
-        weekMetrics: [BodyMetrics],
+    private func makeBodyFatValue(
+        rangeMetrics: [BodyMetrics],
         allMetrics: [BodyMetrics],
-        midpoint: Date,
-        interpolationService: MetricsInterpolationService
+        midpoint: Date
     ) -> GlobalTimelineMetricValue {
-        let weekBodyFat = weekMetrics.compactMap { $0.bodyFatPercentage }
-
-        if let directValue = median(weekBodyFat) {
+        if let directValue = median(rangeMetrics.compactMap(\.bodyFatPercentage)) {
             return GlobalTimelineMetricValue(value: directValue, presence: .present)
         }
 
-        if let interpolated = interpolationService.estimateBodyFat(for: midpoint, metrics: allMetrics) {
+        if let interpolated = MetricsInterpolationService.shared.estimateBodyFat(for: midpoint, metrics: allMetrics) {
             let presence: MetricPresence = interpolated.isInterpolated ? .estimated : .present
             return GlobalTimelineMetricValue(value: interpolated.value, presence: presence)
         }
@@ -188,43 +305,52 @@ final class GlobalTimelineService {
         return GlobalTimelineMetricValue(value: nil, presence: .missing)
     }
 
-    private struct WeeklyPhotoSelectionResult {
+    private struct PhotoSelectionResult {
         let canonicalPhotoId: String?
         let hasPhotosInRange: Bool
     }
 
-    private func makeWeeklyPhotoSelection(
-        weekMetrics: [BodyMetrics],
+    private func makePhotoSelection(
+        rangeMetrics: [BodyMetrics],
         midpoint: Date
-    ) -> WeeklyPhotoSelectionResult {
-        let photoCandidates = weekMetrics.filter { metric in
+    ) -> PhotoSelectionResult {
+        let photoCandidates = rangeMetrics.filter { metric in
             guard let url = metric.photoUrl else { return false }
             return !url.isEmpty
         }
 
         guard !photoCandidates.isEmpty else {
-            return WeeklyPhotoSelectionResult(canonicalPhotoId: nil, hasPhotosInRange: false)
+            return PhotoSelectionResult(canonicalPhotoId: nil, hasPhotosInRange: false)
         }
 
-        let selected = photoCandidates.min { lhs, rhs in
-            let lhsDiff = abs(lhs.date.timeIntervalSince(midpoint))
-            let rhsDiff = abs(rhs.date.timeIntervalSince(midpoint))
-            return lhsDiff < rhsDiff
+        let selectedPhoto = photoCandidates.min { lhs, rhs in
+            abs(lhs.date.timeIntervalSince(midpoint)) < abs(rhs.date.timeIntervalSince(midpoint))
         }
 
-        return WeeklyPhotoSelectionResult(canonicalPhotoId: selected?.photoUrl, hasPhotosInRange: true)
+        return PhotoSelectionResult(
+            canonicalPhotoId: selectedPhoto?.photoUrl,
+            hasPhotosInRange: true
+        )
     }
 
-    private func makeWeekIdentifier(startDate: Date) -> String {
-        let components = calendar.dateComponents([
-            .yearForWeekOfYear,
-            .weekOfYear
-        ], from: startDate)
+    // MARK: - Identifiers
 
+    private func makeWeekIdentifier(startDate: Date) -> String {
+        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: startDate)
         let year = components.yearForWeekOfYear ?? calendar.component(.year, from: startDate)
         let week = components.weekOfYear ?? calendar.component(.weekOfYear, from: startDate)
-
         return String(format: "%04d-W%02d", year, week)
+    }
+
+    private func makeMonthIdentifier(startDate: Date) -> String {
+        let components = calendar.dateComponents([.year, .month], from: startDate)
+        let year = components.year ?? calendar.component(.year, from: startDate)
+        let month = components.month ?? calendar.component(.month, from: startDate)
+        return String(format: "%04d-%02d", year, month)
+    }
+
+    private func makeYearIdentifier(startDate: Date) -> String {
+        String(format: "%04d", calendar.component(.year, from: startDate))
     }
 
     private func median(_ values: [Double]) -> Double? {
@@ -235,11 +361,9 @@ final class GlobalTimelineService {
         let middleIndex = count / 2
 
         if count.isMultiple(of: 2) {
-            let lower = sortedValues[middleIndex - 1]
-            let upper = sortedValues[middleIndex]
-            return (lower + upper) / 2.0
-        } else {
-            return sortedValues[middleIndex]
+            return (sortedValues[middleIndex - 1] + sortedValues[middleIndex]) / 2.0
         }
+
+        return sortedValues[middleIndex]
     }
 }

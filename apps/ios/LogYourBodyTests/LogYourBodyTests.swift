@@ -958,4 +958,237 @@ final class LoadingManagerHealthSyncTests: XCTestCase {
     }
 }
 
+final class GlobalTimelineServiceCoverageTests: XCTestCase {
+    func testWeeklyBucketsAreNotCappedAtFourWeeks() {
+        let service = GlobalTimelineService(calendar: Self.calendar)
+        let anchorDate = Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 15))!
+        let metrics = (0..<6).map { weekOffset in
+            Self.makeMetric(
+                id: "week-\(weekOffset)",
+                date: Self.calendar.date(byAdding: .day, value: -(weekOffset * 7), to: anchorDate)!,
+                weight: 180 - Double(weekOffset),
+                weightUnit: "lbs"
+            )
+        }
+
+        let buckets = service.makeBuckets(for: .week, metrics: metrics)
+
+        XCTAssertEqual(buckets.count, 6)
+    }
+
+    func testMonthlyBucketsAggregateAcrossMonthsAndNormalizeWeightUnits() {
+        let service = GlobalTimelineService(calendar: Self.calendar)
+        let metrics = [
+            Self.makeMetric(
+                id: "jan-1",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 1, day: 5))!,
+                weight: 80,
+                weightUnit: "kg",
+                bodyFatPercentage: 20
+            ),
+            Self.makeMetric(
+                id: "jan-2",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 1, day: 20))!,
+                weight: 82,
+                weightUnit: "kg",
+                bodyFatPercentage: 19
+            ),
+            Self.makeMetric(
+                id: "feb-1",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 2, day: 10))!,
+                weight: 180,
+                weightUnit: "lbs",
+                bodyFatPercentage: 18
+            ),
+            Self.makeMetric(
+                id: "mar-photo",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+                photoUrl: "https://example.com/photo.jpg"
+            )
+        ]
+
+        let buckets = service.makeBuckets(for: .month, metrics: metrics)
+
+        XCTAssertEqual(buckets.map(\.id), ["2026-01", "2026-02", "2026-03"])
+        XCTAssertEqual(buckets[0].metrics.weight.presence, .present)
+        XCTAssertEqual(buckets[0].metrics.weight.value ?? 0, 178.6, accuracy: 0.2)
+        XCTAssertTrue(buckets[2].metrics.hasPhotosInRange)
+        XCTAssertEqual(buckets[2].metrics.canonicalPhotoId, "https://example.com/photo.jpg")
+    }
+
+    func testYearlyBucketsAggregateAcrossYears() {
+        let service = GlobalTimelineService(calendar: Self.calendar)
+        let metrics = [
+            Self.makeMetric(
+                id: "2024",
+                date: Self.calendar.date(from: DateComponents(year: 2024, month: 6, day: 1))!,
+                weight: 78,
+                weightUnit: "kg",
+                bodyFatPercentage: 18,
+                photoUrl: "https://example.com/2024.jpg"
+            ),
+            Self.makeMetric(
+                id: "2025",
+                date: Self.calendar.date(from: DateComponents(year: 2025, month: 6, day: 1))!,
+                weight: 80,
+                weightUnit: "kg",
+                bodyFatPercentage: 17
+            ),
+            Self.makeMetric(
+                id: "2026",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 6, day: 1))!,
+                weight: 82,
+                weightUnit: "kg",
+                bodyFatPercentage: 16
+            )
+        ]
+
+        let buckets = service.makeBuckets(for: .year, metrics: metrics)
+
+        XCTAssertEqual(buckets.map(\.id), ["2024", "2025", "2026"])
+        XCTAssertEqual(buckets[0].metrics.canonicalPhotoId, "https://example.com/2024.jpg")
+        XCTAssertEqual(buckets[2].metrics.bodyFat.value ?? 0, 16, accuracy: 0.01)
+    }
+
+    private static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        return calendar
+    }()
+
+    private static func makeMetric(
+        id: String,
+        date: Date,
+        weight: Double? = nil,
+        weightUnit: String? = nil,
+        bodyFatPercentage: Double? = nil,
+        photoUrl: String? = nil
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: "user",
+            date: date,
+            weight: weight,
+            weightUnit: weightUnit,
+            bodyFatPercentage: bodyFatPercentage,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: photoUrl,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+}
+
+final class MetricsFormatterTests: XCTestCase {
+    func testFormatWeightUsesSingleDecimalPlaceForBothUnits() {
+        XCTAssertEqual(MetricsFormatter.formatWeight(value: 80, unit: "kg"), "80.0")
+        XCTAssertEqual(MetricsFormatter.formatWeight(value: 180.44, unit: "lbs"), "180.4")
+    }
+
+    func testConvertWeightConvertsBetweenKgAndLbs() {
+        XCTAssertEqual(
+            MetricsFormatter.convertWeight(value: 100, from: "kg", to: "lbs"),
+            220.462,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            MetricsFormatter.convertWeight(value: 220.462, from: "lbs", to: "kg"),
+            100,
+            accuracy: 0.001
+        )
+    }
+
+    func testTrendDirectionTreatsTinyDeltasAsFlat() {
+        XCTAssertEqual(MetricsFormatter.trendDirection(delta: 1.0), .up)
+        XCTAssertEqual(MetricsFormatter.trendDirection(delta: -1.0), .down)
+        XCTAssertEqual(MetricsFormatter.trendDirection(delta: 0.0001), .flat)
+    }
+}
+
+final class BodyMetricsValidationTests: XCTestCase {
+    func testInitializerRejectsInvalidWeightUnitAndOutOfRangeValues() {
+        let metrics = Self.makeMetric(
+            weight: 220,
+            weightUnit: "stone",
+            bodyFatPercentage: 80,
+            waistCm: -5,
+            hipCm: 0
+        )
+
+        XCTAssertNil(metrics.weight)
+        XCTAssertNil(metrics.weightUnit)
+        XCTAssertNil(metrics.bodyFatPercentage)
+        XCTAssertNil(metrics.waistCm)
+        XCTAssertNil(metrics.hipCm)
+    }
+
+    func testInitializerRejectsWeightOverOneThousandPoundsEquivalent() {
+        let metrics = Self.makeMetric(weight: 500, weightUnit: "kg")
+
+        XCTAssertNil(metrics.weight)
+        XCTAssertEqual(metrics.weightUnit, "kg")
+    }
+
+    func testDecodingAppliesValidationRules() throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let data = """
+        {
+          "id": "decoded",
+          "user_id": "user",
+          "date": "2026-03-10T00:00:00Z",
+          "weight": 200,
+          "weight_unit": "stone",
+          "body_fat_percentage": 72,
+          "waist_circumference": -1,
+          "hip_circumference": 40,
+          "created_at": "2026-03-10T00:00:00Z",
+          "updated_at": "2026-03-10T00:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let metrics = try decoder.decode(BodyMetrics.self, from: data)
+
+        XCTAssertNil(metrics.weight)
+        XCTAssertNil(metrics.weightUnit)
+        XCTAssertNil(metrics.bodyFatPercentage)
+        XCTAssertNil(metrics.waistCm)
+        XCTAssertEqual(metrics.hipCm, 40.0)
+    }
+
+    private static func makeMetric(
+        weight: Double?,
+        weightUnit: String?,
+        bodyFatPercentage: Double?,
+        waistCm: Double?,
+        hipCm: Double?
+    ) -> BodyMetrics {
+        let now = Date()
+        return BodyMetrics(
+            id: "metric",
+            userId: "user",
+            date: now,
+            weight: weight,
+            weightUnit: weightUnit,
+            bodyFatPercentage: bodyFatPercentage,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            waistCm: waistCm,
+            hipCm: hipCm,
+            waistUnit: "cm",
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: now,
+            updatedAt: now
+        )
+    }
+}
+
 // swiftlint:enable single_test_class

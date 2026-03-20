@@ -34,7 +34,7 @@ struct SecondaryMetricsRow: View {
                     chartAccessibilityValue: nil,
                     trend: stepsTrend.map { trend in
                         MetricSummaryCard.Trend(
-                            direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
+                            direction: MetricsFormatter.trendDirection(delta: Double(trend)).metricSummaryDirection,
                             valueText: String(format: "%d", abs(trend))
                         )
                     },
@@ -56,7 +56,7 @@ struct SecondaryMetricsRow: View {
                     accentColor: Color.metricAccentFFMI,
                     state: ffmi != nil ? .data(MetricSummaryCard.Content(
                         title: "FFMI",
-                        value: String(format: "%.1f", ffmi!),
+                        value: MetricsFormatter.formatDecimal(ffmi!),
                         unit: "",
                         timestamp: nil,
                         dataPoints: [],
@@ -64,8 +64,8 @@ struct SecondaryMetricsRow: View {
                         chartAccessibilityValue: nil,
                         trend: ffmiTrend.map { trend in
                             MetricSummaryCard.Trend(
-                                direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
-                                valueText: String(format: "%.1f", abs(trend))
+                                direction: MetricsFormatter.trendDirection(delta: trend).metricSummaryDirection,
+                                valueText: MetricsFormatter.formatDecimal(abs(trend))
                             )
                         },
                         footnote: nil
@@ -86,7 +86,7 @@ struct SecondaryMetricsRow: View {
                 accentColor: Color.metricAccentWaist,
                 state: leanMass != nil ? .data(MetricSummaryCard.Content(
                     title: "Lean \(weightUnit)",
-                    value: "\(Int(leanMass!))",
+                    value: MetricsFormatter.formatWeight(value: leanMass!, unit: weightUnit),
                     unit: "",
                     timestamp: nil,
                     dataPoints: [],
@@ -94,8 +94,8 @@ struct SecondaryMetricsRow: View {
                     chartAccessibilityValue: nil,
                     trend: leanMassTrend.map { trend in
                         MetricSummaryCard.Trend(
-                            direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
-                            valueText: String(format: "%.1f", abs(trend))
+                            direction: MetricsFormatter.trendDirection(delta: trend).metricSummaryDirection,
+                            valueText: MetricsFormatter.formatDecimal(abs(trend))
                         )
                     },
                     footnote: nil
