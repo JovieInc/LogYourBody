@@ -267,6 +267,33 @@ enum DashboardMetricCardTrendPresentation {
     }
 }
 
+enum DashboardMetricSparklinePresentation {
+    static func trailingBuckets(
+        buckets: [GlobalTimelineBucket],
+        currentBucketId: String,
+        maxCount: Int = 7
+    ) -> [GlobalTimelineBucket] {
+        guard let currentIndex = buckets.firstIndex(where: { $0.id == currentBucketId }) else {
+            return Array(buckets.suffix(maxCount))
+        }
+
+        let startIndex = max(0, currentIndex - (maxCount - 1))
+        return Array(buckets[startIndex...currentIndex])
+    }
+
+    static func points(
+        buckets: [GlobalTimelineBucket],
+        valueProvider: (GlobalTimelineBucket) -> Double?
+    ) -> [MetricDataPoint] {
+        buckets
+            .compactMap(valueProvider)
+            .enumerated()
+            .map { index, value in
+                MetricDataPoint(index: index, value: value)
+            }
+    }
+}
+
 extension DashboardViewLiquid {
     // MARK: - Goal Helpers
 
@@ -524,6 +551,34 @@ extension DashboardViewLiquid {
             selectedTimelineBucket: selectedTimelineBucket,
             unit: "",
             fallbackTrend: fallbackTrend
+        )
+    }
+
+    var bucketsAtSelectedScale: [GlobalTimelineBucket]? {
+        guard isGlobalTimelineEnabled,
+              let cursor = globalTimelineStore.cursor else {
+            return nil
+        }
+
+        switch cursor.scale {
+        case .week:
+            return globalTimelineStore.weeklyBuckets
+        case .month:
+            return globalTimelineStore.monthlyBuckets
+        case .year:
+            return globalTimelineStore.yearlyBuckets
+        }
+    }
+
+    var trailingSelectedScaleBuckets: [GlobalTimelineBucket]? {
+        guard let selectedTimelineBucket,
+              let bucketsAtSelectedScale else {
+            return nil
+        }
+
+        return DashboardMetricSparklinePresentation.trailingBuckets(
+            buckets: bucketsAtSelectedScale,
+            currentBucketId: selectedTimelineBucket.id
         )
     }
 

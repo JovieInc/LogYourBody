@@ -2245,4 +2245,64 @@ final class DashboardMetricCardTrendPresentationTests: XCTestCase {
     }
 }
 
+final class DashboardMetricSparklinePresentationTests: XCTestCase {
+    func testTrailingBucketsEndsAtSelectedBucket() {
+        let buckets = (1...9).map { index in
+            Self.makeBucket(id: "bucket-\(index)", value: Double(index))
+        }
+
+        let trailing = DashboardMetricSparklinePresentation.trailingBuckets(
+            buckets: buckets,
+            currentBucketId: "bucket-8"
+        )
+
+        XCTAssertEqual(trailing.map(\.id), [
+            "bucket-2",
+            "bucket-3",
+            "bucket-4",
+            "bucket-5",
+            "bucket-6",
+            "bucket-7",
+            "bucket-8"
+        ])
+    }
+
+    func testPointsCompactsMissingValuesAndReindexes() {
+        let buckets = [
+            Self.makeBucket(id: "a", value: 10),
+            Self.makeBucket(id: "b", value: nil),
+            Self.makeBucket(id: "c", value: 30)
+        ]
+
+        let points = DashboardMetricSparklinePresentation.points(buckets: buckets) {
+            $0.metrics.bodyFat.value
+        }
+
+        XCTAssertEqual(points.map(\.index), [0, 1])
+        XCTAssertEqual(points.map(\.value), [10, 30])
+    }
+
+    private static func makeBucket(id: String, value: Double?) -> GlobalTimelineBucket {
+        GlobalTimelineBucket(
+            id: id,
+            scale: .month,
+            startDate: Date(timeIntervalSince1970: 0),
+            endDate: Date(timeIntervalSince1970: 86_400),
+            metrics: GlobalTimelineMetricsSnapshot(
+                weight: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                bodyFat: GlobalTimelineMetricValue(
+                    value: value,
+                    presence: value == nil ? .missing : .present
+                ),
+                ffmi: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                steps: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                canonicalPhotoId: nil,
+                hasPhotosInRange: false,
+                bodyScore: nil,
+                bodyScoreCompleteness: .none
+            )
+        )
+    }
+}
+
 // swiftlint:enable single_test_class

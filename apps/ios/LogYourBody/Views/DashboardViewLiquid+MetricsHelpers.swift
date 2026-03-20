@@ -471,6 +471,16 @@ extension DashboardViewLiquid {
     }
 
     func generateStepsChartData() -> [MetricDataPoint] {
+        if let trailingSelectedScaleBuckets {
+            let points = DashboardMetricSparklinePresentation.points(buckets: trailingSelectedScaleBuckets) {
+                bucket in
+                bucket.metrics.steps.value
+            }
+            if !points.isEmpty {
+                return points
+            }
+        }
+
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let lookup = dailyMetricsLookup()
@@ -543,6 +553,20 @@ extension DashboardViewLiquid {
     }
 
     func generateWeightChartData() -> [MetricDataPoint] {
+        if let trailingSelectedScaleBuckets {
+            let points = DashboardMetricSparklinePresentation.points(buckets: trailingSelectedScaleBuckets) {
+                bucket in
+                GlobalTimelineMetricAdapter.displayWeightValue(
+                    from: bucket.metrics.weight,
+                    metrics: bodyMetrics,
+                    preferredUnit: weightUnit
+                )
+            }
+            if !points.isEmpty {
+                return points
+            }
+        }
+
         let system = currentMeasurementSystem
 
         let allPoints: [Double] = sortedBodyMetricsAscending.compactMap { metric in
@@ -557,6 +581,15 @@ extension DashboardViewLiquid {
     }
 
     func generateBodyFatChartData() -> [MetricDataPoint] {
+        if let trailingSelectedScaleBuckets {
+            let points = DashboardMetricSparklinePresentation.points(buckets: trailingSelectedScaleBuckets) {
+                $0.metrics.bodyFat.value
+            }
+            if !points.isEmpty {
+                return points
+            }
+        }
+
         let interpolationContext = MetricsInterpolationService.shared
             .makeBodyFatInterpolationContext(for: bodyMetrics)
 
@@ -577,6 +610,15 @@ extension DashboardViewLiquid {
     }
 
     func generateFFMIChartData() -> [MetricDataPoint] {
+        if let trailingSelectedScaleBuckets {
+            let points = DashboardMetricSparklinePresentation.points(buckets: trailingSelectedScaleBuckets) {
+                $0.metrics.ffmi.value
+            }
+            if !points.isEmpty {
+                return points
+            }
+        }
+
         let normalizedMetrics = bodyMetricsNormalizedToKilograms
         let heightInches = convertHeightToInches(
             height: authManager.currentUser?.profile?.height,

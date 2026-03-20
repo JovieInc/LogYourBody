@@ -367,7 +367,7 @@ struct DashboardMetricsSection: View {
                     dataPoints: generateStepsChartData().map { point in
                         MetricSummaryCard.DataPoint(index: point.index, value: point.value)
                     },
-                    chartAccessibilityLabel: "Steps trend for the past week",
+                    chartAccessibilityLabel: "Steps trend",
                     chartAccessibilityValue: accessibilityValue,
                     trend: nil,
                     footnote: stepsGoalText
@@ -398,8 +398,8 @@ struct DashboardMetricsSection: View {
                         dataPoints: generateWeightChartData().map { point in
                             MetricSummaryCard.DataPoint(index: point.index, value: point.value)
                         },
-                        chartAccessibilityLabel: "Weight trend for the past week",
-                        chartAccessibilityValue: "Latest value \(weightDisplayValue) \(weightUnit)",
+                        chartAccessibilityLabel: "Weight trend",
+                        chartAccessibilityValue: "Current value \(weightDisplayValue) \(weightUnit)",
                         trend: selectedWeightMetricTrend,
                         footnote: combinedAverageAndGoal(averageText, weightGoalText)
                     )),
@@ -430,8 +430,8 @@ struct DashboardMetricsSection: View {
                         dataPoints: generateBodyFatChartData().map { point in
                             MetricSummaryCard.DataPoint(index: point.index, value: point.value)
                         },
-                        chartAccessibilityLabel: "Body fat percentage trend for the past week",
-                        chartAccessibilityValue: "Latest value \(bodyFatDisplayValue)%",
+                        chartAccessibilityLabel: "Body fat percentage trend",
+                        chartAccessibilityValue: "Current value \(bodyFatDisplayValue)%",
                         trend: selectedBodyFatMetricTrend,
                         footnote: combinedAverageAndGoal(averageText, bodyFatGoalText)
                     )),
@@ -462,7 +462,7 @@ struct DashboardMetricsSection: View {
                         dataPoints: generateFFMIChartData().map { point in
                             MetricSummaryCard.DataPoint(index: point.index, value: point.value)
                         },
-                        chartAccessibilityLabel: "FFMI trend for the past week",
+                        chartAccessibilityLabel: "FFMI trend",
                         chartAccessibilityValue: "Current value \(selectedFFMIMetricValueText)",
                         trend: selectedFFMIMetricTrend,
                         footnote: combinedAverageAndGoal(averageText, ffmiGoalText)
