@@ -1324,4 +1324,95 @@ final class GlobalTimelineHeaderPresentationTests: XCTestCase {
     }
 }
 
+@MainActor
+final class GlobalTimelineStoreTests: XCTestCase {
+    func testPreviousBucketReturnsPriorBucketAtSameScale() {
+        let store = GlobalTimelineStore(service: GlobalTimelineService(calendar: Self.calendar))
+        store.updateMetrics([
+            Self.makeMetric(
+                id: "jan",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 1, day: 10))!,
+                weight: 80,
+                weightUnit: "kg"
+            ),
+            Self.makeMetric(
+                id: "feb",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 2, day: 10))!,
+                weight: 81,
+                weightUnit: "kg"
+            ),
+            Self.makeMetric(
+                id: "mar",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 10))!,
+                weight: 82,
+                weightUnit: "kg"
+            )
+        ])
+
+        let marchCursor = GlobalTimelineCursor(
+            date: Self.calendar.date(from: DateComponents(year: 2026, month: 4, day: 1))!,
+            scale: .month,
+            bucketId: "2026-03"
+        )
+
+        XCTAssertEqual(store.previousBucket(for: marchCursor)?.id, "2026-02")
+    }
+
+    func testPreviousBucketReturnsNilForFirstBucket() {
+        let store = GlobalTimelineStore(service: GlobalTimelineService(calendar: Self.calendar))
+        store.updateMetrics([
+            Self.makeMetric(
+                id: "week-a",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 15))!,
+                weight: 180,
+                weightUnit: "lbs"
+            ),
+            Self.makeMetric(
+                id: "week-b",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 22))!,
+                weight: 179,
+                weightUnit: "lbs"
+            )
+        ])
+
+        let firstWeekCursor = GlobalTimelineCursor(
+            date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 16))!,
+            scale: .week,
+            bucketId: "2026-W11"
+        )
+
+        XCTAssertNil(store.previousBucket(for: firstWeekCursor))
+    }
+
+    private static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        return calendar
+    }()
+
+    private static func makeMetric(
+        id: String,
+        date: Date,
+        weight: Double? = nil,
+        weightUnit: String? = nil
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: "user",
+            date: date,
+            weight: weight,
+            weightUnit: weightUnit,
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+}
+
 // swiftlint:enable single_test_class

@@ -29,13 +29,27 @@ final class GlobalTimelineStore: ObservableObject {
     }
 
     func bucket(for cursor: GlobalTimelineCursor) -> GlobalTimelineBucket? {
-        switch cursor.scale {
+        buckets(for: cursor.scale).first { $0.id == cursor.bucketId }
+    }
+
+    func previousBucket(for cursor: GlobalTimelineCursor) -> GlobalTimelineBucket? {
+        let bucketsAtScale = buckets(for: cursor.scale)
+        guard let selectedIndex = bucketsAtScale.firstIndex(where: { $0.id == cursor.bucketId }),
+              selectedIndex > 0 else {
+            return nil
+        }
+
+        return bucketsAtScale[selectedIndex - 1]
+    }
+
+    func buckets(for scale: GlobalTimelineScale) -> [GlobalTimelineBucket] {
+        switch scale {
         case .week:
-            return weeklyBuckets.first { $0.id == cursor.bucketId }
+            return weeklyBuckets
         case .month:
-            return monthlyBuckets.first { $0.id == cursor.bucketId }
+            return monthlyBuckets
         case .year:
-            return yearlyBuckets.first { $0.id == cursor.bucketId }
+            return yearlyBuckets
         }
     }
 
