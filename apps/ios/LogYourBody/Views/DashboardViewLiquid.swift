@@ -639,7 +639,7 @@ struct DashboardViewLiquid: View {
                 title: "FFMI",
                 icon: "figure.arms.open",
                 iconColor: Color.metricAccentFFMI,
-                currentValue: currentMetric.map { formatFFMIValue($0) } ?? "–",
+                currentValue: selectedFFMIMetricValueText,
                 unit: "",
                 currentDate: selectedMetricDateText,
                 chartData: cachedChartData(for: .ffmi, generator: generateFullScreenFFMIChartData),

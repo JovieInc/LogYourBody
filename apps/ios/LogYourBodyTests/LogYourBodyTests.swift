@@ -1971,4 +1971,62 @@ final class DashboardBodyScorePresentationTests: XCTestCase {
     }
 }
 
+final class DashboardFFMIPresentationTests: XCTestCase {
+    func testValueTextUsesSelectedBucketValueWhenPresent() {
+        let bucket = Self.makeBucket(ffmiValue: 20.4)
+
+        XCTAssertEqual(
+            DashboardFFMIPresentation.valueText(
+                selectedTimelineBucket: bucket,
+                fallbackValue: "18.9"
+            ),
+            "20.4"
+        )
+    }
+
+    func testValueTextShowsMissingWhenSelectedBucketHasNoFFMI() {
+        let bucket = Self.makeBucket(ffmiValue: nil)
+
+        XCTAssertEqual(
+            DashboardFFMIPresentation.valueText(
+                selectedTimelineBucket: bucket,
+                fallbackValue: "18.9"
+            ),
+            "–"
+        )
+    }
+
+    func testValueTextFallsBackWhenNoSelectedBucketExists() {
+        XCTAssertEqual(
+            DashboardFFMIPresentation.valueText(
+                selectedTimelineBucket: nil,
+                fallbackValue: "18.9"
+            ),
+            "18.9"
+        )
+    }
+
+    private static func makeBucket(ffmiValue: Double?) -> GlobalTimelineBucket {
+        GlobalTimelineBucket(
+            id: "2026-03",
+            scale: .month,
+            startDate: Date(timeIntervalSince1970: 0),
+            endDate: Date(timeIntervalSince1970: 86_400),
+            metrics: GlobalTimelineMetricsSnapshot(
+                weight: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                bodyFat: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                ffmi: GlobalTimelineMetricValue(
+                    value: ffmiValue,
+                    presence: ffmiValue == nil ? .missing : .present
+                ),
+                steps: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                canonicalPhotoId: nil,
+                hasPhotosInRange: false,
+                bodyScore: nil,
+                bodyScoreCompleteness: .none
+            )
+        )
+    }
+}
+
 // swiftlint:enable single_test_class

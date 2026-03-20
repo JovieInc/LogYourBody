@@ -456,14 +456,14 @@ struct DashboardMetricsSection: View {
                     accentColor: Color.metricAccentFFMI,
                     state: .data(MetricSummaryCard.Content(
                         title: "FFMI",
-                        value: formatFFMIValue(currentMetric),
+                        value: selectedFFMIMetricValueText,
                         unit: "FFMI",
                         timestamp: ffmiTimestamp,
                         dataPoints: generateFFMIChartData().map { point in
                             MetricSummaryCard.DataPoint(index: point.index, value: point.value)
                         },
                         chartAccessibilityLabel: "FFMI trend for the past week",
-                        chartAccessibilityValue: "Latest value \(formatFFMIValue(currentMetric))",
+                        chartAccessibilityValue: "Current value \(selectedFFMIMetricValueText)",
                         trend: stats.flatMap { makeTrend($0.delta, "", selectedRange) },
                         footnote: combinedAverageAndGoal(averageText, ffmiGoalText)
                     )),

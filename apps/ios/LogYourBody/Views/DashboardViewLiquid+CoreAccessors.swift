@@ -201,6 +201,23 @@ enum DashboardBodyScorePresentation {
     }
 }
 
+enum DashboardFFMIPresentation {
+    static func valueText(
+        selectedTimelineBucket: GlobalTimelineBucket?,
+        fallbackValue: String
+    ) -> String {
+        guard let selectedTimelineBucket else {
+            return fallbackValue
+        }
+
+        guard let value = selectedTimelineBucket.metrics.ffmi.value else {
+            return "–"
+        }
+
+        return MetricsFormatter.formatDecimal(value)
+    }
+}
+
 extension DashboardViewLiquid {
     // MARK: - Goal Helpers
 
@@ -370,6 +387,13 @@ extension DashboardViewLiquid {
         }
 
         return currentMetric.flatMap { formatBodyFatValue($0.bodyFatPercentage) } ?? "–"
+    }
+
+    var selectedFFMIMetricValueText: String {
+        DashboardFFMIPresentation.valueText(
+            selectedTimelineBucket: selectedTimelineBucket,
+            fallbackValue: currentMetric.map { formatFFMIValue($0) } ?? "–"
+        )
     }
 
     var selectedStepsMetricValue: Int? {
