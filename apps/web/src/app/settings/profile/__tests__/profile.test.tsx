@@ -732,6 +732,15 @@ describe('ProfileSettingsPage', () => {
   it('correctly calculates age from date of birth', async () => {
     const currentYear = new Date().getFullYear();
     const birthYear = currentYear - 25; // 25 years old
+    const birthDate = new Date(`${birthYear}-06-15T00:00:00`);
+    const now = new Date();
+    let expectedAge = now.getFullYear() - birthDate.getFullYear();
+    const hasHadBirthdayThisYear =
+      now.getMonth() > birthDate.getMonth() ||
+      (now.getMonth() === birthDate.getMonth() && now.getDate() >= birthDate.getDate());
+    if (!hasHadBirthdayThisYear) {
+      expectedAge -= 1;
+    }
 
     mockGetProfile.mockResolvedValue({
       ...mockProfile,
@@ -743,8 +752,7 @@ describe('ProfileSettingsPage', () => {
     await waitFor(() => {
       const ageText = screen.getByText(/\(\d+ years old\)/);
       expect(ageText).toBeInTheDocument();
-      // Age should be 24 or 25 depending on current date
-      expect(ageText.textContent).toMatch(/\((24|25) years old\)/);
+      expect(ageText.textContent).toBe(`(${expectedAge} years old)`);
     });
   });
 });
