@@ -730,14 +730,13 @@ describe('ProfileSettingsPage', () => {
   });
 
   it('correctly calculates age from date of birth', async () => {
-    const currentYear = new Date().getFullYear();
-    const birthYear = currentYear - 25; // 25 years old
-    const birthDate = new Date(`${birthYear}-06-15T00:00:00`);
-    const now = new Date();
-    let expectedAge = now.getFullYear() - birthDate.getFullYear();
+    const today = new Date(2024, 5, 30);
+    const birthYear = today.getFullYear() - 25; // 25 years old relative to frozen test clock
+    const birthDate = new Date(birthYear, 5, 15);
+    let expectedAge = today.getFullYear() - birthDate.getFullYear();
     const hasHadBirthdayThisYear =
-      now.getMonth() > birthDate.getMonth() ||
-      (now.getMonth() === birthDate.getMonth() && now.getDate() >= birthDate.getDate());
+      today.getMonth() > birthDate.getMonth() ||
+      (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
     if (!hasHadBirthdayThisYear) {
       expectedAge -= 1;
     }
