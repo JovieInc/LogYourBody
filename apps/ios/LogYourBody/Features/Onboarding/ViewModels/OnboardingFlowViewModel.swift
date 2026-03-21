@@ -1080,8 +1080,6 @@ struct OnboardingProfileUpdateBuilder {
         }
 
         if let heightCm = bodyScoreInput.height.inCentimeters {
-            updates["height"] = heightCm
-
             let preferredHeightUnit: String
             switch heightUnit {
             case .centimeters:
@@ -1090,6 +1088,10 @@ struct OnboardingProfileUpdateBuilder {
                 preferredHeightUnit = "in"
             }
 
+            updates["height"] = ProfileHeightStorage.storedHeightValue(
+                heightCm: heightCm,
+                preferredUnit: preferredHeightUnit
+            )
             updates["heightUnit"] = preferredHeightUnit
         }
 

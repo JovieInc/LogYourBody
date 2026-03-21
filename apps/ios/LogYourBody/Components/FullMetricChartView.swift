@@ -198,6 +198,32 @@ struct MetricHistoryEntry: Identifiable, Sendable {
     let primaryValue: Double
     let secondaryValue: Double?
     let source: MetricEntrySourceType
+    let displayDateText: String?
+    let sectionKeyOverride: String?
+    let sectionTitleOverride: String?
+    let isDeletable: Bool
+
+    init(
+        id: String,
+        date: Date,
+        primaryValue: Double,
+        secondaryValue: Double?,
+        source: MetricEntrySourceType,
+        displayDateText: String? = nil,
+        sectionKeyOverride: String? = nil,
+        sectionTitleOverride: String? = nil,
+        isDeletable: Bool = true
+    ) {
+        self.id = id
+        self.date = date
+        self.primaryValue = primaryValue
+        self.secondaryValue = secondaryValue
+        self.source = source
+        self.displayDateText = displayDateText
+        self.sectionKeyOverride = sectionKeyOverride
+        self.sectionTitleOverride = sectionTitleOverride
+        self.isDeletable = isDeletable
+    }
 }
 
 struct MetricEntriesConfiguration {
@@ -211,6 +237,240 @@ struct MetricEntriesConfiguration {
 struct MetricEntriesPayload {
     let config: MetricEntriesConfiguration
     let entries: [MetricHistoryEntry]
+}
+
+enum DetailChartTimelinePresentation {
+    enum XAxisMode: Equatable {
+        case rawWeek
+        case rawAuto(desiredCount: Int)
+        case bucketWeek
+        case bucketMonth
+        case bucketYear
+    }
+
+    static func availableTimeRanges(for timelineScale: GlobalTimelineScale?) -> [TimeRange] {
+        switch timelineScale {
+        case .week, nil:
+            return TimeRange.allCases
+        case .month:
+            return [.month1, .month3, .month6, .year1, .all]
+        case .year:
+            return [.year1, .all]
+        }
+    }
+
+    static func fallbackTimeRange(for timelineScale: GlobalTimelineScale?) -> TimeRange {
+        switch timelineScale {
+        case .week, nil, .month:
+            return .month1
+        case .year:
+            return .year1
+        }
+    }
+
+    static func pointDateText(_ date: Date, timelineScale: GlobalTimelineScale?) -> String {
+        switch timelineScale {
+        case .week:
+            return "Week of \(date.formatted(.dateTime.month(.abbreviated).day()))"
+        case .month:
+            return date.formatted(.dateTime.month(.wide).year())
+        case .year:
+            return date.formatted(.dateTime.year())
+        case nil:
+            return date.formatted(.dateTime.month().day().year())
+        }
+    }
+
+    static func calloutContextLabel(for timelineScale: GlobalTimelineScale?) -> String? {
+        switch timelineScale {
+        case .week:
+            return "Weekly summary"
+        case .month:
+            return "Monthly summary"
+        case .year:
+            return "Yearly summary"
+        case nil:
+            return nil
+        }
+    }
+
+    static func xAxisMode(
+        timelineScale: GlobalTimelineScale?,
+        selectedTimeRange: TimeRange
+    ) -> XAxisMode {
+        switch timelineScale {
+        case .week:
+            return .bucketWeek
+        case .month:
+            return .bucketMonth
+        case .year:
+            return .bucketYear
+        case nil:
+            if selectedTimeRange == .week1 {
+                return .rawWeek
+            }
+            return .rawAuto(desiredCount: rawXAxisTickCount(for: selectedTimeRange))
+        }
+    }
+
+    static func smoothingWindowSize(for timelineScale: GlobalTimelineScale?) -> Int {
+        switch timelineScale {
+        case .week:
+            return 4
+        case .month:
+            return 3
+        case .year:
+            return 1
+        case nil:
+            return 7
+        }
+    }
+
+    static func showsChartModeToggle(for timelineScale: GlobalTimelineScale?) -> Bool {
+        smoothingWindowSize(for: timelineScale) > 1
+    }
+
+    static func averageTitle(
+        selectedTimeRange: TimeRange,
+        timelineScale: GlobalTimelineScale?
+    ) -> String {
+        switch timelineScale {
+        case .week:
+            return "Avg (weekly)"
+        case .month:
+            return "Avg (monthly)"
+        case .year:
+            return "Avg (yearly)"
+        case nil:
+            return "Avg (\(selectedTimeRange.rawValue))"
+        }
+    }
+
+    static func boundsTitles(for timelineScale: GlobalTimelineScale?) -> (low: String, high: String) {
+        switch timelineScale {
+        case .week:
+            return ("Lowest week", "Highest week")
+        case .month:
+            return ("Lowest month", "Highest month")
+        case .year:
+            return ("Lowest year", "Highest year")
+        case nil:
+            return ("Low", "High")
+        }
+    }
+
+    static func changeCaptionText(
+        selectedTimeRange: TimeRange,
+        timelineScale: GlobalTimelineScale?
+    ) -> String {
+        switch timelineScale {
+        case .week:
+            return "Change across weeks"
+        case .month:
+            return "Change across months"
+        case .year:
+            return "Change across years"
+        case nil:
+            switch selectedTimeRange {
+            case .week1:
+                return "Change vs 1 week ago"
+            case .month1:
+                return "Change vs 1 month ago"
+            case .month3:
+                return "Change vs 3 months ago"
+            case .month6:
+                return "Change vs 6 months ago"
+            case .year1:
+                return "Change vs 1 year ago"
+            case .all:
+                return "Change over time"
+            }
+        }
+    }
+
+    private static func rawXAxisTickCount(for selectedTimeRange: TimeRange) -> Int {
+        switch selectedTimeRange {
+        case .week1:
+            return 7
+        case .month1:
+            return 8
+        case .month3, .month6, .year1, .all:
+            return 6
+        }
+    }
+}
+
+enum DetailChartStatisticsPresentation {
+    static func summarySeries(
+        chartMode: ChartMode,
+        displayedSeries: [MetricChartDataPoint],
+        smoothedSeries: [MetricChartDataPoint]
+    ) -> [MetricChartDataPoint] {
+        switch chartMode {
+        case .trend:
+            return smoothedSeries
+        case .raw:
+            return displayedSeries
+        }
+    }
+}
+
+enum DetailHistorySourcePresentation {
+    static func label(for source: MetricEntrySourceType) -> String {
+        switch source {
+        case .manual:
+            return "Manual"
+        case .healthKit:
+            return "Apple Health"
+        case .integration(let id):
+            if id == "Timeline" {
+                return "Timeline summary"
+            }
+            return id ?? "Connected"
+        }
+    }
+
+    static func isTimelineSummary(_ source: MetricEntrySourceType) -> Bool {
+        if case .integration(let id) = source, id == "Timeline" {
+            return true
+        }
+        return false
+    }
+}
+
+enum DetailHistoryValuePresentation {
+    static func secondaryText(
+        entry: MetricHistoryEntry,
+        config: MetricEntriesConfiguration
+    ) -> String? {
+        guard let secondaryValue = entry.secondaryValue,
+              let formatter = config.secondaryFormatter,
+              let formatted = formatter.string(from: NSNumber(value: secondaryValue)) else {
+            return nil
+        }
+
+        if let unit = config.secondaryUnitLabel, !unit.isEmpty {
+            return "\(formatted) \(unit)"
+        }
+        return formatted
+    }
+}
+
+enum DetailHistoryDeletionTarget: Equatable {
+    case bodyMetric
+    case dailyMetric
+    case unsupported
+
+    static func resolve(metricType: DashboardViewLiquid.MetricType?) -> DetailHistoryDeletionTarget {
+        switch metricType {
+        case .steps:
+            return .dailyMetric
+        case .weight, .bodyFat, .ffmi, .bodyScore:
+            return .bodyMetric
+        case .glp1, nil:
+            return .unsupported
+        }
+    }
 }
 
 func makeMetricFormatter(minFractionDigits: Int = 0, maxFractionDigits: Int = 1) -> NumberFormatter {
@@ -242,6 +502,7 @@ struct FullMetricChartView: View {
     let onAdd: () -> Void
     let metricEntries: MetricEntriesPayload?
     let headlineChangeOverride: HeadlineChangeOverride?
+    let timelineScale: GlobalTimelineScale?
 
     let goalValue: Double?
 
@@ -304,9 +565,15 @@ struct FullMetricChartView: View {
         .task(id: metricEntries?.entries.count ?? 0) {
             await preprocessHistorySectionsIfNeeded()
         }
+        .onAppear {
+            sanitizeSelectedTimeRangeIfNeeded()
+        }
         .onChange(of: selectedTimeRange) { _, _ in
             activePoint = nil
             HapticManager.shared.selection()
+        }
+        .onChange(of: timelineScale) { _, _ in
+            sanitizeSelectedTimeRangeIfNeeded()
         }
         .onChange(of: chartMode) { _, _ in
             activePoint = nil
@@ -349,7 +616,12 @@ struct FullMetricChartView: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.65))
 
-            let seriesStats = computeSeriesStats(for: displayedSeries)
+            let summarySeries = DetailChartStatisticsPresentation.summarySeries(
+                chartMode: chartMode,
+                displayedSeries: displayedSeries,
+                smoothedSeries: smoothedSeries
+            )
+            let seriesStats = computeSeriesStats(for: summarySeries)
             let changeDelta = headlineChangeOverride?.delta ?? seriesStats?.delta
 
             if seriesStats != nil || changeDelta != nil {
@@ -357,7 +629,7 @@ struct FullMetricChartView: View {
                     HStack(alignment: .top, spacing: 16) {
                         if let seriesStats {
                             statsCell(
-                                title: "Avg (\(selectedTimeRange.rawValue))",
+                                title: averageTitle,
                                 value: formatStatValue(seriesStats.average),
                                 alignRight: false
                             )
@@ -375,10 +647,10 @@ struct FullMetricChartView: View {
                         }
                     }
 
-                    if let bounds = minMaxTexts(for: displayedSeries) {
+                    if let bounds = minMaxTexts(for: summarySeries) {
                         HStack(alignment: .top, spacing: 16) {
                             statsCell(
-                                title: "Low",
+                                title: boundsTitles.low,
                                 value: bounds.min,
                                 alignRight: false
                             )
@@ -386,7 +658,7 @@ struct FullMetricChartView: View {
                             Spacer(minLength: 12)
 
                             statsCell(
-                                title: "High",
+                                title: boundsTitles.high,
                                 value: bounds.max,
                                 alignRight: true
                             )
@@ -420,20 +692,10 @@ struct FullMetricChartView: View {
     }
 
     private var changeCaptionText: String {
-        switch selectedTimeRange {
-        case .week1:
-            return "Change vs 1 week ago"
-        case .month1:
-            return "Change vs 1 month ago"
-        case .month3:
-            return "Change vs 3 months ago"
-        case .month6:
-            return "Change vs 6 months ago"
-        case .year1:
-            return "Change vs 1 year ago"
-        case .all:
-            return "Change over time"
-        }
+        DetailChartTimelinePresentation.changeCaptionText(
+            selectedTimeRange: selectedTimeRange,
+            timelineScale: timelineScale
+        )
     }
 
     private func formatDeltaValueCompact(_ delta: Double) -> String {
@@ -471,7 +733,7 @@ struct FullMetricChartView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack {
                 HStack(spacing: 4) {
-                    ForEach(TimeRange.allCases, id: \.self) { range in
+                    ForEach(availableTimeRanges, id: \.self) { range in
                         Button {
                             selectedTimeRange = range
                         } label: {
@@ -550,7 +812,9 @@ struct FullMetricChartView: View {
 
                 Spacer()
 
-                chartModeToggle
+                if showsChartModeToggle {
+                    chartModeToggle
+                }
             }
 
             timeRangeSelector
@@ -676,15 +940,34 @@ struct FullMetricChartView: View {
             }
         }
         .chartXAxis {
-            if selectedTimeRange == .week1 {
+            switch xAxisMode {
+            case .rawWeek:
                 AxisMarks(values: .stride(by: .day)) { _ in
                     AxisValueLabel()
                         .foregroundStyle(Color.metricTextSecondary)
                         .font(.system(size: 10, weight: .medium))
                 }
-            } else {
-                AxisMarks(values: .automatic(desiredCount: xAxisTickCount)) { _ in
+            case .rawAuto(let desiredCount):
+                AxisMarks(values: .automatic(desiredCount: desiredCount)) { _ in
                     AxisValueLabel()
+                        .foregroundStyle(Color.metricTextSecondary)
+                        .font(.system(size: 10, weight: .medium))
+                }
+            case .bucketWeek:
+                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                        .foregroundStyle(Color.metricTextSecondary)
+                        .font(.system(size: 10, weight: .medium))
+                }
+            case .bucketMonth:
+                AxisMarks(values: .stride(by: .month)) { _ in
+                    AxisValueLabel(format: .dateTime.month(.abbreviated))
+                        .foregroundStyle(Color.metricTextSecondary)
+                        .font(.system(size: 10, weight: .medium))
+                }
+            case .bucketYear:
+                AxisMarks(values: .stride(by: .year)) { _ in
+                    AxisValueLabel(format: .dateTime.year())
                         .foregroundStyle(Color.metricTextSecondary)
                         .font(.system(size: 10, weight: .medium))
                 }
@@ -741,9 +1024,14 @@ struct FullMetricChartView: View {
             Text(formatHeadlineValue(point.value))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.black)
-            Text(point.date.formatted(.dateTime.month().day()))
+            Text(DetailChartTimelinePresentation.pointDateText(point.date, timelineScale: timelineScale))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.black.opacity(0.7))
+            if let calloutContextLabel {
+                Text(calloutContextLabel)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.black.opacity(0.55))
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -803,15 +1091,19 @@ struct FullMetricChartView: View {
                             }
 
                             ForEach(section.entries) { entry in
-                                historyRow(for: entry, config: payload.config)
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        Button(role: .destructive) {
-                                            historyEntryPendingDeletion = entry
-                                            showingHistoryDeleteConfirmation = true
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
+                                if entry.isDeletable {
+                                    historyRow(for: entry, config: payload.config)
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            Button(role: .destructive) {
+                                                historyEntryPendingDeletion = entry
+                                                showingHistoryDeleteConfirmation = true
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
                                         }
-                                    }
+                                } else {
+                                    historyRow(for: entry, config: payload.config)
+                                }
 
                                 if entry.id != section.entries.last?.id {
                                     Divider()
@@ -833,6 +1125,7 @@ struct FullMetricChartView: View {
 
     private func historyRow(for entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> some View {
         let primary = primaryHistoryValue(entry, config: config)
+        let secondaryText = DetailHistoryValuePresentation.secondaryText(entry: entry, config: config)
         let unitLabel = config.unitLabel
 
         let valueText: String
@@ -854,7 +1147,7 @@ struct FullMetricChartView: View {
 
         return HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(entry.date.formatted(.dateTime.month().day().year()))
+                Text(entry.displayDateText ?? entry.date.formatted(.dateTime.month().day().year()))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
 
@@ -864,6 +1157,16 @@ struct FullMetricChartView: View {
                     Text(sourceLabel(for: entry.source))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.metricTextTertiary)
+
+                    if let secondaryText {
+                        Text("•")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(Color.metricTextTertiary.opacity(0.7))
+
+                        Text(secondaryText)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(Color.metricTextSecondary)
+                    }
                 }
             }
 
@@ -893,33 +1196,18 @@ struct FullMetricChartView: View {
         return "\(value) \(config.unitLabel)"
     }
 
-    private func secondaryHistoryValue(_ entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> String? {
-        guard let secondaryValue = entry.secondaryValue,
-              let formatter = config.secondaryFormatter,
-              let formatted = formatter.string(from: NSNumber(value: secondaryValue)) else {
-            return nil
-        }
-
-        if let unit = config.secondaryUnitLabel, !unit.isEmpty {
-            return "\(formatted) \(unit)"
-        }
-        return formatted
-    }
-
     private func sourceLabel(for source: MetricEntrySourceType) -> String {
-        switch source {
-        case .manual:
-            return "Manual"
-        case .healthKit:
-            return "Apple Health"
-        case .integration(let id):
-            return id ?? "Connected"
-        }
+        DetailHistorySourcePresentation.label(for: source)
     }
 
     @ViewBuilder
     private func historySourceIcon(for source: MetricEntrySourceType) -> some View {
-        switch source {
+        if DetailHistorySourcePresentation.isTimelineSummary(source) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color.metricTextSecondary)
+        } else {
+            switch source {
         case .healthKit:
             Image(systemName: "heart.fill")
                 .font(.system(size: 12, weight: .semibold))
@@ -934,6 +1222,7 @@ struct FullMetricChartView: View {
             Image(systemName: "bolt.horizontal.circle.fill")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(Color.metricAccent)
+            }
         }
     }
 
@@ -1012,7 +1301,7 @@ struct FullMetricChartView: View {
     }
 
     private var smoothedSeries: [MetricChartDataPoint] {
-        movingAverage(for: displayedSeries, windowSize: 7)
+        movingAverage(for: displayedSeries, windowSize: smoothingWindowSize)
     }
 
     private var activeSeries: [MetricChartDataPoint] {
@@ -1032,9 +1321,43 @@ struct FullMetricChartView: View {
 
     private var headlineDateText: String {
         if let point = activePoint {
-            return point.date.formatted(.dateTime.month().day().year())
+            return DetailChartTimelinePresentation.pointDateText(point.date, timelineScale: timelineScale)
         }
         return currentDate
+    }
+
+    private var availableTimeRanges: [TimeRange] {
+        DetailChartTimelinePresentation.availableTimeRanges(for: timelineScale)
+    }
+
+    private var xAxisMode: DetailChartTimelinePresentation.XAxisMode {
+        DetailChartTimelinePresentation.xAxisMode(
+            timelineScale: timelineScale,
+            selectedTimeRange: selectedTimeRange
+        )
+    }
+
+    private var smoothingWindowSize: Int {
+        DetailChartTimelinePresentation.smoothingWindowSize(for: timelineScale)
+    }
+
+    private var showsChartModeToggle: Bool {
+        DetailChartTimelinePresentation.showsChartModeToggle(for: timelineScale)
+    }
+
+    private var averageTitle: String {
+        DetailChartTimelinePresentation.averageTitle(
+            selectedTimeRange: selectedTimeRange,
+            timelineScale: timelineScale
+        )
+    }
+
+    private var boundsTitles: (low: String, high: String) {
+        DetailChartTimelinePresentation.boundsTitles(for: timelineScale)
+    }
+
+    private var calloutContextLabel: String? {
+        DetailChartTimelinePresentation.calloutContextLabel(for: timelineScale)
     }
 
     private var chartDataFingerprint: String {
@@ -1161,7 +1484,20 @@ struct FullMetricChartView: View {
             showingHistoryDeleteConfirmation = false
         }
 
-        let success = await CoreDataManager.shared.markBodyMetricDeleted(id: entry.id)
+        let deletionTarget = DetailHistoryDeletionTarget.resolve(
+            metricType: metricEntries?.config.metricType
+        )
+
+        let success: Bool
+        switch deletionTarget {
+        case .bodyMetric:
+            success = await CoreDataManager.shared.markBodyMetricDeleted(id: entry.id)
+        case .dailyMetric:
+            success = await CoreDataManager.shared.markDailyMetricDeleted(id: entry.id)
+        case .unsupported:
+            success = false
+        }
+
         guard success else { return }
 
         var sections = localHistorySections ?? historySections
@@ -1196,23 +1532,17 @@ struct FullMetricChartView: View {
         }
     }
 
-    private var isStepsMetric: Bool {
-        unit.lowercased() == "steps"
+    private func sanitizeSelectedTimeRangeIfNeeded() {
+        guard !availableTimeRanges.isEmpty,
+              !availableTimeRanges.contains(selectedTimeRange) else {
+            return
+        }
+
+        selectedTimeRange = DetailChartTimelinePresentation.fallbackTimeRange(for: timelineScale)
     }
 
-    private var xAxisTickCount: Int {
-        switch selectedTimeRange {
-        case .week1:
-            return 7
-        case .month1:
-            return 8
-        case .month3:
-            return 6
-        case .month6:
-            return 6
-        case .year1, .all:
-            return 6
-        }
+    private var isStepsMetric: Bool {
+        unit.lowercased() == "steps"
     }
 
     @MainActor
@@ -1275,36 +1605,38 @@ struct FullMetricChartView: View {
 
 private func makeHistorySections(from entries: [MetricHistoryEntry]) -> [HistorySection] {
     let calendar = Calendar.current
+    let defaultSectionTitle: (Date) -> String = { date in
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM yyyy"
+        return formatter.string(from: date)
+    }
 
     // Use newest-first ordering for a more natural ledger feel
     let sortedEntries = entries.sorted { $0.date > $1.date }
 
-    var groups: [(key: String, date: Date, entries: [MetricHistoryEntry])] = []
+    var groups: [(key: String, date: Date, title: String, entries: [MetricHistoryEntry])] = []
     var indexByKey: [String: Int] = [:]
 
     for entry in sortedEntries {
         let components = calendar.dateComponents([.year, .month], from: entry.date)
         guard let year = components.year, let month = components.month else { continue }
-        let key = "\(year)-\(month)"
+        let key = entry.sectionKeyOverride ?? "\(year)-\(month)"
+        let title = entry.sectionTitleOverride ?? defaultSectionTitle(entry.date)
 
         if let index = indexByKey[key] {
             groups[index].entries.append(entry)
         } else {
-            groups.append((key: key, date: entry.date, entries: [entry]))
+            groups.append((key: key, date: entry.date, title: title, entries: [entry]))
             indexByKey[key] = groups.count - 1
         }
     }
 
     guard !groups.isEmpty else { return [] }
 
-    let formatter = DateFormatter()
-    formatter.dateFormat = "MMM yyyy"
-
     let totalGroups = groups.count
     var sections: [HistorySection] = []
 
     for (index, group) in groups.enumerated() {
-        let title = formatter.string(from: group.date)
         let entryCount = group.entries.count
 
         // Avoid a wall of headers for very sparse histories.
@@ -1320,7 +1652,7 @@ private func makeHistorySections(from entries: [MetricHistoryEntry]) -> [History
         sections.append(
             HistorySection(
                 id: group.key,
-                title: title,
+                title: group.title,
                 showsHeader: showsHeader,
                 entries: group.entries
             )

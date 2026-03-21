@@ -180,9 +180,21 @@ final class OnboardingFlowViewModelTests: XCTestCase {
 }
 
 final class StubSupabaseManager: SupabaseManager {
+    struct EndActiveGlp1Call {
+        let userId: String
+        let endedAt: Date
+    }
+
     private(set) var bodyMetricsBatches: [[[String: Any]]] = []
     private(set) var dailyMetricsBatches: [[[String: Any]]] = []
     private(set) var dexaPayloads: [[String: Any]] = []
+    private(set) var glp1DosePayloads: [[String: Any]] = []
+    private(set) var glp1MedicationPayloads: [[String: Any]] = []
+    private(set) var endActiveGlp1Calls: [EndActiveGlp1Call] = []
+    private(set) var profilePayloads: [[String: Any]] = []
+    var fetchedGlp1Medications: [Glp1Medication] = []
+    var fetchedGlp1DoseLogs: [Glp1DoseLog] = []
+    var fetchedDexaResults: [DexaResult] = []
 
     override func upsertBodyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> [[String: Any]] {
         bodyMetricsBatches.append(metrics)
@@ -200,14 +212,39 @@ final class StubSupabaseManager: SupabaseManager {
         }
     }
 
-    override func upsertData(table: String, data: Data, token: String) async throws {
-        guard table == "dexa_results" else {
-            return
-        }
+    override func updateProfile(_ profile: [String: Any], token: String) async throws {
+        profilePayloads.append(profile)
+    }
 
+    override func endActiveGlp1Medications(userId: String, endedAt: Date) async throws {
+        endActiveGlp1Calls.append(EndActiveGlp1Call(userId: userId, endedAt: endedAt))
+    }
+
+    override func fetchGlp1Medications(userId: String) async throws -> [Glp1Medication] {
+        fetchedGlp1Medications.filter { $0.userId == userId }
+    }
+
+    override func fetchGlp1DoseLogs(userId: String, limit: Int = 100) async throws -> [Glp1DoseLog] {
+        Array(fetchedGlp1DoseLogs.filter { $0.userId == userId }.prefix(limit))
+    }
+
+    override func fetchDexaResults(userId: String, limit: Int = 50) async throws -> [DexaResult] {
+        Array(fetchedDexaResults.filter { $0.userId == userId }.prefix(limit))
+    }
+
+    override func upsertData(table: String, data: Data, token: String) async throws {
         let jsonObject = try JSONSerialization.jsonObject(with: data)
         let array = jsonObject as? [[String: Any]] ?? []
-        dexaPayloads.append(contentsOf: array)
+        switch table {
+        case "dexa_results":
+            dexaPayloads.append(contentsOf: array)
+        case "glp1_dose_logs":
+            glp1DosePayloads.append(contentsOf: array)
+        case "glp1_medications":
+            glp1MedicationPayloads.append(contentsOf: array)
+        default:
+            return
+        }
     }
 }
 
@@ -267,6 +304,92 @@ final class SyncIntegrationTests: XCTestCase {
 
         XCTAssertEqual(metric.createdAt.timeIntervalSince(createdAt), 0, accuracy: 0.001)
         XCTAssertEqual(metric.updatedAt.timeIntervalSince(updatedAt), 0, accuracy: 0.001)
+    }
+
+    func testUpdateOrCreateBodyMetric_NormalizesPoundPayloadToKilograms() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_body_lbs_\(UUID().uuidString)"
+        let date = Date()
+        let formatter = ISO8601DateFormatter()
+
+        let payload: [String: Any] = [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: date),
+            "weight": 180.0,
+            "weight_unit": "LBS",
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: date)
+        ]
+
+        coreData.updateOrCreateBodyMetric(from: payload)
+
+        let metrics = await coreData.fetchAllBodyMetrics(for: userId)
+        XCTAssertEqual(metrics.count, 1)
+
+        let metric = try XCTUnwrap(metrics.first)
+        XCTAssertEqual(metric.weight ?? 0, 81.6, accuracy: 0.2)
+        XCTAssertEqual(metric.weightUnit, "kg")
+    }
+
+    func testUpdateOrCreateBodyMetric_NormalizesInchCircumferencePayloadToCentimeters() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_body_inches_\(UUID().uuidString)"
+        let date = Date()
+        let formatter = ISO8601DateFormatter()
+
+        let payload: [String: Any] = [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: date),
+            "weight": 80.0,
+            "weight_unit": "kg",
+            "waist_circumference": 32.0,
+            "hip_circumference": 40.0,
+            "waist_unit": "IN",
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: date)
+        ]
+
+        coreData.updateOrCreateBodyMetric(from: payload)
+
+        let metrics = await coreData.fetchAllBodyMetrics(for: userId)
+        XCTAssertEqual(metrics.count, 1)
+
+        let metric = try XCTUnwrap(metrics.first)
+        XCTAssertEqual(metric.waistCm ?? 0, 81.28, accuracy: 0.01)
+        XCTAssertEqual(metric.hipCm ?? 0, 101.6, accuracy: 0.01)
+        XCTAssertEqual(metric.waistUnit, "cm")
+    }
+
+    func testUpdateOrCreateBodyMetric_MapsServerDataSource() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_body_source_\(UUID().uuidString)"
+        let date = Date()
+        let formatter = ISO8601DateFormatter()
+
+        let payload: [String: Any] = [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: date),
+            "weight": 80.0,
+            "weight_unit": "kg",
+            "data_source": "HealthKit",
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: date)
+        ]
+
+        coreData.updateOrCreateBodyMetric(from: payload)
+
+        let metrics = await coreData.fetchAllBodyMetrics(for: userId)
+        XCTAssertEqual(metrics.count, 1)
+        XCTAssertEqual(metrics.first?.dataSource, "HealthKit")
     }
 
     func testUpdateOrCreateDailyMetric_MapsSupabasePayload() async throws {
@@ -347,6 +470,82 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertEqual(metric.updatedAt.timeIntervalSince(updatedAt2), 0, accuracy: 0.001)
     }
 
+    func testUpdateOrCreateBodyMetricClearsDeletedFlagWhenServerRecordReturns() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_body_restore_\(UUID().uuidString)"
+        let date = Date()
+        let formatter = ISO8601DateFormatter()
+
+        let metric = BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 75.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            waistCm: nil,
+            hipCm: nil,
+            waistUnit: nil,
+            notes: "local",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        coreData.saveBodyMetrics(metric, userId: userId)
+        XCTAssertTrue(await coreData.markBodyMetricDeleted(id: id))
+
+        coreData.updateOrCreateBodyMetric(from: [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: date),
+            "weight": 80.0,
+            "weight_unit": "kg",
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: date)
+        ])
+
+        let metrics = await coreData.fetchAllBodyMetrics(for: userId)
+        XCTAssertEqual(metrics.count, 1)
+        XCTAssertEqual(metrics.first?.weight ?? 0, 80.0, accuracy: 0.001)
+    }
+
+    func testUpdateOrCreateBodyMetricMarksDeletedWhenServerPayloadIsDeleted() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_body_remote_delete_\(UUID().uuidString)"
+        let date = Date()
+        let formatter = ISO8601DateFormatter()
+
+        coreData.updateOrCreateBodyMetric(from: [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: date),
+            "weight": 80.0,
+            "weight_unit": "kg",
+            "is_deleted": true,
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: date)
+        ])
+
+        let fetched = await coreData.fetchAllBodyMetrics(for: userId)
+        XCTAssertTrue(fetched.isEmpty)
+
+        let rawDeletedState = await coreData.viewContext.perform { () -> Bool in
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            return (try? coreData.viewContext.fetch(request).first?.isMarkedDeleted) ?? false
+        }
+        XCTAssertTrue(rawDeletedState)
+    }
+
     func testUpdateOrCreateDailyMetric_IsIdempotentForSameId() async throws {
         let coreData = CoreDataManager.shared
 
@@ -387,6 +586,294 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertEqual(log.stepCount, 12_000)
         XCTAssertEqual(log.notes, "second")
         XCTAssertEqual(log.updatedAt.timeIntervalSince(updatedAt2), 0, accuracy: 0.001)
+    }
+
+    func testUpdateOrCreateDailyMetricClearsDeletedFlagWhenServerRecordReturns() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_daily_restore_\(UUID().uuidString)"
+        let date = Date()
+        let formatter = ISO8601DateFormatter()
+
+        let dailyModel = DailyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            steps: 5_000,
+            notes: "local",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        coreData.saveDailyMetrics(dailyModel, userId: userId)
+        XCTAssertTrue(await coreData.markDailyMetricDeleted(id: id))
+
+        coreData.updateOrCreateDailyMetric(from: [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: date),
+            "steps": 9_000,
+            "notes": "restored",
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: date)
+        ])
+
+        let fetched = await coreData.fetchAllDailyLogs(for: userId)
+        XCTAssertEqual(fetched.count, 1)
+        XCTAssertEqual(fetched.first?.stepCount, 9_000)
+    }
+
+    func testUpdateOrCreateDailyMetricMarksDeletedWhenServerPayloadIsDeleted() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_daily_remote_delete_\(UUID().uuidString)"
+        let date = Date()
+        let formatter = ISO8601DateFormatter()
+
+        coreData.updateOrCreateDailyMetric(from: [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: date),
+            "steps": 4_500,
+            "is_deleted": true,
+            "notes": "remote-delete",
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: date)
+        ])
+
+        let fetched = await coreData.fetchAllDailyLogs(for: userId)
+        XCTAssertTrue(fetched.isEmpty)
+
+        let rawDeletedState = await coreData.viewContext.perform { () -> Bool in
+            let request: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            return (try? coreData.viewContext.fetch(request).first?.isMarkedDeleted) ?? false
+        }
+        XCTAssertTrue(rawDeletedState)
+    }
+
+    func testUpdateOrCreateProfileUpdatesExistingProfileById() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_profile_restore_\(UUID().uuidString)"
+        let email = "profile@example.com"
+        let originalProfile = UserProfile(
+            fullName: "Original Name",
+            username: "original",
+            dateOfBirth: nil,
+            height: 70,
+            heightUnit: "in",
+            gender: "Male",
+            activityLevel: "moderate",
+            goalWeight: nil,
+            goalWeightUnit: nil
+        )
+
+        coreData.saveProfile(originalProfile, userId: userId, email: email)
+
+        let dob = Date(timeIntervalSince1970: 946684800) // 2000-01-01T00:00:00Z
+        let createdAt = Date(timeIntervalSince1970: 946684800)
+        let updatedAt = Date(timeIntervalSince1970: 978307200) // 2001-01-01
+        let formatter = ISO8601DateFormatter()
+        coreData.updateOrCreateProfile(from: [
+            "id": userId,
+            "email": "server@example.com",
+            "full_name": "Updated Name",
+            "username": "updated",
+            "height": 72.0,
+            "height_unit": "in",
+            "gender": "Female",
+            "activity_level": "active",
+            "goal_weight": 150.0,
+            "goal_weight_unit": "lbs",
+            "date_of_birth": formatter.string(from: dob),
+            "created_at": formatter.string(from: createdAt),
+            "updated_at": formatter.string(from: updatedAt)
+        ])
+
+        let fetchedProfile = try XCTUnwrap(await coreData.fetchProfile(for: userId))
+        XCTAssertEqual(fetchedProfile.email, "server@example.com")
+        XCTAssertEqual(fetchedProfile.fullName, "Updated Name")
+        XCTAssertEqual(fetchedProfile.username, "updated")
+        XCTAssertEqual(fetchedProfile.gender, "Female")
+        XCTAssertEqual(fetchedProfile.goalWeight, 150.0, accuracy: 0.001)
+        XCTAssertEqual(fetchedProfile.goalWeightUnit, "lbs")
+        XCTAssertEqual(fetchedProfile.createdAt?.timeIntervalSince(createdAt) ?? 0, 0, accuracy: 0.001)
+        XCTAssertEqual(fetchedProfile.updatedAt?.timeIntervalSince(updatedAt) ?? 0, 0, accuracy: 0.001)
+
+        let count = await coreData.viewContext.perform { () -> Int in
+            let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", userId)
+            return (try? coreData.viewContext.count(for: request)) ?? 0
+        }
+        XCTAssertEqual(count, 1)
+    }
+
+    func testUpdateOrCreateProfileMarksDeletedWhenServerPayloadIsDeleted() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_profile_remote_delete_\(UUID().uuidString)"
+        let formatter = ISO8601DateFormatter()
+        let now = Date()
+
+        coreData.updateOrCreateProfile(from: [
+            "id": userId,
+            "email": "deleted@example.com",
+            "is_deleted": true,
+            "created_at": formatter.string(from: now),
+            "updated_at": formatter.string(from: now)
+        ])
+
+        let fetchedProfile = await coreData.fetchProfile(for: userId)
+        XCTAssertNil(fetchedProfile)
+
+        let rawDeletedState = await coreData.viewContext.perform { () -> Bool in
+            let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", userId)
+            return (try? coreData.viewContext.fetch(request).first?.isMarkedDeleted) ?? false
+        }
+        XCTAssertTrue(rawDeletedState)
+    }
+
+    func testFetchAllBodyMetricsExcludesMarkedDeletedEntries() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_body_fetch_delete_\(UUID().uuidString)"
+        let date = Date()
+        let metric = BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 81.0,
+            weightUnit: "kg",
+            bodyFatPercentage: 18.0,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            waistCm: nil,
+            hipCm: nil,
+            waistUnit: nil,
+            notes: "delete-me",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        coreData.saveBodyMetrics(metric, userId: userId)
+        XCTAssertTrue(await coreData.markBodyMetricDeleted(id: id))
+
+        let fetched = await coreData.fetchAllBodyMetrics(for: userId)
+        XCTAssertTrue(fetched.isEmpty)
+    }
+
+    func testMarkDailyMetricDeletedHidesEntryFromDailyFetchAndMarksUnsynced() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_daily_delete_\(UUID().uuidString)"
+        let date = Date()
+
+        let dailyModel = DailyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            steps: 7_500,
+            notes: "delete-me",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        coreData.saveDailyMetrics(dailyModel, userId: userId)
+
+        let deleted = await coreData.markDailyMetricDeleted(id: id)
+        XCTAssertTrue(deleted)
+
+        let fetched = await coreData.fetchDailyMetrics(for: userId, date: date)
+        XCTAssertNil(fetched)
+
+        let unsynced = await coreData.fetchUnsyncedEntries()
+        let deletedEntry = try XCTUnwrap(
+            unsynced.dailyMetrics.first(where: { $0.id == id })
+        )
+        XCTAssertTrue(deletedEntry.isMarkedDeleted)
+        XCTAssertFalse(deletedEntry.isSynced)
+        XCTAssertEqual(deletedEntry.syncStatus, "pending")
+    }
+
+    func testFetchAllDailyLogsExcludesMarkedDeletedEntries() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_daily_fetch_delete_\(UUID().uuidString)"
+        let date = Date()
+        let dailyModel = DailyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            steps: 8_200,
+            notes: "delete-me",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        coreData.saveDailyMetrics(dailyModel, userId: userId)
+        XCTAssertTrue(await coreData.markDailyMetricDeleted(id: id))
+
+        let fetched = await coreData.fetchAllDailyLogs(for: userId)
+        XCTAssertTrue(fetched.isEmpty)
+    }
+
+    func testCleanupOldDataRemovesDeletedDailyMetrics() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_daily_cleanup_\(UUID().uuidString)"
+        let oldDate = Date().addingTimeInterval(-400 * 24 * 60 * 60)
+        let recentDate = Date()
+
+        let oldDeleted = DailyMetrics(
+            id: UUID().uuidString,
+            userId: userId,
+            date: oldDate,
+            steps: 4_000,
+            notes: "old-deleted",
+            createdAt: oldDate,
+            updatedAt: oldDate
+        )
+        let recentDeleted = DailyMetrics(
+            id: UUID().uuidString,
+            userId: userId,
+            date: recentDate,
+            steps: 8_000,
+            notes: "recent-deleted",
+            createdAt: recentDate,
+            updatedAt: recentDate
+        )
+
+        coreData.saveDailyMetrics(oldDeleted, userId: userId)
+        coreData.saveDailyMetrics(recentDeleted, userId: userId)
+        XCTAssertTrue(await coreData.markDailyMetricDeleted(id: oldDeleted.id))
+        XCTAssertTrue(await coreData.markDailyMetricDeleted(id: recentDeleted.id))
+
+        coreData.cleanupOldData()
+
+        let counts = await coreData.viewContext.perform { () -> (Int, Int) in
+            let oldRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+            oldRequest.predicate = NSPredicate(format: "id == %@", oldDeleted.id)
+
+            let recentRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+            recentRequest.predicate = NSPredicate(format: "id == %@", recentDeleted.id)
+
+            let oldCount = (try? coreData.viewContext.count(for: oldRequest)) ?? 0
+            let recentCount = (try? coreData.viewContext.count(for: recentRequest)) ?? 0
+            return (oldCount, recentCount)
+        }
+
+        XCTAssertEqual(counts.0, 0)
+        XCTAssertEqual(counts.1, 1)
     }
 
     func testProcessBatchHealthKitData_RespectsExistingEntriesWithinSameHour() async throws {
@@ -536,6 +1023,58 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertEqual(metric.bodyFatMethod, "HealthKit")
     }
 
+    func testCreateOrUpdateMetrics_PreservesExistingCircumferenceFields() async throws {
+        let coreData = CoreDataManager.shared
+        let userId = "photo_metadata_preserve_circumference_\(UUID().uuidString)"
+        let date = Date()
+        let startOfDay = Calendar.current.startOfDay(for: date)
+
+        coreData.saveBodyMetrics(
+            BodyMetrics(
+                id: UUID().uuidString,
+                userId: userId,
+                date: startOfDay,
+                weight: 80.0,
+                weightUnit: "kg",
+                bodyFatPercentage: 20.0,
+                bodyFatMethod: "Manual",
+                muscleMass: nil,
+                boneMass: nil,
+                waistCm: 82.4,
+                hipCm: 99.1,
+                waistUnit: "cm",
+                notes: "existing",
+                photoUrl: nil,
+                dataSource: "Manual",
+                createdAt: startOfDay,
+                updatedAt: startOfDay
+            ),
+            userId: userId
+        )
+
+        let updated = await PhotoMetadataService.shared.createOrUpdateMetrics(
+            for: date,
+            photoUrl: "https://example.com/progress.jpg",
+            weight: nil,
+            bodyFatPercentage: nil,
+            userId: userId
+        )
+
+        XCTAssertEqual(updated.waistCm, 82.4, accuracy: 0.001)
+        XCTAssertEqual(updated.hipCm, 99.1, accuracy: 0.001)
+        XCTAssertEqual(updated.waistUnit, "cm")
+
+        let savedMetrics = await coreData.fetchAllBodyMetrics(for: userId)
+        let savedMetric = try XCTUnwrap(savedMetrics.first(where: {
+            Calendar.current.isDate($0.date, inSameDayAs: startOfDay)
+        }))
+
+        XCTAssertEqual(savedMetric.waistCm, 82.4, accuracy: 0.001)
+        XCTAssertEqual(savedMetric.hipCm, 99.1, accuracy: 0.001)
+        XCTAssertEqual(savedMetric.waistUnit, "cm")
+        XCTAssertEqual(savedMetric.photoUrl, "https://example.com/progress.jpg")
+    }
+
     func testSyncLocalChanges_UsesSupabaseAndMarksBodyMetricSynced() async throws {
         let coreData = CoreDataManager.shared
 
@@ -557,7 +1096,7 @@ final class SyncIntegrationTests: XCTestCase {
             boneMass: 4.2,
             notes: "unsynced-local",
             photoUrl: "https://example.com/photo.jpg",
-            dataSource: "Manual",
+            dataSource: "HealthKit",
             createdAt: createdAt,
             updatedAt: updatedAt
         )
@@ -588,6 +1127,7 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertEqual(payloadWeight, 80.5, accuracy: 0.001)
 
         XCTAssertEqual(payload["weight_unit"] as? String, "kg")
+        XCTAssertEqual(payload["data_source"] as? String, "HealthKit")
         XCTAssertEqual(payload["photo_url"] as? String, "https://example.com/photo.jpg")
         XCTAssertEqual(payload["notes"] as? String, "unsynced-local")
 
@@ -603,6 +1143,308 @@ final class SyncIntegrationTests: XCTestCase {
         let unsynced = await coreData.fetchUnsyncedEntries()
         let unsyncedForUser = unsynced.bodyMetrics.filter { $0.userId == userId }
         XCTAssertTrue(unsyncedForUser.isEmpty)
+    }
+
+    func testLogBodyMetrics_PreservesCircumferenceFieldsForCurrentUser() async throws {
+        let coreData = CoreDataManager.shared
+        let authManager = AuthManager.shared
+        let previousUser = authManager.currentUser
+        let previousAuth = authManager.isAuthenticated
+        defer {
+            authManager.currentUser = previousUser
+            authManager.isAuthenticated = previousAuth
+        }
+
+        let userId = "sync_test_user_log_body_metrics_\(UUID().uuidString)"
+        authManager.currentUser = LocalUser(
+            id: userId,
+            email: "log-body-metrics@example.com",
+            name: "Body Metrics",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: false
+        )
+        authManager.isAuthenticated = false
+
+        let date = Date()
+        let metric = BodyMetrics(
+            id: UUID().uuidString,
+            userId: "ignored-user-id",
+            date: date,
+            weight: 84.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            waistCm: 81.5,
+            hipCm: 98.2,
+            waistUnit: "cm",
+            notes: "circumference",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: authManager,
+            supabaseManager: StubSupabaseManager()
+        )
+
+        manager.logBodyMetrics(metric)
+
+        let savedMetrics = await coreData.fetchAllBodyMetrics(for: userId)
+        let savedMetric = try XCTUnwrap(savedMetrics.first(where: { $0.id == metric.id }))
+
+        XCTAssertEqual(savedMetric.userId, userId)
+        XCTAssertEqual(savedMetric.waistCm, 81.5, accuracy: 0.001)
+        XCTAssertEqual(savedMetric.hipCm, 98.2, accuracy: 0.001)
+        XCTAssertEqual(savedMetric.waistUnit, "cm")
+    }
+
+    func testSyncLocalChanges_ScopesUploadsToExplicitUserId() async throws {
+        let coreData = CoreDataManager.shared
+
+        let activeUserId = "sync_test_user_scoped_active_\(UUID().uuidString)"
+        let otherUserId = "sync_test_user_scoped_other_\(UUID().uuidString)"
+        let date = Date()
+
+        coreData.saveBodyMetrics(
+            BodyMetrics(
+                id: UUID().uuidString,
+                userId: activeUserId,
+                date: date,
+                weight: 81.0,
+                weightUnit: "kg",
+                bodyFatPercentage: nil,
+                bodyFatMethod: nil,
+                muscleMass: nil,
+                boneMass: nil,
+                notes: "active-user",
+                photoUrl: nil,
+                dataSource: "Manual",
+                createdAt: date,
+                updatedAt: date
+            ),
+            userId: activeUserId
+        )
+
+        coreData.saveBodyMetrics(
+            BodyMetrics(
+                id: UUID().uuidString,
+                userId: otherUserId,
+                date: date,
+                weight: 92.0,
+                weightUnit: "kg",
+                bodyFatPercentage: nil,
+                bodyFatMethod: nil,
+                muscleMass: nil,
+                boneMass: nil,
+                notes: "other-user",
+                photoUrl: nil,
+                dataSource: "Manual",
+                createdAt: date,
+                updatedAt: date
+            ),
+            userId: otherUserId
+        )
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token", userId: activeUserId)
+
+        XCTAssertEqual(stubSupabase.bodyMetricsBatches.count, 1)
+        let batch = try XCTUnwrap(stubSupabase.bodyMetricsBatches.first)
+        XCTAssertEqual(batch.count, 1)
+        XCTAssertEqual(batch.first?["user_id"] as? String, activeUserId)
+
+        let unsynced = await coreData.fetchUnsyncedEntries()
+        XCTAssertFalse(unsynced.bodyMetrics.contains(where: { $0.userId == activeUserId }))
+        XCTAssertTrue(unsynced.bodyMetrics.contains(where: { $0.userId == otherUserId }))
+    }
+
+    func testPendingSyncState_IgnoresUnsyncedEntriesFromOtherUsers() async throws {
+        let coreData = CoreDataManager.shared
+        let authManager = AuthManager.shared
+        let previousUser = authManager.currentUser
+        let previousAuth = authManager.isAuthenticated
+        defer {
+            authManager.currentUser = previousUser
+            authManager.isAuthenticated = previousAuth
+        }
+
+        let activeUserId = "sync_test_user_pending_active_\(UUID().uuidString)"
+        let otherUserId = "sync_test_user_pending_other_\(UUID().uuidString)"
+        authManager.currentUser = LocalUser(
+            id: activeUserId,
+            email: "pending-sync@example.com",
+            name: "Pending Sync",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: false
+        )
+        authManager.isAuthenticated = true
+
+        coreData.saveBodyMetrics(
+            BodyMetrics(
+                id: UUID().uuidString,
+                userId: otherUserId,
+                date: Date(),
+                weight: 90.0,
+                weightUnit: "kg",
+                bodyFatPercentage: nil,
+                bodyFatMethod: nil,
+                muscleMass: nil,
+                boneMass: nil,
+                notes: "other-user",
+                photoUrl: nil,
+                dataSource: "Manual",
+                createdAt: Date(),
+                updatedAt: Date()
+            ),
+            userId: otherUserId
+        )
+
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: authManager,
+            supabaseManager: StubSupabaseManager()
+        )
+
+        XCTAssertFalse(await manager.hasPendingSyncOperations())
+
+        manager.updatePendingSyncCount()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(manager.pendingSyncCount, 0)
+
+        coreData.saveBodyMetrics(
+            BodyMetrics(
+                id: UUID().uuidString,
+                userId: activeUserId,
+                date: Date(),
+                weight: 81.0,
+                weightUnit: "kg",
+                bodyFatPercentage: nil,
+                bodyFatMethod: nil,
+                muscleMass: nil,
+                boneMass: nil,
+                notes: "active-user",
+                photoUrl: nil,
+                dataSource: "Manual",
+                createdAt: Date(),
+                updatedAt: Date()
+            ),
+            userId: activeUserId
+        )
+
+        XCTAssertTrue(await manager.hasPendingSyncOperations())
+
+        manager.updatePendingSyncCount()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(manager.pendingSyncCount, 1)
+    }
+
+    func testSyncLocalChanges_SendsNullsForMissingBodyMetricValues() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_realtime_sparse_body_\(UUID().uuidString)"
+        let date = Date()
+        let metricModel = BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: nil,
+            weightUnit: nil,
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            waistCm: nil,
+            hipCm: nil,
+            waistUnit: nil,
+            notes: "sparse",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        coreData.saveBodyMetrics(metricModel, userId: userId)
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        guard let batch = stubSupabase.bodyMetricsBatches.first,
+              let payload = batch.first else {
+            XCTFail("No body metrics batch captured")
+            return
+        }
+
+        XCTAssertTrue(payload["weight"] is NSNull)
+        XCTAssertTrue(payload["weight_unit"] is NSNull)
+        XCTAssertTrue(payload["waist_circumference"] is NSNull)
+        XCTAssertTrue(payload["hip_circumference"] is NSNull)
+        XCTAssertTrue(payload["waist_unit"] is NSNull)
+        XCTAssertTrue(payload["body_fat_percentage"] is NSNull)
+        XCTAssertTrue(payload["muscle_mass"] is NSNull)
+        XCTAssertTrue(payload["bone_mass"] is NSNull)
+    }
+
+    func testSyncLocalChanges_SendsDeletionFlagForDeletedBodyMetric() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_realtime_deleted_body_\(UUID().uuidString)"
+        let date = Date()
+        let metricModel = BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 80.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            waistCm: nil,
+            hipCm: nil,
+            waistUnit: nil,
+            notes: "to-delete",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        coreData.saveBodyMetrics(metricModel, userId: userId)
+        XCTAssertTrue(await coreData.markBodyMetricDeleted(id: id))
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        let payload = try XCTUnwrap(stubSupabase.bodyMetricsBatches.first?.first)
+        XCTAssertEqual(payload["id"] as? String, id)
+        XCTAssertEqual(payload["is_deleted"] as? Bool, true)
     }
 
     func testSyncLocalChanges_UsesSupabaseAndMarksDailyMetricSynced() async throws {
@@ -668,6 +1510,689 @@ final class SyncIntegrationTests: XCTestCase {
         let unsynced = await coreData.fetchUnsyncedEntries()
         let unsyncedForUser = unsynced.dailyMetrics.filter { $0.userId == userId }
         XCTAssertTrue(unsyncedForUser.isEmpty)
+    }
+
+    func testSyncLocalChanges_SendsNullForMissingDailySteps() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_daily_realtime_sparse_\(UUID().uuidString)"
+        let date = Date()
+
+        let dailyModel = DailyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            steps: nil,
+            notes: "notes-only",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        coreData.saveDailyMetrics(dailyModel, userId: userId)
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        guard let batch = stubSupabase.dailyMetricsBatches.first,
+              let payload = batch.first else {
+            XCTFail("No daily metrics batch captured")
+            return
+        }
+
+        XCTAssertTrue(payload["steps"] is NSNull)
+        XCTAssertEqual(payload["notes"] as? String, "notes-only")
+    }
+
+    func testSyncLocalChanges_SendsDeletionFlagForDeletedDailyMetric() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_daily_realtime_deleted_\(UUID().uuidString)"
+        let date = Date()
+
+        let dailyModel = DailyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            steps: 5_000,
+            notes: "to-delete",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        coreData.saveDailyMetrics(dailyModel, userId: userId)
+        XCTAssertTrue(await coreData.markDailyMetricDeleted(id: id))
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        let payload = try XCTUnwrap(stubSupabase.dailyMetricsBatches.first?.first)
+        XCTAssertEqual(payload["id"] as? String, id)
+        XCTAssertEqual(payload["is_deleted"] as? Bool, true)
+    }
+
+    func testSyncLocalChanges_UsesSupabaseAndSendsProfileGoalWeightFields() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_profile_realtime_\(UUID().uuidString)"
+        let profile = UserProfile(
+            fullName: "Goal User",
+            username: "goaluser",
+            dateOfBirth: nil,
+            height: 70,
+            heightUnit: "in",
+            gender: "Female",
+            activityLevel: "active",
+            goalWeight: 145.0,
+            goalWeightUnit: "lbs"
+        )
+
+        coreData.saveProfile(profile, userId: userId, email: "goal@example.com")
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        XCTAssertEqual(stubSupabase.profilePayloads.count, 1)
+        let payload = try XCTUnwrap(stubSupabase.profilePayloads.first)
+        XCTAssertEqual(payload["id"] as? String, userId)
+        XCTAssertEqual(payload["goal_weight"] as? Double, 145.0, accuracy: 0.001)
+        XCTAssertEqual(payload["goal_weight_unit"] as? String, "lbs")
+
+        let unsynced = await coreData.fetchUnsyncedEntries()
+        let unsyncedForUser = unsynced.profiles.filter { $0.id == userId }
+        XCTAssertTrue(unsyncedForUser.isEmpty)
+    }
+
+    func testSyncLocalChanges_SendsDeletionFlagForDeletedProfile() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_profile_deleted_\(UUID().uuidString)"
+        let profile = UserProfile(
+            fullName: "Deleted User",
+            username: "deleteduser",
+            dateOfBirth: nil,
+            height: 70,
+            heightUnit: "in",
+            gender: "Female",
+            activityLevel: "active",
+            goalWeight: nil,
+            goalWeightUnit: nil
+        )
+
+        coreData.saveProfile(profile, userId: userId, email: "deleted@example.com")
+        await coreData.viewContext.perform {
+            let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", userId)
+            let cached = try? coreData.viewContext.fetch(request).first
+            cached?.isMarkedDeleted = true
+            cached?.isSynced = false
+            cached?.syncStatus = "pending"
+            cached?.lastModified = Date()
+            try? coreData.viewContext.save()
+        }
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        let payload = try XCTUnwrap(stubSupabase.profilePayloads.first)
+        XCTAssertEqual(payload["id"] as? String, userId)
+        XCTAssertEqual(payload["is_deleted"] as? Bool, true)
+    }
+
+    func testSyncLocalChanges_SendsNullForMissingGlp1DoseAmount() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_glp1_sparse_\(UUID().uuidString)"
+        let takenAt = Date()
+        let log = Glp1DoseLog(
+            id: id,
+            userId: userId,
+            takenAt: takenAt,
+            medicationId: nil,
+            doseAmount: nil,
+            doseUnit: nil,
+            drugClass: "GLP-1",
+            brand: nil,
+            isCompounded: false,
+            supplierType: nil,
+            supplierName: nil,
+            notes: "dose pending",
+            createdAt: takenAt,
+            updatedAt: takenAt
+        )
+
+        coreData.saveGlp1DoseLogs([log], userId: userId, markAsSynced: false)
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        let payload = try XCTUnwrap(stubSupabase.glp1DosePayloads.first)
+        XCTAssertEqual(payload["id"] as? String, id)
+        XCTAssertTrue(payload["dose_amount"] is NSNull)
+        XCTAssertEqual(payload["notes"] as? String, "dose pending")
+
+        let unsyncedLogs = await coreData.fetchUnsyncedGlp1DoseLogs()
+        XCTAssertFalse(unsyncedLogs.contains(where: { $0.id == id }))
+    }
+
+    func testSyncLocalChanges_DoesNotEndActiveGlp1MedicationsForHistoricalMedicationSync() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_glp1_historical_\(UUID().uuidString)"
+        let startedAt = Date().addingTimeInterval(-14 * 24 * 60 * 60)
+        let endedAt = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+        let medication = Glp1Medication(
+            id: UUID().uuidString,
+            userId: userId,
+            displayName: "Historical Med",
+            genericName: "historical",
+            drugClass: "GLP-1",
+            brand: nil,
+            route: "subcutaneous",
+            frequency: "weekly",
+            doseUnit: "mg/week",
+            isCompounded: false,
+            hkIdentifier: nil,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            notes: "historical",
+            createdAt: startedAt,
+            updatedAt: endedAt
+        )
+
+        coreData.saveGlp1Medications([medication], userId: userId, markAsSynced: false)
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        XCTAssertTrue(stubSupabase.endActiveGlp1Calls.isEmpty)
+        XCTAssertEqual(stubSupabase.glp1MedicationPayloads.first?["id"] as? String, medication.id)
+    }
+
+    func testSyncLocalChanges_EndsActiveGlp1MedicationsAtMedicationStartDate() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_glp1_active_\(UUID().uuidString)"
+        let startedAt = Date().addingTimeInterval(-3 * 24 * 60 * 60)
+        let medication = Glp1Medication(
+            id: UUID().uuidString,
+            userId: userId,
+            displayName: "Active Med",
+            genericName: "active",
+            drugClass: "GLP-1",
+            brand: nil,
+            route: "subcutaneous",
+            frequency: "weekly",
+            doseUnit: "mg/week",
+            isCompounded: false,
+            hkIdentifier: nil,
+            startedAt: startedAt,
+            endedAt: nil,
+            notes: "active",
+            createdAt: startedAt,
+            updatedAt: startedAt
+        )
+
+        coreData.saveGlp1Medications([medication], userId: userId, markAsSynced: false)
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        let endCall = try XCTUnwrap(stubSupabase.endActiveGlp1Calls.first)
+        XCTAssertEqual(endCall.userId, userId)
+        XCTAssertEqual(endCall.endedAt.timeIntervalSince(startedAt), 0, accuracy: 0.001)
+        XCTAssertEqual(stubSupabase.glp1MedicationPayloads.first?["id"] as? String, medication.id)
+    }
+
+    func testPullSupplementalRemoteDataCachesGlp1AndDexaAsSynced() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_remote_supplemental_\(UUID().uuidString)"
+        let now = Date()
+
+        let medication = Glp1Medication(
+            id: UUID().uuidString,
+            userId: userId,
+            displayName: "Remote Med",
+            genericName: "remote",
+            drugClass: "GLP-1",
+            brand: "RemoteBrand",
+            route: "subcutaneous",
+            frequency: "weekly",
+            doseUnit: "mg/week",
+            isCompounded: false,
+            hkIdentifier: nil,
+            startedAt: now.addingTimeInterval(-7 * 24 * 60 * 60),
+            endedAt: nil,
+            notes: "remote-med",
+            createdAt: now,
+            updatedAt: now
+        )
+
+        let doseLog = Glp1DoseLog(
+            id: UUID().uuidString,
+            userId: userId,
+            takenAt: now,
+            medicationId: medication.id,
+            doseAmount: 1.0,
+            doseUnit: "mg",
+            drugClass: "GLP-1",
+            brand: "RemoteBrand",
+            isCompounded: false,
+            supplierType: nil,
+            supplierName: nil,
+            notes: "remote-dose",
+            createdAt: now,
+            updatedAt: now
+        )
+
+        let dexaResult = DexaResult(
+            id: UUID().uuidString,
+            userId: userId,
+            bodyMetricsId: nil,
+            externalSource: "BodySpec",
+            externalResultId: "remote-result",
+            externalUpdateTime: now,
+            scannerModel: "Scanner",
+            locationId: "location",
+            locationName: "Remote Location",
+            acquireTime: now,
+            analyzeTime: now,
+            vatMassKg: 1.2,
+            vatVolumeCm3: 450,
+            resultPdfUrl: "https://example.com/result.pdf",
+            resultPdfName: "result.pdf",
+            createdAt: now,
+            updatedAt: now
+        )
+
+        let stubSupabase = StubSupabaseManager()
+        stubSupabase.fetchedGlp1Medications = [medication]
+        stubSupabase.fetchedGlp1DoseLogs = [doseLog]
+        stubSupabase.fetchedDexaResults = [dexaResult]
+
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.pullSupplementalRemoteData(userId: userId)
+
+        let fetchedMedications = await coreData.fetchGlp1Medications(for: userId)
+        XCTAssertEqual(fetchedMedications.map(\.id), [medication.id])
+
+        let fetchedDoseLogs = await coreData.fetchGlp1DoseLogs(for: userId)
+        XCTAssertEqual(fetchedDoseLogs.map(\.id), [doseLog.id])
+
+        let fetchedDexa = await coreData.fetchDexaResults(for: userId, limit: 10)
+        XCTAssertEqual(fetchedDexa.map(\.id), [dexaResult.id])
+
+        let unsyncedMeds = await coreData.fetchUnsyncedGlp1Medications()
+        XCTAssertFalse(unsyncedMeds.contains(where: { $0.id == medication.id }))
+
+        let unsyncedLogs = await coreData.fetchUnsyncedGlp1DoseLogs()
+        XCTAssertFalse(unsyncedLogs.contains(where: { $0.id == doseLog.id }))
+
+        let unsyncedDexa = await coreData.fetchUnsyncedDexaResults()
+        XCTAssertFalse(unsyncedDexa.contains(where: { $0.id == dexaResult.id }))
+    }
+
+    func testPullSupplementalRemoteDataRefreshesExistingSupplementalCreatedAtValues() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_remote_supplemental_created_at_\(UUID().uuidString)"
+        let localDate = Date().addingTimeInterval(-10 * 24 * 60 * 60)
+        let remoteDate = Date().addingTimeInterval(-2 * 24 * 60 * 60)
+
+        let medicationId = UUID().uuidString
+        let doseLogId = UUID().uuidString
+        let dexaId = UUID().uuidString
+
+        coreData.saveGlp1Medications([
+            Glp1Medication(
+                id: medicationId,
+                userId: userId,
+                displayName: "Local Med",
+                genericName: nil,
+                drugClass: "GLP-1",
+                brand: nil,
+                route: nil,
+                frequency: nil,
+                doseUnit: nil,
+                isCompounded: false,
+                hkIdentifier: nil,
+                startedAt: localDate,
+                endedAt: nil,
+                notes: nil,
+                createdAt: localDate,
+                updatedAt: localDate
+            )
+        ], userId: userId, markAsSynced: false)
+
+        coreData.saveGlp1DoseLogs([
+            Glp1DoseLog(
+                id: doseLogId,
+                userId: userId,
+                takenAt: localDate,
+                medicationId: medicationId,
+                doseAmount: 0.5,
+                doseUnit: "mg",
+                drugClass: "GLP-1",
+                brand: nil,
+                isCompounded: false,
+                supplierType: nil,
+                supplierName: nil,
+                notes: nil,
+                createdAt: localDate,
+                updatedAt: localDate
+            )
+        ], userId: userId, markAsSynced: false)
+
+        coreData.saveDexaResults([
+            DexaResult(
+                id: dexaId,
+                userId: userId,
+                bodyMetricsId: nil,
+                externalSource: "BodySpec",
+                externalResultId: "local-result",
+                externalUpdateTime: localDate,
+                scannerModel: nil,
+                locationId: nil,
+                locationName: nil,
+                acquireTime: localDate,
+                analyzeTime: localDate,
+                vatMassKg: 1.0,
+                vatVolumeCm3: 400,
+                resultPdfUrl: nil,
+                resultPdfName: nil,
+                createdAt: localDate,
+                updatedAt: localDate
+            )
+        ], userId: userId, markAsSynced: false)
+
+        let stubSupabase = StubSupabaseManager()
+        stubSupabase.fetchedGlp1Medications = [
+            Glp1Medication(
+                id: medicationId,
+                userId: userId,
+                displayName: "Remote Med",
+                genericName: nil,
+                drugClass: "GLP-1",
+                brand: nil,
+                route: nil,
+                frequency: nil,
+                doseUnit: nil,
+                isCompounded: false,
+                hkIdentifier: nil,
+                startedAt: remoteDate,
+                endedAt: nil,
+                notes: nil,
+                createdAt: remoteDate,
+                updatedAt: remoteDate
+            )
+        ]
+        stubSupabase.fetchedGlp1DoseLogs = [
+            Glp1DoseLog(
+                id: doseLogId,
+                userId: userId,
+                takenAt: remoteDate,
+                medicationId: medicationId,
+                doseAmount: 1.0,
+                doseUnit: "mg",
+                drugClass: "GLP-1",
+                brand: nil,
+                isCompounded: false,
+                supplierType: nil,
+                supplierName: nil,
+                notes: nil,
+                createdAt: remoteDate,
+                updatedAt: remoteDate
+            )
+        ]
+        stubSupabase.fetchedDexaResults = [
+            DexaResult(
+                id: dexaId,
+                userId: userId,
+                bodyMetricsId: nil,
+                externalSource: "BodySpec",
+                externalResultId: "remote-result",
+                externalUpdateTime: remoteDate,
+                scannerModel: nil,
+                locationId: nil,
+                locationName: nil,
+                acquireTime: remoteDate,
+                analyzeTime: remoteDate,
+                vatMassKg: 1.2,
+                vatVolumeCm3: 450,
+                resultPdfUrl: nil,
+                resultPdfName: nil,
+                createdAt: remoteDate,
+                updatedAt: remoteDate
+            )
+        ]
+
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.pullSupplementalRemoteData(userId: userId)
+
+        let medicationCreatedAt = await coreData.fetchGlp1Medications(for: userId).first?.createdAt
+        XCTAssertEqual(medicationCreatedAt?.timeIntervalSince(remoteDate) ?? 0, 0, accuracy: 0.001)
+
+        let doseLogCreatedAt = await coreData.fetchGlp1DoseLogs(for: userId).first?.createdAt
+        XCTAssertEqual(doseLogCreatedAt?.timeIntervalSince(remoteDate) ?? 0, 0, accuracy: 0.001)
+
+        let dexaCreatedAt = await coreData.fetchDexaResults(for: userId, limit: 1).first?.createdAt
+        XCTAssertEqual(dexaCreatedAt?.timeIntervalSince(remoteDate) ?? 0, 0, accuracy: 0.001)
+    }
+
+    func testHasDexaResult_MatchesExternalResultIdAndSourceCaseInsensitively() async throws {
+        let coreData = CoreDataManager.shared
+        let userId = "sync_test_user_has_dexa_result_\(UUID().uuidString)"
+        let resultId = "bodyspec-result-\(UUID().uuidString)"
+        let now = Date()
+
+        coreData.saveDexaResults([
+            DexaResult(
+                id: UUID().uuidString,
+                userId: userId,
+                bodyMetricsId: nil,
+                externalSource: "BodySpec",
+                externalResultId: resultId,
+                externalUpdateTime: now,
+                scannerModel: nil,
+                locationId: nil,
+                locationName: nil,
+                acquireTime: now,
+                analyzeTime: now,
+                vatMassKg: 1.3,
+                vatVolumeCm3: 420,
+                resultPdfUrl: nil,
+                resultPdfName: nil,
+                createdAt: now,
+                updatedAt: now
+            )
+        ], userId: userId, markAsSynced: false)
+
+        XCTAssertTrue(await coreData.hasDexaResult(
+            for: userId,
+            externalSource: "bodyspec",
+            externalResultId: resultId
+        ))
+        XCTAssertFalse(await coreData.hasDexaResult(
+            for: userId,
+            externalSource: "bodyspec",
+            externalResultId: "missing-\(UUID().uuidString)"
+        ))
+    }
+
+    func testProfileHeightStorage_ConvertsCentimetersToMatchingStoredUnit() {
+        XCTAssertEqual(
+            ProfileHeightStorage.storedHeightValue(heightCm: 177.8, preferredUnit: "cm"),
+            177.8,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            ProfileHeightStorage.storedHeightValue(heightCm: 177.8, preferredUnit: "in"),
+            70.0,
+            accuracy: 0.001
+        )
+    }
+
+    func testProfileHeightStorage_NormalizesStoredHeightBackToCentimeters() {
+        XCTAssertEqual(
+            ProfileHeightStorage.heightCentimeters(storedHeight: 177.8, preferredUnit: "cm"),
+            177.8,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            ProfileHeightStorage.heightCentimeters(storedHeight: 70.0, preferredUnit: "in"),
+            177.8,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            ProfileHeightStorage.heightCentimeters(storedHeight: 177.8, preferredUnit: "in"),
+            177.8,
+            accuracy: 0.001
+        )
+    }
+
+    func testOnboardingProfileUpdateBuilder_UsesMatchingImperialHeightValue() {
+        var bodyScoreInput = BodyScoreInput()
+        bodyScoreInput.sex = .male
+        bodyScoreInput.height = HeightMeasurement(value: 177.8, unit: .centimeters)
+
+        let updates = OnboardingProfileUpdateBuilder.buildUpdates(
+            bodyScoreInput: bodyScoreInput,
+            heightUnit: .inches
+        )
+
+        XCTAssertEqual(updates["heightUnit"] as? String, "in")
+        let height = try? XCTUnwrap(updates["height"] as? Double)
+        XCTAssertEqual(height ?? 0, 70.0, accuracy: 0.001)
+    }
+
+    func testNormalizedProfilePayload_ConvertsCamelCaseKeysToSupabaseFields() {
+        let dateOfBirth = Date(timeIntervalSince1970: 1_234_567)
+        let payload: [String: Any] = [
+            "id": "user_123",
+            "name": "Taylor User",
+            "dateOfBirth": dateOfBirth,
+            "height": 70.0,
+            "heightUnit": "in",
+            "activityLevel": "active",
+            "goalWeight": 145.0,
+            "goal_weight_unit": "lbs",
+            "onboardingCompleted": true
+        ]
+
+        let normalized = SupabaseManager.normalizedProfilePayload(payload)
+
+        XCTAssertEqual(normalized["id"] as? String, "user_123")
+        XCTAssertEqual(normalized["full_name"] as? String, "Taylor User")
+        XCTAssertEqual(normalized["height_unit"] as? String, "in")
+        XCTAssertEqual(normalized["activity_level"] as? String, "active")
+        XCTAssertEqual(normalized["goal_weight"] as? Double, 145.0, accuracy: 0.001)
+        XCTAssertEqual(normalized["goal_weight_unit"] as? String, "lbs")
+        XCTAssertEqual(normalized["onboarding_completed"] as? Bool, true)
+        XCTAssertEqual(normalized["date_of_birth"] as? Date, dateOfBirth)
+        XCTAssertNil(normalized["name"])
+        XCTAssertNil(normalized["dateOfBirth"])
+        XCTAssertNil(normalized["heightUnit"])
+        XCTAssertNil(normalized["activityLevel"])
+        XCTAssertNil(normalized["goalWeight"])
+        XCTAssertNil(normalized["onboardingCompleted"])
+    }
+
+    func testProfileUpdateMerge_UpdatesLocalUserAndPreservesExistingProfileFields() {
+        let existingProfile = UserProfile(
+            id: "user_123",
+            email: "taylor@example.com",
+            username: "taylor",
+            fullName: "Taylor User",
+            dateOfBirth: nil,
+            height: 165.0,
+            heightUnit: "cm",
+            gender: "Female",
+            activityLevel: "moderate",
+            goalWeight: 140.0,
+            goalWeightUnit: "lbs",
+            onboardingCompleted: false
+        )
+        let user = User(
+            id: "user_123",
+            email: "taylor@example.com",
+            name: "Taylor User",
+            avatarUrl: nil,
+            profile: existingProfile,
+            onboardingCompleted: false
+        )
+        let dateOfBirth = Date(timeIntervalSince1970: 2_345_678)
+
+        let updatedUser = ProfileUpdateMerge.updatedUser(user, updates: [
+            "dateOfBirth": dateOfBirth,
+            "height": 70.0,
+            "heightUnit": "in",
+            "onboardingCompleted": true
+        ])
+
+        XCTAssertEqual(updatedUser.profile?.fullName, "Taylor User")
+        XCTAssertEqual(updatedUser.profile?.dateOfBirth, dateOfBirth)
+        XCTAssertEqual(updatedUser.profile?.height, 70.0, accuracy: 0.001)
+        XCTAssertEqual(updatedUser.profile?.heightUnit, "in")
+        XCTAssertEqual(updatedUser.profile?.goalWeight, 140.0, accuracy: 0.001)
+        XCTAssertEqual(updatedUser.profile?.goalWeightUnit, "lbs")
+        XCTAssertEqual(updatedUser.profile?.activityLevel, "moderate")
+        XCTAssertEqual(updatedUser.profile?.onboardingCompleted, true)
+        XCTAssertTrue(updatedUser.onboardingCompleted)
     }
 
     func testSyncLocalChanges_UsesSupabaseAndMarksDexaResultsSynced() async throws {
@@ -2323,6 +3848,426 @@ final class DashboardMetricSparklinePresentationTests: XCTestCase {
                 bodyScoreCompleteness: .none
             )
         )
+    }
+}
+
+final class DashboardMetricBucketHistoryBuilderTests: XCTestCase {
+    func testWeightPayloadBuildsMonthlyTimelineEntriesWithYearGrouping() {
+        let buckets = [
+            Self.makeBucket(
+                id: "2026-02",
+                scale: .month,
+                startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 2, day: 1))!,
+                endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+                weightValue: 176,
+                bodyFatValue: 19,
+                ffmiValue: nil,
+                bodyScore: nil,
+                stepsValue: nil
+            ),
+            Self.makeBucket(
+                id: "2026-03",
+                scale: .month,
+                startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+                endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 4, day: 1))!,
+                weightValue: 180,
+                bodyFatValue: 18,
+                ffmiValue: nil,
+                bodyScore: nil,
+                stepsValue: nil
+            )
+        ]
+        let metrics = [
+            Self.makeMetric(
+                id: "latest-weight-unit",
+                date: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 15))!,
+                weight: 180,
+                weightUnit: "lbs"
+            )
+        ]
+
+        let payload = DashboardMetricBucketHistoryBuilder.payload(
+            for: .weight,
+            buckets: buckets,
+            metrics: metrics,
+            preferredUnit: "kg"
+        )
+
+        let entries = try XCTUnwrap(payload?.entries)
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertEqual(entries.last?.displayDateText, "March 2026")
+        XCTAssertEqual(entries.last?.sectionKeyOverride, "timeline-year-2026")
+        XCTAssertEqual(entries.last?.sectionTitleOverride, "2026")
+        XCTAssertEqual(entries.last?.source, .integration(id: "Timeline"))
+        XCTAssertFalse(entries.last?.isDeletable ?? true)
+        XCTAssertEqual(entries.last?.primaryValue ?? 0, 81.6, accuracy: 0.2)
+        XCTAssertEqual(entries.last?.secondaryValue ?? 0, 18, accuracy: 0.001)
+    }
+
+    func testBodyScorePayloadUsesSharedYearlySectionMetadata() {
+        let buckets = [
+            Self.makeBucket(
+                id: "2025",
+                scale: .year,
+                startDate: Self.calendar.date(from: DateComponents(year: 2025, month: 1, day: 1))!,
+                endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!,
+                weightValue: nil,
+                bodyFatValue: nil,
+                ffmiValue: nil,
+                bodyScore: 78,
+                stepsValue: nil
+            ),
+            Self.makeBucket(
+                id: "2026",
+                scale: .year,
+                startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!,
+                endDate: Self.calendar.date(from: DateComponents(year: 2027, month: 1, day: 1))!,
+                weightValue: nil,
+                bodyFatValue: nil,
+                ffmiValue: nil,
+                bodyScore: 82,
+                stepsValue: nil
+            )
+        ]
+
+        let payload = DashboardMetricBucketHistoryBuilder.payload(
+            for: .bodyScore,
+            buckets: buckets,
+            metrics: [],
+            preferredUnit: "kg"
+        )
+
+        let entries = try XCTUnwrap(payload?.entries)
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertEqual(entries.first?.displayDateText, "2025")
+        XCTAssertEqual(entries.first?.sectionKeyOverride, "timeline-years")
+        XCTAssertEqual(entries.first?.sectionTitleOverride, "By year")
+        XCTAssertFalse(entries.first?.isDeletable ?? true)
+    }
+
+    func testMetadataLeavesWeeklyBucketsOnDefaultMonthGrouping() {
+        let bucket = Self.makeBucket(
+            id: "2026-W11",
+            scale: .week,
+            startDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))!,
+            endDate: Self.calendar.date(from: DateComponents(year: 2026, month: 3, day: 16))!,
+            weightValue: nil,
+            bodyFatValue: nil,
+            ffmiValue: nil,
+            bodyScore: nil,
+            stepsValue: 10_000
+        )
+
+        let metadata = DashboardMetricBucketHistoryBuilder.metadata(for: bucket)
+
+        XCTAssertEqual(metadata.displayDateText, "Week of Mar 9")
+        XCTAssertNil(metadata.sectionKey)
+        XCTAssertNil(metadata.sectionTitle)
+    }
+
+    private static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        return calendar
+    }()
+
+    private static func makeMetric(
+        id: String,
+        date: Date,
+        weight: Double,
+        weightUnit: String
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: "user",
+            date: date,
+            weight: weight,
+            weightUnit: weightUnit,
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+
+    private static func makeBucket(
+        id: String,
+        scale: GlobalTimelineScale,
+        startDate: Date,
+        endDate: Date,
+        weightValue: Double?,
+        bodyFatValue: Double?,
+        ffmiValue: Double?,
+        bodyScore: Int?,
+        stepsValue: Double?
+    ) -> GlobalTimelineBucket {
+        GlobalTimelineBucket(
+            id: id,
+            scale: scale,
+            startDate: startDate,
+            endDate: endDate,
+            metrics: GlobalTimelineMetricsSnapshot(
+                weight: GlobalTimelineMetricValue(
+                    value: weightValue,
+                    presence: weightValue == nil ? .missing : .present
+                ),
+                bodyFat: GlobalTimelineMetricValue(
+                    value: bodyFatValue,
+                    presence: bodyFatValue == nil ? .missing : .present
+                ),
+                ffmi: GlobalTimelineMetricValue(
+                    value: ffmiValue,
+                    presence: ffmiValue == nil ? .missing : .present
+                ),
+                steps: GlobalTimelineMetricValue(
+                    value: stepsValue,
+                    presence: stepsValue == nil ? .missing : .present
+                ),
+                canonicalPhotoId: nil,
+                hasPhotosInRange: false,
+                bodyScore: bodyScore,
+                bodyScoreCompleteness: bodyScore == nil ? .none : .full
+            )
+        )
+    }
+}
+
+final class DetailChartTimelinePresentationTests: XCTestCase {
+    func testAvailableTimeRangesTrimForMonthlyAndYearlyBuckets() {
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.availableTimeRanges(for: .month),
+            [.month1, .month3, .month6, .year1, .all]
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.availableTimeRanges(for: .year),
+            [.year1, .all]
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.availableTimeRanges(for: .week),
+            TimeRange.allCases
+        )
+    }
+
+    func testFallbackTimeRangeMatchesScale() {
+        XCTAssertEqual(DetailChartTimelinePresentation.fallbackTimeRange(for: .month), .month1)
+        XCTAssertEqual(DetailChartTimelinePresentation.fallbackTimeRange(for: .year), .year1)
+        XCTAssertEqual(DetailChartTimelinePresentation.fallbackTimeRange(for: nil), .month1)
+    }
+
+    func testXAxisModeSwitchesBetweenRawAndBucketSemantics() {
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.xAxisMode(timelineScale: nil, selectedTimeRange: .week1),
+            .rawWeek
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.xAxisMode(timelineScale: nil, selectedTimeRange: .month6),
+            .rawAuto(desiredCount: 6)
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.xAxisMode(timelineScale: .week, selectedTimeRange: .month1),
+            .bucketWeek
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.xAxisMode(timelineScale: .month, selectedTimeRange: .month3),
+            .bucketMonth
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.xAxisMode(timelineScale: .year, selectedTimeRange: .all),
+            .bucketYear
+        )
+    }
+
+    func testSmoothingWindowShrinksForBucketScales() {
+        XCTAssertEqual(DetailChartTimelinePresentation.smoothingWindowSize(for: nil), 7)
+        XCTAssertEqual(DetailChartTimelinePresentation.smoothingWindowSize(for: .week), 4)
+        XCTAssertEqual(DetailChartTimelinePresentation.smoothingWindowSize(for: .month), 3)
+        XCTAssertEqual(DetailChartTimelinePresentation.smoothingWindowSize(for: .year), 1)
+        XCTAssertTrue(DetailChartTimelinePresentation.showsChartModeToggle(for: .month))
+        XCTAssertFalse(DetailChartTimelinePresentation.showsChartModeToggle(for: .year))
+    }
+
+    func testStatTitlesBecomeBucketSpecific() {
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.averageTitle(selectedTimeRange: .month3, timelineScale: nil),
+            "Avg (3M)"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.averageTitle(selectedTimeRange: .month3, timelineScale: .month),
+            "Avg (monthly)"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.averageTitle(selectedTimeRange: .all, timelineScale: .year),
+            "Avg (yearly)"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.boundsTitles(for: .week).low,
+            "Lowest week"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.boundsTitles(for: .month).high,
+            "Highest month"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.boundsTitles(for: nil).high,
+            "High"
+        )
+    }
+
+    func testCalloutContextLabelIdentifiesBucketAggregates() {
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.calloutContextLabel(for: .week),
+            "Weekly summary"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.calloutContextLabel(for: .month),
+            "Monthly summary"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.calloutContextLabel(for: .year),
+            "Yearly summary"
+        )
+        XCTAssertNil(DetailChartTimelinePresentation.calloutContextLabel(for: nil))
+    }
+
+    func testChangeCaptionTextBecomesBucketAwareForFallbackSeriesDelta() {
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.changeCaptionText(selectedTimeRange: .month3, timelineScale: nil),
+            "Change vs 3 months ago"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.changeCaptionText(selectedTimeRange: .month3, timelineScale: .month),
+            "Change across months"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.changeCaptionText(selectedTimeRange: .all, timelineScale: .year),
+            "Change across years"
+        )
+    }
+
+    func testPointDateTextUsesBucketFriendlyFormatting() {
+        let formatter = ISO8601DateFormatter()
+        let weekDate = formatter.date(from: "2026-03-09T00:00:00Z")!
+        let monthDate = formatter.date(from: "2026-03-01T00:00:00Z")!
+        let yearDate = formatter.date(from: "2026-01-01T00:00:00Z")!
+
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.pointDateText(weekDate, timelineScale: .week),
+            "Week of Mar 9"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.pointDateText(monthDate, timelineScale: .month),
+            "March 2026"
+        )
+        XCTAssertEqual(
+            DetailChartTimelinePresentation.pointDateText(yearDate, timelineScale: .year),
+            "2026"
+        )
+    }
+}
+
+final class DetailChartStatisticsPresentationTests: XCTestCase {
+    func testSummarySeriesFollowsSelectedChartMode() {
+        let displayed = [
+            MetricChartDataPoint(date: Date(timeIntervalSince1970: 0), value: 10),
+            MetricChartDataPoint(date: Date(timeIntervalSince1970: 1), value: 20)
+        ]
+        let smoothed = [
+            MetricChartDataPoint(date: Date(timeIntervalSince1970: 0), value: 12),
+            MetricChartDataPoint(date: Date(timeIntervalSince1970: 1), value: 18)
+        ]
+
+        let rawSummary = DetailChartStatisticsPresentation.summarySeries(
+            chartMode: .raw,
+            displayedSeries: displayed,
+            smoothedSeries: smoothed
+        )
+        let trendSummary = DetailChartStatisticsPresentation.summarySeries(
+            chartMode: .trend,
+            displayedSeries: displayed,
+            smoothedSeries: smoothed
+        )
+
+        XCTAssertEqual(rawSummary.map(\.value), [10, 20])
+        XCTAssertEqual(trendSummary.map(\.value), [12, 18])
+    }
+}
+
+final class DetailHistorySourcePresentationTests: XCTestCase {
+    func testTimelineSummaryUsesFirstPartyLabel() {
+        XCTAssertEqual(
+            DetailHistorySourcePresentation.label(for: .integration(id: "Timeline")),
+            "Timeline summary"
+        )
+        XCTAssertTrue(
+            DetailHistorySourcePresentation.isTimelineSummary(.integration(id: "Timeline"))
+        )
+        XCTAssertFalse(
+            DetailHistorySourcePresentation.isTimelineSummary(.integration(id: "Whoop"))
+        )
+        XCTAssertEqual(
+            DetailHistorySourcePresentation.label(for: .integration(id: "Whoop")),
+            "Whoop"
+        )
+    }
+}
+
+final class DetailHistoryDeletionTargetTests: XCTestCase {
+    func testResolveUsesDailyMetricsForStepsAndBodyMetricsForBodyComposition() {
+        XCTAssertEqual(DetailHistoryDeletionTarget.resolve(metricType: .steps), .dailyMetric)
+        XCTAssertEqual(DetailHistoryDeletionTarget.resolve(metricType: .weight), .bodyMetric)
+        XCTAssertEqual(DetailHistoryDeletionTarget.resolve(metricType: .bodyFat), .bodyMetric)
+        XCTAssertEqual(DetailHistoryDeletionTarget.resolve(metricType: .ffmi), .bodyMetric)
+        XCTAssertEqual(DetailHistoryDeletionTarget.resolve(metricType: .bodyScore), .bodyMetric)
+        XCTAssertEqual(DetailHistoryDeletionTarget.resolve(metricType: .glp1), .unsupported)
+        XCTAssertEqual(DetailHistoryDeletionTarget.resolve(metricType: nil), .unsupported)
+    }
+}
+
+final class DetailHistoryValuePresentationTests: XCTestCase {
+    func testSecondaryTextFormatsConfiguredSecondaryValue() {
+        let entry = MetricHistoryEntry(
+            id: "entry",
+            date: Date(),
+            primaryValue: 180,
+            secondaryValue: 18.4,
+            source: .manual
+        )
+        let config = MetricEntriesConfiguration(
+            metricType: .weight,
+            unitLabel: "lbs",
+            secondaryUnitLabel: "%",
+            primaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1),
+            secondaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
+        )
+
+        XCTAssertEqual(
+            DetailHistoryValuePresentation.secondaryText(entry: entry, config: config),
+            "18.4 %"
+        )
+    }
+
+    func testSecondaryTextReturnsNilWhenValueMissing() {
+        let entry = MetricHistoryEntry(
+            id: "entry",
+            date: Date(),
+            primaryValue: 180,
+            secondaryValue: nil,
+            source: .manual
+        )
+        let config = MetricEntriesConfiguration(
+            metricType: .weight,
+            unitLabel: "lbs",
+            secondaryUnitLabel: "%",
+            primaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1),
+            secondaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
+        )
+
+        XCTAssertNil(DetailHistoryValuePresentation.secondaryText(entry: entry, config: config))
     }
 }
 

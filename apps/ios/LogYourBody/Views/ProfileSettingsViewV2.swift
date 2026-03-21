@@ -380,8 +380,11 @@ struct ProfileSettingsViewV2: View {
         editableLastName = parts.count > 1 ? parts.dropFirst().joined(separator: " ") : ""
         editableDateOfBirth = user.profile?.dateOfBirth ?? Date()
 
-        if let height = user.profile?.height {
-            editableHeightCm = Int(height.rounded())
+        if let heightCm = ProfileHeightStorage.heightCentimeters(
+            storedHeight: user.profile?.height,
+            preferredUnit: user.profile?.heightUnit
+        ) {
+            editableHeightCm = Int(heightCm.rounded())
             useMetricHeight = user.profile?.heightUnit == "cm"
         }
 
@@ -407,14 +410,19 @@ struct ProfileSettingsViewV2: View {
                 }
 
                 // Create updated profile
+                let preferredHeightUnit = useMetricHeight ? "cm" : "in"
+                let storedHeight = ProfileHeightStorage.storedHeightValue(
+                    heightCm: Double(editableHeightCm),
+                    preferredUnit: preferredHeightUnit
+                )
                 let updatedProfile = UserProfile(
                     id: currentUser.id,
                     email: currentUser.email,
                     username: currentUser.profile?.username,
                     fullName: editableName.isEmpty ? nil : editableName,
                     dateOfBirth: editableDateOfBirth,
-                    height: Double(editableHeightCm),
-                    heightUnit: useMetricHeight ? "cm" : "in",
+                    height: storedHeight,
+                    heightUnit: preferredHeightUnit,
                     gender: editableGender.description,
                     activityLevel: currentUser.profile?.activityLevel,
                     goalWeight: currentUser.profile?.goalWeight,
@@ -429,8 +437,8 @@ struct ProfileSettingsViewV2: View {
                 let updates: [String: Any] = [
                     "name": editableName.isEmpty ? "" : editableName,
                     "dateOfBirth": editableDateOfBirth,
-                    "height": Double(editableHeightCm),
-                    "heightUnit": useMetricHeight ? "cm" : "in",
+                    "height": storedHeight,
+                    "heightUnit": preferredHeightUnit,
                     "gender": editableGender.description,
                     "onboardingCompleted": true
                 ]

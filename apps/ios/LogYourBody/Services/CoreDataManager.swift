@@ -306,6 +306,40 @@ class CoreDataManager: ObservableObject {
         }
     }
 
+    func hasDexaResult(
+        for userId: String,
+        externalSource: String,
+        externalResultId: String
+    ) async -> Bool {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "userId == %@", userId),
+                NSPredicate(format: "externalResultId == %@", externalResultId),
+                NSPredicate(format: "externalSource =[c] %@", externalSource)
+            ])
+            request.fetchLimit = 1
+
+            do {
+                return try context.count(for: request) > 0
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "hasDexaResult", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "hasDexaResult",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return false
+            }
+        }
+    }
+
     func saveDexaResults(_ results: [DexaResult], userId: String, markAsSynced: Bool = false) {
         guard !results.isEmpty else { return }
 
@@ -328,6 +362,7 @@ class CoreDataManager: ObservableObject {
                 }
 
                 cached.userId = userId
+                cached.createdAt = result.createdAt
                 cached.bodyMetricsId = result.bodyMetricsId
                 cached.externalSource = result.externalSource
                 cached.externalResultId = result.externalResultId
@@ -796,6 +831,46 @@ class CoreDataManager: ObservableObject {
         }
     }
 
+    func markDailyMetricDeleted(id: String) async -> Bool {
+        let context = viewContext
+
+        return await context.perform {
+            let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", id)
+            fetchRequest.fetchLimit = 1
+
+            guard let cachedMetric = try? context.fetch(fetchRequest).first else {
+                return false
+            }
+
+            let now = Date()
+            cachedMetric.isMarkedDeleted = true
+            cachedMetric.updatedAt = now
+            cachedMetric.lastModified = now
+            cachedMetric.isSynced = false
+            cachedMetric.syncStatus = "pending"
+
+            do {
+                if context.hasChanges {
+                    try context.save()
+                }
+                return true
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "markDailyMetricDeleted", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "markDailyMetricDeleted",
+                    screen: nil,
+                    userId: cachedMetric.userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return false
+            }
+        }
+    }
+
     // MARK: - Daily Metrics Operations
     func saveProfile(_ profile: UserProfile, userId: String, email: String) {
         let context = viewContext
@@ -1173,31 +1248,39 @@ class CoreDataManager: ObservableObject {
                 let rawWeight = data["weight"] as? Double ?? 0
                 let rawWeightUnit = data["weight_unit"] as? String
                 let weightUnitLower = rawWeightUnit?.lowercased()
+                let storedWeightUnit: String?
                 let weightKg: Double
                 if rawWeight > 0 {
                     if weightUnitLower == "lbs" {
                         weightKg = rawWeight * 0.45359237
+                        storedWeightUnit = "kg"
                     } else {
                         weightKg = rawWeight
+                        storedWeightUnit = weightUnitLower ?? rawWeightUnit
                     }
                 } else {
                     weightKg = 0
+                    storedWeightUnit = weightUnitLower ?? rawWeightUnit
                 }
 
                 let rawWaistValue = (data["waist_circumference"] ?? data["waist"]) as? Double ?? 0
                 let rawHipValue = (data["hip_circumference"] ?? data["hip"]) as? Double ?? 0
                 let rawWaistUnit = data["waist_unit"] as? String
                 let waistUnitLower = rawWaistUnit?.lowercased()
+                let storedWaistUnit: String?
 
                 let waistCm: Double
                 if rawWaistValue > 0 {
                     if waistUnitLower == "in" {
                         waistCm = rawWaistValue * 2.54
+                        storedWaistUnit = "cm"
                     } else {
                         waistCm = rawWaistValue
+                        storedWaistUnit = waistUnitLower ?? rawWaistUnit
                     }
                 } else {
                     waistCm = 0
+                    storedWaistUnit = waistUnitLower ?? rawWaistUnit
                 }
 
                 let hipCm: Double
@@ -1212,16 +1295,21 @@ class CoreDataManager: ObservableObject {
                 }
 
                 metric.weight = weightKg
-                metric.weightUnit = rawWeightUnit
+                metric.weightUnit = storedWeightUnit
                 metric.waistCircumference = waistCm
                 metric.hipCircumference = hipCm
-                metric.waistUnit = rawWaistUnit
+                metric.waistUnit = storedWaistUnit
                 metric.bodyFatPercentage = data["body_fat_percentage"] as? Double ?? 0
                 metric.bodyFatMethod = data["body_fat_method"] as? String
                 metric.muscleMass = data["muscle_mass"] as? Double ?? 0
                 metric.boneMass = data["bone_mass"] as? Double ?? 0
                 metric.notes = data["notes"] as? String
                 metric.photoUrl = data["photo_url"] as? String
+                if data.keys.contains("data_source") {
+                    metric.dataSource = data["data_source"] as? String
+                } else if metric.dataSource == nil {
+                    metric.dataSource = "Manual"
+                }
 
                 if let dateString = data["date"] as? String {
                     metric.date = formatter.date(from: dateString)
@@ -1237,6 +1325,7 @@ class CoreDataManager: ObservableObject {
                     metric.updatedAt = updatedAt
                 }
 
+                metric.isMarkedDeleted = data["is_deleted"] as? Bool ?? false
                 metric.syncStatus = "synced"
                 metric.isSynced = true
                 metric.lastModified = Date()
@@ -1292,6 +1381,7 @@ class CoreDataManager: ObservableObject {
                     metric.updatedAt = updatedAt
                 }
 
+                metric.isMarkedDeleted = data["is_deleted"] as? Bool ?? false
                 metric.syncStatus = "synced"
                 metric.isSynced = true
                 metric.lastModified = Date()
@@ -1318,7 +1408,7 @@ class CoreDataManager: ObservableObject {
             let userId = data["id"] as? String ?? ""
 
             let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
-            request.predicate = NSPredicate(format: "userId == %@", userId)
+            request.predicate = NSPredicate(format: "id == %@", userId)
             request.fetchLimit = 1
 
             do {
@@ -1328,6 +1418,7 @@ class CoreDataManager: ObservableObject {
                 // Update fields
                 // profile.userId = userId // Using id field instead
                 profile.id = userId
+                profile.email = (data["email"] as? String) ?? profile.email ?? ""
                 profile.fullName = data["full_name"] as? String
                 profile.username = data["username"] as? String
                 // profile.avatarUrl = data["avatar_url"] as? String // avatarUrl field not in Core Data model
@@ -1335,11 +1426,26 @@ class CoreDataManager: ObservableObject {
                 profile.heightUnit = data["height_unit"] as? String
                 profile.gender = data["gender"] as? String
                 profile.activityLevel = data["activity_level"] as? String
+                profile.goalWeight = data["goal_weight"] as? Double ?? 0
+                profile.goalWeightUnit = data["goal_weight_unit"] as? String
 
                 if let dateString = data["date_of_birth"] as? String {
                     profile.dateOfBirth = ISO8601DateFormatter().date(from: dateString)
                 }
+                if let createdString = data["created_at"] as? String,
+                   let createdAt = ISO8601DateFormatter().date(from: createdString) {
+                    profile.createdAt = createdAt
+                } else if profile.createdAt == nil {
+                    profile.createdAt = Date()
+                }
+                if let updatedString = data["updated_at"] as? String,
+                   let updatedAt = ISO8601DateFormatter().date(from: updatedString) {
+                    profile.updatedAt = updatedAt
+                } else if profile.updatedAt == nil {
+                    profile.updatedAt = Date()
+                }
 
+                profile.isMarkedDeleted = data["is_deleted"] as? Bool ?? false
                 profile.syncStatus = "synced"
                 profile.isSynced = true
                 profile.lastModified = Date()
@@ -1367,7 +1473,11 @@ class CoreDataManager: ObservableObject {
 
         return await context.perform {
             let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "userId == %@", userId)
+            fetchRequest.predicate = NSPredicate(
+                format: "userId == %@ AND isMarkedDeleted == %@",
+                userId,
+                NSNumber(value: false)
+            )
             fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: true)]
 
             do {
@@ -1393,7 +1503,11 @@ class CoreDataManager: ObservableObject {
 
         return await context.perform {
             let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "userId == %@", userId)
+            fetchRequest.predicate = NSPredicate(
+                format: "userId == %@ AND isMarkedDeleted == %@",
+                userId,
+                NSNumber(value: false)
+            )
             fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: true)]
 
             do {
@@ -1462,17 +1576,24 @@ class CoreDataManager: ObservableObject {
     // MARK: - Cleanup
 
     func cleanupOldData() {
-        // Delete body metrics older than 1 year
+        // Delete tombstoned metrics older than 1 year.
         let oneYearAgo = Date().addingTimeInterval(-365 * 24 * 60 * 60)
 
         let bodyMetricsRequest: NSFetchRequest<NSFetchRequestResult> = CachedBodyMetrics.fetchRequest()
         bodyMetricsRequest.predicate = NSPredicate(format: "date < %@ AND isMarkedDeleted == true", oneYearAgo as NSDate)
 
-        let deleteRequest = NSBatchDeleteRequest(fetchRequest: bodyMetricsRequest)
-        deleteRequest.resultType = .resultTypeCount
+        let dailyMetricsRequest: NSFetchRequest<NSFetchRequestResult> = CachedDailyMetrics.fetchRequest()
+        dailyMetricsRequest.predicate = NSPredicate(format: "date < %@ AND isMarkedDeleted == true", oneYearAgo as NSDate)
+
+        let bodyDeleteRequest = NSBatchDeleteRequest(fetchRequest: bodyMetricsRequest)
+        bodyDeleteRequest.resultType = .resultTypeCount
+
+        let dailyDeleteRequest = NSBatchDeleteRequest(fetchRequest: dailyMetricsRequest)
+        dailyDeleteRequest.resultType = .resultTypeCount
 
         do {
-            _ = try viewContext.execute(deleteRequest) as? NSBatchDeleteResult
+            _ = try viewContext.execute(bodyDeleteRequest) as? NSBatchDeleteResult
+            _ = try viewContext.execute(dailyDeleteRequest) as? NSBatchDeleteResult
             // print("Deleted \(result?.result ?? 0) old body metrics")
         } catch {
             // print("Error cleaning up old data: \(error)")
@@ -1648,6 +1769,7 @@ class CoreDataManager: ObservableObject {
                 }
 
                 cached.userId = userId
+                cached.createdAt = log.createdAt
                 cached.takenAt = log.takenAt
                 cached.medicationId = log.medicationId
                 cached.doseAmount = log.doseAmount ?? 0
@@ -1762,6 +1884,7 @@ class CoreDataManager: ObservableObject {
                 }
 
                 cached.userId = userId
+                cached.createdAt = medication.createdAt
                 cached.displayName = medication.displayName
                 cached.genericName = medication.genericName
                 cached.drugClass = medication.drugClass
@@ -1964,33 +2087,13 @@ extension CachedDailyMetrics {
 
 extension CachedProfile {
     func toUserProfile() -> UserProfile {
-        let storedHeight = height
-        let unit = heightUnit?.lowercased()
-
-        let heightCm: Double?
-        if storedHeight > 0 {
-            if unit == "in" {
-                if storedHeight >= 100 {
-                    heightCm = storedHeight
-                } else {
-                    heightCm = storedHeight * 2.54
-                }
-            } else if unit == "cm" {
-                heightCm = storedHeight < 100 ? storedHeight * 2.54 : storedHeight
-            } else {
-                heightCm = storedHeight >= 100 ? storedHeight : storedHeight * 2.54
-            }
-        } else {
-            heightCm = nil
-        }
-
         return UserProfile(
             id: id ?? "",
             email: email ?? "",
             username: username,
             fullName: fullName,
             dateOfBirth: dateOfBirth,
-            height: heightCm,
+            height: ProfileHeightStorage.heightCentimeters(storedHeight: height, preferredUnit: heightUnit),
             heightUnit: heightUnit,
             gender: gender,
             activityLevel: activityLevel,

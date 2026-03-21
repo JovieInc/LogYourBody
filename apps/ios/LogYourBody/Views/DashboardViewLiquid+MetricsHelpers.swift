@@ -45,6 +45,241 @@ enum BodyCompositionMetricsNormalization {
     }
 }
 
+struct TimelineHistoryMetadata: Equatable {
+    let displayDateText: String
+    let sectionKey: String?
+    let sectionTitle: String?
+}
+
+enum DashboardMetricBucketHistoryBuilder {
+    private static let timelineSource = MetricEntrySourceType.integration(id: "Timeline")
+
+    static func payload(
+        for metricType: DashboardViewLiquid.MetricType,
+        buckets: [GlobalTimelineBucket],
+        metrics: [BodyMetrics],
+        preferredUnit: String
+    ) -> MetricEntriesPayload? {
+        switch metricType {
+        case .steps:
+            return stepsPayload(from: buckets)
+        case .weight:
+            return weightPayload(from: buckets, metrics: metrics, preferredUnit: preferredUnit)
+        case .bodyFat:
+            return bodyFatPayload(from: buckets, metrics: metrics, preferredUnit: preferredUnit)
+        case .ffmi:
+            return ffmiPayload(from: buckets)
+        case .bodyScore:
+            return bodyScorePayload(from: buckets)
+        case .glp1:
+            return nil
+        }
+    }
+
+    static func metadata(for bucket: GlobalTimelineBucket) -> TimelineHistoryMetadata {
+        switch bucket.scale {
+        case .week:
+            return TimelineHistoryMetadata(
+                displayDateText: GlobalTimelineMetricAdapter.bucketDateText(bucket),
+                sectionKey: nil,
+                sectionTitle: nil
+            )
+        case .month:
+            let year = Calendar.current.component(.year, from: bucket.startDate)
+            return TimelineHistoryMetadata(
+                displayDateText: GlobalTimelineMetricAdapter.bucketDateText(bucket),
+                sectionKey: "timeline-year-\(year)",
+                sectionTitle: "\(year)"
+            )
+        case .year:
+            return TimelineHistoryMetadata(
+                displayDateText: GlobalTimelineMetricAdapter.bucketDateText(bucket),
+                sectionKey: "timeline-years",
+                sectionTitle: "By year"
+            )
+        }
+    }
+
+    private static func stepsPayload(from buckets: [GlobalTimelineBucket]) -> MetricEntriesPayload? {
+        let entries = buckets.compactMap { bucket -> MetricHistoryEntry? in
+            guard let value = GlobalTimelineMetricAdapter.displayStepsValue(from: bucket.metrics.steps) else {
+                return nil
+            }
+
+            return makeEntry(
+                metricKey: "steps",
+                bucket: bucket,
+                primaryValue: Double(value),
+                secondaryValue: nil
+            )
+        }
+
+        guard !entries.isEmpty else { return nil }
+
+        return MetricEntriesPayload(
+            config: MetricEntriesConfiguration(
+                metricType: .steps,
+                unitLabel: "steps",
+                secondaryUnitLabel: nil,
+                primaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 0),
+                secondaryFormatter: nil
+            ),
+            entries: entries
+        )
+    }
+
+    private static func weightPayload(
+        from buckets: [GlobalTimelineBucket],
+        metrics: [BodyMetrics],
+        preferredUnit: String
+    ) -> MetricEntriesPayload? {
+        let entries = buckets.compactMap { bucket -> MetricHistoryEntry? in
+            guard let value = GlobalTimelineMetricAdapter.displayWeightValue(
+                from: bucket.metrics.weight,
+                metrics: metrics,
+                preferredUnit: preferredUnit
+            ) else {
+                return nil
+            }
+
+            return makeEntry(
+                metricKey: "weight",
+                bucket: bucket,
+                primaryValue: value,
+                secondaryValue: bucket.metrics.bodyFat.value
+            )
+        }
+
+        guard !entries.isEmpty else { return nil }
+
+        return MetricEntriesPayload(
+            config: MetricEntriesConfiguration(
+                metricType: .weight,
+                unitLabel: preferredUnit,
+                secondaryUnitLabel: "%",
+                primaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1),
+                secondaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
+            ),
+            entries: entries
+        )
+    }
+
+    private static func bodyFatPayload(
+        from buckets: [GlobalTimelineBucket],
+        metrics: [BodyMetrics],
+        preferredUnit: String
+    ) -> MetricEntriesPayload? {
+        let entries = buckets.compactMap { bucket -> MetricHistoryEntry? in
+            guard let value = bucket.metrics.bodyFat.value else {
+                return nil
+            }
+
+            let secondaryValue = GlobalTimelineMetricAdapter.displayWeightValue(
+                from: bucket.metrics.weight,
+                metrics: metrics,
+                preferredUnit: preferredUnit
+            )
+
+            return makeEntry(
+                metricKey: "body-fat",
+                bucket: bucket,
+                primaryValue: value,
+                secondaryValue: secondaryValue
+            )
+        }
+
+        guard !entries.isEmpty else { return nil }
+
+        return MetricEntriesPayload(
+            config: MetricEntriesConfiguration(
+                metricType: .bodyFat,
+                unitLabel: "%",
+                secondaryUnitLabel: preferredUnit,
+                primaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 1, maxFractionDigits: 1),
+                secondaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 1)
+            ),
+            entries: entries
+        )
+    }
+
+    private static func ffmiPayload(from buckets: [GlobalTimelineBucket]) -> MetricEntriesPayload? {
+        let entries = buckets.compactMap { bucket -> MetricHistoryEntry? in
+            guard let value = bucket.metrics.ffmi.value else {
+                return nil
+            }
+
+            return makeEntry(
+                metricKey: "ffmi",
+                bucket: bucket,
+                primaryValue: value,
+                secondaryValue: nil
+            )
+        }
+
+        guard !entries.isEmpty else { return nil }
+
+        return MetricEntriesPayload(
+            config: MetricEntriesConfiguration(
+                metricType: .ffmi,
+                unitLabel: "",
+                secondaryUnitLabel: nil,
+                primaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 1, maxFractionDigits: 1),
+                secondaryFormatter: nil
+            ),
+            entries: entries
+        )
+    }
+
+    private static func bodyScorePayload(from buckets: [GlobalTimelineBucket]) -> MetricEntriesPayload? {
+        let entries = buckets.compactMap { bucket -> MetricHistoryEntry? in
+            guard let value = bucket.metrics.bodyScore else {
+                return nil
+            }
+
+            return makeEntry(
+                metricKey: "body-score",
+                bucket: bucket,
+                primaryValue: Double(value),
+                secondaryValue: nil
+            )
+        }
+
+        guard !entries.isEmpty else { return nil }
+
+        return MetricEntriesPayload(
+            config: MetricEntriesConfiguration(
+                metricType: .bodyScore,
+                unitLabel: "",
+                secondaryUnitLabel: nil,
+                primaryFormatter: MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 0),
+                secondaryFormatter: nil
+            ),
+            entries: entries
+        )
+    }
+
+    private static func makeEntry(
+        metricKey: String,
+        bucket: GlobalTimelineBucket,
+        primaryValue: Double,
+        secondaryValue: Double?
+    ) -> MetricHistoryEntry {
+        let metadata = metadata(for: bucket)
+
+        return MetricHistoryEntry(
+            id: "timeline-\(metricKey)-\(bucket.id)",
+            date: bucket.startDate,
+            primaryValue: primaryValue,
+            secondaryValue: secondaryValue,
+            source: timelineSource,
+            displayDateText: metadata.displayDateText,
+            sectionKeyOverride: metadata.sectionKey,
+            sectionTitleOverride: metadata.sectionTitle,
+            isDeletable: false
+        )
+    }
+}
+
 extension DashboardViewLiquid {
     // MARK: - Animation Helpers
 
@@ -181,6 +416,10 @@ extension DashboardViewLiquid {
     // MARK: - Metric Entries Helpers
 
     func metricEntriesPayload(for metricType: MetricType) -> MetricEntriesPayload? {
+        if let payload = selectedScaleEntriesPayload(for: metricType) {
+            return payload
+        }
+
         switch metricType {
         case .weight:
             return weightEntriesPayload()
@@ -195,6 +434,20 @@ extension DashboardViewLiquid {
         case .bodyScore:
             return bodyScoreEntriesPayload()
         }
+    }
+
+    func selectedScaleEntriesPayload(for metricType: MetricType) -> MetricEntriesPayload? {
+        guard usesSelectedScaleChartData(for: metricType),
+              let buckets = selectedScaleBucketsForCharts else {
+            return nil
+        }
+
+        return DashboardMetricBucketHistoryBuilder.payload(
+            for: metricType,
+            buckets: buckets,
+            metrics: bodyMetrics,
+            preferredUnit: weightUnit
+        )
     }
 
     func stepsEntriesPayload() -> MetricEntriesPayload? {
@@ -655,6 +908,10 @@ extension DashboardViewLiquid {
     }
 
     func cachedMetricEntries(for type: MetricType) -> MetricEntriesPayload? {
+        if usesSelectedScaleChartData(for: type) {
+            return metricEntriesPayload(for: type)
+        }
+
         if let cached = metricEntriesCache[type] {
             return cached
         }

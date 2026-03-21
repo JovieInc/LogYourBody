@@ -86,11 +86,24 @@ actor BodySpecDexaImporter {
         userId: String
     ) async -> Bool {
         let metricsId = UUID().uuidString
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: summary.startTime)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? summary.startTime
+
+        let alreadyImportedDexa = await coreDataManager.hasDexaResult(
+            for: userId,
+            externalSource: "bodyspec",
+            externalResultId: summary.resultId
+        )
+
+        if alreadyImportedDexa {
+            return false
+        }
 
         let existing = await coreDataManager.fetchBodyMetrics(
             for: userId,
-            from: summary.startTime,
-            to: summary.startTime
+            from: startOfDay,
+            to: endOfDay
         )
 
         let alreadyHasBodySpecEntry = existing.contains { cached in

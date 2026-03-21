@@ -886,7 +886,8 @@ extension AuthManager {
     }
 
     func updateProfile(_ updates: [String: Any]) async {
-        guard let userId = currentUser?.id else { return }
+        guard let currentUser else { return }
+        let userId = currentUser.id
 
         var payload = updates
         payload["id"] = userId
@@ -895,6 +896,11 @@ extension AuthManager {
 
         do {
             try await SupabaseManager.shared.updateProfile(payload, token: token)
+            let updatedUser = ProfileUpdateMerge.updatedUser(currentUser, updates: updates)
+            self.currentUser = updatedUser
+            if let profile = updatedUser.profile {
+                CoreDataManager.shared.saveProfile(profile, userId: userId, email: updatedUser.email)
+            }
         } catch {
             let context = ErrorContext(
                 feature: "profile",

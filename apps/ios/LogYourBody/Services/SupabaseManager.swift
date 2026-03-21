@@ -11,6 +11,19 @@ import Clerk
 class SupabaseManager: ObservableObject {
     static let shared = SupabaseManager()
 
+    private static let profileKeyAliases: [String: String] = [
+        "name": "full_name",
+        "fullName": "full_name",
+        "dateOfBirth": "date_of_birth",
+        "heightUnit": "height_unit",
+        "activityLevel": "activity_level",
+        "goalWeight": "goal_weight",
+        "goalWeightUnit": "goal_weight_unit",
+        "onboardingCompleted": "onboarding_completed",
+        "firstName": "first_name",
+        "lastName": "last_name"
+    ]
+
     private let supabaseURL = Constants.supabaseURL
     private let supabaseAnonKey = Constants.supabaseAnonKey
 
@@ -214,7 +227,8 @@ class SupabaseManager: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let isoFormatter = ISO8601DateFormatter()
-        let sanitizedProfile: [String: Any] = profile.reduce(into: [:]) { result, element in
+        let normalizedProfile = Self.normalizedProfilePayload(profile)
+        let sanitizedProfile: [String: Any] = normalizedProfile.reduce(into: [:]) { result, element in
             let (key, value) = element
 
             if let dateValue = value as? Date {
@@ -246,6 +260,25 @@ class SupabaseManager: ObservableObject {
               (200...299).contains(httpResponse.statusCode) else {
             throw SupabaseError.requestFailed
         }
+    }
+
+    static func normalizedProfilePayload(_ profile: [String: Any]) -> [String: Any] {
+        var normalizedProfile = profile
+
+        for alias in profileKeyAliases.keys {
+            normalizedProfile.removeValue(forKey: alias)
+        }
+
+        for (alias, canonical) in profileKeyAliases {
+            guard normalizedProfile[canonical] == nil,
+                  let value = profile[alias] else {
+                continue
+            }
+
+            normalizedProfile[canonical] = value
+        }
+
+        return normalizedProfile
     }
 
     func upsertData(table: String, data: Data, token: String) async throws {

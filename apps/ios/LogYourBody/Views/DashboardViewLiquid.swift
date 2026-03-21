@@ -599,6 +599,7 @@ struct DashboardViewLiquid: View {
                 headlineChangeOverride: selectedStepsHeadlineChange.map {
                     .init(title: $0.title, delta: $0.delta)
                 },
+                timelineScale: selectedTimelineBucket?.scale,
                 goalValue: Double(stepGoal),
                 selectedTimeRange: $selectedRange
             )
@@ -619,6 +620,7 @@ struct DashboardViewLiquid: View {
                 headlineChangeOverride: selectedWeightHeadlineChange.map {
                     .init(title: $0.title, delta: $0.delta)
                 },
+                timelineScale: selectedTimelineBucket?.scale,
                 goalValue: weightGoal,
                 selectedTimeRange: $selectedRange
             )
@@ -639,6 +641,7 @@ struct DashboardViewLiquid: View {
                 headlineChangeOverride: selectedBodyFatHeadlineChange.map {
                     .init(title: $0.title, delta: $0.delta)
                 },
+                timelineScale: selectedTimelineBucket?.scale,
                 goalValue: bodyFatGoal,
                 selectedTimeRange: $selectedRange
             )
@@ -659,6 +662,7 @@ struct DashboardViewLiquid: View {
                 headlineChangeOverride: selectedFFMIHeadlineChange.map {
                     .init(title: $0.title, delta: $0.delta)
                 },
+                timelineScale: selectedTimelineBucket?.scale,
                 goalValue: ffmiGoal,
                 selectedTimeRange: $selectedRange
             )
@@ -679,6 +683,7 @@ struct DashboardViewLiquid: View {
                 headlineChangeOverride: selectedBodyScoreHeadlineChange.map {
                     .init(title: $0.title, delta: $0.delta)
                 },
+                timelineScale: selectedTimelineBucket?.scale,
                 goalValue: nil,
                 selectedTimeRange: $selectedRange
             )
@@ -703,6 +708,7 @@ struct DashboardViewLiquid: View {
                 },
                 metricEntries: nil,
                 headlineChangeOverride: nil,
+                timelineScale: nil,
                 goalValue: nil,
                 selectedTimeRange: $selectedRange
             )

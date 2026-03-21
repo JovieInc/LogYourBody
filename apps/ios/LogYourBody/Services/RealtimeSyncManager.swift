@@ -309,7 +309,7 @@ class RealtimeSyncManager: ObservableObject {
                     }
                 }
 
-                try await self.syncLocalChanges(token: token)
+                try await self.syncLocalChanges(token: token, userId: userId)
                 try await self.pullLatestData(userId: userId, lastSync: lastSyncSnapshot, token: token)
                 self.coreDataManager.cleanupOldData()
 
@@ -359,35 +359,55 @@ class RealtimeSyncManager: ObservableObject {
         }
     }
 
-    nonisolated func syncLocalChanges(token: String) async throws {
+    nonisolated func syncLocalChanges(token: String, userId: String? = nil) async throws {
         let unsynced = await coreDataManager.fetchUnsyncedEntries()
         let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs()
         let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications()
         let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults()
+        let scopedUserId = userId ?? await MainActor.run { authManager.currentUser?.id }
+
+        let bodyMetrics = scopedUserId.map { scope in
+            unsynced.bodyMetrics.filter { $0.userId == scope }
+        } ?? unsynced.bodyMetrics
+        let dailyMetrics = scopedUserId.map { scope in
+            unsynced.dailyMetrics.filter { $0.userId == scope }
+        } ?? unsynced.dailyMetrics
+        let profiles = scopedUserId.map { scope in
+            unsynced.profiles.filter { $0.id == scope }
+        } ?? unsynced.profiles
+        let glp1Logs = scopedUserId.map { scope in
+            unsyncedGlp1.filter { $0.userId == scope }
+        } ?? unsyncedGlp1
+        let medications = scopedUserId.map { scope in
+            unsyncedMedications.filter { $0.userId == scope }
+        } ?? unsyncedMedications
+        let dexaResults = scopedUserId.map { scope in
+            unsyncedDexa.filter { $0.userId == scope }
+        } ?? unsyncedDexa
 
         // Batch sync for efficiency
-        if !unsynced.bodyMetrics.isEmpty {
-            try await syncBodyMetricsBatch(unsynced.bodyMetrics, token: token)
+        if !bodyMetrics.isEmpty {
+            try await syncBodyMetricsBatch(bodyMetrics, token: token)
         }
 
-        if !unsynced.dailyMetrics.isEmpty {
-            try await syncDailyMetricsBatch(unsynced.dailyMetrics, token: token)
+        if !dailyMetrics.isEmpty {
+            try await syncDailyMetricsBatch(dailyMetrics, token: token)
         }
 
-        if !unsynced.profiles.isEmpty {
-            try await syncProfilesBatch(unsynced.profiles, token: token)
+        if !profiles.isEmpty {
+            try await syncProfilesBatch(profiles, token: token)
         }
 
-        if !unsyncedGlp1.isEmpty {
-            try await syncGlp1DoseLogsBatch(unsyncedGlp1, token: token)
+        if !glp1Logs.isEmpty {
+            try await syncGlp1DoseLogsBatch(glp1Logs, token: token)
         }
 
-        if !unsyncedMedications.isEmpty {
-            try await syncGlp1MedicationsBatch(unsyncedMedications, token: token)
+        if !medications.isEmpty {
+            try await syncGlp1MedicationsBatch(medications, token: token)
         }
 
-        if !unsyncedDexa.isEmpty {
-            try await syncDexaResultsBatch(unsyncedDexa, token: token)
+        if !dexaResults.isEmpty {
+            try await syncDexaResultsBatch(dexaResults, token: token)
         }
     }
 
@@ -401,22 +421,37 @@ class RealtimeSyncManager: ObservableObject {
                 let date = metric.date ?? Date()
                 let createdAt = metric.createdAt ?? date
                 let updatedAt = metric.updatedAt ?? createdAt
+                let hasWeight = metric.weight > 0
+                let hasWaist = metric.waistCircumference > 0
+                let hasHip = metric.hipCircumference > 0
+                let hasCircumference = hasWaist || hasHip
+
+                let weightValue: Any = hasWeight ? metric.weight : NSNull()
+                let weightUnitValue: Any = hasWeight ? (metric.weightUnit ?? "kg") : NSNull()
+                let waistValue: Any = hasWaist ? metric.waistCircumference : NSNull()
+                let hipValue: Any = hasHip ? metric.hipCircumference : NSNull()
+                let waistUnitValue: Any = hasCircumference ? (metric.waistUnit ?? "cm") : NSNull()
+                let bodyFatValue: Any = metric.bodyFatPercentage > 0 ? metric.bodyFatPercentage : NSNull()
+                let muscleMassValue: Any = metric.muscleMass > 0 ? metric.muscleMass : NSNull()
+                let boneMassValue: Any = metric.boneMass > 0 ? metric.boneMass : NSNull()
 
                 return [
                     "id": id,
                     "user_id": metric.userId ?? "",
                     "date": formatter.string(from: date),
-                    "weight": metric.weight,
-                    "weight_unit": metric.weightUnit ?? "kg",
-                    "waist_circumference": metric.waistCircumference as Any,
-                    "hip_circumference": metric.hipCircumference as Any,
-                    "waist_unit": metric.waistUnit ?? "cm",
-                    "body_fat_percentage": metric.bodyFatPercentage as Any,
+                    "weight": weightValue,
+                    "weight_unit": weightUnitValue,
+                    "waist_circumference": waistValue,
+                    "hip_circumference": hipValue,
+                    "waist_unit": waistUnitValue,
+                    "body_fat_percentage": bodyFatValue,
                     "body_fat_method": metric.bodyFatMethod as Any,
-                    "muscle_mass": metric.muscleMass as Any,
-                    "bone_mass": metric.boneMass as Any,
+                    "muscle_mass": muscleMassValue,
+                    "bone_mass": boneMassValue,
+                    "data_source": metric.dataSource as Any,
                     "photo_url": metric.photoUrl as Any,
                     "notes": metric.notes as Any,
+                    "is_deleted": metric.isMarkedDeleted,
                     "created_at": formatter.string(from: createdAt),
                     "updated_at": formatter.string(from: updatedAt)
                 ]
@@ -527,8 +562,13 @@ class RealtimeSyncManager: ObservableObject {
 
         for userId in userIds {
             let userMeds = medications.filter { $0.userId == userId }
-            let endDate = userMeds.compactMap { $0.endedAt }.max() ?? Date()
-            try await supabaseManager.endActiveGlp1Medications(userId: userId, endedAt: endDate)
+            let activeMedicationStartDates = userMeds.compactMap { medication -> Date? in
+                medication.endedAt == nil ? medication.startedAt : nil
+            }
+
+            if let endDate = activeMedicationStartDates.min() {
+                try await supabaseManager.endActiveGlp1Medications(userId: userId, endedAt: endDate)
+            }
         }
 
         for batch in medications.chunked(into: batchSize) {
@@ -589,13 +629,14 @@ class RealtimeSyncManager: ObservableObject {
                 let takenAt = log.takenAt ?? Date()
                 let createdAt = log.createdAt ?? takenAt
                 let updatedAt = log.updatedAt ?? createdAt
+                let doseAmountValue: Any = log.doseAmount > 0 ? log.doseAmount : NSNull()
 
                 return [
                     "id": id,
                     "user_id": userId,
                     "taken_at": formatter.string(from: takenAt),
                     "medication_id": log.medicationId as Any,
-                    "dose_amount": log.doseAmount,
+                    "dose_amount": doseAmountValue,
                     "dose_unit": log.doseUnit as Any,
                     "drug_class": log.drugClass as Any,
                     "brand": log.brand as Any,
@@ -631,13 +672,15 @@ class RealtimeSyncManager: ObservableObject {
                 let date = metric.date ?? Date()
                 let createdAt = metric.createdAt ?? date
                 let updatedAt = metric.updatedAt ?? createdAt
+                let stepsValue: Any = metric.steps > 0 ? metric.steps : NSNull()
 
                 return [
                     "id": id,
                     "user_id": metric.userId ?? "",
                     "date": formatter.string(from: date),
-                    "steps": metric.steps,
+                    "steps": stepsValue,
                     "notes": metric.notes as Any,
+                    "is_deleted": metric.isMarkedDeleted,
                     "created_at": formatter.string(from: createdAt),
                     "updated_at": formatter.string(from: updatedAt)
                 ]
@@ -676,15 +719,30 @@ class RealtimeSyncManager: ObservableObject {
                 "height_unit": profile.heightUnit as Any,
                 "gender": profile.gender as Any,
                 "date_of_birth": formattedBirthDate,
-                "activity_level": profile.activityLevel as Any
+                "activity_level": profile.activityLevel as Any,
+                "goal_weight": profile.goalWeight > 0 ? profile.goalWeight : NSNull(),
+                "goal_weight_unit": profile.goalWeightUnit as Any,
+                "is_deleted": profile.isMarkedDeleted
             ]
 
             try await supabaseManager.updateProfile(profileData, token: token)
 
             profile.syncStatus = "synced"
+            profile.isSynced = true
             // profile.lastSyncedAt = Date() // Field doesn't exist
             coreDataManager.save()
         }
+    }
+
+    nonisolated func pullSupplementalRemoteData(userId: String) async throws {
+        let medications = try await supabaseManager.fetchGlp1Medications(userId: userId)
+        coreDataManager.saveGlp1Medications(medications, userId: userId, markAsSynced: true)
+
+        let doseLogs = try await supabaseManager.fetchGlp1DoseLogs(userId: userId, limit: 200)
+        coreDataManager.saveGlp1DoseLogs(doseLogs, userId: userId, markAsSynced: true)
+
+        let dexaResults = try await supabaseManager.fetchDexaResults(userId: userId, limit: 50)
+        coreDataManager.saveDexaResults(dexaResults, userId: userId, markAsSynced: true)
     }
 
     nonisolated private func pullLatestData(userId: String, lastSync: Date?, token: String) async throws {
@@ -717,6 +775,8 @@ class RealtimeSyncManager: ObservableObject {
         if let profileData = try await supabaseManager.fetchProfile(userId: userId, token: token) {
             coreDataManager.updateOrCreateProfile(from: profileData)
         }
+
+        try await pullSupplementalRemoteData(userId: userId)
 
         // Pull latest body metric timestamp
         if let remoteLatest = try? await supabaseManager.fetchLatestBodyMetricTimestamp(
@@ -804,6 +864,12 @@ class RealtimeSyncManager: ObservableObject {
         return failedOperations
     }
 
+    nonisolated private func currentSyncScopeUserId() async -> String? {
+        await MainActor.run {
+            authManager.currentUser?.id
+        }
+    }
+
     // MARK: - Helpers
     func updatePendingSyncCount() {
         pendingCountTask?.cancel()
@@ -813,19 +879,38 @@ class RealtimeSyncManager: ObservableObject {
             let unsyncedGlp1 = await self.coreDataManager.fetchUnsyncedGlp1DoseLogs()
             let unsyncedMedications = await self.coreDataManager.fetchUnsyncedGlp1Medications()
             let unsyncedDexa = await self.coreDataManager.fetchUnsyncedDexaResults()
+            let scopedUserId = await self.currentSyncScopeUserId()
+            let scopedBodyMetrics = scopedUserId.map { scope in
+                unsynced.bodyMetrics.filter { $0.userId == scope }
+            } ?? unsynced.bodyMetrics
+            let scopedDailyMetrics = scopedUserId.map { scope in
+                unsynced.dailyMetrics.filter { $0.userId == scope }
+            } ?? unsynced.dailyMetrics
+            let scopedProfiles = scopedUserId.map { scope in
+                unsynced.profiles.filter { $0.id == scope }
+            } ?? unsynced.profiles
+            let scopedGlp1 = scopedUserId.map { scope in
+                unsyncedGlp1.filter { $0.userId == scope }
+            } ?? unsyncedGlp1
+            let scopedMedications = scopedUserId.map { scope in
+                unsyncedMedications.filter { $0.userId == scope }
+            } ?? unsyncedMedications
+            let scopedDexa = scopedUserId.map { scope in
+                unsyncedDexa.filter { $0.userId == scope }
+            } ?? unsyncedDexa
             let operationsCount = await MainActor.run { self.pendingOperations.count }
             await MainActor.run {
-                self.unsyncedBodyCount = unsynced.bodyMetrics.count
-                self.unsyncedDailyCount = unsynced.dailyMetrics.count
-                self.unsyncedProfileCount = unsynced.profiles.count
-                self.unsyncedGlp1Count = unsyncedGlp1.count
-                self.unsyncedDexaCount = unsyncedDexa.count
-                self.pendingSyncCount = unsynced.bodyMetrics.count +
-                    unsynced.dailyMetrics.count +
-                    unsynced.profiles.count +
-                    unsyncedGlp1.count +
-                    unsyncedMedications.count +
-                    unsyncedDexa.count +
+                self.unsyncedBodyCount = scopedBodyMetrics.count
+                self.unsyncedDailyCount = scopedDailyMetrics.count
+                self.unsyncedProfileCount = scopedProfiles.count
+                self.unsyncedGlp1Count = scopedGlp1.count
+                self.unsyncedDexaCount = scopedDexa.count
+                self.pendingSyncCount = scopedBodyMetrics.count +
+                    scopedDailyMetrics.count +
+                    scopedProfiles.count +
+                    scopedGlp1.count +
+                    scopedMedications.count +
+                    scopedDexa.count +
                     operationsCount
             }
         }
@@ -836,12 +921,31 @@ class RealtimeSyncManager: ObservableObject {
         let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs()
         let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications()
         let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults()
-        return !unsynced.bodyMetrics.isEmpty ||
-            !unsynced.dailyMetrics.isEmpty ||
-            !unsynced.profiles.isEmpty ||
-            !unsyncedGlp1.isEmpty ||
-            !unsyncedMedications.isEmpty ||
-            !unsyncedDexa.isEmpty ||
+        let scopedUserId = await currentSyncScopeUserId()
+        let hasUnsyncedBodyMetrics = scopedUserId.map { scope in
+            unsynced.bodyMetrics.contains { $0.userId == scope }
+        } ?? !unsynced.bodyMetrics.isEmpty
+        let hasUnsyncedDailyMetrics = scopedUserId.map { scope in
+            unsynced.dailyMetrics.contains { $0.userId == scope }
+        } ?? !unsynced.dailyMetrics.isEmpty
+        let hasUnsyncedProfiles = scopedUserId.map { scope in
+            unsynced.profiles.contains { $0.id == scope }
+        } ?? !unsynced.profiles.isEmpty
+        let hasUnsyncedGlp1Logs = scopedUserId.map { scope in
+            unsyncedGlp1.contains { $0.userId == scope }
+        } ?? !unsyncedGlp1.isEmpty
+        let hasUnsyncedMedications = scopedUserId.map { scope in
+            unsyncedMedications.contains { $0.userId == scope }
+        } ?? !unsyncedMedications.isEmpty
+        let hasUnsyncedDexa = scopedUserId.map { scope in
+            unsyncedDexa.contains { $0.userId == scope }
+        } ?? !unsyncedDexa.isEmpty
+        return hasUnsyncedBodyMetrics ||
+            hasUnsyncedDailyMetrics ||
+            hasUnsyncedProfiles ||
+            hasUnsyncedGlp1Logs ||
+            hasUnsyncedMedications ||
+            hasUnsyncedDexa ||
             !pendingOperations.isEmpty
     }
     private func shouldPullLatestData() -> Bool {
@@ -875,6 +979,9 @@ class RealtimeSyncManager: ObservableObject {
             bodyFatMethod: metrics.bodyFatMethod,
             muscleMass: metrics.muscleMass,
             boneMass: metrics.boneMass,
+            waistCm: metrics.waistCm,
+            hipCm: metrics.hipCm,
+            waistUnit: metrics.waistUnit,
             notes: metrics.notes,
             photoUrl: metrics.photoUrl,
             dataSource: metrics.dataSource,
