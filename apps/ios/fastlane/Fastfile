@@ -851,7 +851,7 @@ platform :ios do
           app_identifier: [ENV["APP_IDENTIFIER"] || "com.logyourbody.app"],
           readonly: readonly,
           git_url: ENV["MATCH_GIT_URL"],
-          git_branch: ENV["MATCH_GIT_BRANCH"] || "main",
+          git_branch: ENV["MATCH_GIT_BRANCH"].to_s.empty? ? "main" : ENV["MATCH_GIT_BRANCH"],
           git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
           team_id: ENV["APPLE_TEAM_ID"],
           generate_apple_certs: false, # Never generate certs due to OpenSSL issues and cert limits
@@ -951,7 +951,7 @@ platform :ios do
     # Set up match parameters that work with our authentication
     match_params = {
       git_url: ENV["MATCH_GIT_URL"],
-      git_branch: ENV["MATCH_GIT_BRANCH"] || "main",
+      git_branch: ENV["MATCH_GIT_BRANCH"].to_s.empty? ? "main" : ENV["MATCH_GIT_BRANCH"],
       git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
       team_id: ENV["APPLE_TEAM_ID"],
       skip_confirmation: true
