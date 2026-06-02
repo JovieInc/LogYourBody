@@ -211,7 +211,6 @@ struct DashboardViewLiquid: View {
                 if !viewModel.bodyMetrics.isEmpty {
                     updateAnimatedValues(for: selectedIndex)
                 }
-                await loadGlp1DoseLogs()
             }
         )
     }
@@ -244,7 +243,6 @@ struct DashboardViewLiquid: View {
                 if !viewModel.bodyMetrics.isEmpty {
                     updateAnimatedValues(for: selectedIndex)
                 }
-                await loadGlp1DoseLogs()
             }
         }
 
@@ -362,7 +360,6 @@ struct DashboardViewLiquid: View {
             metricsContent: {
                 VStack(spacing: 16) {
                     metricsView
-                    glp1MetricCard
                 }
             },
             onRefresh: {
@@ -370,7 +367,6 @@ struct DashboardViewLiquid: View {
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
-                await loadGlp1DoseLogs()
             }
         )
     }

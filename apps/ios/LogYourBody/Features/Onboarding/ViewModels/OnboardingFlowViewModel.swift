@@ -1079,6 +1079,11 @@ struct OnboardingProfileUpdateBuilder {
             updates["gender"] = sex.description
         }
 
+        if let birthYear = bodyScoreInput.birthYear,
+           let dateOfBirth = Calendar.current.date(from: DateComponents(year: birthYear, month: 1, day: 1)) {
+            updates["dateOfBirth"] = dateOfBirth
+        }
+
         if let heightCm = bodyScoreInput.height.inCentimeters {
             updates["height"] = heightCm
 

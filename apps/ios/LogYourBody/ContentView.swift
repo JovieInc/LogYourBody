@@ -41,11 +41,13 @@ struct ContentView: View {
             return false
         }
 
-        // Check all required fields exist
-        let hasName = profile.fullName != nil && !(profile.fullName?.isEmpty ?? true)
+        let displayName = profile.fullName ?? user.name
+        let hasName = !(displayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         let hasDOB = profile.dateOfBirth != nil
+        let hasHeight = (profile.height ?? 0) > 0
+        let hasGender = !(profile.gender?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
 
-        return hasName && hasDOB
+        return hasName && hasDOB && hasHeight && hasGender
     }
 
     private var shouldShowOnboarding: Bool {

@@ -14,7 +14,6 @@ struct LoginView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isRetrying = false
-    @State private var showPreAuthOnboarding = false
     @State private var navigateToSignUp = false
 
     var body: some View {
@@ -24,10 +23,6 @@ struct LoginView: View {
         }
         .navigationBarHidden(true)
         .standardErrorAlert(isPresented: $showError, message: errorMessage)
-        .fullScreenCover(isPresented: $showPreAuthOnboarding) {
-            PreAuthBodyScoreOnboardingContainer {
-            }
-        }
         .onAppear {
             AnalyticsService.shared.track(event: "login_view")
         }
@@ -58,14 +53,10 @@ struct LoginView: View {
                 // Molecule: Auth Header
                 AuthHeader(
                     title: "LogYourBody",
-                    subtitle: "Sign in with a one-time code sent to your email."
+                    subtitle: "Log your body in under 10 seconds."
                 )
                 .padding(.top, authManager.isClerkLoaded ? 80 : 20)
                 .padding(.bottom, 24)
-
-                preAuthOnboardingCTA
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 26)
 
                 // Organism: Login Form
                 LoginForm(
@@ -105,26 +96,6 @@ struct LoginView: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
-    }
-
-    private var preAuthOnboardingCTA: some View {
-        Button {
-            showPreAuthOnboarding = true
-        } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Preview body score onboarding")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.appText)
-
-                Text("Walk through the body score setup before you create an account.")
-                    .font(.system(size: 13))
-                    .foregroundColor(.appTextSecondary)
-            }
-            .padding(16)
-            .background(Color.black.opacity(0.25))
-            .cornerRadius(12)
-        }
-        .buttonStyle(.plain)
     }
 
     private var sessionStatusBanner: some View {

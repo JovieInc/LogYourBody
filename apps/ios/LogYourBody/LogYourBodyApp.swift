@@ -37,7 +37,7 @@ struct LogYourBodyApp: App {
                         .environmentObject(bugReportManager)
                 }
                 .sheet(isPresented: $showAddEntrySheet) {
-                    AddEntrySheet(isPresented: $showAddEntrySheet)
+                    AddEntrySheet(isPresented: $showAddEntrySheet, initialTab: selectedEntryTab)
                         .environmentObject(authManager)
                         .onAppear {
                             // Set the selected tab based on deep link
@@ -176,10 +176,13 @@ struct LogYourBodyApp: App {
             if let path = url.pathComponents.dropFirst().first {
                 switch path {
                 case "weight":
+                    selectedEntryTab = 0
                     UserDefaults.standard.set(0, forKey: "pendingEntryTab")
                 case "bodyfat":
+                    selectedEntryTab = 1
                     UserDefaults.standard.set(1, forKey: "pendingEntryTab")
                 case "photo":
+                    selectedEntryTab = 2
                     UserDefaults.standard.set(2, forKey: "pendingEntryTab")
                 default:
                     break

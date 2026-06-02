@@ -88,8 +88,7 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         let height = updates["height"] as? Double
         XCTAssertNotNil(height)
         if let height {
-            let expectedInches = 180.0 / 2.54
-            XCTAssertEqual(height, expectedInches, accuracy: 0.01)
+            XCTAssertEqual(height, 180.0, accuracy: 0.01)
         }
 
         XCTAssertEqual(updates["heightUnit"] as? String, "cm")
@@ -103,7 +102,12 @@ final class OnboardingFlowViewModelTests: XCTestCase {
 
         let updates = viewModel.buildOnboardingProfileUpdates()
 
-        XCTAssertEqual(updates["height"] as? Double, 72)
+        let height = updates["height"] as? Double
+        XCTAssertNotNil(height)
+        if let height {
+            XCTAssertEqual(height, 72 * 2.54, accuracy: 0.01)
+        }
+
         XCTAssertEqual(updates["heightUnit"] as? String, "in")
     }
 
