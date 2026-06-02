@@ -54,6 +54,8 @@ jobs:
     name: Deploy to TestFlight (${{ inputs.distribution_group }})
     runs-on: macos-26
     timeout-minutes: 30
+    permissions:
+      contents: write
     environment:
       name: ${{ inputs.environment }}
       url: https://testflight.apple.com
@@ -239,6 +241,7 @@ jobs:
     
     - name: Post deployment notification
       if: success()
+      continue-on-error: true
       uses: actions/github-script@v8
       with:
         script: |
@@ -261,7 +264,7 @@ jobs:
           
           ${group === 'production' ? '⚠️ This is a production release candidate.' : `This is a ${group} build for testing.`}`;
           
-          github.rest.repos.createCommitComment({
+          await github.rest.repos.createCommitComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
             commit_sha: context.sha,
