@@ -156,16 +156,11 @@ jobs:
     
     - name: Archive and export
       run: |
+        set -o pipefail
         cd apps/ios
         
-        # Use Fastlane to build, capturing output for error detection
+        # Use Fastlane to build while preserving its exit status through tee.
         bundle exec fastlane build_release 2>&1 | tee fastlane.log
-        
-        # Check for errors and surface them in the summary
-        if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" fastlane.log; then
-          echo "::error::Build errors detected - see highlighted lines above"
-          exit 1
-        fi
       env:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
