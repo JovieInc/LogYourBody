@@ -70,7 +70,7 @@ jobs:
 
   ios-beta:
     name: iOS Beta
-    runs-on: macos-14
+    runs-on: macos-26
     needs: [detect-changes, web]
     if: needs.detect-changes.outputs.ios == 'true' && false  # Enable when ready
     timeout-minutes: 30
@@ -83,7 +83,7 @@ jobs:
       - name: Setup iOS build environment
         uses: ./.github/actions/setup-ios-build
         with:
-          xcode-version: '16.1'
+          xcode-version: 'latest-stable'
           working-directory: apps/ios
           setup-ruby: 'true'
           create-config-files: 'true'
