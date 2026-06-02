@@ -732,6 +732,10 @@ platform :ios do
     release_profile = ENV["PROVISIONING_PROFILE_SPECIFIER"].to_s
     release_profile = "match AppStore com.logyourbody.app 1780400349" if release_profile.empty?
 
+    if ENV["MATCH_GIT_URL"] && ENV["MATCH_PASSWORD"]
+      setup_provisioning(type: "appstore", readonly: true)
+    end
+
     build_app(
       project: project,
       scheme: scheme,
