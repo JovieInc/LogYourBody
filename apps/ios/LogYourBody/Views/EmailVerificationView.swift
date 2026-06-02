@@ -91,9 +91,7 @@ struct EmailVerificationView: View {
                     try await authManager.verifySignInEmail(code: verificationCode)
                     successMessage = "Signed in successfully!"
                     AnalyticsService.shared.track(event: "login_email_code_verified")
-                case .signUp?:
-                    fallthrough
-                case nil:
+                case .signUp?, nil:
                     try await authManager.verifyEmail(code: verificationCode)
                     successMessage = "Email verified successfully!"
                     AnalyticsService.shared.track(event: "email_verified")
@@ -106,9 +104,7 @@ struct EmailVerificationView: View {
                 switch authManager.emailVerificationFlow {
                 case .signIn?:
                     event = "login_email_code_failed"
-                case .signUp?:
-                    fallthrough
-                case nil:
+                case .signUp?, nil:
                     event = "email_verification_failed"
                 }
 
@@ -128,9 +124,7 @@ struct EmailVerificationView: View {
                     try await authManager.resendSignInEmailCode()
                     successMessage = "A new sign-in code has been sent to your email."
                     AnalyticsService.shared.track(event: "login_email_code_resent")
-                case .signUp?:
-                    fallthrough
-                case nil:
+                case .signUp?, nil:
                     try await authManager.resendVerificationEmail()
                     successMessage = "A new verification code has been sent to your email."
                     AnalyticsService.shared.track(event: "email_verification_resent")

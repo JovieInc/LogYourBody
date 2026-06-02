@@ -390,18 +390,11 @@ private struct PaywallFeatureRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Color.appPrimary.opacity(0.14))
-                    .frame(width: 44, height: 44)
+            Image(systemName: icon)
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundColor(.appPrimary)
+                .frame(width: 30, height: 28, alignment: .top)
 
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.appPrimary)
-            }
-
-            // Text
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 17, weight: .semibold))
