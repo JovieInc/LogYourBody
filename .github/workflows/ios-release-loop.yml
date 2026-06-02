@@ -209,6 +209,8 @@ jobs:
     name: Deploy to TestFlight
     needs: [validate-release, build-release]
     if: github.event.inputs.release_type != 'app_store'
+    permissions:
+      contents: write
     uses: ./.github/workflows/ios-testflight-deploy.yml
     with:
       distribution_group: production
