@@ -172,17 +172,12 @@ struct AppleSignInButton: UIViewRepresentable {
                 case .notHandled:
                     // print("🍎 Authorization not handled")
                     showErrorAlert("Apple Sign In request was not handled.")
-                case .notInteractive,
-                     .matchedExcludedCredential,
-                     .credentialImport,
-                     .credentialExport,
-                     .preferSignInWithApple,
-                     .deviceNotConfiguredForPasskeyCreation:
+                case .notInteractive:
                     showErrorAlert("Apple Sign In is not available right now. Please try again or use another sign-in method.")
                 case .unknown:
                     // print("🍎 Unknown error")
                     showErrorAlert("An unknown error occurred with Apple Sign In.")
-                @unknown default:
+                default:
                     // print("🍎 Unknown error case")
                     showErrorAlert("An error occurred with Apple Sign In.")
                 }
