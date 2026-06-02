@@ -212,10 +212,16 @@ jobs:
         
         echo "Found IPA: $IPA_PATH"
 
+        CHANGELOG_PATH="$PWD/release_notes.txt"
+        if [ ! -f "$CHANGELOG_PATH" ]; then
+          echo "::error::Release notes file not found at $CHANGELOG_PATH"
+          exit 1
+        fi
+
         bundle exec fastlane upload_testflight \
           ipa_path:"$IPA_PATH" \
           groups:"$TESTFLIGHT_GROUPS" \
-          changelog_file:release_notes.txt
+          changelog_file:"$CHANGELOG_PATH"
       env:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
