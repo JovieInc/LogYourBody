@@ -19,50 +19,32 @@ struct PaywallView: View {
 
     var body: some View {
         ZStack {
-            // Background gradient
             LinearGradient(
-                colors: [.black, .black.opacity(0.8)],
+                colors: [Color.appBackground, Color.black],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 32) {
-                    // Header
+                VStack(spacing: 24) {
                     header
-
-                    // Features List
                     featuresSection
 
-                    // Pricing Card
                     if let package = firstAvailablePackage {
                         pricingCard(package: package)
                     } else if isLoading {
                         ProgressView()
-                            .tint(Color(hex: "#6EE7F0"))
+                            .tint(.appPrimary)
                     } else {
-                        // No packages available - show error
-                        Text("No subscription plans available")
-                            .foregroundColor(.white.opacity(0.7))
-                            .padding()
-
-                        Text("Please check your internet connection and try again")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
+                        plansUnavailableState
                     }
 
-                    // Purchase Button
                     if let package = firstAvailablePackage {
                         purchaseButton(package: package)
                     }
 
-                    // Restore purchases
                     restorePurchasesButton
-
-                    // Legal links
                     legalLinks
 
                     Spacer(minLength: 50)
@@ -140,67 +122,48 @@ struct PaywallView: View {
     // MARK: - Components
 
     private var header: some View {
-        VStack(spacing: 16) {
-            // App icon/logo
+        VStack(spacing: 14) {
             Image(systemName: "chart.line.uptrend.xyaxis.circle.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color(hex: "#6EE7F0"), Color(hex: "#4FA9B1")],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: Color(hex: "#6EE7F0").opacity(0.3), radius: 20, x: 0, y: 10)
+                .font(.system(size: 56))
+                .foregroundStyle(Color.appPrimary)
 
             Text("LogYourBody Pro")
-                .font(.system(size: 32, weight: .bold))
-                .foregroundColor(.white)
+                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .foregroundColor(.appText)
 
-            Text("Track your transformation")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundColor(.white.opacity(0.7))
+            Text("Log your body in under 10 seconds and see if you are moving in the right direction.")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var featuresSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             PaywallFeatureRow(
-                icon: "camera.fill",
-                title: "Progress Photos",
-                description: "Visual timeline of your transformation"
+                icon: "scalemass.fill",
+                title: "Daily logging",
+                description: "Save weight and body fat fast."
             )
 
             PaywallFeatureRow(
                 icon: "chart.xyaxis.line",
-                title: "Advanced Analytics",
-                description: "Track weight, body fat, and FFMI trends"
-            )
-
-            PaywallFeatureRow(
-                icon: "heart.fill",
-                title: "HealthKit Sync",
-                description: "Seamless integration with Apple Health"
+                title: "Clear trends",
+                description: "See weight, body fat, FFMI, and body score."
             )
 
             PaywallFeatureRow(
                 icon: "icloud.fill",
-                title: "Cloud Backup",
-                description: "Your data safely synced across devices"
-            )
-
-            PaywallFeatureRow(
-                icon: "sparkles",
-                title: "Premium Features",
-                description: "Unlock all current and future features"
+                title: "Private sync",
+                description: "Keep local data backed up to your account."
             )
         }
         .padding(.horizontal, 8)
     }
 
     private func pricingCard(package: Package) -> some View {
-        VStack(spacing: 16) {
-            // Trial badge
+        VStack(spacing: 14) {
             if let trialText = revenueCatManager.getTrialDurationText(package: package) {
                 HStack(spacing: 8) {
                     Image(systemName: "gift.fill")
@@ -210,74 +173,54 @@ struct PaywallView: View {
                         .font(.system(size: 13, weight: .bold))
                         .tracking(1)
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(
-                    LinearGradient(
-                        colors: [Color(hex: "#6EE7F0"), Color(hex: "#4FA9B1")],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(20)
-                .shadow(color: Color(hex: "#6EE7F0").opacity(0.4), radius: 15, x: 0, y: 5)
+                .foregroundColor(.black)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.appPrimary)
+                .clipShape(Capsule())
             }
 
-            // Price
             VStack(spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(revenueCatManager.formatPrice(package: package))
-                        .font(.system(size: 56, weight: .bold))
-                        .foregroundColor(.white)
+                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .foregroundColor(.appText)
 
-                    Text("/year")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(.white.opacity(0.6))
+                    Text(billingPeriodSuffix(for: package))
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.appTextSecondary)
                 }
 
-                Text("Just $5.75 per month, billed annually")
+                Text(packageSummaryText(for: package))
                     .font(.system(size: 15))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(.appTextSecondary)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
+        .padding(.vertical, 28)
         .padding(.horizontal, 24)
         .background(
             ZStack {
-                // Glass background
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.appCard.opacity(0.95))
 
-                // Border
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [Color.white.opacity(0.3), Color.white.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-
-                // Accent glow
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "#6EE7F0").opacity(0.1), Color.clear],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.appBorder.opacity(0.8), lineWidth: 1)
             }
         )
-        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+        .shadow(color: .black.opacity(0.25), radius: 18, x: 0, y: 12)
     }
 
     private func purchaseButton(package: Package) -> some View {
         Button {
             Task {
+                AnalyticsService.shared.track(
+                    event: "purchase_start",
+                    properties: [
+                        "package_id": package.identifier
+                    ]
+                )
+
                 let success = await revenueCatManager.purchase(package: package)
                 if !success && revenueCatManager.errorMessage != nil {
                     showPurchaseError = true
@@ -297,21 +240,14 @@ struct PaywallView: View {
                         .font(.system(size: 20, weight: .semibold))
                 }
 
-                Text(revenueCatManager.isPurchasing ? "Processing..." : "Start Free Trial")
+                Text(revenueCatManager.isPurchasing ? "Processing..." : purchaseButtonTitle(for: package))
                     .font(.system(size: 18, weight: .semibold))
             }
-            .foregroundColor(.white)
+            .foregroundColor(.black)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .background(
-                LinearGradient(
-                    colors: [Color(hex: "#6EE7F0"), Color(hex: "#4FA9B1")],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .background(Color.appPrimary)
             .cornerRadius(16)
-            .shadow(color: Color(hex: "#6EE7F0").opacity(0.4), radius: 20, x: 0, y: 10)
         }
         .disabled(revenueCatManager.isPurchasing)
     }
@@ -361,6 +297,77 @@ struct PaywallView: View {
         }
     }
 
+    private var plansUnavailableState: some View {
+        VStack(spacing: 12) {
+            Text("Subscription plans are unavailable")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.appText)
+
+            Text("Check your connection and retry.")
+                .font(.system(size: 14))
+                .foregroundColor(.appTextSecondary)
+
+            Button {
+                Task {
+                    await loadOfferings()
+                }
+            } label: {
+                Label("Retry", systemImage: "arrow.clockwise")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.appText)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.appCard)
+                    .cornerRadius(12)
+            }
+            .disabled(isLoading)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(20)
+        .background(Color.appCard.opacity(0.65))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.appBorder.opacity(0.8), lineWidth: 1)
+        )
+        .cornerRadius(16)
+    }
+
+    private func billingPeriodSuffix(for package: Package) -> String {
+        let period = billingPeriodLabel(for: package)
+        return period.isEmpty ? "" : "/\(period)"
+    }
+
+    private func packageSummaryText(for package: Package) -> String {
+        let period = billingPeriodLabel(for: package)
+        if period.isEmpty {
+            return "Billed by the App Store."
+        }
+
+        return "Billed \(period)ly by the App Store."
+    }
+
+    private func purchaseButtonTitle(for package: Package) -> String {
+        revenueCatManager.getTrialDurationText(package: package) == nil ? "Subscribe" : "Start trial"
+    }
+
+    private func billingPeriodLabel(for package: Package) -> String {
+        let identifier = "\(package.identifier) \(package.storeProduct.productIdentifier)".lowercased()
+
+        if identifier.contains("annual") || identifier.contains("year") {
+            return "year"
+        }
+
+        if identifier.contains("month") {
+            return "month"
+        }
+
+        if identifier.contains("week") {
+            return "week"
+        }
+
+        return ""
+    }
+
     // MARK: - Functions
 
     private func loadOfferings() async {
@@ -386,23 +393,23 @@ private struct PaywallFeatureRow: View {
             // Icon
             ZStack {
                 Circle()
-                    .fill(Color(hex: "#6EE7F0").opacity(0.15))
-                    .frame(width: 48, height: 48)
+                    .fill(Color.appPrimary.opacity(0.14))
+                    .frame(width: 44, height: 44)
 
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(Color(hex: "#6EE7F0"))
+                    .foregroundColor(.appPrimary)
             }
 
             // Text
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.appText)
 
                 Text(description)
                     .font(.system(size: 15))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.appTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 

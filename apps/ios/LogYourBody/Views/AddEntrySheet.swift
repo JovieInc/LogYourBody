@@ -70,7 +70,6 @@ struct AddEntrySheet: View {
                     Label("Weight", systemImage: "scalemass").tag(0)
                     Label("Body Fat", systemImage: "percent").tag(1)
                     Label("Photos", systemImage: "photo.fill").tag(2)
-                    Label("GLP-1", systemImage: "syringe").tag(3)
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
@@ -161,13 +160,6 @@ struct AddEntrySheet: View {
                 // Set default weight unit based on user preference
                 if weightUnit.isEmpty {
                     weightUnit = currentSystem.weightUnit
-                }
-
-                glp1UserId = authManager.currentUser?.id
-                if let userId = glp1UserId {
-                    Task {
-                        await loadGlp1Medications(userId: userId)
-                    }
                 }
 
                 AnalyticsService.shared.track(event: "add_entry_view")
@@ -619,6 +611,8 @@ struct AddEntrySheet: View {
                     "unit": resolvedWeightUnit
                 ]
             )
+            trackLogEntrySaved(type: "weight")
+            HapticManager.shared.successAction()
 
             dismiss()
         } catch let error as ValidationError {
@@ -648,6 +642,8 @@ struct AddEntrySheet: View {
                 BodyScoreRecalculationService.shared.scheduleRecalculation()
             }
 
+            trackLogEntrySaved(type: "body_fat")
+            HapticManager.shared.successAction()
             dismiss()
         } catch let error as ValidationError {
             handleValidationError(error, for: .bodyFat)
@@ -774,6 +770,17 @@ struct AddEntrySheet: View {
             properties: [
                 "type": "photos",
                 "count": String(selectedPhotos.count)
+            ]
+        )
+        trackLogEntrySaved(type: "photos")
+        HapticManager.shared.successAction()
+    }
+
+    private func trackLogEntrySaved(type: String) {
+        AnalyticsService.shared.track(
+            event: "log_entry_saved",
+            properties: [
+                "type": type
             ]
         )
     }

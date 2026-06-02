@@ -523,7 +523,7 @@ extension DashboardViewLiquid {
 
     var quickActions: some View {
         HStack(spacing: 12) {
-            GlassPillButton(icon: "plus.circle.fill", title: "Log Weight") {
+            GlassPillButton(icon: "plus.circle.fill", title: "Log") {
                 showAddEntrySheet = true
             }
 

@@ -345,6 +345,12 @@ class RealtimeSyncManager: ObservableObject {
 
                     self.savePendingOperations()
                     self.updatePendingSyncCount()
+                    AnalyticsService.shared.track(
+                        event: "sync_failed",
+                        properties: [
+                            "pending_count": String(self.pendingSyncCount)
+                        ]
+                    )
                     onCompletion?()
                 }
             }

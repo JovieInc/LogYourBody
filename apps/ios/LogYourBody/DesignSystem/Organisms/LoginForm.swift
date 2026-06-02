@@ -26,6 +26,14 @@ struct LoginForm: View {
 
     var body: some View {
         VStack(spacing: 20) {
+            // Apple Sign In is the primary path for the paid iOS app.
+            SocialLoginButton(
+                provider: .apple,
+                action: onAppleSignIn
+            )
+
+            DSAuthDivider()
+
             // Email Field
             AuthFormField(
                 label: "Email",
@@ -46,23 +54,14 @@ struct LoginForm: View {
 
             // Login Button
             BaseButton(
-                "Sign in",
+                "Email me a code",
                 configuration: ButtonConfiguration(
-                    style: .custom(background: .white, foreground: .black),
+                    style: .custom(background: .appCard, foreground: .appText),
                     isLoading: isLoading,
                     isEnabled: isFormValid,
                     fullWidth: true
                 ),
                 action: onLogin
-            )
-
-            // Divider
-            DSAuthDivider()
-
-            // Apple Sign In
-            SocialLoginButton(
-                provider: .apple,
-                action: onAppleSignIn
             )
         }
     }
