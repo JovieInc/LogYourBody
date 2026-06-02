@@ -98,22 +98,31 @@ jobs:
         esac
     
     - name: Setup App Store Connect Authentication
+      env:
+        ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+        ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
       run: |
         cd apps/ios
-        # Create API key file from secret
         mkdir -p fastlane
-        cat > fastlane/api_key.json << 'EOFKEY'
-        {
-          "key_id": "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}",
-          "issuer_id": "${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}",
-          "key": "${{ secrets.APP_STORE_CONNECT_API_KEY }}",
-          "duration": 1200,
-          "in_house": false
+
+        ruby <<'RUBY'
+        require "json"
+
+        api_key = {
+          "key_id" => ENV.fetch("ASC_KEY_ID"),
+          "issuer_id" => ENV.fetch("ASC_ISSUER_ID"),
+          "key" => ENV.fetch("ASC_PRIVATE_KEY").gsub("\\n", "\n"),
+          "duration" => 1200,
+          "in_house" => false
         }
-        EOFKEY
+
+        File.write("fastlane/api_key.json", JSON.pretty_generate(api_key))
+        JSON.parse(File.read("fastlane/api_key.json"))
+        RUBY
         
         # Set API key path for subsequent steps
-        echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> $GITHUB_ENV
+        echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> "$GITHUB_ENV"
     
     - name: Sync Certificates with Match
       uses: ./.github/actions/sync-match
