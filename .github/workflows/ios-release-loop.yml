@@ -168,6 +168,10 @@ jobs:
         fi
       env:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+        MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+        MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
     
     - name: Upload build artifact
       uses: actions/upload-artifact@v5
