@@ -24,7 +24,7 @@ concurrency:
 jobs:
   validate-release:
     name: Validate Release
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 5
     permissions:
       contents: read
@@ -107,7 +107,7 @@ jobs:
     name: Build Release
     needs: [validate-release, check-existing-build]
     if: needs.check-existing-build.outputs.has_artifact != 'true'
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 30
     
     steps:
@@ -116,14 +116,17 @@ jobs:
     - name: Setup iOS Build Environment
       uses: ./.github/actions/setup-ios-build
       with:
-        xcode-version: '16.1'
+        xcode-version: 'latest-stable'
         working-directory: apps/ios
         create-config-files: 'true'
     
     - name: Install Compatible OpenSSL
       run: |
-        brew install openssl@1.1
-        echo "/usr/local/opt/openssl@1.1/bin" >> $GITHUB_PATH
+        if brew list openssl@1.1 >/dev/null 2>&1 || brew install openssl@1.1; then
+          echo "$(brew --prefix openssl@1.1)/bin" >> "$GITHUB_PATH"
+        else
+          echo "::warning::openssl@1.1 unavailable; continuing with the runner OpenSSL"
+        fi
         
     - name: Setup Match Authentication
       env:
@@ -230,7 +233,7 @@ jobs:
     name: Deploy to App Store
     needs: [validate-release, build-release]
     if: github.event.inputs.release_type == 'app_store'
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 30
     environment:
       name: production-app-store
@@ -248,7 +251,7 @@ jobs:
     - name: Setup iOS Build Environment
       uses: ./.github/actions/setup-ios-build
       with:
-        xcode-version: '16.1'
+        xcode-version: 'latest-stable'
         working-directory: apps/ios
     
     - name: Set Environment Variables for Build
