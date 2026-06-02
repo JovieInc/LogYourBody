@@ -307,6 +307,8 @@ jobs:
     needs: [validate-release, deploy-testflight, deploy-app-store]
     if: always() && (needs.deploy-testflight.result == 'success' || needs.deploy-app-store.result == 'success')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - uses: actions/checkout@v6
