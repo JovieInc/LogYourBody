@@ -728,6 +728,10 @@ platform :ios do
 
   desc "Build for release (archive only)"
   lane :build_release do
+    bundle_identifier = ENV["APP_IDENTIFIER"] || "com.logyourbody.app"
+    release_profile = ENV["PROVISIONING_PROFILE_SPECIFIER"].to_s
+    release_profile = "match AppStore com.logyourbody.app 1780400349" if release_profile.empty?
+
     build_app(
       project: project,
       scheme: scheme,
@@ -737,7 +741,7 @@ platform :ios do
       export_options: {
         teamID: ENV["APPLE_TEAM_ID"],
         provisioningProfiles: {
-          "LogYourBody.LogYourBody" => ENV["PROVISIONING_PROFILE_SPECIFIER"] || ENV["PROVISIONING_PROFILE_UUID"]
+          bundle_identifier => release_profile
         },
         compileBitcode: false,
         uploadBitcode: false,
@@ -751,7 +755,7 @@ platform :ios do
       disable_package_automatic_updates: true,
       cloned_source_packages_path: "SourcePackages",
       skip_profile_detection: true,
-      xcargs: "-allowProvisioningUpdates"
+      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM='#{ENV["APPLE_TEAM_ID"]}' CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='#{release_profile}' PROVISIONING_PROFILE=''"
     )
   end
 
