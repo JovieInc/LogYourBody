@@ -203,28 +203,19 @@ jobs:
       run: |
         cd apps/ios
         
-        # Find the IPA file
-        IPA_PATH=$(find ../build -name "*.ipa" -type f | head -1)
+        # Find the IPA file downloaded by actions/download-artifact at repo root.
+        IPA_PATH=$(find "$GITHUB_WORKSPACE/build" -name "*.ipa" -type f | head -1)
         if [ -z "$IPA_PATH" ]; then
           echo "::error::No IPA file found in build artifacts"
           exit 1
         fi
         
         echo "Found IPA: $IPA_PATH"
-        
-        # Create upload parameters
-        UPLOAD_PARAMS="ipa:\"$IPA_PATH\" "
-        UPLOAD_PARAMS+="groups:\"$TESTFLIGHT_GROUPS\" "
-        UPLOAD_PARAMS+="changelog_file:release_notes.txt "
-        UPLOAD_PARAMS+="beta_app_review_info:$TESTFLIGHT_BETA_APP_REVIEW "
-        
-        if [ "${{ inputs.distribution_group }}" == "production" ]; then
-          UPLOAD_PARAMS+="submit_beta_review:true "
-          UPLOAD_PARAMS+="distribute_external:true "
-        fi
-        
-        # Use Fastlane to upload to TestFlight
-        bundle exec fastlane run upload_to_testflight $UPLOAD_PARAMS
+
+        bundle exec fastlane upload_testflight \
+          ipa_path:"$IPA_PATH" \
+          groups:"$TESTFLIGHT_GROUPS" \
+          changelog_file:release_notes.txt
       env:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
