@@ -57,14 +57,26 @@ jobs:
       run: |
         cd apps/ios
         
-        # Get marketing version
-        VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" LogYourBody/Info.plist)
+        # Info.plist stores the Xcode placeholder, so resolve the real app
+        # version from build settings before passing it to downstream jobs.
+        VERSION=$(xcodebuild \
+          -project LogYourBody.xcodeproj \
+          -scheme LogYourBody \
+          -configuration Release \
+          -showBuildSettings 2>/dev/null \
+          | awk -F ' = ' '/MARKETING_VERSION/ { print $2; exit }')
+
+        UNRESOLVED_MARKER="\$("
+        if [ -z "$VERSION" ] || printf '%s' "$VERSION" | grep -qF "$UNRESOLVED_MARKER"; then
+          echo "::error::Unable to resolve MARKETING_VERSION for release"
+          exit 1
+        fi
         
         # Generate build number with timestamp
         BUILD_NUMBER=$(date -u +%Y%m%d%H%M%S)
         
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
         
         echo "📦 Version: $VERSION"
         echo "🔢 Build: $BUILD_NUMBER"

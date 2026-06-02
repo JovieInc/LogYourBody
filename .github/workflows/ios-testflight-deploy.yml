@@ -126,19 +126,24 @@ jobs:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     
     - name: Prepare release notes
+      env:
+        BUILD_NUMBER: ${{ inputs.build_number }}
+        RELEASE_NOTES_INPUT: ${{ inputs.release_notes }}
+        VERSION_NAME: ${{ inputs.version_name }}
       run: |
         cd apps/ios
         
         # Use provided release notes or generate default ones
-        if [ -n "${{ inputs.release_notes }}" ]; then
-          echo "${{ inputs.release_notes }}" > release_notes.txt
+        if [ -n "$RELEASE_NOTES_INPUT" ]; then
+          printf '%s\n' "$RELEASE_NOTES_INPUT" > release_notes.txt
         else
+          DISPLAY_VERSION="${VERSION_NAME:-Latest}"
           # Generate release notes based on distribution group
           case "${{ inputs.distribution_group }}" in
             alpha)
               cat > release_notes.txt << EOF
-        Alpha Build ${{ inputs.build_number }}
-        Version: ${{ inputs.version_name || 'Latest' }}
+        Alpha Build $BUILD_NUMBER
+        Version: $DISPLAY_VERSION
         
         This is an automated alpha build for internal testing.
         Please report any issues found during testing.
@@ -146,8 +151,8 @@ jobs:
               ;;
             beta)
               cat > release_notes.txt << EOF
-        Beta Build ${{ inputs.build_number }}
-        Version: ${{ inputs.version_name || 'Latest' }}
+        Beta Build $BUILD_NUMBER
+        Version: $DISPLAY_VERSION
         
         This beta release includes the latest features and bug fixes.
         Your feedback is valuable for improving the app.
@@ -155,8 +160,8 @@ jobs:
               ;;
             production)
               cat > release_notes.txt << EOF
-        Release Build ${{ inputs.build_number }}
-        Version: ${{ inputs.version_name || 'Latest' }}
+        Release Build $BUILD_NUMBER
+        Version: $DISPLAY_VERSION
         
         This release includes stability improvements and bug fixes.
         Thank you for using our app!
@@ -170,6 +175,8 @@ jobs:
     
     - name: Production release checks
       if: inputs.distribution_group == 'production'
+      env:
+        VERSION_NAME: ${{ inputs.version_name }}
       run: |
         cd apps/ios
         
@@ -177,7 +184,8 @@ jobs:
         echo "🔍 Running production release checks..."
         
         # Verify version number is properly set
-        if [ -z "${{ inputs.version_name }}" ]; then
+        UNRESOLVED_MARKER="\$("
+        if [ -z "$VERSION_NAME" ] || printf '%s' "$VERSION_NAME" | grep -qF "$UNRESOLVED_MARKER"; then
           echo "::error::Version name is required for production releases"
           exit 1
         fi
