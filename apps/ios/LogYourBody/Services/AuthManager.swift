@@ -392,6 +392,10 @@ class AuthManager: NSObject, ObservableObject {
                 // print("🔄 Clerk session state: signed out")
                 if previousSessionId != nil && currentSessionId == nil && lastExitReason == .none {
                     lastExitReason = .sessionExpired
+                    Task {
+                        await self.performLogout(exitReason: .sessionExpired)
+                    }
+                    return
                 }
                 self.isAuthenticated = false
                 self.currentUser = nil
@@ -444,13 +448,7 @@ class AuthManager: NSObject, ObservableObject {
         }
 
         if clerk.session == nil || clerk.session?.id == sessionId {
-            isAuthenticated = false
-            currentUser = nil
-            bootstrappedProfileSessionIds.remove(sessionId)
-            userDefaults.removeObject(forKey: userKey)
-            ErrorTrackingService.shared.updateUserId(nil)
-            AnalyticsService.shared.reset()
-            await RevenueCatManager.shared.logoutUser()
+            await performLogout(exitReason: .sessionExpired)
         }
     }
 

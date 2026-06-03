@@ -383,11 +383,11 @@ final class StubSupabaseManager: SupabaseManager {
 final class SyncIntegrationTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
-        await CoreDataManager.shared.deleteAllDataAndWait()
+        try await CoreDataManager.shared.deleteAllDataAndWait()
     }
 
     override func tearDown() async throws {
-        await CoreDataManager.shared.deleteAllDataAndWait()
+        try await CoreDataManager.shared.deleteAllDataAndWait()
         try await super.tearDown()
     }
 
@@ -610,7 +610,7 @@ final class SyncIntegrationTests: XCTestCase {
             updatedAt: existingDate
         )
 
-        await coreData.saveBodyMetricsAndWait(existingMetric, userId: userId)
+        try await coreData.saveBodyMetricsAndWait(existingMetric, userId: userId)
 
         let sameHourDate = calendar.date(byAdding: DateComponents(hour: 10, minute: 15), to: day) ?? day
         let nextHourDate = calendar.date(byAdding: DateComponents(hour: 11, minute: 5), to: day) ?? day
@@ -744,7 +744,7 @@ final class SyncIntegrationTests: XCTestCase {
             updatedAt: updatedAt
         )
 
-        await coreData.saveBodyMetricsAndWait(metricModel, userId: userId)
+        try await coreData.saveBodyMetricsAndWait(metricModel, userId: userId)
 
         let stubSupabase = StubSupabaseManager()
         let manager = RealtimeSyncManager(
@@ -806,7 +806,7 @@ final class SyncIntegrationTests: XCTestCase {
             updatedAt: updatedAt
         )
 
-        await coreData.saveDailyMetricsAndWait(dailyModel, userId: userId)
+        try await coreData.saveDailyMetricsAndWait(dailyModel, userId: userId)
 
         let stubSupabase = StubSupabaseManager()
         let manager = RealtimeSyncManager(

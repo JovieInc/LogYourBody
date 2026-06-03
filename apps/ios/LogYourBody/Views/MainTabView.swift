@@ -433,7 +433,7 @@ private struct PaidWeightLoggerMVPView: View {
                 updatedAt: now
             )
 
-            await CoreDataManager.shared.saveBodyMetricsAndWait(metrics, userId: userId, markAsSynced: false)
+            try await CoreDataManager.shared.saveBodyMetricsAndWait(metrics, userId: userId, markAsSynced: false)
             realtimeSyncManager.syncIfNeeded()
             AnalyticsService.shared.track(event: "mvp_weight_logged")
 

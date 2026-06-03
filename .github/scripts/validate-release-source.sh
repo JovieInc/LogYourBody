@@ -67,7 +67,7 @@ for check_name in "${required_checks[@]}"; do
   check_name="$(printf '%s' "$check_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
   [ -n "$check_name" ] || continue
 
-  matches="$(awk -F '\t' -v wanted="$check_name" '$1 == wanted { print }' "$CHECK_RUNS_TSV")"
+  matches="$(awk -F '\t' -v wanted="$check_name" '$1 == wanted { print }' "$CHECK_RUNS_TSV" | LC_ALL=C sort -t $'\t' -k4,4)"
 
   if [ -z "$matches" ]; then
     missing_required+=("$check_name")
