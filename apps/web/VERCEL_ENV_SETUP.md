@@ -17,7 +17,8 @@ pnpm dlx vercel link
 
 Add these values through the Vercel dashboard or CLI:
 
-- `VITE_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_URL` - required for Supabase initialization
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - required for Supabase initialization
 - `VITE_REVENUECAT_IOS_KEY`
 - `VITE_REVENUECAT_WEB_KEY`
 - `VITE_REVENUECAT_PUBLIC_KEY` if a legacy web path still reads it
@@ -29,8 +30,10 @@ configured project.
 ## CLI Flow
 
 ```bash
-pnpm dlx vercel env add VITE_SUPABASE_URL production
-pnpm dlx vercel env add VITE_SUPABASE_URL preview
+pnpm dlx vercel env add NEXT_PUBLIC_SUPABASE_URL production
+pnpm dlx vercel env add NEXT_PUBLIC_SUPABASE_URL preview
+pnpm dlx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
+pnpm dlx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY preview
 pnpm dlx vercel env add VITE_REVENUECAT_IOS_KEY production
 pnpm dlx vercel env add VITE_REVENUECAT_IOS_KEY preview
 pnpm dlx vercel env add VITE_REVENUECAT_WEB_KEY production
