@@ -51,8 +51,10 @@ yarn-error.log*
 
 # Local scripts
 apps/web/scripts/
+!apps/web/scripts/
 !apps/web/scripts/seed-database.ts
 !apps/web/scripts/test-seeded-users.ts
+!apps/web/scripts/next-build.cjs
 !apps/web/scripts/tsconfig.json
 !apps/web/scripts/README.md
 # Note: Root scripts/ folder contains CI/CD tools and should be committed
