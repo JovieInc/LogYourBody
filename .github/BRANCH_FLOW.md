@@ -1,144 +1,77 @@
-# LogYourBody Branch Flow & CI/CD
+# LogYourBody Branch Flow
 
-## 🌊 Branch Flow
+LogYourBody uses trunk-based development. `main` is the single production trunk; all work lands through short-lived pull requests.
+
+## Branch Model
 
 ```
-dev ──(green CI auto-sync)──► preview ──(manual PR)──► main
+feat/*, fix/*, refactor/*, agent/* -> pull request -> main
 ```
 
-### Branch Purposes
+- `main`: protected production trunk.
+- `feat/*`: new user-visible or product behavior.
+- `fix/*`: bug fixes and release repairs.
+- `refactor/*`: structure-only changes with no intended behavior change.
+- `agent/*`: agent scratch or automation branches.
+- `codex/*`: generated repair branches opened by Codex automation.
 
-- **`dev`** - Active development branch
-  - All feature development happens here
-  - Runs full test suite + Next.js build
-  - Auto-syncs to `preview` on successful CI
+There is no long-lived `dev` branch in the active process. `preview` and `production` may exist as deployment environments or legacy branch names, but agents should not treat them as the normal development lane.
 
-- **`preview`** - Staging environment
-  - Always contains the latest passing state from `dev`
-  - Deploys to Vercel Preview environment
-  - Used for manual testing and review
+## Merge Contract
 
-- **`main`** - Production branch
-  - Stable production code
-  - Manual PR merge from `preview` only
-  - Deploys to Vercel Production environment
+Pull requests into `main` should be small and focused. The required merge signal is the aggregate `CI Summary` status from `.github/workflows/ci.yml`.
 
-## 🚀 CI/CD Workflows
+`CI Summary` fails only when changed-path deterministic validation fails:
 
-### 1. Dev Branch CI (`.github/workflows/ci-dev.yml`)
-**Triggers:** Push to `dev` or PR to `dev`
+- Web/package changes: `pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test:ci`.
+- iOS changes: the iOS Fastlane CI lane.
+- The summary job itself if required upstream validation fails.
 
-**Steps:**
-1. Setup Node.js + pnpm with caching
-2. Install dependencies
-3. Run linting (`pnpm lint`)
-4. Run type checking (`pnpm tsc --noEmit`) 
-5. Run tests (`pnpm test`)
-6. Build Next.js app (`pnpm build`)
-7. Run Supabase migrations (dev environment)
-8. **On success:** Auto-sync `dev` → `preview` (fast-forward merge)
+External or AI review comments are advisory unless they point to a deterministic release-breaker such as a failing command, leaked secret, unsafe workflow permission change, crash-on-launch risk, data loss, or broken auth/billing/release path.
 
-### 2. Preview Branch CI (`.github/workflows/ci-preview.yml`)
-**Triggers:** Push to `preview`
+## Advisory Review
 
-**Steps:**
-1. Setup Node.js + pnpm with caching
-2. Install dependencies
-3. Run linting and type checking
-4. Run tests (preview environment)
-5. Build Next.js app
-6. Run Supabase migrations (preview environment)
-7. Optional: E2E tests with Playwright (commented out)
+`Advisory / AI Review` is the internal replacement lane for external review bots such as CodeRabbit and gReptile. It posts a sticky, non-blocking pull request comment after CI runs.
 
-**Note:** Vercel auto-deploys the `preview` branch to staging
+Use advisory findings this way:
 
-### 3. Main Branch CI (`.github/workflows/ci-main.yml`)
-**Triggers:** Push to `main` or PR to `main`
+- Fix release-blockers in the current PR if they include concrete evidence.
+- Convert noncritical findings into follow-up issues or small PRs.
+- Promote repeated findings into deterministic tests, lint, or CI harness rules.
 
-**Steps:**
-1. Setup Node.js + pnpm with caching
-2. Install dependencies
-3. Run smoke tests (lint + type check only)
-4. Build production bundle
-5. Run Supabase migrations (production environment)
-6. Post-deployment verification
+The advisory reviewer should not become a branch-protection requirement.
 
-## 🔧 Required Repository Secrets
+## Autonomous Repair
 
-### Supabase Configuration
-| Secret | Purpose |
-|--------|---------|
-| `SUPA_DEV_URL` | Supabase URL for dev environment |
-| `SUPA_DEV_ANON_KEY` | Supabase anon key for dev |
-| `SUPA_DEV_REF` | Supabase project ref for dev |
-| `SUPA_PRE_URL` | Supabase URL for preview environment |
-| `SUPA_PRE_ANON_KEY` | Supabase anon key for preview |
-| `SUPA_PRE_REF` | Supabase project ref for preview |
-| `SUPA_PROD_URL` | Supabase URL for production |
-| `SUPA_PROD_ANON_KEY` | Supabase anon key for production |
-| `SUPA_PROD_REF` | Supabase project ref for production |
-| `SUPABASE_ACCESS_TOKEN` | Supabase CLI access token |
+When required CI fails, `.github/workflows/codex-auto-fix-ci.yml` can open a focused repair PR back to the failing branch. It must not push to `main` directly.
 
-### GitHub Configuration
-| Secret | Purpose |
-|--------|---------|
-| `GITHUB_TOKEN` | GitHub Actions token (auto-provided) |
+Agents should prefer repair PRs and follow-up PRs over expanding an already-landable PR.
 
-## 📋 How to Use
+## Local Validation
 
-### Daily Development
-1. Work on `dev` branch
-2. Push commits to `dev`
-3. CI runs automatically
-4. On success, `dev` auto-syncs to `preview`
-5. Check staging at `https://preview-logyourbody.vercel.app`
-
-### Promoting to Production
-1. Create PR: `preview` → `main`
-2. Review changes in PR
-3. Merge PR to trigger production deployment
-4. Production deploys to `https://logyourbody.com`
-
-### Emergency Hotfixes
-1. Create hotfix branch from `main`
-2. Make minimal changes
-3. PR hotfix → `main` directly
-4. After merge, sync changes back to `dev` and `preview`
-
-## 🛠️ Local Development
+Run common validation from the repository root:
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Run development server
-pnpm dev
-
-# Run tests
-pnpm test
-
-# Build for production
-pnpm build
-
-# Run linting
 pnpm lint
+pnpm typecheck
+pnpm test:ci
 ```
 
-## 🔍 Troubleshooting
+For iOS-specific work:
 
-### Auto-sync Fails
-If the `dev` → `preview` auto-sync fails (merge conflicts):
-1. Manually merge `dev` into `preview`
-2. Resolve conflicts
-3. Push to `preview`
+```bash
+cd apps/ios
+bundle exec fastlane ci_ios
+```
 
-### Failed CI
-- Check the Actions tab in GitHub
-- Look for specific error messages
-- Ensure all secrets are properly configured
-- Verify Supabase environment variables
+## Sensitive Paths
 
-### Migration Issues
-- Supabase migrations run with `|| true` on dev/preview (non-blocking)
-- Production migrations are blocking and will fail the deployment if they error
-- Always test migrations on dev/preview first
+Changes in these areas deserve extra scrutiny and may block unattended automation:
+
+- `.github/**`
+- Authentication, Clerk, Supabase, and session handling
+- Billing, RevenueCat, StoreKit, App Store, subscriptions, and entitlements
+- iOS signing, provisioning, Fastlane, and release metadata
+- Database migrations and destructive data paths
+- Secrets, credentials, environment files, and production configuration

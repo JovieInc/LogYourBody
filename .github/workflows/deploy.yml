@@ -35,6 +35,12 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.web == 'true'
     timeout-minutes: 10
+    env:
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_Y2xlcmsucGxhY2Vob2xkZXIuZGV2JA' }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || vars.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || vars.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -72,7 +78,7 @@ jobs:
     name: iOS Beta
     runs-on: macos-26
     needs: [detect-changes, web]
-    if: needs.detect-changes.outputs.ios == 'true' && false  # Enable when ready
+    if: needs.detect-changes.outputs.ios == 'true' && false # Enable when ready
     timeout-minutes: 30
     environment:
       name: development

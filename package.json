@@ -16,7 +16,7 @@
     "test:ci": "turbo run test",
     "web": "pnpm --filter apps/web dev",
     "ios": "cd apps/ios && open LogYourBody.xcodeproj",
-    "prepush": "turbo run lint typecheck test --filter='...[origin/main]'",
+    "prepush": "export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\"${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-pk_test_Y2xlcmsucGxhY2Vob2xkZXIuZGV2JA}\" CLERK_SECRET_KEY=\"${CLERK_SECRET_KEY:-sk_test_placeholder}\" NEXT_PUBLIC_SUPABASE_URL=\"${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}\" NEXT_PUBLIC_SUPABASE_ANON_KEY=\"${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key}\" SUPABASE_SERVICE_ROLE_KEY=\"${SUPABASE_SERVICE_ROLE_KEY:-placeholder-service-key}\"; turbo run lint --filter='...[origin/main]' && turbo run typecheck --filter='...[origin/main]' && turbo run test --filter='...[origin/main]'",
     "prepare": "husky install",
     "check": "pnpm --filter apps/web check",
     "format": "prettier --write .",

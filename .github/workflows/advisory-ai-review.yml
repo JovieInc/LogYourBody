@@ -1,0 +1,50 @@
+name: Advisory AI Review
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: advisory-ai-review-${{ github.event.workflow_run.head_branch || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  openrouter-review:
+    name: Advisory / AI Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion != 'cancelled'
+      )
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_REVIEW_MODEL: ${{ vars.OPENROUTER_REVIEW_MODEL || 'openrouter/free' }}
+      OPENROUTER_REVIEW_MODELS: ${{ vars.OPENROUTER_REVIEW_MODELS }}
+      OPENROUTER_PROVIDER_DATA_COLLECTION: ${{ vars.OPENROUTER_PROVIDER_DATA_COLLECTION || 'deny' }}
+      AI_REVIEW_MAX_DIFF_CHARS: ${{ vars.AI_REVIEW_MAX_DIFF_CHARS || '60000' }}
+      AI_REVIEW_ALLOW_SENSITIVE: ${{ vars.AI_REVIEW_ALLOW_SENSITIVE || 'false' }}
+      AI_REVIEW_COMMENT_ON_SKIP: ${{ vars.AI_REVIEW_COMMENT_ON_SKIP || 'false' }}
+      PR_NUMBER: ${{ inputs.pr_number }}
+
+    steps:
+      - name: Checkout default branch reviewer
+        uses: actions/checkout@v4
+
+      - name: Run advisory OpenRouter review
+        run: node .github/scripts/advisory-ai-review.mjs

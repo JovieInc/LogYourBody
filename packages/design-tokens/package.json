@@ -10,13 +10,13 @@
     "tokens"
   ],
   "scripts": {
-    "build": "npm run build:ios && npm run build:web",
+    "build": "pnpm run build:ios && pnpm run build:web",
     "build:ios": "node scripts/build-ios.js",
     "build:web": "node scripts/build-web.js",
-    "build:all": "npm run build",
-    "watch": "nodemon --watch tokens --exec npm run build",
+    "build:all": "pnpm run build",
+    "watch": "nodemon --watch tokens --exec \"pnpm run build\"",
     "validate": "node scripts/validate-tokens.js",
-    "test": "npm run validate",
+    "test": "pnpm run validate",
     "clean": "rm -rf build"
   },
   "dependencies": {

@@ -1,237 +1,113 @@
-# Three-Loop CI/CD System
+# GitHub Actions Workflows
 
-This repository uses a three-loop CI/CD system designed for rapid feedback, comprehensive testing, and safe production deployments.
+This directory supports fast trunk-based shipping. Required checks should prove a pull request can land; slower or judgment-heavy work should run as advisory automation or post-merge release validation.
 
-## Overview
+## Required PR Gate
 
-```
-dev branch → Rapid Loop → Alpha/Preview Deployments (< 5 min)
-    ↓
-preview branch → Confidence Loop → Beta/Staging Deployments (nightly)
-    ↓
-main branch → Release Loop → Production Deployments (manual)
-```
+### `ci.yml`
 
-## 🚀 Rapid Loop (dev branch)
+Primary pull request workflow for `main`.
 
-**Goal**: Fast feedback for developers  
-**Target Time**: < 5 min for web, < 15 min for iOS  
-**Deployments**: Vercel Alpha, TestFlight Alpha (internal only)
+- `Detect Changes`: path filter for web/package and iOS changes.
+- `JavaScript/TypeScript`: runs `pnpm install`, `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` when web, package, or CI harness files change. The job supplies syntactically valid placeholder Clerk/Supabase values when repository secrets are unavailable so pull request CI can verify buildability without privileged credentials.
+- `iOS`: runs the iOS Fastlane CI lane when iOS files change.
+- `CI Summary`: aggregate required status. Branch protection should depend on this stable aggregate name rather than individual implementation jobs.
 
-### Workflows
+`CI Summary` is the normal hard merge gate. Keep it deterministic and fast enough for agent throughput.
 
-- `web-rapid-loop.yml`: Lint, type-check, unit tests → Vercel deploy
-- `ios-rapid-loop.yml`: SwiftLint, smoke tests → TestFlight Alpha
+## Advisory Automation
 
-### Features
+### `advisory-ai-review.yml`
 
-- Runs on every push to dev branch
-- Minimal test suite (smoke tests only)
-- Timestamp + SHA versioning
-- Auto-deploys for immediate testing
+Non-blocking internal AI review for pull requests after the `CI` workflow completes.
 
-## 🛡️ Confidence Loop (preview branch)
+- Uses OpenRouter through `.github/scripts/advisory-ai-review.mjs`.
+- Posts a sticky PR comment named `Advisory / AI Review`.
+- Defaults to `openrouter/free` unless repository variables override the model/router.
+- Skips sensitive path diffs by default.
+- Never checks out untrusted pull request code in a privileged context.
+- Must not be added as a required status check.
 
-**Goal**: Catch quality issues before release  
-**Schedule**: Nightly at 2 AM PT (9 AM UTC) or on-demand  
-**Deployments**: Vercel Beta, TestFlight Beta (external testers)
+Useful repository variables:
 
-### Workflows
+| Variable                              | Purpose                                                               |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| `OPENROUTER_REVIEW_MODELS`            | Comma-separated fallback model/router list.                           |
+| `OPENROUTER_REVIEW_MODEL`             | Single model/router fallback; defaults to `openrouter/free`.          |
+| `OPENROUTER_PROVIDER_DATA_COLLECTION` | Provider policy; defaults to `deny`.                                  |
+| `AI_REVIEW_MAX_DIFF_CHARS`            | Maximum diff sent to the model; defaults to `60000`.                  |
+| `AI_REVIEW_ALLOW_SENSITIVE`           | Set `true` only for trusted model/provider review of sensitive paths. |
+| `AI_REVIEW_COMMENT_ON_SKIP`           | Set `true` if skipped reviews should still post a PR comment.         |
 
-- `web-confidence-loop.yml`: E2E tests, Lighthouse, accessibility → Vercel Beta
-- `ios-confidence-loop.yml`: Full UI tests, sanitizers, snapshots, performance → TestFlight Beta
+Required secret:
 
-### Features
+| Secret               | Purpose                                            |
+| -------------------- | -------------------------------------------------- |
+| `OPENROUTER_API_KEY` | Authenticates advisory review calls to OpenRouter. |
 
-- Comprehensive test suite
-- Performance profiling
-- Memory leak detection (iOS)
-- Visual regression testing
-- Slack notifications on failure
+### `codex-auto-fix-ci.yml`
 
-## 🎯 Release Loop (main branch)
+Opens a repair pull request when the primary `CI` workflow fails on a pull request.
 
-**Goal**: Production-ready deployments  
-**Trigger**: Manual PR from preview → main  
-**Deployments**: Vercel Production, App Store
+- Uses `openai/codex-action`.
+- Requires `OPENAI_API_KEY`.
+- Skips forked pull requests.
+- Opens `codex/auto-fix-<run_id>` against the contributor branch.
+- Does not push directly to `main`.
 
-### Workflows
+## Release Workflows
 
-- `web-release-loop.yml`: Validates preview is green → Production deploy
-- `ios-release-loop.yml`: Builds release → TestFlight/App Store
+### `deploy.yml`
 
-### Features
+Runs after changes land on `main` and handles production deployment work.
 
-- Requires all preview checks passing
-- Creates GitHub releases and tags
-- Supports phased rollouts
-- Post-deployment validation
+### `web-release-loop.yml`
 
-## 🔄 Supporting Workflows
+Reusable/manual web release loop.
 
-### main-orchestrator.yml
+### `ios-release-loop.yml`
 
-Central dispatcher that:
+Reusable/manual iOS release loop for TestFlight/App Store release paths.
 
-- Detects which files changed (web/iOS/docs)
-- Routes to appropriate loop based on branch
-- Provides unified `ci-summary` status check
+### `ios-testflight-deploy.yml`
 
-### promote-preview.yml
+Reusable TestFlight deployment workflow.
 
-Automatic promotion from dev → preview:
+Release workflows are app-specific and can be stricter than PR CI because they run after a change has already cleared the merge contract.
 
-- Triggers when dev CI passes
-- Creates/updates PR automatically
-- Enables auto-merge when checks pass
-- Mentions @JovieInc for visibility
+## Scheduled and Security Workflows
 
-### dependabot-auto-merge.yml
+### `codeql-analysis.yml`
 
-Handles dependency updates:
+CodeQL analysis on pushes, pull requests, and schedule.
 
-- Auto-approves minor/patch updates
-- Requires manual review for major updates
-- Runs security checks before merge
+### `security-scan.yml`
 
-### codex-auto-fix-ci.yml
+Weekly/manual/main-branch secret, dependency, and SBOM scanning.
 
-Uses Codex to repair failed PR checks automatically:
+### `dependabot-auto-merge.yml`
 
-- Triggers when the primary `CI` workflow finishes with a failure on a pull request
-- Checks out the failing commit, installs pnpm dependencies, and calls the official `openai/codex-action` to craft a minimal fix
-- Re-runs the test suite and opens a reviewable PR from `codex/auto-fix-<run_id>` back to the contributor branch; forked PRs are skipped with a status comment
+Attempts to auto-merge Dependabot patch/minor updates after CI passes.
 
-## Branch Protection
+### `regenerate-certificates.yml`
 
-All branches use `ci-summary` as the required status check:
+iOS certificate and provisioning maintenance.
 
-- **dev**: No PR reviews (optimized for speed)
-- **preview**: 0 reviews required (enables auto-merge)
-- **main**: 1 review + code owners (production safety)
+## Blocking vs Advisory
 
-## Configuration
+Blocking checks:
 
-### Codex Auto-Fix prerequisites
-
-- `OPENAI_API_KEY` must be set as a repository or organization secret so Codex can authenticate.
-- The default `GITHUB_TOKEN` needs `contents` and `pull-requests` write permissions (granted in the workflow) so the action can create branches and open PRs.
-- Forked pull requests are skipped automatically; maintainers can cherry-pick from a maintainer branch if Codex needs to be run manually.
-
-### Environment Variables
-
-#### Web Deployments
-
-- `VERCEL_TOKEN`: Vercel authentication
-- `VERCEL_ORG_ID`: Organization ID
-- `VERCEL_PROJECT_ID`: Project ID
-- `{ENV}_SUPABASE_URL`: Supabase URL per environment
-- `{ENV}_SUPABASE_ANON_KEY`: Supabase anon key
-- `{ENV}_CLERK_PUBLISHABLE_KEY`: Clerk public key
-- `{ENV}_CLERK_SECRET_KEY`: Clerk secret key
-
-#### iOS Deployments
-
-- `IOS_P12_BASE64`: Code signing certificate
-- `IOS_P12_PASSWORD`: Certificate password
-- `IOS_PROVISIONING_PROFILE_BASE64`: Provisioning profile
-- `ASC_API_KEY_JSON`: App Store Connect API key
-- `APPLE_TEAM_ID`: Apple Developer Team ID
-- `APP_STORE_APP_ID`: App Store app identifier
-
-#### Notifications
-
-- `SLACK_WEBHOOK_URL`: Slack webhook for confidence loop failures
-
-### GitHub Environments
-
-1. **development**: Used for dev branch deployments
-2. **preview**: Used for preview branch deployments
-3. **production**: Used for main branch deployments
-4. **production-testflight**: iOS TestFlight releases
-5. **production-app-store**: iOS App Store releases
-
-## Usage
-
-### Deploying Changes
-
-1. **Development**: Push to `dev` branch
-   - Rapid tests run automatically
-   - Alpha builds deploy within minutes
-
-2. **Staging**: Merge dev → preview (automatic)
-   - Comprehensive tests run nightly
-   - Beta builds available for testing
-
-3. **Production**: Create PR preview → main
-   - Requires manual approval
-   - Deploys same tested artifacts
-
-### Manual Workflows
-
-#### Force iOS Release
-
-```bash
-gh workflow run ios-release-loop.yml \
-  -f release_type=testflight
-```
-
-#### Run Confidence Tests
-
-```bash
-gh workflow run web-confidence-loop.yml
-gh workflow run ios-confidence-loop.yml
-```
-
-## Monitoring
-
-### Check Workflow Status
-
-```bash
-# View recent runs
-gh run list --workflow=main-orchestrator.yml
-
-# Watch specific run
-gh run watch <run-id>
-```
-
-### View Deployments
-
-- Web Alpha: https://dev-latest.logyourbody.com
-- Web Beta: https://preview.logyourbody.com
-- Web Production: https://logyourbody.com
-- iOS: TestFlight app
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Rapid loop timeout**: Increase timeout in workflow or optimize tests
-2. **Confidence loop failures**: Check Slack for detailed error reports
-3. **Auto-merge not working**: Verify branch protection settings
-4. **iOS signing errors**: Check certificate/profile expiration
-
-### Debug Commands
-
-```bash
-# Check branch protection
-gh api repos/JovieInc/LogYourBody/branches/{branch}/protection
-
-# View workflow logs
-gh run view <run-id> --log
-
-# Re-run failed job
-gh run rerun <run-id> --failed
-```
-
-## Best Practices
-
-1. **Keep rapid tests fast**: Only critical smoke tests
-2. **Fix flaky tests**: Don't ignore intermittent failures
-3. **Monitor costs**: GitHub Actions and Vercel usage
-4. **Regular cleanup**: Remove old artifacts and deployments
-5. **Security**: Never commit secrets, use GitHub Secrets
-
----
-
-For more information, see the individual workflow files or contact the maintainers.
+- Deterministic install, lint, typecheck, test, and build failures.
+- iOS compile/release-path failures when iOS files changed.
+- Secret leaks and concrete security failures.
+- Unsafe workflow permission changes.
+- Auth, billing, RevenueCat, App Store, signing, or migration changes with concrete release-breaking evidence.
+
+Advisory checks:
+
+- AI code review without deterministic evidence.
+- Style, architecture, or maintainability suggestions.
+- Performance and accessibility suggestions without measured regression.
+- Follow-up cleanup and test coverage ideas.
+
+When advisory review finds a noncritical issue, open a focused follow-up PR or issue instead of delaying a landable PR.

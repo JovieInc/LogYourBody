@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "check": "../../scripts/web/pre-push-check.sh",
     "check:all": "../../scripts/web/pre-push-check.sh --with-build",
-    "prepush": "npm run check",
+    "prepush": "pnpm run check",
     "db:migrate": "../../scripts/web/create-migration.sh",
     "db:push": "supabase db push",
     "db:push:local": "supabase db push --local",
