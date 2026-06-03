@@ -40,10 +40,10 @@
     "typescript": "^5.8.3",
     "vitest": "^4.0.14"
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@10.34.1",
   "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
+    "node": "20.x",
+    "pnpm": ">=10.34.1"
   },
   "lint-staged": {
     "apps/web/**/*.{js,jsx,ts,tsx}": [

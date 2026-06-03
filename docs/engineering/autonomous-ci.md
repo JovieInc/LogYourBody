@@ -64,4 +64,6 @@ The target cross-repo shape is:
 - `Agent Remediation`: opens repair PRs for blocking failures.
 - `Nightly Quality`: slow security, dependency, coverage, visual, performance, and flake checks.
 
+Vercel GitHub auto-deploys are disabled for this repository. GitHub Actions owns production web deployment with `vercel build` and `vercel deploy --prebuilt` after `main` has passed deterministic validation. Pull requests should not wait on Vercel preview installs.
+
 Repository-specific release gates stay local: LogYourBody owns Fastlane, RevenueCat, App Store, and iOS signing gates; Jovie owns its web deployment, Sentry, and product-specific smoke gates.
