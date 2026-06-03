@@ -109,6 +109,8 @@ jobs:
     if: needs.check-existing-build.outputs.has_artifact != 'true'
     runs-on: macos-26
     timeout-minutes: 30
+    environment:
+      name: Production
     
     steps:
     - uses: actions/checkout@v6
@@ -118,7 +120,17 @@ jobs:
       with:
         xcode-version: 'latest-stable'
         working-directory: apps/ios
-        create-config-files: 'true'
+        create-config-files: 'false'
+
+    - name: Write production iOS config
+      run: apps/ios/Scripts/write_release_config.sh
+      env:
+        CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+        SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
+        REVENUE_CAT_API_KEY: ${{ secrets.REVENUE_CAT_API_KEY }}
+        STATSIG_CLIENT_SDK_KEY: ${{ secrets.STATSIG_CLIENT_SDK_KEY }}
+        SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
     
     - name: Install Compatible OpenSSL
       run: |

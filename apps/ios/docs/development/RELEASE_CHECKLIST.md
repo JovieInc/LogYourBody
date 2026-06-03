@@ -5,12 +5,17 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 ## Configuration
 
 - Clerk production publishable key is configured in `Config.xcconfig`.
+- GitHub `Production` environment has `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
 - Clerk Apple Sign In is enabled for the production app.
 - Supabase production URL and anon key are configured in `Config.xcconfig`.
+- GitHub `Production` environment has `NEXT_PUBLIC_SUPABASE_URL`.
+- GitHub `Production` environment has either `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`.
 - Supabase RLS policies accept Clerk session JWT `sub` for `profiles`, `user_profiles`, `body_metrics`, and `daily_metrics`.
 - RevenueCat production API key is configured.
+- GitHub `Production` environment has `REVENUE_CAT_API_KEY`.
 - RevenueCat `Premium` entitlement matches `Constants.proEntitlementID`.
 - StoreKit/App Store products are attached to the active RevenueCat offering.
+- Optional GitHub `Production` secrets `STATSIG_CLIENT_SDK_KEY` and `SENTRY_DSN` are real values if present.
 - `ios_full_body_composition_dashboard` stays off for the v0.1 App Store launch unless the full dashboard has separate approval.
 
 ## Product Path
