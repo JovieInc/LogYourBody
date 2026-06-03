@@ -65,7 +65,7 @@ struct LogYourBodyApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     // App entering foreground - refresh data
                     Task {
-                        if healthKitManager.isAuthorized {
+                        if isFullBodyCompositionDashboardEnabled, healthKitManager.isAuthorized {
                             try? await HealthSyncCoordinator.shared.syncStepsFromHealthKit()
                         }
                         // Update widget with latest data
@@ -76,6 +76,10 @@ struct LogYourBodyApp: App {
     }
 
     // MARK: - Startup Helpers
+
+    private var isFullBodyCompositionDashboardEnabled: Bool {
+        AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.fullBodyCompositionDashboardFlagKey)
+    }
 
     @MainActor
     private func performStartupSequence() async {
@@ -93,7 +97,9 @@ struct LogYourBodyApp: App {
         }
 
         Task { @MainActor in
-            await bootstrapHealthKit()
+            if isFullBodyCompositionDashboardEnabled {
+                await bootstrapHealthKit()
+            }
         }
 
         await clerkInitializationTask.value

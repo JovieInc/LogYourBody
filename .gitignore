@@ -106,8 +106,12 @@ apps/ios/**/*.xcresult
 
 # Config files with secrets
 apps/ios/LogYourBody/Config.xcconfig
+apps/ios/LogYourBody/Config-Development.xcconfig
+apps/ios/LogYourBody/Config-Production.xcconfig
 apps/ios/Supabase.xcconfig
 !apps/ios/LogYourBody/Config-Template.xcconfig
+!apps/ios/LogYourBody/*.xcconfig.example
+!apps/ios/LogYourBody/*.xcconfig.template
 
 # Backup directories
 **/project_backup_*

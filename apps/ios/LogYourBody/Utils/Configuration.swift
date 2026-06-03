@@ -12,6 +12,46 @@ enum Configuration {
         case missingKey, invalidValue
     }
 
+    enum AppEnvironment: String {
+        case development
+        case production
+
+        init(rawValue: String?) {
+            switch rawValue?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "production", "prod", "release":
+                self = .production
+            default:
+                self = .development
+            }
+        }
+    }
+
+    struct AuthEnvironmentSnapshot {
+        let environment: AppEnvironment
+        let clerkPublishableKey: String
+        let supabaseURL: String
+        let supabaseExpectedHost: String
+        let apiBaseURL: String
+        let apiExpectedHost: String
+        let revenueCatAPIKey: String
+        let sentryEnvironment: String
+        let statsigEnvironmentTier: String
+        let allowProductionServicesInDevelopment: Bool
+    }
+
+    struct AuthEnvironmentValidationResult {
+        let messages: [String]
+
+        var isValid: Bool {
+            messages.isEmpty
+        }
+
+        var userMessage: String {
+            guard !messages.isEmpty else { return "" }
+            return "Authentication configuration error: \(messages.joined(separator: " "))"
+        }
+    }
+
     // MARK: - Generic Value Reader
 
     static func value<T>(for key: String) throws -> T where T: LosslessStringConvertible {
@@ -33,137 +73,103 @@ enum Configuration {
         }
     }
 
+    private static func stringValue(for key: String, default defaultValue: String = "") -> String {
+        do {
+            let value: String = try Configuration.value(for: key)
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return isPlaceholder(trimmed) ? defaultValue : trimmed
+        } catch {
+            return defaultValue
+        }
+    }
+
+    private static func boolValue(for key: String, default defaultValue: Bool = false) -> Bool {
+        let value = stringValue(for: key).lowercased()
+
+        switch value {
+        case "1", "true", "yes":
+            return true
+        case "0", "false", "no":
+            return false
+        default:
+            return defaultValue
+        }
+    }
+
+    private static func isPlaceholder(_ value: String) -> Bool {
+        value.isEmpty ||
+            value.contains("$(") ||
+            value.contains("your-") ||
+            value.contains("placeholder") ||
+            value.contains("replace")
+    }
+
     // MARK: - API Configuration
 
     static var apiBaseURL: String {
-        do {
-            return try Configuration.value(for: "API_BASE_URL")
-        } catch {
-            #if DEBUG
-            // print("⚠️ API_BASE_URL not configured in Config.xcconfig")
-            #endif
-            return "https://www.logyourbody.com"
-        }
+        stringValue(for: "API_BASE_URL", default: "https://www.logyourbody.com")
+    }
+
+    static var apiExpectedHost: String {
+        stringValue(for: "API_EXPECTED_HOST")
     }
 
     // MARK: - Clerk Authentication
 
     static var clerkPublishableKey: String {
-        do {
-            return try Configuration.value(for: "CLERK_PUBLISHABLE_KEY")
-        } catch {
-            #if DEBUG
-            // print("⚠️ CLERK_PUBLISHABLE_KEY not configured in Config.xcconfig")
-            #endif
-            return ""
-        }
+        stringValue(for: "CLERK_PUBLISHABLE_KEY")
     }
 
     static var clerkFrontendAPI: String {
-        do {
-            return try Configuration.value(for: "CLERK_FRONTEND_API")
-        } catch {
-            #if DEBUG
-            // print("⚠️ CLERK_FRONTEND_API not configured in Config.xcconfig")
-            #endif
-            return "https://clerk.logyourbody.com"
-        }
+        stringValue(for: "CLERK_FRONTEND_API", default: "https://clerk.logyourbody.com")
     }
 
     // MARK: - Supabase Configuration
 
     static var supabaseURL: String {
-        do {
-            return try Configuration.value(for: "SUPABASE_URL")
-        } catch {
-            #if DEBUG
-            // print("⚠️ SUPABASE_URL not configured in Config.xcconfig")
-            #endif
-            return ""
-        }
+        stringValue(for: "SUPABASE_URL")
+    }
+
+    static var supabaseExpectedHost: String {
+        stringValue(for: "SUPABASE_EXPECTED_HOST")
     }
 
     static var supabaseAnonKey: String {
-        do {
-            return try Configuration.value(for: "SUPABASE_ANON_KEY")
-        } catch {
-            #if DEBUG
-            // print("⚠️ SUPABASE_ANON_KEY not configured in Config.xcconfig")
-            #endif
-            return ""
-        }
+        stringValue(for: "SUPABASE_ANON_KEY")
     }
 
     // MARK: - RevenueCat Configuration
 
     static var revenueCatAPIKey: String {
-        do {
-            return try Configuration.value(for: "REVENUE_CAT_API_KEY")
-        } catch {
-            #if DEBUG
-            // print("⚠️ REVENUE_CAT_API_KEY not configured in Config.xcconfig")
-            // print("⚠️ Add REVENUE_CAT_API_KEY = your_api_key_here to Config.xcconfig")
-            #endif
-            return ""
-        }
+        stringValue(for: "REVENUE_CAT_API_KEY")
     }
 
     // MARK: - Statsig Analytics Configuration
 
     static var statsigClientSDKKey: String {
-        do {
-            return try Configuration.value(for: "STATSIG_CLIENT_SDK_KEY")
-        } catch {
-            return ""
-        }
+        stringValue(for: "STATSIG_CLIENT_SDK_KEY")
     }
 
     static var statsigEnvironmentTier: String {
-        do {
-            return try Configuration.value(for: "STATSIG_ENVIRONMENT_TIER")
-        } catch {
-            return "development"
-        }
+        stringValue(for: "STATSIG_ENVIRONMENT_TIER", default: "development")
     }
 
     // MARK: - BodySpec Configuration
 
     static var bodySpecClientId: String {
-        do {
-            return try Configuration.value(for: "BODYSPEC_CLIENT_ID")
-        } catch {
-            #if DEBUG
-            // print("⚠️ BODYSPEC_CLIENT_ID not configured in Config.xcconfig")
-            #endif
-            return ""
-        }
+        stringValue(for: "BODYSPEC_CLIENT_ID")
     }
 
     static var bodySpecRedirectURI: String {
-        do {
-            return try Configuration.value(for: "BODYSPEC_REDIRECT_URI")
-        } catch {
-            #if DEBUG
-            // print("⚠️ BODYSPEC_REDIRECT_URI not configured in Config.xcconfig")
-            #endif
-            return ""
-        }
+        stringValue(for: "BODYSPEC_REDIRECT_URI")
     }
 
     static var sentryDSN: String {
-        do {
-            return try Configuration.value(for: "SENTRY_DSN")
-        } catch {
-            return ""
-        }
+        stringValue(for: "SENTRY_DSN")
     }
 
     static var sentryEnvironment: String {
-        do {
-            return try Configuration.value(for: "SENTRY_ENVIRONMENT")
-        } catch {
-            return "development"
-        }
+        stringValue(for: "SENTRY_ENVIRONMENT", default: "development")
     }
 
     static var sentryTracesSampleRate: Double {
@@ -176,8 +182,106 @@ enum Configuration {
 
     // MARK: - Validation
 
+    static var appEnvironment: AppEnvironment {
+        AppEnvironment(rawValue: stringValue(for: "APP_ENVIRONMENT"))
+    }
+
+    static var allowProductionServicesInDevelopment: Bool {
+        boolValue(for: "ALLOW_PRODUCTION_SERVICES_IN_DEBUG")
+    }
+
     static var isClerkConfigured: Bool {
         let key = clerkPublishableKey
         return !key.isEmpty && key.hasPrefix("pk_")
+    }
+
+    static var currentAuthEnvironmentSnapshot: AuthEnvironmentSnapshot {
+        AuthEnvironmentSnapshot(
+            environment: appEnvironment,
+            clerkPublishableKey: clerkPublishableKey,
+            supabaseURL: supabaseURL,
+            supabaseExpectedHost: supabaseExpectedHost,
+            apiBaseURL: apiBaseURL,
+            apiExpectedHost: apiExpectedHost,
+            revenueCatAPIKey: revenueCatAPIKey,
+            sentryEnvironment: sentryEnvironment,
+            statsigEnvironmentTier: statsigEnvironmentTier,
+            allowProductionServicesInDevelopment: allowProductionServicesInDevelopment
+        )
+    }
+
+    static var currentAuthEnvironmentValidation: AuthEnvironmentValidationResult {
+        validateAuthEnvironment(currentAuthEnvironmentSnapshot)
+    }
+
+    static func validateAuthEnvironment(_ snapshot: AuthEnvironmentSnapshot) -> AuthEnvironmentValidationResult {
+        var messages: [String] = []
+        let clerkKey = snapshot.clerkPublishableKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let revenueCatKey = snapshot.revenueCatAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sentryEnvironment = snapshot.sentryEnvironment.lowercased()
+        let statsigTier = snapshot.statsigEnvironmentTier.lowercased()
+
+        if isPlaceholder(clerkKey) || !clerkKey.hasPrefix("pk_") {
+            messages.append("Clerk publishable key must be configured with a publishable pk_ key.")
+        }
+
+        let supabaseURL = URL(string: snapshot.supabaseURL)
+        if supabaseURL == nil || isPlaceholder(snapshot.supabaseURL) {
+            messages.append("Supabase URL must be configured.")
+        }
+
+        let apiBaseURL = URL(string: snapshot.apiBaseURL)
+        if apiBaseURL == nil || isPlaceholder(snapshot.apiBaseURL) {
+            messages.append("API base URL must be configured.")
+        }
+
+        if let supabaseURL {
+            if supabaseURL.scheme != "https" {
+                messages.append("Supabase URL must use HTTPS.")
+            }
+
+            if let host = supabaseURL.host,
+               !snapshot.supabaseExpectedHost.isEmpty,
+               host != snapshot.supabaseExpectedHost {
+                messages.append("Supabase URL host must match SUPABASE_EXPECTED_HOST for this environment.")
+            }
+        }
+
+        if let apiBaseURL,
+           let host = apiBaseURL.host,
+           !snapshot.apiExpectedHost.isEmpty,
+           host != snapshot.apiExpectedHost {
+            messages.append("API base URL host must match API_EXPECTED_HOST for this environment.")
+        }
+
+        switch snapshot.environment {
+        case .production:
+            if clerkKey.hasPrefix("pk_test_") {
+                messages.append("Production builds cannot use Clerk test publishable keys.")
+            }
+
+            if apiBaseURL?.scheme != "https" {
+                messages.append("Production API base URL must use HTTPS.")
+            }
+
+            if isPlaceholder(revenueCatKey) {
+                messages.append("Production RevenueCat API key must be configured.")
+            }
+
+            if sentryEnvironment != "production" {
+                messages.append("Production Sentry environment must be production.")
+            }
+
+            if statsigTier != "production" {
+                messages.append("Production Statsig tier must be production.")
+            }
+
+        case .development:
+            if clerkKey.hasPrefix("pk_live_") && !snapshot.allowProductionServicesInDevelopment {
+                messages.append("Development builds cannot use Clerk live publishable keys unless explicitly allowed.")
+            }
+        }
+
+        return AuthEnvironmentValidationResult(messages: messages)
     }
 }

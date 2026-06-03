@@ -3,6 +3,27 @@
 // LogYourBody
 //
 import SwiftUI
+
+enum LaunchSurfacePolicy {
+    static func shouldShowFullBodyCompositionDashboard(gateEnabled: Bool) -> Bool {
+        gateEnabled
+    }
+
+    static func requiresBodyCompositionOnboarding(
+        hasCompletedOnboarding: Bool,
+        fullDashboardEnabled: Bool
+    ) -> Bool {
+        fullDashboardEnabled && !hasCompletedOnboarding
+    }
+
+    static func requiresCompleteProfile(
+        isProfileComplete: Bool,
+        fullDashboardEnabled: Bool
+    ) -> Bool {
+        fullDashboardEnabled && !isProfileComplete
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
@@ -51,7 +72,25 @@ struct ContentView: View {
     }
 
     private var shouldShowOnboarding: Bool {
-        return !hasCompletedOnboarding
+        LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+            hasCompletedOnboarding: hasCompletedOnboarding,
+            fullDashboardEnabled: isFullBodyCompositionDashboardEnabled
+        )
+    }
+
+    private var shouldShowProfileCompletion: Bool {
+        LaunchSurfacePolicy.requiresCompleteProfile(
+            isProfileComplete: isProfileComplete,
+            fullDashboardEnabled: isFullBodyCompositionDashboardEnabled
+        )
+    }
+
+    private var isFullBodyCompositionDashboardEnabled: Bool {
+        LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(
+            gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                flagKey: Constants.fullBodyCompositionDashboardFlagKey
+            )
+        )
     }
 
     var body: some View {
@@ -161,7 +200,7 @@ struct ContentView: View {
                     .onAppear {
                         AnalyticsService.shared.track(event: "onboarding_view")
                     }
-            } else if !isProfileComplete {
+            } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
             } else if !revenueCatManager.isSubscribed {
                 PaywallView()

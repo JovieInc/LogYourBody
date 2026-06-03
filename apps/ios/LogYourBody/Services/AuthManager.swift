@@ -141,6 +141,7 @@ class AuthManager: NSObject, ObservableObject {
     private var sessionObservationTask: Task<Void, Never>?
     private let legalConsentGate = AsyncGate()
     private var clerkInitializationTask: Task<Void, Never>?
+    private var bootstrappedProfileSessionIds = Set<String>()
 
     override init() {
         super.init()
@@ -157,8 +158,47 @@ class AuthManager: NSObject, ObservableObject {
         migrateLegacyAuthToken()
     }
 
+    nonisolated static let legacySensitiveUserDefaultsKeys: [String] = [
+        Constants.authTokenKey,
+        Constants.currentUserKey,
+        "accessToken",
+        "authSession",
+        "clerkJWT",
+        "clerkSession",
+        "clerkToken",
+        "jwt",
+        "refreshToken",
+        "session",
+        "supabaseAccessToken",
+        "supabaseRefreshToken",
+        "userSession"
+    ]
+
+    @discardableResult
+    nonisolated static func migrateLegacyAuthStorage(in defaults: UserDefaults = .standard) -> [String] {
+        var removedKeys: [String] = []
+
+        for key in legacySensitiveUserDefaultsKeys {
+            guard defaults.object(forKey: key) != nil else { continue }
+            defaults.removeObject(forKey: key)
+            removedKeys.append(key)
+        }
+
+        return removedKeys
+    }
+
     private func migrateLegacyAuthToken() {
-        // Legacy auth token migration is no longer required.
+        _ = Self.migrateLegacyAuthStorage(in: userDefaults)
+
+        #if DEBUG
+        let remainingKeys = Self.legacySensitiveUserDefaultsKeys.filter {
+            userDefaults.object(forKey: $0) != nil
+        }
+
+        if !remainingKeys.isEmpty {
+            assertionFailure("Legacy auth/session values remain in UserDefaults: \(remainingKeys.joined(separator: ", "))")
+        }
+        #endif
     }
 
     private func showAuthError(_ message: String) {
@@ -171,7 +211,7 @@ class AuthManager: NSObject, ObservableObject {
     }
 
     func handleSupabaseUnauthorized() async {
-        await logout()
+        await performLogout(exitReason: .sessionExpired)
     }
 
     func initializeClerk() async {
@@ -186,6 +226,16 @@ class AuthManager: NSObject, ObservableObject {
         // Clear any previous error
         await MainActor.run {
             self.clerkInitError = nil
+        }
+
+        let environmentValidation = Configuration.currentAuthEnvironmentValidation
+        guard environmentValidation.isValid else {
+            let error = environmentValidation.userMessage
+            await MainActor.run {
+                self.isClerkLoaded = false
+                self.clerkInitError = error
+            }
+            return
         }
 
         // Validate publishable key before attempting to configure
@@ -333,6 +383,10 @@ class AuthManager: NSObject, ObservableObject {
                         await RevenueCatManager.shared.identifyUser(userId: localUserId)
                     }
                 }
+
+                Task { @MainActor in
+                    await self.bootstrapAuthenticatedProfileIfNeeded(sessionId: currentSessionId)
+                }
             } else {
                 // No valid session or user
                 // print("🔄 Clerk session state: signed out")
@@ -341,6 +395,7 @@ class AuthManager: NSObject, ObservableObject {
                 }
                 self.isAuthenticated = false
                 self.currentUser = nil
+                self.bootstrappedProfileSessionIds.removeAll()
                 userDefaults.removeObject(forKey: userKey)
                 ErrorTrackingService.shared.updateUserId(nil)
                 AnalyticsService.shared.reset()
@@ -388,6 +443,7 @@ class AuthManager: NSObject, ObservableObject {
         if clerk.session == nil || clerk.session?.id == sessionId {
             isAuthenticated = false
             currentUser = nil
+            bootstrappedProfileSessionIds.remove(sessionId)
             userDefaults.removeObject(forKey: userKey)
         }
     }
@@ -466,6 +522,24 @@ class AuthManager: NSObject, ObservableObject {
         self.lastExitReason = .none
 
         ErrorTrackingService.shared.updateUserId(localUser.id)
+        CoreDataManager.shared.saveProfile(
+            localUser.profile ?? UserProfile(
+                id: localUser.id,
+                email: localUser.email,
+                username: nil,
+                fullName: localUser.name,
+                dateOfBirth: nil,
+                height: nil,
+                heightUnit: "cm",
+                gender: nil,
+                activityLevel: nil,
+                goalWeight: nil,
+                goalWeightUnit: "kg",
+                onboardingCompleted: nil
+            ),
+            userId: localUser.id,
+            email: localUser.email
+        )
 
         var traits: [String: String] = [
             "email": email,
@@ -737,16 +811,22 @@ class AuthManager: NSObject, ObservableObject {
     // MARK: - Session Termination
 
     func logout() async {
+        await performLogout(exitReason: .userInitiated)
+    }
+
+    private func performLogout(exitReason: AuthExitReason) async {
         do {
             try await clerk.signOut()
         } catch {
             // Ignore sign-out failures; we'll still clear local state
         }
 
-        AnalyticsService.shared.track(event: "logout")
+        if exitReason == .userInitiated {
+            AnalyticsService.shared.track(event: "logout")
+        }
 
         await MainActor.run {
-            self.lastExitReason = .userInitiated
+            self.lastExitReason = exitReason
             self.clerkSession = nil
             self.currentUser = nil
             self.isAuthenticated = false
@@ -756,14 +836,15 @@ class AuthManager: NSObject, ObservableObject {
             self.currentSignIn = nil
             self.pendingSignInEmail = nil
             self.emailVerificationFlow = nil
+            self.bootstrappedProfileSessionIds.removeAll()
         }
 
         await RevenueCatManager.shared.logoutUser()
 
-        userDefaults.removeObject(forKey: userKey)
-        userDefaults.removeObject(forKey: Constants.currentUserKey)
-        userDefaults.removeObject(forKey: Constants.authTokenKey)
+        Self.migrateLegacyAuthStorage(in: userDefaults)
         try? KeychainManager.shared.clearAll()
+        ErrorTrackingService.shared.updateUserId(nil)
+        AnalyticsService.shared.reset()
 
         UserDefaults.standard.removeObject(forKey: "HasSyncedHistoricalSteps")
         UserDefaults.standard.removeObject(forKey: "lastSupabaseSyncDate")
@@ -868,6 +949,13 @@ extension AuthManager {
         currentSignUp = updated
 
         if updated.status == .complete {
+            if let sessionId = updated.createdSessionId {
+                try await clerk.setActive(sessionId: sessionId)
+            }
+
+            updateSessionState()
+            await bootstrapAuthenticatedProfileIfNeeded(sessionId: clerk.session?.id)
+
             needsEmailVerification = false
             currentSignUp = nil
             pendingSignUpEmail = nil
@@ -901,6 +989,31 @@ extension AuthManager {
                 operation: "updateProfile",
                 screen: nil,
                 userId: userId
+            )
+            ErrorReporter.shared.captureNonFatal(error, context: context)
+        }
+    }
+
+    private func bootstrapAuthenticatedProfileIfNeeded(sessionId: String?) async {
+        guard let sessionId,
+              !bootstrappedProfileSessionIds.contains(sessionId),
+              let user = currentUser,
+              let profile = user.profile else {
+            return
+        }
+
+        bootstrappedProfileSessionIds.insert(sessionId)
+        CoreDataManager.shared.saveProfile(profile, userId: user.id, email: user.email)
+
+        do {
+            try await SupabaseManager.shared.upsertProfile(profile)
+        } catch {
+            bootstrappedProfileSessionIds.remove(sessionId)
+            let context = ErrorContext(
+                feature: "auth",
+                operation: "bootstrapAuthenticatedProfile",
+                screen: nil,
+                userId: user.id
             )
             ErrorReporter.shared.captureNonFatal(error, context: context)
         }

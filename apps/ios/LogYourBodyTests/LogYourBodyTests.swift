@@ -7,6 +7,55 @@ import XCTest
 
 // swiftlint:disable single_test_class
 
+final class LaunchSurfacePolicyTests: XCTestCase {
+    func testMVPDefaultSkipsBodyCompositionOnboardingAndProfileGate() {
+        XCTAssertFalse(
+            LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+                hasCompletedOnboarding: false,
+                fullDashboardEnabled: false
+            )
+        )
+        XCTAssertFalse(
+            LaunchSurfacePolicy.requiresCompleteProfile(
+                isProfileComplete: false,
+                fullDashboardEnabled: false
+            )
+        )
+    }
+
+    func testFullDashboardGateRestoresBodyCompositionRequirements() {
+        XCTAssertTrue(
+            LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+                hasCompletedOnboarding: false,
+                fullDashboardEnabled: true
+            )
+        )
+        XCTAssertTrue(
+            LaunchSurfacePolicy.requiresCompleteProfile(
+                isProfileComplete: false,
+                fullDashboardEnabled: true
+            )
+        )
+        XCTAssertFalse(
+            LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+                hasCompletedOnboarding: true,
+                fullDashboardEnabled: true
+            )
+        )
+        XCTAssertFalse(
+            LaunchSurfacePolicy.requiresCompleteProfile(
+                isProfileComplete: true,
+                fullDashboardEnabled: true
+            )
+        )
+    }
+
+    func testFullDashboardPolicyMirrorsFeatureGate() {
+        XCTAssertTrue(LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(gateEnabled: true))
+        XCTAssertFalse(LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(gateEnabled: false))
+    }
+}
+
 @MainActor
 final class OnboardingFlowViewModelTests: XCTestCase {
     func testAdvanceAfterHealthConfirmationSkipsToLoadingWhenMetricsExist() {
@@ -180,6 +229,101 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertEqual(manager.lastExitReason, .none)
         XCTAssertTrue(manager.isAuthenticated)
         XCTAssertEqual(manager.currentUser?.email, "test@example.com")
+    }
+}
+
+final class AuthConfigurationValidationTests: XCTestCase {
+    func testProductionRejectsDevelopmentAuthAndTelemetryConfig() {
+        let snapshot = Configuration.AuthEnvironmentSnapshot(
+            environment: .production,
+            clerkPublishableKey: "pk_test_123",
+            supabaseURL: "https://dev-project.supabase.co",
+            supabaseExpectedHost: "prod-project.supabase.co",
+            apiBaseURL: "ht" + "tp://localhost:3000",
+            apiExpectedHost: "www.logyourbody.com",
+            revenueCatAPIKey: "replace_with_prod_revenuecat_public_key",
+            sentryEnvironment: "development",
+            statsigEnvironmentTier: "development",
+            allowProductionServicesInDevelopment: false
+        )
+
+        let result = Configuration.validateAuthEnvironment(snapshot)
+
+        XCTAssertFalse(result.isValid)
+        XCTAssertTrue(result.messages.contains("Production builds cannot use Clerk test publishable keys."))
+        XCTAssertTrue(result.messages.contains("Supabase URL host must match SUPABASE_EXPECTED_HOST for this environment."))
+        XCTAssertTrue(result.messages.contains("Production API base URL must use HTTPS."))
+        XCTAssertTrue(result.messages.contains("Production RevenueCat API key must be configured."))
+        XCTAssertTrue(result.messages.contains("Production Sentry environment must be production."))
+        XCTAssertTrue(result.messages.contains("Production Statsig tier must be production."))
+    }
+
+    func testDevelopmentRejectsProductionClerkKeyByDefault() {
+        let snapshot = Configuration.AuthEnvironmentSnapshot(
+            environment: .development,
+            clerkPublishableKey: "pk_live_123",
+            supabaseURL: "https://dev-project.supabase.co",
+            supabaseExpectedHost: "dev-project.supabase.co",
+            apiBaseURL: "ht" + "tp://localhost:3000",
+            apiExpectedHost: "localhost",
+            revenueCatAPIKey: "",
+            sentryEnvironment: "development",
+            statsigEnvironmentTier: "development",
+            allowProductionServicesInDevelopment: false
+        )
+
+        let result = Configuration.validateAuthEnvironment(snapshot)
+
+        XCTAssertFalse(result.isValid)
+        XCTAssertTrue(
+            result.messages.contains("Development builds cannot use Clerk live publishable keys unless explicitly allowed.")
+        )
+    }
+
+    func testDevelopmentAllowsProductionServicesWhenExplicitlyAllowed() {
+        let snapshot = Configuration.AuthEnvironmentSnapshot(
+            environment: .development,
+            clerkPublishableKey: "pk_live_123",
+            supabaseURL: "https://prod-project.supabase.co",
+            supabaseExpectedHost: "prod-project.supabase.co",
+            apiBaseURL: "https://www.logyourbody.com",
+            apiExpectedHost: "www.logyourbody.com",
+            revenueCatAPIKey: "appl_123",
+            sentryEnvironment: "development",
+            statsigEnvironmentTier: "development",
+            allowProductionServicesInDevelopment: true
+        )
+
+        let result = Configuration.validateAuthEnvironment(snapshot)
+
+        XCTAssertTrue(result.isValid)
+        XCTAssertTrue(result.messages.isEmpty)
+    }
+}
+
+final class AuthLegacyStorageMigrationTests: XCTestCase {
+    func testMigrateLegacyAuthStorageRemovesSensitiveDefaultsOnly() {
+        let suiteName = "auth-legacy-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set("legacy-access", forKey: Constants.authTokenKey)
+        defaults.set("legacy-refresh", forKey: "refreshToken")
+        defaults.set("legacy-session", forKey: "clerkSession")
+        defaults.set("legacy-user-json", forKey: Constants.currentUserKey)
+        defaults.set(true, forKey: Constants.hasCompletedOnboardingKey)
+
+        let removedKeys = AuthManager.migrateLegacyAuthStorage(in: defaults)
+
+        XCTAssertTrue(removedKeys.contains(Constants.authTokenKey))
+        XCTAssertTrue(removedKeys.contains("refreshToken"))
+        XCTAssertTrue(removedKeys.contains("clerkSession"))
+        XCTAssertTrue(removedKeys.contains(Constants.currentUserKey))
+        XCTAssertNil(defaults.object(forKey: Constants.authTokenKey))
+        XCTAssertNil(defaults.object(forKey: "refreshToken"))
+        XCTAssertNil(defaults.object(forKey: "clerkSession"))
+        XCTAssertNil(defaults.object(forKey: Constants.currentUserKey))
+        XCTAssertEqual(defaults.bool(forKey: Constants.hasCompletedOnboardingKey), true)
     }
 }
 

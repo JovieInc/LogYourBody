@@ -9,18 +9,21 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 - Supabase production URL and anon key are configured in `Config.xcconfig`.
 - Supabase RLS policies accept Clerk session JWT `sub` for `profiles`, `user_profiles`, `body_metrics`, and `daily_metrics`.
 - RevenueCat production API key is configured.
-- RevenueCat `pro` entitlement matches `Constants.proEntitlementID`.
+- RevenueCat `Premium` entitlement matches `Constants.proEntitlementID`.
 - StoreKit/App Store products are attached to the active RevenueCat offering.
+- `ios_full_body_composition_dashboard` stays off for the v0.1 App Store launch unless the full dashboard has separate approval.
 
 ## Product Path
 
 - Fresh install opens to auth with Apple Sign In as the primary action.
 - Email one-time code sign-in remains available as fallback.
-- New user can complete name, date of birth, sex at birth, and height setup.
 - Unpaid authenticated user sees the paywall.
-- Purchase success unlocks the dashboard.
-- Restore success unlocks the dashboard.
-- Paid returning user opens directly to the dashboard after loading.
+- Purchase success unlocks the weight logger.
+- Restore success unlocks the weight logger.
+- Paid returning user opens directly to the weight logger after loading.
+- Paid user can log body weight without body-score onboarding or full profile completion.
+- Recent entries show the latest saved weight and history.
+- Paid user can prepare and share a weight-only CSV export.
 - Signed-out user opens to auth.
 
 ## Data And Sync
@@ -34,7 +37,7 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 ## Legal And Store Review
 
 - Terms and privacy links open in-app from the paywall.
-- Camera, photo library, HealthKit, and Face ID usage strings are accurate.
+- Camera, photo library, HealthKit, and Face ID usage strings are accurate for any enabled surfaces.
 - No secrets or local config files are committed.
 - App icon, display name, bundle identifier, and version/build number are correct.
 
@@ -65,7 +68,7 @@ xcodebuild -project LogYourBody.xcodeproj \
 
 ## PR Evidence
 
-- Include screenshots or a simulator recording for auth, onboarding/profile completion, paywall, dashboard, and logging.
+- Include screenshots or a simulator recording for auth, paywall, purchase/restore, weight logging, recent history, and CSV export.
 - Include RevenueCat purchase and restore test results.
 - Include Supabase sync test results.
 - Include validation command output and known risks.
