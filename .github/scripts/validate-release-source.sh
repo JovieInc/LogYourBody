@@ -91,17 +91,9 @@ for check_name in "${required_checks[@]}"; do
 done
 
 if [ "$found_required" -eq 0 ]; then
-  if [ "$REF_NAME" = "main" ]; then
-    warn "No required PR CI check runs were found on $SHA; continuing on main because branch protection is the merge gate."
-  else
-    fail "No required CI check runs were found on non-main ref $REF_NAME."
-  fi
+  fail "No required CI check runs were found on ref $REF_NAME for $SHA."
 elif [ "${#missing_required[@]}" -gt 0 ]; then
-  if [ "$REF_NAME" = "main" ]; then
-    warn "Some required PR CI checks were absent on main: ${missing_required[*]}; continuing because protected main is the merge gate."
-  else
-    fail "Required CI checks were missing on non-main ref $REF_NAME: ${missing_required[*]}."
-  fi
+  fail "Required CI checks were missing on ref $REF_NAME for $SHA: ${missing_required[*]}."
 fi
 
 echo "Release source validation passed."

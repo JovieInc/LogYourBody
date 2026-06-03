@@ -168,11 +168,24 @@ struct LogYourBodyApp: App {
                 return
             }
 
-            // Check if onboarding is complete
+            // Check if body-composition onboarding/profile gates apply to this launch surface.
             let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Constants.hasCompletedOnboardingKey)
             let isProfileComplete = checkProfileComplete()
+            let fullDashboardEnabled = LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(
+                gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                    flagKey: Constants.fullBodyCompositionDashboardFlagKey
+                )
+            )
+            let requiresOnboarding = LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+                hasCompletedOnboarding: hasCompletedOnboarding,
+                fullDashboardEnabled: fullDashboardEnabled
+            )
+            let requiresProfile = LaunchSurfacePolicy.requiresCompleteProfile(
+                isProfileComplete: isProfileComplete,
+                fullDashboardEnabled: fullDashboardEnabled
+            )
 
-            if !hasCompletedOnboarding || !isProfileComplete {
+            if requiresOnboarding || requiresProfile {
                 // User needs to complete onboarding first
                 // Don't open the add entry sheet
                 return

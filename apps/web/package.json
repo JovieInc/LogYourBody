@@ -12,7 +12,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --runInBand",
-    "typecheck": "rm -rf .next/types tsconfig.tsbuildinfo && tsc --noEmit",
+    "typecheck": "node -e \"const fs=require('node:fs'); for (const p of ['.next/types','tsconfig.tsbuildinfo']) fs.rmSync(p,{recursive:true,force:true});\" && tsc --noEmit",
     "check": "../../scripts/web/pre-push-check.sh",
     "check:all": "../../scripts/web/pre-push-check.sh --with-build",
     "prepush": "npm run check",

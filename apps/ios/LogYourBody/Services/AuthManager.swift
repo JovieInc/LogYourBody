@@ -399,6 +399,9 @@ class AuthManager: NSObject, ObservableObject {
                 userDefaults.removeObject(forKey: userKey)
                 ErrorTrackingService.shared.updateUserId(nil)
                 AnalyticsService.shared.reset()
+                Task {
+                    await RevenueCatManager.shared.logoutUser()
+                }
             }
         }
     }
@@ -445,6 +448,9 @@ class AuthManager: NSObject, ObservableObject {
             currentUser = nil
             bootstrappedProfileSessionIds.remove(sessionId)
             userDefaults.removeObject(forKey: userKey)
+            ErrorTrackingService.shared.updateUserId(nil)
+            AnalyticsService.shared.reset()
+            await RevenueCatManager.shared.logoutUser()
         }
     }
 

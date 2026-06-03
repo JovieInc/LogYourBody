@@ -4,6 +4,13 @@ import { NextResponse, type NextRequest } from 'next/server';
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 export async function updateSession(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  const pathname = url.pathname;
+  const protectedRoutes = ['/dashboard', '/settings', '/profile', '/log', '/photos', '/steps'];
+  const isProtectedRoute = protectedRoutes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+
   try {
     let supabaseResponse = NextResponse.next({
       request,
@@ -38,13 +45,6 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const url = request.nextUrl.clone();
-    const pathname = url.pathname;
-
-    // Define protected routes that require authentication
-    const protectedRoutes = ['/dashboard', '/settings', '/profile', '/log', '/photos', '/steps'];
-    const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route));
-
     // Allow auth callbacks to process
     if (pathname.startsWith('/auth/callback')) {
       return supabaseResponse;
@@ -62,8 +62,13 @@ export async function updateSession(request: NextRequest) {
     // authentication status, make sure to do it above.
     return supabaseResponse;
   } catch (error) {
-    // If there's an error with Supabase, allow the request to continue
     console.error('Middleware error:', error);
+
+    if (isProtectedRoute) {
+      url.pathname = '/signin';
+      return NextResponse.redirect(url);
+    }
+
     return NextResponse.next({
       request,
     });

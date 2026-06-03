@@ -123,10 +123,14 @@ class CoreDataManager: ObservableObject {
         }
     }
 
-    func saveDailyMetrics(_ metrics: DailyMetrics, userId: String) {
+    func saveDailyMetrics(_ metrics: DailyMetrics, userId: String, completion: (() -> Void)? = nil) {
         let context = viewContext
 
         context.perform {
+            defer {
+                completion?()
+            }
+
             let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "id == %@", metrics.id)
             fetchRequest.fetchLimit = 1
@@ -167,6 +171,14 @@ class CoreDataManager: ObservableObject {
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to save daily metrics: \(error)")
                 #endif
+            }
+        }
+    }
+
+    func saveDailyMetricsAndWait(_ metrics: DailyMetrics, userId: String) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            saveDailyMetrics(metrics, userId: userId) {
+                continuation.resume()
             }
         }
     }
@@ -463,11 +475,20 @@ class CoreDataManager: ObservableObject {
     }
 
     // MARK: - Body Metrics Operations
-    func saveBodyMetrics(_ metrics: BodyMetrics, userId: String, markAsSynced: Bool = false) {
+    func saveBodyMetrics(
+        _ metrics: BodyMetrics,
+        userId: String,
+        markAsSynced: Bool = false,
+        completion: (() -> Void)? = nil
+    ) {
         let context = viewContext
 
         // Ensure all Core Data operations happen on the context's queue
         context.perform {
+            defer {
+                completion?()
+            }
+
             // Check if entry already exists
             let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "id == %@", metrics.id)
@@ -522,6 +543,14 @@ class CoreDataManager: ObservableObject {
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to save body metrics: \(error)")
                 #endif
+            }
+        }
+    }
+
+    func saveBodyMetricsAndWait(_ metrics: BodyMetrics, userId: String, markAsSynced: Bool = false) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            saveBodyMetrics(metrics, userId: userId, markAsSynced: markAsSynced) {
+                continuation.resume()
             }
         }
     }
@@ -1084,10 +1113,14 @@ class CoreDataManager: ObservableObject {
 
     // MARK: - Delete All Data
 
-    func deleteAllData() {
+    func deleteAllData(completion: (() -> Void)? = nil) {
         let context = viewContext
 
         context.perform {
+            defer {
+                completion?()
+            }
+
             // Delete all body metrics
             let bodyMetricsRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
             if let bodyMetrics = try? context.fetch(bodyMetricsRequest) {
@@ -1144,7 +1177,28 @@ class CoreDataManager: ObservableObject {
             }
 
             // Save changes
-            self.save()
+            do {
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                let appError = AppError.coreData(operation: "deleteAllData", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "deleteAllData",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+            }
+        }
+    }
+
+    func deleteAllDataAndWait() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            deleteAllData {
+                continuation.resume()
+            }
         }
     }
 

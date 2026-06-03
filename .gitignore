@@ -118,4 +118,5 @@ apps/ios/Supabase.xcconfig
 # Backup directories
 **/project_backup_*
 **/backup_*
-**/*_backup_*sentry-wizard
+**/*_backup_*
+sentry-wizard

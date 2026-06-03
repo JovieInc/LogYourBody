@@ -11,8 +11,8 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 - GitHub `Production` environment has `NEXT_PUBLIC_SUPABASE_URL`.
 - GitHub `Production` environment has either `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`.
 - Supabase RLS policies accept Clerk session JWT `sub` for `profiles`, `user_profiles`, `body_metrics`, and `daily_metrics`.
-- RevenueCat production API key is configured.
-- GitHub `Production` environment has `REVENUE_CAT_API_KEY`.
+- RevenueCat production public key is configured.
+- GitHub `Production` environment has `REVENUE_CAT_PUBLIC_KEY`.
 - RevenueCat `Premium` entitlement matches `Constants.proEntitlementID`.
 - StoreKit/App Store products are attached to the active RevenueCat offering.
 - Release workflow verifies the RevenueCat current iOS offering exposes `$rc_annual` -> `com.logyourbody.app.pro.annual.3daytrial` and `$rc_monthly` -> `com.logyourbody.app.pro.monthly.3daytrial`.

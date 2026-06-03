@@ -110,11 +110,11 @@ private struct PaidWeightLoggerMVPView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Weight log")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .font(.largeTitle.weight(.bold))
                 .foregroundColor(.appText)
 
             Text("Log today's weight. Your entries stay on this device and sync to your account.")
-                .font(.system(size: 16, weight: .medium))
+                .font(.body.weight(.medium))
                 .foregroundColor(.appTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -124,7 +124,7 @@ private struct PaidWeightLoggerMVPView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("Latest", systemImage: "scalemass.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(.appTextSecondary)
 
                 Spacer()
@@ -141,26 +141,26 @@ private struct PaidWeightLoggerMVPView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(display.value)
-                            .font(.system(size: 52, weight: .bold, design: .rounded))
+                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
                             .foregroundColor(.appText)
 
                         Text(display.unit)
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.title3.weight(.semibold))
                             .foregroundColor(.appTextSecondary)
                     }
 
                     Text(latestWeight.date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.footnote.weight(.medium))
                         .foregroundColor(.appTextSecondary)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("No weight yet")
-                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .font(.title2.weight(.semibold))
                         .foregroundColor(.appText)
 
                     Text("Add one entry to start the log.")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.subheadline.weight(.medium))
                         .foregroundColor(.appTextSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -182,7 +182,7 @@ private struct PaidWeightLoggerMVPView: View {
                 .frame(width: 7, height: 7)
 
             Text(syncStatusText)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundColor(.appTextSecondary)
         }
         .accessibilityIdentifier("mvp_sync_status")
@@ -191,7 +191,7 @@ private struct PaidWeightLoggerMVPView: View {
     private var entryCard: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Add weight")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundColor(.appText)
 
             Picker("Units", selection: $measurementSystem) {
@@ -204,13 +204,13 @@ private struct PaidWeightLoggerMVPView: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 TextField("0.0", text: $weightText)
                     .keyboardType(.decimalPad)
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
                     .foregroundColor(.appText)
                     .focused($isWeightFieldFocused)
                     .accessibilityIdentifier("mvp_weight_text_field")
 
                 Text(currentSystem.weightUnit)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundColor(.appTextSecondary)
             }
             .padding(.horizontal, 16)
@@ -224,7 +224,7 @@ private struct PaidWeightLoggerMVPView: View {
 
             if let savedMessage {
                 Label(savedMessage, systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.footnote.weight(.medium))
                     .foregroundColor(.green)
             }
 
@@ -236,7 +236,7 @@ private struct PaidWeightLoggerMVPView: View {
                     }
 
                     Text(isSaving ? "Saving" : "Save weight")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.headline.weight(.semibold))
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
@@ -259,12 +259,12 @@ private struct PaidWeightLoggerMVPView: View {
     private var recentHistorySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Recent entries")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundColor(.appText)
 
             HStack {
                 Text("\(recentMetrics.count) saved")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.caption.weight(.medium))
                     .foregroundColor(.appTextSecondary)
 
                 Spacer()
@@ -274,7 +274,7 @@ private struct PaidWeightLoggerMVPView: View {
 
             if recentMetrics.isEmpty && !isLoading {
                 Text("Saved weights will appear here.")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(.appTextSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
@@ -306,13 +306,13 @@ private struct PaidWeightLoggerMVPView: View {
         if let exportFileURL {
             ShareLink(item: exportFileURL) {
                 Label("Share CSV", systemImage: "square.and.arrow.up")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.caption.weight(.semibold))
             }
             .disabled(recentMetrics.isEmpty)
         } else {
             Button(action: prepareCSVExport) {
                 Label("CSV", systemImage: "doc.text")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.caption.weight(.semibold))
             }
             .disabled(recentMetrics.isEmpty)
         }
@@ -322,11 +322,11 @@ private struct PaidWeightLoggerMVPView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(metric.date.formatted(date: .abbreviated, time: .omitted))
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(.appText)
 
                 Text(metric.date.formatted(date: .omitted, time: .shortened))
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.caption.weight(.medium))
                     .foregroundColor(.appTextSecondary)
             }
 
@@ -335,7 +335,7 @@ private struct PaidWeightLoggerMVPView: View {
             if let weight = metric.weight {
                 let display = displayWeight(weight)
                 Text("\(display.value) \(display.unit)")
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.headline.weight(.semibold))
                     .foregroundColor(.appText)
             }
         }
@@ -433,7 +433,7 @@ private struct PaidWeightLoggerMVPView: View {
                 updatedAt: now
             )
 
-            CoreDataManager.shared.saveBodyMetrics(metrics, userId: userId, markAsSynced: false)
+            await CoreDataManager.shared.saveBodyMetricsAndWait(metrics, userId: userId, markAsSynced: false)
             realtimeSyncManager.syncIfNeeded()
             AnalyticsService.shared.track(event: "mvp_weight_logged")
 

@@ -16,12 +16,12 @@ enum Configuration {
         case development
         case production
 
-        init(rawValue: String?) {
+        static func from(rawValue: String?) -> AppEnvironment {
             switch rawValue?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
             case "production", "prod", "release":
-                self = .production
+                return .production
             default:
-                self = .development
+                return .development
             }
         }
     }
@@ -97,11 +97,16 @@ enum Configuration {
     }
 
     private static func isPlaceholder(_ value: String) -> Bool {
-        value.isEmpty ||
-            value.contains("$(") ||
-            value.contains("your-") ||
-            value.contains("placeholder") ||
-            value.contains("replace")
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        return normalized.isEmpty ||
+            normalized.contains("$(") ||
+            normalized.contains("your-") ||
+            normalized.contains("placeholder") ||
+            normalized.contains("replace") ||
+            normalized.contains("todo") ||
+            normalized.contains("changeme") ||
+            normalized.contains("xxx")
     }
 
     // MARK: - API Configuration
@@ -183,7 +188,7 @@ enum Configuration {
     // MARK: - Validation
 
     static var appEnvironment: AppEnvironment {
-        AppEnvironment(rawValue: stringValue(for: "APP_ENVIRONMENT"))
+        AppEnvironment.from(rawValue: stringValue(for: "APP_ENVIRONMENT"))
     }
 
     static var allowProductionServicesInDevelopment: Bool {
@@ -258,6 +263,10 @@ enum Configuration {
         case .production:
             if clerkKey.hasPrefix("pk_test_") {
                 messages.append("Production builds cannot use Clerk test publishable keys.")
+            }
+
+            if snapshot.supabaseExpectedHost.isEmpty {
+                messages.append("Supabase expected host must be configured for production.")
             }
 
             if apiBaseURL?.scheme != "https" {

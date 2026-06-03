@@ -258,6 +258,26 @@ final class AuthConfigurationValidationTests: XCTestCase {
         XCTAssertTrue(result.messages.contains("Production Statsig tier must be production."))
     }
 
+    func testProductionRequiresExplicitSupabaseExpectedHost() {
+        let snapshot = Configuration.AuthEnvironmentSnapshot(
+            environment: .production,
+            clerkPublishableKey: "pk_live_123",
+            supabaseURL: "https://prod-project.supabase.co",
+            supabaseExpectedHost: "",
+            apiBaseURL: "https://www.logyourbody.com",
+            apiExpectedHost: "www.logyourbody.com",
+            revenueCatAPIKey: "appl_123",
+            sentryEnvironment: "production",
+            statsigEnvironmentTier: "production",
+            allowProductionServicesInDevelopment: false
+        )
+
+        let result = Configuration.validateAuthEnvironment(snapshot)
+
+        XCTAssertFalse(result.isValid)
+        XCTAssertTrue(result.messages.contains("Supabase expected host must be configured for production."))
+    }
+
     func testDevelopmentRejectsProductionClerkKeyByDefault() {
         let snapshot = Configuration.AuthEnvironmentSnapshot(
             environment: .development,
@@ -361,12 +381,26 @@ final class StubSupabaseManager: SupabaseManager {
 
 @MainActor
 final class SyncIntegrationTests: XCTestCase {
+    override func setUp() async throws {
+        try await super.setUp()
+        await CoreDataManager.shared.deleteAllDataAndWait()
+    }
+
+    override func tearDown() async throws {
+        await CoreDataManager.shared.deleteAllDataAndWait()
+        try await super.tearDown()
+    }
+
+    private func wholeSecondDate(_ offset: TimeInterval = 0) -> Date {
+        Date(timeIntervalSince1970: 1_735_000_000 + offset)
+    }
+
     func testUpdateOrCreateBodyMetric_MapsSupabasePayload() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
         let userId = "sync_test_user_body_\(UUID().uuidString)"
-        let date = Date()
+        let date = wholeSecondDate()
         let createdAt = date.addingTimeInterval(-60)
         let updatedAt = date
         let formatter = ISO8601DateFormatter()
@@ -422,7 +456,7 @@ final class SyncIntegrationTests: XCTestCase {
 
         let id = UUID().uuidString
         let userId = "sync_test_user_daily_\(UUID().uuidString)"
-        let date = Date()
+        let date = wholeSecondDate(1_000)
         let createdAt = date.addingTimeInterval(-120)
         let updatedAt = date
         let formatter = ISO8601DateFormatter()
@@ -457,7 +491,7 @@ final class SyncIntegrationTests: XCTestCase {
 
         let id = UUID().uuidString
         let userId = "sync_test_user_body_idempotent_\(UUID().uuidString)"
-        let date = Date()
+        let date = wholeSecondDate(2_000)
         let createdAt = date.addingTimeInterval(-300)
         let updatedAt1 = date.addingTimeInterval(-120)
         let updatedAt2 = date
@@ -500,7 +534,7 @@ final class SyncIntegrationTests: XCTestCase {
 
         let id = UUID().uuidString
         let userId = "sync_test_user_daily_idempotent_\(UUID().uuidString)"
-        let date = Date()
+        let date = wholeSecondDate(3_000)
         let createdAt = date.addingTimeInterval(-300)
         let updatedAt1 = date.addingTimeInterval(-120)
         let updatedAt2 = date
@@ -554,7 +588,7 @@ final class SyncIntegrationTests: XCTestCase {
 
         let calendar = Calendar.current
         let day = calendar.startOfDay(for: Date())
-        let existingDate = calendar.date(byAdding: DateComponents(hour: 10, minute: 15), to: day) ?? day
+        let existingDate = calendar.date(byAdding: DateComponents(hour: 10, minute: 45), to: day) ?? day
 
         let existingMetric = BodyMetrics(
             id: UUID().uuidString,
@@ -576,9 +610,9 @@ final class SyncIntegrationTests: XCTestCase {
             updatedAt: existingDate
         )
 
-        coreData.saveBodyMetrics(existingMetric, userId: userId)
+        await coreData.saveBodyMetricsAndWait(existingMetric, userId: userId)
 
-        let sameHourDate = calendar.date(byAdding: DateComponents(hour: 10, minute: 45), to: day) ?? day
+        let sameHourDate = calendar.date(byAdding: DateComponents(hour: 10, minute: 15), to: day) ?? day
         let nextHourDate = calendar.date(byAdding: DateComponents(hour: 11, minute: 5), to: day) ?? day
 
         let weightHistory: [(weight: Double, date: Date)] = [
@@ -710,7 +744,7 @@ final class SyncIntegrationTests: XCTestCase {
             updatedAt: updatedAt
         )
 
-        coreData.saveBodyMetrics(metricModel, userId: userId)
+        await coreData.saveBodyMetricsAndWait(metricModel, userId: userId)
 
         let stubSupabase = StubSupabaseManager()
         let manager = RealtimeSyncManager(
@@ -772,7 +806,7 @@ final class SyncIntegrationTests: XCTestCase {
             updatedAt: updatedAt
         )
 
-        coreData.saveDailyMetrics(dailyModel, userId: userId)
+        await coreData.saveDailyMetricsAndWait(dailyModel, userId: userId)
 
         let stubSupabase = StubSupabaseManager()
         let manager = RealtimeSyncManager(
