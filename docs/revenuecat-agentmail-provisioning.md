@@ -47,9 +47,9 @@ The RevenueCat App Store offering is configured and verified.
 - Entitlement id: `entled3b1a2e7a`.
 - Offering id: `ofrng86fde23d98`.
 - Monthly product:
-  `com.logyourbody.app.pro.monthly.3daytrial`.
+  `com.logyourbody.app.pro1.monthly.3daytrial`.
 - Annual product:
-  `com.logyourbody.app.pro.annual.3daytrial`, duration `P1Y`.
+  `com.logyourbody.app.pro1.annual.3daytrial`, duration `P1Y`.
 - Packages returned by the SDK offering endpoint:
   `$rc_monthly` and `$rc_annual`.
 - The SDK offering endpoint must be called with `X-Platform: ios`; without it, the generic offering response can show empty packages even when the iOS offering is valid.
@@ -63,7 +63,7 @@ REVENUE_CAT_PUBLIC_KEY=<app-store-sdk-key> apps/ios/Scripts/verify_revenuecat_of
 Result:
 
 ```text
-Verified RevenueCat current offering default includes $rc_annual:com.logyourbody.app.pro.annual.3daytrial, $rc_monthly:com.logyourbody.app.pro.monthly.3daytrial.
+Verified RevenueCat current offering default includes $rc_annual:com.logyourbody.app.pro1.annual.3daytrial, $rc_monthly:com.logyourbody.app.pro1.monthly.3daytrial.
 ```
 
 ## Local iOS Config
@@ -83,6 +83,6 @@ RevenueCat is now configured for the App Store app and the iOS offering prefligh
 
 The remaining gates are outside RevenueCat configuration:
 
-- App Store Connect products must be approved/available for sandbox/live purchase.
+- App Store Connect products are `READY_TO_SUBMIT` and must be approved/available for sandbox/live purchase.
 - Run a real sandbox purchase and restore on a TestFlight or App Store build.
 - Merge the paid MVP PR after human review and green checks.

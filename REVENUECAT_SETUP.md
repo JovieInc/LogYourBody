@@ -17,14 +17,14 @@ The RevenueCat dashboard and iOS app are configured. The production App Store SD
 
 **Products:**
 
-- **Annual:** `com.logyourbody.app.pro.annual.3daytrial`
+- **Annual:** `com.logyourbody.app.pro1.annual.3daytrial`
   - Display Name: LogYourBody Pro Annual (3-Day Trial)
-  - Price: $79.99/year
-  - Product ID: `prodcfa314705c`
-- **Monthly:** `com.logyourbody.app.pro.monthly.3daytrial`
+  - Price: $69.99/year
+  - Product ID: `prodcf17db6623`
+- **Monthly:** `com.logyourbody.app.pro1.monthly.3daytrial`
   - Display Name: LogYourBody Pro Monthly (3-Day Trial)
   - Price: $9.99/month
-  - Product ID: `prod19a4c04da9`
+  - Product ID: `prod17519525d5`
 
 **Offering:** Default (lookup_key: `default`)
 
@@ -43,6 +43,8 @@ The RevenueCat dashboard and iOS app are configured. The production App Store SD
 - Bundle ID: `com.logyourbody.app`
 - App Store Connect API key: ✅ configured
 - In-app purchase key: ✅ configured
+- App Store subscription state: ✅ both products are `READY_TO_SUBMIT`
+- U.S. introductory offers: ✅ 3-day free trial configured for both products
 
 **StoreKit Configuration:**
 
@@ -81,8 +83,8 @@ open LogYourBody.xcodeproj
 
 **✅ Products Already Created:**
 
-- Annual: `com.logyourbody.app.pro.annual.3daytrial` ($79.99/year)
-- Monthly: `com.logyourbody.app.pro.monthly.3daytrial` ($9.99/month)
+- Annual: `com.logyourbody.app.pro1.annual.3daytrial` ($69.99/year)
+- Monthly: `com.logyourbody.app.pro1.monthly.3daytrial` ($9.99/month)
 
 **✅ Offering Already Created:**
 
@@ -102,28 +104,28 @@ open LogYourBody.xcodeproj
 
 ### 3. Configure App Store Connect
 
-**Create In-App Purchases:**
+**✅ App Store Connect Subscriptions Already Created:**
 
-You need to create these subscriptions in App Store Connect:
+The active RevenueCat products must continue to match these App Store Connect subscriptions:
 
 **Annual Subscription:**
 
-1. Go to [App Store Connect](https://appstoreconnect.apple.com)
+1. Go to [App Store Connect](https://appstoreconnect.apple.com) if you need to inspect or recreate it.
 2. Select your app (LogYourBody)
 3. Go to **Features → In-App Purchases**
 4. Click **+** to create new subscription
 5. **Type:** Auto-Renewable Subscription
-6. **Product ID:** `com.logyourbody.app.pro.annual.3daytrial` ⚠️ MUST match exactly
+6. **Product ID:** `com.logyourbody.app.pro1.annual.3daytrial` ⚠️ MUST match exactly
 7. **Subscription Group:** "Standard" (or create if doesn't exist)
-8. **Pricing:** $79.99/year
+8. **Pricing:** $69.99/year
 9. **Free Trial:** 3 days
 10. Add localized descriptions
-11. Submit for review
+11. Submit for review with the app version.
 
 **Monthly Subscription:**
 Repeat the same process with:
 
-- **Product ID:** `com.logyourbody.app.pro.monthly.3daytrial`
+- **Product ID:** `com.logyourbody.app.pro1.monthly.3daytrial`
 - **Pricing:** $9.99/month
 - **Free Trial:** 3 days
 
