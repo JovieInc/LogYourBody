@@ -15,6 +15,7 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 - GitHub `Production` environment has `REVENUE_CAT_API_KEY`.
 - RevenueCat `Premium` entitlement matches `Constants.proEntitlementID`.
 - StoreKit/App Store products are attached to the active RevenueCat offering.
+- Release workflow verifies the RevenueCat current iOS offering exposes `$rc_annual` -> `com.logyourbody.app.pro.annual.3daytrial` and `$rc_monthly` -> `com.logyourbody.app.pro.monthly.3daytrial`.
 - Optional GitHub `Production` secrets `STATSIG_CLIENT_SDK_KEY` and `SENTRY_DSN` are real values if present.
 - `ios_full_body_composition_dashboard` stays off for the v0.1 App Store launch unless the full dashboard has separate approval.
 

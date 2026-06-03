@@ -131,6 +131,11 @@ jobs:
         REVENUE_CAT_API_KEY: ${{ secrets.REVENUE_CAT_API_KEY }}
         STATSIG_CLIENT_SDK_KEY: ${{ secrets.STATSIG_CLIENT_SDK_KEY }}
         SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+
+    - name: Verify RevenueCat iOS offering
+      run: apps/ios/Scripts/verify_revenuecat_offerings.sh
+      env:
+        REVENUE_CAT_API_KEY: ${{ secrets.REVENUE_CAT_API_KEY }}
     
     - name: Install Compatible OpenSSL
       run: |
