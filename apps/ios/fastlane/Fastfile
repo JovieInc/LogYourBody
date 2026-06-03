@@ -198,7 +198,7 @@ platform :ios do
     end
     
     # Check app ID matches
-    expected_app_id = options[:expected_app_id] || "*.LogYourBody.LogYourBody"
+    expected_app_id = options[:expected_app_id] || "*.com.logyourbody.app"
     unless app_id.end_with?(expected_app_id.sub("*", ""))
       UI.user_error!("App ID mismatch! Expected: #{expected_app_id}, Got: #{app_id}")
     end
@@ -289,7 +289,7 @@ platform :ios do
     latest_build_number = latest_testflight_build_number(
       api_key: api_key,
       initial_build_number: 0,
-      app_identifier: "LogYourBody.LogYourBody"
+      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app"
     )
     
     new_build_number = latest_build_number + 1
@@ -459,7 +459,8 @@ platform :ios do
       UI.message("=== Match Environment Variables ===")
       ENV.each do |key, value|
         if key.start_with?("sigh_") || key.include?("MATCH_")
-          UI.message("#{key}: #{value}")
+          redacted = key.match?(/PASSWORD|AUTHORIZATION|TOKEN|KEY/i) ? "[masked]" : value
+          UI.message("#{key}: #{redacted}")
         end
       end
       UI.message("APPLE_TEAM_ID: #{ENV["APPLE_TEAM_ID"]}")

@@ -1,74 +1,49 @@
-# GitHub Actions Secrets for iOS CI/CD
+# GitHub Secrets Setup
 
-## Required Secrets for Fastlane Match and App Store Connect
+This repository must never contain live credential values. Store release
+credentials only in GitHub Secrets or environment-scoped secrets.
 
-### 1. App Store Connect API Authentication
-These are required for API key authentication (recommended over username/password):
+## Actions Secrets
 
-- **`APP_STORE_CONNECT_API_KEY_ID`**: `V9NW6ZGUK3`
-  - Your API key ID from App Store Connect
-  
-- **`APP_STORE_CONNECT_API_KEY_ISSUER_ID`**: `c195f569-ff16-40fa-aaff-4fe94e8139ad`
-  - The issuer ID for your API key
-  
-- **`APP_STORE_CONNECT_API_KEY`**: 
-  - The actual private key content (PEM format)
-  - Should include the full key with:
-    ```
-    -----BEGIN PRIVATE KEY-----
-    [your key content]
-    -----END PRIVATE KEY-----
-    ```
+Required for iOS signing and App Store Connect:
 
-### 2. Match Configuration
-For certificate and provisioning profile management:
+- `APP_STORE_CONNECT_API_KEY`
+- `APP_STORE_CONNECT_API_KEY_ID`
+- `APP_STORE_CONNECT_API_KEY_ISSUER_ID`
+- `APPLE_TEAM_ID`
+- `APP_STORE_APP_ID`
+- `MATCH_PASSWORD`
+- `MATCH_GIT_URL`
+- `MATCH_GIT_BASIC_AUTHORIZATION`
 
-- **`MATCH_PASSWORD`**: `Xuwa8gLaHbj3UCC3eC7M`
-  - Password to decrypt certificates stored in Match repository
-  
-- **`MATCH_GIT_URL`**: `https://github.com/JovieInc/certificates.git`
-  - Your private git repository for storing certificates
-  
-- **`MATCH_GIT_BASIC_AUTHORIZATION`**: 
-  - Format: `base64(username:personal_access_token)`
-  - Example: If your GitHub username is `itstimwhite` and PAT is `ghp_xxxxx`, run:
-    ```bash
-    echo -n "itstimwhite:ghp_xxxxx" | base64
-    ```
-  - This allows Match to access your private certificates repository
+Required for paid iOS release config:
 
-### 3. Apple Developer Account
-- **`APPLE_TEAM_ID`**: `G24T327LXT`
-  - Your Apple Developer Team ID
-  
-- **`APP_STORE_APP_ID`**: `6740237149`
-  - The numeric App Store ID (not bundle ID)
-  - Find this in App Store Connect under your app
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
+- `REVENUE_CAT_PUBLIC_KEY`
 
-### 4. Optional (Not currently used but good to have)
-- **`FASTLANE_USER`**: `t@timwhite.co`
-  - Apple ID email (backup for when API key fails)
-  
-- **`FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD`**: `gmro-cwoj-lvhj-zxub`
-  - App-specific password for Apple ID (backup authentication)
+Optional integrations:
 
-## How to Add These Secrets
+- `STATSIG_CLIENT_SDK_KEY`
+- `SENTRY_DSN`
 
-1. Go to your GitHub repository
-2. Navigate to Settings → Secrets and variables → Actions
-3. Click "New repository secret"
-4. Add each secret with the exact name and value listed above
+## Setup
 
-## Verify Your Setup
-
-After adding all secrets, you can verify they're working by checking the CI logs for:
-- "✅ App Store Connect API key configured from file"
-- "Match successfully synced certificates"
-- No errors about missing authentication
+1. Open the repository in GitHub.
+2. Go to Settings > Secrets and variables > Actions.
+3. Add repository-level signing secrets.
+4. Go to Settings > Environments > Production.
+5. Add production app configuration secrets.
+6. Re-run the iOS Release Loop from `main`.
 
 ## Security Notes
 
-- Never commit these values to your repository
-- The MATCH_PASSWORD should be strong and unique
-- Rotate your API keys periodically
-- Use repository secrets, not environment secrets, for better security
+- Do not commit private keys, Match passwords, personal access tokens, or
+  application-specific passwords.
+- Do not use Apple ID password fallback in CI; use App Store Connect API key
+  authentication.
+- Rotate any credential that was previously committed or pasted into a shared
+  log.
+- Prefer environment secrets for production app config and repository secrets
+  for signing material shared across release workflows.

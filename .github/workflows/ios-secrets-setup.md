@@ -1,118 +1,71 @@
-thes# GitHub Actions Secrets for iOS CI/CD with Match
+# GitHub Actions Secrets for iOS CI/CD
 
-Set up these secrets in your GitHub repository settings:
+Use this guide to configure iOS release secrets in GitHub. Do not paste actual
+secret values into this repository, pull requests, issues, logs, or docs.
 
-## Required Secrets
+## Required Repository Secrets
 
-### 1. App Store Connect API Key
-- **Secret Name**: `APP_STORE_CONNECT_API_KEY`
-- **Value**: The contents of your private key (-----BEGIN PRIVATE KEY-----...-----END PRIVATE KEY-----)
-- **How to get**: From your api_key.json file, copy just the key content
+- `APP_STORE_CONNECT_API_KEY`
+  - Raw App Store Connect private key content in PEM format.
+- `APP_STORE_CONNECT_API_KEY_ID`
+  - App Store Connect API key ID.
+- `APP_STORE_CONNECT_API_KEY_ISSUER_ID`
+  - App Store Connect issuer ID.
+- `APPLE_TEAM_ID`
+  - Apple Developer team ID.
+- `APP_STORE_APP_ID`
+  - Numeric App Store Connect app ID for the iOS app.
+- `MATCH_PASSWORD`
+  - Fastlane Match encryption password.
+- `MATCH_GIT_URL`
+  - Private Fastlane Match certificates repository URL.
+- `MATCH_GIT_BASIC_AUTHORIZATION`
+  - Base64 encoded `username:personal_access_token` for the private Match repo.
+- `REVENUE_CAT_PUBLIC_KEY`
+  - RevenueCat iOS public SDK key used by release config and offering preflight.
 
-### 2. App Store Connect API Key ID
-- **Secret Name**: `APP_STORE_CONNECT_API_KEY_ID`
-- **Value**: V9NW6ZGUK3
+## Required Production Environment Secrets
 
-### 3. App Store Connect API Issuer ID
-- **Secret Name**: `APP_STORE_CONNECT_API_ISSUER_ID`
-- **Value**: c195f569-ff16-40fa-aaff-4fe94e8139ad
+The iOS Release Loop reads production app config from the GitHub `Production`
+environment:
 
-### 4. Match Password
-- **Secret Name**: `MATCH_PASSWORD`
-- **Value**: Your Match encryption password (the new one you just set)
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
+- `REVENUE_CAT_PUBLIC_KEY`
 
-### 5. Match Git URL (Optional - can be in workflow)
-- **Secret Name**: `MATCH_GIT_URL`
-- **Value**: https://github.com/JovieInc/certificates.git
+Optional production integrations:
 
-### 6. Apple Team ID
-- **Secret Name**: `APPLE_TEAM_ID`
-- **Value**: 6P36X5723P
+- `STATSIG_CLIENT_SDK_KEY`
+- `SENTRY_DSN`
 
-### 7. App Store App ID
-- **Secret Name**: `APP_STORE_APP_ID`
-- **Value**: 6470661673
+## Match Setup
 
-### 8. Match Git Basic Authorization (for private repository)
-- **Secret Name**: `MATCH_GIT_BASIC_AUTHORIZATION`
-- **Value**: Base64 encoded "username:personal_access_token"
-- **Notes**:
-- - The GitHub personal access token must include the **repo** scope (read & write) so that Match can clone and push certificates and provisioning profiles when creating or renewing them.
-- - Insufficient permissions will result in clone or push failures during CI.
-- **How to create**: 
-  1. Get your GitHub username (e.g., `itstimwhite`)
-  2. Create a GitHub Personal Access Token:
-     - Go to GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)
-     - Click "Generate new token" (classic)
-     - Give it a descriptive name like "Match Certificates Access"
-     - Select the `repo` scope (Full control of private repositories)
-     - Set expiration (recommend 90 days and rotate regularly)
-     - Click "Generate token"
-     - Copy the token value (starts with `ghp_` or `github_pat_`)
-  3. Encode your credentials:
-     ```bash
-     echo -n "your-github-username:your-personal-access-token" | base64
-     ```
-     For example:
-     ```bash
-     echo -n "itstimwhite:github_pat_11AILQMSY0..." | base64
-     ```
-  4. Use the base64 output as the secret value
+1. Create a private certificates repository for Fastlane Match.
+2. Create a GitHub token with access to that private repository.
+3. Store the repository URL in `MATCH_GIT_URL`.
+4. Store the base64 encoded `username:token` value in
+   `MATCH_GIT_BASIC_AUTHORIZATION`.
+5. Store the Match encryption password in `MATCH_PASSWORD`.
+6. Run certificate creation locally only when rotating or bootstrapping Match.
+   CI release jobs should use readonly Match sync.
 
-**Important**: The token needs `repo` scope because Match needs to:
-- Clone the private certificates repository
-- Read existing certificates and profiles
-- Push new certificates when they're created/renewed
-- Access all repository contents (certificates are stored encrypted)
+## Rotation
 
-## Setting Up Secrets
+If a real value is ever committed or exposed in logs:
 
-1. Go to your repository on GitHub
-2. Navigate to Settings > Secrets and variables > Actions
-3. Click "New repository secret"
-4. Add each secret with the name and value listed above
+1. Revoke or rotate that credential immediately in the source service.
+2. Update the matching GitHub secret.
+3. Re-run the relevant release workflow.
+4. Remove the exposed value from docs/history where feasible.
 
-## Notes
+## Verification
 
-- The API key should be the raw private key content, not base64 encoded
-- Make sure there are no extra spaces or newlines when copying values
-- The Match password should be the one you just changed to
+After secrets are configured, run the iOS Release Loop from `main`. The release
+job must pass:
 
-## Initial Certificate Setup
-
-The first time you set up Match, you need to create the certificates locally:
-
-1. Clone this repository locally
-2. Navigate to the iOS directory:
-   ```bash
-   cd apps/ios
-   ```
-
-3. Set up environment variables:
-   ```bash
-   export MATCH_GIT_URL='https://github.com/JovieInc/certificates.git'
-   export MATCH_PASSWORD='your-secure-password'
-   export MATCH_READONLY=false
-   export APP_STORE_CONNECT_API_KEY_ID='V9NW6ZGUK3'
-   export APP_STORE_CONNECT_API_ISSUER_ID='c195f569-ff16-40fa-aaff-4fe94e8139ad'
-   export APP_STORE_CONNECT_API_KEY='-----BEGIN PRIVATE KEY-----
-   ... your key content ...
-   -----END PRIVATE KEY-----'
-   export APPLE_TEAM_ID='6P36X5723P'
-   ```
-
-4. Create the certificates and provisioning profiles:
-   ```bash
-   bundle install
-   bundle exec fastlane setup_provisioning type:appstore
-   ```
-
-5. Commit and push the changes to your certificates repository
-
-## Troubleshooting
-
-### OpenSSL Curve Name Error
-If you encounter "invalid curve name" errors on GitHub Actions, the setup_provisioning lane includes error handling for this. The API key setup is handled in the Fastfile rather than through Match directly to work around OpenSSL compatibility issues.
-
-### No Code Signing Identity Found
-This error occurs when the certificates repository is empty. You must run the "Initial Certificate Setup" steps above locally first to create the certificates. GitHub Actions runs in readonly mode by default and cannot create new certificates.
+- production config generation
+- RevenueCat offering preflight
+- Match certificate sync
+- archive/export
+- TestFlight or App Store deployment

@@ -46,6 +46,8 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 - Terms and privacy links open in-app from the paywall.
 - Camera, photo library, HealthKit, and Face ID usage strings are accurate for any enabled surfaces.
 - No secrets or local config files are committed.
+- Any credential previously exposed in setup docs or logs has been rotated
+  before release.
 - App icon, display name, bundle identifier, and version/build number are correct.
 
 ## Validation
