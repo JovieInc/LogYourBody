@@ -50,8 +50,7 @@ yarn-error.log*
 *.tsbuildinfo
 
 # Local scripts
-apps/web/scripts/
-!apps/web/scripts/
+apps/web/scripts/*
 !apps/web/scripts/seed-database.ts
 !apps/web/scripts/test-seeded-users.ts
 !apps/web/scripts/next-build.cjs

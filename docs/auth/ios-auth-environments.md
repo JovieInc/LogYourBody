@@ -14,30 +14,30 @@ LogYourBody iOS uses Clerk for identity and Supabase for data/storage. Real conf
 ## Development Setup
 
 1. Copy `Config-Development.xcconfig.template` to `Config-Development.xcconfig`.
-2. Fill only dev/test provider values:
+1. Fill only dev/test provider values:
    - Clerk test/dev publishable key.
    - Clerk dev frontend API.
    - Supabase dev URL and anon key.
    - `SUPABASE_EXPECTED_HOST` matching the Supabase dev URL host.
    - Local or dev `API_BASE_URL` and matching `API_EXPECTED_HOST`.
-3. Create `Config.xcconfig` with:
+1. Create `Config.xcconfig` with:
 
 ```xcconfig
 #include "Config-Development.xcconfig"
 ```
 
-4. Keep `ALLOW_PRODUCTION_SERVICES_IN_DEBUG = NO` unless a human explicitly approves a temporary production-provider test.
+1. Keep `ALLOW_PRODUCTION_SERVICES_IN_DEBUG = NO` unless a human explicitly approves a temporary production-provider test.
 
 ## Production Setup
 
 1. Copy `Config-Production.xcconfig.template` to `Config-Production.xcconfig`.
-2. Fill reviewed production values:
+1. Fill reviewed production values:
    - Clerk live publishable key.
    - Supabase production URL and anon key.
    - `SUPABASE_EXPECTED_HOST` matching the production Supabase URL host.
    - HTTPS production `API_BASE_URL` and matching `API_EXPECTED_HOST`.
    - Production Statsig and Sentry environment values.
-3. Create `Config.xcconfig` with:
+1. Create `Config.xcconfig` with:
 
 ```xcconfig
 #include "Config-Production.xcconfig"
