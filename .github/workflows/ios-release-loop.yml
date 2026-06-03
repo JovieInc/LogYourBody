@@ -28,6 +28,8 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      checks: read
+      statuses: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
@@ -35,22 +37,11 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     
-    - name: Validate preview checks
+    - name: Validate release source
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        echo "🔍 Validating that preview branch is green..."
-        
-        # Get latest preview branch status
-        PREVIEW_STATUS=$(gh api repos/${{ github.repository }}/commits/preview/status --jq '.state')
-        
-        if [[ "$PREVIEW_STATUS" != "success" ]]; then
-          echo "❌ Preview branch checks are not passing"
-          echo "Status: $PREVIEW_STATUS"
-          exit 1
-        fi
-        
-        echo "✅ Preview branch is green"
+        RELEASE_TYPE: ${{ github.event.inputs.release_type || 'testflight' }}
+      run: .github/scripts/validate-release-source.sh
     
     - name: Extract version info
       id: version
