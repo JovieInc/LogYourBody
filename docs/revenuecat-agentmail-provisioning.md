@@ -13,6 +13,7 @@ This note captures the current external setup state for the iOS paid MVP.
 - `stripe projects search revenuecat --json` returned `result_count: 0`.
 - `stripe projects search agentmail --json` returned one available service.
 - `stripe projects init` could not finish because Stripe browser auth redirected into a stuck `projects/kyc_redirect` / hCaptcha-backed flow. No local Stripe profile was created.
+- The RevenueCat MCP endpoint in `.cursor/mcp.json` points at `localhost:49797`, but no local server was listening there during Codex provisioning. RevenueCat was configured through the v2 REST API instead.
 
 ## AgentMail
 
@@ -26,34 +27,37 @@ This note captures the current external setup state for the iOS paid MVP.
 
 ## RevenueCat
 
-- RevenueCat account email: `logyourbody-codex@agentmail.to`.
-- RevenueCat email confirmation is complete.
 - Project name: `LogYourBody`.
-- Dashboard project id: `1f8e7a51`.
-- API project id: `proj1f8e7a51`.
+- Dashboard/project slug: `2385165b`.
+- API project id: `proj2385165b`.
+- App Store app id: `app5fa54db3c0`.
+- App Store bundle id: `com.logyourbody.app`.
+- App Store API key configuration: configured.
+- App Store in-app purchase key configuration: configured.
 - Local RevenueCat credentials are stored outside the repo at:
   `/Users/timwhite/.codex/secrets/logyourbody-revenuecat-agentmail.env`
-- Secret API key label: `codex-local-project-config-2026-06-03`.
-- Secret API key scope: API v2, Project Configuration read/write only.
-- SDK key available now: Test Store SDK key, stored in the private env file and local ignored iOS config.
+- Production App Store SDK key is stored in the private env file and local ignored iOS config.
 
 ## Current Offering Verification
 
-The RevenueCat Test Store offering is configured and verified.
+The RevenueCat App Store offering is configured and verified.
 
 - Current offering: `default`.
-- Entitlement display name: `Premium`.
+- Entitlement lookup key: `Premium`.
+- Entitlement id: `entled3b1a2e7a`.
+- Offering id: `ofrng86fde23d98`.
 - Monthly product:
-  `com.logyourbody.app.pro.monthly.3daytrial`, duration `P1M`.
+  `com.logyourbody.app.pro.monthly.3daytrial`.
 - Annual product:
   `com.logyourbody.app.pro.annual.3daytrial`, duration `P1Y`.
 - Packages returned by the SDK offering endpoint:
   `$rc_monthly` and `$rc_annual`.
+- The SDK offering endpoint must be called with `X-Platform: ios`; without it, the generic offering response can show empty packages even when the iOS offering is valid.
 
 Verified with:
 
 ```bash
-REVENUE_CAT_PUBLIC_KEY=<test-store-sdk-key> apps/ios/Scripts/verify_revenuecat_offerings.sh
+REVENUE_CAT_PUBLIC_KEY=<app-store-sdk-key> apps/ios/Scripts/verify_revenuecat_offerings.sh
 ```
 
 Result:
@@ -64,17 +68,21 @@ Verified RevenueCat current offering default includes $rc_annual:com.logyourbody
 
 ## Local iOS Config
 
-The ignored local file `apps/ios/LogYourBody/Config.xcconfig` now uses the new Test Store SDK key for `REVENUE_CAT_API_KEY`, so local builds can fetch the verified offering.
+The ignored local file `apps/ios/LogYourBody/Config.xcconfig` now uses the production App Store SDK key for `REVENUE_CAT_API_KEY`, so local builds can fetch the verified iOS offering.
 
-## Remaining Production Blocker
+## GitHub Secrets
 
-This is not yet production-money-ready. RevenueCat still needs a real App Store app configuration before App Store purchases can be processed live.
+The GitHub `Production` environment has been updated so the iOS release workflow uses the verified App Store SDK key:
 
-RevenueCat requires an App Store Connect in-app purchase key (`SubscriptionKey_*.p8`) plus Key ID and Issuer ID for the App Store configuration. The repo references these values only through GitHub Actions secrets, which are not readable locally:
+- `REVENUE_CAT_PUBLIC_KEY`
+- `REVENUE_CAT_API_KEY`
 
-- `APP_STORE_CONNECT_API_KEY`
-- `APP_STORE_CONNECT_API_KEY_ID`
-- `APP_STORE_CONNECT_API_KEY_ISSUER_ID`
-- `APP_STORE_APP_ID`
+## Remaining Release Blocker
 
-Once that `.p8` key material is available locally or uploaded by a human in the RevenueCat dashboard, add the App Store configuration for bundle id `com.logyourbody.app`, then switch production builds from the Test Store SDK key to the App Store SDK key.
+RevenueCat is now configured for the App Store app and the iOS offering preflight passes against the production App Store SDK key.
+
+The remaining gates are outside RevenueCat configuration:
+
+- App Store Connect products must be approved/available for sandbox/live purchase.
+- Run a real sandbox purchase and restore on a TestFlight or App Store build.
+- Merge the paid MVP PR after human review and green checks.
