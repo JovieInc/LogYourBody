@@ -834,7 +834,7 @@ platform :ios do
       submit_for_review: submit_for_review,
       automatic_release: automatic_release,
       phased_release: phased_release,
-      apple_id: ENV["APP_STORE_APP_ID"],
+      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
       team_id: ENV["APPLE_TEAM_ID"]
     )
   end
@@ -861,7 +861,7 @@ platform :ios do
       skip_screenshots: false,
       submit_for_review: false,
       automatic_release: false,
-      apple_id: ENV["APP_STORE_APP_ID"],
+      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
       team_id: ENV["APPLE_TEAM_ID"]
     )
     
