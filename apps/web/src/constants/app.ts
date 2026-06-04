@@ -6,15 +6,15 @@ export const APP_CONFIG = {
   appName: 'LogYourBody',
   appNameShort: 'LYB',
   companyName: 'LogYourBody, Inc.',
-  
+
   // App Store Links
-  appStoreUrl: 'https://apps.apple.com/app/logyourbody/id6444302778',
+  appStoreUrl: 'https://apps.apple.com/us/app/logyourbody/id6739360530',
   playStoreUrl: 'https://play.google.com/store/apps/details?id=com.logyourbody.app', // Coming soon
-  
+
   // Trial & Subscription
-  trialLengthDays: 7,
-  trialLengthText: '7-day free trial',
-  
+  trialLengthDays: 3,
+  trialLengthText: '3-day free trial',
+
   // Pricing (in USD)
   pricing: {
     monthly: {
@@ -30,7 +30,7 @@ export const APP_CONFIG = {
       savingsPercent: 42,
     },
   },
-  
+
   // Social Media URLs
   social: {
     twitter: 'https://twitter.com/logyourbody',
@@ -38,7 +38,7 @@ export const APP_CONFIG = {
     instagram: 'https://instagram.com/logyourbody',
     youtube: 'https://youtube.com/@logyourbody',
   },
-  
+
   // Contact
   contact: {
     support: 'support@logyourbody.com',
@@ -46,7 +46,7 @@ export const APP_CONFIG = {
     legal: 'legal@logyourbody.com',
     careers: 'careers@logyourbody.com',
   },
-  
+
   // Company Info
   company: {
     address: {
@@ -58,14 +58,14 @@ export const APP_CONFIG = {
     },
     founded: 2023,
   },
-  
+
   // Feature Flags
   features: {
     webAppEnabled: true, // Web app is now live
     androidAppEnabled: false, // Coming soon
     removeOriginalsEnabled: true, // New privacy feature
   },
-  
+
   // App Metadata
   metadata: {
     currentVersion: '2.0.0',
@@ -74,19 +74,19 @@ export const APP_CONFIG = {
     totalUsers: '10,000+',
     successRate: '93%',
   },
-  
+
   // API & Backend
   api: {
     baseUrl: process.env.NEXT_PUBLIC_API_URL || 'https://api.logyourbody.com',
     websocketUrl: process.env.NEXT_PUBLIC_WS_URL || 'wss://api.logyourbody.com',
   },
-  
+
   // Analytics & Tracking
   analytics: {
     googleAnalyticsId: process.env.NEXT_PUBLIC_GA_ID,
     mixpanelToken: process.env.NEXT_PUBLIC_MIXPANEL_TOKEN,
   },
-  
+
   // PWA Configuration
   pwa: {
     themeColor: '#08090a',

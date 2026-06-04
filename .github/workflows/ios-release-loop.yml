@@ -261,7 +261,7 @@ jobs:
     timeout-minutes: 30
     environment:
       name: production-app-store
-      url: https://apps.apple.com/app/logyourbody
+      url: https://apps.apple.com/us/app/logyourbody/id6739360530
 
     steps:
       - uses: actions/checkout@v6
