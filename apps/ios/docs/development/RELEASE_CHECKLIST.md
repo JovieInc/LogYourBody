@@ -17,7 +17,8 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 - StoreKit/App Store products are attached to the active RevenueCat offering.
 - Release workflow verifies the RevenueCat current iOS offering exposes `$rc_annual` -> `com.logyourbody.app.pro1.annual.3daytrial` and `$rc_monthly` -> `com.logyourbody.app.pro1.monthly.3daytrial`.
 - Release workflow validates the actual release ref/SHA instead of the unrelated `preview` branch.
-- App Store release workflow is run from `main` with `release_type=app_store` and `submit_for_review=true` after the TestFlight build is accepted.
+- App Store release workflow is run from `main` with `release_type=app_store`, `submit_for_review=true`, and automatic release enabled after the TestFlight build is accepted.
+- The approved-release monitor is enabled so Apple-approved builds that enter `PENDING_DEVELOPER_RELEASE` are released without a manual App Store Connect click.
 - Optional GitHub `Production` secrets `STATSIG_CLIENT_SDK_KEY` and `SENTRY_DSN` are real values if present.
 - `ios_full_body_composition_dashboard` stays off for the v0.1 App Store launch unless the full dashboard has separate approval.
 

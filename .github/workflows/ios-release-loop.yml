@@ -24,7 +24,7 @@ on:
         description: 'Automatically release after Apple approval'
         required: false
         type: boolean
-        default: false
+        default: true
       phased_release:
         description: 'Use phased release for approved App Store builds'
         required: false
@@ -338,7 +338,7 @@ jobs:
           cd apps/ios
 
           SUBMIT_FOR_REVIEW="${{ github.event.inputs.submit_for_review || 'true' }}"
-          AUTOMATIC_RELEASE="${{ github.event.inputs.automatic_release || 'false' }}"
+          AUTOMATIC_RELEASE="${{ github.event.inputs.automatic_release || 'true' }}"
           PHASED_RELEASE="${{ github.event.inputs.phased_release || 'true' }}"
 
           IPA_PATH="$(find "$GITHUB_WORKSPACE/apps/ios/build" -name "*.ipa" -type f -print -quit)"
