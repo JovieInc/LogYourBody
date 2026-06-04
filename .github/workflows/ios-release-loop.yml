@@ -332,9 +332,18 @@ jobs:
           AUTOMATIC_RELEASE="${{ github.event.inputs.automatic_release || 'false' }}"
           PHASED_RELEASE="${{ github.event.inputs.phased_release || 'true' }}"
 
+          IPA_PATH="$(find "$GITHUB_WORKSPACE/apps/ios/build" -name "*.ipa" -type f -print -quit)"
+          if [ -z "$IPA_PATH" ]; then
+            echo "::error::No IPA file found in downloaded build artifact"
+            find "$GITHUB_WORKSPACE/apps/ios/build" -maxdepth 4 -type f -print || true
+            exit 1
+          fi
+
+          echo "Submitting IPA: $IPA_PATH"
+
           # Submit for review
           bundle exec fastlane submit_app_store \
-            ipa_path:build/*.ipa \
+            ipa_path:"$IPA_PATH" \
             submit_for_review:$SUBMIT_FOR_REVIEW \
             automatic_release:$AUTOMATIC_RELEASE \
             phased_release:$PHASED_RELEASE 2>&1 | tee submit.log
