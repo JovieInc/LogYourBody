@@ -47,28 +47,36 @@ platform :ios do
   private_lane :setup_app_store_connect_api do |options|
     # Skip if explicitly disabled
     return if options[:skip_asc_api] == true
+
+    issuer_id = ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"] || ENV["APP_STORE_CONNECT_API_ISSUER_ID"]
+
+    configure_from_api_key_json = lambda do |path|
+      api_key = JSON.parse(File.read(path))
+
+      app_store_connect_api_key(
+        key_id: api_key.fetch("key_id"),
+        issuer_id: api_key.fetch("issuer_id"),
+        key_content: api_key.fetch("key"),
+        is_key_content_base64: false,
+        duration: api_key["duration"] || 1200,
+        in_house: api_key["in_house"] || false
+      )
+    end
     
     # Check if we're in an environment that supports the API key
     if ENV["CI"] && ENV["GITHUB_ACTIONS"]
       # On GitHub Actions, check for OpenSSL compatibility
       begin
         # Try to initialize the API key
-        if ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_API_ISSUER_ID"]
-          if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
-            # Use key from file
-            app_store_connect_api_key(
-              key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-              issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
-              key_filepath: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
-              duration: 1200,
-              in_house: false
-            )
-            UI.success("✅ App Store Connect API key configured from file")
-          elsif ENV["APP_STORE_CONNECT_API_KEY"]
+        if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+          configure_from_api_key_json.call(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+          UI.success("✅ App Store Connect API key configured from file")
+        elsif ENV["APP_STORE_CONNECT_API_KEY_ID"] && issuer_id
+          if ENV["APP_STORE_CONNECT_API_KEY"]
             # Use key from environment variable (plain text PEM format)
             app_store_connect_api_key(
               key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-              issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+              issuer_id: issuer_id,
               key_content: ENV["APP_STORE_CONNECT_API_KEY"],
               is_key_content_base64: false,
               duration: 1200,
@@ -92,12 +100,25 @@ platform :ios do
       end
     else
       # Local development - try API key if available
-      if ENV["APP_STORE_CONNECT_API_KEY_ID"]
+      if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+        begin
+          UI.message("Using App Store Connect API key file for local development")
+          configure_from_api_key_json.call(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+          UI.success("✅ App Store Connect API key configured successfully")
+        rescue => e
+          if e.message.include?("invalid curve name") || e.message.include?("OpenSSL")
+            UI.important("⚠️  OpenSSL curve compatibility issue - API key will be passed directly to Match")
+            # Don't set the API key in lane context - Match will use it directly via env vars
+          else
+            raise e
+          end
+        end
+      elsif ENV["APP_STORE_CONNECT_API_KEY_ID"] && issuer_id
         begin
           UI.message("Using App Store Connect API key for local development")
           app_store_connect_api_key(
             key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-            issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+            issuer_id: issuer_id,
             key_filepath: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
             duration: 1200,
             in_house: false

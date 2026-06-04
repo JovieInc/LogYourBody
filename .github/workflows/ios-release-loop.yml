@@ -284,6 +284,32 @@ jobs:
           echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> "$GITHUB_ENV"
           echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> "$GITHUB_ENV"
 
+      - name: Setup App Store Connect Authentication
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          cd apps/ios
+          mkdir -p fastlane
+
+          ruby <<'RUBY'
+          require "json"
+
+          api_key = {
+            "key_id" => ENV.fetch("ASC_KEY_ID"),
+            "issuer_id" => ENV.fetch("ASC_ISSUER_ID"),
+            "key" => ENV.fetch("ASC_PRIVATE_KEY").gsub("\\n", "\n"),
+            "duration" => 1200,
+            "in_house" => false
+          }
+
+          File.write("fastlane/api_key.json", JSON.pretty_generate(api_key))
+          JSON.parse(File.read("fastlane/api_key.json"))
+          RUBY
+
+          echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> "$GITHUB_ENV"
+
       - name: Run Fastlane Precheck
         run: |
           cd apps/ios
@@ -326,7 +352,7 @@ jobs:
         if: always()
         run: |
           cd apps/ios
-          # API key is now handled via environment variables
+          rm -f fastlane/api_key.json
 
   create-release:
     name: Create Release
