@@ -91,7 +91,7 @@ jobs:
           echo "🔍 Checking for reusable preview build..."
 
           # This is a placeholder - in production, you'd check artifact storage
-          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "exists=false" >> "$GITHUB_OUTPUT"
           echo "ℹ️ No reusable build found, will build fresh"
 
   build-release:
@@ -173,8 +173,8 @@ jobs:
       - name: Set Environment Variables for Build
         run: |
           cd apps/ios
-          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
-          echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> $GITHUB_ENV
+          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> "$GITHUB_ENV"
+          echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> "$GITHUB_ENV"
 
       - name: Update version and build
         run: |
@@ -266,8 +266,8 @@ jobs:
       - name: Set Environment Variables for Build
         run: |
           cd apps/ios
-          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
-          echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> $GITHUB_ENV
+          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> "$GITHUB_ENV"
+          echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> "$GITHUB_ENV"
 
       - name: Run Fastlane Precheck
         run: |
@@ -320,39 +320,82 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Prepare release metadata
+        id: release_metadata
+        run: |
+          DEPLOYMENT_TYPE="${{ github.event.inputs.release_type || 'testflight' }}"
+          VERSION="ios-v${{ needs.validate-release.outputs.version }}"
+
+          if [[ "$DEPLOYMENT_TYPE" == "app_store" ]]; then
+            TAG="$VERSION"
+            PRERELEASE=false
+          else
+            TAG="$VERSION-testflight.${{ needs.validate-release.outputs.build_number }}"
+            PRERELEASE=true
+          fi
+
+          {
+            echo "deployment_type=$DEPLOYMENT_TYPE"
+            echo "prerelease=$PRERELEASE"
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Tag release
+        id: tag_release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="ios-v${{ needs.validate-release.outputs.version }}"
+          TAG="${{ steps.release_metadata.outputs.tag }}"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "Tag already exists: $TAG"
+            exit 0
+          fi
 
           # Create git tag
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git tag -a "$VERSION" -m "iOS Release $VERSION
+          git tag -a "$TAG" -m "iOS Release $TAG
 
           Build: ${{ needs.validate-release.outputs.build_number }}
-          Deployment: ${{ github.event.inputs.release_type || 'testflight' }}"
+          Deployment: ${{ steps.release_metadata.outputs.deployment_type }}"
 
           # Push tag
-          git push origin "$VERSION"
+          git push origin "$TAG"
 
-          echo "✅ Tagged release: $VERSION"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+          echo "Tagged release: $TAG"
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="ios-v${{ needs.validate-release.outputs.version }}"
-          DEPLOYMENT_TYPE="${{ github.event.inputs.release_type || 'TestFlight' }}"
+          TAG="${{ steps.release_metadata.outputs.tag }}"
+          VERSION="${{ steps.release_metadata.outputs.version }}"
+          DEPLOYMENT_TYPE="${{ steps.release_metadata.outputs.deployment_type }}"
+          PRERELEASE="${{ steps.release_metadata.outputs.prerelease }}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release already exists: $TAG"
+            exit 0
+          fi
+
+          RELEASE_ARGS=()
+          if [[ "$PRERELEASE" == "true" ]]; then
+            RELEASE_ARGS+=(--prerelease)
+          fi
 
           # Generate release notes
-          gh release create "$VERSION" \
-            --title "iOS Release $VERSION" \
-            --notes "## 📱 iOS Release $VERSION
+          gh release create "$TAG" \
+            --title "iOS Release $TAG" \
+            "${RELEASE_ARGS[@]}" \
+            --notes "## 📱 iOS Release $TAG
 
             **Build Number**: ${{ needs.validate-release.outputs.build_number }}
             **Deployment**: $DEPLOYMENT_TYPE
+            **Version**: $VERSION
 
             ### Changes
             This release includes all changes that have been tested in the preview environment.
