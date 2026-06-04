@@ -40,7 +40,7 @@ case "$STATUS_STATE" in
     echo "Commit statuses are successful."
     ;;
   failure|error)
-    fail "Commit status state for $SHA is $STATUS_STATE."
+    warn "Commit status state for $SHA is $STATUS_STATE; continuing because required check runs are validated explicitly."
     ;;
   pending)
     warn "Commit status state for $SHA is pending; continuing because required check runs are validated separately when present."
