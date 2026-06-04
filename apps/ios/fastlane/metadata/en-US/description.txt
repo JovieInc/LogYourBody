@@ -1,0 +1,14 @@
+LogYourBody is a focused body metrics tracker for people who want a simple, private weight log that can grow into deeper body composition tracking.
+
+Start with the essentials:
+
+- Log today's weight in pounds or kilograms
+- See your latest entry at a glance
+- Review recent weight history
+- Sync entries to your account
+- Export your weight log as CSV
+- Keep access managed through LogYourBody Pro
+
+LogYourBody is built for consistent tracking without noisy coaching. Your entries stay available on device and sync to your account when you are signed in.
+
+LogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.
