@@ -123,7 +123,11 @@ class CoreDataManager: ObservableObject {
         }
     }
 
-    func saveDailyMetrics(_ metrics: DailyMetrics, userId: String) {
+    func saveDailyMetrics(
+        _ metrics: DailyMetrics,
+        userId: String,
+        completion: ((Result<Void, Error>) -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
@@ -155,6 +159,7 @@ class CoreDataManager: ObservableObject {
                 if context.hasChanges {
                     try context.save()
                 }
+                completion?(.success(()))
             } catch {
                 #if DEBUG
                 let appError = AppError.coreData(operation: "saveDailyMetrics", underlying: error)
@@ -167,6 +172,15 @@ class CoreDataManager: ObservableObject {
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to save daily metrics: \(error)")
                 #endif
+                completion?(.failure(error))
+            }
+        }
+    }
+
+    func saveDailyMetricsAndWait(_ metrics: DailyMetrics, userId: String) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            saveDailyMetrics(metrics, userId: userId) { result in
+                continuation.resume(with: result)
             }
         }
     }
@@ -463,7 +477,12 @@ class CoreDataManager: ObservableObject {
     }
 
     // MARK: - Body Metrics Operations
-    func saveBodyMetrics(_ metrics: BodyMetrics, userId: String, markAsSynced: Bool = false) {
+    func saveBodyMetrics(
+        _ metrics: BodyMetrics,
+        userId: String,
+        markAsSynced: Bool = false,
+        completion: ((Result<Void, Error>) -> Void)? = nil
+    ) {
         let context = viewContext
 
         // Ensure all Core Data operations happen on the context's queue
@@ -509,6 +528,7 @@ class CoreDataManager: ObservableObject {
                 if context.hasChanges {
                     try context.save()
                 }
+                completion?(.success(()))
             } catch {
                 // Use OSLog for production-safe logging
                 #if DEBUG
@@ -522,6 +542,15 @@ class CoreDataManager: ObservableObject {
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to save body metrics: \(error)")
                 #endif
+                completion?(.failure(error))
+            }
+        }
+    }
+
+    func saveBodyMetricsAndWait(_ metrics: BodyMetrics, userId: String, markAsSynced: Bool = false) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            saveBodyMetrics(metrics, userId: userId, markAsSynced: markAsSynced) { result in
+                continuation.resume(with: result)
             }
         }
     }
@@ -1084,67 +1113,101 @@ class CoreDataManager: ObservableObject {
 
     // MARK: - Delete All Data
 
-    func deleteAllData() {
+    func deleteAllData(completion: ((Result<Void, Error>) -> Void)? = nil) {
         let context = viewContext
 
         context.perform {
-            // Delete all body metrics
-            let bodyMetricsRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-            if let bodyMetrics = try? context.fetch(bodyMetricsRequest) {
+            do {
+                // Delete all body metrics
+                let bodyMetricsRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+                let bodyMetrics = try context.fetch(bodyMetricsRequest)
                 for metric in bodyMetrics {
                     context.delete(metric)
                 }
-            }
 
-            // Delete all daily metrics
-            let dailyMetricsRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
-            if let dailyMetrics = try? context.fetch(dailyMetricsRequest) {
+                // Delete all daily metrics
+                let dailyMetricsRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+                let dailyMetrics = try context.fetch(dailyMetricsRequest)
                 for metric in dailyMetrics {
                     context.delete(metric)
                 }
-            }
 
-            // Delete all GLP-1 dose logs
-            let glp1Request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
-            if let glp1Logs = try? context.fetch(glp1Request) {
+                // Delete all GLP-1 dose logs
+                let glp1Request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+                let glp1Logs = try context.fetch(glp1Request)
                 for log in glp1Logs {
                     context.delete(log)
                 }
-            }
 
-            // Delete all GLP-1 medications
-            let medicationRequest: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
-            if let medications = try? context.fetch(medicationRequest) {
+                // Delete all GLP-1 medications
+                let medicationRequest: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+                let medications = try context.fetch(medicationRequest)
                 for medication in medications {
                     context.delete(medication)
                 }
-            }
 
-            let dexaRequest: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
-            if let dexaResults = try? context.fetch(dexaRequest) {
+                let dexaRequest: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
+                let dexaResults = try context.fetch(dexaRequest)
                 for result in dexaResults {
                     context.delete(result)
                 }
-            }
 
-            // Delete all profiles
-            let profileRequest: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
-            if let profiles = try? context.fetch(profileRequest) {
+                // Delete all profiles
+                let profileRequest: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
+                let profiles = try context.fetch(profileRequest)
                 for profile in profiles {
                     context.delete(profile)
                 }
-            }
 
-            // Delete all sync metadata
-            let syncRequest: NSFetchRequest<SyncMetadata> = SyncMetadata.fetchRequest()
-            if let syncRecords = try? context.fetch(syncRequest) {
+                // Delete all sync metadata
+                let syncRequest: NSFetchRequest<SyncMetadata> = SyncMetadata.fetchRequest()
+                let syncRecords = try context.fetch(syncRequest)
                 for record in syncRecords {
                     context.delete(record)
                 }
-            }
 
-            // Save changes
-            self.save()
+                let hkSampleRequest: NSFetchRequest<CachedHKSample> = CachedHKSample.fetchRequest()
+                let hkSamples = try context.fetch(hkSampleRequest)
+                for sample in hkSamples {
+                    context.delete(sample)
+                }
+
+                let deviceRequest: NSFetchRequest<CachedDevice> = CachedDevice.fetchRequest()
+                let devices = try context.fetch(deviceRequest)
+                for device in devices {
+                    context.delete(device)
+                }
+
+                let userDeviceRequest: NSFetchRequest<CachedUserDevice> = CachedUserDevice.fetchRequest()
+                let userDevices = try context.fetch(userDeviceRequest)
+                for userDevice in userDevices {
+                    context.delete(userDevice)
+                }
+
+                // Save changes
+                if context.hasChanges {
+                    try context.save()
+                }
+                completion?(.success(()))
+            } catch {
+                let appError = AppError.coreData(operation: "deleteAllData", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "deleteAllData",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                completion?(.failure(error))
+            }
+        }
+    }
+
+    func deleteAllDataAndWait() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            deleteAllData { result in
+                continuation.resume(with: result)
+            }
         }
     }
 

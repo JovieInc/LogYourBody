@@ -65,7 +65,7 @@ struct LogYourBodyApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     // App entering foreground - refresh data
                     Task {
-                        if healthKitManager.isAuthorized {
+                        if isFullBodyCompositionDashboardEnabled, healthKitManager.isAuthorized {
                             try? await HealthSyncCoordinator.shared.syncStepsFromHealthKit()
                         }
                         // Update widget with latest data
@@ -76,6 +76,10 @@ struct LogYourBodyApp: App {
     }
 
     // MARK: - Startup Helpers
+
+    private var isFullBodyCompositionDashboardEnabled: Bool {
+        AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.fullBodyCompositionDashboardFlagKey)
+    }
 
     @MainActor
     private func performStartupSequence() async {
@@ -93,7 +97,9 @@ struct LogYourBodyApp: App {
         }
 
         Task { @MainActor in
-            await bootstrapHealthKit()
+            if isFullBodyCompositionDashboardEnabled {
+                await bootstrapHealthKit()
+            }
         }
 
         await clerkInitializationTask.value
@@ -162,11 +168,24 @@ struct LogYourBodyApp: App {
                 return
             }
 
-            // Check if onboarding is complete
+            // Check if body-composition onboarding/profile gates apply to this launch surface.
             let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Constants.hasCompletedOnboardingKey)
             let isProfileComplete = checkProfileComplete()
+            let fullDashboardEnabled = LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(
+                gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                    flagKey: Constants.fullBodyCompositionDashboardFlagKey
+                )
+            )
+            let requiresOnboarding = LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+                hasCompletedOnboarding: hasCompletedOnboarding,
+                fullDashboardEnabled: fullDashboardEnabled
+            )
+            let requiresProfile = LaunchSurfacePolicy.requiresCompleteProfile(
+                isProfileComplete: isProfileComplete,
+                fullDashboardEnabled: fullDashboardEnabled
+            )
 
-            if !hasCompletedOnboarding || !isProfileComplete {
+            if requiresOnboarding || requiresProfile {
                 // User needs to complete onboarding first
                 // Don't open the add entry sheet
                 return

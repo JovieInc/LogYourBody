@@ -3,6 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main, production, preview]
+  push:
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -98,17 +100,19 @@ jobs:
     steps:
       - name: Check results
         run: |
-          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Web changed: ${{ needs.detect-changes.outputs.web }}" >> $GITHUB_STEP_SUMMARY
-          echo "- iOS changed: ${{ needs.detect-changes.outputs.ios }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## CI Summary"
+            echo ""
+            echo "- Web changed: ${{ needs.detect-changes.outputs.web }}"
+            echo "- iOS changed: ${{ needs.detect-changes.outputs.ios }}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
 
           # Check if any required jobs failed
           if [[ "${{ needs.js.result }}" == "failure" ]] || \
              [[ "${{ needs.ios.result }}" == "failure" ]]; then
-            echo "❌ One or more CI jobs failed" >> $GITHUB_STEP_SUMMARY
+            echo "❌ One or more CI jobs failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 
-          echo "✅ All CI checks passed!" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All CI checks passed!" >> "$GITHUB_STEP_SUMMARY"

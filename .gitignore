@@ -41,7 +41,6 @@ yarn-error.log*
 
 # Local env files
 .env*.local
-.env
 
 # Vercel
 .vercel
@@ -50,9 +49,10 @@ yarn-error.log*
 *.tsbuildinfo
 
 # Local scripts
-apps/web/scripts/
+apps/web/scripts/*
 !apps/web/scripts/seed-database.ts
 !apps/web/scripts/test-seeded-users.ts
+!apps/web/scripts/next-build.cjs
 !apps/web/scripts/tsconfig.json
 !apps/web/scripts/README.md
 # Note: Root scripts/ folder contains CI/CD tools and should be committed
@@ -106,10 +106,23 @@ apps/ios/**/*.xcresult
 
 # Config files with secrets
 apps/ios/LogYourBody/Config.xcconfig
+apps/ios/LogYourBody/Config-Development.xcconfig
+apps/ios/LogYourBody/Config-Production.xcconfig
 apps/ios/Supabase.xcconfig
 !apps/ios/LogYourBody/Config-Template.xcconfig
+!apps/ios/LogYourBody/*.xcconfig.example
+!apps/ios/LogYourBody/*.xcconfig.template
 
 # Backup directories
 **/project_backup_*
 **/backup_*
-**/*_backup_*sentry-wizard
+**/*_backup_*
+sentry-wizard
+
+.projects/cache
+.projects/vault
+.projects/state.test.json
+.projects/state.local.test.json
+.env
+.env.*
+!.env.example

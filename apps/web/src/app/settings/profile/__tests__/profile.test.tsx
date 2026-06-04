@@ -667,11 +667,14 @@ describe('ProfileSettingsPage', () => {
   });
 
   it('shows saving indicator during save', async () => {
+    let resolveSave!: (value: typeof mockProfile) => void;
     mockUpdateProfile.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve(mockProfile), 100)),
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
     );
 
-    const user = userEvent.setup();
     render(<ProfileSettingsPage />);
 
     await waitFor(() => {
@@ -679,11 +682,13 @@ describe('ProfileSettingsPage', () => {
     });
 
     const nameInput = screen.getByLabelText('Full Name');
-    await user.type(nameInput, ' Updated');
+    fireEvent.change(nameInput, { target: { value: 'Test User Updated' } });
 
     await waitFor(() => {
       expect(screen.getByText('Saving...')).toBeInTheDocument();
     });
+
+    resolveSave(mockProfile);
 
     await waitFor(() => {
       expect(screen.getByText('Saved')).toBeInTheDocument();
@@ -730,12 +735,9 @@ describe('ProfileSettingsPage', () => {
   });
 
   it('correctly calculates age from date of birth', async () => {
-    const currentYear = new Date().getFullYear();
-    const birthYear = currentYear - 25; // 25 years old
-
     mockGetProfile.mockResolvedValue({
       ...mockProfile,
-      date_of_birth: `${birthYear}-06-15`,
+      date_of_birth: '1999-06-15',
     });
 
     render(<ProfileSettingsPage />);
@@ -743,8 +745,7 @@ describe('ProfileSettingsPage', () => {
     await waitFor(() => {
       const ageText = screen.getByText(/\(\d+ years old\)/);
       expect(ageText).toBeInTheDocument();
-      // Age should be 24 or 25 depending on current date
-      expect(ageText.textContent).toMatch(/\((24|25) years old\)/);
+      expect(ageText.textContent).toBe('(25 years old)');
     });
   });
 });

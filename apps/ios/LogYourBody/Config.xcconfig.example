@@ -1,16 +1,11 @@
-// Configuration settings file format documentation can be found at:
+// Configuration settings file format documentation:
 // https://help.apple.com/xcode/#/dev745c5c974
-// 
-// Copy this file to Config.xcconfig and fill in your actual values
-
-// Supabase Configuration
-SUPABASE_URL = https:/$()/your-project.supabase.co
-SUPABASE_ANON_KEY = your-anon-key-here
-
-// API Base URL - Change this for different environments
-API_BASE_URL_DEBUG = http:/$()/localhost:3000
-API_BASE_URL_RELEASE = https:/$()/your-production-url.com
-
-// Statsig Analytics
-STATSIG_CLIENT_SDK_KEY = your-statsig-ios-client-sdk-key-here
-STATSIG_ENVIRONMENT_TIER = development
+//
+// Real Config*.xcconfig files are gitignored because they contain provider keys.
+// For local development, copy Config-Development.xcconfig.template to
+// Config-Development.xcconfig, fill it in, then set Config.xcconfig to include it:
+//
+// #include "Config-Development.xcconfig"
+//
+// For release builds, copy Config-Production.xcconfig.template to
+// Config-Production.xcconfig and include that file from Config.xcconfig.

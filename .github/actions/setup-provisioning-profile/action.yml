@@ -5,9 +5,9 @@ inputs:
     description: 'Base64 encoded provisioning profile'
     required: true
   expected-app-id:
-    description: 'Expected app ID pattern (e.g., *.LogYourBody.LogYourBody)'
+    description: 'Expected app ID pattern (e.g., *.com.logyourbody.app)'
     required: false
-    default: '*.LogYourBody.LogYourBody'
+    default: '*.com.logyourbody.app'
   validate-capabilities:
     description: 'Whether to validate required capabilities'
     required: false

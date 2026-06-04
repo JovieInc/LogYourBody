@@ -17,6 +17,7 @@ struct Constants {
 
     // MARK: - Feature Flags
     static let isBodySpecEnabled = true
+    static let fullBodyCompositionDashboardFlagKey = "ios_full_body_composition_dashboard"
     static let photosTabFlagKey = "photos_tab"
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)

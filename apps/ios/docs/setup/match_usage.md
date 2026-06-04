@@ -1,55 +1,42 @@
-# Fastlane Match Setup Complete
+# Fastlane Match Usage
 
-Your Fastlane Match is now configured to use App Store Connect API authentication instead of username/password.
+The iOS release pipeline uses Fastlane Match with App Store Connect API key
+authentication. Keep all real values in local environment variables or GitHub
+Secrets.
 
-## Certificates Created
-
-- **Development Certificate**: `9UJBLUW69K`
-- **Distribution Certificate**: `8PRT68NL6X`
-
-## Usage
-
-### 1. Set Environment Variables
+## Local Readonly Sync
 
 ```bash
+cd apps/ios
 export APP_STORE_CONNECT_API_KEY_PATH="$(pwd)/fastlane/api_key.json"
-export MATCH_PASSWORD="your-secure-match-password"
-```
-
-### 2. Sync Certificates (Read-only)
-
-```bash
-# Development
-bundle exec fastlane match development --readonly
-
-# App Store
+export MATCH_PASSWORD="<match-encryption-password>"
+export MATCH_GIT_URL="<private-match-repo-url>"
+export MATCH_GIT_BASIC_AUTHORIZATION="<base64-username-token>"
 bundle exec fastlane match appstore --readonly
 ```
 
-### 3. Force Refresh Certificates
+## Regenerate Profiles
+
+Only regenerate profiles intentionally during signing maintenance:
 
 ```bash
-# Development
-bundle exec fastlane match development --force
-
-# App Store  
-bundle exec fastlane match appstore --force
+cd apps/ios
+export MATCH_READONLY=false
+bundle exec fastlane match appstore
+bundle exec fastlane match development
 ```
 
-### 4. Use in Fastlane Lanes
+## CI Setup
 
-Your existing lanes (`alpha`, `beta`, `release`) will automatically use the API key authentication when you set the environment variables.
+GitHub Actions needs these secret names:
 
-## Important Notes
+- `APP_STORE_CONNECT_API_KEY`
+- `APP_STORE_CONNECT_API_KEY_ID`
+- `APP_STORE_CONNECT_API_KEY_ISSUER_ID`
+- `MATCH_PASSWORD`
+- `MATCH_GIT_URL`
+- `MATCH_GIT_BASIC_AUTHORIZATION`
+- `APPLE_TEAM_ID`
 
-- **No Username/Password**: The system is configured to fail if API key is not available
-- **Match Password**: Required for encrypting/decrypting certificates in the git repository
-- **API Key**: Located at `fastlane/api_key.json` - keep this secure!
-
-## CI/CD Setup
-
-For GitHub Actions or other CI systems:
-
-1. Add `APP_STORE_CONNECT_API_KEY_PATH` as a secret
-2. Add `MATCH_PASSWORD` as a secret
-3. The certificates will be automatically synced during builds
+The release workflow should sync Match in readonly mode and should fail if any
+required secret is missing.
