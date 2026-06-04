@@ -825,15 +825,32 @@ platform :ios do
       UI.user_error!("automatic_release requires submit_for_review")
     end
 
+    env_or_default = lambda do |key, default|
+      value = ENV[key].to_s.strip
+      value.empty? ? default : value
+    end
+
+    app_review_information = {
+      first_name: env_or_default.call("APP_REVIEW_FIRST_NAME", "LogYourBody"),
+      last_name: env_or_default.call("APP_REVIEW_LAST_NAME", "Team"),
+      email_address: env_or_default.call("APP_REVIEW_EMAIL_ADDRESS", "support@logyourbody.com"),
+      phone_number: ENV["APP_REVIEW_PHONE_NUMBER"],
+      notes: env_or_default.call("APP_REVIEW_NOTES", "LogYourBody lets users sign in, log their weight, sync their entries, export CSV data, and manage their subscription. No demo account is required; reviewers can create a test account in the app.")
+    }.compact
+
     # Upload to App Store Connect
     upload_to_app_store(
       ipa: options[:ipa_path],
       force: true,
-      skip_metadata: true,
-      skip_screenshots: true,
+      metadata_path: "fastlane/metadata",
+      screenshots_path: "fastlane/screenshots",
+      skip_metadata: false,
+      skip_screenshots: false,
       submit_for_review: submit_for_review,
       automatic_release: automatic_release,
       phased_release: phased_release,
+      price_tier: env_or_default.call("APP_STORE_PRICE_TIER", "0"),
+      app_review_information: app_review_information,
       run_precheck_before_submit: false,
       app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
       team_id: ENV["APPLE_TEAM_ID"]

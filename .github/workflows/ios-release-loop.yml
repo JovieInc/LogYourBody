@@ -356,6 +356,12 @@ jobs:
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+          APP_REVIEW_FIRST_NAME: ${{ vars.APP_REVIEW_FIRST_NAME }}
+          APP_REVIEW_LAST_NAME: ${{ vars.APP_REVIEW_LAST_NAME }}
+          APP_REVIEW_EMAIL_ADDRESS: ${{ vars.APP_REVIEW_EMAIL_ADDRESS }}
+          APP_REVIEW_PHONE_NUMBER: ${{ secrets.APP_REVIEW_PHONE_NUMBER || vars.APP_REVIEW_PHONE_NUMBER }}
+          APP_REVIEW_NOTES: ${{ vars.APP_REVIEW_NOTES }}
+          APP_STORE_PRICE_TIER: ${{ vars.APP_STORE_PRICE_TIER }}
 
       - name: Cleanup
         if: always()
