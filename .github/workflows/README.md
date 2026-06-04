@@ -8,6 +8,7 @@ This directory supports fast trunk-based shipping. Required checks should prove 
 
 Primary pull request workflow for `main`.
 
+- Pull requests target `main`; `preview`, `production`, and `dev` are not active development branches.
 - `Detect Changes`: path filter for web/package and iOS changes.
 - `JavaScript/TypeScript`: runs `pnpm install`, `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` when web, package, or CI harness files change. The job supplies syntactically valid placeholder Clerk/Supabase values when repository secrets are unavailable so pull request CI can verify buildability without privileged credentials.
 - `iOS`: runs the iOS Fastlane CI lane when iOS files change.

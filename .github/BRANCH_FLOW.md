@@ -17,6 +17,8 @@ feat/*, fix/*, refactor/*, agent/* -> pull request -> main
 
 There is no long-lived `dev` branch in the active process. `preview` and `production` may exist as deployment environments or legacy branch names, but agents should not treat them as the normal development lane.
 
+Pull requests should target `main`. CI is configured around `main` as the trunk, and agents should not open routine product or release PRs against `preview`, `production`, or other staging branches.
+
 ## Merge Contract
 
 Pull requests into `main` should be small and focused. The required merge signal is the aggregate `CI Summary` status from `.github/workflows/ci.yml`.
