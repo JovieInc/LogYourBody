@@ -15,6 +15,21 @@ Only deterministic release-breakers should block merges:
 
 If a risk is subjective, stylistic, speculative, or not backed by a command/policy violation, it belongs in advisory review.
 
+## Autonomous Development Loop
+
+Agents should assume an implementation request includes closeout unless the user explicitly asks to stop earlier. A complete cycle means:
+
+1. Implement the smallest shippable change.
+2. Run scoped local validation.
+3. Open or update the pull request with evidence.
+4. Wait for required GitHub checks and required deployments.
+5. Merge through the configured PR path when gates are green.
+6. Watch the `main` CI/deploy result after merge.
+7. Verify the real external surface: production web, TestFlight/App Store, RevenueCat, Clerk, Supabase, or whichever provider owns the shipped behavior.
+8. Create follow-up PRs for non-blocking findings.
+
+The loop should stop only for hard external blockers: missing credentials, account-owner approval, provider outage, App Review rejection, unresolved required-check failure, or unsafe conflicts that need product judgment.
+
 ## Advisory Review
 
 `Advisory / AI Review` replaces external review bots such as CodeRabbit and gReptile as the default AI review surface. It is not a branch-protection requirement.

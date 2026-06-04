@@ -75,6 +75,21 @@ LogYourBody/
 
 > **Rule of Thumb**: Agents ship through the same controls every time. `main` only contains PR-merged, CI-passing, deployable code with evidence in the PR.
 
+### Default Operating Mode
+
+When a user asks for implementation, ship, land, continue, fix CI, or release work, treat it as authorization to close the loop autonomously. Do not stop at a plan, draft, local commit, green local check, or open pull request unless the user explicitly asks for that pause.
+
+The expected cycle is:
+
+1. Make the smallest shippable change that preserves the product goal.
+2. Validate locally with scoped commands appropriate to the diff.
+3. Open or update the pull request with evidence.
+4. Wait for required checks and required deployments.
+5. Enqueue or merge through the configured PR path when gates are green.
+6. Watch the post-merge `main` workflows and release workflows.
+7. Verify the real external surface that matters for the change.
+8. Open follow-up PRs for non-blocking issues instead of expanding the landed PR.
+
 ### Agents May:
 
 - Work only on non-`main` branches (`feat/*`, `fix/*`, `refactor/*`, `agent/*`).
@@ -87,6 +102,7 @@ LogYourBody/
 - Mark PRs ready for review when the implementation and validation evidence are complete.
 - Enable auto-merge, enqueue, or merge PRs after required checks, required deployments, merge queue rules, and configured automated review controls pass.
 - Trigger release workflows after the merged `main` commit is green and the release checklist evidence is present.
+- Open small follow-up PRs for advisory findings, cleanup, coverage expansion, docs, or hardening that are not release blockers.
 
 ### Agents Must NOT:
 
@@ -117,7 +133,13 @@ When the user asks an agent to ship, land, deploy, or continue an active release
 8. Verify the actual external state: TestFlight/App Store, Vercel, RevenueCat, Supabase, Clerk, or other provider state as applicable.
 9. Open follow-up PRs for non-blocking issues instead of holding the main PR when the product remains deployable.
 
-Only stop before merge/release when there is a hard external blocker the agent cannot satisfy, such as missing credentials, account-owner approval, App Review rejection, provider outage, or an unresolved failing required check.
+Only stop before merge/release when there is a hard external blocker the agent cannot satisfy, such as missing credentials, account-owner approval, App Review rejection, provider outage, merge conflicts that cannot be resolved safely, or an unresolved failing required check.
+
+### Blockers vs Follow-Ups
+
+Block only on deterministic evidence that the PR can break production, customer data, auth, billing, App Store release, signing, migrations, secrets, or required CI. Treat speculative quality concerns, subjective AI review comments, broad refactors, performance ideas without measured regression, and nice-to-have tests as follow-up work.
+
+When a non-blocking issue is worth doing, prefer a focused follow-up PR with its own validation instead of keeping the original PR open. This keeps the merge queue moving while still closing the quality loop.
 
 ---
 

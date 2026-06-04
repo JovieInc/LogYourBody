@@ -19,7 +19,7 @@ jobs:
         id: version
         run: |
           VERSION=$(node -p "require('./apps/web/package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "📦 Version: $VERSION"
 
   deploy-production:
@@ -37,9 +37,9 @@ jobs:
       - name: Setup deployment info
         id: deploy-info
         run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
-          echo "deployment_name=v${{ needs.validate-release.outputs.version }}-$SHORT_SHA" >> $GITHUB_OUTPUT
+          SHORT_SHA="$(printf '%s' "${{ github.sha }}" | cut -c1-7)"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "deployment_name=v${{ needs.validate-release.outputs.version }}-$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v4
 
@@ -49,11 +49,14 @@ jobs:
           cache: 'pnpm'
 
       - name: Pull Vercel Environment
-        run: pnpm dlx vercel@latest pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project
-        run: pnpm dlx vercel@latest build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN"
         env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
@@ -65,10 +68,12 @@ jobs:
         id: deploy
         run: |
           # Deploy to production
-          DEPLOYMENT_URL=$(pnpm dlx vercel@latest deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          DEPLOYMENT_URL="$(pnpm dlx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          echo "url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
 
           echo "✅ Deployed to production: $DEPLOYMENT_URL"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Create GitHub deployment
         uses: actions/github-script@v8
@@ -144,7 +149,7 @@ jobs:
 
   post-deploy-validation:
     name: Post-Deploy Validation
-    needs: deploy-production
+    needs: [validate-release, deploy-production]
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
