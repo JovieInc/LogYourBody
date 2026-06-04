@@ -24,15 +24,23 @@ secret values into this repository, pull requests, issues, logs, or docs.
 - `REVENUE_CAT_PUBLIC_KEY`
   - RevenueCat iOS public SDK key used by release config and offering preflight.
 
-## Required Production Environment Secrets
+## Required Release Environment Secrets
 
-The iOS Release Loop reads production app config from the GitHub `Production`
-environment:
+The iOS Release Loop reads production app config from GitHub deployment
+environments:
+
+- TestFlight builds use `production-testflight`, which allows release-candidate
+  branch dispatches.
+- App Store builds use `Production`, which is branch-restricted to protect live
+  releases.
+
+Both environments need these secrets:
 
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 - `REVENUE_CAT_PUBLIC_KEY`
+- `REVENUE_CAT_API_KEY`
 
 Optional production integrations:
 
@@ -61,8 +69,12 @@ If a real value is ever committed or exposed in logs:
 
 ## Verification
 
-After secrets are configured, run the iOS Release Loop from `main`. The release
-job must pass:
+After secrets are configured, run the iOS Release Loop with:
+
+- `release_type=testflight` from a release-candidate branch or `main`.
+- `release_type=app_store` from `main`.
+
+The release job must pass:
 
 - production config generation
 - RevenueCat offering preflight

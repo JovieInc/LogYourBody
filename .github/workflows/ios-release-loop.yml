@@ -33,44 +33,44 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
-      
-    steps:
-    - uses: actions/checkout@v6
-    
-    - name: Validate release source
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        RELEASE_TYPE: ${{ github.event.inputs.release_type || 'testflight' }}
-      run: .github/scripts/validate-release-source.sh
-    
-    - name: Extract version info
-      id: version
-      run: |
-        cd apps/ios
-        
-        # Info.plist stores the Xcode placeholder, so resolve the real app
-        # version from build settings before passing it to downstream jobs.
-        VERSION=$(xcodebuild \
-          -project LogYourBody.xcodeproj \
-          -scheme LogYourBody \
-          -configuration Release \
-          -showBuildSettings 2>/dev/null \
-          | awk -F ' = ' '/MARKETING_VERSION/ { print $2; exit }')
 
-        UNRESOLVED_MARKER="\$("
-        if [ -z "$VERSION" ] || printf '%s' "$VERSION" | grep -qF "$UNRESOLVED_MARKER"; then
-          echo "::error::Unable to resolve MARKETING_VERSION for release"
-          exit 1
-        fi
-        
-        # Generate build number with timestamp
-        BUILD_NUMBER=$(date -u +%Y%m%d%H%M%S)
-        
-        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-        echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
-        
-        echo "📦 Version: $VERSION"
-        echo "🔢 Build: $BUILD_NUMBER"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate release source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TYPE: ${{ github.event.inputs.release_type || 'testflight' }}
+        run: .github/scripts/validate-release-source.sh
+
+      - name: Extract version info
+        id: version
+        run: |
+          cd apps/ios
+
+          # Info.plist stores the Xcode placeholder, so resolve the real app
+          # version from build settings before passing it to downstream jobs.
+          VERSION=$(xcodebuild \
+            -project LogYourBody.xcodeproj \
+            -scheme LogYourBody \
+            -configuration Release \
+            -showBuildSettings 2>/dev/null \
+            | awk -F ' = ' '/MARKETING_VERSION/ { print $2; exit }')
+
+          UNRESOLVED_MARKER="\$("
+          if [ -z "$VERSION" ] || printf '%s' "$VERSION" | grep -qF "$UNRESOLVED_MARKER"; then
+            echo "::error::Unable to resolve MARKETING_VERSION for release"
+            exit 1
+          fi
+
+          # Generate build number with timestamp
+          BUILD_NUMBER=$(date -u +%Y%m%d%H%M%S)
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+          echo "📦 Version: $VERSION"
+          echo "🔢 Build: $BUILD_NUMBER"
 
   # Reuse artifacts from preview if possible
   check-existing-build:
@@ -80,19 +80,19 @@ jobs:
     outputs:
       has_artifact: ${{ steps.check.outputs.exists }}
       artifact_url: ${{ steps.check.outputs.url }}
-    
+
     steps:
-    - name: Check for existing preview artifact
-      id: check
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        # Look for recent successful preview builds
-        echo "🔍 Checking for reusable preview build..."
-        
-        # This is a placeholder - in production, you'd check artifact storage
-        echo "exists=false" >> $GITHUB_OUTPUT
-        echo "ℹ️ No reusable build found, will build fresh"
+      - name: Check for existing preview artifact
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Look for recent successful preview builds
+          echo "🔍 Checking for reusable preview build..."
+
+          # This is a placeholder - in production, you'd check artifact storage
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "ℹ️ No reusable build found, will build fresh"
 
   build-release:
     name: Build Release
@@ -101,117 +101,116 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 30
     environment:
-      name: Production
-    
+      name: ${{ github.event.inputs.release_type == 'app_store' && 'Production' || 'production-testflight' }}
+
     steps:
-    - uses: actions/checkout@v6
-    
-    - name: Setup iOS Build Environment
-      uses: ./.github/actions/setup-ios-build
-      with:
-        xcode-version: 'latest-stable'
-        working-directory: apps/ios
-        create-config-files: 'false'
+      - uses: actions/checkout@v6
 
-    - name: Write production iOS config
-      run: apps/ios/Scripts/write_release_config.sh
-      env:
-        CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-        SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
-        REVENUE_CAT_PUBLIC_KEY: ${{ secrets.REVENUE_CAT_PUBLIC_KEY || secrets.REVENUE_CAT_API_KEY }}
-        STATSIG_CLIENT_SDK_KEY: ${{ secrets.STATSIG_CLIENT_SDK_KEY }}
-        SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      - name: Setup iOS Build Environment
+        uses: ./.github/actions/setup-ios-build
+        with:
+          xcode-version: 'latest-stable'
+          working-directory: apps/ios
+          create-config-files: 'false'
 
-    - name: Verify RevenueCat iOS offering
-      run: apps/ios/Scripts/verify_revenuecat_offerings.sh
-      env:
-        REVENUE_CAT_PUBLIC_KEY: ${{ secrets.REVENUE_CAT_PUBLIC_KEY || secrets.REVENUE_CAT_API_KEY }}
-    
-    - name: Install Compatible OpenSSL
-      run: |
-        if brew list openssl@1.1 >/dev/null 2>&1 || brew install openssl@1.1; then
-          echo "$(brew --prefix openssl@1.1)/bin" >> "$GITHUB_PATH"
-        else
-          echo "::warning::openssl@1.1 unavailable; continuing with the runner OpenSSL"
-        fi
-        
-    - name: Setup Match Authentication
-      env:
-        ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-        ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
-        ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-      run: |
-        cd apps/ios
-        mkdir -p fastlane
+      - name: Write production iOS config
+        run: apps/ios/Scripts/write_release_config.sh
+        env:
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
+          REVENUE_CAT_PUBLIC_KEY: ${{ secrets.REVENUE_CAT_PUBLIC_KEY || secrets.REVENUE_CAT_API_KEY }}
+          STATSIG_CLIENT_SDK_KEY: ${{ secrets.STATSIG_CLIENT_SDK_KEY }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
-        ruby <<'RUBY'
-        require "json"
+      - name: Verify RevenueCat iOS offering
+        run: apps/ios/Scripts/verify_revenuecat_offerings.sh
+        env:
+          REVENUE_CAT_PUBLIC_KEY: ${{ secrets.REVENUE_CAT_PUBLIC_KEY || secrets.REVENUE_CAT_API_KEY }}
 
-        api_key = {
-          "key_id" => ENV.fetch("ASC_KEY_ID"),
-          "issuer_id" => ENV.fetch("ASC_ISSUER_ID"),
-          "key" => ENV.fetch("ASC_PRIVATE_KEY").gsub("\\n", "\n"),
-          "duration" => 1200,
-          "in_house" => false
-        }
+      - name: Install Compatible OpenSSL
+        run: |
+          if brew list openssl@1.1 >/dev/null 2>&1 || brew install openssl@1.1; then
+            echo "$(brew --prefix openssl@1.1)/bin" >> "$GITHUB_PATH"
+          else
+            echo "::warning::openssl@1.1 unavailable; continuing with the runner OpenSSL"
+          fi
 
-        File.write("fastlane/api_key.json", JSON.pretty_generate(api_key))
-        JSON.parse(File.read("fastlane/api_key.json"))
-        RUBY
-        
-        # Set API key path for subsequent steps
-        echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> "$GITHUB_ENV"
-      
-      
-    - name: Sync Certificates with Match
-      uses: ./.github/actions/sync-match
-      with:
-        match_password: ${{ secrets.MATCH_PASSWORD }}
-        match_git_url: ${{ secrets.MATCH_GIT_URL }}
-        match_git_basic: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-    
-    - name: Set Environment Variables for Build
-      run: |
-        cd apps/ios
-        echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
-        echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> $GITHUB_ENV
-    
-    - name: Update version and build
-      run: |
-        cd apps/ios
-        
-        # Update build number
-        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ needs.validate-release.outputs.build_number }}" LogYourBody/Info.plist
-        
-        echo "📱 Building iOS app for release..."
-    
-    - name: Archive and export
-      run: |
-        set -o pipefail
-        cd apps/ios
-        
-        # Use Fastlane to build while preserving its exit status through tee.
-        bundle exec fastlane build_release 2>&1 | tee fastlane.log
-      env:
-        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-        MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
-        MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-        MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
-    
-    - name: Upload build artifact
-      uses: actions/upload-artifact@v5
-      with:
-        name: ios-release-build
-        path: apps/ios/build/*.ipa
-        retention-days: 3
-    
-    - name: Cleanup
-      if: always()
-      run: |
-        cd apps/ios
-        # API key is now handled via environment variables
+      - name: Setup Match Authentication
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          cd apps/ios
+          mkdir -p fastlane
+
+          ruby <<'RUBY'
+          require "json"
+
+          api_key = {
+            "key_id" => ENV.fetch("ASC_KEY_ID"),
+            "issuer_id" => ENV.fetch("ASC_ISSUER_ID"),
+            "key" => ENV.fetch("ASC_PRIVATE_KEY").gsub("\\n", "\n"),
+            "duration" => 1200,
+            "in_house" => false
+          }
+
+          File.write("fastlane/api_key.json", JSON.pretty_generate(api_key))
+          JSON.parse(File.read("fastlane/api_key.json"))
+          RUBY
+
+          # Set API key path for subsequent steps
+          echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> "$GITHUB_ENV"
+
+      - name: Sync Certificates with Match
+        uses: ./.github/actions/sync-match
+        with:
+          match_password: ${{ secrets.MATCH_PASSWORD }}
+          match_git_url: ${{ secrets.MATCH_GIT_URL }}
+          match_git_basic: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+
+      - name: Set Environment Variables for Build
+        run: |
+          cd apps/ios
+          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+          echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> $GITHUB_ENV
+
+      - name: Update version and build
+        run: |
+          cd apps/ios
+
+          # Update build number
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ needs.validate-release.outputs.build_number }}" LogYourBody/Info.plist
+
+          echo "📱 Building iOS app for release..."
+
+      - name: Archive and export
+        run: |
+          set -o pipefail
+          cd apps/ios
+
+          # Use Fastlane to build while preserving its exit status through tee.
+          bundle exec fastlane build_release 2>&1 | tee fastlane.log
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ios-release-build
+          path: apps/ios/build/*.ipa
+          retention-days: 3
+
+      - name: Cleanup
+        if: always()
+        run: |
+          cd apps/ios
+          # API key is now handled via environment variables
 
   deploy-testflight:
     name: Deploy to TestFlight
@@ -229,13 +228,13 @@ jobs:
       release_notes: |
         Version ${{ needs.validate-release.outputs.version }}
         Build ${{ needs.validate-release.outputs.build_number }}
-        
+
         This is a production release candidate.
-        
+
         Changes:
         - All features tested in preview environment
         - Ready for production release
-        
+
         Please test thoroughly before App Store submission.
     secrets: inherit
 
@@ -248,67 +247,67 @@ jobs:
     environment:
       name: production-app-store
       url: https://apps.apple.com/app/logyourbody
-    
+
     steps:
-    - uses: actions/checkout@v6
-    
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: ios-release-build
-        path: apps/ios/build
-    
-    - name: Setup iOS Build Environment
-      uses: ./.github/actions/setup-ios-build
-      with:
-        xcode-version: 'latest-stable'
-        working-directory: apps/ios
-    
-    - name: Set Environment Variables for Build
-      run: |
-        cd apps/ios
-        echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
-        echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> $GITHUB_ENV
-    
-    - name: Run Fastlane Precheck
-      run: |
-        cd apps/ios
-        bundle exec fastlane precheck 2>&1 | tee precheck.log
-        
-        # Check for errors and surface them in the summary
-        if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" precheck.log; then
-          echo "::error::Precheck errors detected - see highlighted lines above"
-          exit 1
-        fi
-      env:
-        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
-    
-    - name: Submit to App Store
-      run: |
-        cd apps/ios
-        
-        # Submit for review
-        bundle exec fastlane submit_app_store \
-          ipa_path:build/*.ipa \
-          submit_for_review:false \
-          automatic_release:false \
-          phased_release:true 2>&1 | tee submit.log
-        
-        # Check for errors and surface them in the summary
-        if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" submit.log; then
-          echo "::error::Submission errors detected - see highlighted lines above"
-          exit 1
-        fi
-      env:
-        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
-    
-    - name: Cleanup
-      if: always()
-      run: |
-        cd apps/ios
-        # API key is now handled via environment variables
+      - uses: actions/checkout@v6
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-release-build
+          path: apps/ios/build
+
+      - name: Setup iOS Build Environment
+        uses: ./.github/actions/setup-ios-build
+        with:
+          xcode-version: 'latest-stable'
+          working-directory: apps/ios
+
+      - name: Set Environment Variables for Build
+        run: |
+          cd apps/ios
+          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+          echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> $GITHUB_ENV
+
+      - name: Run Fastlane Precheck
+        run: |
+          cd apps/ios
+          bundle exec fastlane precheck 2>&1 | tee precheck.log
+
+          # Check for errors and surface them in the summary
+          if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" precheck.log; then
+            echo "::error::Precheck errors detected - see highlighted lines above"
+            exit 1
+          fi
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+
+      - name: Submit to App Store
+        run: |
+          cd apps/ios
+
+          # Submit for review
+          bundle exec fastlane submit_app_store \
+            ipa_path:build/*.ipa \
+            submit_for_review:false \
+            automatic_release:false \
+            phased_release:true 2>&1 | tee submit.log
+
+          # Check for errors and surface them in the summary
+          if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" submit.log; then
+            echo "::error::Submission errors detected - see highlighted lines above"
+            exit 1
+          fi
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+
+      - name: Cleanup
+        if: always()
+        run: |
+          cd apps/ios
+          # API key is now handled via environment variables
 
   create-release:
     name: Create Release
@@ -317,59 +316,59 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
-    - uses: actions/checkout@v6
-    
-    - name: Tag release
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        VERSION="ios-v${{ needs.validate-release.outputs.version }}"
-        
-        # Create git tag
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git tag -a "$VERSION" -m "iOS Release $VERSION
-        
-        Build: ${{ needs.validate-release.outputs.build_number }}
-        Deployment: ${{ github.event.inputs.release_type || 'testflight' }}"
-        
-        # Push tag
-        git push origin "$VERSION"
-        
-        echo "✅ Tagged release: $VERSION"
-    
-    - name: Create GitHub release
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        VERSION="ios-v${{ needs.validate-release.outputs.version }}"
-        DEPLOYMENT_TYPE="${{ github.event.inputs.release_type || 'TestFlight' }}"
-        
-        # Generate release notes
-        gh release create "$VERSION" \
-          --title "iOS Release $VERSION" \
-          --notes "## 📱 iOS Release $VERSION
-          
-          **Build Number**: ${{ needs.validate-release.outputs.build_number }}
-          **Deployment**: $DEPLOYMENT_TYPE
-          
-          ### Changes
-          This release includes all changes that have been tested in the preview environment.
-          
-          ### Deployment Info
-          - **Environment**: Production
-          - **Commit**: ${{ github.sha }}
-          - **Deployed by**: @${{ github.actor }}
-          - **Workflow**: [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          
-          ### Installation
-          $(if [[ "$DEPLOYMENT_TYPE" == "app_store" ]]; then
-            echo "- **App Store**: Pending review"
-          else
-            echo "- **TestFlight**: Available for all testers"
-          fi)
-          
-          ---
-          *Automated release via three-loop CI/CD system*"
+      - uses: actions/checkout@v6
+
+      - name: Tag release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="ios-v${{ needs.validate-release.outputs.version }}"
+
+          # Create git tag
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "$VERSION" -m "iOS Release $VERSION
+
+          Build: ${{ needs.validate-release.outputs.build_number }}
+          Deployment: ${{ github.event.inputs.release_type || 'testflight' }}"
+
+          # Push tag
+          git push origin "$VERSION"
+
+          echo "✅ Tagged release: $VERSION"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="ios-v${{ needs.validate-release.outputs.version }}"
+          DEPLOYMENT_TYPE="${{ github.event.inputs.release_type || 'TestFlight' }}"
+
+          # Generate release notes
+          gh release create "$VERSION" \
+            --title "iOS Release $VERSION" \
+            --notes "## 📱 iOS Release $VERSION
+
+            **Build Number**: ${{ needs.validate-release.outputs.build_number }}
+            **Deployment**: $DEPLOYMENT_TYPE
+
+            ### Changes
+            This release includes all changes that have been tested in the preview environment.
+
+            ### Deployment Info
+            - **Environment**: Production
+            - **Commit**: ${{ github.sha }}
+            - **Deployed by**: @${{ github.actor }}
+            - **Workflow**: [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            ### Installation
+            $(if [[ "$DEPLOYMENT_TYPE" == "app_store" ]]; then
+              echo "- **App Store**: Pending review"
+            else
+              echo "- **TestFlight**: Available for all testers"
+            fi)
+
+            ---
+            *Automated release via three-loop CI/CD system*"
