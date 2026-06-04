@@ -1,0 +1,90 @@
+name: iOS App Store Approved Release
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      app_version:
+        description: 'Optional App Store version to release after Apple approval'
+        required: false
+        type: string
+
+concurrency:
+  group: ios-app-store-approved-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-approved-version:
+    name: Release Approved App Store Version
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Ruby and Bundler
+        uses: ./.github/actions/setup-ruby-bundler
+        with:
+          working-directory: apps/ios
+          cache-key-prefix: ios-release-monitor-gems
+
+      - name: Setup App Store Connect Authentication
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          cd apps/ios
+          mkdir -p fastlane
+
+          ruby <<'RUBY'
+          require "json"
+
+          api_key = {
+            "key_id" => ENV.fetch("ASC_KEY_ID"),
+            "issuer_id" => ENV.fetch("ASC_ISSUER_ID"),
+            "key" => ENV.fetch("ASC_PRIVATE_KEY").gsub("\\n", "\n"),
+            "duration" => 1200,
+            "in_house" => false
+          }
+
+          File.write("fastlane/api_key.json", JSON.pretty_generate(api_key))
+          JSON.parse(File.read("fastlane/api_key.json"))
+          RUBY
+
+          echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> "$GITHUB_ENV"
+
+      - name: Resolve App Version
+        id: app_version
+        env:
+          INPUT_APP_VERSION: ${{ github.event.inputs.app_version }}
+        run: |
+          if [ -n "$INPUT_APP_VERSION" ]; then
+            version="$INPUT_APP_VERSION"
+          else
+            version="$(awk -F ' = ' '/MARKETING_VERSION = / { gsub(/[;[:space:]]/, "", $2); if ($2 ~ /^[0-9]+[.][0-9]+/) { print $2; exit } }' apps/ios/LogYourBody.xcodeproj/project.pbxproj)"
+          fi
+
+          if [ -z "$version" ]; then
+            echo "::error::Unable to resolve App Store version"
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Release Approved Version
+        run: |
+          cd apps/ios
+          bundle exec ruby ../../.github/scripts/release-approved-app-store-version.rb
+        env:
+          APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+          APP_IDENTIFIER: com.logyourbody.app
+          APP_VERSION: ${{ steps.app_version.outputs.version }}
+
+      - name: Cleanup
+        if: always()
+        run: rm -f apps/ios/fastlane/api_key.json
