@@ -119,7 +119,7 @@ def free_price_point_id(token, app_id)
 end
 
 def create_free_price_schedule(token, app_id, price_point_id)
-  included_price_id = "free-price-#{BASE_TERRITORY.downcase}"
+  included_price_id = "${free-price-#{BASE_TERRITORY.downcase}}"
   body = {
     data: {
       type: "appPriceSchedules",
