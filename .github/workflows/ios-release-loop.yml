@@ -310,6 +310,15 @@ jobs:
 
           echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> "$GITHUB_ENV"
 
+      - name: Ensure App Store Free Pricing
+        run: |
+          cd apps/ios
+          bundle exec ruby ../../.github/scripts/ensure-app-store-free-pricing.rb
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+          APP_IDENTIFIER: com.logyourbody.app
+
       - name: Run Fastlane Precheck
         run: |
           cd apps/ios
@@ -361,7 +370,6 @@ jobs:
           APP_REVIEW_EMAIL_ADDRESS: ${{ vars.APP_REVIEW_EMAIL_ADDRESS }}
           APP_REVIEW_PHONE_NUMBER: ${{ secrets.APP_REVIEW_PHONE_NUMBER || vars.APP_REVIEW_PHONE_NUMBER }}
           APP_REVIEW_NOTES: ${{ vars.APP_REVIEW_NOTES }}
-          APP_STORE_PRICE_TIER: ${{ vars.APP_STORE_PRICE_TIER }}
 
       - name: Cleanup
         if: always()
