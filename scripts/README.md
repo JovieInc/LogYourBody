@@ -18,6 +18,7 @@ scripts/
 ## Web Scripts
 
 The `apps/web/scripts/` directory has been gitignored to prevent CodeQL warnings from development scripts. Only essential scripts remain:
+
 - `seed-database.ts` - Database seeding
 - `test-seeded-users.ts` - Test seeded data
 
@@ -26,6 +27,7 @@ All other scripts (avatar generators, test scripts, etc.) are ignored by git but
 ## Usage
 
 ### Clerk Configuration
+
 ```bash
 # Check current environment secrets
 ./scripts/check-env-secrets.sh
@@ -35,10 +37,11 @@ All other scripts (avatar generators, test scripts, etc.) are ignored by git but
 ```
 
 ### Web Development
+
 ```bash
 # Run pre-push checks
-cd apps/web && npm run check
+cd apps/web && pnpm run check
 
 # Create a database migration
-cd apps/web && npm run db:migrate
+cd apps/web && pnpm run db:migrate
 ```

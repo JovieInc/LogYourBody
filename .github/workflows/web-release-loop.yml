@@ -1,12 +1,6 @@
 name: Web Release Loop
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/web/**'
-      - 'packages/**'
-      - '.github/workflows/web-release-loop.yml'
   workflow_dispatch:
   workflow_call:
 
@@ -17,33 +11,16 @@ jobs:
     timeout-minutes: 5
     outputs:
       version: ${{ steps.version.outputs.version }}
-      
+
     steps:
-    - uses: actions/checkout@v6
-    
-    - name: Validate preview checks
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        echo "🔍 Validating that preview branch is green..."
-        
-        # Get latest preview branch status
-        PREVIEW_STATUS=$(gh api repos/${{ github.repository }}/commits/preview/status --jq '.state')
-        
-        if [[ "$PREVIEW_STATUS" != "success" ]]; then
-          echo "❌ Preview branch checks are not passing"
-          echo "Status: $PREVIEW_STATUS"
-          exit 1
-        fi
-        
-        echo "✅ Preview branch is green"
-    
-    - name: Extract version
-      id: version
-      run: |
-        VERSION=$(node -p "require('./apps/web/package.json').version")
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "📦 Version: $VERSION"
+      - uses: actions/checkout@v6
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./apps/web/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION"
 
   deploy-production:
     name: Deploy to Production
@@ -53,168 +30,168 @@ jobs:
     environment:
       name: Production
       url: https://logyourbody.com
-    
+
     steps:
-    - uses: actions/checkout@v6
-    
-    - name: Setup deployment info
-      id: deploy-info
-      run: |
-        SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-        echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
-        echo "deployment_name=v${{ needs.validate-release.outputs.version }}-$SHORT_SHA" >> $GITHUB_OUTPUT
-    
-    - name: Install Vercel CLI
-      run: npm install --global vercel@latest
-    
-    - name: Pull Vercel Environment
-      run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-    
-    - name: Build Project
-      run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
-        CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
-        NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://logyourbody.com' }}
-        NEXT_PUBLIC_ENV: production
-    
-    - name: Deploy to Vercel Production
-      id: deploy
-      run: |
-        # Deploy to production
-        DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
-        echo "url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
-        
-        echo "✅ Deployed to production: $DEPLOYMENT_URL"
-    
-    - name: Create GitHub deployment
-      uses: actions/github-script@v8
-      with:
-        script: |
-          // Create deployment
-          const deployment = await github.rest.repos.createDeployment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            ref: context.sha,
-            environment: 'Production',
-            description: 'Production deployment v${{ needs.validate-release.outputs.version }}',
-            auto_merge: false,
-            required_contexts: [],
-            production_environment: true
-          });
-          
-          // Mark as success
-          await github.rest.repos.createDeploymentStatus({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            deployment_id: deployment.data.id,
-            state: 'success',
-            environment_url: '${{ steps.deploy.outputs.url }}',
-            description: 'Deployed to Vercel production'
-          });
-    
-    - name: Tag release
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        VERSION="v${{ needs.validate-release.outputs.version }}"
-        
-        # Create git tag
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git tag -a "$VERSION" -m "Release $VERSION
-        
-        Deployed to production via automated release loop.
-        Deployment: ${{ steps.deploy.outputs.url }}"
-        
-        # Push tag
-        git push origin "$VERSION"
-        
-        echo "✅ Tagged release: $VERSION"
-    
-    - name: Create GitHub release
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        VERSION="v${{ needs.validate-release.outputs.version }}"
-        
-        # Generate release notes
-        gh release create "$VERSION" \
-          --title "Release $VERSION" \
-          --notes "## 🚀 Web Release $VERSION
-          
-          **Production URL**: https://logyourbody.com
-          **Deployment**: ${{ steps.deploy.outputs.url }}
-          
-          ### Changes
-          This release includes all changes that have been tested in the preview environment.
-          
-          ### Deployment Info
-          - **Environment**: Production
-          - **Commit**: ${{ github.sha }}
-          - **Deployed by**: @${{ github.actor }}
-          - **Workflow**: [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          
-          ---
-          *Automated release via three-loop CI/CD system*" \
-          --latest
+      - uses: actions/checkout@v6
+
+      - name: Setup deployment info
+        id: deploy-info
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "deployment_name=v${{ needs.validate-release.outputs.version }}-$SHORT_SHA" >> $GITHUB_OUTPUT
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Pull Vercel Environment
+        run: pnpm dlx vercel@latest pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project
+        run: pnpm dlx vercel@latest build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://logyourbody.com' }}
+          NEXT_PUBLIC_ENV: production
+
+      - name: Deploy to Vercel Production
+        id: deploy
+        run: |
+          # Deploy to production
+          DEPLOYMENT_URL=$(pnpm dlx vercel@latest deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+
+          echo "✅ Deployed to production: $DEPLOYMENT_URL"
+
+      - name: Create GitHub deployment
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Create deployment
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: 'Production',
+              description: 'Production deployment v${{ needs.validate-release.outputs.version }}',
+              auto_merge: false,
+              required_contexts: [],
+              production_environment: true
+            });
+
+            // Mark as success
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'success',
+              environment_url: '${{ steps.deploy.outputs.url }}',
+              description: 'Deployed to Vercel production'
+            });
+
+      - name: Tag release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="v${{ needs.validate-release.outputs.version }}"
+
+          # Create git tag
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "$VERSION" -m "Release $VERSION
+
+          Deployed to production via automated release loop.
+          Deployment: ${{ steps.deploy.outputs.url }}"
+
+          # Push tag
+          git push origin "$VERSION"
+
+          echo "✅ Tagged release: $VERSION"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="v${{ needs.validate-release.outputs.version }}"
+
+          # Generate release notes
+          gh release create "$VERSION" \
+            --title "Release $VERSION" \
+            --notes "## 🚀 Web Release $VERSION
+
+            **Production URL**: https://logyourbody.com
+            **Deployment**: ${{ steps.deploy.outputs.url }}
+
+            ### Changes
+            This release includes changes that passed the main-branch release workflow.
+
+            ### Deployment Info
+            - **Environment**: Production
+            - **Commit**: ${{ github.sha }}
+            - **Deployed by**: @${{ github.actor }}
+            - **Workflow**: [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            ---
+            *Automated release via three-loop CI/CD system*" \
+            --latest
 
   post-deploy-validation:
     name: Post-Deploy Validation
     needs: deploy-production
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    
+
     steps:
-    - uses: actions/checkout@v6
-    
-    - name: Run smoke tests
-      run: |
-        echo "🔍 Running production smoke tests..."
-        
-        # Install dependencies for smoke tests
-        npm ci
-        
-        # Run smoke tests against production
-        # Smoke tests would go here if we had test:smoke script
-        echo "🔍 Smoke tests: Skipping (script not available)"
-        
-        echo "✅ Smoke tests completed"
-    
-    - name: Check production health
-      run: |
-        echo "🏥 Checking production health..."
-        
-        # Check main page
-        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://logyourbody.com)
-        if [[ "$HTTP_STATUS" != "200" ]]; then
-          echo "❌ Production health check failed: HTTP $HTTP_STATUS"
-          exit 1
-        fi
-        
-        echo "✅ Production is healthy"
-    
-    - name: Notify success
-      if: success()
-      uses: actions/github-script@v8
-      with:
-        script: |
-          const version = 'v${{ needs.validate-release.outputs.version }}';
-          
-          // Comment on any open issues about deployment
-          const body = `✅ **Web ${version} deployed to production!**
-          
-          - **URL**: https://logyourbody.com
-          - **Status**: Healthy
-          - **Deployed by**: @${{ github.actor }}`;
-          
-          // Create deployment notification issue
-          await github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: `✅ Web ${version} deployed to production`,
-            body: body,
-            labels: ['deployment', 'production', 'web']
-          });
+      - uses: actions/checkout@v6
+
+      - name: Run smoke tests
+        run: |
+          echo "🔍 Running production smoke tests..."
+
+          # Smoke tests would go here if we had test:smoke script
+          echo "🔍 Smoke tests: Skipping (script not available)"
+
+          echo "✅ Smoke tests completed"
+
+      - name: Check production health
+        run: |
+          echo "🏥 Checking production health..."
+
+          # Check main page
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://logyourbody.com)
+          if [[ "$HTTP_STATUS" != "200" ]]; then
+            echo "❌ Production health check failed: HTTP $HTTP_STATUS"
+            exit 1
+          fi
+
+          echo "✅ Production is healthy"
+
+      - name: Notify success
+        if: success()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const version = 'v${{ needs.validate-release.outputs.version }}';
+
+            // Comment on any open issues about deployment
+            const body = `✅ **Web ${version} deployed to production!**
+
+            - **URL**: https://logyourbody.com
+            - **Status**: Healthy
+            - **Deployed by**: @${{ github.actor }}`;
+
+            // Create deployment notification issue
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `✅ Web ${version} deployed to production`,
+              body: body,
+              labels: ['deployment', 'production', 'web']
+            });

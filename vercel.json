@@ -1,16 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "buildCommand": "npm run build --workspace=apps/web",
+  "buildCommand": "pnpm --filter apps/web build",
   "outputDirectory": "apps/web/.next",
-  "installCommand": "npm install",
-  "devCommand": "npm run dev --workspace=apps/web",
+  "installCommand": "node -v && corepack enable && corepack prepare pnpm@10.34.1 --activate && pnpm install --no-frozen-lockfile",
+  "devCommand": "pnpm --filter apps/web dev",
   "framework": "nextjs",
   "git": {
-    "deploymentEnabled": {
-      "dev": true,
-      "main": true,
-      "preview": true
-    }
+    "deploymentEnabled": false
+  },
+  "github": {
+    "silent": true
   }
 }

@@ -15,7 +15,7 @@
     "typecheck": "node -e \"const fs=require('node:fs'); for (const p of ['.next/types','tsconfig.tsbuildinfo']) fs.rmSync(p,{recursive:true,force:true});\" && tsc --noEmit",
     "check": "../../scripts/web/pre-push-check.sh",
     "check:all": "../../scripts/web/pre-push-check.sh --with-build",
-    "prepush": "npm run check",
+    "prepush": "pnpm run check",
     "db:migrate": "../../scripts/web/create-migration.sh",
     "db:push": "supabase db push",
     "db:push:local": "supabase db push --local",
@@ -109,7 +109,7 @@
     "zod": "^4.1.13"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": "20.x"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",

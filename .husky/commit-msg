@@ -1,3 +1,3 @@
 echo "Husky: running commitlint..."
 
-npx commitlint --edit "$1"
+pnpm exec commitlint --edit "$1"

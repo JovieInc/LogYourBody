@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useAuth } from '@/contexts/ClerkAuthContext';
 import { useRouter } from 'next/navigation';
@@ -667,14 +667,15 @@ describe('ProfileSettingsPage', () => {
   });
 
   it('shows saving indicator during save', async () => {
-    let resolveSave!: (value: typeof mockProfile) => void;
+    const pendingSaves: Array<() => void> = [];
     mockUpdateProfile.mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolveSave = resolve;
+          pendingSaves.push(() => resolve(mockProfile));
         }),
     );
 
+    const user = userEvent.setup();
     render(<ProfileSettingsPage />);
 
     await waitFor(() => {
@@ -682,13 +683,13 @@ describe('ProfileSettingsPage', () => {
     });
 
     const nameInput = screen.getByLabelText('Full Name');
-    fireEvent.change(nameInput, { target: { value: 'Test User Updated' } });
+    await user.type(nameInput, ' Updated');
 
-    await waitFor(() => {
-      expect(screen.getByText('Saving...')).toBeInTheDocument();
+    expect(await screen.findByText('Saving...')).toBeInTheDocument();
+
+    await act(async () => {
+      pendingSaves.forEach((resolve) => resolve());
     });
-
-    resolveSave(mockProfile);
 
     await waitFor(() => {
       expect(screen.getByText('Saved')).toBeInTheDocument();

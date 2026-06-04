@@ -24,8 +24,11 @@ jobs:
             web:
               - 'apps/web/**'
               - 'packages/**'
+              - '.npmrc'
               - 'package.json'
               - 'pnpm-lock.yaml'
+              - 'vercel.json'
+              - 'apps/web/vercel.json'
             ios:
               - 'apps/ios/**'
 
@@ -34,7 +37,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.web == 'true'
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_Y2xlcmsucGxhY2Vob2xkZXIuZGV2JA' }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || vars.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || vars.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key' }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,19 +70,32 @@ jobs:
       - name: Build
         run: cd apps/web && pnpm build
 
+      - name: Pull Vercel environment
+        run: pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build Vercel output
+        run: pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy to Vercel
+        id: vercel-deploy
+        run: |
+          DEPLOYMENT_URL=$(pnpm dlx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed to $DEPLOYMENT_URL"
+
       - name: Deploy info
         run: |
           echo "## Web Deployment" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Build and production deploy completed successfully" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Vercel deployment handled by Vercel GitHub integration" >> $GITHUB_STEP_SUMMARY
+          echo "URL: ${{ steps.vercel-deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
 
   ios-beta:
     name: iOS Beta
     runs-on: macos-26
     needs: [detect-changes, web]
-    if: needs.detect-changes.outputs.ios == 'true' && false  # Enable when ready
+    if: needs.detect-changes.outputs.ios == 'true' && false # Enable when ready
     timeout-minutes: 30
     environment:
       name: development

@@ -16,7 +16,7 @@ fi
 
 # 1. Linting
 echo "📝 Running ESLint..."
-npm run lint
+pnpm run lint
 if [ $? -eq 0 ]; then
     echo "✅ Linting passed"
 else
@@ -27,7 +27,7 @@ echo ""
 
 # 2. Type checking
 echo "🔍 Running TypeScript type check..."
-npm run typecheck
+pnpm run typecheck
 if [ $? -eq 0 ]; then
     echo "✅ Type checking passed"
 else
@@ -38,7 +38,7 @@ echo ""
 
 # 3. Tests
 echo "🧪 Running tests..."
-npm test
+pnpm test
 if [ $? -eq 0 ]; then
     echo "✅ Tests passed"
 else
@@ -50,7 +50,7 @@ echo ""
 # 4. Build check (optional, can be slow)
 if [[ "$1" == "--with-build" ]]; then
     echo "🏗️  Running build check..."
-    npm run build
+    pnpm run build
     if [ $? -eq 0 ]; then
         echo "✅ Build passed"
     else
@@ -62,4 +62,4 @@ fi
 
 echo "🎉 All checks passed! Ready to push."
 echo ""
-echo "💡 Tip: To also run a build check, use: npm run check:all"
+echo "💡 Tip: To also run a build check, use: pnpm run check:all"
