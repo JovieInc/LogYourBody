@@ -36,8 +36,9 @@
 
 <!-- Describe the tests you ran to verify your changes -->
 
-- [ ] Unit tests pass (`npm test`)
-- [ ] Type checking passes (`npm run typecheck`)
+- [ ] Unit tests pass (`pnpm test` or `pnpm test:ci`)
+- [ ] Type checking passes (`pnpm typecheck`)
+- [ ] Lint passes (`pnpm lint`)
 - [ ] Manual testing completed
 - [ ] Accessibility testing completed (if UI changes)
 - [ ] Mobile responsiveness tested (if UI changes)
@@ -71,6 +72,15 @@
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] New and existing unit tests pass locally with my changes
 - [ ] Any dependent changes have been merged and published
+
+## Advisory Follow-Ups
+
+<!-- Non-blocking AI or reviewer findings should become focused follow-up work instead of delaying a landable PR -->
+
+- [ ] No advisory follow-ups needed
+- [ ] Follow-up issue(s) opened
+- [ ] Follow-up PR(s) opened
+- [ ] Release-blocking advisory finding fixed in this PR
 
 ## Accessibility
 
