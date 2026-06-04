@@ -5,22 +5,34 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 ## Configuration
 
 - Clerk production publishable key is configured in `Config.xcconfig`.
+- GitHub `Production` environment has `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
 - Clerk Apple Sign In is enabled for the production app.
 - Supabase production URL and anon key are configured in `Config.xcconfig`.
+- GitHub `Production` environment has `NEXT_PUBLIC_SUPABASE_URL`.
+- GitHub `Production` environment has either `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`.
 - Supabase RLS policies accept Clerk session JWT `sub` for `profiles`, `user_profiles`, `body_metrics`, and `daily_metrics`.
-- RevenueCat production API key is configured.
-- RevenueCat `pro` entitlement matches `Constants.proEntitlementID`.
+- RevenueCat production public key is configured.
+- GitHub `Production` environment has `REVENUE_CAT_PUBLIC_KEY`.
+- RevenueCat `Premium` entitlement matches `Constants.proEntitlementID`.
 - StoreKit/App Store products are attached to the active RevenueCat offering.
+- Release workflow verifies the RevenueCat current iOS offering exposes `$rc_annual` -> `com.logyourbody.app.pro1.annual.3daytrial` and `$rc_monthly` -> `com.logyourbody.app.pro1.monthly.3daytrial`.
+- Release workflow validates the actual release ref/SHA instead of the unrelated `preview` branch.
+- App Store release workflow is run from `main` with `release_type=app_store`, `submit_for_review=true`, and automatic release enabled after the TestFlight build is accepted.
+- The approved-release monitor is enabled so Apple-approved builds that enter `PENDING_DEVELOPER_RELEASE` are released without a manual App Store Connect click.
+- Optional GitHub `Production` secrets `STATSIG_CLIENT_SDK_KEY` and `SENTRY_DSN` are real values if present.
+- `ios_full_body_composition_dashboard` stays off for the v0.1 App Store launch unless the full dashboard has separate approval.
 
 ## Product Path
 
 - Fresh install opens to auth with Apple Sign In as the primary action.
 - Email one-time code sign-in remains available as fallback.
-- New user can complete name, date of birth, sex at birth, and height setup.
 - Unpaid authenticated user sees the paywall.
-- Purchase success unlocks the dashboard.
-- Restore success unlocks the dashboard.
-- Paid returning user opens directly to the dashboard after loading.
+- Purchase success unlocks the weight logger.
+- Restore success unlocks the weight logger.
+- Paid returning user opens directly to the weight logger after loading.
+- Paid user can log body weight without body-score onboarding or full profile completion.
+- Recent entries show the latest saved weight and history.
+- Paid user can prepare and share a weight-only CSV export.
 - Signed-out user opens to auth.
 
 ## Data And Sync
@@ -34,8 +46,10 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 ## Legal And Store Review
 
 - Terms and privacy links open in-app from the paywall.
-- Camera, photo library, HealthKit, and Face ID usage strings are accurate.
+- Camera, photo library, HealthKit, and Face ID usage strings are accurate for any enabled surfaces.
 - No secrets or local config files are committed.
+- Any credential previously exposed in setup docs or logs has been rotated
+  before release.
 - App icon, display name, bundle identifier, and version/build number are correct.
 
 ## Validation
@@ -65,7 +79,7 @@ xcodebuild -project LogYourBody.xcodeproj \
 
 ## PR Evidence
 
-- Include screenshots or a simulator recording for auth, onboarding/profile completion, paywall, dashboard, and logging.
+- Include screenshots or a simulator recording for auth, paywall, purchase/restore, weight logging, recent history, and CSV export.
 - Include RevenueCat purchase and restore test results.
 - Include Supabase sync test results.
 - Include validation command output and known risks.

@@ -125,6 +125,14 @@ class RevenueCatManager: NSObject, ObservableObject {
     func logoutUser() async {
         // print("💰 Logging out user")
 
+        guard isConfigured else {
+            customerInfo = nil
+            isSubscribed = false
+            cachedIsSubscribed = false
+            currentOffering = nil
+            return
+        }
+
         do {
             _ = try await Purchases.shared.logOut()
             await MainActor.run {

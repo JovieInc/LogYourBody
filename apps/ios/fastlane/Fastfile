@@ -47,28 +47,36 @@ platform :ios do
   private_lane :setup_app_store_connect_api do |options|
     # Skip if explicitly disabled
     return if options[:skip_asc_api] == true
+
+    issuer_id = ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"] || ENV["APP_STORE_CONNECT_API_ISSUER_ID"]
+
+    configure_from_api_key_json = lambda do |path|
+      api_key = JSON.parse(File.read(path))
+
+      app_store_connect_api_key(
+        key_id: api_key.fetch("key_id"),
+        issuer_id: api_key.fetch("issuer_id"),
+        key_content: api_key.fetch("key"),
+        is_key_content_base64: false,
+        duration: api_key["duration"] || 1200,
+        in_house: api_key["in_house"] || false
+      )
+    end
     
     # Check if we're in an environment that supports the API key
     if ENV["CI"] && ENV["GITHUB_ACTIONS"]
       # On GitHub Actions, check for OpenSSL compatibility
       begin
         # Try to initialize the API key
-        if ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_API_ISSUER_ID"]
-          if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
-            # Use key from file
-            app_store_connect_api_key(
-              key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-              issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
-              key_filepath: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
-              duration: 1200,
-              in_house: false
-            )
-            UI.success("✅ App Store Connect API key configured from file")
-          elsif ENV["APP_STORE_CONNECT_API_KEY"]
+        if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+          configure_from_api_key_json.call(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+          UI.success("✅ App Store Connect API key configured from file")
+        elsif ENV["APP_STORE_CONNECT_API_KEY_ID"] && issuer_id
+          if ENV["APP_STORE_CONNECT_API_KEY"]
             # Use key from environment variable (plain text PEM format)
             app_store_connect_api_key(
               key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-              issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+              issuer_id: issuer_id,
               key_content: ENV["APP_STORE_CONNECT_API_KEY"],
               is_key_content_base64: false,
               duration: 1200,
@@ -92,12 +100,25 @@ platform :ios do
       end
     else
       # Local development - try API key if available
-      if ENV["APP_STORE_CONNECT_API_KEY_ID"]
+      if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+        begin
+          UI.message("Using App Store Connect API key file for local development")
+          configure_from_api_key_json.call(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+          UI.success("✅ App Store Connect API key configured successfully")
+        rescue => e
+          if e.message.include?("invalid curve name") || e.message.include?("OpenSSL")
+            UI.important("⚠️  OpenSSL curve compatibility issue - API key will be passed directly to Match")
+            # Don't set the API key in lane context - Match will use it directly via env vars
+          else
+            raise e
+          end
+        end
+      elsif ENV["APP_STORE_CONNECT_API_KEY_ID"] && issuer_id
         begin
           UI.message("Using App Store Connect API key for local development")
           app_store_connect_api_key(
             key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-            issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+            issuer_id: issuer_id,
             key_filepath: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
             duration: 1200,
             in_house: false
@@ -198,7 +219,7 @@ platform :ios do
     end
     
     # Check app ID matches
-    expected_app_id = options[:expected_app_id] || "*.LogYourBody.LogYourBody"
+    expected_app_id = options[:expected_app_id] || "*.com.logyourbody.app"
     unless app_id.end_with?(expected_app_id.sub("*", ""))
       UI.user_error!("App ID mismatch! Expected: #{expected_app_id}, Got: #{app_id}")
     end
@@ -289,7 +310,7 @@ platform :ios do
     latest_build_number = latest_testflight_build_number(
       api_key: api_key,
       initial_build_number: 0,
-      app_identifier: "LogYourBody.LogYourBody"
+      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app"
     )
     
     new_build_number = latest_build_number + 1
@@ -459,7 +480,8 @@ platform :ios do
       UI.message("=== Match Environment Variables ===")
       ENV.each do |key, value|
         if key.start_with?("sigh_") || key.include?("MATCH_")
-          UI.message("#{key}: #{value}")
+          redacted = key.match?(/PASSWORD|AUTHORIZATION|TOKEN|KEY/i) ? "[masked]" : value
+          UI.message("#{key}: #{redacted}")
         end
       end
       UI.message("APPLE_TEAM_ID: #{ENV["APPLE_TEAM_ID"]}")
@@ -783,16 +805,53 @@ platform :ios do
   desc "Submit existing IPA to App Store"
   lane :submit_app_store do |options|
     setup_app_store_connect_api
+
+    bool_option = lambda do |value, default|
+      return default if value.nil?
+      return value if value == true || value == false
+
+      normalized = value.to_s.strip.downcase
+      return true if %w[true 1 yes y on].include?(normalized)
+      return false if %w[false 0 no n off].include?(normalized)
+
+      UI.user_error!("Invalid boolean option: #{value.inspect}")
+    end
+
+    submit_for_review = bool_option.call(options[:submit_for_review], false)
+    automatic_release = bool_option.call(options[:automatic_release], false)
+    phased_release = bool_option.call(options[:phased_release], false)
+
+    if automatic_release && !submit_for_review
+      UI.user_error!("automatic_release requires submit_for_review")
+    end
+
+    env_or_default = lambda do |key, default|
+      value = ENV[key].to_s.strip
+      value.empty? ? default : value
+    end
+
+    app_review_information = {
+      first_name: env_or_default.call("APP_REVIEW_FIRST_NAME", "LogYourBody"),
+      last_name: env_or_default.call("APP_REVIEW_LAST_NAME", "Team"),
+      email_address: env_or_default.call("APP_REVIEW_EMAIL_ADDRESS", "support@logyourbody.com"),
+      phone_number: ENV["APP_REVIEW_PHONE_NUMBER"],
+      notes: env_or_default.call("APP_REVIEW_NOTES", "LogYourBody lets users sign in, log their weight, sync their entries, export CSV data, and manage their subscription. No demo account is required; reviewers can create a test account in the app.")
+    }.compact
+
     # Upload to App Store Connect
     upload_to_app_store(
       ipa: options[:ipa_path],
       force: true,
-      skip_metadata: true,
-      skip_screenshots: true,
-      submit_for_review: options[:submit_for_review] || false,
-      automatic_release: options[:automatic_release] || false,
-      phased_release: options[:phased_release] || false,
-      apple_id: ENV["APP_STORE_APP_ID"],
+      metadata_path: "fastlane/metadata",
+      screenshots_path: "fastlane/screenshots",
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: submit_for_review,
+      automatic_release: automatic_release,
+      phased_release: phased_release,
+      app_review_information: app_review_information,
+      run_precheck_before_submit: false,
+      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
       team_id: ENV["APPLE_TEAM_ID"]
     )
   end
@@ -819,7 +878,8 @@ platform :ios do
       skip_screenshots: false,
       submit_for_review: false,
       automatic_release: false,
-      apple_id: ENV["APP_STORE_APP_ID"],
+      run_precheck_before_submit: false,
+      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
       team_id: ENV["APPLE_TEAM_ID"]
     )
     

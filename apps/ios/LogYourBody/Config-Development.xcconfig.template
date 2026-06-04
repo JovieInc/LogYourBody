@@ -1,0 +1,30 @@
+// Development iOS configuration template.
+// Copy to Config-Development.xcconfig and fill in non-production provider values.
+
+APP_ENVIRONMENT = development
+ALLOW_PRODUCTION_SERVICES_IN_DEBUG = NO
+
+// Clerk test/dev instance. Must be a publishable key; never use secret keys.
+CLERK_PUBLISHABLE_KEY = pk_test_replace_me
+CLERK_FRONTEND_API = https:/$()/your-dev-clerk-frontend-api
+
+// Supabase dev project. SUPABASE_EXPECTED_HOST must match SUPABASE_URL host.
+SUPABASE_URL = https:/$()/your-dev-project.supabase.co
+SUPABASE_EXPECTED_HOST = your-dev-project.supabase.co
+SUPABASE_ANON_KEY = replace_with_dev_anon_key
+
+// API target for debug builds.
+API_BASE_URL = http:/$()/localhost:3000
+API_EXPECTED_HOST = localhost
+
+// Optional paid/analytics/error reporting providers.
+REVENUE_CAT_API_KEY =
+STATSIG_CLIENT_SDK_KEY =
+STATSIG_ENVIRONMENT_TIER = development
+SENTRY_DSN =
+SENTRY_ENVIRONMENT = development
+SENTRY_TRACES_SAMPLE_RATE = 0
+
+// Optional BodySpec integration.
+BODYSPEC_CLIENT_ID =
+BODYSPEC_REDIRECT_URI =

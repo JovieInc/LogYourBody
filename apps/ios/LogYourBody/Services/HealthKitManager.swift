@@ -1115,9 +1115,7 @@ class HealthKitManager: ObservableObject {
         )
 
         // Save to CoreData and trigger realtime sync to Supabase
-        await MainActor.run {
-            CoreDataManager.shared.saveBodyMetrics(metricsWithUserId, userId: userId, markAsSynced: false)
-        }
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metricsWithUserId, userId: userId, markAsSynced: false)
         await RealtimeSyncManager.shared.syncIfNeeded()
     }
 

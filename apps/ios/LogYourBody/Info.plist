@@ -73,12 +73,20 @@
 	</array>
 	<key>API_BASE_URL</key>
 	<string>$(API_BASE_URL)</string>
+	<key>API_EXPECTED_HOST</key>
+	<string>$(API_EXPECTED_HOST)</string>
+	<key>APP_ENVIRONMENT</key>
+	<string>$(APP_ENVIRONMENT)</string>
+	<key>ALLOW_PRODUCTION_SERVICES_IN_DEBUG</key>
+	<string>$(ALLOW_PRODUCTION_SERVICES_IN_DEBUG)</string>
 	<key>CLERK_PUBLISHABLE_KEY</key>
 	<string>$(CLERK_PUBLISHABLE_KEY)</string>
 	<key>CLERK_FRONTEND_API</key>
 	<string>$(CLERK_FRONTEND_API)</string>
 	<key>SUPABASE_URL</key>
 	<string>$(SUPABASE_URL)</string>
+	<key>SUPABASE_EXPECTED_HOST</key>
+	<string>$(SUPABASE_EXPECTED_HOST)</string>
 	<key>SUPABASE_ANON_KEY</key>
 	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>REVENUE_CAT_API_KEY</key>

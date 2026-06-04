@@ -1,120 +1,130 @@
 # RevenueCat Integration Setup Guide
 
-## Status: ✅ COMPLETE - RevenueCat Fully Configured
+## Status: ✅ COMPLETE - RevenueCat App Store Offering Verified
 
-The RevenueCat dashboard and iOS app are now fully configured and ready to use!
+The RevenueCat dashboard and iOS app are configured. The production App Store SDK key has been verified against the current iOS offering. The remaining paid-launch gates are human PR review/merge, App Store review approval, and a sandbox/TestFlight purchase and restore pass.
 
 ## 🎯 Current Configuration
 
 **Project:** LogYourBody (`proj2385165b`)
 
 **Apps:**
+
 - iOS App Store: `app5fa54db3c0`
   - Bundle ID: `com.logyourbody.app`
-  - API Key: `appl_dJsnXzyTgEAsntJQjOxeOvOnoXP` ✅ (configured in Config.xcconfig)
+  - API Key: production App Store public SDK key ✅ (configured in the ignored local `Config.xcconfig` and GitHub `Production` environment)
 - Web (Stripe): `app3e668190f0`
 
 **Products:**
-- **Annual:** `com.logyourbody.app.pro.annual.3daytrial`
+
+- **Annual:** `com.logyourbody.app.pro1.annual.3daytrial`
   - Display Name: LogYourBody Pro Annual (3-Day Trial)
-  - Price: $79.99/year
-  - Product ID: `prodcfa314705c`
-- **Monthly:** `com.logyourbody.app.pro.monthly.3daytrial`
+  - Price: $69.99/year
+  - Product ID: `prodcf17db6623`
+- **Monthly:** `com.logyourbody.app.pro1.monthly.3daytrial`
   - Display Name: LogYourBody Pro Monthly (3-Day Trial)
   - Price: $9.99/month
-  - Product ID: `prod0894fff301`
+  - Product ID: `prod17519525d5`
 
-**Offering:** Default (lookup_key: `Default`)
+**Offering:** Default (lookup_key: `default`)
+
 - Status: ✅ Current offering
 - Packages:
   - Annual package (`$rc_annual`) → linked to annual product
   - Monthly package (`$rc_monthly`) → linked to monthly product
 
 **Entitlement:** Premium (lookup_key: `Premium`)
+
 - Display Name: "Access to all premium features"
 - Attached Products: ✅ Both annual and monthly products
 
+**App Store Configuration:**
+
+- Bundle ID: `com.logyourbody.app`
+- App Store Connect API key: ✅ configured
+- In-app purchase key: ✅ configured
+- App Store subscription state: ✅ both products are `READY_TO_SUBMIT`
+- U.S. introductory offers: ✅ 3-day free trial configured for both products
+
 **StoreKit Configuration:**
+
 - ✅ Saved to: `apps/ios/LogYourBody.storekit`
 - Ready for local testing in Xcode
 
 ---
 
-## 📱 iOS Setup (Manual Steps Required)
+## 📱 iOS Setup State
 
 ### 1. Add RevenueCat SDK to Xcode
 
-**Open Xcode project:**
-```bash
-cd /Users/timwhite/Documents/GitHub/TBF/LogYourBody/apps/ios
-open LogYourBody.xcodeproj
-```
+**✅ Already added.**
 
-**Add package dependency:**
-1. In Xcode, go to **File → Add Package Dependencies...**
-2. Enter URL: `https://github.com/RevenueCat/purchases-ios`
-3. Select version: **5.0.0** or later
-4. Click **Add Package**
-5. Select **RevenueCat** library and click **Add Package**
+- `LogYourBody.xcodeproj` references `https://github.com/RevenueCat/purchases-ios`.
+- The app target links `RevenueCat` and `RevenueCatUI`.
+- `RevenueCatManager.swift` imports RevenueCat and configures `Purchases` on launch.
 
 ### 2. Configure RevenueCat Dashboard
 
-**Create App:**
-1. Go to [RevenueCat Dashboard](https://app.revenuecat.com)
-2. Create new project: "LogYourBody"
-3. Create new app: "LogYourBody iOS"
-4. Platform: **iOS**
+**✅ Already configured.**
+
+- Project: `LogYourBody` (`proj2385165b`)
+- App Store app: `app5fa54db3c0`
+- Bundle ID: `com.logyourbody.app`
 
 **✅ Products Already Created:**
-- Annual: `com.logyourbody.app.pro.annual.3daytrial` ($79.99/year)
-- Monthly: `com.logyourbody.app.pro.monthly.3daytrial` ($9.99/month)
+
+- Annual: `com.logyourbody.app.pro1.annual.3daytrial` ($69.99/year)
+- Monthly: `com.logyourbody.app.pro1.monthly.3daytrial` ($9.99/month)
 
 **✅ Offering Already Created:**
+
 - Name: "Default" (Current)
 - Packages: Annual and Monthly packages configured
 
 **✅ Entitlement Already Created:**
+
 - ID: `Premium`
 - Products: Both annual and monthly products attached
 
 **✅ API Key Already Configured:**
-- Key: `appl_dJsnXzyTgEAsntJQjOxeOvOnoXP`
-- Location: `apps/ios/LogYourBody/Config.xcconfig`
+
+- Key: production App Store public SDK key
+- Location: ignored local `apps/ios/LogYourBody/Config.xcconfig` and GitHub `Production` environment
 - Status: ✅ Ready to use
 
 ### 3. Configure App Store Connect
 
-**Create In-App Purchases:**
+**✅ App Store Connect Subscriptions Already Created:**
 
-You need to create these subscriptions in App Store Connect:
+The active RevenueCat products must continue to match these App Store Connect subscriptions:
 
 **Annual Subscription:**
-1. Go to [App Store Connect](https://appstoreconnect.apple.com)
-2. Select your app (LogYourBody)
-3. Go to **Features → In-App Purchases**
-4. Click **+** to create new subscription
-5. **Type:** Auto-Renewable Subscription
-6. **Product ID:** `com.logyourbody.app.pro.annual.3daytrial` ⚠️ MUST match exactly
-7. **Subscription Group:** "Standard" (or create if doesn't exist)
-8. **Pricing:** $79.99/year
-9. **Free Trial:** 3 days
-10. Add localized descriptions
-11. Submit for review
+
+- **Product ID:** `com.logyourbody.app.pro1.annual.3daytrial`
+- **Subscription Group:** `Standard`
+- **Pricing:** $69.99/year
+- **Free Trial:** 3 days in the U.S.
+- **State:** `READY_TO_SUBMIT`
 
 **Monthly Subscription:**
-Repeat the same process with:
-- **Product ID:** `com.logyourbody.app.pro.monthly.3daytrial`
+
+- **Product ID:** `com.logyourbody.app.pro1.monthly.3daytrial`
 - **Pricing:** $9.99/month
-- **Free Trial:** 3 days
+- **Free Trial:** 3 days in the U.S.
+- **State:** `READY_TO_SUBMIT`
 
 **CRITICAL:** The product IDs in App Store Connect MUST exactly match the IDs configured in RevenueCat.
+
+**Next App Store action:** submit the app version and these in-app purchases for review together after PR #260 is merged and a release build is uploaded.
 
 ### 4. Link RevenueCat to App Store Connect
 
 **In RevenueCat Dashboard:**
-1. Go to **App Settings → App Store Connect**
-2. Upload your App Store Connect API Key (or use credentials)
-3. This allows RevenueCat to fetch product metadata automatically
+
+1. ✅ App Store Connect API key is configured.
+2. ✅ In-app purchase key is configured.
+3. RevenueCat SDK product fetch works in the simulator with the production App Store public SDK key.
+4. RevenueCat dashboard health has still reported that it could not contact App Store Connect API. Recheck dashboard credentials before final App Review submission even though SDK product fetch is currently working.
 
 ---
 
@@ -148,7 +158,7 @@ import crypto from 'crypto';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role for admin access
+  process.env.SUPABASE_SERVICE_ROLE_KEY!, // Use service role for admin access
 );
 
 // RevenueCat webhook secret (get from RevenueCat dashboard)
@@ -158,10 +168,7 @@ const WEBHOOK_SECRET = process.env.REVENUE_CAT_WEBHOOK_SECRET!;
 function verifyWebhook(body: string, signature: string): boolean {
   const hmac = crypto.createHmac('sha256', WEBHOOK_SECRET);
   const digest = hmac.update(body).digest('hex');
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(digest)
-  );
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
 }
 
 export async function POST(request: NextRequest) {
@@ -243,10 +250,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('Webhook error:', error);
-    return NextResponse.json(
-      { error: 'Webhook handler failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
   }
 }
 ```
@@ -254,6 +258,7 @@ export async function POST(request: NextRequest) {
 ### 3. Configure RevenueCat Webhooks
 
 **In RevenueCat Dashboard:**
+
 1. Go to **Integrations → Webhooks**
 2. Click **+ Add Webhook**
 3. URL: `https://www.logyourbody.com/api/webhooks/revenuecat`
@@ -262,6 +267,7 @@ export async function POST(request: NextRequest) {
 6. Save
 
 **Add to `.env.local`:**
+
 ```bash
 REVENUE_CAT_WEBHOOK_SECRET=your_webhook_secret_here
 ```
@@ -321,21 +327,26 @@ ngrok http 3000
 ## 📋 Remaining Tasks
 
 ### High Priority:
-- [ ] Add RevenueCat SDK to Xcode (Manual - See iOS Setup Step 1)
+
+- [x] Add RevenueCat SDK to Xcode ✅ COMPLETE
 - [x] Setup RevenueCat dashboard ✅ COMPLETE
 - [x] Add API key to Config.xcconfig ✅ COMPLETE
-- [ ] Create in-app purchases in App Store Connect (Manual - See iOS Setup Step 3)
-- [ ] Link RevenueCat to App Store Connect (Manual - See iOS Setup Step 4)
-- [ ] Update Supabase schema (Run SQL in Backend Setup)
-- [ ] Create webhook endpoint (Code provided in Backend Setup)
-- [ ] Configure RevenueCat webhooks (Manual - Backend Setup Step 3)
+- [x] Create in-app purchases in App Store Connect ✅ READY_TO_SUBMIT
+- [x] Link RevenueCat to App Store Connect ✅ CONFIGURED
+- [ ] Merge PR #260 after human review and green required checks
+- [ ] Submit app version and in-app purchases for App Review
+- [ ] Run sandbox/TestFlight purchase and restore on the iOS app
+- [ ] Recheck RevenueCat dashboard App Store Connect health before App Review submission
 
 ### Medium Priority:
+
 - [ ] Add subscription management section to PreferencesView
-- [ ] Test with sandbox accounts
-- [ ] Submit in-app purchase for review
+- [ ] Update Supabase schema if backend subscription mirroring is needed
+- [ ] Create webhook endpoint if backend subscription mirroring is needed
+- [ ] Configure RevenueCat webhooks if backend subscription mirroring is needed
 
 ### Low Priority:
+
 - [ ] Add subscription renewal reminders
 - [ ] Implement promotional offers
 - [ ] Add subscription analytics
@@ -363,6 +374,7 @@ ngrok http 3000
 ## 💡 Key Features Implemented
 
 ### Paywall Features:
+
 - ✅ 3-day free trial prominently displayed
 - ✅ $69/year pricing (displayed as $5.75/month)
 - ✅ Glassmorphic design matching app aesthetic
@@ -372,12 +384,14 @@ ngrok http 3000
 - ✅ Terms of Service & Privacy Policy links
 
 ### Backend Integration:
+
 - ✅ User identification with Clerk ID
 - ✅ Automatic subscription status syncing
 - ✅ Webhook event handling (purchase, renewal, cancellation, expiration)
 - ✅ Account deletion cleanup
 
 ### Security:
+
 - ✅ API key stored securely in Config.xcconfig
 - ✅ Webhook signature verification
 - ✅ Service role key for admin operations
@@ -387,11 +401,11 @@ ngrok http 3000
 
 ## 🚀 Next Steps
 
-1. **Complete Manual Setup** (Steps 1-5 in iOS Setup section)
-2. **Deploy Backend Changes** (Create webhook endpoint)
-3. **Update Database Schema** (Run Supabase migrations)
-4. **Test End-to-End** (Sandbox → Purchase → Webhook → Database)
-5. **Submit for Review** (App Store Connect)
+1. **Human review and merge** PR #260 into `main`.
+2. **Run the iOS release workflow** from `main` for TestFlight or App Store upload.
+3. **Submit for App Review** with the app version and both in-app purchases.
+4. **Test end-to-end** with sandbox/TestFlight purchase and restore.
+5. **Add backend mirroring later** only if product requirements need subscription state in Supabase.
 
 ---
 

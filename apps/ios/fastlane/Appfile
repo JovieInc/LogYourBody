@@ -6,7 +6,7 @@
 
 
 # Default values
-app_identifier ENV["APP_IDENTIFIER"] || "LogYourBody.LogYourBody"
+app_identifier ENV["APP_IDENTIFIER"] || "com.logyourbody.app"
 team_id ENV["APPLE_TEAM_ID"] || ""
 
 # Using App Store Connect API Key authentication - no apple_id needed
@@ -21,5 +21,4 @@ team_id ENV["APPLE_TEAM_ID"] || ""
 # itc_team_id("1234567890")
 # For more information about the Appfile, see:
 #     https://docs.fastlane.tools/advanced/#appfile
-
 

@@ -47,7 +47,7 @@ LogYourBody/
 - `main` must **always** be:
   - ✅ Green in CI
   - ✅ Deployable
-  - ✅ Human-reviewed
+  - ✅ Reviewed by the required automated controls, with human review only when explicitly required by policy or risk
 
 ### Branch Types
 
@@ -71,9 +71,9 @@ LogYourBody/
 
 ---
 
-## Agents vs Humans
+## Fully Autonomous Development Cycles
 
-> **Rule of Thumb**: Agents propose; humans dispose. `main` only contains human-reviewed, CI-passing code.
+> **Rule of Thumb**: Agents ship through the same controls every time. `main` only contains PR-merged, CI-passing, deployable code with evidence in the PR.
 
 ### Agents May:
 
@@ -83,23 +83,41 @@ LogYourBody/
   - `pnpm lint`
   - `pnpm typecheck`
   - `pnpm test` or `pnpm test:ci`
-- Open draft PRs to share progress (but not merge them).
+- Open draft PRs to share progress.
+- Mark PRs ready for review when the implementation and validation evidence are complete.
+- Enable auto-merge, enqueue, or merge PRs after required checks, required deployments, merge queue rules, and configured automated review controls pass.
+- Trigger release workflows after the merged `main` commit is green and the release checklist evidence is present.
 
 ### Agents Must NOT:
 
 - ❌ Push directly to `main`
-- ❌ Merge PRs into `main`
-- ❌ Change branch protection, CI configuration, or workflow files unless explicitly requested
-- ❌ Bypass required checks or PR requirements
+- ❌ Bypass required checks, required deployments, branch rulesets, merge queue, or PR requirements
+- ❌ Relax security, privacy, payment, auth, or data-loss controls to make a merge pass
+- ❌ Ship App Store, billing, legal, credential, or customer-data changes without the release evidence required by this file and the relevant checklist
+- ❌ Change branch protection, CI configuration, workflow files, or this file unless explicitly requested
 - ❌ Relax security or quality gates
 
 ### Humans:
 
-- Review and curate agent changes.
-- Clean up commit history (squash/rebase) before merging.
-- Open and manage PRs targeting `main`.
-- Decide which changes are merged and when.
-- Approve and merge PRs after CI passes and review is complete.
+- Set product priorities, acceptable risk, legal/compliance constraints, and external account approvals.
+- Intervene when an external provider requires account-owner approval, payment, legal attestation, App Review decisions, or credentials Codex cannot access.
+- Review high-risk changes when explicitly requested or when repo rulesets require it.
+
+### Autonomous Closeout Loop
+
+When the user asks an agent to ship, land, deploy, or continue an active release goal, the agent should:
+
+1. Refresh the PR, branch, ruleset, CI, deployment, and release-workflow state from GitHub.
+2. Fix any still-valid release blockers with the smallest aligned diff.
+3. Run the scoped local validation needed for the change and rely on GitHub CI as the merge gate.
+4. Push the branch and wait for required checks and required deployments.
+5. Enqueue or merge through the configured PR/merge-queue path once gates are green.
+6. Watch `main` CI and deployment after merge.
+7. Trigger the appropriate release workflow from `main` when the release checklist says to do so.
+8. Verify the actual external state: TestFlight/App Store, Vercel, RevenueCat, Supabase, Clerk, or other provider state as applicable.
+9. Open follow-up PRs for non-blocking issues instead of holding the main PR when the product remains deployable.
+
+Only stop before merge/release when there is a hard external blocker the agent cannot satisfy, such as missing credentials, account-owner approval, App Review rejection, provider outage, or an unresolved failing required check.
 
 ---
 
@@ -132,13 +150,13 @@ Every change to `main` must come via a **Pull Request** targeting `main`.
 2. Pass CI:
    - `js` job from `.github/workflows/ci.yml` (always required)
    - `ios` job if the change affects iOS code (when enabled/required)
-3. Have at least **one human review** before merging.
+3. Pass the active branch rulesets, required deployments, merge queue, and automated review controls. Human review is required only when the ruleset, change risk, or user explicitly requires it.
 4. Include a clear description of what changed and why.
 
 ### Merge Strategy
 
 - **Prefer "Squash and merge"** for PRs into `main` to keep history clean.
-- Agents must not bypass PR requirements or required checks.
+- Agents must use the configured PR merge path and must not bypass PR requirements or required checks.
 
 ---
 
@@ -199,10 +217,10 @@ Runs on **pushes to `main`** (after merge). Jobs:
 - **`main` is protected**:
   - ❌ No direct pushes
   - ✅ Required status checks from `ci.yml` must pass before merge
-  - ✅ At least one human review required
+  - ✅ Active rulesets, required deployments, merge queue, and automated review controls must pass
 - **Agents must assume**:
   - Any PR that doesn't pass `ci.yml` will be rejected.
-  - They cannot and should not relax branch protection.
+  - They cannot and should not relax branch protection unless explicitly asked to update governance.
 
 ### Agent Responsibilities
 
@@ -493,19 +511,22 @@ For iOS tests, see "Working with the iOS App" section above.
   2. Start by understanding existing patterns in similar features.
   3. Implement behind a Statsig gate if user-visible or risky.
   4. Run `pnpm lint`, `pnpm typecheck`, `pnpm test` before pushing.
-  5. Open a PR targeting `main` (do not merge yourself).
+  5. Open a PR targeting `main`.
+  6. Land through the configured PR/merge-queue path once required checks and deployments pass.
 
 - **Fixing bugs**:
   1. Create a branch: `fix/<short-desc>` off `main`.
   2. Reproduce the issue first, add a failing test, then fix.
   3. Run `pnpm lint`, `pnpm typecheck`, `pnpm test` before pushing.
-  4. Open a PR targeting `main` (do not merge yourself).
+  4. Open a PR targeting `main`.
+  5. Land through the configured PR/merge-queue path once required checks and deployments pass.
 
 - **Refactoring**:
   1. Create a branch: `refactor/<area>-<short-desc>` off `main`.
   2. Ensure tests pass before and after, refactor in small steps.
   3. Run `pnpm lint`, `pnpm typecheck`, `pnpm test` before pushing.
-  4. Open a PR targeting `main` (do not merge yourself).
+  4. Open a PR targeting `main`.
+  5. Land through the configured PR/merge-queue path once required checks and deployments pass.
 
 - **Performance**:
   1. Profile before optimizing, focus on user-perceived performance.
@@ -592,7 +613,7 @@ All external services (feature flags, analytics, email/notifications, payments, 
 ### Critical Rules (NEVER VIOLATE)
 
 1. ❌ **NEVER push directly to `main`**
-2. ❌ **NEVER merge PRs into `main`**
+2. ❌ **NEVER bypass PRs, required checks, required deployments, branch rulesets, or merge queue**
 3. ❌ **NEVER use npm or yarn** (always use `pnpm`)
 4. ❌ **NEVER bypass feature gates** for risky/user-facing changes
 5. ❌ **NEVER change branch protection or CI configuration** without explicit request
@@ -604,7 +625,7 @@ All external services (feature flags, analytics, email/notifications, payments, 
 2. ✅ Run `pnpm lint`, `pnpm typecheck`, `pnpm test` before declaring work complete
 3. ✅ Use Conventional Commits style (`feat:`, `fix:`, `refactor:`, etc.)
 4. ✅ Gate risky changes with Statsig feature flags
-5. ✅ Open PRs targeting `main` for human review (do not merge yourself)
+5. ✅ Open PRs targeting `main` and land them through the configured autonomous PR/merge-queue path when gates are green
 6. ✅ Keep PRs small and focused
 7. ✅ Use root-level `pnpm` scripts that leverage Turborepo
 8. ✅ Respect existing code patterns and architecture
@@ -617,8 +638,8 @@ All external services (feature flags, analytics, email/notifications, payments, 
 3. Run validation: pnpm lint && pnpm typecheck && pnpm test
 4. Push to branch
 5. Open PR targeting main
-6. Wait for human review and CI to pass
-7. Human merges PR (you do not merge)
+6. Wait for required checks, required deployments, automated review controls, and merge queue readiness
+7. Agent enqueues/merges through the configured PR path when gates are green, unless a human-only external approval is required
 ```
 
 ### Package Manager Commands
@@ -644,10 +665,10 @@ pnpm --filter packages/backend test
 
 ### Branch Protection
 
-- `main` is protected: no direct pushes, PRs required, CI must pass, human review required
+- `main` is protected: no direct pushes, PRs required, CI must pass, active rulesets and merge queue required
 
 ---
 
 Remember: When in doubt, follow the existing patterns in the codebase. Consistency is more important than perfection.
 
-**Agents propose; humans dispose. `main` only contains human-reviewed, CI-passing code.**
+**Agents ship through gates. `main` only contains PR-merged, CI-passing, deployable code with release evidence.**
