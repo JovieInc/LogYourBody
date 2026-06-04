@@ -784,15 +784,35 @@ platform :ios do
   desc "Submit existing IPA to App Store"
   lane :submit_app_store do |options|
     setup_app_store_connect_api
+
+    bool_option = lambda do |value, default|
+      return default if value.nil?
+      return value if value == true || value == false
+
+      normalized = value.to_s.strip.downcase
+      return true if %w[true 1 yes y on].include?(normalized)
+      return false if %w[false 0 no n off].include?(normalized)
+
+      UI.user_error!("Invalid boolean option: #{value.inspect}")
+    end
+
+    submit_for_review = bool_option.call(options[:submit_for_review], false)
+    automatic_release = bool_option.call(options[:automatic_release], false)
+    phased_release = bool_option.call(options[:phased_release], false)
+
+    if automatic_release && !submit_for_review
+      UI.user_error!("automatic_release requires submit_for_review")
+    end
+
     # Upload to App Store Connect
     upload_to_app_store(
       ipa: options[:ipa_path],
       force: true,
       skip_metadata: true,
       skip_screenshots: true,
-      submit_for_review: options[:submit_for_review] || false,
-      automatic_release: options[:automatic_release] || false,
-      phased_release: options[:phased_release] || false,
+      submit_for_review: submit_for_review,
+      automatic_release: automatic_release,
+      phased_release: phased_release,
       apple_id: ENV["APP_STORE_APP_ID"],
       team_id: ENV["APPLE_TEAM_ID"]
     )

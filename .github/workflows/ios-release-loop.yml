@@ -15,6 +15,21 @@ on:
         options:
           - testflight
           - app_store
+      submit_for_review:
+        description: 'Submit App Store builds for Apple review'
+        required: false
+        type: boolean
+        default: true
+      automatic_release:
+        description: 'Automatically release after Apple approval'
+        required: false
+        type: boolean
+        default: false
+      phased_release:
+        description: 'Use phased release for approved App Store builds'
+        required: false
+        type: boolean
+        default: true
   workflow_call:
 
 concurrency:
@@ -287,12 +302,16 @@ jobs:
         run: |
           cd apps/ios
 
+          SUBMIT_FOR_REVIEW="${{ github.event.inputs.submit_for_review || 'true' }}"
+          AUTOMATIC_RELEASE="${{ github.event.inputs.automatic_release || 'false' }}"
+          PHASED_RELEASE="${{ github.event.inputs.phased_release || 'true' }}"
+
           # Submit for review
           bundle exec fastlane submit_app_store \
             ipa_path:build/*.ipa \
-            submit_for_review:false \
-            automatic_release:false \
-            phased_release:true 2>&1 | tee submit.log
+            submit_for_review:$SUBMIT_FOR_REVIEW \
+            automatic_release:$AUTOMATIC_RELEASE \
+            phased_release:$PHASED_RELEASE 2>&1 | tee submit.log
 
           # Check for errors and surface them in the summary
           if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" submit.log; then
