@@ -23,6 +23,7 @@ secret values into this repository, pull requests, issues, logs, or docs.
   - Base64 encoded `username:personal_access_token` for the private Match repo.
 - `REVENUE_CAT_PUBLIC_KEY`
   - RevenueCat iOS public SDK key used by release config and offering preflight.
+  - Must start with `appl_`. Do not use a RevenueCat secret/admin key here.
 
 ## Required Release Environment Secrets
 
@@ -40,7 +41,6 @@ Both environments need these secrets:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 - `REVENUE_CAT_PUBLIC_KEY`
-- `REVENUE_CAT_API_KEY`
 
 Optional production integrations:
 

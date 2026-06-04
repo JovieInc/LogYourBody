@@ -59,7 +59,7 @@ xcconfig_url() {
 CLERK_PUBLISHABLE_KEY="${CLERK_PUBLISHABLE_KEY:-${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}}"
 SUPABASE_URL="${SUPABASE_URL:-${NEXT_PUBLIC_SUPABASE_URL:-}}"
 SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-${NEXT_PUBLIC_SUPABASE_ANON_KEY:-${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY:-}}}"
-REVENUE_CAT_PUBLIC_KEY="${REVENUE_CAT_PUBLIC_KEY:-${REVENUE_CAT_API_KEY:-${IOS_REVENUE_CAT_API_KEY:-}}}"
+REVENUE_CAT_PUBLIC_KEY="${REVENUE_CAT_PUBLIC_KEY:-}"
 CLERK_FRONTEND_API="${CLERK_FRONTEND_API:-https://clerk.logyourbody.com}"
 API_BASE_URL="${API_BASE_URL:-https://www.logyourbody.com}"
 STATSIG_CLIENT_SDK_KEY="${STATSIG_CLIENT_SDK_KEY:-}"
@@ -85,6 +85,12 @@ esac
 require_https_url "SUPABASE_URL" "$SUPABASE_URL"
 require_https_url "CLERK_FRONTEND_API" "$CLERK_FRONTEND_API"
 require_https_url "API_BASE_URL" "$API_BASE_URL"
+
+case "$REVENUE_CAT_PUBLIC_KEY" in
+  appl_*) ;;
+  sk_*) fail "REVENUE_CAT_PUBLIC_KEY must be the iOS public SDK key, not a RevenueCat secret API key." ;;
+  *) fail "REVENUE_CAT_PUBLIC_KEY must be a RevenueCat iOS public SDK key that starts with appl_." ;;
+esac
 
 if [ -n "$STATSIG_CLIENT_SDK_KEY" ] && is_placeholder "$STATSIG_CLIENT_SDK_KEY"; then
   fail "STATSIG_CLIENT_SDK_KEY must be empty or set to a real production value."

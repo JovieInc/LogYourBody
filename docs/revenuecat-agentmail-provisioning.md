@@ -72,10 +72,11 @@ The ignored local file `apps/ios/LogYourBody/Config.xcconfig` now uses the produ
 
 ## GitHub Secrets
 
-The GitHub `Production` environment has been updated so the iOS release workflow uses the verified App Store SDK key:
+The GitHub `Production` and `production-testflight` environments have been updated so the iOS release workflow uses the verified App Store SDK key:
 
 - `REVENUE_CAT_PUBLIC_KEY`
-- `REVENUE_CAT_API_KEY`
+
+The release workflow intentionally does not fall back to `REVENUE_CAT_API_KEY`; app builds must use the public iOS SDK key, not a RevenueCat secret/admin key.
 
 ## Remaining Release Blocker
 

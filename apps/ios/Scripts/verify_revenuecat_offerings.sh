@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-API_KEY="${REVENUE_CAT_PUBLIC_KEY:-${REVENUE_CAT_API_KEY:-${IOS_REVENUE_CAT_API_KEY:-}}}"
+API_KEY="${REVENUE_CAT_PUBLIC_KEY:-}"
 APP_USER_ID="${REVENUECAT_PREFLIGHT_APP_USER_ID:-release-preflight}"
 REQUIRED_PACKAGES="${REVENUECAT_REQUIRED_PACKAGES:-\$rc_annual:com.logyourbody.app.pro1.annual.3daytrial,\$rc_monthly:com.logyourbody.app.pro1.monthly.3daytrial}"
 OFFERINGS_URL="${REVENUECAT_OFFERINGS_URL:-https://api.revenuecat.com/v1/subscribers/$APP_USER_ID/offerings}"
@@ -33,6 +33,12 @@ require_value() {
   if is_placeholder "$value"; then
     fail "$name must be set to a real RevenueCat public API key."
   fi
+
+  case "$value" in
+    appl_*) ;;
+    sk_*) fail "$name must be the iOS public SDK key, not a RevenueCat secret API key." ;;
+    *) fail "$name must be a RevenueCat iOS public SDK key that starts with appl_." ;;
+  esac
 }
 
 TMP_JSON="$(mktemp)"
