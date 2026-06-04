@@ -7,6 +7,8 @@ REF_NAME="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required}"
 EVENT_NAME="${GITHUB_EVENT_NAME:?GITHUB_EVENT_NAME is required}"
 RELEASE_TYPE="${RELEASE_TYPE:-testflight}"
 REQUIRED_CHECKS="${REQUIRED_CHECKS:-CI Summary,JavaScript/TypeScript,iOS}"
+RELEASE_CHECK_TIMEOUT_SECONDS="${RELEASE_CHECK_TIMEOUT_SECONDS:-900}"
+RELEASE_CHECK_POLL_SECONDS="${RELEASE_CHECK_POLL_SECONDS:-15}"
 
 fail() {
   echo "::error::$1" >&2
@@ -54,46 +56,80 @@ cleanup() {
 }
 trap cleanup EXIT
 
-gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
-  --paginate \
-  --jq '.check_runs[] | [.name, .status, (.conclusion // ""), (.completed_at // .started_at // ""), (.id | tostring)] | @tsv' \
-  > "$CHECK_RUNS_TSV"
-
 IFS=',' read -r -a required_checks <<< "$REQUIRED_CHECKS"
-found_required=0
-missing_required=()
 
-for check_name in "${required_checks[@]}"; do
-  check_name="$(printf '%s' "$check_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-  [ -n "$check_name" ] || continue
+load_check_runs() {
+  gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+    --paginate \
+    --jq '.check_runs[] | [.name, .status, (.conclusion // ""), (.completed_at // .started_at // ""), (.id | tostring)] | @tsv' \
+    > "$CHECK_RUNS_TSV"
+}
 
-  matches="$(awk -F '\t' -v wanted="$check_name" '$1 == wanted { print }' "$CHECK_RUNS_TSV" | LC_ALL=C sort -t $'\t' -k4,4)"
+validate_required_checks_once() {
+  found_required=0
+  missing_required=()
+  pending_required=()
 
-  if [ -z "$matches" ]; then
-    missing_required+=("$check_name")
-    continue
+  for check_name in "${required_checks[@]}"; do
+    check_name="$(printf '%s' "$check_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [ -n "$check_name" ] || continue
+
+    matches="$(awk -F '\t' -v wanted="$check_name" '$1 == wanted { print }' "$CHECK_RUNS_TSV" | LC_ALL=C sort -t $'\t' -k4,4)"
+
+    if [ -z "$matches" ]; then
+      missing_required+=("$check_name")
+      continue
+    fi
+
+    found_required=1
+    latest="$(printf '%s\n' "$matches" | tail -n 1)"
+    status="$(printf '%s' "$latest" | cut -f2)"
+    conclusion="$(printf '%s' "$latest" | cut -f3)"
+
+    if [ "$status" != "completed" ]; then
+      pending_required+=("$check_name:$status")
+      continue
+    fi
+
+    if [ "$conclusion" != "success" ] && [ "$conclusion" != "skipped" ]; then
+      fail "Required check '$check_name' concluded $conclusion."
+    fi
+
+    echo "Required check '$check_name' concluded $conclusion."
+  done
+
+  if [ "$found_required" -eq 0 ]; then
+    echo "No required CI check runs found yet on ref $REF_NAME for $SHA."
+    return 1
   fi
 
-  found_required=1
-  latest="$(printf '%s\n' "$matches" | tail -n 1)"
-  status="$(printf '%s' "$latest" | cut -f2)"
-  conclusion="$(printf '%s' "$latest" | cut -f3)"
-
-  if [ "$status" != "completed" ]; then
-    fail "Required check '$check_name' is $status."
+  if [ "${#missing_required[@]}" -gt 0 ]; then
+    echo "Required CI checks missing so far: ${missing_required[*]}"
+    return 1
   fi
 
-  if [ "$conclusion" != "success" ] && [ "$conclusion" != "skipped" ]; then
-    fail "Required check '$check_name' concluded $conclusion."
+  if [ "${#pending_required[@]}" -gt 0 ]; then
+    echo "Required CI checks pending so far: ${pending_required[*]}"
+    return 1
   fi
 
-  echo "Required check '$check_name' concluded $conclusion."
+  return 0
+}
+
+deadline=$((SECONDS + RELEASE_CHECK_TIMEOUT_SECONDS))
+while true; do
+  load_check_runs
+
+  if validate_required_checks_once; then
+    break
+  fi
+
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    fail "Required CI checks did not pass within ${RELEASE_CHECK_TIMEOUT_SECONDS}s on ref $REF_NAME for $SHA."
+  fi
+
+  echo "Waiting ${RELEASE_CHECK_POLL_SECONDS}s for required CI checks..."
+  sleep "$RELEASE_CHECK_POLL_SECONDS"
 done
-
-if [ "$found_required" -eq 0 ]; then
-  fail "No required CI check runs were found on ref $REF_NAME for $SHA."
-elif [ "${#missing_required[@]}" -gt 0 ]; then
-  fail "Required CI checks were missing on ref $REF_NAME for $SHA: ${missing_required[*]}."
-fi
 
 echo "Release source validation passed."
