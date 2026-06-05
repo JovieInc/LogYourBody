@@ -210,6 +210,32 @@ class AuthManager: NSObject, ObservableObject {
         value ? "true" : "false"
     }
 
+    nonisolated static func normalizedAuthEmailCandidate(_ value: String?) -> String? {
+        let candidate = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard candidate.contains("@"),
+              !candidate.contains(" ") else {
+            return nil
+        }
+
+        return candidate
+    }
+
+    nonisolated static func syntheticAuthEmail(userId: String) -> String? {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
+        let sanitized = userId
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .unicodeScalars
+            .map { allowed.contains($0) ? String($0) : "-" }
+            .joined()
+        let localPart = sanitized.trimmingCharacters(in: CharacterSet(charactersIn: ".-_"))
+
+        guard !localPart.isEmpty else {
+            return nil
+        }
+
+        return "\(localPart)@apple.local.logyourbody"
+    }
+
     private func logAuthDiagnostic(_ stage: String, details: [String: String] = [:]) {
         let summary = details
             .sorted { $0.key < $1.key }
@@ -493,8 +519,15 @@ class AuthManager: NSObject, ObservableObject {
     @discardableResult
     private func updateLocalUser(clerkSession session: Session) -> Bool {
         guard let publicUserData = session.publicUserData,
-              let userId = publicUserData.userId,
-              publicUserData.identifier.contains("@") else {
+              let userId = publicUserData.userId else {
+            return false
+        }
+
+        let email = Self.normalizedAuthEmailCandidate(publicUserData.identifier)
+            ?? Self.syntheticAuthEmail(userId: userId)
+
+        guard let email else {
+            logAuthDiagnostic("local_user_projection_failed", details: ["source": "session"])
             return false
         }
 
@@ -508,10 +541,10 @@ class AuthManager: NSObject, ObservableObject {
 
         applyLocalUser(
             userId: userId,
-            email: publicUserData.identifier,
+            email: email,
             username: nil,
             imageUrl: publicUserData.imageUrl.isEmpty ? nil : publicUserData.imageUrl,
-            displayName: name
+            displayName: name.isEmpty ? getUserDisplayName() : name
         )
 
         return true
@@ -537,6 +570,7 @@ class AuthManager: NSObject, ObservableObject {
         // Extract properties using Mirror
         var userId = ""
         var emailAddresses: [Any] = []
+        var externalAccounts: [Any] = []
         var username: String?
         var imageUrl: String?
 
@@ -546,6 +580,8 @@ class AuthManager: NSObject, ObservableObject {
                 userId = child.value as? String ?? ""
             case "emailAddresses":
                 emailAddresses = child.value as? [Any] ?? []
+            case "externalAccounts":
+                externalAccounts = child.value as? [Any] ?? []
             case "username":
                 username = child.value as? String
             case "imageUrl":
@@ -555,17 +591,10 @@ class AuthManager: NSObject, ObservableObject {
             }
         }
 
-        // Extract email from first email address
-        var email = ""
-        if let firstEmailAddress = emailAddresses.first {
-            let emailMirror = Mirror(reflecting: firstEmailAddress)
-            for child in emailMirror.children {
-                if child.label == "emailAddress" {
-                    email = child.value as? String ?? ""
-                    break
-                }
-            }
-        }
+        let email = firstEmailAddress(in: emailAddresses)
+            ?? firstEmailAddress(in: externalAccounts)
+            ?? Self.syntheticAuthEmail(userId: userId)
+            ?? ""
 
         return applyLocalUser(
             userId: userId,
@@ -576,6 +605,20 @@ class AuthManager: NSObject, ObservableObject {
         )
     }
 
+    private func firstEmailAddress(in values: [Any]) -> String? {
+        for value in values {
+            let mirror = Mirror(reflecting: value)
+
+            for child in mirror.children where child.label == "emailAddress" {
+                if let email = Self.normalizedAuthEmailCandidate(child.value as? String) {
+                    return email
+                }
+            }
+        }
+
+        return nil
+    }
+
     @discardableResult
     private func applyLocalUser(
         userId: String,
@@ -584,7 +627,7 @@ class AuthManager: NSObject, ObservableObject {
         imageUrl: String?,
         displayName: String
     ) -> Bool {
-        guard !email.isEmpty else {
+        guard !userId.isEmpty, !email.isEmpty else {
             self.currentUser = nil
             self.isAuthenticated = false
             return false
