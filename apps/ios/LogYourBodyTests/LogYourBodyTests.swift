@@ -230,6 +230,89 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertTrue(manager.isAuthenticated)
         XCTAssertEqual(manager.currentUser?.email, "test@example.com")
     }
+
+    func testUpdateLocalUserUsesExternalAccountEmailWhenPrimaryEmailsMissing() {
+        let manager = AuthManager()
+
+        struct FakeExternalAccount {
+            let provider: String
+            let emailAddress: String
+        }
+
+        struct FakeClerkUser {
+            let id: String
+            let emailAddresses: [String]
+            let externalAccounts: [FakeExternalAccount]
+            let firstName: String?
+            let lastName: String?
+            let username: String?
+            let imageUrl: String?
+        }
+
+        let fakeUser = FakeClerkUser(
+            id: "user_apple_123",
+            emailAddresses: [],
+            externalAccounts: [
+                FakeExternalAccount(
+                    provider: "oauth_apple",
+                    emailAddress: "private@example.com"
+                )
+            ],
+            firstName: "Apple",
+            lastName: "User",
+            username: nil,
+            imageUrl: nil
+        )
+
+        manager.updateLocalUser(clerkUser: fakeUser)
+
+        XCTAssertTrue(manager.isAuthenticated)
+        XCTAssertEqual(manager.currentUser?.email, "private@example.com")
+    }
+
+    func testUpdateLocalUserSynthesizesEmailWhenClerkEmailMissing() {
+        let manager = AuthManager()
+
+        struct FakeClerkUser {
+            let id: String
+            let emailAddresses: [String]
+            let externalAccounts: [String]
+            let firstName: String?
+            let lastName: String?
+            let username: String?
+            let imageUrl: String?
+        }
+
+        let fakeUser = FakeClerkUser(
+            id: "user_apple_123",
+            emailAddresses: [],
+            externalAccounts: [],
+            firstName: nil,
+            lastName: nil,
+            username: nil,
+            imageUrl: nil
+        )
+
+        manager.updateLocalUser(clerkUser: fakeUser)
+
+        XCTAssertTrue(manager.isAuthenticated)
+        XCTAssertEqual(manager.currentUser?.email, "user_apple_123@apple.local.logyourbody")
+    }
+
+    func testSyntheticAuthEmailSanitizesClerkUserId() {
+        XCTAssertEqual(
+            AuthManager.syntheticAuthEmail(userId: " user:abc/123 "),
+            "user-abc-123@apple.local.logyourbody"
+        )
+    }
+
+    func testNormalizedAuthEmailRejectsNonEmailIdentifier() {
+        XCTAssertNil(AuthManager.normalizedAuthEmailCandidate("user_apple_123"))
+        XCTAssertEqual(
+            AuthManager.normalizedAuthEmailCandidate(" private@example.com "),
+            "private@example.com"
+        )
+    }
 }
 
 final class AuthConfigurationValidationTests: XCTestCase {
