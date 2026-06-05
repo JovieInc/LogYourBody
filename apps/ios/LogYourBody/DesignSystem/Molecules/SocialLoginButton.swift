@@ -37,9 +37,9 @@ struct SocialLoginButton: View {
         var backgroundColor: Color {
             switch self {
             case .apple:
-                return .white
+                return Color.metricSurface
             case .google:
-                return .white
+                return Color.metricSurface
             case .facebook:
                 return Color(red: 0.258, green: 0.406, blue: 0.697)
             }
@@ -48,9 +48,27 @@ struct SocialLoginButton: View {
         var foregroundColor: Color {
             switch self {
             case .apple, .google:
-                return .black
+                return .appText
             case .facebook:
                 return .white
+            }
+        }
+
+        var borderColor: Color {
+            switch self {
+            case .apple, .google:
+                return Color.white.opacity(0.14)
+            case .facebook:
+                return Color.clear
+            }
+        }
+
+        var borderWidth: CGFloat {
+            switch self {
+            case .apple, .google:
+                return 1
+            case .facebook:
+                return 0
             }
         }
     }
@@ -80,18 +98,14 @@ struct SocialLoginButton: View {
                 size: .medium,
                 isLoading: isLoading,
                 fullWidth: true,
-                icon: provider.icon
+                icon: provider.icon,
+                cornerRadius: 9_999
             ),
             action: action
         )
         .overlay(
-            // Add border for certain providers
-            Group {
-                if provider == .apple || provider == .google {
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.appBorder, lineWidth: 1)
-                }
-            }
+            RoundedRectangle(cornerRadius: 9_999, style: .continuous)
+                .stroke(provider.borderColor, lineWidth: provider.borderWidth)
         )
     }
 }

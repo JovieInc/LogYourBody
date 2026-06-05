@@ -1,6 +1,9 @@
 # LogYourBody iOS App Store Launch Plan
 
+> Current product sequencing lives in [`../../../../docs/product-development-roadmap.md`](../../../../docs/product-development-roadmap.md). Use that roadmap for KPI gates, iOS-first scope, and web/iPad/Watch/AI expansion triggers; this file is historical launch readiness context.
+
 ## Current Status Assessment
+
 **Last Updated: January 12, 2025**
 **Launch Readiness: 85%**
 
@@ -9,10 +12,10 @@ The app has reached feature-complete status with major functionality implemented
 ## 🚨 CRITICAL BLOCKERS for App Store Launch
 
 ### Immediate Action Required (1-2 hours)
+
 1. **Add Photo Library Permissions to Info.plist**
    - [ ] ❌ NSPhotoLibraryUsageDescription
    - [ ] ❌ NSPhotoLibraryAddUsageDescription
-   
 2. **Fix Version Number Synchronization**
    - [ ] ❌ Info.plist: 1.0.0 → 1.2.0
    - [ ] ❌ Constants.swift: 1.0.0 → 1.2.0
@@ -29,6 +32,7 @@ The app has reached feature-complete status with major functionality implemented
 ## 🚀 MUST HAVE for App Store Launch
 
 ### 1. Critical Bug Fixes
+
 - [x] ✅ Fix duplicate LiquidGlass component declarations
 - [x] ✅ Fix onboarding completion crash
 - [x] ✅ Remove debug shake-to-reset from production builds
@@ -41,6 +45,7 @@ The app has reached feature-complete status with major functionality implemented
 - [x] ✅ Fix image rotation with Vision framework
 
 ### 2. App Store Requirements
+
 - [x] ✅ **Privacy Policy URL** - Implemented at logyourbody.com/privacy
 - [x] ✅ **Terms of Service URL** - Implemented at logyourbody.com/terms
 - [ ] ❌ **App Store Connect Screenshots** (6.5", 5.5" required minimum)
@@ -50,6 +55,7 @@ The app has reached feature-complete status with major functionality implemented
 - [x] ✅ **Age Rating** - Set to 17+ (health data collection)
 
 ### 3. Authentication & Security
+
 - [x] ✅ Clerk authentication implemented
 - [x] ✅ Email verification flow
 - [x] ✅ **Apple Sign In** - Implemented with browser-based OAuth flow
@@ -57,6 +63,7 @@ The app has reached feature-complete status with major functionality implemented
 - [x] ✅ Secure token management
 
 ### 4. Core Feature Stability
+
 - [x] ✅ Weight logging with manual and HealthKit sync
 - [x] ✅ Body fat % tracking with multiple methods
 - [x] ✅ Photo capture/upload with background removal
@@ -66,6 +73,7 @@ The app has reached feature-complete status with major functionality implemented
 - [x] ✅ Offline mode support
 
 ### 5. Legal Compliance & GDPR
+
 - [x] ✅ **Support Page** - Implemented at logyourbody.com/support
 - [x] ✅ **Privacy Policy** - Accessible from app and web
 - [x] ✅ **Terms of Service** - Accessible from app and web
@@ -77,6 +85,7 @@ The app has reached feature-complete status with major functionality implemented
 - [ ] ❌ **Complete Account Deletion** - Server-side deletion needed
 
 ### 6. Performance & Stability
+
 - [x] ✅ Test on real devices
 - [x] ✅ Memory optimization for photo handling
 - [x] ✅ Remove debug logging from Apple Sign In
@@ -85,6 +94,7 @@ The app has reached feature-complete status with major functionality implemented
 - [ ] ❌ Analytics integration (optional)
 
 ### 7. Design & UX Polish
+
 - [x] ✅ iOS 26 Liquid Glass design implementation
 - [x] ✅ Professional onboarding flow
 - [x] ✅ Consistent black/white/grayscale theme
@@ -100,49 +110,56 @@ The app has reached feature-complete status with major functionality implemented
 ## 🎯 Critical Action Items Before Submission
 
 ### PHASE 1: Code Fixes (1-2 hours) - HIGHEST PRIORITY
-   - [ ] ❌ Add NSPhotoLibraryUsageDescription to Info.plist
-   - [ ] ❌ Add NSPhotoLibraryAddUsageDescription to Info.plist
-   - [ ] ❌ Synchronize version numbers (1.2.0) across all files
-   - [ ] ❌ Fix LSApplicationCategoryType in Info.plist
-   - [ ] ❌ Replace all fatalError calls with proper error handling
+
+- [ ] ❌ Add NSPhotoLibraryUsageDescription to Info.plist
+- [ ] ❌ Add NSPhotoLibraryAddUsageDescription to Info.plist
+- [ ] ❌ Synchronize version numbers (1.2.0) across all files
+- [ ] ❌ Fix LSApplicationCategoryType in Info.plist
+- [ ] ❌ Replace all fatalError calls with proper error handling
 
 ### PHASE 2: Code Cleanup (2-3 hours)
-   - [ ] ❌ Remove 200+ print statements or wrap in #if DEBUG
-   - [ ] ❌ Remove mock authentication code from AuthManager
-   - [ ] ❌ Address TODO comments in CompletionStepView and HealthKitManager
-   - [ ] ❌ Implement or remove "Coming Soon" forgot password feature
-   - [ ] ❌ Remove debug-only UI elements from production builds
+
+- [ ] ❌ Remove 200+ print statements or wrap in #if DEBUG
+- [ ] ❌ Remove mock authentication code from AuthManager
+- [ ] ❌ Address TODO comments in CompletionStepView and HealthKitManager
+- [ ] ❌ Implement or remove "Coming Soon" forgot password feature
+- [ ] ❌ Remove debug-only UI elements from production builds
 
 ### PHASE 3: Configuration & Security (1 hour)
-   - [ ] ⚠️ Consider moving API keys to secure configuration
-   - [ ] ⏳ Verify server-side account deletion for GDPR compliance
-   - [x] ✅ Data export functionality implemented in ExportDataView
+
+- [ ] ⚠️ Consider moving API keys to secure configuration
+- [ ] ⏳ Verify server-side account deletion for GDPR compliance
+- [x] ✅ Data export functionality implemented in ExportDataView
 
 ### PHASE 4: App Store Assets (3-4 hours)
-   - [ ] ❌ Screenshots for 6.5" (iPhone 14 Pro Max)
-   - [ ] ❌ Screenshots for 5.5" (iPhone 8 Plus) 
-   - [ ] ❌ App Description focusing on privacy and simplicity
-   - [ ] ❌ Keywords: body composition, weight tracker, progress photos, FFMI
-   - [ ] App Preview Video (optional but recommended)
+
+- [ ] ❌ Screenshots for 6.5" (iPhone 14 Pro Max)
+- [ ] ❌ Screenshots for 5.5" (iPhone 8 Plus)
+- [ ] ❌ App Description focusing on privacy and simplicity
+- [ ] ❌ Keywords: body composition, weight tracker, progress photos, FFMI
+- [ ] App Preview Video (optional but recommended)
 
 ### PHASE 5: Final Testing Checklist (2-3 hours)
-   - [ ] Complete onboarding flow
-   - [ ] Log weight, body fat, and photo
-   - [ ] Test HealthKit sync
-   - [ ] Test Apple Sign In
-   - [ ] Test data export
-   - [ ] Test account deletion
-   - [ ] Verify offline functionality
-   - [ ] Check all external links
+
+- [ ] Complete onboarding flow
+- [ ] Log weight, body fat, and photo
+- [ ] Test HealthKit sync
+- [ ] Test Apple Sign In
+- [ ] Test data export
+- [ ] Test account deletion
+- [ ] Verify offline functionality
+- [ ] Check all external links
 
 ### 5. **App Store Connect Setup** (1 hour)
-   - ✅ Set age rating to 17+
-   - ✅ Add privacy policy URL (logyourbody.com/privacy)
-   - ✅ Add support URL (logyourbody.com/support)
-   - Configure in-app purchases (if any)
-   - ✅ Set up TestFlight
+
+- ✅ Set age rating to 17+
+- ✅ Add privacy policy URL (logyourbody.com/privacy)
+- ✅ Add support URL (logyourbody.com/support)
+- Configure in-app purchases (if any)
+- ✅ Set up TestFlight
 
 ## 📱 TestFlight Strategy
+
 1. Internal testing with team (1-2 days)
 2. External beta with 20-50 users (3-5 days)
 3. Address critical feedback
@@ -151,26 +168,30 @@ The app has reached feature-complete status with major functionality implemented
 ## 🚀 Post-Launch Roadmap
 
 ### Version 1.1 (2-4 weeks)
+
 - Widgets for home screen
 - Data export improvements
 - Performance optimizations
 - Bug fixes from user feedback
 
 ### Version 1.2 (1-2 months)
+
 - iPad optimization
 - Advanced charting options
 - Measurement tracking (waist, arms, etc.)
 - Backup/restore functionality
 
 ### Version 2.0 (3-6 months)
+
 - Apple Watch companion app
 - AI-powered insights
 - Social features (optional)
 - Premium themes
 
 ## Time Estimate for Launch
+
 - **Phase 1 (Code Fixes)**: 1-2 hours
-- **Phase 2 (Code Cleanup)**: 2-3 hours  
+- **Phase 2 (Code Cleanup)**: 2-3 hours
 - **Phase 3 (Configuration)**: 1 hour
 - **Phase 4 (App Store Assets)**: 3-4 hours
 - **Phase 5 (Final Testing)**: 2-3 hours
@@ -179,10 +200,11 @@ The app has reached feature-complete status with major functionality implemented
 - **Total**: ~10-15 days (was 8-12 days)
 
 ## Next Immediate Steps (Priority Order)
+
 1. 🚨 **FIX CRITICAL BLOCKERS** (1-2 hours)
    - Add photo library permissions to Info.plist
    - Synchronize version numbers to 1.2.0
-   - Fix LSApplicationCategoryType 
+   - Fix LSApplicationCategoryType
    - Remove fatalError calls
 
 2. 🧹 **CLEAN UP CODE** (2-3 hours)
@@ -202,17 +224,20 @@ The app has reached feature-complete status with major functionality implemented
 5. 🚀 **SUBMIT TO TESTFLIGHT**
 
 ## Success Metrics
+
 - Crash-free rate > 99.5%
 - App Store rating > 4.5 stars
 - User retention > 60% after 30 days
 - HealthKit adoption > 40%
 
 ## Summary
+
 **Launch Readiness: 85%** (was 98% - adjusted after thorough review)
 
 The app has excellent features and UI but needs critical fixes before App Store submission:
 
 ### ✅ What's Complete:
+
 - Premium dashboard with minimal aesthetic
 - Full accessibility support (WCAG AA+)
 - Vision framework for image orientation
@@ -225,12 +250,14 @@ The app has excellent features and UI but needs critical fixes before App Store 
 - Offline support
 
 ### ❌ Critical Blockers (1-2 hours to fix):
+
 1. Missing photo library permissions in Info.plist
 2. Version number mismatch (should be 1.2.0 everywhere)
 3. Empty LSApplicationCategoryType
 4. Fatal errors that could crash app
 
 ### ⚠️ Important Issues (3-4 hours to fix):
+
 1. 200+ debug print statements in production
 2. Mock auth code still present
 3. "Coming Soon" placeholder content
@@ -238,6 +265,7 @@ The app has excellent features and UI but needs critical fixes before App Store 
 5. Hardcoded API keys (though they're public keys)
 
 ### 📋 Remaining Work:
+
 - Code fixes and cleanup (5-6 hours)
 - App Store screenshots and description (3-4 hours)
 - Final testing (2-3 hours)

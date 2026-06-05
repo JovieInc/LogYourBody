@@ -59,7 +59,8 @@ struct LoginForm: View {
                     style: .custom(background: .appCard, foreground: .appText),
                     isLoading: isLoading,
                     isEnabled: isFormValid,
-                    fullWidth: true
+                    fullWidth: true,
+                    cornerRadius: 9_999
                 ),
                 action: onLogin
             )
