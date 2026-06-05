@@ -352,21 +352,21 @@ class AuthManager: NSObject, ObservableObject {
     }
 
     @MainActor
-    private func updateSessionState() {
+    private func updateSessionState(force: Bool = false) {
         _ = clerk.session != nil
         let previousSessionId = self.clerkSession?.id
         let currentSessionId = clerk.session?.id
 
-        // Only update if session actually changed
-        if previousSessionId != currentSessionId {
+        // Update when the session changes, or when a newly-active Clerk session
+        // has not yet been projected into the app's local auth state.
+        if force || previousSessionId != currentSessionId || (currentSessionId != nil && currentUser == nil) {
             // print("🔄 Session change detected: \(previousSessionId ?? "nil") -> \(currentSessionId ?? "nil")")
 
             self.clerkSession = clerk.session
 
-            if let _ = clerk.session, let user = clerk.user {
+            if clerk.session != nil, let user = clerk.user, self.updateLocalUser(clerkUser: user) {
                 // Only authenticate if we have both a valid session AND user
                 // print("🔄 Clerk session state: signed in with user \(user.id)")
-                self.updateLocalUser(clerkUser: user)
                 // isAuthenticated will be set by updateLocalUser if successful
 
                 // Clear any remaining sign-up/sign-in state
@@ -378,6 +378,23 @@ class AuthManager: NSObject, ObservableObject {
                 self.emailVerificationFlow = nil
 
                 // Notify RevenueCat of authenticated user for correct entitlement handling
+                if let localUserId = self.currentUser?.id {
+                    Task {
+                        await RevenueCatManager.shared.identifyUser(userId: localUserId)
+                    }
+                }
+
+                Task { @MainActor in
+                    await self.bootstrapAuthenticatedProfileIfNeeded(sessionId: currentSessionId)
+                }
+            } else if let session = clerk.session, updateLocalUser(clerkSession: session) {
+                self.currentSignUp = nil
+                self.pendingSignUpEmail = nil
+                self.currentSignIn = nil
+                self.pendingSignInEmail = nil
+                self.needsEmailVerification = false
+                self.emailVerificationFlow = nil
+
                 if let localUserId = self.currentUser?.id {
                     Task {
                         await RevenueCatManager.shared.identifyUser(userId: localUserId)
@@ -440,6 +457,33 @@ class AuthManager: NSObject, ObservableObject {
         return [info]
     }
 
+    @discardableResult
+    private func updateLocalUser(clerkSession session: Session) -> Bool {
+        guard let publicUserData = session.publicUserData,
+              let userId = publicUserData.userId,
+              publicUserData.identifier.contains("@") else {
+            return false
+        }
+
+        let name = [
+            publicUserData.firstName,
+            publicUserData.lastName
+        ]
+        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+        .joined(separator: " ")
+
+        applyLocalUser(
+            userId: userId,
+            email: publicUserData.identifier,
+            username: nil,
+            imageUrl: publicUserData.imageUrl.isEmpty ? nil : publicUserData.imageUrl,
+            displayName: name
+        )
+
+        return true
+    }
+
     func revokeSession(sessionId: String) async throws {
         do {
             try await clerk.signOut(sessionId: sessionId)
@@ -452,7 +496,8 @@ class AuthManager: NSObject, ObservableObject {
         }
     }
 
-    func updateLocalUser(clerkUser: Any) {
+    @discardableResult
+    func updateLocalUser(clerkUser: Any) -> Bool {
         // Use Mirror to access properties dynamically due to type naming conflict
         let mirror = Mirror(reflecting: clerkUser)
 
@@ -489,14 +534,27 @@ class AuthManager: NSObject, ObservableObject {
             }
         }
 
-        // Use single source of truth for display name
-        let displayName = getUserDisplayName()
+        return applyLocalUser(
+            userId: userId,
+            email: email,
+            username: username,
+            imageUrl: imageUrl,
+            displayName: getUserDisplayName()
+        )
+    }
 
-        // Don't proceed if we don't have a valid email
+    @discardableResult
+    private func applyLocalUser(
+        userId: String,
+        email: String,
+        username: String?,
+        imageUrl: String?,
+        displayName: String
+    ) -> Bool {
         guard !email.isEmpty else {
             self.currentUser = nil
             self.isAuthenticated = false
-            return
+            return false
         }
 
         // Create user object with Clerk data
@@ -572,6 +630,8 @@ class AuthManager: NSObject, ObservableObject {
             userId: localUser.id,
             properties: traits
         )
+
+        return true
     }
 
     func login(email: String, password: String) async throws {
@@ -739,8 +799,35 @@ class AuthManager: NSObject, ObservableObject {
         }
 
         try await clerk.setActive(sessionId: sessionId)
-        updateSessionState()
+        await reconcileActiveSession(sessionId: sessionId)
+        updateSessionState(force: true)
         await bootstrapAuthenticatedProfileIfNeeded(sessionId: clerk.session?.id)
+    }
+
+    @MainActor
+    private func reconcileActiveSession(sessionId: String) async {
+        for _ in 0..<8 {
+            if clerk.session?.id == sessionId, clerk.user != nil {
+                return
+            }
+
+            try? await Task.sleep(nanoseconds: 150_000_000)
+        }
+
+        do {
+            try await clerk.load()
+            try? await Task.sleep(nanoseconds: 150_000_000)
+        } catch {
+            ErrorReporter.shared.captureNonFatal(
+                error,
+                context: ErrorContext(
+                    feature: "auth",
+                    operation: "reconcileActiveSession",
+                    screen: nil,
+                    userId: nil
+                )
+            )
+        }
     }
 
     private func cacheAppleDisplayName(from credential: ASAuthorizationAppleIDCredential) {
