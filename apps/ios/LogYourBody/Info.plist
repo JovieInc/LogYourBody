@@ -26,6 +26,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>logyourbody</string>
+				<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			</array>
 		</dict>
 	</array>

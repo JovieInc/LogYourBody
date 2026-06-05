@@ -666,7 +666,7 @@ class AuthManager: NSObject, ObservableObject {
         _ = try await signIn.prepareFirstFactor(strategy: .emailCode())
     }
 
-    // MARK: - Apple Sign In with OAuth
+    // MARK: - Apple Sign In
     @MainActor
     func signInWithAppleOAuth() async {
         guard isClerkLoaded else {
@@ -675,13 +675,11 @@ class AuthManager: NSObject, ObservableObject {
         }
 
         do {
-            // Create OAuth sign in
-            let signIn = try await SignIn.create(strategy: .oauth(provider: .apple))
-
-            // Open Safari for authentication
-            try await signIn.authenticateWithRedirect()
+            let credential = try await SignInWithAppleHelper.getAppleIdCredential(
+                requestedScopes: [.email, .fullName]
+            )
+            try await authenticateWithAppleCredential(credential)
         } catch {
-            // Handle specific error cases
             let errorString = String(describing: error)
 
             if errorString.contains("oauth_provider_not_enabled") {
@@ -703,8 +701,59 @@ class AuthManager: NSObject, ObservableObject {
 
     @MainActor
     func signInWithAppleCredentials(_ credential: ASAuthorizationAppleIDCredential) async throws {
-        // For now, reuse the OAuth-based Apple sign-in flow.
-        await signInWithAppleOAuth()
+        try await authenticateWithAppleCredential(credential)
+    }
+
+    @MainActor
+    private func authenticateWithAppleCredential(_ credential: ASAuthorizationAppleIDCredential) async throws {
+        cacheAppleDisplayName(from: credential)
+
+        guard let idToken = credential.identityToken.flatMap({ String(data: $0, encoding: .utf8) }) else {
+            throw AuthError.invalidCredentials
+        }
+
+        let result = try await SignIn.authenticateWithIdToken(provider: .apple, idToken: idToken)
+        try await activateCompletedTransfer(result)
+    }
+
+    @MainActor
+    private func activateCompletedTransfer(_ result: TransferFlowResult) async throws {
+        let sessionId: String?
+
+        switch result {
+        case .signIn(let signIn):
+            guard signIn.status == .complete else {
+                throw AuthError.invalidCredentials
+            }
+            sessionId = signIn.createdSessionId
+
+        case .signUp(let signUp):
+            guard signUp.status == .complete else {
+                throw AuthError.invalidCredentials
+            }
+            sessionId = signUp.createdSessionId
+        }
+
+        guard let sessionId else {
+            throw AuthError.invalidCredentials
+        }
+
+        try await clerk.setActive(sessionId: sessionId)
+        updateSessionState()
+        await bootstrapAuthenticatedProfileIfNeeded(sessionId: clerk.session?.id)
+    }
+
+    private func cacheAppleDisplayName(from credential: ASAuthorizationAppleIDCredential) {
+        guard let fullName = credential.fullName else { return }
+
+        let formatter = PersonNameComponentsFormatter()
+        let name = formatter
+            .string(from: fullName)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if !name.isEmpty {
+            UserDefaults.standard.set(name, forKey: "appleSignInName")
+        }
     }
 
     // MARK: - Unified Apple Sign In Handler
