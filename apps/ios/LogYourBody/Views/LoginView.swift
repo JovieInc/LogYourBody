@@ -38,7 +38,7 @@ struct LoginView: View {
         ScrollView {
             VStack(spacing: 0) {
                 // Show Clerk initialization status banner
-                if !authManager.isClerkLoaded {
+                if shouldShowClerkStatusBanner {
                     clerkStatusBanner
                         .padding(.top, 20)
                         .padding(.horizontal, 24)
@@ -55,7 +55,7 @@ struct LoginView: View {
                     title: "LogYourBody",
                     subtitle: "Log your body in under 10 seconds."
                 )
-                .padding(.top, authManager.isClerkLoaded ? 80 : 20)
+                .padding(.top, shouldShowClerkStatusBanner ? 20 : 80)
                 .padding(.bottom, 24)
 
                 // Organism: Login Form
@@ -96,6 +96,10 @@ struct LoginView: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var shouldShowClerkStatusBanner: Bool {
+        !authManager.isClerkLoaded || authManager.clerkInitError != nil
     }
 
     private var sessionStatusBanner: some View {
