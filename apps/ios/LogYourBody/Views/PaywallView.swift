@@ -16,6 +16,7 @@ struct PaywallView: View {
     @State private var showPurchaseError = false
     @State private var showTermsSheet = false
     @State private var showPrivacySheet = false
+    @State private var showLogoutConfirmation = false
 
     var body: some View {
         ZStack {
@@ -45,6 +46,7 @@ struct PaywallView: View {
                     }
 
                     restorePurchasesButton
+                    logoutButton
                     legalLinks
 
                     Spacer(minLength: 50)
@@ -77,6 +79,21 @@ struct PaywallView: View {
             }
         } message: {
             Text(revenueCatManager.errorMessage ?? "No active subscription found")
+        }
+        .confirmationDialog(
+            "Log out of LogYourBody?",
+            isPresented: $showLogoutConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Log Out", role: .destructive) {
+                Task {
+                    AnalyticsService.shared.track(event: "paywall_logout")
+                    await authManager.logout()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Use this to switch accounts on this device.")
         }
         .onAppear {
             // Use cached offerings if available, otherwise fetch
@@ -272,6 +289,20 @@ struct PaywallView: View {
                 .foregroundColor(.white.opacity(0.7))
         }
         .disabled(revenueCatManager.isPurchasing)
+    }
+
+    private var logoutButton: some View {
+        Button(role: .destructive) {
+            HapticManager.shared.notification(type: .warning)
+            showLogoutConfirmation = true
+        } label: {
+            Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.red.opacity(0.85))
+        }
+        .disabled(revenueCatManager.isPurchasing)
+        .accessibilityLabel("Log out")
+        .accessibilityHint("Signs you out so you can use another account.")
     }
 
     private var legalLinks: some View {
