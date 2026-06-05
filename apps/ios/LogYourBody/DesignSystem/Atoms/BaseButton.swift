@@ -14,6 +14,7 @@ struct ButtonConfiguration {
     var fullWidth: Bool = false
     var icon: String?
     var iconPosition: IconPosition = .leading
+    var cornerRadius: CGFloat?
     var hapticFeedback: UIImpactFeedbackGenerator.FeedbackStyle? = .light
 
     enum ButtonStyleVariant {
@@ -117,6 +118,10 @@ struct BaseButton<Label: View>: View {
         configuration.isEnabled && !configuration.isLoading && isEnvironmentEnabled
     }
 
+    private var cornerRadius: CGFloat {
+        configuration.cornerRadius ?? 10
+    }
+
     var body: some View {
         Button(action: handleTap, label: {
             buttonContent
@@ -124,7 +129,7 @@ struct BaseButton<Label: View>: View {
                 .frame(height: configuration.size.height)
                 .padding(configuration.size.padding)
                 .background(backgroundView)
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 .overlay(borderOverlay)
                 .scaleEffect(isPressed || configuration.isLoading ? 0.98 : 1.0)
                 .opacity(isEnabled ? 1.0 : 0.6)
@@ -166,7 +171,7 @@ struct BaseButton<Label: View>: View {
     @ViewBuilder
     private var borderOverlay: some View {
         if let borderColor = configuration.style.borderColor {
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .stroke(borderColor, lineWidth: 1.5)
         }
     }

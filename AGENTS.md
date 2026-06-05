@@ -37,6 +37,17 @@ LogYourBody/
   - **Data**: Core Data for local storage, Supabase for cloud sync, HealthKit for weight and step data.
   - **Feature Flags**: Statsig for controlled rollouts and A/B testing.
 
+### Product Scope Guardrails
+
+- Treat the native paid iOS app as the only default product surface until usage proves otherwise.
+- Core product promise: answer "How am I doing?" from weight, body-composition, HealthKit, and progress-photo data with minimal user input.
+- Design should follow the Joby/Jovie-style system: dark-only, clean, concise, generous white space, pill-shaped auth controls, neutral surfaces, and Geist-like accent colors only where they communicate metric meaning or state.
+- Do not build a web app before the product has at least 1,000 activated iOS users, or 250 paying subscribers plus repeated web-access requests. Web work before then is limited to marketing, legal, support, and billing/account surfaces that unblock iOS.
+- Do not build an Apple Watch app unless users explicitly ask for it. Initial Watch scope is read-only basic stats and trend direction.
+- Do not build iPad-specific layouts unless there is clear user pull, a measurable kiosk experiment, or enough active iPad usage to justify it. Target future landscape layout: photo left, stats right, timeline along the bottom.
+- AI starts as short deterministic insight, not chat: classify cutting, maintenance, or gaining from trends and warn when a phase has likely gone too long. Jovie-style chat comes later only after the timeline is retained and users ask for recommendations.
+- Do not build a food logger or workout tracker. This app is a body-composition heads-up display for people who already have those systems.
+
 ---
 
 ## Branching Model
