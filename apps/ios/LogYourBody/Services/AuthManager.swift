@@ -202,7 +202,40 @@ class AuthManager: NSObject, ObservableObject {
     }
 
     private func showAuthError(_ message: String) {
+        logAuthDiagnostic("show_error")
         clerkInitError = message
+    }
+
+    private func boolString(_ value: Bool) -> String {
+        value ? "true" : "false"
+    }
+
+    private func logAuthDiagnostic(_ stage: String, details: [String: String] = [:]) {
+        let summary = details
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: " ")
+        let suffix = summary.isEmpty ? "" : " \(summary)"
+
+        AppLogger.auth.info("LYB_AUTH \(stage)\(suffix)")
+    }
+
+    private func logSessionDiagnostic(_ stage: String, expectedSessionId: String? = nil) {
+        let session = clerk.session
+        let identifier = session?.publicUserData?.identifier ?? ""
+        let matchesExpectedSession = expectedSessionId.map { session?.id == $0 } ?? false
+
+        logAuthDiagnostic(
+            stage,
+            details: [
+                "hasSession": boolString(session != nil),
+                "hasUser": boolString(clerk.user != nil),
+                "hasPublicUserData": boolString(session?.publicUserData != nil),
+                "identifierLooksEmail": boolString(identifier.contains("@")),
+                "isAuthenticated": boolString(isAuthenticated),
+                "sessionMatchesExpected": boolString(matchesExpectedSession)
+            ]
+        )
     }
 
     func updateClerkUserName(_ name: String) async throws {
@@ -729,6 +762,9 @@ class AuthManager: NSObject, ObservableObject {
     // MARK: - Apple Sign In
     @MainActor
     func signInWithAppleOAuth() async {
+        logAuthDiagnostic("apple_start", details: ["clerkLoaded": boolString(isClerkLoaded)])
+        clerkInitError = nil
+
         guard isClerkLoaded else {
             showAuthError("Please wait for app to initialize and try again")
             return
@@ -738,9 +774,23 @@ class AuthManager: NSObject, ObservableObject {
             let credential = try await SignInWithAppleHelper.getAppleIdCredential(
                 requestedScopes: [.email, .fullName]
             )
+            logAuthDiagnostic(
+                "apple_credential",
+                details: [
+                    "emailPresent": boolString(credential.email != nil),
+                    "fullNamePresent": boolString(credential.fullName != nil),
+                    "identityTokenPresent": boolString(credential.identityToken != nil)
+                ]
+            )
             try await authenticateWithAppleCredential(credential)
         } catch {
             let errorString = String(describing: error)
+            logAuthDiagnostic(
+                "apple_error",
+                details: [
+                    "type": String(describing: type(of: error))
+                ]
+            )
 
             if errorString.contains("oauth_provider_not_enabled") {
                 showAuthError("Apple Sign In is not configured. Please contact support.")
@@ -772,6 +822,7 @@ class AuthManager: NSObject, ObservableObject {
             throw AuthError.invalidCredentials
         }
 
+        logAuthDiagnostic("clerk_id_token_start")
         let result = try await SignIn.authenticateWithIdToken(provider: .apple, idToken: idToken)
         try await activateCompletedTransfer(result)
     }
@@ -783,40 +834,107 @@ class AuthManager: NSObject, ObservableObject {
         switch result {
         case .signIn(let signIn):
             guard signIn.status == .complete else {
+                logAuthDiagnostic(
+                    "clerk_transfer_incomplete",
+                    details: [
+                        "flow": "sign_in",
+                        "status": String(describing: signIn.status)
+                    ]
+                )
                 throw AuthError.invalidCredentials
             }
             sessionId = signIn.createdSessionId
+            logAuthDiagnostic(
+                "clerk_transfer_complete",
+                details: [
+                    "flow": "sign_in",
+                    "hasSessionId": boolString(sessionId != nil),
+                    "status": String(describing: signIn.status)
+                ]
+            )
 
         case .signUp(let signUp):
             guard signUp.status == .complete else {
+                logAuthDiagnostic(
+                    "clerk_transfer_incomplete",
+                    details: [
+                        "flow": "sign_up",
+                        "status": String(describing: signUp.status)
+                    ]
+                )
                 throw AuthError.invalidCredentials
             }
             sessionId = signUp.createdSessionId
+            logAuthDiagnostic(
+                "clerk_transfer_complete",
+                details: [
+                    "flow": "sign_up",
+                    "hasSessionId": boolString(sessionId != nil),
+                    "status": String(describing: signUp.status)
+                ]
+            )
         }
 
         guard let sessionId else {
             throw AuthError.invalidCredentials
         }
 
+        logAuthDiagnostic("clerk_set_active_start")
         try await clerk.setActive(sessionId: sessionId)
+        logSessionDiagnostic("clerk_set_active_done", expectedSessionId: sessionId)
         await reconcileActiveSession(sessionId: sessionId)
+        logSessionDiagnostic("clerk_reconcile_done", expectedSessionId: sessionId)
         updateSessionState(force: true)
+        logSessionDiagnostic("local_auth_state_updated", expectedSessionId: sessionId)
+
+        guard isAuthenticated else {
+            throw AuthError.syncError(
+                "Authentication session was created, but the app could not load the user profile."
+            )
+        }
+
+        clerkInitError = nil
         await bootstrapAuthenticatedProfileIfNeeded(sessionId: clerk.session?.id)
     }
 
     @MainActor
     private func reconcileActiveSession(sessionId: String) async {
-        for _ in 0..<8 {
-            if clerk.session?.id == sessionId, clerk.user != nil {
+        for attempt in 0..<20 {
+            if clerk.session?.id == sessionId,
+               clerk.user != nil || clerk.session?.publicUserData != nil {
                 return
             }
 
-            try? await Task.sleep(nanoseconds: 150_000_000)
+            if attempt % 4 == 3 {
+                do {
+                    _ = try await Client.get()
+                } catch {
+                    ErrorReporter.shared.captureNonFatal(
+                        error,
+                        context: ErrorContext(
+                            feature: "auth",
+                            operation: "refreshActiveClient",
+                            screen: nil,
+                            userId: nil
+                        )
+                    )
+                }
+            }
+
+            try? await Task.sleep(nanoseconds: 250_000_000)
         }
 
         do {
+            _ = try await Client.get()
+            try? await Task.sleep(nanoseconds: 250_000_000)
+
+            if clerk.session?.id == sessionId,
+               clerk.user != nil || clerk.session?.publicUserData != nil {
+                return
+            }
+
             try await clerk.load()
-            try? await Task.sleep(nanoseconds: 150_000_000)
+            try? await Task.sleep(nanoseconds: 250_000_000)
         } catch {
             ErrorReporter.shared.captureNonFatal(
                 error,

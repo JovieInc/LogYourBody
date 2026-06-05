@@ -61,7 +61,7 @@ struct SignUpView: View {
                 navigationBar
 
                 // Show Clerk initialization status banner
-                if !authManager.isClerkLoaded {
+                if shouldShowClerkStatusBanner {
                     clerkStatusBanner
                         .padding(.horizontal, 24)
                         .padding(.top, 12)
@@ -72,7 +72,7 @@ struct SignUpView: View {
                     title: "Create Account",
                     subtitle: "Start tracking your fitness progress"
                 )
-                .padding(.top, authManager.isClerkLoaded ? 20 : 12)
+                .padding(.top, shouldShowClerkStatusBanner ? 12 : 20)
                 .padding(.bottom, 40)
 
                 // Organism: Sign Up Form
@@ -118,6 +118,10 @@ struct SignUpView: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var shouldShowClerkStatusBanner: Bool {
+        !authManager.isClerkLoaded || authManager.clerkInitError != nil
     }
 
     private var navigationBar: some View {
