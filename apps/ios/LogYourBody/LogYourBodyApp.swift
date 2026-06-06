@@ -83,6 +83,12 @@ struct LogYourBodyApp: App {
 
     @MainActor
     private func performStartupSequence() async {
+        #if DEBUG
+        if applyPaidMVPUITestFixtureIfNeeded() {
+            return
+        }
+        #endif
+
         scheduleDeferredMaintenance()
 
         ErrorTrackingService.shared.start()
@@ -149,6 +155,54 @@ struct LogYourBodyApp: App {
             await widgetDataManager.updateWidgetData()
         }
     }
+
+    #if DEBUG
+    @MainActor
+    @discardableResult
+    private func applyPaidMVPUITestFixtureIfNeeded() -> Bool {
+        guard ProcessInfo.processInfo.arguments.contains("-lybUITestPaidMVPFixture") else {
+            return false
+        }
+
+        let userId = "ui_test_paid_mvp_user_\(UUID().uuidString)"
+        let profile = UserProfile(
+            id: userId,
+            email: "paid-mvp-ui@example.com",
+            username: "paid_mvp_ui",
+            fullName: "Paid MVP UI",
+            dateOfBirth: Calendar.current.date(from: DateComponents(year: 1_990, month: 1, day: 1)),
+            height: 178,
+            heightUnit: "cm",
+            gender: "male",
+            activityLevel: "active",
+            goalWeight: nil,
+            goalWeightUnit: "kg",
+            onboardingCompleted: true
+        )
+        authManager.currentUser = User(
+            id: userId,
+            email: "paid-mvp-ui@example.com",
+            name: "Paid MVP UI",
+            profile: profile,
+            onboardingCompleted: true
+        )
+        authManager.isAuthenticated = true
+        authManager.isClerkLoaded = true
+        revenueCatManager.isSubscribed = true
+
+        UserDefaults.standard.set(
+            MeasurementSystem.imperial.rawValue,
+            forKey: Constants.preferredMeasurementSystemKey
+        )
+        OnboardingStateManager.shared.updateCompletionStatus(true)
+
+        realtimeSyncManager.isOnline = false
+        realtimeSyncManager.syncStatus = .offline
+        realtimeSyncManager.pendingSyncCount = 0
+
+        return true
+    }
+    #endif
 
     // MARK: - Deep Link Handling
 

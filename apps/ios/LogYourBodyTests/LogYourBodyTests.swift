@@ -72,6 +72,57 @@ final class AuthSurfacePolicyTests: XCTestCase {
     }
 }
 
+final class PaidWeightLoggerMVPPolicyTests: XCTestCase {
+    func testWeightSaveRequiresValidInput() {
+        XCTAssertFalse(
+            PaidWeightLoggerMVPPolicy.canSaveWeight(
+                weightText: "",
+                unit: "lbs",
+                isSaving: false
+            )
+        )
+        XCTAssertFalse(
+            PaidWeightLoggerMVPPolicy.canSaveWeight(
+                weightText: "12",
+                unit: "lbs",
+                isSaving: false
+            )
+        )
+        XCTAssertTrue(
+            PaidWeightLoggerMVPPolicy.canSaveWeight(
+                weightText: "182.4",
+                unit: "lbs",
+                isSaving: false
+            )
+        )
+    }
+
+    func testWeightValidationMessageExplainsInvalidRange() {
+        XCTAssertEqual(
+            PaidWeightLoggerMVPPolicy.validationMessage(weightText: "12", unit: "lbs"),
+            "Weight must be between 44-1100 lbs"
+        )
+        XCTAssertNil(
+            PaidWeightLoggerMVPPolicy.validationMessage(weightText: "182.4", unit: "lbs")
+        )
+    }
+
+    func testSyncStatusCopyAvoidsRawPendingState() {
+        XCTAssertEqual(
+            PaidWeightLoggerMVPPolicy.syncStatusText(status: .idle, pendingCount: 1),
+            "Sync queued"
+        )
+        XCTAssertEqual(
+            PaidWeightLoggerMVPPolicy.syncStatusText(status: .offline, pendingCount: 1),
+            "Saved offline"
+        )
+        XCTAssertEqual(
+            PaidWeightLoggerMVPPolicy.syncStatusText(status: .error("No auth session"), pendingCount: 1),
+            "Sync needs retry"
+        )
+    }
+}
+
 @MainActor
 final class OnboardingFlowViewModelTests: XCTestCase {
     func testAdvanceAfterHealthConfirmationSkipsToLoadingWhenMetricsExist() {
