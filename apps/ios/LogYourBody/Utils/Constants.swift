@@ -7,6 +7,7 @@ import SwiftUI
 extension Notification.Name {
     static let profileUpdated = Notification.Name("profileUpdated")
     static let bodyScoreUpdated = Notification.Name("bodyScoreUpdated")
+    static let featureGatesDidChange = Notification.Name("featureGatesDidChange")
 }
 
 struct Constants {
@@ -17,6 +18,7 @@ struct Constants {
 
     // MARK: - Feature Flags
     static let isBodySpecEnabled = true
+    static let appleSignInEnabledFlagKey = "ios_apple_sign_in_enabled"
     static let fullBodyCompositionDashboardFlagKey = "ios_full_body_composition_dashboard"
     static let photosTabFlagKey = "photos_tab"
 
@@ -118,5 +120,14 @@ struct Constants {
             static let femaleOptimalRange: ClosedRange<Double> = 14...17
             static let femaleIdealValue: Double = 15
         }
+    }
+}
+
+struct AuthSurfacePolicy {
+    static let defaultShowsAppleSignIn = false
+    static let primarySignInMethod = "email_otp"
+
+    static func shouldShowAppleSignIn(gateEnabled: Bool) -> Bool {
+        gateEnabled
     }
 }

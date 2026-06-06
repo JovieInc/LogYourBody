@@ -27,6 +27,7 @@ final class AnalyticsService {
     static let shared = AnalyticsService()
 
     private let client: AnalyticsClient
+    private var hasStarted = false
 
     private init(client: AnalyticsClient = StatsigAnalyticsClient()) {
         self.client = client
@@ -34,10 +35,13 @@ final class AnalyticsService {
 
     func start() {
         client.start()
+        hasStarted = true
+        notifyFeatureGatesDidChange()
     }
 
     func identify(userId: String?, properties: [String: String]? = nil) {
         client.identify(userId: userId, properties: properties)
+        notifyFeatureGatesDidChange()
     }
 
     func track(event: String, properties: [String: String]? = nil) {
@@ -46,10 +50,18 @@ final class AnalyticsService {
 
     func reset() {
         client.reset()
+        notifyFeatureGatesDidChange()
     }
 
     func isFeatureEnabled(flagKey: String) -> Bool {
-        client.isFeatureEnabled(flagKey: flagKey)
+        guard hasStarted else { return false }
+        return client.isFeatureEnabled(flagKey: flagKey)
+    }
+
+    private func notifyFeatureGatesDidChange() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .featureGatesDidChange, object: nil)
+        }
     }
 }
 

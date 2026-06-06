@@ -10,6 +10,7 @@ struct LoginForm: View {
     @Binding var email: String
     @Binding var isLoading: Bool
 
+    let showsAppleSignIn: Bool
     let onLogin: () -> Void
     let onAppleSignIn: () -> Void
 
@@ -26,15 +27,6 @@ struct LoginForm: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            // Apple Sign In is the primary path for the paid iOS app.
-            SocialLoginButton(
-                provider: .apple,
-                action: onAppleSignIn
-            )
-
-            DSAuthDivider()
-
-            // Email Field
             AuthFormField(
                 label: "Email",
                 text: $email,
@@ -64,6 +56,15 @@ struct LoginForm: View {
                 ),
                 action: onLogin
             )
+
+            if showsAppleSignIn {
+                DSAuthDivider()
+
+                SocialLoginButton(
+                    provider: .apple,
+                    action: onAppleSignIn
+                )
+            }
         }
     }
 }
@@ -82,6 +83,7 @@ struct LoginForm: View {
             LoginForm(
                 email: .constant(""),
                 isLoading: .constant(false),
+                showsAppleSignIn: false,
                 onLogin: {},
                 onAppleSignIn: {}
             )

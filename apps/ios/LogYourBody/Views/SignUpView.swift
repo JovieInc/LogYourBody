@@ -21,6 +21,7 @@ struct SignUpView: View {
     @State private var showPrivacySheet = false
     @State private var showHealthDisclaimerSheet = false
     @State private var isRetrying = false
+    @State private var showsAppleSignIn = AuthSurfacePolicy.defaultShowsAppleSignIn
 
     var body: some View {
         ZStack {
@@ -46,6 +47,10 @@ struct SignUpView: View {
         }
         .onAppear {
             AnalyticsService.shared.track(event: "signup_view")
+            refreshAppleSignInVisibility()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            refreshAppleSignInVisibility()
         }
     }
 
@@ -82,6 +87,7 @@ struct SignUpView: View {
                     agreedToTerms: $agreedToTerms,
                     agreedToPrivacy: $agreedToPrivacy,
                     agreedToHealthDisclaimer: $agreedToHealthDisclaimer,
+                    showsAppleSignIn: showsAppleSignIn,
                     onSignUp: signUp,
                     onAppleSignIn: {
                         Task {
@@ -122,6 +128,13 @@ struct SignUpView: View {
 
     private var shouldShowClerkStatusBanner: Bool {
         !authManager.isClerkLoaded || authManager.clerkInitError != nil
+    }
+
+    private func refreshAppleSignInVisibility() {
+        let gateEnabled = AnalyticsService.shared.isFeatureEnabled(
+            flagKey: Constants.appleSignInEnabledFlagKey
+        )
+        showsAppleSignIn = AuthSurfacePolicy.shouldShowAppleSignIn(gateEnabled: gateEnabled)
     }
 
     private var navigationBar: some View {
