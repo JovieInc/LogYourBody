@@ -31,6 +31,45 @@ struct MainTabView: View {
     }
 }
 
+enum PaidWeightLoggerMVPPolicy {
+    static func validationMessage(weightText: String, unit: String) -> String? {
+        let trimmed = weightText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        do {
+            _ = try ValidationService.shared.validateWeight(trimmed, unit: unit)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    static func canSaveWeight(weightText: String, unit: String, isSaving: Bool) -> Bool {
+        let trimmed = weightText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !isSaving else { return false }
+        return validationMessage(weightText: trimmed, unit: unit) == nil
+    }
+
+    static func syncStatusText(status: RealtimeSyncManager.SyncStatus, pendingCount: Int) -> String {
+        switch status {
+        case .syncing:
+            return "Syncing now"
+        case .success:
+            return "Synced"
+        case .error:
+            return "Sync needs retry"
+        case .offline:
+            return pendingCount > 0 ? "Saved offline" : "Offline"
+        case .idle:
+            return pendingCount > 0 ? "Sync queued" : "Ready"
+        }
+    }
+
+    static func savedConfirmationText(isOnline: Bool) -> String {
+        isOnline ? "Saved locally. Sync queued." : "Saved locally. Will sync when online."
+    }
+}
+
 private struct PaidWeightLoggerMVPView: View {
     @EnvironmentObject private var authManager: AuthManager
     @EnvironmentObject private var realtimeSyncManager: RealtimeSyncManager
@@ -53,7 +92,18 @@ private struct PaidWeightLoggerMVPView: View {
     }
 
     private var isSaveDisabled: Bool {
-        weightText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving
+        !PaidWeightLoggerMVPPolicy.canSaveWeight(
+            weightText: weightText,
+            unit: currentSystem.weightUnit,
+            isSaving: isSaving
+        )
+    }
+
+    private var weightValidationMessage: String? {
+        PaidWeightLoggerMVPPolicy.validationMessage(
+            weightText: weightText,
+            unit: currentSystem.weightUnit
+        )
     }
 
     var body: some View {
@@ -68,6 +118,7 @@ private struct PaidWeightLoggerMVPView: View {
             .padding(.top, 20)
             .padding(.bottom, 48)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(Color.appBackground.ignoresSafeArea())
         .navigationTitle("LogYourBody")
         .navigationBarTitleDisplayMode(.inline)
@@ -85,7 +136,28 @@ private struct PaidWeightLoggerMVPView: View {
                 }
                 .accessibilityLabel("Account")
             }
+
+            ToolbarItemGroup(placement: .keyboard) {
+                Button("Done") {
+                    isWeightFieldFocused = false
+                }
+                .accessibilityIdentifier("mvp_keyboard_done_button")
+
+                Spacer()
+
+                Button(isSaving ? "Saving" : "Save weight") {
+                    saveWeight()
+                }
+                .disabled(isSaveDisabled)
+                .accessibilityIdentifier("mvp_keyboard_save_weight_button")
+            }
         }
+        .safeAreaInset(edge: .bottom) {
+            if isWeightFieldFocused {
+                keyboardSaveBar
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isWeightFieldFocused)
         .task {
             await loadRecentMetrics()
         }
@@ -188,6 +260,44 @@ private struct PaidWeightLoggerMVPView: View {
         .accessibilityIdentifier("mvp_sync_status")
     }
 
+    private var keyboardSaveBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .background(Color.appBorder)
+
+            HStack(spacing: 12) {
+                Button("Done") {
+                    isWeightFieldFocused = false
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.appTextSecondary)
+                .accessibilityIdentifier("mvp_keyboard_bottom_done_button")
+
+                Button(action: saveWeight) {
+                    HStack(spacing: 8) {
+                        if isSaving {
+                            ProgressView()
+                                .tint(.black)
+                        }
+
+                        Text(isSaving ? "Saving" : "Save weight")
+                    }
+                    .font(.headline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .foregroundColor(.black)
+                    .background(isSaveDisabled ? Color.appBorder : Color.appPrimary)
+                    .cornerRadius(Constants.cornerRadiusLarge)
+                }
+                .disabled(isSaveDisabled)
+                .accessibilityIdentifier("mvp_keyboard_save_weight_bar_button")
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(Color.appCard)
+        }
+    }
+
     private var entryCard: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Add weight")
@@ -222,30 +332,21 @@ private struct PaidWeightLoggerMVPView: View {
             )
             .cornerRadius(Constants.cornerRadiusLarge)
 
+            if let weightValidationMessage {
+                Label(weightValidationMessage, systemImage: "exclamationmark.circle.fill")
+                    .font(.footnote.weight(.medium))
+                    .foregroundColor(.orange)
+                    .accessibilityIdentifier("mvp_weight_validation_message")
+            }
+
             if let savedMessage {
                 Label(savedMessage, systemImage: "checkmark.circle.fill")
                     .font(.footnote.weight(.medium))
                     .foregroundColor(.green)
+                    .accessibilityIdentifier("mvp_weight_saved_message")
             }
 
-            Button(action: saveWeight) {
-                HStack {
-                    if isSaving {
-                        ProgressView()
-                            .tint(.black)
-                    }
-
-                    Text(isSaving ? "Saving" : "Save weight")
-                        .font(.headline.weight(.semibold))
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .foregroundColor(.black)
-                .background(isSaveDisabled ? Color.appBorder : Color.appPrimary)
-                .cornerRadius(Constants.cornerRadiusLarge)
-            }
-            .disabled(isSaveDisabled)
-            .accessibilityIdentifier("mvp_save_weight_button")
+            saveWeightButton
         }
         .padding(20)
         .background(Color.appCard)
@@ -254,6 +355,28 @@ private struct PaidWeightLoggerMVPView: View {
                 .stroke(Color.appBorder, lineWidth: 1)
         )
         .cornerRadius(Constants.cornerRadiusLarge)
+    }
+
+    private var saveWeightButton: some View {
+        Button(action: saveWeight) {
+            HStack {
+                if isSaving {
+                    ProgressView()
+                        .tint(.black)
+                }
+
+                Text(isSaving ? "Saving" : "Save weight")
+                    .font(.headline.weight(.semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .foregroundColor(.black)
+            .background(isSaveDisabled ? Color.appBorder : Color.appPrimary)
+            .cornerRadius(Constants.cornerRadiusLarge)
+        }
+        .disabled(isSaveDisabled)
+        .accessibilityIdentifier("mvp_save_weight_button")
+        .accessibilityHint(saveButtonAccessibilityHint)
     }
 
     private var recentHistorySection: some View {
@@ -344,18 +467,10 @@ private struct PaidWeightLoggerMVPView: View {
     }
 
     private var syncStatusText: String {
-        switch realtimeSyncManager.syncStatus {
-        case .syncing:
-            return "Syncing"
-        case .success:
-            return "Synced"
-        case .error:
-            return "Sync issue"
-        case .offline:
-            return "Offline"
-        case .idle:
-            return realtimeSyncManager.pendingSyncCount > 0 ? "Pending" : "Ready"
-        }
+        PaidWeightLoggerMVPPolicy.syncStatusText(
+            status: realtimeSyncManager.syncStatus,
+            pendingCount: realtimeSyncManager.pendingSyncCount
+        )
     }
 
     private var syncStatusColor: Color {
@@ -382,6 +497,22 @@ private struct PaidWeightLoggerMVPView: View {
                 }
             }
         )
+    }
+
+    private var saveButtonAccessibilityHint: String {
+        if isSaving {
+            return "Saving your weight."
+        }
+
+        if weightText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Enter a weight before saving."
+        }
+
+        if let weightValidationMessage {
+            return weightValidationMessage
+        }
+
+        return "Saves this weight locally and queues account sync."
     }
 
     private func displayWeight(_ weightKg: Double) -> (value: String, unit: String) {
@@ -434,11 +565,13 @@ private struct PaidWeightLoggerMVPView: View {
             )
 
             try await CoreDataManager.shared.saveBodyMetricsAndWait(metrics, userId: userId, markAsSynced: false)
+            realtimeSyncManager.updatePendingSyncCount()
             realtimeSyncManager.syncIfNeeded()
             AnalyticsService.shared.track(event: "mvp_weight_logged")
 
+            isWeightFieldFocused = false
             weightText = ""
-            savedMessage = "Saved"
+            savedMessage = PaidWeightLoggerMVPPolicy.savedConfirmationText(isOnline: realtimeSyncManager.isOnline)
             exportFileURL = nil
 
             try? await Task.sleep(nanoseconds: 150_000_000)

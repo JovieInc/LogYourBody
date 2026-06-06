@@ -28,6 +28,32 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Continue with Apple"].exists)
     }
 
+    func testPaidMVPWeightEntrySavesWithKeyboardOpen() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestPaidMVPFixture"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
+
+        let weightField = app.textFields["mvp_weight_text_field"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 5))
+        weightField.tap()
+        weightField.typeText("182.4")
+
+        let keyboardSaveButton = app.buttons["mvp_keyboard_save_weight_bar_button"]
+        XCTAssertTrue(keyboardSaveButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(keyboardSaveButton.isEnabled)
+        keyboardSaveButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Saved locally. Sync queued."].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Pending"].exists)
+
+        let savedWeight = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "182.4")
+        ).firstMatch
+        XCTAssertTrue(savedWeight.waitForExistence(timeout: 5))
+    }
+
     func testLaunchPerformance() throws {
         if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
             // This measures how long it takes to launch your application.
