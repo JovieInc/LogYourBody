@@ -15,6 +15,7 @@ struct LoginView: View {
     @State private var errorMessage = ""
     @State private var isRetrying = false
     @State private var navigateToSignUp = false
+    @State private var showsAppleSignIn = AuthSurfacePolicy.defaultShowsAppleSignIn
 
     var body: some View {
         ZStack {
@@ -25,6 +26,10 @@ struct LoginView: View {
         .standardErrorAlert(isPresented: $showError, message: errorMessage)
         .onAppear {
             AnalyticsService.shared.track(event: "login_view")
+            refreshAppleSignInVisibility()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            refreshAppleSignInVisibility()
         }
     }
 
@@ -62,6 +67,7 @@ struct LoginView: View {
                 LoginForm(
                     email: $email,
                     isLoading: $isLoading,
+                    showsAppleSignIn: showsAppleSignIn,
                     onLogin: login,
                     onAppleSignIn: {
                         Task {
@@ -100,6 +106,13 @@ struct LoginView: View {
 
     private var shouldShowClerkStatusBanner: Bool {
         !authManager.isClerkLoaded || authManager.clerkInitError != nil
+    }
+
+    private func refreshAppleSignInVisibility() {
+        let gateEnabled = AnalyticsService.shared.isFeatureEnabled(
+            flagKey: Constants.appleSignInEnabledFlagKey
+        )
+        showsAppleSignIn = AuthSurfacePolicy.shouldShowAppleSignIn(gateEnabled: gateEnabled)
     }
 
     private var sessionStatusBanner: some View {

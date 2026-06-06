@@ -13,6 +13,7 @@ struct SignUpForm: View {
     @Binding var agreedToPrivacy: Bool
     @Binding var agreedToHealthDisclaimer: Bool
 
+    let showsAppleSignIn: Bool
     let onSignUp: () -> Void
     let onAppleSignIn: () -> Void
     let onTapTerms: (() -> Void)?
@@ -85,14 +86,14 @@ struct SignUpForm: View {
                 action: onSignUp
             )
 
-            // Divider
-            DSAuthDivider()
+            if showsAppleSignIn {
+                DSAuthDivider()
 
-            // Apple Sign In
-            SocialLoginButton(
-                provider: .apple,
-                action: onAppleSignIn
-            )
+                SocialLoginButton(
+                    provider: .apple,
+                    action: onAppleSignIn
+                )
+            }
         }
     }
 }
@@ -113,6 +114,7 @@ struct SignUpForm: View {
                 agreedToTerms: .constant(false),
                 agreedToPrivacy: .constant(false),
                 agreedToHealthDisclaimer: .constant(false),
+                showsAppleSignIn: false,
                 onSignUp: {},
                 onAppleSignIn: {},
                 onTapTerms: nil,

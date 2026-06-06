@@ -18,12 +18,14 @@ final class LogYourBodyUITests: XCTestCase {
         // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testSignedOutAppleSignInHiddenByDefault() throws {
         let app = XCUIApplication()
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        XCTAssertTrue(app.staticTexts["LogYourBody"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.textFields["Email"].exists)
+        XCTAssertTrue(app.buttons["Email me a code"].exists)
+        XCTAssertFalse(app.buttons["Continue with Apple"].exists)
     }
 
     func testLaunchPerformance() throws {

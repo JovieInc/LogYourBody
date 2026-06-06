@@ -56,6 +56,22 @@ final class LaunchSurfacePolicyTests: XCTestCase {
     }
 }
 
+final class AuthSurfacePolicyTests: XCTestCase {
+    func testAppleSignInDefaultsHiddenBeforeFeatureGateLoads() {
+        XCTAssertFalse(AuthSurfacePolicy.defaultShowsAppleSignIn)
+        XCTAssertFalse(AuthSurfacePolicy.shouldShowAppleSignIn(gateEnabled: false))
+    }
+
+    func testAppleSignInCanBeEnabledByFeatureGate() {
+        XCTAssertTrue(AuthSurfacePolicy.shouldShowAppleSignIn(gateEnabled: true))
+    }
+
+    func testEmailOTPRemainsPrimaryLaunchMethod() {
+        XCTAssertEqual(AuthSurfacePolicy.primarySignInMethod, "email_otp")
+        XCTAssertEqual(Constants.appleSignInEnabledFlagKey, "ios_apple_sign_in_enabled")
+    }
+}
+
 @MainActor
 final class OnboardingFlowViewModelTests: XCTestCase {
     func testAdvanceAfterHealthConfirmationSkipsToLoadingWhenMetricsExist() {
