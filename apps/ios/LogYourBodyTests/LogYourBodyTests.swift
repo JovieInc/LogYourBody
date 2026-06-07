@@ -820,6 +820,12 @@ final class SyncIntegrationTests: XCTestCase {
 
         let metrics = await coreData.fetchAllBodyMetrics(for: userId)
         XCTAssertEqual(metrics.count, 2)
+        XCTAssertEqual(metrics.filter { $0.dataSource == "manual" }.count, 1)
+        XCTAssertEqual(metrics.filter { $0.dataSource == "healthkit" }.count, 1)
+
+        let manualMetric = try XCTUnwrap(metrics.first { $0.dataSource == "manual" })
+        XCTAssertEqual(manualMetric.weight, 80.0)
+        XCTAssertEqual(manualMetric.notes, "existing-healthkit")
     }
 
     func testProcessBatchHealthKitData_DeduplicatesMultipleWeightsInSameHour() async throws {
@@ -905,6 +911,77 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertEqual(bodyFat, 19.5, accuracy: 0.001)
         XCTAssertEqual(metric.bodyFatMethod, "HealthKit")
         XCTAssertEqual(metric.dataSource, "healthkit")
+    }
+
+    func testProcessBatchHealthKitData_AttachesSourceMetadataToImportedMetrics() async throws {
+        let coreData = CoreDataManager.shared
+        let healthKitManager = HealthKitManager.shared
+
+        let userId = "healthkit_test_user_metadata_\(UUID().uuidString)"
+        let user = LocalUser(
+            id: userId,
+            email: "hk_metadata@example.com",
+            name: "HK Metadata",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: false
+        )
+        AuthManager.shared.currentUser = user
+
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: Date())
+        let weightDate = calendar.date(byAdding: DateComponents(hour: 7, minute: 10), to: day) ?? day
+        let bodyFatDate = calendar.date(byAdding: DateComponents(hour: 7, minute: 12), to: day) ?? day
+
+        let result = await healthKitManager.processBatchHealthKitData(
+            weightHistory: [
+                HealthKitWeightImportSample(
+                    weight: 76.5,
+                    date: weightDate,
+                    sourceMetadata: BodyMetricSourceMetadata(
+                        vendor: "apple_health",
+                        sourceName: "Apple Health",
+                        sourceBundleId: "com.apple.Health",
+                        deviceId: "scale-local-id",
+                        deviceManufacturer: "Withings",
+                        deviceModel: "Body Scan",
+                        sampleId: "weight-sample-123",
+                        quantityType: "HKQuantityTypeIdentifierBodyMass"
+                    )
+                )
+            ],
+            bodyFatHistory: [
+                HealthKitBodyFatImportSample(
+                    percentage: 18.4,
+                    date: bodyFatDate,
+                    sourceMetadata: BodyMetricSourceMetadata(
+                        vendor: "apple_health",
+                        sourceName: "Apple Health",
+                        sourceBundleId: "com.apple.Health",
+                        sampleId: "body-fat-sample-456",
+                        quantityType: "HKQuantityTypeIdentifierBodyFatPercentage"
+                    )
+                )
+            ]
+        )
+
+        XCTAssertEqual(result.imported, 1)
+        XCTAssertEqual(result.skipped, 0)
+
+        let metrics = await coreData.fetchAllBodyMetrics(for: userId)
+        let metric = try XCTUnwrap(metrics.first)
+        let sourceMetadata = try XCTUnwrap(metric.sourceMetadata)
+        XCTAssertEqual(metric.dataSource, "healthkit")
+        XCTAssertEqual(metric.bodyFatPercentage, 18.4)
+        XCTAssertEqual(sourceMetadata.vendor, "apple_health")
+        XCTAssertEqual(sourceMetadata.sourceName, "Apple Health")
+        XCTAssertEqual(sourceMetadata.sourceBundleId, "com.apple.Health")
+        XCTAssertEqual(sourceMetadata.deviceId, "scale-local-id")
+        XCTAssertEqual(sourceMetadata.deviceManufacturer, "Withings")
+        XCTAssertEqual(sourceMetadata.deviceModel, "Body Scan")
+        XCTAssertEqual(sourceMetadata.sampleId, "weight-sample-123")
+        XCTAssertEqual(sourceMetadata.bodyFatSampleId, "body-fat-sample-456")
+        XCTAssertEqual(sourceMetadata.quantityType, "HKQuantityTypeIdentifierBodyMass")
     }
 
     func testSyncLocalChanges_UsesSupabaseAndMarksBodyMetricSynced() async throws {
@@ -1300,6 +1377,58 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
         )
 
         XCTAssertNotNil(viewModel)
+    }
+
+    func testRefreshSkipsHealthKitSyncWhenDeniedAndKeepsLocalMetrics() async throws {
+        let userId = "dashboard_healthkit_denied_\(UUID().uuidString)"
+        let user = LocalUser(
+            id: userId,
+            email: "hk_denied@example.com",
+            name: "HealthKit Denied",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+        let authManager = AuthManager()
+        authManager.currentUser = user
+        authManager.isAuthenticated = true
+
+        let localMetric = BodyMetrics(
+            id: UUID().uuidString,
+            userId: userId,
+            date: Date(),
+            weight: 82.1,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "manual still works",
+            photoUrl: nil,
+            dataSource: BodyMetricSource.manual.rawValue,
+            sourceMetadata: nil,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        CoreDataManager.shared.saveBodyMetrics(localMetric, userId: userId, markAsSynced: false)
+
+        let healthKitManager = HealthKitManager.shared
+        healthKitManager.isAuthorized = false
+        let mockCoordinator = MockHealthSyncCoordinator()
+        let viewModel = DashboardViewModel(
+            healthKitManager: healthKitManager,
+            healthSyncCoordinator: mockCoordinator
+        )
+
+        await viewModel.refreshData(
+            authManager: authManager,
+            realtimeSyncManager: RealtimeSyncManager.shared
+        )
+
+        XCTAssertFalse(mockCoordinator.didCallSyncWeightFromHealthKit)
+        XCTAssertTrue(viewModel.hasLoadedInitialData)
+        XCTAssertEqual(viewModel.bodyMetrics.first?.id, localMetric.id)
+        XCTAssertEqual(viewModel.bodyMetrics.first?.dataSource, "manual")
     }
 }
 

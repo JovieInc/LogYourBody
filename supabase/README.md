@@ -66,5 +66,5 @@ The `photos` bucket is configured with:
 ## Body Metric Source Provenance
 
 - `body_metrics.data_source` stores canonical `BodyMetricSource` values: `manual`, `healthkit`, `smart_scale`, `bodyspec_dexa`, `caliper`, and `photo`.
-- `body_metrics.source_metadata` stores compact pointer-style provenance such as HealthKit sample IDs, source bundle/device identifiers, BodySpec result IDs, scanner/location IDs, or legacy source labels.
+- `body_metrics.source_metadata` stores compact pointer-style provenance such as HealthKit sample IDs, quantity types, source bundle/device identifiers, BodySpec result IDs, scanner/location IDs, or legacy source labels.
 - Do not store raw vendor payloads, access tokens, refresh tokens, or unnecessary personal data in source metadata.

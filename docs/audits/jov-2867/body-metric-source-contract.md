@@ -24,7 +24,7 @@ Compact provenance is stored as JSON in `body_metrics.source_metadata` and as `C
 - vendor/source identifiers
 - source bundle identifier
 - device manufacturer/model/id
-- HealthKit sample ID when available
+- HealthKit sample ID, quantity type, and paired body-fat sample ID when available
 - external importer/result IDs
 - scanner/location identifiers
 - imported timestamp
