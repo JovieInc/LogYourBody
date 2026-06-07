@@ -16,6 +16,7 @@
         <attribute name="photoProcessedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="photoUrl" optional="YES" attributeType="String"/>
         <attribute name="dataSource" optional="YES" attributeType="String" defaultValueString="Manual"/>
+        <attribute name="sourceMetadataJSON" optional="YES" attributeType="String"/>
         <attribute name="syncStatus" attributeType="String" defaultValueString="pending"/>
         <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="userId" attributeType="String"/>

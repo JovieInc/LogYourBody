@@ -94,7 +94,7 @@ actor BodySpecDexaImporter {
         )
 
         let alreadyHasBodySpecEntry = existing.contains { cached in
-            if let source = cached.dataSource, source.lowercased() == "partner:bodyspec" {
+            if BodyMetricSource.normalizedRawValue(cached.dataSource) == BodyMetricSource.bodySpecDexa.rawValue {
                 return true
             }
 
@@ -116,6 +116,7 @@ actor BodySpecDexaImporter {
             let date = scanInfo.acquireTime
 
             let now = Date()
+            let importedAt = ISO8601DateFormatter().string(from: now)
 
             let bodyMetrics = BodyMetrics(
                 id: metricsId,
@@ -129,7 +130,15 @@ actor BodySpecDexaImporter {
                 boneMass: composition.total.boneMassKg,
                 notes: "Imported from BodySpec DEXA",
                 photoUrl: nil,
-                dataSource: "partner:bodyspec",
+                dataSource: BodyMetricSource.bodySpecDexa.rawValue,
+                sourceMetadata: BodyMetricSourceMetadata(
+                    vendor: "bodyspec",
+                    externalResultId: summary.resultId,
+                    scannerModel: scanInfo.scannerModel,
+                    locationId: summary.location.locationId,
+                    locationName: summary.location.name,
+                    importedAt: importedAt
+                ),
                 createdAt: now,
                 updatedAt: now
             )

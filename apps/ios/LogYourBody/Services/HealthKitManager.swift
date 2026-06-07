@@ -1061,7 +1061,7 @@ class HealthKitManager: ObservableObject {
                     boneMass: nil,
                     notes: "Imported from HealthKit",
                     photoUrl: nil,
-                    dataSource: "HealthKit",
+                    dataSource: BodyMetricSource.healthKit.rawValue,
                     createdAt: Date(),
                     updatedAt: Date()
                 )
@@ -1110,6 +1110,7 @@ class HealthKitManager: ObservableObject {
             notes: metrics.notes,
             photoUrl: metrics.photoUrl,
             dataSource: metrics.dataSource,
+            sourceMetadata: metrics.sourceMetadata,
             createdAt: metrics.createdAt,
             updatedAt: metrics.updatedAt
         )

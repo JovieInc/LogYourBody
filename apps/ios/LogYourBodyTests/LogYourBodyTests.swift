@@ -123,6 +123,36 @@ final class PaidWeightLoggerMVPPolicyTests: XCTestCase {
     }
 }
 
+final class BodyMetricSourceContractTests: XCTestCase {
+    func testSourceNormalizationCoversLaunchImportSources() {
+        XCTAssertEqual(BodyMetricSource.normalizedRawValue(nil), "manual")
+        XCTAssertEqual(BodyMetricSource.normalizedRawValue("Manual"), "manual")
+        XCTAssertEqual(BodyMetricSource.normalizedRawValue("HealthKit"), "healthkit")
+        XCTAssertEqual(BodyMetricSource.normalizedRawValue("smart scale"), "smart_scale")
+        XCTAssertEqual(BodyMetricSource.normalizedRawValue("partner:bodyspec"), "bodyspec_dexa")
+        XCTAssertEqual(BodyMetricSource.normalizedRawValue("skinfold caliper"), "caliper")
+        XCTAssertEqual(BodyMetricSource.normalizedRawValue("Photo Import"), "photo")
+    }
+
+    func testSourceMetadataTrimsEmptyValuesAndSerializesPointersOnly() throws {
+        let metadata = BodyMetricSourceMetadata(
+            vendor: " BodySpec ",
+            sourceName: "",
+            deviceModel: "Scanner X",
+            externalResultId: " result-123 "
+        )
+
+        let jsonString = try XCTUnwrap(metadata.jsonString)
+        let decoded = try XCTUnwrap(BodyMetricSourceMetadata(jsonString: jsonString))
+
+        XCTAssertEqual(decoded.vendor, "BodySpec")
+        XCTAssertNil(decoded.sourceName)
+        XCTAssertEqual(decoded.deviceModel, "Scanner X")
+        XCTAssertEqual(decoded.externalResultId, "result-123")
+        XCTAssertEqual(decoded.jsonObject["vendor"], "BodySpec")
+    }
+}
+
 @MainActor
 final class OnboardingFlowViewModelTests: XCTestCase {
     func testAdvanceAfterHealthConfirmationSkipsToLoadingWhenMetricsExist() {
@@ -567,6 +597,11 @@ final class SyncIntegrationTests: XCTestCase {
             "bone_mass": 4.2,
             "photo_url": "https://example.com/photo.jpg",
             "notes": "supabase-mapped",
+            "data_source": "HealthKit",
+            "source_metadata": [
+                "sample_id": "hk-sample-123",
+                "device_model": "Withings Body Scan"
+            ],
             "created_at": formatter.string(from: createdAt),
             "updated_at": formatter.string(from: updatedAt)
         ]
@@ -596,6 +631,9 @@ final class SyncIntegrationTests: XCTestCase {
 
         XCTAssertEqual(metric.photoUrl, "https://example.com/photo.jpg")
         XCTAssertEqual(metric.notes, "supabase-mapped")
+        XCTAssertEqual(metric.dataSource, "healthkit")
+        XCTAssertEqual(metric.sourceMetadata?.sampleId, "hk-sample-123")
+        XCTAssertEqual(metric.sourceMetadata?.deviceModel, "Withings Body Scan")
 
         XCTAssertEqual(metric.createdAt.timeIntervalSince(createdAt), 0, accuracy: 0.001)
         XCTAssertEqual(metric.updatedAt.timeIntervalSince(updatedAt), 0, accuracy: 0.001)
@@ -866,6 +904,7 @@ final class SyncIntegrationTests: XCTestCase {
         let bodyFat = try XCTUnwrap(metric.bodyFatPercentage)
         XCTAssertEqual(bodyFat, 19.5, accuracy: 0.001)
         XCTAssertEqual(metric.bodyFatMethod, "HealthKit")
+        XCTAssertEqual(metric.dataSource, "healthkit")
     }
 
     func testSyncLocalChanges_UsesSupabaseAndMarksBodyMetricSynced() async throws {
@@ -890,6 +929,9 @@ final class SyncIntegrationTests: XCTestCase {
             notes: "unsynced-local",
             photoUrl: "https://example.com/photo.jpg",
             dataSource: "Manual",
+            sourceMetadata: BodyMetricSourceMetadata(
+                legacyDataSource: "Manual"
+            ),
             createdAt: createdAt,
             updatedAt: updatedAt
         )
@@ -922,6 +964,10 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertEqual(payload["weight_unit"] as? String, "kg")
         XCTAssertEqual(payload["photo_url"] as? String, "https://example.com/photo.jpg")
         XCTAssertEqual(payload["notes"] as? String, "unsynced-local")
+        XCTAssertEqual(payload["data_source"] as? String, "manual")
+
+        let sourceMetadata = try XCTUnwrap(payload["source_metadata"] as? [String: String])
+        XCTAssertEqual(sourceMetadata["legacy_data_source"], "Manual")
 
         if let dateString = payload["date"] as? String {
             let formatter = ISO8601DateFormatter()

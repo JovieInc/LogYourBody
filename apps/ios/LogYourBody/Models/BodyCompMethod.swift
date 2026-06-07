@@ -11,7 +11,7 @@ enum BodyCompMethod: String, Codable, CaseIterable {
         let normalized = bodyFatMethod?.lowercased() ?? ""
         let source = dataSource?.lowercased() ?? ""
 
-        if normalized.contains("dexa") {
+        if normalized.contains("dexa") || source.contains("bodyspec_dexa") {
             return .dexa
         }
 
@@ -23,7 +23,7 @@ enum BodyCompMethod: String, Codable, CaseIterable {
             return .visualEstimate
         }
 
-        if source.contains("healthkit") {
+        if source.contains("healthkit") || source.contains("smart_scale") {
             return .biaScale
         }
 
@@ -39,6 +39,8 @@ enum BodyCompSourceType: String, Codable, CaseIterable {
     case healthKit = "healthkit"
     case manual = "manual"
     case partner = "partner"
+    case smartScale = "smart_scale"
+    case photo = "photo"
     case unknown = "unknown"
 
     static func infer(from dataSource: String?) -> BodyCompSourceType {
@@ -48,7 +50,15 @@ enum BodyCompSourceType: String, Codable, CaseIterable {
             return .healthKit
         }
 
-        if source.contains("partner") {
+        if source.contains("smart_scale") {
+            return .smartScale
+        }
+
+        if source.contains("photo") {
+            return .photo
+        }
+
+        if source.contains("partner") || source.contains("bodyspec_dexa") {
             return .partner
         }
 
