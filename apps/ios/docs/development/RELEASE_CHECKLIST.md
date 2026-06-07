@@ -26,6 +26,8 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 - Optional GitHub `Production` secrets `STATSIG_CLIENT_SDK_KEY` and `SENTRY_DSN` are real values if present.
 - `ios_apple_sign_in_enabled` stays off for production users until Apple Sign-In
   has physical-device proof.
+- Current JOV-2865 evidence keeps Apple Sign-In safely hidden; production
+  enablement still requires physical Apple prompt and Clerk session proof.
 - `ios_full_body_composition_dashboard` stays off for the paid MVP App Store
   launch unless the full dashboard has separate approval.
 - `ios_photo_timeline_hud` stays off until the photo-first HUD has separate
