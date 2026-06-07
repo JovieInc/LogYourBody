@@ -112,7 +112,13 @@ class ImageCacheService: ObservableObject {
         }
 
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let data: Data
+            if url.isFileURL {
+                data = try Data(contentsOf: url)
+            } else {
+                let (remoteData, _) = try await URLSession.shared.data(from: url)
+                data = remoteData
+            }
 
             guard let originalImage = UIImage(data: data) else {
                 return nil
