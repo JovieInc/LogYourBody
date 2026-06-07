@@ -58,6 +58,8 @@ export interface BodyMetricSourceMetadata {
   device_manufacturer?: string;
   device_model?: string;
   sample_id?: string;
+  quantity_type?: string;
+  body_fat_sample_id?: string;
   external_id?: string;
   external_result_id?: string;
   scanner_model?: string;

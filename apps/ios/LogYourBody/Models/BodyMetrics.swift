@@ -91,6 +91,8 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
     let deviceManufacturer: String?
     let deviceModel: String?
     let sampleId: String?
+    let quantityType: String?
+    let bodyFatSampleId: String?
     let externalId: String?
     let externalResultId: String?
     let scannerModel: String?
@@ -107,6 +109,8 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         deviceManufacturer: String? = nil,
         deviceModel: String? = nil,
         sampleId: String? = nil,
+        quantityType: String? = nil,
+        bodyFatSampleId: String? = nil,
         externalId: String? = nil,
         externalResultId: String? = nil,
         scannerModel: String? = nil,
@@ -122,6 +126,8 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         self.deviceManufacturer = Self.clean(deviceManufacturer)
         self.deviceModel = Self.clean(deviceModel)
         self.sampleId = Self.clean(sampleId)
+        self.quantityType = Self.clean(quantityType)
+        self.bodyFatSampleId = Self.clean(bodyFatSampleId)
         self.externalId = Self.clean(externalId)
         self.externalResultId = Self.clean(externalResultId)
         self.scannerModel = Self.clean(scannerModel)
@@ -139,6 +145,8 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         case deviceManufacturer = "device_manufacturer"
         case deviceModel = "device_model"
         case sampleId = "sample_id"
+        case quantityType = "quantity_type"
+        case bodyFatSampleId = "body_fat_sample_id"
         case externalId = "external_id"
         case externalResultId = "external_result_id"
         case scannerModel = "scanner_model"
@@ -161,6 +169,8 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         object["device_manufacturer"] = deviceManufacturer
         object["device_model"] = deviceModel
         object["sample_id"] = sampleId
+        object["quantity_type"] = quantityType
+        object["body_fat_sample_id"] = bodyFatSampleId
         object["external_id"] = externalId
         object["external_result_id"] = externalResultId
         object["scanner_model"] = scannerModel

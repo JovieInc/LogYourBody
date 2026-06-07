@@ -17,6 +17,30 @@ enum HealthKitDefaultsKey: String {
     }
 }
 
+struct HealthKitWeightImportSample: Equatable {
+    let weight: Double
+    let date: Date
+    let sourceMetadata: BodyMetricSourceMetadata?
+
+    init(weight: Double, date: Date, sourceMetadata: BodyMetricSourceMetadata? = nil) {
+        self.weight = weight
+        self.date = date
+        self.sourceMetadata = sourceMetadata
+    }
+}
+
+struct HealthKitBodyFatImportSample: Equatable {
+    let percentage: Double
+    let date: Date
+    let sourceMetadata: BodyMetricSourceMetadata?
+
+    init(percentage: Double, date: Date, sourceMetadata: BodyMetricSourceMetadata? = nil) {
+        self.percentage = percentage
+        self.date = date
+        self.sourceMetadata = sourceMetadata
+    }
+}
+
 class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
 
@@ -218,6 +242,42 @@ class HealthKitManager: ObservableObject {
         return result.isEmpty ? nil : result
     }
 
+    private func sourceMetadata(from sample: HKQuantitySample) -> BodyMetricSourceMetadata {
+        let deviceId = sample.device?.localIdentifier ?? sample.device?.udiDeviceIdentifier
+
+        return BodyMetricSourceMetadata(
+            vendor: "apple_health",
+            sourceName: sample.sourceRevision.source.name,
+            sourceBundleId: sample.sourceRevision.source.bundleIdentifier,
+            deviceId: deviceId,
+            deviceManufacturer: sample.device?.manufacturer,
+            deviceModel: sample.device?.model,
+            sampleId: sample.uuid.uuidString,
+            quantityType: sample.quantityType.identifier
+        )
+    }
+
+    private func combinedHealthKitMetadata(
+        weightMetadata: BodyMetricSourceMetadata?,
+        bodyFatMetadata: BodyMetricSourceMetadata?
+    ) -> BodyMetricSourceMetadata? {
+        guard weightMetadata != nil || bodyFatMetadata != nil else { return nil }
+
+        let primary = weightMetadata ?? bodyFatMetadata
+
+        return BodyMetricSourceMetadata(
+            vendor: primary?.vendor ?? "apple_health",
+            sourceName: primary?.sourceName ?? bodyFatMetadata?.sourceName,
+            sourceBundleId: primary?.sourceBundleId ?? bodyFatMetadata?.sourceBundleId,
+            deviceId: primary?.deviceId ?? bodyFatMetadata?.deviceId,
+            deviceManufacturer: primary?.deviceManufacturer ?? bodyFatMetadata?.deviceManufacturer,
+            deviceModel: primary?.deviceModel ?? bodyFatMetadata?.deviceModel,
+            sampleId: primary?.sampleId ?? bodyFatMetadata?.sampleId,
+            quantityType: primary?.quantityType ?? bodyFatMetadata?.quantityType,
+            bodyFatSampleId: bodyFatMetadata?.sampleId
+        )
+    }
+
     // Request authorization
     func requestAuthorization() async -> Bool {
         guard isHealthKitAvailable else { return false }
@@ -323,6 +383,14 @@ class HealthKitManager: ObservableObject {
 
     // New function to fetch weight history in a specific date range
     func fetchWeightHistoryInRange(startDate: Date, endDate: Date) async throws -> [(weight: Double, date: Date)] {
+        let samples = try await fetchWeightImportSamplesInRange(startDate: startDate, endDate: endDate)
+        return samples.map { (weight: $0.weight, date: $0.date) }
+    }
+
+    private func fetchWeightImportSamplesInRange(
+        startDate: Date,
+        endDate: Date
+    ) async throws -> [HealthKitWeightImportSample] {
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }
@@ -356,7 +424,11 @@ class HealthKitManager: ObservableObject {
 
                 let results = hkSamples.map { sample in
                     let weightInKg = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
-                    return (weight: weightInKg, date: sample.startDate)  // Return in kg
+                    return HealthKitWeightImportSample(
+                        weight: weightInKg,
+                        date: sample.startDate,
+                        sourceMetadata: self.sourceMetadata(from: sample)
+                    )
                 }
 
                 continuation.resume(returning: results)
@@ -405,6 +477,11 @@ class HealthKitManager: ObservableObject {
 
     // Fetch body fat percentage history
     func fetchBodyFatHistory(startDate: Date) async throws -> [(percentage: Double, date: Date)] {
+        let samples = try await fetchBodyFatImportSamples(startDate: startDate)
+        return samples.map { (percentage: $0.percentage, date: $0.date) }
+    }
+
+    private func fetchBodyFatImportSamples(startDate: Date) async throws -> [HealthKitBodyFatImportSample] {
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }
@@ -438,7 +515,11 @@ class HealthKitManager: ObservableObject {
 
                 let results = hkSamples.map { sample in
                     let percentage = sample.quantity.doubleValue(for: HKUnit.percent()) * 100
-                    return (percentage: percentage, date: sample.startDate)
+                    return HealthKitBodyFatImportSample(
+                        percentage: percentage,
+                        date: sample.startDate,
+                        sourceMetadata: self.sourceMetadata(from: sample)
+                    )
                 }
 
                 continuation.resume(returning: results)
@@ -730,15 +811,18 @@ class HealthKitManager: ObservableObject {
 
     private func fetchRecentWeightAndBodyFatHistory() async throws
     -> (
-        weightHistory: [(weight: Double, date: Date)],
-        bodyFatHistory: [(percentage: Double, date: Date)]
+        weightHistory: [HealthKitWeightImportSample],
+        bodyFatHistory: [HealthKitBodyFatImportSample]
     ) {
         let endDate = Date()
         let recentStartDate = Calendar.current.date(byAdding: .day, value: -30, to: endDate)!
 
         // Fetch recent weight and body fat data
-        let recentWeightHistory = try await fetchWeightHistory(days: 30)
-        let recentBodyFatHistory = try await fetchBodyFatHistory(startDate: recentStartDate)
+        let recentWeightHistory = try await fetchWeightImportSamplesInRange(
+            startDate: recentStartDate,
+            endDate: endDate
+        )
+        let recentBodyFatHistory = try await fetchBodyFatImportSamples(startDate: recentStartDate)
 
         return (weightHistory: recentWeightHistory, bodyFatHistory: recentBodyFatHistory)
     }
@@ -795,11 +879,12 @@ class HealthKitManager: ObservableObject {
         // print("📅 Fetching data from \(batchStartDate) to \(endDate)")
 
         // Fetch weight and body fat data for the specified period
-        // Calculate days between dates
-        let daysBetween = Calendar.current.dateComponents([.day], from: batchStartDate, to: endDate).day ?? 30
-        let weightHistory = try await fetchWeightHistory(days: daysBetween)
+        let weightHistory = try await fetchWeightImportSamplesInRange(
+            startDate: batchStartDate,
+            endDate: endDate
+        )
             .filter { $0.date >= batchStartDate && $0.date <= endDate }
-        let bodyFatHistory = try await fetchBodyFatHistory(startDate: batchStartDate)
+        let bodyFatHistory = try await fetchBodyFatImportSamples(startDate: batchStartDate)
             .filter { $0.date <= endDate }
 
         // print("📈 Found \(weightHistory.count) weight entries and \(bodyFatHistory.count) body fat entries")
@@ -811,13 +896,6 @@ class HealthKitManager: ObservableObject {
                 // Show first 5 entries
                 // print("    - \(date): \(weight)kg")
             }
-        }
-
-        // Create a dictionary of body fat data by date for easy lookup
-        var bodyFatByDate: [Date: Double] = [:]
-        for (percentage, date) in bodyFatHistory {
-            let normalizedDate = Calendar.current.startOfDay(for: date)
-            bodyFatByDate[normalizedDate] = percentage
         }
 
         // Process weight and body fat entries using shared batch logic
@@ -933,8 +1011,11 @@ class HealthKitManager: ObservableObject {
             }
 
             // Fetch weight and body fat data for this batch
-            let weightBatch = try await fetchWeightHistoryInRange(startDate: currentDate, endDate: actualBatchEndDate)
-            let bodyFatBatch = try await fetchBodyFatHistory(startDate: currentDate)
+            let weightBatch = try await fetchWeightImportSamplesInRange(
+                startDate: currentDate,
+                endDate: actualBatchEndDate
+            )
+            let bodyFatBatch = try await fetchBodyFatImportSamples(startDate: currentDate)
                 .filter { $0.date < actualBatchEndDate }
 
             // Process this batch
@@ -1004,14 +1085,28 @@ class HealthKitManager: ObservableObject {
         weightHistory: [(weight: Double, date: Date)],
         bodyFatHistory: [(percentage: Double, date: Date)]
     ) async -> (imported: Int, skipped: Int) {
+        await processBatchHealthKitData(
+            weightHistory: weightHistory.map {
+                HealthKitWeightImportSample(weight: $0.weight, date: $0.date)
+            },
+            bodyFatHistory: bodyFatHistory.map {
+                HealthKitBodyFatImportSample(percentage: $0.percentage, date: $0.date)
+            }
+        )
+    }
+
+    func processBatchHealthKitData(
+        weightHistory: [HealthKitWeightImportSample],
+        bodyFatHistory: [HealthKitBodyFatImportSample]
+    ) async -> (imported: Int, skipped: Int) {
         var imported = 0
         var skipped = 0
 
         // Create a dictionary of body fat data by date
-        var bodyFatByDate: [Date: Double] = [:]
-        for (percentage, date) in bodyFatHistory {
-            let normalizedDate = Calendar.current.startOfDay(for: date)
-            bodyFatByDate[normalizedDate] = percentage
+        var bodyFatByDate: [Date: HealthKitBodyFatImportSample] = [:]
+        for sample in bodyFatHistory {
+            let normalizedDate = Calendar.current.startOfDay(for: sample.date)
+            bodyFatByDate[normalizedDate] = sample
         }
 
         // Get existing entries for this date range to check for duplicates
@@ -1038,22 +1133,23 @@ class HealthKitManager: ObservableObject {
             }
         }
 
-        for (weight, date) in weightHistory {
+        for sample in weightHistory {
             // Check if entry exists within the same hour
             let calendar = Calendar.current
-            let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
-            let roundedDate = calendar.date(from: components) ?? date
+            let components = calendar.dateComponents([.year, .month, .day, .hour], from: sample.date)
+            let roundedDate = calendar.date(from: components) ?? sample.date
             let hourKey = ISO8601DateFormatter().string(from: roundedDate)
 
             if !existingEntriesByHour.contains(hourKey) {
-                let normalizedDate = calendar.startOfDay(for: date)
-                let bodyFatPercentage = bodyFatByDate[normalizedDate]
+                let normalizedDate = calendar.startOfDay(for: sample.date)
+                let bodyFatSample = bodyFatByDate[normalizedDate]
+                let bodyFatPercentage = bodyFatSample?.percentage
 
                 let metrics = BodyMetrics(
                     id: UUID().uuidString,
                     userId: userId,
-                    date: date,
-                    weight: weight,
+                    date: sample.date,
+                    weight: sample.weight,
                     weightUnit: "kg",
                     bodyFatPercentage: bodyFatPercentage,
                     bodyFatMethod: bodyFatPercentage != nil ? "HealthKit" : nil,
@@ -1062,6 +1158,10 @@ class HealthKitManager: ObservableObject {
                     notes: "Imported from HealthKit",
                     photoUrl: nil,
                     dataSource: BodyMetricSource.healthKit.rawValue,
+                    sourceMetadata: combinedHealthKitMetadata(
+                        weightMetadata: sample.sourceMetadata,
+                        bodyFatMetadata: bodyFatSample?.sourceMetadata
+                    ),
                     createdAt: Date(),
                     updatedAt: Date()
                 )
