@@ -345,6 +345,7 @@ struct PreferencesView: View {
         }
         .accessibilityLabel("Log out")
         .accessibilityHint("Signs you out of LogYourBody on this device.")
+        .accessibilityIdentifier("settings_logout_button")
     }
 
     private var subscriptionSection: some View {
@@ -372,6 +373,7 @@ struct PreferencesView: View {
             showChevron: false,
             tintColor: revenueCatManager.isSubscribed ? .appPrimary : .orange
         )
+        .accessibilityIdentifier("settings_subscription_status_row")
     }
 
     private func subscriptionRenewalRow(renewal: String) -> some View {
@@ -401,6 +403,7 @@ struct PreferencesView: View {
         }
         .accessibilityLabel("Manage subscription")
         .accessibilityHint("Opens the App Store to manage your subscription.")
+        .accessibilityIdentifier("settings_manage_subscription_button")
     }
 
     private var profileSection: some View {
@@ -685,6 +688,7 @@ struct PreferencesView: View {
                 }
                 .accessibilityLabel("Restore purchases")
                 .accessibilityHint("Attempts to restore your active subscription.")
+                .accessibilityIdentifier("settings_restore_purchases_button")
             }
             .padding(.top, 4)
             .padding(.bottom, 8)

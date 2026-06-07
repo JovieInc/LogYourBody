@@ -160,16 +160,24 @@ struct LogYourBodyApp: App {
     @MainActor
     @discardableResult
     private func applyPaidMVPUITestFixtureIfNeeded() -> Bool {
-        guard ProcessInfo.processInfo.arguments.contains("-lybUITestPaidMVPFixture") else {
+        let arguments = ProcessInfo.processInfo.arguments
+        let usesPaidFixture = arguments.contains("-lybUITestPaidMVPFixture")
+        let usesPaywallFixture = arguments.contains("-lybUITestPaywallFixture")
+
+        guard usesPaidFixture || usesPaywallFixture else {
             return false
         }
 
-        let userId = "ui_test_paid_mvp_user_\(UUID().uuidString)"
+        let isSubscribed = usesPaidFixture
+        let fixtureName = isSubscribed ? "Paid MVP UI" : "Paywall UI"
+        let fixtureEmail = isSubscribed ? "paid-mvp-ui@example.com" : "paywall-ui@example.com"
+        let fixtureUsername = isSubscribed ? "paid_mvp_ui" : "paywall_ui"
+        let userId = "ui_test_\(isSubscribed ? "paid_mvp" : "paywall")_user_\(UUID().uuidString)"
         let profile = UserProfile(
             id: userId,
-            email: "paid-mvp-ui@example.com",
-            username: "paid_mvp_ui",
-            fullName: "Paid MVP UI",
+            email: fixtureEmail,
+            username: fixtureUsername,
+            fullName: fixtureName,
             dateOfBirth: Calendar.current.date(from: DateComponents(year: 1_990, month: 1, day: 1)),
             height: 178,
             heightUnit: "cm",
@@ -181,14 +189,19 @@ struct LogYourBodyApp: App {
         )
         authManager.currentUser = User(
             id: userId,
-            email: "paid-mvp-ui@example.com",
-            name: "Paid MVP UI",
+            email: fixtureEmail,
+            name: fixtureName,
             profile: profile,
             onboardingCompleted: true
         )
         authManager.isAuthenticated = true
         authManager.isClerkLoaded = true
-        revenueCatManager.isSubscribed = true
+        revenueCatManager.isSubscribed = isSubscribed
+        revenueCatManager.customerInfo = nil
+        revenueCatManager.currentOffering = nil
+        revenueCatManager.errorMessage = nil
+        revenueCatManager.isPurchasing = false
+        UserDefaults.standard.set(isSubscribed, forKey: "revenuecat_isSubscribed")
 
         UserDefaults.standard.set(
             MeasurementSystem.imperial.rawValue,

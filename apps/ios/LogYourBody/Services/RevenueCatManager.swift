@@ -338,6 +338,14 @@ class RevenueCatManager: NSObject, ObservableObject {
             self.errorMessage = nil
         }
 
+        guard isConfigured else {
+            await MainActor.run {
+                self.isPurchasing = false
+                self.errorMessage = "Service not ready. Please try again."
+            }
+            return false
+        }
+
         do {
             let customerInfo = try await Purchases.shared.restorePurchases()
 
