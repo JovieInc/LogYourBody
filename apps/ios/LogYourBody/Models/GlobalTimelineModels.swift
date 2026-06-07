@@ -6,7 +6,7 @@ enum GlobalTimelineScale: String, Codable {
     case year
 }
 
-enum MetricPresence: String, Codable {
+enum MetricPresence: String, Codable, CaseIterable {
     case present
     case interpolated
     case lastKnown = "last_known"
