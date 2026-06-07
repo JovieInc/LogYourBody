@@ -76,6 +76,7 @@ struct DashboardViewLiquid: View {
     @State private var isPhotosTabEnabled = true
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
+    @State private var isStatsDestinationActive = false
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
     @State var isBodyScoreSharePresented = false
@@ -175,16 +176,28 @@ struct DashboardViewLiquid: View {
                 )
             }
             .background(
-                NavigationLink(
-                    isActive: $isMetricDetailActive,
-                    destination: {
-                        fullMetricChartView
-                    },
-                    label: {
-                        EmptyView()
-                    }
-                )
-                .hidden()
+                ZStack {
+                    NavigationLink(
+                        isActive: $isMetricDetailActive,
+                        destination: {
+                            fullMetricChartView
+                        },
+                        label: {
+                            EmptyView()
+                        }
+                    )
+
+                    NavigationLink(
+                        isActive: $isStatsDestinationActive,
+                        destination: {
+                            photoTimelineStatsDestination
+                        },
+                        label: {
+                            EmptyView()
+                        }
+                    )
+                }
+                    .hidden()
             )
             .toolbarBackground(Material.ultraThinMaterial, for: ToolbarPlacement.tabBar)
             .toolbarBackground(Visibility.visible, for: ToolbarPlacement.tabBar)
@@ -430,6 +443,9 @@ struct DashboardViewLiquid: View {
                 hudMetricsStrip
                     .padding(.horizontal, 20)
 
+                hudStatsAction
+                    .padding(.horizontal, 20)
+
                 Spacer(minLength: 120)
             }
             .padding(.bottom, 24)
@@ -641,6 +657,158 @@ struct DashboardViewLiquid: View {
         .accessibilityIdentifier("photo_timeline_hud_metrics")
     }
 
+    private var hudStatsAction: some View {
+        Button {
+            HapticManager.shared.selection()
+            isStatsDestinationActive = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Color.metricAccent)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Stats")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(Color.liquidTextPrimary)
+
+                    Text("Charts, sources, and history")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color.liquidTextPrimary.opacity(0.58))
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.liquidTextPrimary.opacity(0.42))
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color.white.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("photo_timeline_hud_stats_button")
+        .accessibilityLabel("Open stats")
+    }
+
+    private var photoTimelineStatsDestination: some View {
+        ZStack {
+            Color.metricCanvas.ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    photoTimelineStatsHeader
+                        .padding(.horizontal, 20)
+
+                    photoTimelinePresenceSummary
+                        .padding(.horizontal, 20)
+
+                    metricsView
+                }
+                .padding(.top, 14)
+                .padding(.bottom, 32)
+            }
+        }
+        .navigationTitle("Stats")
+        .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier("photo_timeline_stats_destination")
+    }
+
+    private var photoTimelineStatsHeader: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Body trends")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(.white)
+
+            Text("Open a metric for chart and history.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(Color.metricTextSecondary)
+        }
+    }
+
+    private var photoTimelinePresenceSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Timeline states")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Text("\(timelinePresenceValueCount) values")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color.metricTextTertiary)
+            }
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8)
+                ],
+                spacing: 8
+            ) {
+                ForEach(MetricPresence.allCases, id: \.rawValue) { presence in
+                    photoTimelinePresenceChip(
+                        title: photoTimelinePresenceLabel(for: presence),
+                        count: timelinePresenceCounts[presence] ?? 0,
+                        color: photoTimelinePresenceColor(for: presence)
+                    )
+                }
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.white.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .accessibilityIdentifier("photo_timeline_stats_presence_summary")
+    }
+
+    private func photoTimelinePresenceChip(
+        title: String,
+        count: Int,
+        color: Color
+    ) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color.metricTextSecondary)
+
+            Spacer(minLength: 4)
+
+            Text("\(count)")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(.white)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.055))
+        )
+        .accessibilityLabel("\(title), \(count) timeline values")
+    }
+
     private func hudMetricTile(
         title: String,
         value: String,
@@ -688,6 +856,7 @@ struct DashboardViewLiquid: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(title), \(value), \(caption)")
     }
 
     private var activeTimelineBucket: GlobalTimelineBucket? {
@@ -699,8 +868,55 @@ struct DashboardViewLiquid: View {
         return globalTimelineStore.weeklyBuckets.last
     }
 
+    private var timelinePresenceValues: [GlobalTimelineMetricValue] {
+        globalTimelineStore.weeklyBuckets.flatMap { bucket in
+            [
+                bucket.metrics.weight,
+                bucket.metrics.bodyFat,
+                bucket.metrics.ffmi,
+                bucket.metrics.steps
+            ]
+        }
+    }
+
+    private var timelinePresenceCounts: [MetricPresence: Int] {
+        timelinePresenceValues.reduce(into: [:]) { counts, value in
+            counts[value.presence, default: 0] += 1
+        }
+    }
+
+    private var timelinePresenceValueCount: Int {
+        timelinePresenceValues.count
+    }
+
     private var missingHUDMetric: GlobalTimelineMetricValue {
         GlobalTimelineMetricValue(value: nil, presence: .missing)
+    }
+
+    private func photoTimelinePresenceLabel(for presence: MetricPresence) -> String {
+        switch presence {
+        case .present:
+            return "Measured"
+        case .interpolated:
+            return "Interpolated"
+        case .lastKnown:
+            return "Last known"
+        case .missing:
+            return "Missing"
+        }
+    }
+
+    private func photoTimelinePresenceColor(for presence: MetricPresence) -> Color {
+        switch presence {
+        case .present:
+            return Color.metricChartLine
+        case .interpolated:
+            return Color.metricAccentBodyFat
+        case .lastKnown:
+            return Color.metricAccentFFMI
+        case .missing:
+            return Color.metricTextTertiary
+        }
     }
 
     private func selectClosestMetric(to date: Date) {

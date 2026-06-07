@@ -49,7 +49,33 @@ struct MetricChartDataPoint: Identifiable, Sendable {
     let id = UUID()
     let date: Date
     let value: Double
-    var isEstimated: Bool = false
+    let presence: MetricPresence
+
+    var isEstimated: Bool {
+        presence != .present
+    }
+
+    init(
+        date: Date,
+        value: Double,
+        presence: MetricPresence = .present
+    ) {
+        self.date = date
+        self.value = value
+        self.presence = presence
+    }
+
+    init(
+        date: Date,
+        value: Double,
+        isEstimated: Bool
+    ) {
+        self.init(
+            date: date,
+            value: value,
+            presence: isEstimated ? .interpolated : .present
+        )
+    }
 }
 
 // MARK: - Chart Series Preprocessing
@@ -222,6 +248,16 @@ private struct HistorySection: Identifiable, Sendable {
     let title: String
     let showsHeader: Bool
     let entries: [MetricHistoryEntry]
+}
+
+private struct ChartPresenceLegendItem: Identifiable {
+    let presence: MetricPresence
+    let label: String
+    let total: Int
+
+    var id: String {
+        presence.rawValue
+    }
 }
 
 // MARK: - Full Metric Chart View
@@ -542,6 +578,39 @@ struct FullMetricChartView: View {
 
             timeRangeSelector
                 .fixedSize(horizontal: false, vertical: true)
+
+            chartPresenceLegend
+        }
+    }
+
+    private var chartPresenceLegend: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(visiblePresenceLegendItems) { item in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(chartPointColor(for: item.presence))
+                            .frame(width: 7, height: 7)
+
+                        Text(item.label)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Color.metricTextSecondary)
+
+                        if item.total > 0 {
+                            Text("\(item.total)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Color.metricTextTertiary)
+                        }
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.06))
+                    )
+                    .accessibilityLabel("\(item.label), \(item.total) \(pointCountLabel(for: item.total))")
+                }
+            }
         }
     }
 
@@ -583,8 +652,8 @@ struct FullMetricChartView: View {
                     )
                     .foregroundStyle(
                         isToday
-                            ? Color.metricChartLine
-                            : Color.metricChartLine.opacity(0.6)
+                            ? chartPointColor(for: point.presence)
+                            : chartPointColor(for: point.presence).opacity(0.62)
                     )
                 }
             } else {
@@ -596,6 +665,15 @@ struct FullMetricChartView: View {
                     .interpolationMethod(.catmullRom)
                     .lineStyle(StrokeStyle(lineWidth: chartMode == .trend ? 3 : 2, lineCap: .round))
                     .foregroundStyle(Color.metricChartLine)
+
+                    PointMark(
+                        x: .value("Date", point.date),
+                        y: .value("Value", point.value)
+                    )
+                    .symbolSize(chartPointSymbolSize(for: point.presence))
+                    .foregroundStyle(chartPointColor(for: point.presence))
+                    .opacity(chartPointOpacity(for: point.presence))
+                    .accessibilityLabel("\(presenceLabel(for: point.presence)) point")
 
                     if chartMode == .trend {
                         AreaMark(
@@ -731,6 +809,9 @@ struct FullMetricChartView: View {
             Text(point.date.formatted(.dateTime.month().day()))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.black.opacity(0.7))
+            Text(presenceLabel(for: point.presence))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.black.opacity(0.62))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -1006,6 +1087,28 @@ struct FullMetricChartView: View {
         chartMode == .trend ? smoothedSeries : displayedSeries
     }
 
+    private var visiblePresenceLegendItems: [ChartPresenceLegendItem] {
+        let counts = chartPresenceCounts
+        return MetricPresence.allCases.compactMap { presence in
+            let count = counts[presence] ?? 0
+            if count == 0 && !(presence == .missing && chartData.isEmpty) {
+                return nil
+            }
+
+            return ChartPresenceLegendItem(
+                presence: presence,
+                label: presenceLabel(for: presence),
+                total: count
+            )
+        }
+    }
+
+    private var chartPresenceCounts: [MetricPresence: Int] {
+        chartData.reduce(into: [:]) { counts, point in
+            counts[point.presence, default: 0] += 1
+        }
+    }
+
     private var minSeriesValue: Double? {
         activeSeries.map(\.value).min()
     }
@@ -1028,7 +1131,15 @@ struct FullMetricChartView: View {
         guard let first = chartData.first, let last = chartData.last else {
             return "empty-\(chartData.count)"
         }
-        return "\(chartData.count)-\(first.date.timeIntervalSince1970)-\(last.date.timeIntervalSince1970)-\(first.value)-\(last.value)"
+        return [
+            "\(chartData.count)",
+            "\(first.date.timeIntervalSince1970)",
+            "\(last.date.timeIntervalSince1970)",
+            "\(first.value)",
+            "\(last.value)",
+            first.presence.rawValue,
+            last.presence.rawValue
+        ].joined(separator: "-")
     }
 
     // MARK: - Helpers
@@ -1073,13 +1184,13 @@ struct FullMetricChartView: View {
             let start = max(0, index - windowSize + 1)
             let window = series[start...index]
             let average = window.reduce(0) { $0 + $1.value } / Double(window.count)
-            let isEstimated = window.contains(where: { $0.isEstimated })
+            let presence = combinedPresence(for: window.map(\.presence))
 
             smoothed.append(
                 MetricChartDataPoint(
                     date: series[index].date,
                     value: average,
-                    isEstimated: isEstimated
+                    presence: presence
                 )
             )
         }
@@ -1111,6 +1222,78 @@ struct FullMetricChartView: View {
             delta: delta,
             percentageChange: percentageChange
         )
+    }
+
+    private func combinedPresence(for presences: [MetricPresence]) -> MetricPresence {
+        if presences.contains(.interpolated) {
+            return .interpolated
+        }
+
+        if presences.contains(.lastKnown) {
+            return .lastKnown
+        }
+
+        if presences.contains(.missing) {
+            return .missing
+        }
+
+        return .present
+    }
+
+    private func presenceLabel(for presence: MetricPresence) -> String {
+        switch presence {
+        case .present:
+            return "Measured"
+        case .interpolated:
+            return "Interpolated"
+        case .lastKnown:
+            return "Last known"
+        case .missing:
+            return "Missing"
+        }
+    }
+
+    private func chartPointColor(for presence: MetricPresence) -> Color {
+        switch presence {
+        case .present:
+            return Color.metricChartLine
+        case .interpolated:
+            return Color.metricAccentBodyFat
+        case .lastKnown:
+            return Color.metricAccentFFMI
+        case .missing:
+            return Color.metricTextTertiary
+        }
+    }
+
+    private func chartPointSymbolSize(for presence: MetricPresence) -> CGFloat {
+        switch presence {
+        case .present:
+            return 22
+        case .interpolated:
+            return 42
+        case .lastKnown:
+            return 34
+        case .missing:
+            return 18
+        }
+    }
+
+    private func chartPointOpacity(for presence: MetricPresence) -> Double {
+        switch presence {
+        case .present:
+            return 0.78
+        case .interpolated:
+            return 0.86
+        case .lastKnown:
+            return 0.68
+        case .missing:
+            return 0.38
+        }
+    }
+
+    private func pointCountLabel(for count: Int) -> String {
+        count == 1 ? "point" : "points"
     }
 
     private func formatDeltaValue(_ delta: Double) -> String {
