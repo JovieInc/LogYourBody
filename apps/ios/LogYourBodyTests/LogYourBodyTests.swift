@@ -54,6 +54,74 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertTrue(LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(gateEnabled: true))
         XCTAssertFalse(LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(gateEnabled: false))
     }
+
+    func testPhotoTimelineHUDGateRestoresBodyCompositionRequirements() {
+        XCTAssertTrue(
+            LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+                hasCompletedOnboarding: false,
+                fullDashboardEnabled: false,
+                photoTimelineHUDEnabled: true
+            )
+        )
+        XCTAssertTrue(
+            LaunchSurfacePolicy.requiresCompleteProfile(
+                isProfileComplete: false,
+                fullDashboardEnabled: false,
+                photoTimelineHUDEnabled: true
+            )
+        )
+        XCTAssertFalse(
+            LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+                hasCompletedOnboarding: true,
+                fullDashboardEnabled: false,
+                photoTimelineHUDEnabled: true
+            )
+        )
+        XCTAssertFalse(
+            LaunchSurfacePolicy.requiresCompleteProfile(
+                isProfileComplete: true,
+                fullDashboardEnabled: false,
+                photoTimelineHUDEnabled: true
+            )
+        )
+    }
+}
+
+final class PhotoTimelineHUDPolicyTests: XCTestCase {
+    func testPhotoTimelineHUDDefaultsOffBeforeGateLoads() {
+        XCTAssertFalse(PhotoTimelineHUDPolicy.defaultShowsPhotoTimelineHUD)
+        XCTAssertFalse(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: false))
+        XCTAssertEqual(Constants.photoTimelineHUDFlagKey, "ios_photo_timeline_hud")
+    }
+
+    func testPhotoTimelineHUDCanBeEnabledByGate() {
+        XCTAssertTrue(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: true))
+    }
+
+    func testPhotoTimelineHUDTakesPrecedenceOverLegacyFullDashboard() {
+        XCTAssertEqual(
+            PaidAppSurfacePolicy.surface(photoTimelineHUDEnabled: true, fullDashboardEnabled: true),
+            .photoTimelineHUD
+        )
+        XCTAssertEqual(
+            PaidAppSurfacePolicy.surface(photoTimelineHUDEnabled: false, fullDashboardEnabled: true),
+            .fullBodyCompositionDashboard
+        )
+        XCTAssertEqual(
+            PaidAppSurfacePolicy.surface(photoTimelineHUDEnabled: false, fullDashboardEnabled: false),
+            .weightLoggerMVP
+        )
+    }
+
+    func testPhotoTimelineHUDMetricStateCopyIsExplicit() {
+        XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .present), "Measured")
+        XCTAssertEqual(
+            PhotoTimelineHUDPolicy.stateText(presence: .interpolated, confidence: .medium),
+            "Interpolated - medium confidence"
+        )
+        XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .lastKnown), "Last known")
+        XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .missing), "Missing")
+    }
 }
 
 final class AuthSurfacePolicyTests: XCTestCase {

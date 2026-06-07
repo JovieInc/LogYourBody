@@ -206,16 +206,21 @@ struct LogYourBodyApp: App {
         let usesPaidFixture = arguments.contains("-lybUITestPaidMVPFixture")
         let usesPaywallFixture = arguments.contains("-lybUITestPaywallFixture")
         let usesFullDashboardFixture = arguments.contains("-lybUITestFullDashboardFixture")
+        let usesPhotoTimelineHUDFixture = arguments.contains("-lybUITestPhotoTimelineHUDFixture")
 
-        guard usesPaidFixture || usesPaywallFixture || usesFullDashboardFixture else {
+        guard usesPaidFixture || usesPaywallFixture || usesFullDashboardFixture || usesPhotoTimelineHUDFixture else {
             return false
         }
 
-        let isSubscribed = usesPaidFixture || usesFullDashboardFixture
+        let isSubscribed = usesPaidFixture || usesFullDashboardFixture || usesPhotoTimelineHUDFixture
         let fixtureName: String
         let fixtureEmail: String
         let fixtureUsername: String
-        if usesFullDashboardFixture {
+        if usesPhotoTimelineHUDFixture {
+            fixtureName = "Photo HUD UI"
+            fixtureEmail = "photo-hud-ui@example.com"
+            fixtureUsername = "photo_hud_ui"
+        } else if usesFullDashboardFixture {
             fixtureName = "Full Dashboard UI"
             fixtureEmail = "full-dashboard-ui@example.com"
             fixtureUsername = "full_dashboard_ui"
@@ -228,7 +233,14 @@ struct LogYourBodyApp: App {
             fixtureEmail = "paywall-ui@example.com"
             fixtureUsername = "paywall_ui"
         }
-        let fixtureSlug = usesFullDashboardFixture ? "full_dashboard" : (isSubscribed ? "paid_mvp" : "paywall")
+        let fixtureSlug: String
+        if usesPhotoTimelineHUDFixture {
+            fixtureSlug = "photo_hud"
+        } else if usesFullDashboardFixture {
+            fixtureSlug = "full_dashboard"
+        } else {
+            fixtureSlug = isSubscribed ? "paid_mvp" : "paywall"
+        }
         let userId = "ui_test_\(fixtureSlug)_user_\(UUID().uuidString)"
         let profile = UserProfile(
             id: userId,
@@ -270,7 +282,7 @@ struct LogYourBodyApp: App {
         realtimeSyncManager.syncStatus = .offline
         realtimeSyncManager.pendingSyncCount = 0
 
-        if usesFullDashboardFixture {
+        if usesFullDashboardFixture || usesPhotoTimelineHUDFixture {
             await seedFullDashboardUITestFixtureData(userId: userId)
         }
 
@@ -350,13 +362,20 @@ struct LogYourBodyApp: App {
                     flagKey: Constants.fullBodyCompositionDashboardFlagKey
                 )
             )
+            let photoTimelineHUDEnabled = PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
+                gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                    flagKey: Constants.photoTimelineHUDFlagKey
+                )
+            )
             let requiresOnboarding = LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
                 hasCompletedOnboarding: hasCompletedOnboarding,
-                fullDashboardEnabled: fullDashboardEnabled
+                fullDashboardEnabled: fullDashboardEnabled,
+                photoTimelineHUDEnabled: photoTimelineHUDEnabled
             )
             let requiresProfile = LaunchSurfacePolicy.requiresCompleteProfile(
                 isProfileComplete: isProfileComplete,
-                fullDashboardEnabled: fullDashboardEnabled
+                fullDashboardEnabled: fullDashboardEnabled,
+                photoTimelineHUDEnabled: photoTimelineHUDEnabled
             )
 
             if requiresOnboarding || requiresProfile {

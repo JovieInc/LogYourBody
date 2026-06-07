@@ -20,6 +20,7 @@ struct Constants {
     static let isBodySpecEnabled = true
     static let appleSignInEnabledFlagKey = "ios_apple_sign_in_enabled"
     static let fullBodyCompositionDashboardFlagKey = "ios_full_body_composition_dashboard"
+    static let photoTimelineHUDFlagKey = "ios_photo_timeline_hud"
     static let photosTabFlagKey = "photos_tab"
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)
@@ -129,5 +130,39 @@ struct AuthSurfacePolicy {
 
     static func shouldShowAppleSignIn(gateEnabled: Bool) -> Bool {
         gateEnabled
+    }
+}
+
+enum PhotoTimelineHUDPolicy {
+    static let defaultShowsPhotoTimelineHUD = false
+
+    static func shouldShowPhotoTimelineHUD(gateEnabled: Bool) -> Bool {
+        gateEnabled
+    }
+
+    static func stateText(
+        presence: MetricPresence,
+        confidence: GlobalTimelineMetricConfidence? = nil
+    ) -> String {
+        switch presence {
+        case .present:
+            return "Measured"
+        case .interpolated:
+            if let confidence {
+                return "Interpolated - \(confidence.rawValue) confidence"
+            }
+            return "Interpolated"
+        case .lastKnown:
+            return "Last known"
+        case .missing:
+            return "Missing"
+        }
+    }
+
+    static func hasUsablePhoto(_ metric: BodyMetrics?) -> Bool {
+        guard let photoUrl = metric?.photoUrl?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
+        }
+        return !photoUrl.isEmpty
     }
 }
