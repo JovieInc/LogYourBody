@@ -22,6 +22,7 @@ struct Constants {
     // Legacy beta fallback; the intended post-MVP dashboard route is `ios_photo_timeline_hud`.
     static let fullBodyCompositionDashboardFlagKey = "ios_full_body_composition_dashboard"
     static let photoTimelineHUDFlagKey = "ios_photo_timeline_hud"
+    static let phaseInsightFlagKey = "ios_phase_insight"
     static let photosTabFlagKey = "photos_tab"
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)
