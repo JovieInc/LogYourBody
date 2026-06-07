@@ -55,6 +55,7 @@ struct PaywallView: View {
                 .padding(.top, 60)
                 .padding(.bottom, 40)
             }
+            .accessibilityIdentifier("paywall_screen")
 
             // Loading overlay
             if revenueCatManager.isPurchasing {
@@ -147,6 +148,7 @@ struct PaywallView: View {
             Text("LogYourBody Pro")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundColor(.appText)
+                .accessibilityIdentifier("paywall_title")
 
             Text("Log your body in under 10 seconds and see if you are moving in the right direction.")
                 .font(.system(size: 16, weight: .medium))
@@ -267,6 +269,7 @@ struct PaywallView: View {
             .cornerRadius(16)
         }
         .disabled(revenueCatManager.isPurchasing)
+        .accessibilityIdentifier("paywall_purchase_button")
     }
 
     private var restorePurchasesButton: some View {
@@ -289,6 +292,7 @@ struct PaywallView: View {
                 .foregroundColor(.white.opacity(0.7))
         }
         .disabled(revenueCatManager.isPurchasing)
+        .accessibilityIdentifier("paywall_restore_purchases_button")
     }
 
     private var logoutButton: some View {
@@ -303,6 +307,7 @@ struct PaywallView: View {
         .disabled(revenueCatManager.isPurchasing)
         .accessibilityLabel("Log out")
         .accessibilityHint("Signs you out so you can use another account.")
+        .accessibilityIdentifier("paywall_logout_button")
     }
 
     private var legalLinks: some View {
@@ -361,6 +366,7 @@ struct PaywallView: View {
                 .stroke(Color.appBorder.opacity(0.8), lineWidth: 1)
         )
         .cornerRadius(16)
+        .accessibilityIdentifier("paywall_plans_unavailable_state")
     }
 
     private func billingPeriodSuffix(for package: Package) -> String {

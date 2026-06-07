@@ -123,18 +123,33 @@ private struct PaidWeightLoggerMVPView: View {
         .navigationTitle("LogYourBody")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                NavigationLink {
+                    PreferencesView()
+                        .environmentObject(authManager)
+                } label: {
+                    Image(systemName: "gearshape")
+                        .foregroundColor(.appText)
+                }
+                .accessibilityLabel("Settings")
+                .accessibilityHint("Opens account and subscription settings.")
+                .accessibilityIdentifier("mvp_settings_button")
+
                 Menu {
-                    Button("Sign out", role: .destructive) {
+                    Button(role: .destructive) {
                         Task {
                             await authManager.logout()
                         }
+                    } label: {
+                        Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
                     }
+                    .accessibilityIdentifier("mvp_sign_out_button")
                 } label: {
                     Image(systemName: "person.crop.circle")
                         .foregroundColor(.appText)
                 }
                 .accessibilityLabel("Account")
+                .accessibilityIdentifier("mvp_account_menu_button")
             }
 
             ToolbarItemGroup(placement: .keyboard) {
