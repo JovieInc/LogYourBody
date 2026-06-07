@@ -1255,6 +1255,7 @@ struct DashboardViewLiquid: View {
                     }
             }
             .tint(Color.appPrimary)
+            .accessibilityIdentifier("legacy_full_dashboard_beta")
         }
     }
 

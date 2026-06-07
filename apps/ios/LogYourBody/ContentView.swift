@@ -5,24 +5,24 @@
 import SwiftUI
 
 enum LaunchSurfacePolicy {
-    static func shouldShowFullBodyCompositionDashboard(gateEnabled: Bool) -> Bool {
+    static func shouldShowLegacyFullDashboardBeta(gateEnabled: Bool) -> Bool {
         gateEnabled
     }
 
     static func requiresBodyCompositionOnboarding(
         hasCompletedOnboarding: Bool,
-        fullDashboardEnabled: Bool,
+        legacyFullDashboardBetaEnabled: Bool,
         photoTimelineHUDEnabled: Bool = false
     ) -> Bool {
-        (fullDashboardEnabled || photoTimelineHUDEnabled) && !hasCompletedOnboarding
+        (legacyFullDashboardBetaEnabled || photoTimelineHUDEnabled) && !hasCompletedOnboarding
     }
 
     static func requiresCompleteProfile(
         isProfileComplete: Bool,
-        fullDashboardEnabled: Bool,
+        legacyFullDashboardBetaEnabled: Bool,
         photoTimelineHUDEnabled: Bool = false
     ) -> Bool {
-        (fullDashboardEnabled || photoTimelineHUDEnabled) && !isProfileComplete
+        (legacyFullDashboardBetaEnabled || photoTimelineHUDEnabled) && !isProfileComplete
     }
 }
 
@@ -77,7 +77,7 @@ struct ContentView: View {
     private var shouldShowOnboarding: Bool {
         LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
             hasCompletedOnboarding: hasCompletedOnboarding,
-            fullDashboardEnabled: isFullBodyCompositionDashboardEnabled,
+            legacyFullDashboardBetaEnabled: isLegacyFullDashboardBetaEnabled,
             photoTimelineHUDEnabled: isPhotoTimelineHUDEnabled
         )
     }
@@ -85,14 +85,14 @@ struct ContentView: View {
     private var shouldShowProfileCompletion: Bool {
         LaunchSurfacePolicy.requiresCompleteProfile(
             isProfileComplete: isProfileComplete,
-            fullDashboardEnabled: isFullBodyCompositionDashboardEnabled,
+            legacyFullDashboardBetaEnabled: isLegacyFullDashboardBetaEnabled,
             photoTimelineHUDEnabled: isPhotoTimelineHUDEnabled
         )
     }
 
-    private var isFullBodyCompositionDashboardEnabled: Bool {
+    private var isLegacyFullDashboardBetaEnabled: Bool {
         _ = featureGateRefreshToken
-        return LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(
+        return LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(
             gateEnabled: AnalyticsService.shared.isFeatureEnabled(
                 flagKey: Constants.fullBodyCompositionDashboardFlagKey
             )
