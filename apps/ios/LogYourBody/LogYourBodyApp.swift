@@ -92,7 +92,7 @@ struct LogYourBodyApp: App {
             return
         }
 
-        if applyPaidMVPUITestFixtureIfNeeded() {
+        if await applyPaidMVPUITestFixtureIfNeeded() {
             return
         }
         #endif
@@ -201,20 +201,35 @@ struct LogYourBodyApp: App {
 
     @MainActor
     @discardableResult
-    private func applyPaidMVPUITestFixtureIfNeeded() -> Bool {
+    private func applyPaidMVPUITestFixtureIfNeeded() async -> Bool {
         let arguments = ProcessInfo.processInfo.arguments
         let usesPaidFixture = arguments.contains("-lybUITestPaidMVPFixture")
         let usesPaywallFixture = arguments.contains("-lybUITestPaywallFixture")
+        let usesFullDashboardFixture = arguments.contains("-lybUITestFullDashboardFixture")
 
-        guard usesPaidFixture || usesPaywallFixture else {
+        guard usesPaidFixture || usesPaywallFixture || usesFullDashboardFixture else {
             return false
         }
 
-        let isSubscribed = usesPaidFixture
-        let fixtureName = isSubscribed ? "Paid MVP UI" : "Paywall UI"
-        let fixtureEmail = isSubscribed ? "paid-mvp-ui@example.com" : "paywall-ui@example.com"
-        let fixtureUsername = isSubscribed ? "paid_mvp_ui" : "paywall_ui"
-        let userId = "ui_test_\(isSubscribed ? "paid_mvp" : "paywall")_user_\(UUID().uuidString)"
+        let isSubscribed = usesPaidFixture || usesFullDashboardFixture
+        let fixtureName: String
+        let fixtureEmail: String
+        let fixtureUsername: String
+        if usesFullDashboardFixture {
+            fixtureName = "Full Dashboard UI"
+            fixtureEmail = "full-dashboard-ui@example.com"
+            fixtureUsername = "full_dashboard_ui"
+        } else if isSubscribed {
+            fixtureName = "Paid MVP UI"
+            fixtureEmail = "paid-mvp-ui@example.com"
+            fixtureUsername = "paid_mvp_ui"
+        } else {
+            fixtureName = "Paywall UI"
+            fixtureEmail = "paywall-ui@example.com"
+            fixtureUsername = "paywall_ui"
+        }
+        let fixtureSlug = usesFullDashboardFixture ? "full_dashboard" : (isSubscribed ? "paid_mvp" : "paywall")
+        let userId = "ui_test_\(fixtureSlug)_user_\(UUID().uuidString)"
         let profile = UserProfile(
             id: userId,
             email: fixtureEmail,
@@ -255,7 +270,57 @@ struct LogYourBodyApp: App {
         realtimeSyncManager.syncStatus = .offline
         realtimeSyncManager.pendingSyncCount = 0
 
+        if usesFullDashboardFixture {
+            await seedFullDashboardUITestFixtureData(userId: userId)
+        }
+
         return true
+    }
+
+    private func seedFullDashboardUITestFixtureData(userId: String) async {
+        let calendar = Calendar.current
+        let now = Date()
+        let entries: [
+            (daysAgo: Int, weight: Double, bodyFat: Double?, muscle: Double, notes: String, source: String)
+        ] = [
+            (0, 82.1, 15.8, 66.2, "Latest check-in", "manual"),
+            (7, 82.8, 16.2, 66.0, "Weekly check-in", "healthkit"),
+            (14, 83.4, nil, 65.9, "Weight-only import", "healthkit"),
+            (21, 84.0, 16.9, 65.7, "DEXA baseline", "bodyspec_dexa"),
+            (35, 84.7, 17.4, 65.4, "Manual baseline", "manual")
+        ]
+
+        for entry in entries {
+            guard let date = calendar.date(byAdding: .day, value: -entry.daysAgo, to: now) else {
+                continue
+            }
+
+            let metric = BodyMetrics(
+                id: "ui_test_full_dashboard_metric_\(entry.daysAgo)",
+                userId: userId,
+                date: date,
+                weight: entry.weight,
+                weightUnit: "kg",
+                bodyFatPercentage: entry.bodyFat,
+                bodyFatMethod: entry.bodyFat == nil ? nil : entry.source,
+                muscleMass: entry.muscle,
+                boneMass: nil,
+                waistCm: nil,
+                hipCm: nil,
+                waistUnit: nil,
+                notes: entry.notes,
+                photoUrl: nil,
+                dataSource: entry.source,
+                createdAt: date,
+                updatedAt: now
+            )
+
+            try? await CoreDataManager.shared.saveBodyMetricsAndWait(
+                metric,
+                userId: userId,
+                markAsSynced: entry.source != "manual"
+            )
+        }
     }
     #endif
 

@@ -20,6 +20,13 @@ struct MainTabView: View {
             }
         }
         .onAppear {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-lybUITestFullDashboardFixture") {
+                showFullBodyCompositionDashboard = true
+                return
+            }
+            #endif
+
             showFullBodyCompositionDashboard = AnalyticsService.shared.isFeatureEnabled(
                 flagKey: Constants.fullBodyCompositionDashboardFlagKey
             )
