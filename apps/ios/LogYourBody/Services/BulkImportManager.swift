@@ -157,7 +157,7 @@ class BulkImportManager: ObservableObject {
                     boneMass: nil,
                     notes: "Imported from photo library",
                     photoUrl: nil, // Will be set after upload
-                    dataSource: "Photo Import",
+                    dataSource: BodyMetricSource.photo.rawValue,
                     createdAt: Date(),
                     updatedAt: Date()
                 )

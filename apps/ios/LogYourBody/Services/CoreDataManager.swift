@@ -517,7 +517,16 @@ class CoreDataManager: ObservableObject {
                 cached.boneMass = metrics.boneMass ?? 0
                 cached.notes = metrics.notes
                 cached.photoUrl = metrics.photoUrl
-                cached.dataSource = metrics.dataSource ?? "Manual"
+                cached.dataSource = BodyMetricSource.normalizedRawValue(metrics.dataSource)
+                if let sourceMetadataJSON = metrics.sourceMetadata?.jsonString {
+                    cached.sourceMetadataJSON = sourceMetadataJSON
+                } else if cached.sourceMetadataJSON == nil,
+                          let legacyDataSource = metrics.dataSource,
+                          BodyMetricSource.normalizedRawValue(legacyDataSource) != legacyDataSource {
+                    cached.sourceMetadataJSON = BodyMetricSourceMetadata(
+                        legacyDataSource: legacyDataSource
+                    ).jsonString
+                }
                 cached.updatedAt = Date()
                 cached.lastModified = Date()
                 cached.isSynced = markAsSynced
@@ -1285,6 +1294,18 @@ class CoreDataManager: ObservableObject {
                 metric.boneMass = data["bone_mass"] as? Double ?? 0
                 metric.notes = data["notes"] as? String
                 metric.photoUrl = data["photo_url"] as? String
+                let rawDataSource = data["data_source"] as? String
+                metric.dataSource = BodyMetricSource.normalizedRawValue(rawDataSource)
+                if let sourceMetadata = BodyMetricSourceMetadata(jsonObject: data["source_metadata"]) {
+                    metric.sourceMetadataJSON = sourceMetadata.jsonString
+                } else if let rawDataSource,
+                          BodyMetricSource.normalizedRawValue(rawDataSource) != rawDataSource {
+                    metric.sourceMetadataJSON = BodyMetricSourceMetadata(
+                        legacyDataSource: rawDataSource
+                    ).jsonString
+                } else {
+                    metric.sourceMetadataJSON = nil
+                }
 
                 if let dateString = data["date"] as? String {
                     metric.date = formatter.date(from: dateString)
@@ -2004,7 +2025,8 @@ extension CachedBodyMetrics {
             waistUnit: waistUnit,
             notes: notes,
             photoUrl: photoUrl,
-            dataSource: dataSource ?? "Manual",
+            dataSource: BodyMetricSource.normalizedRawValue(dataSource),
+            sourceMetadata: BodyMetricSourceMetadata(jsonString: sourceMetadataJSON),
             createdAt: createdAt,
             updatedAt: updatedAt
         )

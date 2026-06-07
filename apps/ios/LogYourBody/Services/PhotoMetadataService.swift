@@ -126,6 +126,7 @@ class PhotoMetadataService {
                 notes: existing.notes,
                 photoUrl: photoUrl ?? existing.photoUrl,
                 dataSource: existing.dataSource,
+                sourceMetadata: existing.sourceMetadata,
                 createdAt: existing.createdAt,
                 updatedAt: Date()
             )
@@ -146,7 +147,7 @@ class PhotoMetadataService {
                 boneMass: nil,
                 notes: nil,
                 photoUrl: photoUrl,
-                dataSource: "Manual",
+                dataSource: BodyMetricSource.photo.rawValue,
                 createdAt: Date(),
                 updatedAt: Date()
             )

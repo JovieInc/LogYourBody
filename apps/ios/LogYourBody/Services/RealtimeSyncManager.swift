@@ -423,6 +423,8 @@ class RealtimeSyncManager: ObservableObject {
                     "bone_mass": metric.boneMass as Any,
                     "photo_url": metric.photoUrl as Any,
                     "notes": metric.notes as Any,
+                    "data_source": BodyMetricSource.normalizedRawValue(metric.dataSource),
+                    "source_metadata": BodyMetricSourceMetadata(jsonString: metric.sourceMetadataJSON)?.jsonObject ?? [:],
                     "created_at": formatter.string(from: createdAt),
                     "updated_at": formatter.string(from: updatedAt)
                 ]
@@ -884,6 +886,7 @@ class RealtimeSyncManager: ObservableObject {
             notes: metrics.notes,
             photoUrl: metrics.photoUrl,
             dataSource: metrics.dataSource,
+            sourceMetadata: metrics.sourceMetadata,
             createdAt: metrics.createdAt,
             updatedAt: metrics.updatedAt
         )

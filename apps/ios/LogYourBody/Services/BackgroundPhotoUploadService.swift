@@ -164,6 +164,7 @@ class BackgroundPhotoUploadService: ObservableObject {
                 notes: existing.notes,
                 photoUrl: existing.photoUrl,
                 dataSource: existing.dataSource,
+                sourceMetadata: BodyMetricSourceMetadata(jsonString: existing.sourceMetadataJSON),
                 createdAt: existing.createdAt ?? Date(),
                 updatedAt: existing.updatedAt ?? Date()
             )
@@ -183,7 +184,7 @@ class BackgroundPhotoUploadService: ObservableObject {
             boneMass: nil,
             notes: nil,
             photoUrl: nil,
-            dataSource: "Manual",
+            dataSource: BodyMetricSource.photo.rawValue,
             createdAt: Date(),
             updatedAt: Date()
         )

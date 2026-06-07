@@ -16,11 +16,13 @@ supabase/
 ## Setup
 
 1. **Install Supabase CLI**:
+
    ```bash
    brew install supabase/tap/supabase
    ```
 
 2. **Link your project**:
+
    ```bash
    cd supabase
    supabase link --project-ref <your-project-ref>
@@ -47,6 +49,7 @@ Example: `20250706_120000_add_photo_fields.sql`
 ## Storage Configuration
 
 The `photos` bucket is configured with:
+
 - Public access (for processed images)
 - 50MB file size limit
 - Allowed types: JPEG, PNG, HEIC, HEIF, WebP
@@ -59,3 +62,9 @@ The `photos` bucket is configured with:
 - The `weight_logs` identifier is preserved as a read-only compatibility view over `body_metrics` by the `20250705000001_convert_weight_logs_to_view.sql` migration. New writes must target `body_metrics`, not `weight_logs`.
 
 **Canonical source of truth for weight:** `public.body_metrics`.
+
+## Body Metric Source Provenance
+
+- `body_metrics.data_source` stores canonical `BodyMetricSource` values: `manual`, `healthkit`, `smart_scale`, `bodyspec_dexa`, `caliper`, and `photo`.
+- `body_metrics.source_metadata` stores compact pointer-style provenance such as HealthKit sample IDs, source bundle/device identifiers, BodySpec result IDs, scanner/location IDs, or legacy source labels.
+- Do not store raw vendor payloads, access tokens, refresh tokens, or unnecessary personal data in source metadata.

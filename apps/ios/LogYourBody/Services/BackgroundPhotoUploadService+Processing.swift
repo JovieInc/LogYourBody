@@ -58,6 +58,7 @@ extension BackgroundPhotoUploadService {
                             notes: existing.notes,
                             photoUrl: existing.photoUrl,
                             dataSource: existing.dataSource,
+                            sourceMetadata: BodyMetricSourceMetadata(jsonString: existing.sourceMetadataJSON),
                             createdAt: existing.createdAt ?? date,
                             updatedAt: existing.updatedAt ?? date
                         )
@@ -75,7 +76,7 @@ extension BackgroundPhotoUploadService {
                             boneMass: nil,
                             notes: nil,
                             photoUrl: nil,
-                            dataSource: "manual",
+                            dataSource: BodyMetricSource.photo.rawValue,
                             createdAt: date,
                             updatedAt: date
                         )
