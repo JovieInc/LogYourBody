@@ -201,6 +201,45 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Save GLP-1"].exists)
     }
 
+    func testBulkPhotoImportLockedByDefaultInIntegrations() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestPaidMVPFixture"]
+        app.launch()
+
+        try openIntegrations(in: app)
+
+        let lockedRow = app.descendants(matching: .any)["integrations_bulk_photo_import_locked"]
+        XCTAssertTrue(lockedRow.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Locked"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["integrations_bulk_photo_import_link"].exists)
+        XCTAssertFalse(app.staticTexts["Bulk Photo Import"].exists)
+    }
+
+    func testBulkPhotoImportGateOpensScannerEntry() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPaidMVPFixture",
+            "-lybUITestBulkPhotoImportEnabledFixture"
+        ]
+        app.launch()
+
+        try openIntegrations(in: app)
+
+        let importLink = app.descendants(matching: .any)["integrations_bulk_photo_import_link"]
+        XCTAssertTrue(importLink.waitForExistence(timeout: 8))
+
+        let importButton = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Import Progress Photos")
+        ).firstMatch
+        scrollUntilHittable(importButton, in: app)
+        XCTAssertTrue(importButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(importButton.isHittable)
+        importButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Bulk Photo Import"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["Start Scanning"].exists)
+    }
+
     func testLaunchPerformance() throws {
         if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
             // This measures how long it takes to launch your application.
@@ -220,5 +259,25 @@ final class LogYourBodyUITests: XCTestCase {
             app.swipeUp()
             remainingSwipes -= 1
         }
+    }
+
+    private func openIntegrations(in app: XCUIApplication) throws {
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
+
+        let settingsButton = app.buttons["mvp_settings_button"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
+        settingsButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 5))
+
+        let integrationsButton = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Integrations")
+        ).firstMatch
+        scrollUntilHittable(integrationsButton, in: app)
+        XCTAssertTrue(integrationsButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(integrationsButton.isHittable)
+        integrationsButton.tap()
+
+        XCTAssertTrue(app.navigationBars["Integrations"].waitForExistence(timeout: 5))
     }
 }

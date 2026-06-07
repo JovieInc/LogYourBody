@@ -24,6 +24,7 @@ struct Constants {
     static let photoTimelineHUDFlagKey = "ios_photo_timeline_hud"
     static let phaseInsightFlagKey = "ios_phase_insight"
     static let glp1WeeklyCheckInFlagKey = "ios_glp1_weekly_checkin"
+    static let bulkProgressPhotoImportFlagKey = "ios_bulk_progress_photo_import"
     static let photosTabFlagKey = "photos_tab"
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)
@@ -167,5 +168,32 @@ enum PhotoTimelineHUDPolicy {
             return false
         }
         return !photoUrl.isEmpty
+    }
+}
+
+enum BulkProgressPhotoImportPolicy {
+    static let defaultShowsBulkImport = false
+    static let activationProgressPhotoCount = 2
+
+    static func shouldShowBulkImport(
+        gateEnabled: Bool,
+        existingProgressPhotoCount: Int
+    ) -> Bool {
+        gateEnabled || existingProgressPhotoCount >= activationProgressPhotoCount
+    }
+
+    static func footerText(
+        isEnabled: Bool,
+        existingProgressPhotoCount: Int
+    ) -> String {
+        if isEnabled {
+            return "Import progress photos from your photo library."
+        }
+
+        if existingProgressPhotoCount == 1 {
+            return "Bulk import unlocks after one more added progress photo or migration access."
+        }
+
+        return "Bulk import unlocks after you have added progress photos or request migration access."
     }
 }

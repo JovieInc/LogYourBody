@@ -11,6 +11,8 @@ struct IntegrationsView: View {
     @State private var showHealthKitConnect = false
     @State private var bodySpecLastSyncedText: String?
     @State private var isLoadingBodySpecLastSynced = false
+    @State private var progressPhotoCount = 0
+    @State private var featureGateRefreshToken = UUID()
     @Environment(\.dismiss)
 
     var dismiss
@@ -50,6 +52,11 @@ struct IntegrationsView: View {
             Task { @MainActor in
                 await loadBodySpecLastSynced()
             }
+
+            loadBulkPhotoImportActivationEvidence()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            featureGateRefreshToken = UUID()
         }
     }
 
@@ -227,15 +234,30 @@ struct IntegrationsView: View {
     private var photoImportSection: some View {
         SettingsSection(
             header: "Photo Import",
-            footer: "Import progress photos from your photo library"
+            footer: BulkProgressPhotoImportPolicy.footerText(
+                isEnabled: isBulkProgressPhotoImportEnabled,
+                existingProgressPhotoCount: progressPhotoCount
+            )
         ) {
-            NavigationLink(destination: BulkPhotoImportView().environmentObject(authManager)) {
+            if isBulkProgressPhotoImportEnabled {
+                NavigationLink(destination: BulkPhotoImportView().environmentObject(authManager)) {
+                    SettingsRow(
+                        icon: "photo.stack",
+                        title: "Import Progress Photos",
+                        value: "Scan library",
+                        showChevron: true
+                    )
+                    .accessibilityIdentifier("integrations_bulk_photo_import_link")
+                }
+            } else {
                 SettingsRow(
                     icon: "photo.stack",
                     title: "Import Progress Photos",
-                    value: "Scan library",
-                    showChevron: true
+                    value: "Locked",
+                    tintColor: .appTextSecondary
                 )
+                .opacity(0.6)
+                .accessibilityIdentifier("integrations_bulk_photo_import_locked")
             }
         }
     }
@@ -317,6 +339,46 @@ struct IntegrationsView: View {
 // MARK: - BodySpec Helpers
 
 extension IntegrationsView {
+    private var isBulkProgressPhotoImportEnabled: Bool {
+        _ = featureGateRefreshToken
+
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestBulkPhotoImportEnabledFixture") {
+            return true
+        }
+        #endif
+
+        return BulkProgressPhotoImportPolicy.shouldShowBulkImport(
+            gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                flagKey: Constants.bulkProgressPhotoImportFlagKey
+            ),
+            existingProgressPhotoCount: progressPhotoCount
+        )
+    }
+
+    private func loadBulkPhotoImportActivationEvidence() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestBulkPhotoImportActivationFixture") {
+            progressPhotoCount = BulkProgressPhotoImportPolicy.activationProgressPhotoCount
+            return
+        }
+        #endif
+
+        guard let userId = authManager.currentUser?.id else {
+            progressPhotoCount = 0
+            return
+        }
+
+        Task {
+            let metrics = await CoreDataManager.shared.fetchVisibleBodyMetrics(for: userId)
+            let photoCount = metrics.filter { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }.count
+
+            await MainActor.run {
+                progressPhotoCount = photoCount
+            }
+        }
+    }
+
     @MainActor
     private func loadBodySpecLastSynced() async {
         guard Constants.isBodySpecEnabled,

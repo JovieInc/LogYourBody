@@ -518,6 +518,58 @@ final class ProgressPhotoAttachPolicyTests: XCTestCase {
     }
 }
 
+final class BulkProgressPhotoImportPolicyTests: XCTestCase {
+    func testBulkProgressPhotoImportDefaultsLocked() {
+        XCTAssertFalse(BulkProgressPhotoImportPolicy.defaultShowsBulkImport)
+        XCTAssertEqual(Constants.bulkProgressPhotoImportFlagKey, "ios_bulk_progress_photo_import")
+        XCTAssertFalse(
+            BulkProgressPhotoImportPolicy.shouldShowBulkImport(
+                gateEnabled: false,
+                existingProgressPhotoCount: 0
+            )
+        )
+    }
+
+    func testBulkProgressPhotoImportUnlocksForMigrationGate() {
+        XCTAssertTrue(
+            BulkProgressPhotoImportPolicy.shouldShowBulkImport(
+                gateEnabled: true,
+                existingProgressPhotoCount: 0
+            )
+        )
+    }
+
+    func testBulkProgressPhotoImportUnlocksAfterActivationEvidence() {
+        XCTAssertFalse(
+            BulkProgressPhotoImportPolicy.shouldShowBulkImport(
+                gateEnabled: false,
+                existingProgressPhotoCount: BulkProgressPhotoImportPolicy.activationProgressPhotoCount - 1
+            )
+        )
+        XCTAssertTrue(
+            BulkProgressPhotoImportPolicy.shouldShowBulkImport(
+                gateEnabled: false,
+                existingProgressPhotoCount: BulkProgressPhotoImportPolicy.activationProgressPhotoCount
+            )
+        )
+    }
+
+    func testBulkProgressPhotoImportFooterExplainsLockedAndEnabledStates() {
+        XCTAssertEqual(
+            BulkProgressPhotoImportPolicy.footerText(isEnabled: false, existingProgressPhotoCount: 0),
+            "Bulk import unlocks after you have added progress photos or request migration access."
+        )
+        XCTAssertEqual(
+            BulkProgressPhotoImportPolicy.footerText(isEnabled: false, existingProgressPhotoCount: 1),
+            "Bulk import unlocks after one more added progress photo or migration access."
+        )
+        XCTAssertEqual(
+            BulkProgressPhotoImportPolicy.footerText(isEnabled: true, existingProgressPhotoCount: 0),
+            "Import progress photos from your photo library."
+        )
+    }
+}
+
 final class BodyMetricSourceContractTests: XCTestCase {
     func testSourceNormalizationCoversLaunchImportSources() {
         XCTAssertEqual(BodyMetricSource.normalizedRawValue(nil), "manual")
