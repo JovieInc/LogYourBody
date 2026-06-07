@@ -1,15 +1,23 @@
 import Foundation
 
-actor BodySpecDexaImporter {
-    static let shared = BodySpecDexaImporter()
+protocol BodySpecDexaAPIClient {
+    func listResults(page: Int, pageSize: Int) async throws -> BodySpecResultsListResponse
+    func getDexaScanInfo(resultId: String) async throws -> BodySpecDexaScanInfoResponse
+    func getDexaComposition(resultId: String) async throws -> BodySpecDexaCompositionResponse
+}
 
-    private let api: BodySpecAPI
+extension BodySpecAPI: BodySpecDexaAPIClient {}
+
+actor BodySpecDexaImporter {
+    @MainActor static let shared = BodySpecDexaImporter(api: BodySpecAPI.shared, authManager: .shared)
+
+    private let api: BodySpecDexaAPIClient
     private let authManager: AuthManager
     private let coreDataManager: CoreDataManager
 
     init(
-        api: BodySpecAPI = .shared,
-        authManager: AuthManager = .shared,
+        api: BodySpecDexaAPIClient,
+        authManager: AuthManager,
         coreDataManager: CoreDataManager = .shared
     ) {
         self.api = api
@@ -85,34 +93,16 @@ actor BodySpecDexaImporter {
         summary: BodySpecResultSummary,
         userId: String
     ) async -> Bool {
-        let metricsId = UUID().uuidString
-
-        let existing = await coreDataManager.fetchBodyMetrics(
-            for: userId,
-            from: summary.startTime,
-            to: summary.startTime
-        )
-
-        let alreadyHasBodySpecEntry = existing.contains { cached in
-            if BodyMetricSource.normalizedRawValue(cached.dataSource) == BodyMetricSource.bodySpecDexa.rawValue {
-                return true
-            }
-
-            if let notes = cached.notes, notes.localizedCaseInsensitiveContains("BodySpec") {
-                return true
-            }
-
-            return false
-        }
-
-        if alreadyHasBodySpecEntry {
-            return false
-        }
-
         do {
             let scanInfo = try await api.getDexaScanInfo(resultId: summary.resultId)
+
+            if await hasImportedResult(summary: summary, scanDate: scanInfo.acquireTime, userId: userId) {
+                return false
+            }
+
             let composition = try await api.getDexaComposition(resultId: summary.resultId)
 
+            let metricsId = UUID().uuidString
             let date = scanInfo.acquireTime
 
             let now = Date()
@@ -133,6 +123,8 @@ actor BodySpecDexaImporter {
                 dataSource: BodyMetricSource.bodySpecDexa.rawValue,
                 sourceMetadata: BodyMetricSourceMetadata(
                     vendor: "bodyspec",
+                    sourceName: "BodySpec DEXA",
+                    externalId: summary.service.serviceId,
                     externalResultId: summary.resultId,
                     scannerModel: scanInfo.scannerModel,
                     locationId: summary.location.locationId,
@@ -143,8 +135,9 @@ actor BodySpecDexaImporter {
                 updatedAt: now
             )
 
+            try await coreDataManager.saveBodyMetricsAndWait(bodyMetrics, userId: userId, markAsSynced: false)
+
             await MainActor.run {
-                CoreDataManager.shared.saveBodyMetrics(bodyMetrics, userId: userId, markAsSynced: false)
                 RealtimeSyncManager.shared.syncIfNeeded()
             }
 
@@ -169,8 +162,9 @@ actor BodySpecDexaImporter {
                 updatedAt: now
             )
 
+            try await coreDataManager.saveDexaResultsAndWait([dexaResult], userId: userId, markAsSynced: false)
+
             await MainActor.run {
-                CoreDataManager.shared.saveDexaResults([dexaResult], userId: userId, markAsSynced: false)
                 RealtimeSyncManager.shared.updatePendingSyncCount()
                 RealtimeSyncManager.shared.syncIfNeeded()
             }
@@ -185,6 +179,30 @@ actor BodySpecDexaImporter {
             )
             ErrorReporter.shared.captureNonFatal(error, context: context)
             return false
+        }
+    }
+
+    private func hasImportedResult(
+        summary: BodySpecResultSummary,
+        scanDate: Date,
+        userId: String
+    ) async -> Bool {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: scanDate)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? scanDate
+        let existing = await coreDataManager.fetchBodyMetrics(for: userId, from: startOfDay, to: endOfDay)
+
+        return existing.contains { cached in
+            if BodyMetricSourceMetadata(jsonString: cached.sourceMetadataJSON)?.externalResultId == summary.resultId {
+                return true
+            }
+
+            let isBodySpec = BodyMetricSource.normalizedRawValue(cached.dataSource) ==
+                BodyMetricSource.bodySpecDexa.rawValue
+            let hasLegacyBodySpecNote = cached.notes?.localizedCaseInsensitiveContains("BodySpec") == true
+            let isSameScanTimestamp = cached.date.map { abs($0.timeIntervalSince(scanDate)) < 60 } ?? false
+
+            return isSameScanTimestamp && (isBodySpec || hasLegacyBodySpecNote)
         }
     }
 }
