@@ -249,7 +249,15 @@ struct DashboardViewLiquid: View {
         previousSyncStatus = realtimeSyncManager.syncStatus
         handleSyncStatusChange(from: realtimeSyncManager.syncStatus, to: realtimeSyncManager.syncStatus)
 
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestFullDashboardFixture") {
+            isPhotosTabEnabled = true
+        } else {
+            isPhotosTabEnabled = AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.photosTabFlagKey)
+        }
+        #else
         isPhotosTabEnabled = AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.photosTabFlagKey)
+        #endif
     }
 
     private func handleCoreDataContextChange(_ notification: Notification) {
