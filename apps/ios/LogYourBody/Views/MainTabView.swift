@@ -7,21 +7,21 @@ import CoreData
 
 enum PaidAppSurface: Equatable {
     case weightLoggerMVP
-    case fullBodyCompositionDashboard
+    case legacyFullDashboardBeta
     case photoTimelineHUD
 }
 
 enum PaidAppSurfacePolicy {
     static func surface(
         photoTimelineHUDEnabled: Bool,
-        fullDashboardEnabled: Bool
+        legacyFullDashboardBetaEnabled: Bool
     ) -> PaidAppSurface {
         if photoTimelineHUDEnabled {
             return .photoTimelineHUD
         }
 
-        if fullDashboardEnabled {
-            return .fullBodyCompositionDashboard
+        if legacyFullDashboardBetaEnabled {
+            return .legacyFullDashboardBeta
         }
 
         return .weightLoggerMVP
@@ -39,7 +39,7 @@ struct MainTabView: View {
             switch selectedSurface {
             case .photoTimelineHUD:
                 DashboardViewLiquid(layoutMode: .photoTimelineHUD)
-            case .fullBodyCompositionDashboard:
+            case .legacyFullDashboardBeta:
                 DashboardViewLiquid(layoutMode: .legacyTabbed)
             case .weightLoggerMVP:
                 PaidWeightLoggerMVPView()
@@ -63,7 +63,7 @@ struct MainTabView: View {
         }
 
         if arguments.contains("-lybUITestFullDashboardFixture") {
-            selectedSurface = .fullBodyCompositionDashboard
+            selectedSurface = .legacyFullDashboardBeta
             HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
             return
         }
@@ -75,7 +75,7 @@ struct MainTabView: View {
                     flagKey: Constants.photoTimelineHUDFlagKey
                 )
             ),
-            fullDashboardEnabled: LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(
+            legacyFullDashboardBetaEnabled: LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(
                 gateEnabled: AnalyticsService.shared.isFeatureEnabled(
                     flagKey: Constants.fullBodyCompositionDashboardFlagKey
                 )

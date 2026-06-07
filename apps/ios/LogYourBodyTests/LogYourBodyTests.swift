@@ -13,75 +13,75 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertFalse(
             LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
                 hasCompletedOnboarding: false,
-                fullDashboardEnabled: false
+                legacyFullDashboardBetaEnabled: false
             )
         )
         XCTAssertFalse(
             LaunchSurfacePolicy.requiresCompleteProfile(
                 isProfileComplete: false,
-                fullDashboardEnabled: false
+                legacyFullDashboardBetaEnabled: false
             )
         )
     }
 
-    func testFullDashboardGateRestoresBodyCompositionRequirements() {
+    func testLegacyFullDashboardBetaGateRestoresBodyCompositionRequirements() {
         XCTAssertTrue(
             LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
                 hasCompletedOnboarding: false,
-                fullDashboardEnabled: true
+                legacyFullDashboardBetaEnabled: true
             )
         )
         XCTAssertTrue(
             LaunchSurfacePolicy.requiresCompleteProfile(
                 isProfileComplete: false,
-                fullDashboardEnabled: true
+                legacyFullDashboardBetaEnabled: true
             )
         )
         XCTAssertFalse(
             LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
                 hasCompletedOnboarding: true,
-                fullDashboardEnabled: true
+                legacyFullDashboardBetaEnabled: true
             )
         )
         XCTAssertFalse(
             LaunchSurfacePolicy.requiresCompleteProfile(
                 isProfileComplete: true,
-                fullDashboardEnabled: true
+                legacyFullDashboardBetaEnabled: true
             )
         )
     }
 
-    func testFullDashboardPolicyMirrorsFeatureGate() {
-        XCTAssertTrue(LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(gateEnabled: true))
-        XCTAssertFalse(LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(gateEnabled: false))
+    func testLegacyFullDashboardBetaPolicyMirrorsFeatureGate() {
+        XCTAssertTrue(LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(gateEnabled: true))
+        XCTAssertFalse(LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(gateEnabled: false))
     }
 
     func testPhotoTimelineHUDGateRestoresBodyCompositionRequirements() {
         XCTAssertTrue(
             LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
                 hasCompletedOnboarding: false,
-                fullDashboardEnabled: false,
+                legacyFullDashboardBetaEnabled: false,
                 photoTimelineHUDEnabled: true
             )
         )
         XCTAssertTrue(
             LaunchSurfacePolicy.requiresCompleteProfile(
                 isProfileComplete: false,
-                fullDashboardEnabled: false,
+                legacyFullDashboardBetaEnabled: false,
                 photoTimelineHUDEnabled: true
             )
         )
         XCTAssertFalse(
             LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
                 hasCompletedOnboarding: true,
-                fullDashboardEnabled: false,
+                legacyFullDashboardBetaEnabled: false,
                 photoTimelineHUDEnabled: true
             )
         )
         XCTAssertFalse(
             LaunchSurfacePolicy.requiresCompleteProfile(
                 isProfileComplete: true,
-                fullDashboardEnabled: false,
+                legacyFullDashboardBetaEnabled: false,
                 photoTimelineHUDEnabled: true
             )
         )
@@ -101,17 +101,42 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
 
     func testPhotoTimelineHUDTakesPrecedenceOverLegacyFullDashboard() {
         XCTAssertEqual(
-            PaidAppSurfacePolicy.surface(photoTimelineHUDEnabled: true, fullDashboardEnabled: true),
+            PaidAppSurfacePolicy.surface(
+                photoTimelineHUDEnabled: true,
+                legacyFullDashboardBetaEnabled: true
+            ),
             .photoTimelineHUD
         )
         XCTAssertEqual(
-            PaidAppSurfacePolicy.surface(photoTimelineHUDEnabled: false, fullDashboardEnabled: true),
-            .fullBodyCompositionDashboard
+            PaidAppSurfacePolicy.surface(
+                photoTimelineHUDEnabled: false,
+                legacyFullDashboardBetaEnabled: true
+            ),
+            .legacyFullDashboardBeta
         )
         XCTAssertEqual(
-            PaidAppSurfacePolicy.surface(photoTimelineHUDEnabled: false, fullDashboardEnabled: false),
+            PaidAppSurfacePolicy.surface(
+                photoTimelineHUDEnabled: false,
+                legacyFullDashboardBetaEnabled: false
+            ),
             .weightLoggerMVP
         )
+    }
+
+    func testLegacyFullDashboardIsOnlyBetaFallbackWhenHUDIsOff() {
+        XCTAssertEqual(Constants.fullBodyCompositionDashboardFlagKey, "ios_full_body_composition_dashboard")
+
+        let hudPrimary = PaidAppSurfacePolicy.surface(
+            photoTimelineHUDEnabled: true,
+            legacyFullDashboardBetaEnabled: false
+        )
+        let legacyFallback = PaidAppSurfacePolicy.surface(
+            photoTimelineHUDEnabled: false,
+            legacyFullDashboardBetaEnabled: true
+        )
+
+        XCTAssertEqual(hudPrimary, .photoTimelineHUD)
+        XCTAssertEqual(legacyFallback, .legacyFullDashboardBeta)
     }
 
     func testPhotoTimelineHUDMetricStateCopyIsExplicit() {

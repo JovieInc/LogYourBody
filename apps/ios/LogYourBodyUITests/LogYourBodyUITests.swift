@@ -119,6 +119,39 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(restoreButton.exists)
     }
 
+    func testPaidMVPFixtureRoutesToGateOffDefaultSurface() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestPaidMVPFixture"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
+    }
+
+    func testLegacyDashboardFixtureRoutesOnlyToLegacyBetaSurface() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestFullDashboardFixture"]
+        app.launch()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["legacy_full_dashboard_beta"].waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(app.tabBars.buttons["Home"].exists)
+        XCTAssertTrue(app.tabBars.buttons["Metrics"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud"].exists)
+    }
+
+    func testPhotoHUDFixtureRoutesToIntendedPostMVPDashboard() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
+    }
+
     func testLaunchPerformance() throws {
         if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
             // This measures how long it takes to launch your application.

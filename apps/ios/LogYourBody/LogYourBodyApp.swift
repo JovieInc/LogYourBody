@@ -357,7 +357,7 @@ struct LogYourBodyApp: App {
             // Check if body-composition onboarding/profile gates apply to this launch surface.
             let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Constants.hasCompletedOnboardingKey)
             let isProfileComplete = checkProfileComplete()
-            let fullDashboardEnabled = LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(
+            let legacyFullDashboardBetaEnabled = LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(
                 gateEnabled: AnalyticsService.shared.isFeatureEnabled(
                     flagKey: Constants.fullBodyCompositionDashboardFlagKey
                 )
@@ -369,12 +369,12 @@ struct LogYourBodyApp: App {
             )
             let requiresOnboarding = LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
                 hasCompletedOnboarding: hasCompletedOnboarding,
-                fullDashboardEnabled: fullDashboardEnabled,
+                legacyFullDashboardBetaEnabled: legacyFullDashboardBetaEnabled,
                 photoTimelineHUDEnabled: photoTimelineHUDEnabled
             )
             let requiresProfile = LaunchSurfacePolicy.requiresCompleteProfile(
                 isProfileComplete: isProfileComplete,
-                fullDashboardEnabled: fullDashboardEnabled,
+                legacyFullDashboardBetaEnabled: legacyFullDashboardBetaEnabled,
                 photoTimelineHUDEnabled: photoTimelineHUDEnabled
             )
 

@@ -19,6 +19,7 @@ struct Constants {
     // MARK: - Feature Flags
     static let isBodySpecEnabled = true
     static let appleSignInEnabledFlagKey = "ios_apple_sign_in_enabled"
+    // Legacy beta fallback; the intended post-MVP dashboard route is `ios_photo_timeline_hud`.
     static let fullBodyCompositionDashboardFlagKey = "ios_full_body_composition_dashboard"
     static let photoTimelineHUDFlagKey = "ios_photo_timeline_hud"
     static let photosTabFlagKey = "photos_tab"
