@@ -176,6 +176,31 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(trendMessage.exists)
     }
 
+    func testGlp1WeeklyCheckInFixtureShowsPromptAndOpensDoseFlow() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud"].waitForExistence(timeout: 10))
+
+        let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
+        if !prompt.waitForExistence(timeout: 2) {
+            app.scrollViews["photo_timeline_hud"].swipeUp()
+        }
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+
+        scrollUntilHittable(prompt, in: app)
+        XCTAssertTrue(prompt.isHittable)
+        prompt.tap()
+
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Zepbound"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Save GLP-1"].exists)
+    }
+
     func testLaunchPerformance() throws {
         if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
             // This measures how long it takes to launch your application.

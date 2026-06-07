@@ -286,6 +286,10 @@ struct LogYourBodyApp: App {
             await seedFullDashboardUITestFixtureData(userId: userId)
         }
 
+        if arguments.contains("-lybUITestGlp1WeeklyCheckInFixture") {
+            await seedGlp1WeeklyCheckInUITestFixtureData(userId: userId)
+        }
+
         return true
     }
 
@@ -333,6 +337,54 @@ struct LogYourBodyApp: App {
                 markAsSynced: entry.source != "manual"
             )
         }
+    }
+
+    private func seedGlp1WeeklyCheckInUITestFixtureData(userId: String) async {
+        let calendar = Calendar.current
+        let now = Date()
+        let startedAt = calendar.date(byAdding: .day, value: -42, to: now) ?? now
+        let lastDoseDate = calendar.date(byAdding: .day, value: -9, to: now) ?? now
+
+        let medication = Glp1Medication(
+            id: "ui_test_glp1_medication",
+            userId: userId,
+            displayName: "Zepbound",
+            genericName: "tirzepatide",
+            drugClass: "dual GIP/GLP-1 receptor agonist",
+            brand: "Zepbound",
+            route: "subcutaneous",
+            frequency: "once weekly",
+            doseUnit: "mg/week",
+            isCompounded: false,
+            hkIdentifier: "hk.glp1.tirzepatide.zepbound.weekly",
+            startedAt: startedAt,
+            endedAt: nil,
+            notes: nil,
+            createdAt: startedAt,
+            updatedAt: now
+        )
+
+        let doseLog = Glp1DoseLog(
+            id: "ui_test_glp1_dose_due",
+            userId: userId,
+            takenAt: calendar.startOfDay(for: lastDoseDate),
+            medicationId: medication.id,
+            doseAmount: 5.0,
+            doseUnit: "mg/week",
+            drugClass: medication.drugClass,
+            brand: medication.brand,
+            isCompounded: medication.isCompounded,
+            supplierType: nil,
+            supplierName: nil,
+            notes: "UI test weekly check-in seed",
+            createdAt: lastDoseDate,
+            updatedAt: now
+        )
+
+        CoreDataManager.shared.saveGlp1Medications([medication], userId: userId)
+        CoreDataManager.shared.saveGlp1DoseLogs([doseLog], userId: userId)
+        _ = await CoreDataManager.shared.fetchGlp1Medications(for: userId)
+        _ = await CoreDataManager.shared.fetchGlp1DoseLogs(for: userId)
     }
     #endif
 

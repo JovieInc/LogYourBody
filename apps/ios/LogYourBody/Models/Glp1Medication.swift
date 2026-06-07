@@ -43,6 +43,115 @@ struct Glp1Medication: Identifiable, Codable {
     }
 }
 
+enum Glp1WeeklyCheckInStatus: Equatable {
+    case setup
+    case due
+    case logged
+}
+
+struct Glp1WeeklyCheckInSummary: Equatable {
+    let status: Glp1WeeklyCheckInStatus
+    let title: String
+    let message: String
+    let actionTitle: String
+    let medicationName: String?
+    let latestDoseText: String?
+    let daysSinceLastDose: Int?
+}
+
+enum Glp1WeeklyCheckInPolicy {
+    static let defaultShowsWeeklyCheckIn = false
+
+    private static let weeklyDueDays = 6
+
+    static func shouldShowWeeklyCheckIn(gateEnabled: Bool) -> Bool {
+        gateEnabled
+    }
+
+    static func summary(
+        medications: [Glp1Medication],
+        doseLogs: [Glp1DoseLog],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Glp1WeeklyCheckInSummary {
+        let activeMedication = medications
+            .filter { $0.endedAt == nil }
+            .max { $0.startedAt < $1.startedAt } ?? medications.max { $0.startedAt < $1.startedAt }
+        let latestDose = doseLogs.max { $0.takenAt < $1.takenAt }
+        let medicationName = activeMedication?.displayName ?? latestDose?.brand
+        let latestDoseText = formattedDose(latestDose)
+
+        guard let latestDose else {
+            return Glp1WeeklyCheckInSummary(
+                status: .setup,
+                title: "Weekly GLP-1 check-in",
+                message: "Add your medication once, then log dose changes beside your timeline.",
+                actionTitle: "Set up",
+                medicationName: medicationName,
+                latestDoseText: nil,
+                daysSinceLastDose: nil
+            )
+        }
+
+        let elapsedDays = daysBetween(
+            latestDose.takenAt,
+            now,
+            calendar: calendar
+        )
+        let relativeText = relativeDoseText(days: elapsedDays)
+        let name = medicationName ?? "GLP-1"
+
+        if elapsedDays >= weeklyDueDays {
+            return Glp1WeeklyCheckInSummary(
+                status: .due,
+                title: "Weekly GLP-1 check-in",
+                message: "\(name) was last logged \(relativeText). Keep dose history aligned with weight and photos.",
+                actionTitle: "Log dose",
+                medicationName: medicationName,
+                latestDoseText: latestDoseText,
+                daysSinceLastDose: elapsedDays
+            )
+        }
+
+        return Glp1WeeklyCheckInSummary(
+            status: .logged,
+            title: "GLP-1 checked in",
+            message: "\(name) was last logged \(relativeText).",
+            actionTitle: "Log dose",
+            medicationName: medicationName,
+            latestDoseText: latestDoseText,
+            daysSinceLastDose: elapsedDays
+        )
+    }
+
+    private static func daysBetween(
+        _ start: Date,
+        _ end: Date,
+        calendar: Calendar
+    ) -> Int {
+        let startOfStart = calendar.startOfDay(for: start)
+        let startOfEnd = calendar.startOfDay(for: end)
+        return max(calendar.dateComponents([.day], from: startOfStart, to: startOfEnd).day ?? 0, 0)
+    }
+
+    private static func relativeDoseText(days: Int) -> String {
+        switch days {
+        case 0:
+            return "today"
+        case 1:
+            return "yesterday"
+        default:
+            return "\(days) days ago"
+        }
+    }
+
+    private static func formattedDose(_ log: Glp1DoseLog?) -> String? {
+        guard let amount = log?.doseAmount else { return nil }
+        let unit = log?.doseUnit ?? "mg"
+        return "\(String(format: "%.1f", amount)) \(unit)"
+    }
+}
+
 // Catalog of common GLP-1 and related medications and their typical dose ladders.
 // This is used to power fast logging UIs (preset lists + dose wheels).
 

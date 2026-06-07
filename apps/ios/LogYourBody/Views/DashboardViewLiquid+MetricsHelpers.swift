@@ -805,6 +805,16 @@ extension DashboardViewLiquid {
                 glp1DoseLogs = cachedLogs.sorted { $0.takenAt < $1.takenAt }
             }
 
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-lybUITestGlp1WeeklyCheckInFixture") {
+                if cachedLogs.isEmpty {
+                    glp1DoseLogs = [glp1WeeklyCheckInFixtureDoseLog(userId: userId)]
+                }
+                await prewarmMetricCaches()
+                return
+            }
+            #endif
+
             // Always attempt a remote refresh when possible
             let logs = try await SupabaseManager.shared.fetchGlp1DoseLogs(userId: userId, limit: 200)
             glp1DoseLogs = logs.sorted { $0.takenAt < $1.takenAt }
@@ -815,6 +825,92 @@ extension DashboardViewLiquid {
 
         await prewarmMetricCaches()
     }
+
+    @MainActor
+    func loadGlp1Medications() async {
+        guard let userId = authManager.currentUser?.id else {
+            glp1Medications = []
+            return
+        }
+
+        let cached = await CoreDataManager.shared.fetchGlp1Medications(for: userId)
+        if !cached.isEmpty {
+            glp1Medications = cached.sorted { $0.startedAt < $1.startedAt }
+        }
+
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestGlp1WeeklyCheckInFixture") {
+            if cached.isEmpty {
+                glp1Medications = [glp1WeeklyCheckInFixtureMedication(userId: userId)]
+            }
+            return
+        }
+        #endif
+
+        do {
+            let medications = try await SupabaseManager.shared.fetchGlp1Medications(userId: userId)
+            glp1Medications = medications.sorted { $0.startedAt < $1.startedAt }
+            CoreDataManager.shared.saveGlp1Medications(medications, userId: userId)
+        } catch {
+            // Keep cached medications when the network is unavailable.
+        }
+    }
+
+    @MainActor
+    func loadGlp1WeeklyCheckInData() async {
+        await loadGlp1Medications()
+        await loadGlp1DoseLogs()
+    }
+
+    #if DEBUG
+    private func glp1WeeklyCheckInFixtureMedication(userId: String) -> Glp1Medication {
+        let calendar = Calendar.current
+        let now = Date()
+        let startedAt = calendar.date(byAdding: .day, value: -42, to: now) ?? now
+
+        return Glp1Medication(
+            id: "ui_test_glp1_medication",
+            userId: userId,
+            displayName: "Zepbound",
+            genericName: "tirzepatide",
+            drugClass: "dual GIP/GLP-1 receptor agonist",
+            brand: "Zepbound",
+            route: "subcutaneous",
+            frequency: "once weekly",
+            doseUnit: "mg/week",
+            isCompounded: false,
+            hkIdentifier: "hk.glp1.tirzepatide.zepbound.weekly",
+            startedAt: startedAt,
+            endedAt: nil,
+            notes: nil,
+            createdAt: startedAt,
+            updatedAt: now
+        )
+    }
+
+    private func glp1WeeklyCheckInFixtureDoseLog(userId: String) -> Glp1DoseLog {
+        let calendar = Calendar.current
+        let now = Date()
+        let lastDoseDate = calendar.date(byAdding: .day, value: -9, to: now) ?? now
+
+        return Glp1DoseLog(
+            id: "ui_test_glp1_dose_due",
+            userId: userId,
+            takenAt: calendar.startOfDay(for: lastDoseDate),
+            medicationId: "ui_test_glp1_medication",
+            doseAmount: 5.0,
+            doseUnit: "mg/week",
+            drugClass: "dual GIP/GLP-1 receptor agonist",
+            brand: "Zepbound",
+            isCompounded: false,
+            supplierType: nil,
+            supplierName: nil,
+            notes: "UI test weekly check-in seed",
+            createdAt: lastDoseDate,
+            updatedAt: now
+        )
+    }
+    #endif
 }
 
 private func buildFullScreenStepsChartData(from recentDailyMetrics: [DailyMetrics]) -> [MetricChartDataPoint] {

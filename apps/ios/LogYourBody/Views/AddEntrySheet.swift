@@ -11,12 +11,15 @@ struct AddEntrySheet: View {
     @EnvironmentObject var authManager: AuthManager
     @Binding var isPresented: Bool
     @State private var selectedTab: Int
+    private let includesGlp1Entry: Bool
     @State private var selectedDate = Date()
     @AppStorage(Constants.preferredMeasurementSystemKey) private var measurementSystem = PreferencesView.defaultMeasurementSystem
 
-    init(isPresented: Binding<Bool>, initialTab: Int = 0) {
+    init(isPresented: Binding<Bool>, initialTab: Int = 0, includesGlp1Entry: Bool = false) {
+        let resolvedInitialTab = initialTab == 3 && !includesGlp1Entry ? 0 : initialTab
         self._isPresented = isPresented
-        self._selectedTab = State(initialValue: initialTab)
+        self._selectedTab = State(initialValue: resolvedInitialTab)
+        self.includesGlp1Entry = includesGlp1Entry
     }
 
     var currentSystem: MeasurementSystem {
@@ -70,6 +73,9 @@ struct AddEntrySheet: View {
                     Label("Weight", systemImage: "scalemass").tag(0)
                     Label("Body Fat", systemImage: "percent").tag(1)
                     Label("Photos", systemImage: "photo.fill").tag(2)
+                    if includesGlp1Entry {
+                        Label("GLP-1", systemImage: "syringe").tag(3)
+                    }
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
@@ -162,7 +168,11 @@ struct AddEntrySheet: View {
                     weightUnit = currentSystem.weightUnit
                 }
 
+                loadGlp1MedicationsIfNeeded()
                 AnalyticsService.shared.track(event: "add_entry_view")
+            }
+            .onChange(of: selectedTab) { _, _ in
+                loadGlp1MedicationsIfNeeded()
             }
         }
     }
@@ -906,6 +916,13 @@ struct AddEntrySheet: View {
             }
         }
 
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestGlp1WeeklyCheckInFixture") {
+            glp1IsLoadingMedications = false
+            return
+        }
+        #endif
+
         do {
             let medications = try await SupabaseManager.shared.fetchGlp1Medications(userId: userId)
             glp1Medications = medications.sorted(by: { $0.startedAt < $1.startedAt })
@@ -920,6 +937,15 @@ struct AddEntrySheet: View {
         }
 
         glp1IsLoadingMedications = false
+    }
+
+    private func loadGlp1MedicationsIfNeeded() {
+        guard includesGlp1Entry, selectedTab == 3 else { return }
+        guard let userId = authManager.currentUser?.id else { return }
+
+        Task {
+            await loadGlp1Medications(userId: userId)
+        }
     }
 
     private func applyDefaultDoseConfig(for medication: Glp1Medication) {
