@@ -23,6 +23,7 @@ struct Constants {
     static let fullBodyCompositionDashboardFlagKey = "ios_full_body_composition_dashboard"
     static let photoTimelineHUDFlagKey = "ios_photo_timeline_hud"
     static let phaseInsightFlagKey = "ios_phase_insight"
+    static let glp1WeeklyCheckInFlagKey = "ios_glp1_weekly_checkin"
     static let photosTabFlagKey = "photos_tab"
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)

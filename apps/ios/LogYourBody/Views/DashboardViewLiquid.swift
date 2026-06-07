@@ -49,6 +49,7 @@ struct DashboardViewLiquid: View {
     @State var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
     @State var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
     @State var glp1DoseLogs: [Glp1DoseLog] = []
+    @State var glp1Medications: [Glp1Medication] = []
     @State var dailyMetricsLookupCache: [Date: DailyMetrics] = [:]
 
     // Animated metric values for tweening
@@ -87,6 +88,8 @@ struct DashboardViewLiquid: View {
     @State var bodyScoreSharePayload: BodyScoreSharePayload?
     @State private var hasPerformedInitialRefresh = false
     @State private var featureGateRefreshToken = UUID()
+    @State private var addEntryInitialTab = 0
+    @State private var addEntryIncludesGlp1Entry = false
 
     init(layoutMode: LayoutMode = .legacyTabbed) {
         self.layoutMode = layoutMode
@@ -170,11 +173,16 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
                 featureGateRefreshToken = UUID()
+                loadGlp1WeeklyCheckInDataIfNeeded()
             }
 
         let withSheetsAndNavigation = withSyncAndState
             .sheet(isPresented: $showAddEntrySheet) {
-                AddEntrySheet(isPresented: $showAddEntrySheet)
+                AddEntrySheet(
+                    isPresented: $showAddEntrySheet,
+                    initialTab: addEntryInitialTab,
+                    includesGlp1Entry: addEntryIncludesGlp1Entry
+                )
                     .environmentObject(authManager)
             }
             .sheet(isPresented: $showSyncDetails) {
@@ -230,6 +238,11 @@ struct DashboardViewLiquid: View {
                 guard let payload = makeBodyScoreSharePayload() else { return }
                 bodyScoreSharePayload = payload
                 isBodyScoreSharePresented = true
+            }
+            .onChange(of: showAddEntrySheet) { _, isPresented in
+                guard !isPresented else { return }
+                addEntryInitialTab = 0
+                addEntryIncludesGlp1Entry = false
             }
 
         return withSheetsAndNavigation
@@ -307,6 +320,8 @@ struct DashboardViewLiquid: View {
         #else
         isPhotosTabEnabled = AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.photosTabFlagKey)
         #endif
+
+        loadGlp1WeeklyCheckInDataIfNeeded()
     }
 
     private func handleCoreDataContextChange(_ notification: Notification) {
@@ -457,6 +472,11 @@ struct DashboardViewLiquid: View {
 
                 hudTimelineSection
                     .padding(.horizontal, 20)
+
+                if isGlp1WeeklyCheckInEnabled {
+                    hudGlp1WeeklyCheckIn
+                        .padding(.horizontal, 20)
+                }
 
                 hudMetricsStrip
                     .padding(.horizontal, 20)
@@ -739,6 +759,75 @@ struct DashboardViewLiquid: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("photo_timeline_hud_phase_insight")
+    }
+
+    private var hudGlp1WeeklyCheckIn: some View {
+        let summary = Glp1WeeklyCheckInPolicy.summary(
+            medications: glp1Medications,
+            doseLogs: glp1DoseLogs
+        )
+
+        return Button {
+            presentAddEntrySheet(initialTab: 3, includesGlp1Entry: true)
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "syringe")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(glp1WeeklyCheckInColor(for: summary.status))
+                    .frame(width: 34, height: 34)
+                    .background(
+                        Circle()
+                            .fill(glp1WeeklyCheckInColor(for: summary.status).opacity(0.15))
+                    )
+
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 8) {
+                        Text(summary.title)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(Color.liquidTextPrimary)
+
+                        if let latestDoseText = summary.latestDoseText {
+                            Text(latestDoseText)
+                                .font(.system(size: 11, weight: .bold))
+                                .monospacedDigit()
+                                .foregroundColor(glp1WeeklyCheckInColor(for: summary.status))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule()
+                                        .fill(glp1WeeklyCheckInColor(for: summary.status).opacity(0.14))
+                                )
+                        }
+                    }
+
+                    Text(summary.message)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color.liquidTextPrimary.opacity(0.68))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                Text(summary.actionTitle)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Color.white))
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color.white.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("photo_timeline_hud_glp1_weekly_checkin")
+        .accessibilityLabel("\(summary.title). \(summary.message). \(summary.actionTitle)")
     }
 
     private var hudStatsAction: some View {
@@ -1032,6 +1121,36 @@ struct DashboardViewLiquid: View {
         )
     }
 
+    private var isGlp1WeeklyCheckInEnabled: Bool {
+        _ = featureGateRefreshToken
+
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestGlp1WeeklyCheckInFixture") {
+            return true
+        }
+        #endif
+
+        return Glp1WeeklyCheckInPolicy.shouldShowWeeklyCheckIn(
+            gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                flagKey: Constants.glp1WeeklyCheckInFlagKey
+            )
+        )
+    }
+
+    private func loadGlp1WeeklyCheckInDataIfNeeded() {
+        guard isGlp1WeeklyCheckInEnabled else { return }
+
+        Task {
+            await loadGlp1WeeklyCheckInData()
+        }
+    }
+
+    private func presentAddEntrySheet(initialTab: Int = 0, includesGlp1Entry: Bool = false) {
+        addEntryInitialTab = initialTab
+        addEntryIncludesGlp1Entry = includesGlp1Entry
+        showAddEntrySheet = true
+    }
+
     private func phaseInsightIcon(for kind: PhaseInsightKind) -> String {
         switch kind {
         case .cutting:
@@ -1055,6 +1174,17 @@ struct DashboardViewLiquid: View {
             return Color.metricAccentWeight
         case .insufficientData:
             return Color.metricTextTertiary
+        }
+    }
+
+    private func glp1WeeklyCheckInColor(for status: Glp1WeeklyCheckInStatus) -> Color {
+        switch status {
+        case .setup:
+            return Color.metricAccent
+        case .due:
+            return Color.metricAccentWeight
+        case .logged:
+            return Color.metricAccentSteps
         }
     }
 
