@@ -86,6 +86,7 @@ struct DashboardViewLiquid: View {
     @State var isBodyScoreSharePresented = false
     @State var bodyScoreSharePayload: BodyScoreSharePayload?
     @State private var hasPerformedInitialRefresh = false
+    @State private var featureGateRefreshToken = UUID()
 
     init(layoutMode: LayoutMode = .legacyTabbed) {
         self.layoutMode = layoutMode
@@ -166,6 +167,9 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .bodyScoreUpdated)) { _ in
                 bodyScoreRefreshToken = UUID()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+                featureGateRefreshToken = UUID()
             }
 
         let withSheetsAndNavigation = withSyncAndState
@@ -457,6 +461,11 @@ struct DashboardViewLiquid: View {
                 hudMetricsStrip
                     .padding(.horizontal, 20)
 
+                if isPhaseInsightEnabled {
+                    hudPhaseInsight
+                        .padding(.horizontal, 20)
+                }
+
                 hudStatsAction
                     .padding(.horizontal, 20)
 
@@ -669,6 +678,67 @@ struct DashboardViewLiquid: View {
             )
         }
         .accessibilityIdentifier("photo_timeline_hud_metrics")
+    }
+
+    private var hudPhaseInsight: some View {
+        let insight = PhaseInsightPolicy.insight(for: bodyMetrics)
+
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: phaseInsightIcon(for: insight.kind))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(phaseInsightColor(for: insight.kind))
+                .frame(width: 34, height: 34)
+                .background(
+                    Circle()
+                        .fill(phaseInsightColor(for: insight.kind).opacity(0.15))
+                )
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 8) {
+                    Text(insight.title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(Color.liquidTextPrimary)
+
+                    if let delta = insight.weightDeltaPercentPerWeek {
+                        Text(formatPhaseInsightDelta(delta))
+                            .font(.system(size: 11, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundColor(phaseInsightColor(for: insight.kind))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(phaseInsightColor(for: insight.kind).opacity(0.14))
+                            )
+                    }
+                }
+
+                Text(insight.message)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Color.liquidTextPrimary.opacity(0.68))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let detail = insight.detail {
+                    Text(detail)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color.liquidTextPrimary.opacity(0.52))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.white.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("photo_timeline_hud_phase_insight")
     }
 
     private var hudStatsAction: some View {
@@ -944,6 +1014,52 @@ struct DashboardViewLiquid: View {
 
     private var missingHUDMetric: GlobalTimelineMetricValue {
         GlobalTimelineMetricValue(value: nil, presence: .missing)
+    }
+
+    private var isPhaseInsightEnabled: Bool {
+        _ = featureGateRefreshToken
+
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestPhaseInsightFixture") {
+            return true
+        }
+        #endif
+
+        return PhaseInsightPolicy.shouldShowPhaseInsight(
+            gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                flagKey: Constants.phaseInsightFlagKey
+            )
+        )
+    }
+
+    private func phaseInsightIcon(for kind: PhaseInsightKind) -> String {
+        switch kind {
+        case .cutting:
+            return "chart.line.downtrend.xyaxis"
+        case .maintaining:
+            return "equal.circle.fill"
+        case .gaining:
+            return "chart.line.uptrend.xyaxis"
+        case .insufficientData:
+            return "clock.badge.questionmark.fill"
+        }
+    }
+
+    private func phaseInsightColor(for kind: PhaseInsightKind) -> Color {
+        switch kind {
+        case .cutting:
+            return Color.metricAccentBodyFat
+        case .maintaining:
+            return Color.metricAccent
+        case .gaining:
+            return Color.metricAccentWeight
+        case .insufficientData:
+            return Color.metricTextTertiary
+        }
+    }
+
+    private func formatPhaseInsightDelta(_ value: Double) -> String {
+        String(format: "%+.1f%%/wk", value)
     }
 
     private func photoTimelinePresenceLabel(for presence: MetricPresence) -> String {

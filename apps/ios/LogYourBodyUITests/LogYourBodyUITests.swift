@@ -149,7 +149,31 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_phase_insight"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
+    }
+
+    func testPhaseInsightFixtureShowsDeterministicCuttingInsight() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhaseInsightFixture"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud"].waitForExistence(timeout: 10))
+
+        let insight = app.descendants(matching: .any)["photo_timeline_hud_phase_insight"]
+        if !insight.waitForExistence(timeout: 2) {
+            app.scrollViews["photo_timeline_hud"].swipeUp()
+        }
+        XCTAssertTrue(insight.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Cutting"].exists)
+
+        let trendMessage = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Weight is trending down")
+        ).firstMatch
+        XCTAssertTrue(trendMessage.exists)
     }
 
     func testLaunchPerformance() throws {
