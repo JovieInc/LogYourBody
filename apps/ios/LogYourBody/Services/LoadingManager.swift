@@ -52,6 +52,16 @@ class LoadingManager: ObservableObject {
 
     private var completedWeight: Double = 0.0
 
+    #if DEBUG
+    private var usesUITestAuthFixture: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.contains("-lybUITestSignedOutFixture")
+            || arguments.contains("-lybUITestEmailVerificationFixture")
+            || arguments.contains("-lybUITestPaidMVPFixture")
+            || arguments.contains("-lybUITestPaywallFixture")
+    }
+    #endif
+
     init(
         authManager: AuthManager,
         healthSyncCoordinator: HealthSyncCoordinating = HealthSyncCoordinator.shared
@@ -95,6 +105,13 @@ class LoadingManager: ObservableObject {
 
         // Skip Clerk loading wait if using mock auth
         if !Constants.useMockAuth {
+            #if DEBUG
+            if usesUITestAuthFixture {
+                await updateProgress(for: .checkAuth)
+                return
+            }
+            #endif
+
             let clerkTask = authManager.ensureClerkInitializationTask()
             let maxWaitTimeNanoseconds: UInt64 = 500_000_000 // 0.5 seconds
             let clerkReady = await waitForClerkInitialization(

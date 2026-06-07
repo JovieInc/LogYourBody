@@ -40,6 +40,7 @@ struct EmailVerificationView: View {
                         title: "Verify Your Email",
                         subtitle: "We've sent a verification code to your email address"
                     )
+                    .accessibilityIdentifier("email_verification_header")
                     .padding(.bottom, 50)
 
                     // Organism: Verification Form
@@ -71,6 +72,7 @@ struct EmailVerificationView: View {
                 }
             }
         }
+        .accessibilityIdentifier("email_verification_screen")
         .navigationBarHidden(true)
         .onAppear {
             AnalyticsService.shared.track(event: "email_verification_view")
