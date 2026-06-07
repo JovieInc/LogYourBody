@@ -20,12 +20,30 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testSignedOutAppleSignInHiddenByDefault() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestSignedOutFixture"]
         app.launch()
 
         XCTAssertTrue(app.staticTexts["LogYourBody"].waitForExistence(timeout: 8))
-        XCTAssertTrue(app.textFields["Email"].exists)
-        XCTAssertTrue(app.buttons["Email me a code"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["login_email_field"].exists)
+        XCTAssertTrue(app.buttons["login_email_code_button"].exists)
         XCTAssertFalse(app.buttons["Continue with Apple"].exists)
+    }
+
+    func testEmailVerificationFixtureShowsOTPReadyState() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestEmailVerificationFixture"]
+        app.launch()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["email_verification_screen"].waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(app.staticTexts["Verify Your Email"].exists)
+        XCTAssertTrue(app.staticTexts["email_verification_pending_email"].exists)
+        XCTAssertEqual(app.staticTexts["email_verification_pending_email"].label, "otp-ready-ui@example.com")
+        XCTAssertTrue(app.descendants(matching: .any)["email_verification_code_field"].exists)
+        XCTAssertTrue(app.buttons["email_verification_verify_button"].exists)
+        XCTAssertFalse(app.buttons["email_verification_verify_button"].isEnabled)
+        XCTAssertTrue(app.staticTexts["email_verification_resend_timer"].exists)
     }
 
     func testPaidMVPWeightEntrySavesWithKeyboardOpen() throws {
@@ -45,7 +63,9 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(keyboardSaveButton.isEnabled)
         keyboardSaveButton.tap()
 
-        XCTAssertTrue(app.staticTexts["Saved locally. Sync queued."].waitForExistence(timeout: 5))
+        let savedMessage = app.descendants(matching: .any)["mvp_weight_saved_message"]
+        XCTAssertTrue(savedMessage.waitForExistence(timeout: 8))
+        XCTAssertTrue(savedMessage.label.contains("Saved locally"))
         XCTAssertFalse(app.staticTexts["Pending"].exists)
 
         let savedWeight = app.staticTexts.matching(

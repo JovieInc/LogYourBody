@@ -9,6 +9,7 @@ import SwiftUI
 struct OTPField: View {
     @Binding var code: String
     let length: Int
+    let accessibilityIdentifier: String?
     let onComplete: ((String) -> Void)?
 
     @FocusState private var isFieldFocused: Bool
@@ -16,10 +17,12 @@ struct OTPField: View {
     init(
         code: Binding<String>,
         length: Int = 6,
+        accessibilityIdentifier: String? = nil,
         onComplete: ((String) -> Void)? = nil
     ) {
         self._code = code
         self.length = length
+        self.accessibilityIdentifier = accessibilityIdentifier
         self.onComplete = onComplete
     }
 
@@ -56,6 +59,8 @@ struct OTPField: View {
                 isFieldFocused = true
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(accessibilityIdentifier ?? "otp_field")
     }
 
     private func digitAt(_ index: Int) -> String {

@@ -34,6 +34,7 @@ struct LoginForm: View {
                 textContentType: .emailAddress,
                 autocapitalization: .never
             )
+            .accessibilityIdentifier("login_email_field")
             .onSubmit {
                 if isFormValid {
                     onLogin()
@@ -56,6 +57,7 @@ struct LoginForm: View {
                 ),
                 action: onLogin
             )
+            .accessibilityIdentifier("login_email_code_button")
 
             if showsAppleSignIn {
                 DSAuthDivider()

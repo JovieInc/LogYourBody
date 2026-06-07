@@ -84,6 +84,14 @@ struct LogYourBodyApp: App {
     @MainActor
     private func performStartupSequence() async {
         #if DEBUG
+        if applySignedOutUITestFixtureIfNeeded() {
+            return
+        }
+
+        if applyEmailVerificationUITestFixtureIfNeeded() {
+            return
+        }
+
         if applyPaidMVPUITestFixtureIfNeeded() {
             return
         }
@@ -157,6 +165,40 @@ struct LogYourBodyApp: App {
     }
 
     #if DEBUG
+    @MainActor
+    @discardableResult
+    private func applySignedOutUITestFixtureIfNeeded() -> Bool {
+        guard ProcessInfo.processInfo.arguments.contains("-lybUITestSignedOutFixture") else {
+            return false
+        }
+
+        authManager.applySignedOutUITestFixture()
+        revenueCatManager.isSubscribed = false
+        revenueCatManager.customerInfo = nil
+        revenueCatManager.currentOffering = nil
+        revenueCatManager.errorMessage = nil
+        revenueCatManager.isPurchasing = false
+
+        return true
+    }
+
+    @MainActor
+    @discardableResult
+    private func applyEmailVerificationUITestFixtureIfNeeded() -> Bool {
+        guard ProcessInfo.processInfo.arguments.contains("-lybUITestEmailVerificationFixture") else {
+            return false
+        }
+
+        authManager.applyEmailVerificationUITestFixture()
+        revenueCatManager.isSubscribed = false
+        revenueCatManager.customerInfo = nil
+        revenueCatManager.currentOffering = nil
+        revenueCatManager.errorMessage = nil
+        revenueCatManager.isPurchasing = false
+
+        return true
+    }
+
     @MainActor
     @discardableResult
     private func applyPaidMVPUITestFixtureIfNeeded() -> Bool {

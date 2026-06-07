@@ -206,6 +206,43 @@ class AuthManager: NSObject, ObservableObject {
         clerkInitError = message
     }
 
+    #if DEBUG
+    func applySignedOutUITestFixture() {
+        currentUser = nil
+        clerkSession = nil
+        isAuthenticated = false
+        isClerkLoaded = true
+        clerkInitError = nil
+        needsLegalConsent = false
+        lastExitReason = .none
+        memberSinceDate = nil
+        pendingAppleUserId = nil
+        currentSignIn = nil
+        currentSignUp = nil
+        pendingSignInEmail = nil
+        pendingSignUpEmail = nil
+        emailVerificationFlow = nil
+        needsEmailVerification = false
+    }
+
+    func applyEmailVerificationUITestFixture(
+        email: String = "otp-ready-ui@example.com",
+        flow: EmailVerificationFlow = .signIn
+    ) {
+        applySignedOutUITestFixture()
+
+        switch flow {
+        case .signIn:
+            pendingSignInEmail = email
+        case .signUp:
+            pendingSignUpEmail = email
+        }
+
+        emailVerificationFlow = flow
+        needsEmailVerification = true
+    }
+    #endif
+
     private func boolString(_ value: Bool) -> String {
         value ? "true" : "false"
     }

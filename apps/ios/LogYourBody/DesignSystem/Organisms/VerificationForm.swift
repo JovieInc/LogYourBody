@@ -30,6 +30,7 @@ struct VerificationForm: View {
                 Text(email)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.appText)
+                    .accessibilityIdentifier("email_verification_pending_email")
             }
             .multilineTextAlignment(.center)
 
@@ -37,6 +38,7 @@ struct VerificationForm: View {
             OTPField(
                 code: $verificationCode,
                 length: 6,
+                accessibilityIdentifier: "email_verification_code_field",
                 onComplete: { _ in
                     if !isLoading {
                         onVerify()
@@ -55,6 +57,7 @@ struct VerificationForm: View {
                 ),
                 action: onVerify
             )
+            .accessibilityIdentifier("email_verification_verify_button")
 
             // Resend Code
             VStack(spacing: 4) {
@@ -62,6 +65,7 @@ struct VerificationForm: View {
                     Text("Resend code in \(timeRemaining)s")
                         .font(.system(size: 14))
                         .foregroundColor(.appTextSecondary)
+                        .accessibilityIdentifier("email_verification_resend_timer")
                 } else {
                     HStack(spacing: 4) {
                         Text("Didn't receive code?")
