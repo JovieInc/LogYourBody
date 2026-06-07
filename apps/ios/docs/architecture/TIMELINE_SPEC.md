@@ -43,17 +43,19 @@ All types below are **conceptual contracts**, not final Swift APIs.
 
 - **MetricPresence**
   - `.present` – metric has direct observations in the bucket window
-  - `.estimated` – metric is derived from interpolation / carry-forward
+  - `.interpolated` – metric is derived between nearby observations
+  - `.lastKnown` – metric is carried forward from the latest usable observation
   - `.missing` – no reasonable value can be produced
 
 - **BodyScoreCompleteness**
-  - `.full` – all core metrics are present (or high-confidence estimates)
+  - `.full` – all core metrics are present (or high-confidence interpolations)
   - `.partial` – body score computed from a subset of core metrics
   - `.none` – not enough data to compute a reasonable score
 
 - **MetricValue** (per metric, per bucket)
   - `value: Double?`
   - `presence: MetricPresence`
+  - `confidence: GlobalTimelineMetricConfidence?` – optional confidence for interpolated values
 
 - **MetricsSnapshot** (per bucket)
   - Scalar metrics (examples – not exhaustive):
@@ -63,7 +65,9 @@ All types below are **conceptual contracts**, not final Swift APIs.
     - `steps: MetricValue` (or activity)
   - Visual / media:
     - `canonicalPhotoId: String?` – representative photo for bucket, if any
+    - `canonicalPhotoDate: Date?`
     - `hasPhotosInRange: Bool`
+    - `photoCount: Int`
   - Body score:
     - `bodyScore: Double?` – output of the current body score algorithm
     - `bodyScoreCompleteness: BodyScoreCompleteness`
@@ -115,7 +119,8 @@ The header timeline is divided into three logical zones, arranged from right (mo
   - No interpolation between weekly buckets in Zone A.
   - All `MetricValue` instances in Zone A are either:
     - `.present` – directly derived from events in that week
-    - `.estimated` – via short-range carry-forward within a bounded window (per-metric)
+    - `.interpolated` – between nearby observations inside a bounded window
+    - `.lastKnown` – via carry-forward from the latest usable observation
     - `.missing` – if nothing usable is available
 
 ### 3.2 Zone B – Recent months (medium)
@@ -155,7 +160,8 @@ Each weekly bucket is built from events in its `DateInterval`.
   - `weight.value` = median of all weight events in the week (or the last event if only one).
   - `weight.presence`:
     - `.present` if ≥1 weight event in week.
-    - `.estimated` if no weight events this week but a recent week (within N weeks) has weight (carry-forward with decay).
+    - `.interpolated` if no weight events this week but nearby observations support interpolation.
+    - `.lastKnown` if the latest usable observation is carried forward.
     - `.missing` if the last weight measurement is older than the acceptable freshness window.
 
 - **Body fat**
@@ -164,7 +170,7 @@ Each weekly bucket is built from events in its `DateInterval`.
 
 - **FFMI / composition metrics**
   - Derived from DEXA or other composition events.
-  - If composition last measured within a longer freshness window (e.g. several months), can be treated as `.estimated` in more recent weeks.
+  - If composition last measured within a longer freshness window (e.g. several months), can be treated as `.lastKnown` in more recent weeks.
 
 - **Steps / activity**
   - `steps.value` = mean daily steps across the week (from daily step events).
@@ -181,8 +187,8 @@ Each weekly bucket is built from events in its `DateInterval`.
 - We treat the body score function as `f(metrics, version)`.
 - Inputs come from the weekly `MetricsSnapshot`.
 - Completeness rules:
-  - `.full` – all core metrics for `f` are `.present` (or high-confidence `.estimated`).
-  - `.partial` – at least one core metric is `.present` but others are `.estimated` or `.missing`.
+  - `.full` – all core metrics for `f` are `.present` (or high-confidence `.interpolated`).
+  - `.partial` – at least one core metric is `.present` but others are `.interpolated`, `.lastKnown`, or `.missing`.
   - `.none` – not enough core metrics to compute a meaningful score.
 
 ### 4.2 Monthly buckets (Zone B)
@@ -193,14 +199,15 @@ Monthly buckets aggregate across weekly buckets that fall in the given calendar 
 
 - Use precomputed weekly `MetricValue`s as inputs.
 - For each metric:
-  - Consider only weeks where `presence` is `.present` or high-confidence `.estimated`.
+  - Consider only weeks where `presence` is `.present` or high-confidence `.interpolated`.
   - Compute a representative monthly value, e.g.:
     - `weightMonth.value` = median of `weightWeekly.value` for eligible weeks in the month.
     - `bodyFatMonth.value` = median of body fat weekly values.
     - `stepsMonth.value` = mean of weekly steps.
   - `presence` rules:
     - `.present` if ≥1 eligible weekly value in the month.
-    - `.estimated` if derived mainly from estimated weekly inputs but still reasonably grounded.
+    - `.interpolated` if derived mainly from interpolated weekly inputs but still reasonably grounded.
+    - `.lastKnown` if derived mainly from carried-forward weekly inputs.
     - `.missing` if no eligible weekly values exist.
 
 **Monthly interpolation:**
@@ -208,7 +215,7 @@ Monthly buckets aggregate across weekly buckets that fall in the given calendar 
 - Only interpolate **between months that have data**.
 - For a month with no data but neighbors with present values:
   - Interpolate each metric separately (e.g. linear interpolation on the aggregated values).
-  - Mark `presence = .estimated` for that metric.
+  - Mark `presence = .interpolated` for that metric.
   - Cap the interpolation window (e.g. do not interpolate across gaps of >2 consecutive missing months).
 
 **Monthly body score:**
@@ -229,7 +236,8 @@ Yearly buckets aggregate across monthly buckets in the given calendar year.
   - Similar logic for body fat, FFMI, steps, etc.
   - `presence` rules:
     - `.present` if enough months have present values.
-    - `.estimated` if primarily derived from estimated months.
+    - `.interpolated` if primarily derived from interpolated months.
+    - `.lastKnown` if primarily derived from carried-forward months.
     - `.missing` if the year has almost no usable data.
 
 **Yearly interpolation:**
@@ -238,7 +246,7 @@ Yearly buckets aggregate across monthly buckets in the given calendar year.
 - Optionally interpolate **one or two bridge years** only when:
   - The year has no data.
   - Surrounding years both have strong data.
-- Bridge years are always `presence = .estimated` for all metrics and visually de-emphasized.
+- Bridge years are always `presence = .interpolated` for all metrics and visually de-emphasized.
 
 **Yearly body score:**
 
@@ -301,7 +309,7 @@ All three main surfaces subscribe to the same `TimelineCursor` and `TimelineBuck
 - **Secondary metric tiles**
   - Each tile reads its `MetricValue` from the bucket snapshot.
   - Deltas are always computed **relative to the previous bucket at the same scale**.
-  - Tiles must handle `present`, `estimated`, and `missing` states explicitly.
+  - Tiles must handle `present`, `interpolated`, `lastKnown`, and `missing` states explicitly.
 
 ### 6.2 Photos Tab
 
@@ -388,14 +396,15 @@ Rules:
 - Body score uses whatever subset of metrics is available and reports `BodyScoreCompleteness`.
 - Screens must visually distinguish:
   - Real values.
-  - Estimated values.
+  - Interpolated values.
+  - Last-known values.
   - Missing values.
 
 Examples:
 
 - **Weight only** week:
   - Weight: `.present`.
-  - Body fat: `.missing` or `.estimated` (if recently measured elsewhere).
+  - Body fat: `.missing`, `.interpolated`, or `.lastKnown` (if recently measured elsewhere).
   - Body score: `.partial` (weight-driven).
 
 - **Photo only** week:

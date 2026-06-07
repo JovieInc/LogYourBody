@@ -8,8 +8,36 @@ enum GlobalTimelineScale: String, Codable {
 
 enum MetricPresence: String, Codable {
     case present
-    case estimated
+    case interpolated
+    case lastKnown = "last_known"
     case missing
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+
+        switch rawValue {
+        case "present":
+            self = .present
+        case "interpolated", "estimated":
+            self = .interpolated
+        case "last_known":
+            self = .lastKnown
+        case "missing":
+            self = .missing
+        default:
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unknown metric presence: \(rawValue)"
+            )
+        }
+    }
+}
+
+enum GlobalTimelineMetricConfidence: String, Codable {
+    case high
+    case medium
+    case low
 }
 
 enum BodyScoreCompleteness: String, Codable {
@@ -21,6 +49,17 @@ enum BodyScoreCompleteness: String, Codable {
 struct GlobalTimelineMetricValue: Codable, Equatable {
     let value: Double?
     let presence: MetricPresence
+    let confidence: GlobalTimelineMetricConfidence?
+
+    init(
+        value: Double?,
+        presence: MetricPresence,
+        confidence: GlobalTimelineMetricConfidence? = nil
+    ) {
+        self.value = value
+        self.presence = presence
+        self.confidence = confidence
+    }
 }
 
 struct GlobalTimelineMetricsSnapshot: Codable, Equatable {
@@ -30,7 +69,9 @@ struct GlobalTimelineMetricsSnapshot: Codable, Equatable {
     let steps: GlobalTimelineMetricValue
 
     let canonicalPhotoId: String?
+    let canonicalPhotoDate: Date?
     let hasPhotosInRange: Bool
+    let photoCount: Int
 
     let bodyScore: Double?
     let bodyScoreCompleteness: BodyScoreCompleteness
