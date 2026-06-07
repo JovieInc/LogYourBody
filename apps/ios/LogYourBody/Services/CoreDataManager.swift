@@ -320,8 +320,16 @@ class CoreDataManager: ObservableObject {
         }
     }
 
-    func saveDexaResults(_ results: [DexaResult], userId: String, markAsSynced: Bool = false) {
-        guard !results.isEmpty else { return }
+    func saveDexaResults(
+        _ results: [DexaResult],
+        userId: String,
+        markAsSynced: Bool = false,
+        completion: ((Result<Void, Error>) -> Void)? = nil
+    ) {
+        guard !results.isEmpty else {
+            completion?(.success(()))
+            return
+        }
 
         let context = viewContext
 
@@ -364,6 +372,7 @@ class CoreDataManager: ObservableObject {
                 if context.hasChanges {
                     try context.save()
                 }
+                completion?(.success(()))
             } catch {
                 #if DEBUG
                 let appError = AppError.coreData(operation: "saveDexaResults", underlying: error)
@@ -375,6 +384,15 @@ class CoreDataManager: ObservableObject {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 #endif
+                completion?(.failure(error))
+            }
+        }
+    }
+
+    func saveDexaResultsAndWait(_ results: [DexaResult], userId: String, markAsSynced: Bool = false) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            saveDexaResults(results, userId: userId, markAsSynced: markAsSynced) { result in
+                continuation.resume(with: result)
             }
         }
     }

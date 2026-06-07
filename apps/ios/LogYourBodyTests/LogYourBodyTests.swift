@@ -559,6 +559,36 @@ final class StubSupabaseManager: SupabaseManager {
     }
 }
 
+final class StubBodySpecDexaAPI: BodySpecDexaAPIClient {
+    var pages: [Int: BodySpecResultsListResponse] = [:]
+    var scanInfos: [String: BodySpecDexaScanInfoResponse] = [:]
+    var compositions: [String: BodySpecDexaCompositionResponse] = [:]
+
+    private(set) var compositionRequests: [String] = []
+
+    func listResults(page: Int, pageSize: Int) async throws -> BodySpecResultsListResponse {
+        pages[page] ?? BodySpecResultsListResponse(results: [])
+    }
+
+    func getDexaScanInfo(resultId: String) async throws -> BodySpecDexaScanInfoResponse {
+        guard let scanInfo = scanInfos[resultId] else {
+            throw BodySpecAPIError.invalidResponse
+        }
+
+        return scanInfo
+    }
+
+    func getDexaComposition(resultId: String) async throws -> BodySpecDexaCompositionResponse {
+        compositionRequests.append(resultId)
+
+        guard let composition = compositions[resultId] else {
+            throw BodySpecAPIError.invalidResponse
+        }
+
+        return composition
+    }
+}
+
 @MainActor
 final class SyncIntegrationTests: XCTestCase {
     override func setUp() async throws {
@@ -573,6 +603,198 @@ final class SyncIntegrationTests: XCTestCase {
 
     private func wholeSecondDate(_ offset: TimeInterval = 0) -> Date {
         Date(timeIntervalSince1970: 1_735_000_000 + offset)
+    }
+
+    private func makeBodySpecSummary(
+        resultId: String,
+        startTime: Date,
+        serviceId: String = "svc-dxa"
+    ) -> BodySpecResultSummary {
+        BodySpecResultSummary(
+            resultId: resultId,
+            startTime: startTime,
+            location: BodySpecLocation(locationId: "loc-santa-monica", name: "Santa Monica"),
+            service: BodySpecService(
+                name: "DEXA",
+                description: "DEXA scan",
+                serviceId: serviceId,
+                serviceCode: "DXA"
+            )
+        )
+    }
+
+    private func makeBodySpecComposition(resultId: String) -> BodySpecDexaCompositionResponse {
+        BodySpecDexaCompositionResponse(
+            resultId: resultId,
+            total: BodySpecBodyRegion(
+                fatMassKg: 14.0,
+                leanMassKg: 62.0,
+                boneMassKg: 3.2,
+                totalMassKg: 79.2,
+                tissueFatPct: 18.4,
+                regionFatPct: 17.7
+            )
+        )
+    }
+
+    func testBodySpecDexaImporter_AddsProvenanceWithoutOverwritingManualOrHealthKit() async throws {
+        let coreData = CoreDataManager.shared
+        let authManager = AuthManager()
+
+        let userId = "bodyspec_import_user_\(UUID().uuidString)"
+        let user = LocalUser(
+            id: userId,
+            email: "bodyspec@example.com",
+            name: "BodySpec Import",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+        authManager.currentUser = user
+
+        let scanDate = wholeSecondDate(20_000)
+        let manualMetric = BodyMetrics(
+            id: UUID().uuidString,
+            userId: userId,
+            date: scanDate,
+            weight: 80.0,
+            weightUnit: "kg",
+            bodyFatPercentage: 20.0,
+            bodyFatMethod: "manual",
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "same-day manual entry",
+            photoUrl: nil,
+            dataSource: BodyMetricSource.manual.rawValue,
+            sourceMetadata: nil,
+            createdAt: scanDate,
+            updatedAt: scanDate
+        )
+        try await coreData.saveBodyMetricsAndWait(manualMetric, userId: userId, markAsSynced: false)
+
+        let healthKitMetric = BodyMetrics(
+            id: UUID().uuidString,
+            userId: userId,
+            date: scanDate.addingTimeInterval(600),
+            weight: 80.4,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "same-day HealthKit entry",
+            photoUrl: nil,
+            dataSource: BodyMetricSource.healthKit.rawValue,
+            sourceMetadata: BodyMetricSourceMetadata(vendor: "apple_health", sampleId: "hk-sample"),
+            createdAt: scanDate,
+            updatedAt: scanDate
+        )
+        try await coreData.saveBodyMetricsAndWait(healthKitMetric, userId: userId, markAsSynced: false)
+
+        let resultId = "bodyspec-result-123"
+        let stubAPI = StubBodySpecDexaAPI()
+        stubAPI.pages[1] = BodySpecResultsListResponse(results: [
+            makeBodySpecSummary(resultId: resultId, startTime: scanDate)
+        ])
+        stubAPI.scanInfos[resultId] = BodySpecDexaScanInfoResponse(
+            resultId: resultId,
+            scannerModel: "Hologic Horizon A",
+            acquireTime: scanDate.addingTimeInterval(1_200),
+            analyzeTime: scanDate.addingTimeInterval(1_500)
+        )
+        stubAPI.compositions[resultId] = makeBodySpecComposition(resultId: resultId)
+
+        let importer = BodySpecDexaImporter(
+            api: stubAPI,
+            authManager: authManager,
+            coreDataManager: coreData
+        )
+
+        let importResult = await importer.importDexaResults()
+
+        XCTAssertEqual(importResult.importedCount, 1)
+        XCTAssertEqual(importResult.skippedCount, 0)
+
+        let metrics = await coreData.fetchAllBodyMetrics(for: userId)
+        XCTAssertEqual(metrics.count, 3)
+
+        let manual = try XCTUnwrap(metrics.first { $0.id == manualMetric.id })
+        XCTAssertEqual(manual.dataSource, "manual")
+        XCTAssertEqual(try XCTUnwrap(manual.weight), 80.0, accuracy: 0.001)
+
+        let healthKit = try XCTUnwrap(metrics.first { $0.id == healthKitMetric.id })
+        XCTAssertEqual(healthKit.dataSource, "healthkit")
+        XCTAssertEqual(try XCTUnwrap(healthKit.weight), 80.4, accuracy: 0.001)
+
+        let dexa = try XCTUnwrap(metrics.first { $0.dataSource == BodyMetricSource.bodySpecDexa.rawValue })
+        XCTAssertEqual(dexa.bodyFatMethod, "DEXA (BodySpec)")
+        XCTAssertEqual(try XCTUnwrap(dexa.weight), 79.2, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(dexa.bodyFatPercentage), 17.7, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(dexa.muscleMass), 62.0, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(dexa.boneMass), 3.2, accuracy: 0.001)
+
+        let sourceMetadata = try XCTUnwrap(dexa.sourceMetadata)
+        XCTAssertEqual(sourceMetadata.vendor, "bodyspec")
+        XCTAssertEqual(sourceMetadata.sourceName, "BodySpec DEXA")
+        XCTAssertEqual(sourceMetadata.externalId, "svc-dxa")
+        XCTAssertEqual(sourceMetadata.externalResultId, resultId)
+        XCTAssertEqual(sourceMetadata.scannerModel, "Hologic Horizon A")
+        XCTAssertEqual(sourceMetadata.locationId, "loc-santa-monica")
+        XCTAssertEqual(sourceMetadata.locationName, "Santa Monica")
+        XCTAssertNotNil(sourceMetadata.importedAt)
+
+        let dexaResults = await coreData.fetchDexaResults(for: userId, limit: 10)
+        XCTAssertEqual(dexaResults.count, 1)
+        XCTAssertEqual(dexaResults.first?.bodyMetricsId, dexa.id)
+        XCTAssertEqual(dexaResults.first?.externalSource, "bodyspec")
+        XCTAssertEqual(dexaResults.first?.externalResultId, resultId)
+    }
+
+    func testBodySpecDexaImporter_SkipsExistingExternalResultId() async throws {
+        let coreData = CoreDataManager.shared
+        let authManager = AuthManager()
+
+        let userId = "bodyspec_duplicate_user_\(UUID().uuidString)"
+        authManager.currentUser = LocalUser(
+            id: userId,
+            email: "bodyspec-duplicate@example.com",
+            name: "BodySpec Duplicate",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+
+        let scanDate = wholeSecondDate(30_000)
+        let resultId = "bodyspec-result-duplicate"
+        let stubAPI = StubBodySpecDexaAPI()
+        stubAPI.pages[1] = BodySpecResultsListResponse(results: [
+            makeBodySpecSummary(resultId: resultId, startTime: scanDate)
+        ])
+        stubAPI.scanInfos[resultId] = BodySpecDexaScanInfoResponse(
+            resultId: resultId,
+            scannerModel: "Hologic Horizon A",
+            acquireTime: scanDate,
+            analyzeTime: scanDate.addingTimeInterval(300)
+        )
+        stubAPI.compositions[resultId] = makeBodySpecComposition(resultId: resultId)
+
+        let importer = BodySpecDexaImporter(
+            api: stubAPI,
+            authManager: authManager,
+            coreDataManager: coreData
+        )
+
+        let firstImport = await importer.importDexaResults()
+        let secondImport = await importer.importDexaResults()
+
+        XCTAssertEqual(firstImport.importedCount, 1)
+        XCTAssertEqual(firstImport.skippedCount, 0)
+        XCTAssertEqual(secondImport.importedCount, 0)
+        XCTAssertEqual(secondImport.skippedCount, 1)
+        XCTAssertEqual(stubAPI.compositionRequests.filter { $0 == resultId }.count, 1)
+
+        let metrics = await coreData.fetchAllBodyMetrics(for: userId)
+        XCTAssertEqual(metrics.filter { $0.dataSource == BodyMetricSource.bodySpecDexa.rawValue }.count, 1)
     }
 
     func testUpdateOrCreateBodyMetric_MapsSupabasePayload() async throws {
