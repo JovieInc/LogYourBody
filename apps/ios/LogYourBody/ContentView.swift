@@ -11,16 +11,18 @@ enum LaunchSurfacePolicy {
 
     static func requiresBodyCompositionOnboarding(
         hasCompletedOnboarding: Bool,
-        fullDashboardEnabled: Bool
+        fullDashboardEnabled: Bool,
+        photoTimelineHUDEnabled: Bool = false
     ) -> Bool {
-        fullDashboardEnabled && !hasCompletedOnboarding
+        (fullDashboardEnabled || photoTimelineHUDEnabled) && !hasCompletedOnboarding
     }
 
     static func requiresCompleteProfile(
         isProfileComplete: Bool,
-        fullDashboardEnabled: Bool
+        fullDashboardEnabled: Bool,
+        photoTimelineHUDEnabled: Bool = false
     ) -> Bool {
-        fullDashboardEnabled && !isProfileComplete
+        (fullDashboardEnabled || photoTimelineHUDEnabled) && !isProfileComplete
     }
 }
 
@@ -37,6 +39,7 @@ struct ContentView: View {
     @State private var isLoadingComplete = false
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
+    @State private var featureGateRefreshToken = UUID()
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
 
     init() {
@@ -74,21 +77,33 @@ struct ContentView: View {
     private var shouldShowOnboarding: Bool {
         LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
             hasCompletedOnboarding: hasCompletedOnboarding,
-            fullDashboardEnabled: isFullBodyCompositionDashboardEnabled
+            fullDashboardEnabled: isFullBodyCompositionDashboardEnabled,
+            photoTimelineHUDEnabled: isPhotoTimelineHUDEnabled
         )
     }
 
     private var shouldShowProfileCompletion: Bool {
         LaunchSurfacePolicy.requiresCompleteProfile(
             isProfileComplete: isProfileComplete,
-            fullDashboardEnabled: isFullBodyCompositionDashboardEnabled
+            fullDashboardEnabled: isFullBodyCompositionDashboardEnabled,
+            photoTimelineHUDEnabled: isPhotoTimelineHUDEnabled
         )
     }
 
     private var isFullBodyCompositionDashboardEnabled: Bool {
-        LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(
+        _ = featureGateRefreshToken
+        return LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(
             gateEnabled: AnalyticsService.shared.isFeatureEnabled(
                 flagKey: Constants.fullBodyCompositionDashboardFlagKey
+            )
+        )
+    }
+
+    private var isPhotoTimelineHUDEnabled: Bool {
+        _ = featureGateRefreshToken
+        return PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
+            gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                flagKey: Constants.photoTimelineHUDFlagKey
             )
         )
     }
@@ -137,6 +152,9 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: OnboardingStateManager.onboardingStateDidChange)) { _ in
             hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            featureGateRefreshToken = UUID()
         }
         .onChange(of: authManager.isAuthenticated) { _, newValue in
             currentUserId = authManager.currentUser?.id

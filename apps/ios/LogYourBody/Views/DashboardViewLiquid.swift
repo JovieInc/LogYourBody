@@ -13,9 +13,17 @@ import CoreData
 @preconcurrency import Combine
 
 struct DashboardViewLiquid: View {
+    enum LayoutMode {
+        case legacyTabbed
+        case photoTimelineHUD
+    }
+
+    let layoutMode: LayoutMode
+
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     @StateObject var viewModel = DashboardViewModel()
+    @StateObject var globalTimelineStore = GlobalTimelineStore()
 
     // Core data / selection
     @State var selectedIndex: Int = 0
@@ -74,6 +82,10 @@ struct DashboardViewLiquid: View {
     @State var bodyScoreSharePayload: BodyScoreSharePayload?
     @State private var hasPerformedInitialRefresh = false
 
+    init(layoutMode: LayoutMode = .legacyTabbed) {
+        self.layoutMode = layoutMode
+    }
+
     enum DashboardTab: Hashable {
         case home
         case photos
@@ -131,6 +143,10 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(viewModel.$recentDailyMetrics) { _ in
                 rebuildDailyMetricsLookupCache()
+                refreshGlobalTimelineStore()
+            }
+            .onReceive(viewModel.$bodyMetrics) { _ in
+                refreshGlobalTimelineStore()
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
@@ -226,6 +242,7 @@ struct DashboardViewLiquid: View {
                     loadOnlyNewest: true,
                     selectedIndex: selectedIndex
                 )
+                refreshGlobalTimelineStore()
                 if !viewModel.bodyMetrics.isEmpty {
                     updateAnimatedValues(for: selectedIndex)
                 }
@@ -240,6 +257,7 @@ struct DashboardViewLiquid: View {
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
+                refreshGlobalTimelineStore()
                 if !viewModel.bodyMetrics.isEmpty {
                     updateAnimatedValues(for: selectedIndex)
                 }
@@ -290,10 +308,24 @@ struct DashboardViewLiquid: View {
                 loadOnlyNewest: true,
                 selectedIndex: selectedIndex
             )
+            refreshGlobalTimelineStore()
             if !viewModel.bodyMetrics.isEmpty {
                 updateAnimatedValues(for: selectedIndex)
             }
         }
+    }
+
+    private func refreshGlobalTimelineStore() {
+        let heightInches = convertHeightToInches(
+            height: authManager.currentUser?.profile?.height,
+            heightUnit: authManager.currentUser?.profile?.heightUnit
+        )
+
+        globalTimelineStore.updateMetrics(
+            bodyMetrics,
+            dailyMetrics: recentDailyMetrics,
+            heightInches: heightInches
+        )
     }
 
     private var heroSection: some View {
@@ -377,6 +409,333 @@ struct DashboardViewLiquid: View {
                 )
             }
         )
+    }
+
+    private var photoTimelineHUD: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 16) {
+                compactHeader
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+
+                syncStatusBanner
+                    .padding(.horizontal, 20)
+
+                hudPhotoStage
+                    .padding(.horizontal, 20)
+
+                hudTimelineSection
+                    .padding(.horizontal, 20)
+
+                hudMetricsStrip
+                    .padding(.horizontal, 20)
+
+                Spacer(minLength: 120)
+            }
+            .padding(.bottom, 24)
+        }
+        .refreshable {
+            await viewModel.refreshData(
+                authManager: authManager,
+                realtimeSyncManager: realtimeSyncManager
+            )
+            refreshGlobalTimelineStore()
+            if !viewModel.bodyMetrics.isEmpty {
+                updateAnimatedValues(for: selectedIndex)
+            }
+        }
+        .accessibilityIdentifier("photo_timeline_hud")
+    }
+
+    private var hudPhotoStage: some View {
+        ZStack(alignment: .bottomLeading) {
+            ProgressPhotoCarouselView(
+                currentMetric: currentMetric,
+                historicalMetrics: bodyMetrics,
+                selectedMetricsIndex: $selectedIndex,
+                displayMode: $photoDisplayMode
+            )
+            .frame(height: 330)
+            .clipShape(RoundedRectangle(cornerRadius: 28))
+            .overlay(
+                RoundedRectangle(cornerRadius: 28)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            )
+
+            if !PhotoTimelineHUDPolicy.hasUsablePhoto(currentMetric) {
+                hudMissingPhotoOverlay
+            }
+
+            hudPhotoDateChip
+                .padding(14)
+        }
+        .accessibilityIdentifier("photo_timeline_hud_photo_stage")
+    }
+
+    private var hudMissingPhotoOverlay: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundColor(Color.white.opacity(0.82))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("No progress photo")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(Color.white)
+
+                Text("This timeline point has metrics only.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.68))
+            }
+
+            Button {
+                showAddEntrySheet = true
+            } label: {
+                Label("Add photo", systemImage: "camera.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Color.white.opacity(0.14)))
+                    .foregroundColor(.white)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("photo_timeline_hud_add_photo_button")
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.05),
+                    Color.black.opacity(0.58)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 28))
+        )
+    }
+
+    private var hudPhotoDateChip: some View {
+        Text(formatHUDDate(currentMetric?.date ?? Date()))
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.black.opacity(0.45)))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .accessibilityIdentifier("photo_timeline_hud_date_chip")
+    }
+
+    private var hudTimelineSection: some View {
+        VStack(spacing: 12) {
+            if !globalTimelineStore.weeklyBuckets.isEmpty ||
+                !globalTimelineStore.monthlyBuckets.isEmpty ||
+                !globalTimelineStore.yearlyBuckets.isEmpty {
+                GlobalTimelineHeader(
+                    weeklyBuckets: globalTimelineStore.weeklyBuckets,
+                    monthlyBuckets: globalTimelineStore.monthlyBuckets,
+                    yearlyBuckets: globalTimelineStore.yearlyBuckets,
+                    cursor: globalTimelineStore.cursor,
+                    onCursorChange: { cursor in
+                        globalTimelineStore.updateCursor(cursor)
+                        selectClosestMetric(to: cursor.date)
+                    },
+                    onTodayTap: {
+                        globalTimelineStore.selectToday()
+                        if let cursor = globalTimelineStore.cursor {
+                            selectClosestMetric(to: cursor.date)
+                        }
+                    }
+                )
+            }
+
+            DashboardTimelineScrubber(
+                bodyMetrics: bodyMetrics,
+                selectedIndex: $selectedIndex,
+                timelineMode: $timelineMode
+            )
+        }
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.06))
+        )
+        .accessibilityIdentifier("photo_timeline_hud_timeline")
+    }
+
+    private var hudMetricsStrip: some View {
+        let bucket = activeTimelineBucket
+        let weight = bucket?.metrics.weight ?? missingHUDMetric
+        let bodyFat = bucket?.metrics.bodyFat ?? missingHUDMetric
+        let ffmi = bucket?.metrics.ffmi ?? missingHUDMetric
+        let steps = bucket?.metrics.steps ?? missingHUDMetric
+
+        return LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 10),
+                GridItem(.flexible(), spacing: 10)
+            ],
+            spacing: 10
+        ) {
+            hudMetricTile(
+                title: "Weight",
+                value: formattedHUDWeight(weight.value),
+                caption: PhotoTimelineHUDPolicy.stateText(
+                    presence: weight.presence,
+                    confidence: weight.confidence
+                ),
+                icon: "scalemass.fill",
+                color: Color.metricAccentWeight,
+                onTap: {
+                    selectedMetricType = .weight
+                    isMetricDetailActive = true
+                }
+            )
+
+            hudMetricTile(
+                title: "Body Fat",
+                value: formattedHUDBodyFat(bodyFat.value),
+                caption: PhotoTimelineHUDPolicy.stateText(
+                    presence: bodyFat.presence,
+                    confidence: bodyFat.confidence
+                ),
+                icon: "percent",
+                color: Color.metricAccentBodyFat,
+                onTap: {
+                    selectedMetricType = .bodyFat
+                    isMetricDetailActive = true
+                }
+            )
+
+            hudMetricTile(
+                title: "FFMI",
+                value: formattedHUDFFMI(ffmi.value),
+                caption: PhotoTimelineHUDPolicy.stateText(
+                    presence: ffmi.presence,
+                    confidence: ffmi.confidence
+                ),
+                icon: "figure.arms.open",
+                color: Color.metricAccentFFMI,
+                onTap: {
+                    selectedMetricType = .ffmi
+                    isMetricDetailActive = true
+                }
+            )
+
+            hudMetricTile(
+                title: "Steps",
+                value: formattedHUDSteps(steps.value),
+                caption: PhotoTimelineHUDPolicy.stateText(
+                    presence: steps.presence,
+                    confidence: steps.confidence
+                ),
+                icon: "flame.fill",
+                color: Color.metricAccentSteps,
+                onTap: {
+                    selectedMetricType = .steps
+                    isMetricDetailActive = true
+                }
+            )
+        }
+        .accessibilityIdentifier("photo_timeline_hud_metrics")
+    }
+
+    private func hudMetricTile(
+        title: String,
+        value: String,
+        caption: String,
+        icon: String,
+        color: Color,
+        onTap: @escaping () -> Void
+    ) -> some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: icon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(color)
+
+                    Text(title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.liquidTextPrimary.opacity(0.68))
+
+                    Spacer(minLength: 0)
+                }
+
+                Text(value)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(Color.liquidTextPrimary)
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.72)
+                    .lineLimit(1)
+
+                Text(caption)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Color.liquidTextPrimary.opacity(0.54))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 116, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color.white.opacity(0.07))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var activeTimelineBucket: GlobalTimelineBucket? {
+        if let cursor = globalTimelineStore.cursor,
+           let bucket = globalTimelineStore.bucket(for: cursor) {
+            return bucket
+        }
+
+        return globalTimelineStore.weeklyBuckets.last
+    }
+
+    private var missingHUDMetric: GlobalTimelineMetricValue {
+        GlobalTimelineMetricValue(value: nil, presence: .missing)
+    }
+
+    private func selectClosestMetric(to date: Date) {
+        guard let match = bodyMetrics.enumerated().min(by: { lhs, rhs in
+            abs(lhs.element.date.timeIntervalSince(date)) < abs(rhs.element.date.timeIntervalSince(date))
+        }) else {
+            return
+        }
+
+        selectedIndex = match.offset
+        updateAnimatedValues(for: match.offset)
+    }
+
+    private func formatHUDDate(_ date: Date) -> String {
+        FormatterCache.mediumDateFormatter.string(from: date)
+    }
+
+    private func formattedHUDWeight(_ value: Double?) -> String {
+        guard let value else { return "–" }
+        return "\(formatWeightValue(value)) \(weightUnit)"
+    }
+
+    private func formattedHUDBodyFat(_ value: Double?) -> String {
+        guard let value else { return "–" }
+        return "\(formatBodyFatValue(value))%"
+    }
+
+    private func formattedHUDFFMI(_ value: Double?) -> String {
+        guard let value else { return "–" }
+        return String(format: "%.1f", value)
+    }
+
+    private func formattedHUDSteps(_ value: Double?) -> String {
+        guard let value else { return "–" }
+        return FormatterCache.stepsFormatter.string(from: NSNumber(value: value)) ?? "\(Int(value))"
     }
 
     private func loadMetricsOrder() {
@@ -595,8 +954,12 @@ struct DashboardViewLiquid: View {
     private var dashboardContent: some View {
         if viewModel.bodyMetrics.isEmpty && !viewModel.hasLoadedInitialData {
             DashboardSkeleton()
+        } else if viewModel.bodyMetrics.isEmpty && layoutMode == .photoTimelineHUD {
+            photoTimelineHUDEmptyState
         } else if viewModel.bodyMetrics.isEmpty {
             emptyState
+        } else if layoutMode == .photoTimelineHUD {
+            photoTimelineHUD
         } else {
             TabView(selection: $selectedTab) {
                 homeTab
@@ -632,6 +995,62 @@ struct DashboardViewLiquid: View {
         DashboardEmptyStateLiquid {
             showAddEntrySheet = true
         }
+    }
+
+    private var photoTimelineHUDEmptyState: some View {
+        VStack(spacing: 16) {
+            compactHeader
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+
+            syncStatusBanner
+                .padding(.horizontal, 20)
+
+            VStack(alignment: .leading, spacing: 16) {
+                Image(systemName: "camera.metering.center.weighted")
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundColor(Color.white.opacity(0.78))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Start with a photo")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.white)
+
+                    Text("Add a progress photo or weight entry to build your body-composition timeline.")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.68))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Button {
+                    showAddEntrySheet = true
+                } label: {
+                    Label("Add first entry", systemImage: "plus")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Capsule().fill(Color.white))
+                        .foregroundColor(.black)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("photo_timeline_hud_empty_add_entry_button")
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, minHeight: 420, alignment: .bottomLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(Color.white.opacity(0.07))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 28)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+            )
+            .padding(.horizontal, 20)
+
+            Spacer(minLength: 80)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityIdentifier("photo_timeline_hud_empty_state")
     }
 }
 

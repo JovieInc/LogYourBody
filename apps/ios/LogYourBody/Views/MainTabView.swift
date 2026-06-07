@@ -5,35 +5,85 @@
 import SwiftUI
 import CoreData
 
+enum PaidAppSurface: Equatable {
+    case weightLoggerMVP
+    case fullBodyCompositionDashboard
+    case photoTimelineHUD
+}
+
+enum PaidAppSurfacePolicy {
+    static func surface(
+        photoTimelineHUDEnabled: Bool,
+        fullDashboardEnabled: Bool
+    ) -> PaidAppSurface {
+        if photoTimelineHUDEnabled {
+            return .photoTimelineHUD
+        }
+
+        if fullDashboardEnabled {
+            return .fullBodyCompositionDashboard
+        }
+
+        return .weightLoggerMVP
+    }
+}
+
 struct MainTabView: View {
     @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
-    @State private var showFullBodyCompositionDashboard = false
+    @State private var selectedSurface: PaidAppSurface = .weightLoggerMVP
 
     var body: some View {
         NavigationStack {
-            if showFullBodyCompositionDashboard {
-                DashboardViewLiquid()
-            } else {
+            switch selectedSurface {
+            case .photoTimelineHUD:
+                DashboardViewLiquid(layoutMode: .photoTimelineHUD)
+            case .fullBodyCompositionDashboard:
+                DashboardViewLiquid(layoutMode: .legacyTabbed)
+            case .weightLoggerMVP:
                 PaidWeightLoggerMVPView()
             }
         }
         .onAppear {
-            #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-lybUITestFullDashboardFixture") {
-                showFullBodyCompositionDashboard = true
-                return
-            }
-            #endif
+            updateSelectedSurface()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            updateSelectedSurface()
+        }
+    }
 
-            showFullBodyCompositionDashboard = AnalyticsService.shared.isFeatureEnabled(
-                flagKey: Constants.fullBodyCompositionDashboardFlagKey
+    private func updateSelectedSurface() {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-lybUITestPhotoTimelineHUDFixture") {
+            selectedSurface = .photoTimelineHUD
+            HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
+            return
+        }
+
+        if arguments.contains("-lybUITestFullDashboardFixture") {
+            selectedSurface = .fullBodyCompositionDashboard
+            HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
+            return
+        }
+        #endif
+
+        selectedSurface = PaidAppSurfacePolicy.surface(
+            photoTimelineHUDEnabled: PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
+                gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                    flagKey: Constants.photoTimelineHUDFlagKey
+                )
+            ),
+            fullDashboardEnabled: LaunchSurfacePolicy.shouldShowFullBodyCompositionDashboard(
+                gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                    flagKey: Constants.fullBodyCompositionDashboardFlagKey
+                )
             )
+        )
 
-            if showFullBodyCompositionDashboard {
-                HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
-            }
+        if selectedSurface != .weightLoggerMVP {
+            HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
         }
     }
 }
