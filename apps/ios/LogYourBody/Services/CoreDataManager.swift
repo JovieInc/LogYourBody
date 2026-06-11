@@ -1612,21 +1612,34 @@ class CoreDataManager: ObservableObject {
 
     // MARK: - Cleanup
 
-    func cleanupOldData() {
-        // Delete body metrics older than 1 year
-        let oneYearAgo = Date().addingTimeInterval(-365 * 24 * 60 * 60)
+    func cleanupOldData() async {
+        let context = viewContext
 
-        let bodyMetricsRequest: NSFetchRequest<NSFetchRequestResult> = CachedBodyMetrics.fetchRequest()
-        bodyMetricsRequest.predicate = NSPredicate(format: "date < %@ AND isMarkedDeleted == true", oneYearAgo as NSDate)
+        await context.perform {
+            // Delete body metrics older than 1 year
+            let oneYearAgo = Date().addingTimeInterval(-365 * 24 * 60 * 60)
 
-        let deleteRequest = NSBatchDeleteRequest(fetchRequest: bodyMetricsRequest)
-        deleteRequest.resultType = .resultTypeCount
+            let bodyMetricsRequest: NSFetchRequest<NSFetchRequestResult> = CachedBodyMetrics.fetchRequest()
+            bodyMetricsRequest.predicate = NSPredicate(
+                format: "date < %@ AND isMarkedDeleted == true",
+                oneYearAgo as NSDate
+            )
 
-        do {
-            _ = try viewContext.execute(deleteRequest) as? NSBatchDeleteResult
-            // print("Deleted \(result?.result ?? 0) old body metrics")
-        } catch {
-            // print("Error cleaning up old data: \(error)")
+            let deleteRequest = NSBatchDeleteRequest(fetchRequest: bodyMetricsRequest)
+            deleteRequest.resultType = .resultTypeObjectIDs
+
+            do {
+                if let result = try context.execute(deleteRequest) as? NSBatchDeleteResult,
+                   let objectIDs = result.result as? [NSManagedObjectID],
+                   !objectIDs.isEmpty {
+                    NSManagedObjectContext.mergeChanges(
+                        fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                        into: [context]
+                    )
+                }
+            } catch {
+                // print("Error cleaning up old data: \(error)")
+            }
         }
     }
 
