@@ -11,7 +11,6 @@ struct LogYourBodyApp: App {
     @StateObject private var revenueCatManager = RevenueCatManager.shared
     @StateObject private var healthKitManager = HealthKitManager.shared
     @StateObject private var realtimeSyncManager = RealtimeSyncManager.shared
-    @StateObject private var widgetDataManager = WidgetDataManager.shared
     @StateObject private var bugReportManager = BugReportManager.shared
     @State private var clerk = Clerk.shared
     @State private var showAddEntrySheet = false
@@ -56,11 +55,6 @@ struct LogYourBodyApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                     // App entering background - ensure sync is complete
                     realtimeSyncManager.syncIfNeeded()
-
-                    // Update widget data
-                    Task {
-                        await widgetDataManager.updateWidgetData()
-                    }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     // App entering foreground - refresh data
@@ -68,8 +62,6 @@ struct LogYourBodyApp: App {
                         if isFullBodyCompositionDashboardEnabled, healthKitManager.isAuthorized {
                             try? await HealthSyncCoordinator.shared.syncStepsFromHealthKit()
                         }
-                        // Update widget with latest data
-                        await widgetDataManager.updateWidgetData()
                     }
                 }
         }
@@ -155,13 +147,6 @@ struct LogYourBodyApp: App {
         }
 
         MetricChartDataHelper.setupCacheInvalidation()
-
-        widgetDataManager.setupAutomaticUpdates()
-
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            await widgetDataManager.updateWidgetData()
-        }
     }
 
     #if DEBUG
