@@ -264,12 +264,16 @@ class CoreDataManager: ObservableObject {
         }
     }
 
-    func fetchUnsyncedDexaResults() async -> [CachedDexaResult] {
+    func fetchUnsyncedDexaResults(for userId: String? = nil) async -> [CachedDexaResult] {
         let context = viewContext
 
         return await context.perform {
             let request: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
-            request.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+            var predicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            if let userId {
+                predicates.append(NSPredicate(format: "userId == %@", userId))
+            }
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
 
             do {
                 return try context.fetch(request)
@@ -976,7 +980,7 @@ class CoreDataManager: ObservableObject {
     // MARK: - Sync Operations
 
     /// Async version - does NOT block the main thread
-    func fetchUnsyncedEntries() async -> (
+    func fetchUnsyncedEntries(for userId: String? = nil) async -> (
         bodyMetrics: [CachedBodyMetrics],
         dailyMetrics: [CachedDailyMetrics],
         profiles: [CachedProfile]
@@ -985,13 +989,25 @@ class CoreDataManager: ObservableObject {
 
         return await context.perform {
             let bodyMetricsFetch: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-            bodyMetricsFetch.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+            var bodyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            if let userId {
+                bodyPredicates.append(NSPredicate(format: "userId == %@", userId))
+            }
+            bodyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: bodyPredicates)
 
             let dailyMetricsFetch: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
-            dailyMetricsFetch.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+            var dailyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            if let userId {
+                dailyPredicates.append(NSPredicate(format: "userId == %@", userId))
+            }
+            dailyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: dailyPredicates)
 
             let profilesFetch: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
-            profilesFetch.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+            var profilePredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            if let userId {
+                profilePredicates.append(NSPredicate(format: "id == %@", userId))
+            }
+            profilesFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: profilePredicates)
 
             do {
                 let bodyMetrics = try context.fetch(bodyMetricsFetch)
@@ -1016,12 +1032,16 @@ class CoreDataManager: ObservableObject {
         }
     }
 
-    func fetchUnsyncedGlp1DoseLogs() async -> [CachedGlp1DoseLog] {
+    func fetchUnsyncedGlp1DoseLogs(for userId: String? = nil) async -> [CachedGlp1DoseLog] {
         let context = viewContext
 
         return await context.perform {
             let request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
-            request.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+            var predicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            if let userId {
+                predicates.append(NSPredicate(format: "userId == %@", userId))
+            }
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
 
             do {
                 return try context.fetch(request)
@@ -1041,12 +1061,16 @@ class CoreDataManager: ObservableObject {
         }
     }
 
-    func fetchUnsyncedGlp1Medications() async -> [CachedGlp1Medication] {
+    func fetchUnsyncedGlp1Medications(for userId: String? = nil) async -> [CachedGlp1Medication] {
         let context = viewContext
 
         return await context.perform {
             let request: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
-            request.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+            var predicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            if let userId {
+                predicates.append(NSPredicate(format: "userId == %@", userId))
+            }
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
 
             do {
                 return try context.fetch(request)

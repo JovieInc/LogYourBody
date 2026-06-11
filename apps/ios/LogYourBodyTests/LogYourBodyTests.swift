@@ -2189,6 +2189,125 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertTrue(unsyncedForUser.isEmpty)
     }
 
+    func testSyncLocalChangesScopesUnsyncedRowsToActiveUser() async throws {
+        let coreData = CoreDataManager.shared
+
+        let activeUserId = "sync_active_user_\(UUID().uuidString)"
+        let otherUserId = "sync_other_user_\(UUID().uuidString)"
+        let activeMetricId = UUID().uuidString
+        let otherMetricId = UUID().uuidString
+        let date = Date()
+
+        let activeMetric = BodyMetrics(
+            id: activeMetricId,
+            userId: activeUserId,
+            date: date,
+            weight: 80.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+        let otherMetric = BodyMetrics(
+            id: otherMetricId,
+            userId: otherUserId,
+            date: date,
+            weight: 82.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+
+        try await coreData.saveBodyMetricsAndWait(activeMetric, userId: activeUserId)
+        try await coreData.saveBodyMetricsAndWait(otherMetric, userId: otherUserId)
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(for: activeUserId, token: "test-token")
+
+        let syncedPayloads = stubSupabase.bodyMetricsBatches.flatMap { $0 }
+        XCTAssertEqual(syncedPayloads.count, 1)
+        XCTAssertEqual(syncedPayloads.first?["id"] as? String, activeMetricId)
+        XCTAssertEqual(syncedPayloads.first?["user_id"] as? String, activeUserId)
+
+        let activeUnsynced = await coreData.fetchUnsyncedEntries(for: activeUserId)
+        XCTAssertTrue(activeUnsynced.bodyMetrics.isEmpty)
+
+        let otherUnsynced = await coreData.fetchUnsyncedEntries(for: otherUserId)
+        XCTAssertEqual(otherUnsynced.bodyMetrics.map(\.id), [otherMetricId])
+    }
+
+    func testPendingSyncOperationsAreScopedToActiveUser() async throws {
+        UserDefaults.standard.removeObject(forKey: "pendingSyncOperations")
+        defer {
+            UserDefaults.standard.removeObject(forKey: "pendingSyncOperations")
+        }
+
+        let activeUserId = "pending_active_user_\(UUID().uuidString)"
+        let otherUserId = "pending_other_user_\(UUID().uuidString)"
+        let authManager = AuthManager()
+        authManager.currentUser = LocalUser(
+            id: activeUserId,
+            email: "pending-active@example.com",
+            name: "Pending Active",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+        authManager.isAuthenticated = true
+
+        let manager = RealtimeSyncManager(
+            coreDataManager: CoreDataManager.shared,
+            authManager: authManager,
+            supabaseManager: StubSupabaseManager()
+        )
+        manager.isOnline = false
+
+        manager.queueOperation(
+            RealtimeSyncManager.SyncOperation(
+                id: UUID().uuidString,
+                userId: otherUserId,
+                type: .delete,
+                data: Data(),
+                tableName: "body_metrics",
+                timestamp: Date()
+            )
+        )
+        let hasOtherUserPendingOperations = await manager.hasPendingSyncOperations()
+        XCTAssertFalse(hasOtherUserPendingOperations)
+
+        manager.queueOperation(
+            RealtimeSyncManager.SyncOperation(
+                id: UUID().uuidString,
+                userId: activeUserId,
+                type: .delete,
+                data: Data(),
+                tableName: "body_metrics",
+                timestamp: Date()
+            )
+        )
+        let hasActiveUserPendingOperations = await manager.hasPendingSyncOperations()
+        XCTAssertTrue(hasActiveUserPendingOperations)
+    }
+
     func testSyncLocalChangesDeletesMarkedBodyMetricInsteadOfUpserting() async throws {
         let coreData = CoreDataManager.shared
 
