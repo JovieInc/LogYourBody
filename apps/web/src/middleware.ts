@@ -1,4 +1,5 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
 
 const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
@@ -10,7 +11,7 @@ const isProtectedRoute = createRouteMatcher([
   '/photos(.*)',
   '/steps(.*)',
   '/import(.*)',
-])
+]);
 
 const _isPublicRoute = createRouteMatcher([
   '/signin(.*)',
@@ -23,13 +24,57 @@ const _isPublicRoute = createRouteMatcher([
   '/about(.*)',
   '/blog(.*)',
   '/mobile(.*)',
-])
+]);
+
+const productionDebugRoutePatterns = [
+  /^\/debug(?:\/.*)?$/,
+  /^\/debug-[^/]+(?:\/.*)?$/,
+  /^\/test(?:\/.*)?$/,
+  /^\/test-[^/]+(?:\/.*)?$/,
+  /^\/api\/debug(?:\/.*)?$/,
+  /^\/api\/debug-[^/]+(?:\/.*)?$/,
+  /^\/api\/test-[^/]+(?:\/.*)?$/,
+  /^\/basic-test(?:\/.*)?$/,
+  /^\/compare-avatars(?:\/.*)?$/,
+  /^\/diag(?:\/.*)?$/,
+  /^\/login-test(?:\/.*)?$/,
+  /^\/pwa-test(?:\/.*)?$/,
+];
+
+function normalizePathname(pathname: string) {
+  if (pathname === '/') {
+    return pathname;
+  }
+
+  return pathname.replace(/\/+$/, '');
+}
+
+export function isProductionDebugRoute(pathname: string) {
+  const normalizedPathname = normalizePathname(pathname);
+  return productionDebugRoutePatterns.some((pattern) => pattern.test(normalizedPathname));
+}
+
+export function shouldBlockProductionDebugRoute(
+  pathname: string,
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  return env['VERCEL_ENV'] === 'production' && isProductionDebugRoute(pathname);
+}
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect()
+  if (shouldBlockProductionDebugRoute(req.nextUrl.pathname)) {
+    return new NextResponse(null, {
+      status: 404,
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    });
   }
-})
+
+  if (isProtectedRoute(req)) {
+    await auth.protect();
+  }
+});
 
 export const config = {
   matcher: [
@@ -43,4 +88,4 @@ export const config = {
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
-}
+};
