@@ -82,9 +82,7 @@ struct MainTabView: View {
             )
         )
 
-        if selectedSurface != .weightLoggerMVP {
-            HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
-        }
+        HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
     }
 }
 

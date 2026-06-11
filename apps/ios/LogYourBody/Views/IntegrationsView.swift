@@ -88,7 +88,10 @@ struct IntegrationsView: View {
                             Button("Connect") {
                                 Task {
                                     let authorized = await healthKitManager.requestAuthorization()
-                                    if !authorized {
+                                    if authorized {
+                                        await HealthSyncCoordinator.shared
+                                            .configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
+                                    } else {
                                         showHealthKitConnect = true
                                     }
                                 }

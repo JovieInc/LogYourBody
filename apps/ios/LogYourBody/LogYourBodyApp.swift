@@ -64,6 +64,8 @@ struct LogYourBodyApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     // App entering foreground - refresh data
                     Task {
+                        await bootstrapHealthKit()
+
                         if isFullBodyCompositionDashboardEnabled, healthKitManager.isAuthorized {
                             try? await HealthSyncCoordinator.shared.syncStepsFromHealthKit()
                         }
@@ -108,9 +110,7 @@ struct LogYourBodyApp: App {
         }
 
         Task { @MainActor in
-            if isFullBodyCompositionDashboardEnabled {
-                await bootstrapHealthKit()
-            }
+            await bootstrapHealthKit()
         }
 
         await clerkInitializationTask.value
