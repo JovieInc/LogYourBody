@@ -3,6 +3,7 @@
 // LogYourBody
 //
 import Foundation
+import Intents
 
 enum BodyMetricLoggingError: LocalizedError {
     case notAuthenticated

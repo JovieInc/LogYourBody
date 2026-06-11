@@ -181,7 +181,6 @@
 		ADDC47B82E2D89F3003C97E7 /* AppVersionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD85525D2E19DC01003552EE /* AppVersionManager.swift */; };
 		ADDC47B92E2D89F3003C97E7 /* BulkImportManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD933DFE2E249EA000801078 /* BulkImportManager.swift */; };
 		ADDC47BA2E2D89F3003C97E7 /* PhotoLibraryScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD933DFF2E249EA000801078 /* PhotoLibraryScanner.swift */; };
-		ADDC47BB2E2D89F3003C97E7 /* WidgetDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF5C1BB2E1DFE4000E3FB4D /* WidgetDataManager.swift */; };
 		ADDC47BC2E2D89F3003C97E7 /* RealtimeSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8552552E19A5B5003552EE /* RealtimeSyncManager.swift */; };
 		ADDC47BD2E2D89F3003C97E7 /* BackgroundRemovalService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8552932E1CC15B003552EE /* BackgroundRemovalService.swift */; };
 		ADDC47BE2E2D89F3003C97E7 /* PhotoMetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF5C1B32E1CDB9C00E3FB4D /* PhotoMetadataService.swift */; };
@@ -613,8 +612,6 @@
 		ADF5C1B12E1CD2FD00E3FB4D /* AddEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEntrySheet.swift; sourceTree = "<group>"; };
 		ADF5C1B32E1CDB9C00E3FB4D /* PhotoMetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoMetadataService.swift; sourceTree = "<group>"; };
 		ADF5C1B52E1CF89E00E3FB4D /* BackgroundPhotoUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPhotoUploadService.swift; sourceTree = "<group>"; };
-		ADF5C1BB2E1DFE4000E3FB4D /* WidgetDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataManager.swift; sourceTree = "<group>"; };
-		ADF5C1C22E1DFE7800E3FB4D /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		ADF5C1C42E1DFE7900E3FB4D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		ADF5C1EA2E1E1B1B00E3FB4D /* ProfilePreparationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilePreparationView.swift; sourceTree = "<group>"; };
 		ADF5C1F32E1E1B3600E3FB4D /* SecuritySessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySessionsView.swift; sourceTree = "<group>"; };
@@ -813,7 +810,6 @@
 			isa = PBXGroup;
 			children = (
 				AD3E4F642E17A12300345678 /* HealthKit.framework */,
-				ADF5C1C22E1DFE7800E3FB4D /* WidgetKit.framework */,
 				ADF5C1C42E1DFE7900E3FB4D /* SwiftUI.framework */,
 			);
 			name = Frameworks;
@@ -916,7 +912,6 @@
 				ADE146472EBF0B4800B64DA0 /* TimelineDataProvider.swift */,
 				AD933DFE2E249EA000801078 /* BulkImportManager.swift */,
 				AD933DFF2E249EA000801078 /* PhotoLibraryScanner.swift */,
-				ADF5C1BB2E1DFE4000E3FB4D /* WidgetDataManager.swift */,
 				AD8552552E19A5B5003552EE /* RealtimeSyncManager.swift */,
 				AD8552932E1CC15B003552EE /* BackgroundRemovalService.swift */,
 				ADF5C1B32E1CDB9C00E3FB4D /* PhotoMetadataService.swift */,
@@ -1610,7 +1605,6 @@
 				ADDC47B92E2D89F3003C97E7 /* BulkImportManager.swift in Sources */,
 				AD8872432EB87F290041C426 /* ProgressRing.swift in Sources */,
 				ADDC47BA2E2D89F3003C97E7 /* PhotoLibraryScanner.swift in Sources */,
-				ADDC47BB2E2D89F3003C97E7 /* WidgetDataManager.swift in Sources */,
 				ADDC47BC2E2D89F3003C97E7 /* RealtimeSyncManager.swift in Sources */,
 				ADDC47BD2E2D89F3003C97E7 /* BackgroundRemovalService.swift in Sources */,
 				ADDC47BE2E2D89F3003C97E7 /* PhotoMetadataService.swift in Sources */,

@@ -9,7 +9,6 @@ DUPLICATE_FILES=(
     "EmailVerificationView.swift"
     "DietPhaseHistoryView.swift" 
     "ImageProcessingService.swift"
-    "WidgetDataManager.swift"
     "AppVersion.swift"
     "LiquidGlassComponents.swift"
     "BulkImportManager.swift"

@@ -605,10 +605,6 @@ struct AddEntrySheet: View {
                     weight: weightInKg,
                     userId: userId
                 )
-
-                // Update widget data
-                await WidgetDataManager.shared.updateWidgetData()
-
                 RealtimeSyncManager.shared.syncIfNeeded()
 
                 BodyScoreRecalculationService.shared.scheduleRecalculation()
@@ -643,10 +639,6 @@ struct AddEntrySheet: View {
                     bodyFatPercentage: validatedBodyFat,
                     userId: userId
                 )
-
-                // Update widget data
-                await WidgetDataManager.shared.updateWidgetData()
-
                 RealtimeSyncManager.shared.syncIfNeeded()
 
                 BodyScoreRecalculationService.shared.scheduleRecalculation()
