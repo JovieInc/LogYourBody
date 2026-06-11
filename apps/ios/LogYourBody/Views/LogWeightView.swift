@@ -9,6 +9,8 @@ struct LogWeightView: View {
     @StateObject private var healthKitManager = HealthKitManager.shared
     @State private var weight: String = ""
     @State private var bodyFat: String = ""
+    @State private var weightError: String?
+    @State private var bodyFatError: String?
     @AppStorage(Constants.preferredMeasurementSystemKey) private var measurementSystem = PreferencesView.defaultMeasurementSystem
     @State private var isLoading = false
     @State private var showError = false
@@ -89,11 +91,20 @@ struct LogWeightView: View {
                                             .keyboardType(.decimalPad)
                                             .focused($focusedField, equals: .weight)
                                             .frame(maxWidth: 150)
+                                            .accessibilityIdentifier("log_weight_weight_field")
+                                            .onChange(of: weight) { _, newValue in
+                                                validateWeight(newValue)
+                                            }
 
                                         Text(currentSystem.weightUnit)
                                             .font(.system(size: 20, weight: .medium))
                                             .foregroundColor(.appTextSecondary)
                                             .padding(.bottom, 6)
+                                    }
+
+                                    if let weightError {
+                                        validationMessage(weightError)
+                                            .accessibilityIdentifier("log_weight_weight_error")
                                     }
                                 }
                                 .padding(20)
@@ -137,11 +148,20 @@ struct LogWeightView: View {
                                             .keyboardType(.decimalPad)
                                             .focused($focusedField, equals: .bodyFat)
                                             .frame(maxWidth: 150)
+                                            .accessibilityIdentifier("log_weight_body_fat_field")
+                                            .onChange(of: bodyFat) { _, newValue in
+                                                validateBodyFat(newValue)
+                                            }
 
                                         Text("%")
                                             .font(.system(size: 20, weight: .medium))
                                             .foregroundColor(.appTextSecondary)
                                             .padding(.bottom, 6)
+                                    }
+
+                                    if let bodyFatError {
+                                        validationMessage(bodyFatError)
+                                            .accessibilityIdentifier("log_weight_body_fat_error")
                                     }
                                 }
                                 .padding(20)
@@ -247,6 +267,7 @@ struct LogWeightView: View {
                             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFormValid())
                         }
                         .disabled(!isFormValid() || isLoading)
+                        .accessibilityIdentifier("log_weight_save_measurement_button")
                         .padding(.horizontal, 20)
                         .padding(.bottom, 34)
                     }
@@ -275,7 +296,29 @@ struct LogWeightView: View {
     }
 
     private func isFormValid() -> Bool {
-        return !weight.isEmpty || !bodyFat.isEmpty
+        LogWeightFormValidator
+            .validate(weight: weight, bodyFat: bodyFat, unit: currentSystem.weightUnit)
+            .isValid
+    }
+
+    private func validateWeight(_ value: String) {
+        weightError = LogWeightFormValidator.fieldError(for: value, field: .weight, unit: currentSystem.weightUnit)
+    }
+
+    private func validateBodyFat(_ value: String) {
+        bodyFatError = LogWeightFormValidator.fieldError(for: value, field: .bodyFat, unit: currentSystem.weightUnit)
+    }
+
+    private func validationMessage(_ message: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 12, weight: .semibold))
+            Text(message)
+                .font(.system(size: 13, weight: .medium))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .foregroundColor(.red)
     }
 
     private func quickAdd() {
@@ -301,49 +344,25 @@ struct LogWeightView: View {
     }
 
     private func saveMeasurement() {
+        let validation = LogWeightFormValidator.validate(weight: weight, bodyFat: bodyFat, unit: currentSystem.weightUnit)
+        weightError = validation.weightError
+        bodyFatError = validation.bodyFatError
+
+        guard validation.isValid else {
+            if let formError = validation.formError {
+                errorMessage = formError
+                showError = true
+            }
+            return
+        }
+
         isLoading = true
         hideKeyboard()
 
         Task {
             do {
-                var weightValue: Double?
-                var bodyFatValue: Double?
-
-                // Parse weight if provided
-                if !weight.isEmpty {
-                    guard let w = Double(weight) else {
-                        await MainActor.run {
-                            errorMessage = "Please enter a valid weight"
-                            showError = true
-                            isLoading = false
-                        }
-                        return
-                    }
-                    weightValue = w
-                }
-
-                // Parse body fat if provided
-                if !bodyFat.isEmpty {
-                    guard let bf = Double(bodyFat), bf >= 0, bf <= 100 else {
-                        await MainActor.run {
-                            errorMessage = "Please enter a valid body fat percentage (0-100)"
-                            showError = true
-                            isLoading = false
-                        }
-                        return
-                    }
-                    bodyFatValue = bf
-                }
-
-                // At least one value must be provided
-                guard weightValue != nil || bodyFatValue != nil else {
-                    await MainActor.run {
-                        errorMessage = "Please enter at least one measurement"
-                        showError = true
-                        isLoading = false
-                    }
-                    return
-                }
+                let weightValue = validation.weightValue
+                let bodyFatValue = validation.bodyFatValue
 
                 // Convert weight to kg for storage
                 let weightInKg = weightValue != nil
@@ -432,6 +451,82 @@ struct LogWeightView: View {
                 }
             }
         }
+    }
+}
+
+enum LogWeightInputField {
+    case weight
+    case bodyFat
+}
+
+struct LogWeightFormValidation: Equatable {
+    let weightValue: Double?
+    let bodyFatValue: Double?
+    let weightError: String?
+    let bodyFatError: String?
+    let formError: String?
+
+    var isValid: Bool {
+        formError == nil
+            && weightError == nil
+            && bodyFatError == nil
+            && (weightValue != nil || bodyFatValue != nil)
+    }
+}
+
+enum LogWeightFormValidator {
+    static func validate(weight: String, bodyFat: String, unit: String) -> LogWeightFormValidation {
+        var weightValue: Double?
+        var bodyFatValue: Double?
+        var weightError: String?
+        var bodyFatError: String?
+
+        if hasValue(weight) {
+            do {
+                weightValue = try ValidationService.shared.validateWeight(weight, unit: unit)
+            } catch let error as ValidationError {
+                weightError = error.errorDescription
+            } catch {
+                weightError = "Please enter a valid number"
+            }
+        }
+
+        if hasValue(bodyFat) {
+            do {
+                bodyFatValue = try ValidationService.shared.validateBodyFat(bodyFat)
+            } catch let error as ValidationError {
+                bodyFatError = error.errorDescription
+            } catch {
+                bodyFatError = "Please enter a valid percentage"
+            }
+        }
+
+        let formError = !hasValue(weight) && !hasValue(bodyFat)
+            ? "Please enter at least one measurement"
+            : nil
+
+        return LogWeightFormValidation(
+            weightValue: weightValue,
+            bodyFatValue: bodyFatValue,
+            weightError: weightError,
+            bodyFatError: bodyFatError,
+            formError: formError
+        )
+    }
+
+    static func fieldError(for value: String, field: LogWeightInputField, unit: String) -> String? {
+        guard hasValue(value) else { return nil }
+
+        switch field {
+        case .weight:
+            return validate(weight: value, bodyFat: "", unit: unit).weightError
+        case .bodyFat:
+            return validate(weight: "", bodyFat: value, unit: unit).bodyFatError
+        }
+    }
+
+    private static func hasValue(_ value: String) -> Bool {
+        !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
