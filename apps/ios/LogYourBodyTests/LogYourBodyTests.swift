@@ -194,6 +194,66 @@ final class BodyMetricLoggingServiceTests: XCTestCase {
             "Logged 180.0 lbs and 14.8% body fat."
         )
     }
+
+    func testSpotlightDocumentUsesLatestMetricSearchCopy() {
+        let metric = BodyMetrics(
+            id: "metric-spotlight",
+            userId: "user-1",
+            date: Date(timeIntervalSince1970: 0),
+            localDate: "1970-01-01",
+            weight: 81.6467,
+            weightUnit: "kg",
+            bodyFatPercentage: 14.8,
+            bodyFatMethod: "Manual",
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: BodyMetricSource.manual.rawValue,
+            createdAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
+
+        let document = BodyMetricSpotlightDocument.make(for: metric, preferredSystem: .imperial)
+
+        XCTAssertEqual(document?.identifier, "body-metric-metric-spotlight")
+        XCTAssertEqual(document?.title, "Latest LogYourBody metrics")
+        XCTAssertEqual(document?.contentDescription, "180.0 lbs, 14.8% body fat on 1970-01-01")
+        XCTAssertEqual(
+            document?.keywords,
+            [
+                "LogYourBody",
+                "body metrics",
+                "weight",
+                "body composition",
+                "1970-01-01",
+                "latest weight",
+                "body fat"
+            ]
+        )
+    }
+
+    func testSpotlightDocumentSkipsEntriesWithoutSearchableMetrics() {
+        let metric = BodyMetrics(
+            id: "metric-empty",
+            userId: "user-1",
+            date: Date(timeIntervalSince1970: 0),
+            localDate: "1970-01-01",
+            weight: nil,
+            weightUnit: nil,
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: BodyMetricSource.manual.rawValue,
+            createdAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
+
+        XCTAssertNil(BodyMetricSpotlightDocument.make(for: metric, preferredSystem: .imperial))
+    }
 }
 
 final class PhaseInsightPolicyTests: XCTestCase {
