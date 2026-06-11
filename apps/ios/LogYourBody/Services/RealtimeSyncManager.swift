@@ -311,7 +311,7 @@ class RealtimeSyncManager: ObservableObject {
 
                 try await self.syncLocalChanges(token: token)
                 try await self.pullLatestData(userId: userId, lastSync: lastSyncSnapshot, token: token)
-                self.coreDataManager.cleanupOldData()
+                await self.coreDataManager.cleanupOldData()
 
                 await MainActor.run {
                     self.isSyncing = false

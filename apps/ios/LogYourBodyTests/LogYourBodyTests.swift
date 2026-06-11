@@ -4,6 +4,7 @@
 //
 import XCTest
 import AVFoundation
+import CoreData
 @testable import LogYourBody
 
 // swiftlint:disable single_test_class
@@ -1376,6 +1377,91 @@ final class SyncIntegrationTests: XCTestCase {
                 regionFatPct: 17.7
             )
         )
+    }
+
+    func testCleanupOldDataDeletesOnlyOldTombstonedBodyMetrics() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "cleanup_user_\(UUID().uuidString)"
+        let oldDeletedId = UUID().uuidString
+        let recentDeletedId = UUID().uuidString
+        let oldLiveId = UUID().uuidString
+        let now = Date()
+        let oldDate = now.addingTimeInterval(-370 * 24 * 60 * 60)
+        let recentDate = now.addingTimeInterval(-10 * 24 * 60 * 60)
+
+        let oldDeletedMetric = BodyMetrics(
+            id: oldDeletedId,
+            userId: userId,
+            date: oldDate,
+            weight: 80.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: oldDate,
+            updatedAt: oldDate
+        )
+        let recentDeletedMetric = BodyMetrics(
+            id: recentDeletedId,
+            userId: userId,
+            date: recentDate,
+            weight: 81.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: recentDate,
+            updatedAt: recentDate
+        )
+        let oldLiveMetric = BodyMetrics(
+            id: oldLiveId,
+            userId: userId,
+            date: oldDate,
+            weight: 82.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: oldDate,
+            updatedAt: oldDate
+        )
+
+        try await coreData.saveBodyMetricsAndWait(oldDeletedMetric, userId: userId, markAsSynced: true)
+        try await coreData.saveBodyMetricsAndWait(recentDeletedMetric, userId: userId, markAsSynced: true)
+        try await coreData.saveBodyMetricsAndWait(oldLiveMetric, userId: userId, markAsSynced: true)
+
+        let didMarkOldDeleted = await coreData.markBodyMetricDeleted(id: oldDeletedId)
+        let didMarkRecentDeleted = await coreData.markBodyMetricDeleted(id: recentDeletedId)
+        XCTAssertTrue(didMarkOldDeleted)
+        XCTAssertTrue(didMarkRecentDeleted)
+
+        await coreData.cleanupOldData()
+
+        let context = coreData.viewContext
+        let remainingIds = await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "userId == %@", userId)
+
+            let metrics = (try? context.fetch(request)) ?? []
+            return Set(metrics.compactMap(\.id))
+        }
+
+        XCTAssertFalse(remainingIds.contains(oldDeletedId))
+        XCTAssertTrue(remainingIds.contains(recentDeletedId))
+        XCTAssertTrue(remainingIds.contains(oldLiveId))
     }
 
     func testBodySpecDexaImporter_AddsProvenanceWithoutOverwritingManualOrHealthKit() async throws {

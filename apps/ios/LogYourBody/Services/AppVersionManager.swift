@@ -197,7 +197,9 @@ class AppVersionManager {
         // print("🗑️ Cleaning up old data...")
 
         // Clean up CoreData
-        CoreDataManager.shared.cleanupOldData()
+        Task(priority: .utility) {
+            await CoreDataManager.shared.cleanupOldData()
+        }
 
         // Clean up old user defaults
         cleanupOldUserDefaults()
