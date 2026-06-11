@@ -61,6 +61,19 @@ class PhotoUploadManager: ObservableObject {
 
     private init() {}
 
+    private func authenticatedJWT() async throws -> String {
+        guard let session = authManager.clerkSession else {
+            throw PhotoError.notAuthenticated
+        }
+
+        let tokenResource = try await session.getToken()
+        guard let token = tokenResource?.jwt else {
+            throw PhotoError.notAuthenticated
+        }
+
+        return token
+    }
+
     // MARK: - Public Methods
 
     func uploadProgressPhoto(for metrics: BodyMetrics, image: UIImage) async throws -> String {
@@ -354,16 +367,7 @@ class PhotoUploadManager: ObservableObject {
     }
 
     private func uploadToSupabase(imageData: Data, fileName: String) async throws -> String {
-        guard let session = authManager.clerkSession else {
-            // print("❌ PhotoUploadManager: No Clerk session for storage upload")
-            throw PhotoError.notAuthenticated
-        }
-
-        let tokenResource = try await session.getToken()
-        guard let token = tokenResource?.jwt else {
-            // print("❌ PhotoUploadManager: Failed to get JWT for storage upload")
-            throw PhotoError.notAuthenticated
-        }
+        let token = try await authenticatedJWT()
 
         // print("📸 PhotoUploadManager: Got JWT token for storage upload")
 
@@ -401,14 +405,13 @@ class PhotoUploadManager: ObservableObject {
     }
 
     private func processImageWithCloudinary(storagePath: String, metricsId: String) async throws -> String {
-        // Edge functions can be called with just the anon key
-        // print("📸 PhotoUploadManager: Calling edge function with anon key")
+        let token = try await authenticatedJWT()
 
         let url = URL(string: "\(Constants.supabaseURL)/functions/v1/process-progress-photo")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(Constants.supabaseAnonKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [

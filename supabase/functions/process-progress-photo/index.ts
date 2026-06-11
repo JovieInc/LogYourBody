@@ -11,6 +11,25 @@ interface RequestBody {
   metricsId: string
 }
 
+function jsonResponse(body: Record<string, unknown>, status: number): Response {
+  return new Response(
+    JSON.stringify(body),
+    {
+      status,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    }
+  )
+}
+
+function bearerToken(authHeader: string | null): string | null {
+  const match = authHeader?.match(/^Bearer\s+(.+)$/i)
+  const token = match?.[1]?.trim()
+  return token || null
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -18,12 +37,70 @@ serve(async (req) => {
   }
 
   try {
-    // Skip JWT validation - we'll validate by checking if the user owns the metrics record
-    const { storagePath, metricsId } = await req.json() as RequestBody
+    if (req.method !== 'POST') {
+      return jsonResponse({ error: 'Method not allowed' }, 405)
+    }
+
+    const token = bearerToken(req.headers.get('Authorization'))
+    if (!token) {
+      return jsonResponse({ error: 'Missing or invalid authorization header' }, 401)
+    }
+
+    // Get Supabase credentials from environment
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase service configuration for process-progress-photo')
+      return jsonResponse({ error: 'Server configuration error' }, 500)
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token)
+
+    if (authError || !user) {
+      return jsonResponse({ error: 'Invalid token' }, 401)
+    }
+
+    const body = await req.json().catch(() => null) as Partial<RequestBody> | null
+    const storagePath = body?.storagePath
+    const metricsId = body?.metricsId
 
     // Validate inputs
-    if (!metricsId) {
-      throw new Error('Missing required parameters')
+    if (typeof storagePath !== 'string' || typeof metricsId !== 'string' || !storagePath || !metricsId) {
+      return jsonResponse({ error: 'Missing required parameters' }, 400)
+    }
+
+    const normalizedStoragePath = storagePath.replace(/^\/+/, '')
+    if (
+      normalizedStoragePath !== storagePath ||
+      normalizedStoragePath.includes('..') ||
+      !normalizedStoragePath.startsWith(`${user.id}/`)
+    ) {
+      return jsonResponse({ error: 'Photo path does not belong to the authenticated user' }, 403)
+    }
+
+    const { data: metric, error: metricError } = await supabase
+      .from('body_metrics')
+      .select('id, user_id')
+      .eq('id', metricsId)
+      .maybeSingle()
+
+    if (metricError) {
+      console.error('Failed to load body_metrics owner:', metricError)
+      return jsonResponse({ error: 'Failed to verify metrics ownership' }, 500)
+    }
+
+    if (!metric) {
+      return jsonResponse({ error: 'Metrics record not found' }, 404)
+    }
+
+    if (metric.user_id !== user.id) {
+      return jsonResponse({ error: 'Metrics record does not belong to the authenticated user' }, 403)
     }
 
     // Get Cloudinary credentials from environment
@@ -34,11 +111,6 @@ serve(async (req) => {
     if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
       throw new Error('Cloudinary credentials not configured')
     }
-
-    // Get Supabase credentials from environment
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Build Cloudinary transformation URL
     // PNG with transparency already has background removed on device
@@ -65,14 +137,14 @@ serve(async (req) => {
     ].join(',')
 
     // Resolve the original Supabase Storage URL from the storage path
-    const originalUrl = `${supabaseUrl}/storage/v1/object/public/photos/${storagePath}`
+    const originalUrl = `${supabaseUrl}/storage/v1/object/public/photos/${normalizedStoragePath}`
 
     // Create Cloudinary upload URL
     const timestamp = Math.round(Date.now() / 1000)
     const publicId = `progress-photos/${metricsId}_${timestamp}`
 
     // Parameters that need to be included in the signature (in alphabetical order)
-    const params = {
+    const params: Record<string, string | number> = {
       eager: transformations,
       eager_async: 'false',
       invalidate: 'true',
@@ -97,7 +169,7 @@ serve(async (req) => {
     const { data: signedData, error: signedError } = await supabase
       .storage
       .from('photos')
-      .createSignedUrl(storagePath, 60 * 10)
+      .createSignedUrl(normalizedStoragePath, 60 * 10)
 
     if (signedError || !signedData || !signedData.signedUrl) {
       throw new Error('Failed to create signed URL for original photo')
@@ -145,18 +217,25 @@ serve(async (req) => {
     const processedUrl = uploadResult.eager?.[0]?.secure_url || uploadResult.secure_url
 
     // Update the body_metrics record with the processed URL and storage path
-    const { error: updateError } = await supabase
+    const { data: updatedMetric, error: updateError } = await supabase
       .from('body_metrics')
       .update({
         photo_url: processedUrl,
-        original_photo_url: storagePath,
+        original_photo_url: normalizedStoragePath,
         photo_processed_at: new Date().toISOString()
       })
       .eq('id', metricsId)
+      .eq('user_id', user.id)
+      .select('id')
+      .maybeSingle()
 
     if (updateError) {
       console.error('Failed to update body_metrics:', updateError)
-      // Don't fail the whole operation if DB update fails
+      return jsonResponse({ error: 'Failed to update metrics photo' }, 500)
+    }
+
+    if (!updatedMetric) {
+      return jsonResponse({ error: 'Metrics record does not belong to the authenticated user' }, 403)
     }
 
     return new Response(
@@ -175,15 +254,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error processing image:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
-    )
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return jsonResponse({ error: message }, 500)
   }
 })
