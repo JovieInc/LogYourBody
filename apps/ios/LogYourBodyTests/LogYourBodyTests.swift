@@ -1235,6 +1235,41 @@ final class RevenueCatProductConfigurationTests: XCTestCase {
     }
 }
 
+final class RevenueCatSubscriptionAnalyticsTransitionTests: XCTestCase {
+    func testTrialStartTracksWhenEnteringTrial() {
+        XCTAssertEqual(
+            RevenueCatSubscriptionAnalyticsTransition.event(from: .none, to: .trial),
+            .trialStart
+        )
+    }
+
+    func testTrialStartDoesNotDuplicateForRepeatedTrialRefresh() {
+        XCTAssertNil(
+            RevenueCatSubscriptionAnalyticsTransition.event(from: .trial, to: .trial)
+        )
+    }
+
+    func testTrialConversionTracksWhenTrialBecomesPaid() {
+        XCTAssertEqual(
+            RevenueCatSubscriptionAnalyticsTransition.event(from: .trial, to: .paid),
+            .trialConvertedToPaid
+        )
+    }
+
+    func testTrialExpirationTracksWhenTrialExpiresUnpaid() {
+        XCTAssertEqual(
+            RevenueCatSubscriptionAnalyticsTransition.event(from: .trial, to: .expiredUnpaid),
+            .trialExpiredUnpaid
+        )
+    }
+
+    func testExistingPaidSubscriberDoesNotBackfillTrialConversion() {
+        XCTAssertNil(
+            RevenueCatSubscriptionAnalyticsTransition.event(from: .none, to: .paid)
+        )
+    }
+}
+
 final class CachedPaywallOfferingDisplayTests: XCTestCase {
     func testPreferredPackageUsesAnnualBeforeMonthly() {
         let display = CachedPaywallOfferingDisplay(

@@ -33,6 +33,37 @@ struct CachedPaywallOfferingDisplay: Codable, Equatable {
     }
 }
 
+enum RevenueCatSubscriptionAnalyticsPhase: String {
+    case none
+    case trial
+    case paid
+    case expiredUnpaid = "expired_unpaid"
+}
+
+enum RevenueCatTrialAnalyticsEvent: String {
+    case trialStart = "trial_start"
+    case trialConvertedToPaid = "trial_converted_to_paid"
+    case trialExpiredUnpaid = "trial_expired_unpaid"
+}
+
+struct RevenueCatSubscriptionAnalyticsTransition {
+    static func event(
+        from previousPhase: RevenueCatSubscriptionAnalyticsPhase,
+        to currentPhase: RevenueCatSubscriptionAnalyticsPhase
+    ) -> RevenueCatTrialAnalyticsEvent? {
+        switch (previousPhase, currentPhase) {
+        case (.trial, .paid):
+            return .trialConvertedToPaid
+        case (.trial, .expiredUnpaid):
+            return .trialExpiredUnpaid
+        case (_, .trial) where previousPhase != .trial:
+            return .trialStart
+        default:
+            return nil
+        }
+    }
+}
+
 @MainActor
 class RevenueCatManager: NSObject, ObservableObject {
     static let shared = RevenueCatManager()
@@ -64,6 +95,16 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     /// Timestamp of last successful customer info fetch
     @AppStorage("revenuecat_lastFetchTimestamp") private var lastFetchTimestamp: Double = 0
+
+    /// Last locally observed subscription analytics phase for idempotent trial funnel events.
+    @AppStorage("revenuecat_subscriptionAnalyticsPhase") private var cachedSubscriptionAnalyticsPhase: String =
+        RevenueCatSubscriptionAnalyticsPhase.none.rawValue
+
+    /// RevenueCat app user associated with the cached analytics phase.
+    @AppStorage("revenuecat_subscriptionAnalyticsAppUserId") private var cachedSubscriptionAnalyticsAppUserId: String = ""
+
+    /// Last observed trial expiration used to classify canceled trials after they expire.
+    @AppStorage("revenuecat_trialExpirationTimestamp") private var cachedTrialExpirationTimestamp: Double = 0
 
     // MARK: - Constants
 
@@ -166,6 +207,7 @@ class RevenueCatManager: NSObject, ObservableObject {
             isSubscribed = false
             cachedIsSubscribed = false
             currentOffering = nil
+            resetSubscriptionAnalyticsCache()
             return
         }
 
@@ -176,6 +218,7 @@ class RevenueCatManager: NSObject, ObservableObject {
                 self.isSubscribed = false
                 self.cachedIsSubscribed = false
                 self.currentOffering = nil
+                self.resetSubscriptionAnalyticsCache()
             }
         } catch {
             let appError = AppError.billing(operation: "logoutUser", underlying: error)
@@ -558,7 +601,9 @@ class RevenueCatManager: NSObject, ObservableObject {
     /// Call this method whenever customerInfo is updated to keep cache in sync
     private func updateSubscriptionStatus(customerInfo: CustomerInfo) {
         self.customerInfo = customerInfo
-        let isActive = customerInfo.entitlements[proEntitlementID]?.isActive == true
+        let entitlement = customerInfo.entitlements[proEntitlementID]
+        let isActive = entitlement?.isActive == true
+        trackTrialAnalyticsIfNeeded(customerInfo: customerInfo, entitlement: entitlement, now: Date())
         self.isSubscribed = isActive
         self.cachedIsSubscribed = isActive
         self.lastFetchTimestamp = Date().timeIntervalSince1970
@@ -569,6 +614,146 @@ class RevenueCatManager: NSObject, ObservableObject {
     var isCacheExpired: Bool {
         let currentTime = Date().timeIntervalSince1970
         return (currentTime - lastFetchTimestamp) > cacheExpiryDuration
+    }
+
+    private func trackTrialAnalyticsIfNeeded(
+        customerInfo: CustomerInfo,
+        entitlement: EntitlementInfo?,
+        now: Date
+    ) {
+        resetSubscriptionAnalyticsCacheIfNeeded(for: customerInfo.originalAppUserId)
+
+        let previousPhase = RevenueCatSubscriptionAnalyticsPhase(rawValue: cachedSubscriptionAnalyticsPhase) ?? .none
+        let currentPhase = subscriptionAnalyticsPhase(
+            entitlement: entitlement,
+            previousPhase: previousPhase,
+            now: now
+        )
+
+        if let event = RevenueCatSubscriptionAnalyticsTransition.event(from: previousPhase, to: currentPhase) {
+            AnalyticsService.shared.track(
+                event: event.rawValue,
+                properties: trialAnalyticsProperties(
+                    customerInfo: customerInfo,
+                    entitlement: entitlement,
+                    previousPhase: previousPhase,
+                    currentPhase: currentPhase
+                )
+            )
+        }
+
+        persistSubscriptionAnalyticsPhase(
+            currentPhase,
+            appUserId: customerInfo.originalAppUserId,
+            entitlement: entitlement
+        )
+    }
+
+    private func resetSubscriptionAnalyticsCacheIfNeeded(for appUserId: String) {
+        guard !cachedSubscriptionAnalyticsAppUserId.isEmpty,
+              cachedSubscriptionAnalyticsAppUserId != appUserId else {
+            return
+        }
+
+        resetSubscriptionAnalyticsCache()
+    }
+
+    private func resetSubscriptionAnalyticsCache() {
+        cachedSubscriptionAnalyticsPhase = RevenueCatSubscriptionAnalyticsPhase.none.rawValue
+        cachedSubscriptionAnalyticsAppUserId = ""
+        cachedTrialExpirationTimestamp = 0
+    }
+
+    private func subscriptionAnalyticsPhase(
+        entitlement: EntitlementInfo?,
+        previousPhase: RevenueCatSubscriptionAnalyticsPhase,
+        now: Date
+    ) -> RevenueCatSubscriptionAnalyticsPhase {
+        guard let entitlement else {
+            return .none
+        }
+
+        if entitlement.isActive {
+            return entitlement.periodType == .trial ? .trial : .paid
+        }
+
+        guard previousPhase == .trial else {
+            return .none
+        }
+
+        let expirationTimestamp = entitlement.expirationDate?.timeIntervalSince1970
+            ?? cachedTrialExpirationTimestamp
+
+        guard expirationTimestamp > 0 else {
+            return .none
+        }
+
+        return now.timeIntervalSince1970 >= expirationTimestamp ? .expiredUnpaid : .trial
+    }
+
+    private func persistSubscriptionAnalyticsPhase(
+        _ phase: RevenueCatSubscriptionAnalyticsPhase,
+        appUserId: String,
+        entitlement: EntitlementInfo?
+    ) {
+        cachedSubscriptionAnalyticsPhase = phase.rawValue
+        cachedSubscriptionAnalyticsAppUserId = appUserId
+
+        if phase == .trial, let expirationDate = entitlement?.expirationDate {
+            cachedTrialExpirationTimestamp = expirationDate.timeIntervalSince1970
+        } else if phase != .trial {
+            cachedTrialExpirationTimestamp = 0
+        }
+    }
+
+    private func trialAnalyticsProperties(
+        customerInfo: CustomerInfo,
+        entitlement: EntitlementInfo?,
+        previousPhase: RevenueCatSubscriptionAnalyticsPhase,
+        currentPhase: RevenueCatSubscriptionAnalyticsPhase
+    ) -> [String: String] {
+        var properties = [
+            "entitlement_id": proEntitlementID,
+            "previous_phase": previousPhase.rawValue,
+            "current_phase": currentPhase.rawValue,
+            "app_user_id": customerInfo.originalAppUserId
+        ]
+
+        if let entitlement {
+            properties["is_active"] = String(entitlement.isActive)
+            properties["will_renew"] = String(entitlement.willRenew)
+            properties["period_type"] = periodTypeName(entitlement.periodType)
+            properties["product_identifier"] = entitlement.productIdentifier
+
+            if let expirationDate = entitlement.expirationDate {
+                properties["expiration_at"] = ISO8601DateFormatter().string(from: expirationDate)
+            }
+
+            if let unsubscribeDetectedAt = entitlement.unsubscribeDetectedAt {
+                properties["unsubscribe_detected_at"] = ISO8601DateFormatter().string(from: unsubscribeDetectedAt)
+            }
+        } else if cachedTrialExpirationTimestamp > 0 {
+            properties["expiration_at"] = ISO8601DateFormatter().string(
+                from: Date(timeIntervalSince1970: cachedTrialExpirationTimestamp)
+            )
+        }
+
+        return properties
+    }
+
+    private func periodTypeName(_ periodType: PeriodType) -> String {
+        switch periodType {
+        case .normal:
+            return "normal"
+        case .intro:
+            return "intro"
+        case .trial:
+            return "trial"
+        case .prepaid:
+            return "prepaid"
+        @unknown default:
+            return "unknown"
+        }
     }
 }
 
