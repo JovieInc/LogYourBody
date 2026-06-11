@@ -48,6 +48,8 @@
 	<string>LogYourBody needs access to scan your photo library for progress photos to import.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>LogYourBody saves your shared body score images to your photo library.</string>
+	<key>NSSiriUsageDescription</key>
+	<string>LogYourBody uses Siri to log and read your body metrics when you ask.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

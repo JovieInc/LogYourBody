@@ -151,6 +151,51 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
     }
 }
 
+final class BodyMetricLoggingServiceTests: XCTestCase {
+    func testStoredWeightConvertsPoundsToKilograms() {
+        let stored = BodyMetricLoggingService.storedWeightInKilograms(
+            displayWeight: 180,
+            unit: "lbs"
+        )
+
+        XCTAssertEqual(stored ?? 0, 81.6467, accuracy: 0.001)
+    }
+
+    func testStoredWeightKeepsKilograms() {
+        let stored = BodyMetricLoggingService.storedWeightInKilograms(
+            displayWeight: 82.5,
+            unit: "kg"
+        )
+
+        XCTAssertEqual(stored, 82.5)
+    }
+
+    func testLoggedSummaryUsesPreferredWeightUnitAndBodyFatPercent() {
+        let metric = BodyMetrics(
+            id: "metric-1",
+            userId: "user-1",
+            date: Date(timeIntervalSince1970: 0),
+            localDate: "1970-01-01",
+            weight: 81.6467,
+            weightUnit: "kg",
+            bodyFatPercentage: 14.8,
+            bodyFatMethod: "Manual",
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: BodyMetricSource.manual.rawValue,
+            createdAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
+
+        XCTAssertEqual(
+            BodyMetricLoggingService.loggedSummary(for: metric, preferredSystem: .imperial),
+            "Logged 180.0 lbs and 14.8% body fat."
+        )
+    }
+}
+
 final class PhaseInsightPolicyTests: XCTestCase {
     private var calendar: Calendar!
 

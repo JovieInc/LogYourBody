@@ -28,6 +28,8 @@
 		AD050C4D2EC135360082A313 /* ReceiptParser in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C4C2EC135360082A313 /* ReceiptParser */; };
 		AD050C4F2EC135360082A313 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C4E2EC135360082A313 /* RevenueCat */; };
 		AD050C512EC135360082A313 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C502EC135360082A313 /* RevenueCatUI */; };
+		AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */; };
+		AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */; };
 		AD0B7BF52EC552FA008B29E7 /* LogYourBody.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */; };
 		AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */; };
 		AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */; };
@@ -371,6 +373,8 @@
 		AD723AE42E15FA5C002376C6 /* AuthManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		AD723AE62E15FA5C002376C6 /* CoreDataManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CoreDataManager.swift; sourceTree = "<group>"; };
 		AD723AE72E15FA5C002376C6 /* HealthKitManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
+		AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricAppIntents.swift; sourceTree = "<group>"; };
+		AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricLoggingService.swift; sourceTree = "<group>"; };
 		AD723AE82E15FA5C002376C6 /* LoadingManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingManager.swift; sourceTree = "<group>"; };
 		AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseDataClient.swift; sourceTree = "<group>"; };
 		AD723AEE2E15FA5C002376C6 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
@@ -899,6 +903,8 @@
 				ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */,
 				ADA4B74C2ED00F1500F4262A /* KeychainManager.swift */,
 				ADA4B74A2ED00E1F00F4262A /* ValidationService.swift */,
+				AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */,
+				AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */,
 				ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */,
 				ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */,
 				AD050C482EC12E390082A313 /* RevenueCatManager.swift */,
@@ -1555,6 +1561,8 @@
 				ADDC47A92E2D89F3003C97E7 /* DailyLog.swift in Sources */,
 				ADDC47AA2E2D89F3003C97E7 /* DailyMetrics.swift in Sources */,
 				ADDC47AB2E2D89F3003C97E7 /* LogYourBody.xcdatamodeld in Sources */,
+				AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */,
+				AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
 				ADDC487C2E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift in Sources */,
