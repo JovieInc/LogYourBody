@@ -60,6 +60,7 @@ class RealtimeSyncManager: ObservableObject {
 
     struct SyncOperation: Codable {
         let id: String
+        let userId: String?
         let type: OperationType
         let data: Data
         let tableName: String
@@ -267,28 +268,27 @@ class RealtimeSyncManager: ObservableObject {
             onCompletion?()
             return
         }
+        guard let userIdSnapshot = authManager.currentUser?.id else {
+            onCompletion?()
+            return
+        }
 
         lastSyncAttempt = Date()
         isSyncing = true
         syncStatus = .syncing
         error = nil
 
-        let operationsToProcess = pendingOperations
-        pendingOperations.removeAll()
+        let operationsToProcess = pendingOperations.filter { $0.userId == userIdSnapshot }
+        pendingOperations.removeAll { $0.userId == userIdSnapshot || $0.userId == nil }
         savePendingOperations()
 
         let lastSyncSnapshot = lastSyncDate
-        let userIdSnapshot = authManager.currentUser?.id
 
         Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
             var operationsNeedingRetry = operationsToProcess
 
             do {
-                guard let userId = userIdSnapshot else {
-                    throw SyncError.noAuthSession
-                }
-
                 let session = await MainActor.run { self.authManager.clerkSession }
                 guard let session else {
                     throw SyncError.noAuthSession
@@ -309,8 +309,8 @@ class RealtimeSyncManager: ObservableObject {
                     }
                 }
 
-                try await self.syncLocalChanges(token: token)
-                try await self.pullLatestData(userId: userId, lastSync: lastSyncSnapshot, token: token)
+                try await self.syncLocalChanges(for: userIdSnapshot, token: token)
+                try await self.pullLatestData(userId: userIdSnapshot, lastSync: lastSyncSnapshot, token: token)
                 await self.coreDataManager.cleanupOldData()
 
                 await MainActor.run {
@@ -366,10 +366,14 @@ class RealtimeSyncManager: ObservableObject {
     }
 
     nonisolated func syncLocalChanges(token: String) async throws {
-        let unsynced = await coreDataManager.fetchUnsyncedEntries()
-        let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs()
-        let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications()
-        let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults()
+        try await syncLocalChanges(for: nil, token: token)
+    }
+
+    nonisolated func syncLocalChanges(for userId: String?, token: String) async throws {
+        let unsynced = await coreDataManager.fetchUnsyncedEntries(for: userId)
+        let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs(for: userId)
+        let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications(for: userId)
+        let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults(for: userId)
         let deletedBodyMetrics = unsynced.bodyMetrics.filter(\.isMarkedDeleted)
         let bodyMetricsToUpsert = unsynced.bodyMetrics.filter { !$0.isMarkedDeleted }
 
@@ -838,14 +842,29 @@ class RealtimeSyncManager: ObservableObject {
 
     // MARK: - Helpers
     func updatePendingSyncCount() {
+        let userId = authManager.currentUser?.id
         pendingCountTask?.cancel()
         pendingCountTask = Task(priority: .utility) { [weak self] in
             guard let self else { return }
-            let unsynced = await self.coreDataManager.fetchUnsyncedEntries()
-            let unsyncedGlp1 = await self.coreDataManager.fetchUnsyncedGlp1DoseLogs()
-            let unsyncedMedications = await self.coreDataManager.fetchUnsyncedGlp1Medications()
-            let unsyncedDexa = await self.coreDataManager.fetchUnsyncedDexaResults()
-            let operationsCount = await MainActor.run { self.pendingOperations.count }
+            guard let userId else {
+                await MainActor.run {
+                    self.unsyncedBodyCount = 0
+                    self.unsyncedDailyCount = 0
+                    self.unsyncedProfileCount = 0
+                    self.unsyncedGlp1Count = 0
+                    self.unsyncedDexaCount = 0
+                    self.pendingSyncCount = 0
+                }
+                return
+            }
+
+            let unsynced = await self.coreDataManager.fetchUnsyncedEntries(for: userId)
+            let unsyncedGlp1 = await self.coreDataManager.fetchUnsyncedGlp1DoseLogs(for: userId)
+            let unsyncedMedications = await self.coreDataManager.fetchUnsyncedGlp1Medications(for: userId)
+            let unsyncedDexa = await self.coreDataManager.fetchUnsyncedDexaResults(for: userId)
+            let operationsCount = await MainActor.run {
+                self.pendingOperations.filter { $0.userId == userId }.count
+            }
             await MainActor.run {
                 self.unsyncedBodyCount = unsynced.bodyMetrics.count
                 self.unsyncedDailyCount = unsynced.dailyMetrics.count
@@ -864,17 +883,21 @@ class RealtimeSyncManager: ObservableObject {
     }
 
     func hasPendingSyncOperations() async -> Bool {
-        let unsynced = await coreDataManager.fetchUnsyncedEntries()
-        let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs()
-        let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications()
-        let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults()
+        guard let userId = authManager.currentUser?.id else {
+            return false
+        }
+
+        let unsynced = await coreDataManager.fetchUnsyncedEntries(for: userId)
+        let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs(for: userId)
+        let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications(for: userId)
+        let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults(for: userId)
         return !unsynced.bodyMetrics.isEmpty ||
             !unsynced.dailyMetrics.isEmpty ||
             !unsynced.profiles.isEmpty ||
             !unsyncedGlp1.isEmpty ||
             !unsyncedMedications.isEmpty ||
             !unsyncedDexa.isEmpty ||
-            !pendingOperations.isEmpty
+            pendingOperations.contains { $0.userId == userId }
     }
     private func shouldPullLatestData() -> Bool {
         guard let lastSync = lastSyncDate else { return true }
@@ -902,6 +925,7 @@ class RealtimeSyncManager: ObservableObject {
         queueOperation(
             SyncOperation(
                 id: id,
+                userId: authManager.currentUser?.id,
                 type: .delete,
                 data: Data(),
                 tableName: "body_metrics",
