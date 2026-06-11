@@ -5,8 +5,8 @@ on:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: production-deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   detect-changes:
