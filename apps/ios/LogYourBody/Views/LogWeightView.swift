@@ -6,7 +6,6 @@ import SwiftUI
 
 struct LogWeightView: View {
     @EnvironmentObject var authManager: AuthManager
-    @StateObject private var healthKitManager = HealthKitManager.shared
     @State private var weight: String = ""
     @State private var bodyFat: String = ""
     @State private var weightError: String?
@@ -361,78 +360,11 @@ struct LogWeightView: View {
 
         Task {
             do {
-                let weightValue = validation.weightValue
-                let bodyFatValue = validation.bodyFatValue
-                let now = Date()
-
-                // Convert weight to kg for storage
-                let weightInKg = weightValue != nil
-                    ? (
-                        currentSystem.weightUnit == "lbs"
-                            ? weightValue!.lbsToKg
-                            : weightValue!
-                    )
-                    : nil
-
-                // Save to HealthKit if authorized
-                if healthKitManager.isAuthorized {
-                    if let w = weightValue {
-                        let weightInLbs = currentSystem.weightUnit == "kg"
-                            ? w.kgToLbs
-                            : w
-                        try await healthKitManager.saveWeight(weightInLbs, date: now)
-                    }
-
-                    if let bf = bodyFatValue {
-                        try await healthKitManager.saveBodyFatPercentage(bf / 100, date: now)
-                    }
-                }
-
-                // If only body fat is provided, try to get latest weight
-                var finalWeight = weightInKg
-                if weightInKg == nil && bodyFatValue != nil, let userId = authManager.currentUser?.id {
-                    let fromDate = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-                    let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(
-                        for: userId,
-                        from: fromDate,
-                        to: Date()
-                    )
-                    let recentMetrics = cachedMetrics
-                        .compactMap { $0.toBodyMetrics() }
-                        .sorted { $0.date > $1.date }
-                    finalWeight = recentMetrics.first?.weight
-                }
-
-                // Create body metrics
-                let metrics = BodyMetrics(
-                    id: UUID().uuidString,
-                    userId: authManager.currentUser?.id ?? "",
-                    date: now,
-                    localDate: BodyMetricLocalDate.key(for: now),
-                    weight: finalWeight,
-                    weightUnit: finalWeight != nil ? "kg" : nil,
-                    bodyFatPercentage: bodyFatValue,
-                    bodyFatMethod: bodyFatValue != nil ? "Manual" : nil,
-                    muscleMass: nil,
-                    boneMass: nil,
-                    notes: nil,
-                    photoUrl: nil,
-                    dataSource: "Manual",
-                    createdAt: now,
-                    updatedAt: now
+                _ = try await BodyMetricLoggingService.shared.log(
+                    weight: weight,
+                    bodyFat: bodyFat,
+                    unit: currentSystem.weightUnit
                 )
-
-                // Save to local storage and sync
-                if let userId = authManager.currentUser?.id {
-                    await MainActor.run {
-                        CoreDataManager.shared.saveBodyMetrics(
-                            metrics,
-                            userId: userId,
-                            markAsSynced: false
-                        )
-                    }
-                    RealtimeSyncManager.shared.syncIfNeeded()
-                }
 
                 await MainActor.run {
                     isLoading = false
