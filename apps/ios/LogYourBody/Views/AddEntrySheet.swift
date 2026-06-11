@@ -91,7 +91,7 @@ struct AddEntrySheet: View {
 
                     Spacer()
 
-                    DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                    DatePicker("", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
                         .labelsHidden()
                 }
                 .padding(.horizontal)

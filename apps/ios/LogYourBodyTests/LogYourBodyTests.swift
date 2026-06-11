@@ -463,6 +463,50 @@ final class PaidWeightLoggerMVPPolicyTests: XCTestCase {
     }
 }
 
+final class LogWeightFormValidatorTests: XCTestCase {
+    func testRejectsOutOfRangeWeightValues() {
+        let zeroPounds = LogWeightFormValidator.validate(weight: "0", bodyFat: "", unit: "lbs")
+        XCTAssertFalse(zeroPounds.isValid)
+        XCTAssertEqual(zeroPounds.weightError, "Weight must be between 44-1100 lbs")
+        XCTAssertNil(zeroPounds.weightValue)
+
+        let extremePounds = LogWeightFormValidator.validate(weight: "9999", bodyFat: "", unit: "lbs")
+        XCTAssertFalse(extremePounds.isValid)
+        XCTAssertEqual(extremePounds.weightError, "Weight must be between 44-1100 lbs")
+        XCTAssertNil(extremePounds.weightValue)
+    }
+
+    func testRejectsOutOfRangeBodyFatValues() {
+        let tooLow = LogWeightFormValidator.validate(weight: "", bodyFat: "1", unit: "lbs")
+        XCTAssertFalse(tooLow.isValid)
+        XCTAssertEqual(tooLow.bodyFatError, "Body fat must be between 3-50%")
+        XCTAssertNil(tooLow.bodyFatValue)
+
+        let tooHigh = LogWeightFormValidator.validate(weight: "", bodyFat: "60", unit: "lbs")
+        XCTAssertFalse(tooHigh.isValid)
+        XCTAssertEqual(tooHigh.bodyFatError, "Body fat must be between 3-50%")
+        XCTAssertNil(tooHigh.bodyFatValue)
+    }
+
+    func testAllowsValidWeightAndBodyFat() {
+        let validation = LogWeightFormValidator.validate(weight: "175", bodyFat: "18", unit: "lbs")
+
+        XCTAssertTrue(validation.isValid)
+        XCTAssertEqual(validation.weightValue, 175)
+        XCTAssertEqual(validation.bodyFatValue, 18)
+        XCTAssertNil(validation.weightError)
+        XCTAssertNil(validation.bodyFatError)
+        XCTAssertNil(validation.formError)
+    }
+
+    func testRequiresAtLeastOneMeasurement() {
+        let validation = LogWeightFormValidator.validate(weight: " ", bodyFat: "", unit: "lbs")
+
+        XCTAssertFalse(validation.isValid)
+        XCTAssertEqual(validation.formError, "Please enter at least one measurement")
+    }
+}
+
 final class ProgressPhotoAttachPolicyTests: XCTestCase {
     func testProgressPhotoAttachStateCopyCoversCoreStates() {
         XCTAssertEqual(ProgressPhotoAttachPolicy.statusTitle(for: .empty), "Choose a photo")
