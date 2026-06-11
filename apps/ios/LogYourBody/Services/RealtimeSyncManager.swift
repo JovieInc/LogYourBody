@@ -370,10 +370,16 @@ class RealtimeSyncManager: ObservableObject {
         let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs()
         let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications()
         let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults()
+        let deletedBodyMetrics = unsynced.bodyMetrics.filter(\.isMarkedDeleted)
+        let bodyMetricsToUpsert = unsynced.bodyMetrics.filter { !$0.isMarkedDeleted }
 
         // Batch sync for efficiency
-        if !unsynced.bodyMetrics.isEmpty {
-            try await syncBodyMetricsBatch(unsynced.bodyMetrics, token: token)
+        if !deletedBodyMetrics.isEmpty {
+            try await syncDeletedBodyMetricsBatch(deletedBodyMetrics, token: token)
+        }
+
+        if !bodyMetricsToUpsert.isEmpty {
+            try await syncBodyMetricsBatch(bodyMetricsToUpsert, token: token)
         }
 
         if !unsynced.dailyMetrics.isEmpty {
@@ -395,6 +401,23 @@ class RealtimeSyncManager: ObservableObject {
         if !unsyncedDexa.isEmpty {
             try await syncDexaResultsBatch(unsyncedDexa, token: token)
         }
+    }
+
+    nonisolated private func syncDeletedBodyMetricsBatch(_ metrics: [CachedBodyMetrics], token: String) async throws {
+        for metric in metrics {
+            guard let id = metric.id else { continue }
+
+            try await supabaseManager.deleteData(
+                table: "body_metrics",
+                id: id,
+                token: token
+            )
+
+            metric.syncStatus = "synced"
+            metric.isSynced = true
+        }
+
+        coreDataManager.save()
     }
 
     nonisolated private func syncBodyMetricsBatch(_ metrics: [CachedBodyMetrics], token: String) async throws {
@@ -871,6 +894,28 @@ class RealtimeSyncManager: ObservableObject {
     }
 
     // MARK: - Public Methods
+    @discardableResult
+    func deleteBodyMetric(id: String) async -> Bool {
+        let success = await coreDataManager.markBodyMetricDeleted(id: id)
+        guard success else { return false }
+
+        queueOperation(
+            SyncOperation(
+                id: id,
+                type: .delete,
+                data: Data(),
+                tableName: "body_metrics",
+                timestamp: Date()
+            )
+        )
+
+        if isOnline {
+            syncAll()
+        }
+
+        return true
+    }
+
     func logBodyMetrics(_ metrics: BodyMetrics) {
         guard let userId = authManager.currentUser?.id else { return }
 

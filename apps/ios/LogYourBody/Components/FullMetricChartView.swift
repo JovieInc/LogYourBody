@@ -1331,7 +1331,7 @@ struct FullMetricChartView: View {
             showingHistoryDeleteConfirmation = false
         }
 
-        let success = await CoreDataManager.shared.markBodyMetricDeleted(id: entry.id)
+        let success = await RealtimeSyncManager.shared.deleteBodyMetric(id: entry.id)
         guard success else { return }
 
         var sections = localHistorySections ?? historySections

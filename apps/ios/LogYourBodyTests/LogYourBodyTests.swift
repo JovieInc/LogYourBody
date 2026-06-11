@@ -1267,6 +1267,7 @@ final class StubSupabaseManager: SupabaseManager {
     private(set) var bodyMetricsBatches: [[[String: Any]]] = []
     private(set) var dailyMetricsBatches: [[[String: Any]]] = []
     private(set) var dexaPayloads: [[String: Any]] = []
+    private(set) var deletedRecords: [(table: String, id: String)] = []
 
     override func upsertBodyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> [[String: Any]] {
         bodyMetricsBatches.append(metrics)
@@ -1292,6 +1293,10 @@ final class StubSupabaseManager: SupabaseManager {
         let jsonObject = try JSONSerialization.jsonObject(with: data)
         let array = jsonObject as? [[String: Any]] ?? []
         dexaPayloads.append(contentsOf: array)
+    }
+
+    override func deleteData(table: String, id: String, token: String) async throws {
+        deletedRecords.append((table: table, id: id))
     }
 }
 
@@ -2013,6 +2018,53 @@ final class SyncIntegrationTests: XCTestCase {
         }
 
         // Verify Core Data entry for this user is no longer unsynced
+        let unsynced = await coreData.fetchUnsyncedEntries()
+        let unsyncedForUser = unsynced.bodyMetrics.filter { $0.userId == userId }
+        XCTAssertTrue(unsyncedForUser.isEmpty)
+    }
+
+    func testSyncLocalChangesDeletesMarkedBodyMetricInsteadOfUpserting() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_deleted_realtime_\(UUID().uuidString)"
+        let date = Date()
+
+        let metricModel = BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 81.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date.addingTimeInterval(-60),
+            updatedAt: date
+        )
+
+        try await coreData.saveBodyMetricsAndWait(metricModel, userId: userId, markAsSynced: true)
+        let didMarkDeleted = await coreData.markBodyMetricDeleted(id: id)
+        XCTAssertTrue(didMarkDeleted)
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        XCTAssertTrue(stubSupabase.bodyMetricsBatches.isEmpty)
+        XCTAssertEqual(stubSupabase.deletedRecords.count, 1)
+        XCTAssertEqual(stubSupabase.deletedRecords.first?.table, "body_metrics")
+        XCTAssertEqual(stubSupabase.deletedRecords.first?.id, id)
+
         let unsynced = await coreData.fetchUnsyncedEntries()
         let unsyncedForUser = unsynced.bodyMetrics.filter { $0.userId == userId }
         XCTAssertTrue(unsyncedForUser.isEmpty)
