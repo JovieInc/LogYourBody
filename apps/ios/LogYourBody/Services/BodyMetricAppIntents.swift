@@ -30,8 +30,14 @@ struct LogWeightIntent: AppIntent {
     static var title: LocalizedStringResource = "Log Weight"
     static var description = IntentDescription("Log a body weight measurement in LogYourBody.")
     static var openAppWhenRun = false
+    static var parameterSummary: some ParameterSummary {
+        Summary("Log \(\.$weight) \(\.$unit)")
+    }
 
-    @Parameter(title: "Weight")
+    @Parameter(
+        title: "Weight",
+        requestValueDialog: "What weight do you want to log?"
+    )
     var weight: Double
 
     @Parameter(title: "Unit", default: .pounds)
@@ -52,8 +58,14 @@ struct LogBodyFatIntent: AppIntent {
     static var title: LocalizedStringResource = "Log Body Fat"
     static var description = IntentDescription("Log a body fat percentage in LogYourBody.")
     static var openAppWhenRun = false
+    static var parameterSummary: some ParameterSummary {
+        Summary("Log \(\.$bodyFatPercentage)% body fat")
+    }
 
-    @Parameter(title: "Body Fat Percentage")
+    @Parameter(
+        title: "Body Fat Percentage",
+        requestValueDialog: "What body fat percentage do you want to log?"
+    )
     var bodyFatPercentage: Double
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
