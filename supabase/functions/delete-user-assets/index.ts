@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.210.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+import { deleteUserDatabaseRows } from "./account-deletion.ts"
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -73,6 +74,14 @@ serve(async (req) => {
             photo_url: string | null
             thumbnail_url: string | null
         }[]
+
+        if (bodyMetricsResult.error) {
+            console.error("Error loading body metric assets for account deletion", { userId, error: bodyMetricsResult.error })
+        }
+
+        if (progressPhotosResult.error) {
+            console.error("Error loading progress photo assets for account deletion", { userId, error: progressPhotosResult.error })
+        }
 
         const storagePaths = new Set<string>()
         const cloudinaryPublicIds = new Set<string>()
@@ -202,8 +211,10 @@ serve(async (req) => {
             }
         }
 
+        const deletedRows = await deleteUserDatabaseRows(supabase, userId)
+
         return new Response(
-            JSON.stringify({ success: true }),
+            JSON.stringify({ success: true, deletedRows }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         )
     } catch (error) {
