@@ -24,6 +24,38 @@ platform :ios do
   # Define workspace and scheme
   scheme = "LogYourBody"
   project = "LogYourBody.xcodeproj"
+  default_app_identifier = "com.logyourbody.app"
+  default_app_store_app_id = "6739360530"
+
+  app_identifier = lambda do
+    value = ENV["APP_IDENTIFIER"].to_s.strip
+    value.empty? ? default_app_identifier : value
+  end
+
+  app_store_app_id = lambda do
+    value = ENV["APP_STORE_APP_ID"].to_s.strip
+    return default_app_store_app_id if value.empty?
+
+    if app_identifier.call == default_app_identifier && value != default_app_store_app_id
+      UI.user_error!("APP_STORE_APP_ID must be #{default_app_store_app_id} for #{default_app_identifier}; got #{value}")
+    end
+
+    value
+  end
+
+  testflight_upload_options = lambda do |ipa:, groups:, distribute_external:, changelog: nil|
+    options = {
+      ipa: ipa,
+      skip_waiting_for_build_processing: true,
+      app_identifier: app_identifier.call,
+      apple_id: app_store_app_id.call,
+      team_id: ENV["APPLE_TEAM_ID"],
+      groups: groups,
+      distribute_external: distribute_external
+    }
+    options[:changelog] = changelog unless changelog.nil?
+    options
+  end
   
   before_all do
     # Setup CI environment if running in CI
@@ -669,13 +701,12 @@ platform :ios do
     test_groups = options[:groups] ? options[:groups].split(",") : ["Internal Testers"]
     
     upload_to_testflight(
-      ipa: build_result[:output_path],
-      skip_waiting_for_build_processing: true,
-      apple_id: ENV["APP_STORE_APP_ID"],
-      team_id: ENV["APPLE_TEAM_ID"],
-      groups: test_groups,
-      changelog: release_notes,
-      distribute_external: false
+      testflight_upload_options.call(
+        ipa: build_result[:output_path],
+        groups: test_groups,
+        changelog: release_notes,
+        distribute_external: false
+      )
     )
 
     archive_path = lane_context[SharedValues::XCODEBUILD_ARCHIVE]
@@ -713,12 +744,11 @@ platform :ios do
     
     # Upload to TestFlight
     upload_to_testflight(
-      ipa: build_result[:output_path],
-      skip_waiting_for_build_processing: true,
-      apple_id: ENV["APP_STORE_APP_ID"],
-      team_id: ENV["APPLE_TEAM_ID"],
-      groups: ["Beta Testers"],
-      distribute_external: true # Beta includes external testers
+      testflight_upload_options.call(
+        ipa: build_result[:output_path],
+        groups: ["Beta Testers"],
+        distribute_external: true # Beta includes external testers
+      )
     )
 
     archive_path = lane_context[SharedValues::XCODEBUILD_ARCHIVE]
@@ -792,13 +822,12 @@ platform :ios do
     
     # Upload IPA
     upload_to_testflight(
-      ipa: options[:ipa_path],
-      skip_waiting_for_build_processing: true,
-      apple_id: ENV["APP_STORE_APP_ID"],
-      team_id: ENV["APPLE_TEAM_ID"],
-      groups: options[:groups] ? options[:groups].split(",") : ["Beta Testers"],
-      changelog: options[:changelog_file] ? File.read(options[:changelog_file]) : "New build",
-      distribute_external: true
+      testflight_upload_options.call(
+        ipa: options[:ipa_path],
+        groups: options[:groups] ? options[:groups].split(",") : ["Beta Testers"],
+        changelog: options[:changelog_file] ? File.read(options[:changelog_file]) : "New build",
+        distribute_external: true
+      )
     )
   end
 

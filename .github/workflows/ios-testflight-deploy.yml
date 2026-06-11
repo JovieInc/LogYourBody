@@ -47,7 +47,11 @@ on:
       APPLE_TEAM_ID:
         required: true
       APP_STORE_APP_ID:
-        required: true
+        required: false
+
+env:
+  LOGYOURBODY_APP_IDENTIFIER: com.logyourbody.app
+  LOGYOURBODY_APP_STORE_APP_ID: "6739360530"
 
 jobs:
   deploy-testflight:
@@ -188,6 +192,8 @@ jobs:
       if: inputs.distribution_group == 'production'
       env:
         VERSION_NAME: ${{ inputs.version_name }}
+        APP_IDENTIFIER: ${{ env.LOGYOURBODY_APP_IDENTIFIER }}
+        APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
       run: |
         cd apps/ios
         
@@ -198,6 +204,16 @@ jobs:
         UNRESOLVED_MARKER="\$("
         if [ -z "$VERSION_NAME" ] || printf '%s' "$VERSION_NAME" | grep -qF "$UNRESOLVED_MARKER"; then
           echo "::error::Version name is required for production releases"
+          exit 1
+        fi
+
+        if [ "$APP_IDENTIFIER" != "com.logyourbody.app" ]; then
+          echo "::error::Unexpected bundle identifier for production TestFlight deploy: $APP_IDENTIFIER"
+          exit 1
+        fi
+
+        if [ "$APP_STORE_APP_ID" != "6739360530" ]; then
+          echo "::error::Unexpected App Store app id for production TestFlight deploy: $APP_STORE_APP_ID"
           exit 1
         fi
         
@@ -235,7 +251,8 @@ jobs:
           changelog_file:"$CHANGELOG_PATH"
       env:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+        APP_IDENTIFIER: ${{ env.LOGYOURBODY_APP_IDENTIFIER }}
+        APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
         FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "180"
         FASTLANE_XCODEBUILD_SETTINGS_RETRIES: "10"
     
