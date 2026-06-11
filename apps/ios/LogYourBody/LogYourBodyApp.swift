@@ -4,6 +4,7 @@
 //
 import SwiftUI
 import Clerk
+import AppIntents
 
 @main
 struct LogYourBodyApp: App {
@@ -17,6 +18,10 @@ struct LogYourBodyApp: App {
     @State private var selectedEntryTab = 0
 
     let persistenceController = CoreDataManager.shared
+
+    init() {
+        LogYourBodyAppShortcuts.updateAppShortcutParameters()
+    }
 
     var body: some Scene {
         WindowGroup {
