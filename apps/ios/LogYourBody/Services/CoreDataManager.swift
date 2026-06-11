@@ -524,6 +524,7 @@ class CoreDataManager: ObservableObject {
                 // Update values
                 cached.userId = userId
                 cached.date = metrics.date
+                cached.localDate = metrics.localDate
                 cached.weight = metrics.weight ?? 0
                 cached.weightUnit = metrics.weightUnit
                 cached.waistCircumference = metrics.waistCm ?? 0
@@ -618,6 +619,49 @@ class CoreDataManager: ObservableObject {
                 return []
             }
         }
+    }
+
+    func fetchBodyMetrics(for userId: String, localDate: String) async -> [CachedBodyMetrics] {
+        let context = viewContext
+
+        return await context.perform {
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            let normalizedLocalDate = BodyMetricLocalDate.normalized(localDate, fallback: Date())
+
+            fetchRequest.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
+                NSCompoundPredicate(andPredicateWithSubpredicates: [
+                    NSPredicate(format: "userId == %@", userId),
+                    NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false)),
+                    NSPredicate(format: "localDate == %@", normalizedLocalDate)
+                ]),
+                self.legacyBodyMetricDatePredicate(userId: userId, localDate: normalizedLocalDate)
+            ])
+            fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+
+            do {
+                return try context.fetch(fetchRequest)
+            } catch {
+                #if DEBUG
+                // print("Failed to fetch body metrics by local date: \(error)")
+                #endif
+                return []
+            }
+        }
+    }
+
+    private func legacyBodyMetricDatePredicate(userId: String, localDate: String) -> NSPredicate {
+        guard let startOfDay = BodyMetricLocalDate.startOfDay(for: localDate),
+              let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay) else {
+            return NSPredicate(value: false)
+        }
+
+        return NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "userId == %@", userId),
+            NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false)),
+            NSPredicate(format: "localDate == nil"),
+            NSPredicate(format: "date >= %@", startOfDay as NSDate),
+            NSPredicate(format: "date < %@", endOfDay as NSDate)
+        ])
     }
 
     func fetchLatestBodyMetric(for userId: String) async -> CachedBodyMetrics? {
@@ -775,6 +819,7 @@ class CoreDataManager: ObservableObject {
 
             let normalizedDate = Calendar.current.startOfDay(for: date)
             cachedMetric.date = normalizedDate
+            cachedMetric.localDate = BodyMetricLocalDate.key(for: date)
 
             if let weight {
                 cachedMetric.weight = weight
@@ -1328,6 +1373,10 @@ class CoreDataManager: ObservableObject {
                 if let dateString = data["date"] as? String {
                     metric.date = formatter.date(from: dateString)
                 }
+                metric.localDate = BodyMetricLocalDate.normalized(
+                    data["local_date"] as? String,
+                    fallback: metric.date ?? Date()
+                )
 
                 if let createdString = data["created_at"] as? String,
                    let createdAt = formatter.date(from: createdString) {
@@ -1663,6 +1712,10 @@ class CoreDataManager: ObservableObject {
                     reasons.append("missing updatedAt")
                 }
 
+                if !shouldDelete, metric.localDate == nil, let date = metric.date {
+                    metric.localDate = BodyMetricLocalDate.key(for: date)
+                }
+
                 if shouldDelete {
                     // print("🗑️ Deleting invalid body metric: \(reasons.joined(separator: ", "))")
                     context.delete(metric)
@@ -1670,7 +1723,7 @@ class CoreDataManager: ObservableObject {
                 }
             }
 
-            if deletedCount > 0 {
+            if context.hasChanges {
                 try context.save()
             }
 
@@ -1705,6 +1758,11 @@ class CoreDataManager: ObservableObject {
 
                     if metric.updatedAt == nil {
                         metric.updatedAt = metric.lastModified ?? metric.date ?? Date()
+                        wasRepaired = true
+                    }
+
+                    if metric.localDate == nil, let date = metric.date {
+                        metric.localDate = BodyMetricLocalDate.key(for: date)
                         wasRepaired = true
                     }
 
@@ -2032,6 +2090,7 @@ extension CachedBodyMetrics {
             id: id,
             userId: userId,
             date: date,
+            localDate: BodyMetricLocalDate.normalized(localDate, fallback: date),
             weight: weight > 0 ? weight : nil,
             weightUnit: weightUnit,
             bodyFatPercentage: bodyFatPercentage > 0 ? bodyFatPercentage : nil,

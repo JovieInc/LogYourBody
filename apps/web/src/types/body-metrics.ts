@@ -2,6 +2,7 @@ export interface BodyMetrics {
   id: string;
   user_id: string;
   date: string;
+  local_date?: string;
   weight?: number;
   weight_unit?: 'kg' | 'lbs';
   body_fat_percentage?: number;

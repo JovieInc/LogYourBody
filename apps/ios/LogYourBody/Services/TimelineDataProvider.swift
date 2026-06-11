@@ -126,9 +126,9 @@ class TimelineDataProvider: ObservableObject {
     /// Get metric for a specific date (exact match)
     func getMetric(for date: Date) -> BodyMetrics? {
         // Find metric with matching date (within same day)
-        let calendar = Calendar.current
+        let localDate = BodyMetricLocalDate.key(for: date)
         return bodyMetrics.first { metric in
-            calendar.isDate(metric.date, inSameDayAs: date)
+            metric.localDate == localDate
         }
     }
 

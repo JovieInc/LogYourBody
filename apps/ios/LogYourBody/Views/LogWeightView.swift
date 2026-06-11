@@ -363,6 +363,7 @@ struct LogWeightView: View {
             do {
                 let weightValue = validation.weightValue
                 let bodyFatValue = validation.bodyFatValue
+                let now = Date()
 
                 // Convert weight to kg for storage
                 let weightInKg = weightValue != nil
@@ -379,11 +380,11 @@ struct LogWeightView: View {
                         let weightInLbs = currentSystem.weightUnit == "kg"
                             ? w.kgToLbs
                             : w
-                        try await healthKitManager.saveWeight(weightInLbs, date: Date())
+                        try await healthKitManager.saveWeight(weightInLbs, date: now)
                     }
 
                     if let bf = bodyFatValue {
-                        try await healthKitManager.saveBodyFatPercentage(bf / 100, date: Date())
+                        try await healthKitManager.saveBodyFatPercentage(bf / 100, date: now)
                     }
                 }
 
@@ -406,7 +407,8 @@ struct LogWeightView: View {
                 let metrics = BodyMetrics(
                     id: UUID().uuidString,
                     userId: authManager.currentUser?.id ?? "",
-                    date: Date(),
+                    date: now,
+                    localDate: BodyMetricLocalDate.key(for: now),
                     weight: finalWeight,
                     weightUnit: finalWeight != nil ? "kg" : nil,
                     bodyFatPercentage: bodyFatValue,
@@ -416,8 +418,8 @@ struct LogWeightView: View {
                     notes: nil,
                     photoUrl: nil,
                     dataSource: "Manual",
-                    createdAt: Date(),
-                    updatedAt: Date()
+                    createdAt: now,
+                    updatedAt: now
                 )
 
                 // Save to local storage and sync

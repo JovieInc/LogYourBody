@@ -60,6 +60,8 @@ The `photos` bucket is configured with:
 - Both iOS and web now read and write weight data via the `body_metrics` table.
 - Historical data from the legacy `weight_logs` table is backfilled into `body_metrics` by the `20250705000000_backfill_weight_logs_into_body_metrics.sql` migration.
 - The `weight_logs` identifier is preserved as a read-only compatibility view over `body_metrics` by the `20250705000001_convert_weight_logs_to_view.sql` migration. New writes must target `body_metrics`, not `weight_logs`.
+- `body_metrics.date` stores the precise timestamp for ordering and sync conflict handling.
+- `body_metrics.local_date` stores the user-device calendar day (`YYYY-MM-DD`) for stable day buckets across timezone changes.
 
 **Canonical source of truth for weight:** `public.body_metrics`.
 

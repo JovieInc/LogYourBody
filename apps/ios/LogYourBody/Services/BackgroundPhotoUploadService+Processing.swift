@@ -34,13 +34,13 @@ extension BackgroundPhotoUploadService {
                     // Create body metrics for today
                     let userId = AuthManager.shared.currentUser?.id ?? ""
                     let date = Date()
+                    let localDate = BodyMetricLocalDate.key(for: date)
 
                     // Check if metrics already exist for today
-                    let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
-                        .first { metrics in
-                            guard let metricsDate = metrics.date else { return false }
-                            return Calendar.current.isDate(metricsDate, inSameDayAs: date)
-                        }
+                    let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(
+                        for: userId,
+                        localDate: localDate
+                    ).first
 
                     let metrics: BodyMetrics
                     if let existing = existingMetrics {
@@ -49,6 +49,7 @@ extension BackgroundPhotoUploadService {
                             id: existing.id ?? UUID().uuidString,
                             userId: existing.userId ?? userId,
                             date: existing.date ?? date,
+                            localDate: existing.localDate,
                             weight: existing.weight > 0 ? existing.weight : nil,
                             weightUnit: existing.weightUnit,
                             bodyFatPercentage: existing.bodyFatPercentage > 0 ? existing.bodyFatPercentage : nil,
@@ -68,6 +69,7 @@ extension BackgroundPhotoUploadService {
                             id: UUID().uuidString,
                             userId: userId,
                             date: date,
+                            localDate: localDate,
                             weight: nil,
                             weightUnit: "lbs",
                             bodyFatPercentage: nil,

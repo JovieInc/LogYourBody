@@ -84,11 +84,10 @@ final class EntryVisibilityManager {
     private func resolveConflicts(_ metrics: [BodyMetrics]) -> [BodyMetrics] {
         guard !metrics.isEmpty else { return [] }
 
-        let calendar = Calendar.current
         var merged: [String: BodyMetrics] = [:]
 
         for metric in metrics.sorted(by: { $0.date > $1.date }) {
-            let key = slotKey(for: metric.date, calendar: calendar)
+            let key = slotKey(for: metric)
 
             if let existing = merged[key] {
                 if shouldReplace(existing: existing, with: metric) {
@@ -102,13 +101,8 @@ final class EntryVisibilityManager {
         return merged.values.sorted { $0.date > $1.date }
     }
 
-    private func slotKey(for date: Date, calendar: Calendar) -> String {
-        let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
-        let year = components.year ?? 0
-        let month = components.month ?? 0
-        let day = components.day ?? 0
-        let hour = components.hour ?? 0
-        return "\(year)-\(month)-\(day)-\(hour)"
+    private func slotKey(for metric: BodyMetrics) -> String {
+        metric.localDate
     }
 
     private func shouldReplace(existing: BodyMetrics, with candidate: BodyMetrics) -> Bool {

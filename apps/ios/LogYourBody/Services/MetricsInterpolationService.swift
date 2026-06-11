@@ -618,7 +618,8 @@ class MetricsInterpolationService {
 
         // Find metrics within the max days difference
         let closeMetrics = metrics.filter { metric in
-            let metricStartOfDay = calendar.startOfDay(for: metric.date)
+            let metricStartOfDay = BodyMetricLocalDate.startOfDay(for: metric.localDate, calendar: calendar) ??
+                calendar.startOfDay(for: metric.date)
             let daysDifference = abs(calendar.dateComponents([.day], from: targetStartOfDay, to: metricStartOfDay).day ?? Int.max)
             return daysDifference <= maxDaysDifference
         }

@@ -130,14 +130,9 @@ class BulkImportManager: ObservableObject {
             }
 
             // Check if we already have an entry for this date
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: photo.date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
-
             let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(
                 for: userId,
-                from: startOfDay,
-                to: endOfDay
+                localDate: BodyMetricLocalDate.key(for: photo.date)
             ).first?.toBodyMetrics()
 
             let bodyMetrics: BodyMetrics
@@ -149,6 +144,7 @@ class BulkImportManager: ObservableObject {
                     id: UUID().uuidString,
                     userId: userId,
                     date: photo.date,
+                    localDate: BodyMetricLocalDate.key(for: photo.date),
                     weight: nil, // Will be estimated later
                     weightUnit: "kg",
                     bodyFatPercentage: nil, // Will be estimated later
