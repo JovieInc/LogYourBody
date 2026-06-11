@@ -64,6 +64,10 @@ platform :ios do
     # Set up environment
     ENV["FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT"] = "180"
     ENV["FASTLANE_XCODEBUILD_SETTINGS_RETRIES"] = "10"
+    # Xcode 26 altool can fail resolving the Apple ID even when pilot has one.
+    if ENV["CI"] && ENV["DELIVER_ALTOOL_ADDITIONAL_UPLOAD_PARAMETERS"].to_s.strip.empty?
+      ENV["DELIVER_ALTOOL_ADDITIONAL_UPLOAD_PARAMETERS"] = "--use-old-altool"
+    end
     
     # Ensure project path is correct
     ios_dir = File.expand_path("..", Dir.pwd.end_with?("/fastlane") ? Dir.pwd : "#{Dir.pwd}/fastlane")
@@ -701,7 +705,7 @@ platform :ios do
     test_groups = options[:groups] ? options[:groups].split(",") : ["Internal Testers"]
     
     upload_to_testflight(
-      testflight_upload_options.call(
+      **testflight_upload_options.call(
         ipa: build_result[:output_path],
         groups: test_groups,
         changelog: release_notes,
@@ -744,7 +748,7 @@ platform :ios do
     
     # Upload to TestFlight
     upload_to_testflight(
-      testflight_upload_options.call(
+      **testflight_upload_options.call(
         ipa: build_result[:output_path],
         groups: ["Beta Testers"],
         distribute_external: true # Beta includes external testers
@@ -822,7 +826,7 @@ platform :ios do
     
     # Upload IPA
     upload_to_testflight(
-      testflight_upload_options.call(
+      **testflight_upload_options.call(
         ipa: options[:ipa_path],
         groups: options[:groups] ? options[:groups].split(",") : ["Beta Testers"],
         changelog: options[:changelog_file] ? File.read(options[:changelog_file]) : "New build",
