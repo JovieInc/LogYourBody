@@ -83,6 +83,11 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)["paywall_plans_unavailable_state"].waitForExistence(timeout: 8)
         )
+        XCTAssertTrue(app.staticTexts["$79.99"].waitForExistence(timeout: 3))
+
+        let supportButton = app.buttons["Contact Support"]
+        XCTAssertTrue(supportButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(supportButton.isHittable)
 
         let restoreButton = app.buttons["paywall_restore_purchases_button"]
         XCTAssertTrue(restoreButton.waitForExistence(timeout: 3))

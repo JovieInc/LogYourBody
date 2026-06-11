@@ -9,6 +9,30 @@ import Combine
 import RevenueCat
 import SwiftUI
 
+struct CachedPaywallOfferingDisplay: Codable, Equatable {
+    struct PackageDisplay: Codable, Equatable {
+        let packageIdentifier: String
+        let productIdentifier: String
+        let localizedPrice: String
+        let billingPeriod: String
+        let trialText: String?
+    }
+
+    let generatedAt: Date
+    let packages: [PackageDisplay]
+
+    var preferredPackage: PackageDisplay? {
+        packages.first { $0.packageIdentifier == "$rc_annual" }
+            ?? packages.first { $0.billingPeriod == "year" }
+            ?? packages.first { $0.packageIdentifier == "$rc_monthly" }
+            ?? packages.first
+    }
+
+    var isEmpty: Bool {
+        packages.isEmpty
+    }
+}
+
 @MainActor
 class RevenueCatManager: NSObject, ObservableObject {
     static let shared = RevenueCatManager()
@@ -30,6 +54,9 @@ class RevenueCatManager: NSObject, ObservableObject {
     /// Error message for display
     @Published var errorMessage: String?
 
+    /// Last successfully loaded offering shape, used only for display when offerings fail to load.
+    @Published private(set) var cachedPaywallOfferingDisplay: CachedPaywallOfferingDisplay?
+
     // MARK: - Cached Properties (AppStorage)
 
     /// Cached subscription status for faster app startup
@@ -47,8 +74,16 @@ class RevenueCatManager: NSObject, ObservableObject {
     /// Cache expiry duration (24 hours)
     private let cacheExpiryDuration: TimeInterval = 24 * 60 * 60
 
+    /// Last successful paywall offering display snapshot.
+    private let cachedPaywallOfferingDisplayKey = "revenuecat_cachedPaywallOfferingDisplay"
+
     /// Flag to track if SDK has been configured
     private var isConfigured: Bool = false
+
+    #if DEBUG
+    /// Keeps the paywall unavailable-state fixture deterministic without touching production purchase paths.
+    private var shouldForceOfferingsUnavailableForUITests = false
+    #endif
 
     // MARK: - Initialization
 
@@ -58,6 +93,7 @@ class RevenueCatManager: NSObject, ObservableObject {
 
         // Load cached subscription status for instant UI update
         self.isSubscribed = cachedIsSubscribed
+        self.cachedPaywallOfferingDisplay = loadCachedPaywallOfferingDisplay()
         // print("💰 Loaded cached subscription status: \(cachedIsSubscribed)")
     }
 
@@ -205,6 +241,14 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     /// Fetch available offerings from RevenueCat
     func fetchOfferings() async {
+        #if DEBUG
+        if shouldForceOfferingsUnavailableForUITests {
+            currentOffering = nil
+            errorMessage = "Failed to load subscription options"
+            return
+        }
+        #endif
+
         // Wait for SDK to be configured (with timeout)
         var retries = 0
         while !isConfigured && retries < 50 {
@@ -227,6 +271,9 @@ class RevenueCatManager: NSObject, ObservableObject {
             let offerings = try await Purchases.shared.offerings()
             await MainActor.run {
                 self.currentOffering = offerings.current
+                if let current = offerings.current {
+                    self.cachePaywallOfferingDisplay(from: current)
+                }
                 // print("💰 Fetched \(offerings.all.count) offerings")
 
                 // Debug: Print details about current offering
@@ -407,7 +454,105 @@ class RevenueCatManager: NSObject, ObservableObject {
         return nil
     }
 
+    func cachePaywallOfferingDisplay(_ display: CachedPaywallOfferingDisplay) {
+        guard !display.isEmpty else {
+            return
+        }
+
+        cachedPaywallOfferingDisplay = display
+
+        do {
+            let data = try JSONEncoder().encode(display)
+            UserDefaults.standard.set(data, forKey: cachedPaywallOfferingDisplayKey)
+        } catch {
+            ErrorReporter.shared.capture(
+                AppError.billing(operation: "cachePaywallOfferingDisplay", underlying: error),
+                context: ErrorContext(
+                    feature: "billing",
+                    operation: "cachePaywallOfferingDisplay",
+                    screen: "PaywallView",
+                    userId: nil
+                )
+            )
+        }
+    }
+
+    #if DEBUG
+    func applyCachedPaywallOfferingUITestFixture() {
+        shouldForceOfferingsUnavailableForUITests = true
+        currentOffering = nil
+        errorMessage = "Failed to load subscription options"
+
+        cachePaywallOfferingDisplay(
+            CachedPaywallOfferingDisplay(
+                generatedAt: Date(),
+                packages: [
+                    CachedPaywallOfferingDisplay.PackageDisplay(
+                        packageIdentifier: "$rc_annual",
+                        productIdentifier: "com.logyourbody.app.pro1.annual.3daytrial",
+                        localizedPrice: "$79.99",
+                        billingPeriod: "year",
+                        trialText: "3 days free"
+                    ),
+                    CachedPaywallOfferingDisplay.PackageDisplay(
+                        packageIdentifier: "$rc_monthly",
+                        productIdentifier: "com.logyourbody.app.pro1.monthly.3daytrial",
+                        localizedPrice: "$9.99",
+                        billingPeriod: "month",
+                        trialText: "3 days free"
+                    )
+                ]
+            )
+        )
+    }
+    #endif
+
     // MARK: - Private Helper Methods
+
+    private func cachePaywallOfferingDisplay(from offering: Offering) {
+        let packageDisplays = offering.availablePackages.map { package in
+            CachedPaywallOfferingDisplay.PackageDisplay(
+                packageIdentifier: package.identifier,
+                productIdentifier: package.storeProduct.productIdentifier,
+                localizedPrice: package.localizedPriceString,
+                billingPeriod: billingPeriodLabel(for: package),
+                trialText: getTrialDurationText(package: package)
+            )
+        }
+
+        cachePaywallOfferingDisplay(
+            CachedPaywallOfferingDisplay(
+                generatedAt: Date(),
+                packages: packageDisplays
+            )
+        )
+    }
+
+    private func loadCachedPaywallOfferingDisplay() -> CachedPaywallOfferingDisplay? {
+        guard let data = UserDefaults.standard.data(forKey: cachedPaywallOfferingDisplayKey) else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(CachedPaywallOfferingDisplay.self, from: data)
+    }
+
+    private func billingPeriodLabel(for package: Package) -> String {
+        let identifier = "\(package.identifier) \(package.storeProduct.productIdentifier)".lowercased()
+
+        if identifier.contains("annual") || identifier.contains("year") {
+            return "year"
+        }
+
+        if identifier.contains("month") {
+            return "month"
+        }
+
+        if identifier.contains("week") {
+            return "week"
+        }
+
+        return ""
+    }
 
     /// Update subscription status and cache it for faster app startup
     /// Call this method whenever customerInfo is updated to keep cache in sync

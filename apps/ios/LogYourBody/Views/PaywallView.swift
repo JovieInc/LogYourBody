@@ -8,6 +8,7 @@ import SwiftUI
 import RevenueCat
 
 struct PaywallView: View {
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var revenueCatManager: RevenueCatManager
     @State private var isLoading = true
@@ -38,7 +39,9 @@ struct PaywallView: View {
                         ProgressView()
                             .tint(.appPrimary)
                     } else {
-                        plansUnavailableState
+                        plansUnavailableState(
+                            cachedPackage: revenueCatManager.cachedPaywallOfferingDisplay?.preferredPackage
+                        )
                     }
 
                     if let package = firstAvailablePackage {
@@ -333,30 +336,55 @@ struct PaywallView: View {
         }
     }
 
-    private var plansUnavailableState: some View {
+    private func plansUnavailableState(
+        cachedPackage: CachedPaywallOfferingDisplay.PackageDisplay?
+    ) -> some View {
         VStack(spacing: 12) {
             Text("Subscription plans are unavailable")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.appText)
 
-            Text("Check your connection and retry.")
+            if let cachedPackage {
+                cachedPricingSummary(package: cachedPackage)
+            }
+
+            Text("Check your connection and retry. You can still restore a purchase or log out below.")
                 .font(.system(size: 14))
                 .foregroundColor(.appTextSecondary)
+                .multilineTextAlignment(.center)
 
-            Button {
-                Task {
-                    await loadOfferings()
+            HStack(spacing: 10) {
+                Button {
+                    Task {
+                        await loadOfferings()
+                    }
+                } label: {
+                    Label("Retry", systemImage: "arrow.clockwise")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.appText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.appCard)
+                        .cornerRadius(12)
                 }
-            } label: {
-                Label("Retry", systemImage: "arrow.clockwise")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.appText)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color.appCard)
-                    .cornerRadius(12)
+                .disabled(isLoading)
+                .accessibilityIdentifier("paywall_retry_offerings_button")
+
+                Button {
+                    contactSupportAboutUnavailablePlans()
+                } label: {
+                    Label("Contact Support", systemImage: "envelope")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.appTextSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.appCard.opacity(0.45))
+                        .cornerRadius(12)
+                }
+                .accessibilityLabel("Contact Support")
+                .accessibilityHint("Opens an email to LogYourBody support.")
+                .accessibilityIdentifier("paywall_contact_support_button")
             }
-            .disabled(isLoading)
         }
         .frame(maxWidth: .infinity)
         .padding(20)
@@ -367,6 +395,45 @@ struct PaywallView: View {
         )
         .cornerRadius(16)
         .accessibilityIdentifier("paywall_plans_unavailable_state")
+    }
+
+    private func cachedPricingSummary(package: CachedPaywallOfferingDisplay.PackageDisplay) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Last loaded price")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.appTextSecondary)
+                    .textCase(.uppercase)
+
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(package.localizedPrice)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(.appText)
+
+                    Text(package.billingPeriod.isEmpty ? "" : "/\(package.billingPeriod)")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.appTextSecondary)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            if let trialText = package.trialText {
+                Text(trialText.uppercased())
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.appPrimary.opacity(0.8))
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.appCard.opacity(0.65))
+        .cornerRadius(14)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("paywall_cached_pricing_card")
     }
 
     private func billingPeriodSuffix(for package: Package) -> String {
@@ -403,6 +470,16 @@ struct PaywallView: View {
         }
 
         return ""
+    }
+
+    private func contactSupportAboutUnavailablePlans() {
+        let subject = "Subscription plans unavailable"
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Subscription%20plans%20unavailable"
+        let body = "I cannot load subscription plans in the iOS app."
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        if let url = URL(string: "mailto:support@logyourbody.com?subject=\(subject)&body=\(body)") {
+            openURL(url)
+        }
     }
 
     // MARK: - Functions
