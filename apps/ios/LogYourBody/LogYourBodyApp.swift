@@ -270,6 +270,9 @@ struct LogYourBodyApp: App {
         revenueCatManager.currentOffering = nil
         revenueCatManager.errorMessage = nil
         revenueCatManager.isPurchasing = false
+        if usesPaywallFixture {
+            revenueCatManager.applyCachedPaywallOfferingUITestFixture()
+        }
         UserDefaults.standard.set(isSubscribed, forKey: "revenuecat_isSubscribed")
 
         UserDefaults.standard.set(
