@@ -81,7 +81,7 @@ jobs:
           cd apps/ios
           bundle exec ruby ../../.github/scripts/release-approved-app-store-version.rb
         env:
-          APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+          APP_STORE_APP_ID: "6739360530"
           APP_IDENTIFIER: com.logyourbody.app
           APP_VERSION: ${{ steps.app_version.outputs.version }}
 

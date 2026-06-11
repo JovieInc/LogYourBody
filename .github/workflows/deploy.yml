@@ -149,7 +149,8 @@ jobs:
           bundle exec fastlane beta build_number:${{ steps.build.outputs.build_number }}
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+          APP_IDENTIFIER: com.logyourbody.app
+          APP_STORE_APP_ID: "6739360530"
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}

@@ -36,6 +36,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  LOGYOURBODY_APP_IDENTIFIER: com.logyourbody.app
+  LOGYOURBODY_APP_STORE_APP_ID: "6739360530"
+
 jobs:
   validate-release:
     name: Validate Release
@@ -189,7 +193,7 @@ jobs:
         run: |
           cd apps/ios
           echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> "$GITHUB_ENV"
-          echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> "$GITHUB_ENV"
+          echo "APP_STORE_APP_ID=${{ env.LOGYOURBODY_APP_STORE_APP_ID }}" >> "$GITHUB_ENV"
 
       - name: Update version and build
         run: |
@@ -282,7 +286,7 @@ jobs:
         run: |
           cd apps/ios
           echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> "$GITHUB_ENV"
-          echo "APP_STORE_APP_ID=${{ secrets.APP_STORE_APP_ID }}" >> "$GITHUB_ENV"
+          echo "APP_STORE_APP_ID=${{ env.LOGYOURBODY_APP_STORE_APP_ID }}" >> "$GITHUB_ENV"
 
       - name: Setup App Store Connect Authentication
         env:
@@ -316,8 +320,8 @@ jobs:
           bundle exec ruby ../../.github/scripts/ensure-app-store-free-pricing.rb
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
-          APP_IDENTIFIER: com.logyourbody.app
+          APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
+          APP_IDENTIFIER: ${{ env.LOGYOURBODY_APP_IDENTIFIER }}
 
       - name: Run Fastlane Precheck
         run: |
@@ -331,7 +335,7 @@ jobs:
           fi
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+          APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
 
       - name: Submit to App Store
         run: |
@@ -364,7 +368,7 @@ jobs:
           fi
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APP_STORE_APP_ID: ${{ secrets.APP_STORE_APP_ID }}
+          APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
           APP_REVIEW_FIRST_NAME: ${{ vars.APP_REVIEW_FIRST_NAME }}
           APP_REVIEW_LAST_NAME: ${{ vars.APP_REVIEW_LAST_NAME }}
           APP_REVIEW_EMAIL_ADDRESS: ${{ vars.APP_REVIEW_EMAIL_ADDRESS }}
