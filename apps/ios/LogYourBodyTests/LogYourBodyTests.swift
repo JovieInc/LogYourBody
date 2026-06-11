@@ -2866,6 +2866,132 @@ final class MockHealthSyncCoordinator: HealthSyncCoordinating {
     }
 }
 
+final class MockHealthKitSyncManager: HealthKitSyncManaging {
+    var isHealthKitAvailable = true
+    var isAuthorized = true
+
+    private(set) var didCallCheckAuthorizationStatus = false
+    private(set) var didCallObserveWeightChanges = false
+    private(set) var didCallObserveBodyFatChanges = false
+    private(set) var didCallObserveStepChanges = false
+    private(set) var setupBackgroundDeliveryCallCount = 0
+    private(set) var setupStepCountBackgroundDeliveryCallCount = 0
+    private(set) var didCallResetForCurrentUser = false
+    private(set) var syncWeightFromHealthKitCallCount = 0
+    private(set) var syncStepsFromHealthKitCallCount = 0
+    private(set) var fetchTodayStepCountCallCount = 0
+    private(set) var didCallForceFullHealthKitSync = false
+
+    func checkAuthorizationStatus() {
+        didCallCheckAuthorizationStatus = true
+    }
+
+    func observeWeightChanges() {
+        didCallObserveWeightChanges = true
+    }
+
+    func observeBodyFatChanges() {
+        didCallObserveBodyFatChanges = true
+    }
+
+    func observeStepChanges() {
+        didCallObserveStepChanges = true
+    }
+
+    func setupBackgroundDelivery() async throws {
+        setupBackgroundDeliveryCallCount += 1
+    }
+
+    func setupStepCountBackgroundDelivery() async throws {
+        setupStepCountBackgroundDeliveryCallCount += 1
+    }
+
+    func resetForCurrentUser() async {
+        didCallResetForCurrentUser = true
+    }
+
+    func syncWeightFromHealthKit() async throws {
+        syncWeightFromHealthKitCallCount += 1
+    }
+
+    func syncStepsFromHealthKit() async throws {
+        syncStepsFromHealthKitCallCount += 1
+    }
+
+    func fetchTodayStepCount() async throws -> Int {
+        fetchTodayStepCountCallCount += 1
+        return 123
+    }
+
+    func forceFullHealthKitSync() async {
+        didCallForceFullHealthKitSync = true
+    }
+}
+
+@MainActor
+final class HealthSyncCoordinatorPipelineTests: XCTestCase {
+    func testBootstrapSkipsHealthKitWhenSyncIsDisabled() async {
+        let manager = MockHealthKitSyncManager()
+        let coordinator = HealthSyncCoordinator(healthKitManager: manager)
+
+        coordinator.bootstrapIfNeeded(syncEnabled: false)
+        await Task.yield()
+
+        XCTAssertFalse(manager.didCallCheckAuthorizationStatus)
+        XCTAssertFalse(manager.didCallObserveWeightChanges)
+        XCTAssertFalse(manager.didCallObserveBodyFatChanges)
+        XCTAssertFalse(manager.didCallObserveStepChanges)
+        XCTAssertEqual(manager.setupBackgroundDeliveryCallCount, 0)
+        XCTAssertEqual(manager.setupStepCountBackgroundDeliveryCallCount, 0)
+    }
+
+    func testBootstrapConfiguresBodyMetricAndStepObserversWithBackgroundDelivery() async throws {
+        let manager = MockHealthKitSyncManager()
+        let coordinator = HealthSyncCoordinator(healthKitManager: manager)
+
+        coordinator.bootstrapIfNeeded(syncEnabled: true)
+        await Task.yield()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertTrue(manager.didCallCheckAuthorizationStatus)
+        XCTAssertTrue(manager.didCallObserveWeightChanges)
+        XCTAssertTrue(manager.didCallObserveBodyFatChanges)
+        XCTAssertTrue(manager.didCallObserveStepChanges)
+        XCTAssertEqual(manager.setupBackgroundDeliveryCallCount, 1)
+        XCTAssertEqual(manager.setupStepCountBackgroundDeliveryCallCount, 1)
+    }
+
+    func testDeferredOnboardingWeightSyncBootstrapsBodyMetricPipelineBeforeImport() async {
+        let manager = MockHealthKitSyncManager()
+        let coordinator = HealthSyncCoordinator(healthKitManager: manager)
+
+        await coordinator.runDeferredOnboardingWeightSync()
+        await Task.yield()
+
+        XCTAssertTrue(manager.didCallObserveWeightChanges)
+        XCTAssertTrue(manager.didCallObserveBodyFatChanges)
+        XCTAssertTrue(manager.didCallObserveStepChanges)
+        XCTAssertEqual(manager.setupBackgroundDeliveryCallCount, 1)
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 1)
+    }
+
+    func testInitialConnectSyncBootstrapsObserversAndRunsInitialImports() async throws {
+        let manager = MockHealthKitSyncManager()
+        let coordinator = HealthSyncCoordinator(healthKitManager: manager)
+
+        try await coordinator.performInitialConnectSync()
+        await Task.yield()
+
+        XCTAssertTrue(manager.didCallObserveWeightChanges)
+        XCTAssertTrue(manager.didCallObserveBodyFatChanges)
+        XCTAssertTrue(manager.didCallObserveStepChanges)
+        XCTAssertGreaterThanOrEqual(manager.setupBackgroundDeliveryCallCount, 1)
+        XCTAssertGreaterThanOrEqual(manager.setupStepCountBackgroundDeliveryCallCount, 1)
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 1)
+        XCTAssertEqual(manager.fetchTodayStepCountCallCount, 1)
+    }
+}
+
 @MainActor
 final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
     func testCanInitializeWithMockHealthSyncCoordinator() {

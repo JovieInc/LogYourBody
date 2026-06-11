@@ -37,9 +37,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>LogYourBody uses HealthKit to read your weight data and sync it with your profile.</string>
+	<string>LogYourBody uses HealthKit to read your weight and body composition data and sync it with your profile.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>LogYourBody uses HealthKit to save your weight measurements.</string>
+	<string>LogYourBody uses HealthKit to save your weight and body fat measurements.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>LogYourBody uses Face ID to secure your personal health data and progress photos.</string>
 	<key>NSCameraUsageDescription</key>

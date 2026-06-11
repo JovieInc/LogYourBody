@@ -5,6 +5,25 @@
 
 import Foundation
 
+protocol HealthKitSyncManaging: AnyObject {
+    var isHealthKitAvailable: Bool { get }
+    var isAuthorized: Bool { get }
+
+    func checkAuthorizationStatus()
+    func observeWeightChanges()
+    func observeBodyFatChanges()
+    func observeStepChanges()
+    func setupBackgroundDelivery() async throws
+    func setupStepCountBackgroundDelivery() async throws
+    func resetForCurrentUser() async
+    func syncWeightFromHealthKit() async throws
+    func syncStepsFromHealthKit() async throws
+    func fetchTodayStepCount() async throws -> Int
+    func forceFullHealthKitSync() async
+}
+
+extension HealthKitManager: HealthKitSyncManaging {}
+
 /// Protocol abstraction for coordinating HealthKit-related sync operations.
 /// This enables easier unit testing for components that depend on
 /// HealthSyncCoordinator by allowing mock implementations.
@@ -28,10 +47,10 @@ protocol HealthSyncCoordinating {
 final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
     static let shared = HealthSyncCoordinator()
 
-    private let healthKitManager: HealthKitManager
+    private let healthKitManager: HealthKitSyncManaging
     private var hasBootstrappedObservers = false
 
-    private init(healthKitManager: HealthKitManager = .shared) {
+    init(healthKitManager: HealthKitSyncManaging = HealthKitManager.shared) {
         self.healthKitManager = healthKitManager
     }
 
@@ -63,9 +82,11 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
         hasBootstrappedObservers = true
 
         healthKitManager.observeWeightChanges()
+        healthKitManager.observeBodyFatChanges()
         healthKitManager.observeStepChanges()
 
         Task {
+            try? await healthKitManager.setupBackgroundDelivery()
             try? await healthKitManager.setupStepCountBackgroundDelivery()
         }
     }
@@ -147,6 +168,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
             category: "healthKitCoordinator"
         )
 
+        bootstrapIfNeeded(syncEnabled: true)
         try await healthKitManager.setupBackgroundDelivery()
         try await healthKitManager.setupStepCountBackgroundDelivery()
         try await healthKitManager.syncWeightFromHealthKit()
@@ -166,6 +188,8 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
         )
 
         guard healthKitManager.isAuthorized else { return }
+
+        bootstrapIfNeeded(syncEnabled: true)
 
         do {
             try await healthKitManager.syncWeightFromHealthKit()

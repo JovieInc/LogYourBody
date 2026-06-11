@@ -85,6 +85,7 @@ class HealthKitManager: ObservableObject {
     private var isSyncingWeight = false
     private var syncDebounceTimer: Timer?
     private var weightObserverQuery: HKObserverQuery?
+    private var bodyFatObserverQuery: HKObserverQuery?
     private var stepObserverQuery: HKObserverQuery?
     private var activeQueries: [HKQuery] = []
     private var activeUserId: String?
@@ -573,6 +574,11 @@ class HealthKitManager: ObservableObject {
         if let weightObserverQuery {
             healthStore.stop(weightObserverQuery)
             self.weightObserverQuery = nil
+        }
+
+        if let bodyFatObserverQuery {
+            healthStore.stop(bodyFatObserverQuery)
+            self.bodyFatObserverQuery = nil
         }
 
         if let stepObserverQuery {
@@ -1252,30 +1258,7 @@ class HealthKitManager: ObservableObject {
 
         let query = HKObserverQuery(sampleType: weightType, predicate: nil) { [weak self] _, completionHandler, error in
             if error == nil {
-                // Check if we should sync (not more than once per hour)
-                let currentUserId = AuthManager.shared.currentUser?.id
-                let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: currentUserId)
-                let shouldSync: Bool = {
-                    if let lastSync = UserDefaults.standard.object(forKey: lastSyncKey) as? Date {
-                        let minutesSinceLastSync = Date().timeIntervalSince(lastSync) / 60
-                        return minutesSinceLastSync >= 60 // Only sync if more than 60 minutes have passed
-                    }
-                    return true
-                }()
-
-                if shouldSync {
-                    // Debounce sync requests to prevent multiple concurrent syncs
-                    DispatchQueue.main.async { [weak self] in
-                        self?.syncDebounceTimer?.invalidate()
-                        self?.syncDebounceTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
-                            UserDefaults.standard.set(Date(), forKey: lastSyncKey)
-                            Task { [weak self] in
-                                // Only sync recent data (last 7 days) when observer triggers
-                                try? await self?.syncWeightFromHealthKitIncremental(days: 7)
-                            }
-                        }
-                    }
-                }
+                self?.scheduleObservedBodyMetricSync()
             }
             completionHandler()
         }
@@ -1283,6 +1266,61 @@ class HealthKitManager: ObservableObject {
         weightObserverQuery = query
         healthStore.execute(query)
         activeQueries.append(query)
+    }
+
+    // Setup observer for new body fat entries in HealthKit
+    func observeBodyFatChanges() {
+        guard isAuthorized else { return }
+
+        if let existingQuery = bodyFatObserverQuery {
+            healthStore.stop(existingQuery)
+            bodyFatObserverQuery = nil
+        }
+
+        let query = HKObserverQuery(sampleType: bodyFatType, predicate: nil) { [weak self] _, completionHandler, error in
+            if error == nil {
+                self?.scheduleObservedBodyMetricSync()
+            }
+            completionHandler()
+        }
+
+        bodyFatObserverQuery = query
+        healthStore.execute(query)
+        activeQueries.append(query)
+    }
+
+    private func scheduleObservedBodyMetricSync() {
+        Task { @MainActor [weak self] in
+            let currentUserId = AuthManager.shared.currentUser?.id
+            self?.scheduleObservedBodyMetricSync(for: currentUserId)
+        }
+    }
+
+    @MainActor
+    private func scheduleObservedBodyMetricSync(for currentUserId: String?) {
+        // Check if we should sync (not more than once per hour)
+        let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: currentUserId)
+        let shouldSync: Bool = {
+            if let lastSync = UserDefaults.standard.object(forKey: lastSyncKey) as? Date {
+                let minutesSinceLastSync = Date().timeIntervalSince(lastSync) / 60
+                return minutesSinceLastSync >= 60
+            }
+            return true
+        }()
+
+        guard shouldSync else { return }
+
+        // Debounce sync requests to prevent multiple concurrent syncs.
+        DispatchQueue.main.async { [weak self] in
+            self?.syncDebounceTimer?.invalidate()
+            self?.syncDebounceTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
+                UserDefaults.standard.set(Date(), forKey: lastSyncKey)
+                Task { [weak self] in
+                    // Weight sync imports both weight and body fat for the recent window.
+                    try? await self?.syncWeightFromHealthKitIncremental(days: 7)
+                }
+            }
+        }
     }
 
     // Setup observer for new step count entries in HealthKit
