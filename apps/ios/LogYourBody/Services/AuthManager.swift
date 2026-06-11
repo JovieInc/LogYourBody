@@ -1181,6 +1181,7 @@ class AuthManager: NSObject, ObservableObject {
 
         Self.migrateLegacyAuthStorage(in: userDefaults)
         try? KeychainManager.shared.clearAll()
+        BodyMetricSpotlightIndexer.deleteAllIndexedMetrics()
         ErrorTrackingService.shared.updateUserId(nil)
         AnalyticsService.shared.reset()
 

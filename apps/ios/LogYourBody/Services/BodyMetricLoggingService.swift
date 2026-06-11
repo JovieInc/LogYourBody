@@ -119,6 +119,7 @@ final class BodyMetricLoggingService {
         }
 
         Self.donateLoggedMetricActivity(metrics)
+        BodyMetricSpotlightIndexer.indexLatestMetric(metrics)
 
         return BodyMetricLoggingResult(
             metrics: metrics,
@@ -205,7 +206,7 @@ final class BodyMetricLoggingService {
             .weight
     }
 
-    private static func metricParts(for metrics: BodyMetrics, preferredSystem: MeasurementSystem) -> [String] {
+    static func metricParts(for metrics: BodyMetrics, preferredSystem: MeasurementSystem) -> [String] {
         var parts: [String] = []
 
         if let weight = metrics.weight {
