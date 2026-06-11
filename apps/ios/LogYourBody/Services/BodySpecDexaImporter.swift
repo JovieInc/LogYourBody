@@ -112,6 +112,7 @@ actor BodySpecDexaImporter {
                 id: metricsId,
                 userId: userId,
                 date: date,
+                localDate: BodyMetricLocalDate.key(for: date),
                 weight: composition.total.totalMassKg,
                 weightUnit: "kg",
                 bodyFatPercentage: composition.total.regionFatPct,
@@ -187,10 +188,10 @@ actor BodySpecDexaImporter {
         scanDate: Date,
         userId: String
     ) async -> Bool {
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: scanDate)
-        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? scanDate
-        let existing = await coreDataManager.fetchBodyMetrics(for: userId, from: startOfDay, to: endOfDay)
+        let existing = await coreDataManager.fetchBodyMetrics(
+            for: userId,
+            localDate: BodyMetricLocalDate.key(for: scanDate)
+        )
 
         return existing.contains { cached in
             if BodyMetricSourceMetadata(jsonString: cached.sourceMetadataJSON)?.externalResultId == summary.resultId {

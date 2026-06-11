@@ -141,13 +141,13 @@ class BackgroundPhotoUploadService: ObservableObject {
 
     private func createBodyMetrics(for date: Date) async -> BodyMetrics {
         let userId = authManager.currentUser?.id ?? ""
+        let localDate = BodyMetricLocalDate.key(for: date)
 
         // Check if metrics already exist for this date
-        let existingMetrics = await coreDataManager.fetchBodyMetrics(for: userId)
-            .first { metrics in
-                guard let metricsDate = metrics.date else { return false }
-                return Calendar.current.isDate(metricsDate, inSameDayAs: date)
-            }
+        let existingMetrics = await coreDataManager.fetchBodyMetrics(
+            for: userId,
+            localDate: localDate
+        ).first
 
         if let existing = existingMetrics {
             // Convert CachedBodyMetrics to BodyMetrics
@@ -155,6 +155,7 @@ class BackgroundPhotoUploadService: ObservableObject {
                 id: existing.id ?? UUID().uuidString,
                 userId: existing.userId ?? userId,
                 date: existing.date ?? date,
+                localDate: existing.localDate,
                 weight: existing.weight > 0 ? existing.weight : nil,
                 weightUnit: existing.weightUnit,
                 bodyFatPercentage: existing.bodyFatPercentage > 0 ? existing.bodyFatPercentage : nil,
@@ -176,6 +177,7 @@ class BackgroundPhotoUploadService: ObservableObject {
             id: metricsId,
             userId: userId,
             date: date,
+            localDate: localDate,
             weight: nil,
             weightUnit: "lbs",
             bodyFatPercentage: nil,

@@ -81,7 +81,8 @@ class PhotoMetadataService {
 
         // Find metrics within the max days difference
         let closeMetrics = metrics.filter { metric in
-            let metricStartOfDay = calendar.startOfDay(for: metric.date)
+            let metricStartOfDay = BodyMetricLocalDate.startOfDay(for: metric.localDate, calendar: calendar) ??
+                calendar.startOfDay(for: metric.date)
             let daysDifference = abs(calendar.dateComponents([.day], from: targetStartOfDay, to: metricStartOfDay).day ?? Int.max)
             return daysDifference <= maxDaysDifference
         }
@@ -102,12 +103,12 @@ class PhotoMetadataService {
     ) async -> BodyMetrics {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
+        let localDate = BodyMetricLocalDate.key(for: date)
 
         // Check if metrics already exist for this date
         let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(
             for: userId,
-            from: startOfDay,
-            to: calendar.date(byAdding: .day, value: 1, to: startOfDay)
+            localDate: localDate
         )
         .first?.toBodyMetrics()
 
@@ -117,6 +118,7 @@ class PhotoMetadataService {
                 id: existing.id,
                 userId: userId,
                 date: existing.date,
+                localDate: existing.localDate,
                 weight: weight ?? existing.weight,
                 weightUnit: existing.weightUnit ?? "kg",
                 bodyFatPercentage: bodyFatPercentage ?? existing.bodyFatPercentage,
@@ -139,6 +141,7 @@ class PhotoMetadataService {
                 id: UUID().uuidString,
                 userId: userId,
                 date: startOfDay,
+                localDate: localDate,
                 weight: weight,
                 weightUnit: "kg",
                 bodyFatPercentage: bodyFatPercentage,

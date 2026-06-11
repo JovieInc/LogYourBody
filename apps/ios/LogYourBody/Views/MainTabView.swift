@@ -623,6 +623,7 @@ private struct PaidWeightLoggerMVPView: View {
                 id: UUID().uuidString,
                 userId: userId,
                 date: now,
+                localDate: BodyMetricLocalDate.key(for: now),
                 weight: weightInKilograms,
                 weightUnit: "kg",
                 bodyFatPercentage: nil,

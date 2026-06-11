@@ -230,10 +230,101 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
     }
 }
 
+struct BodyMetricLocalDate: Equatable {
+    static func key(for date: Date, calendar: Calendar = .current) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        return key(
+            year: components.year ?? 0,
+            month: components.month ?? 0,
+            day: components.day ?? 0
+        )
+    }
+
+    static func normalized(_ value: String?, fallback date: Date, calendar: Calendar = .current) -> String {
+        guard let value else {
+            return key(for: date, calendar: calendar)
+        }
+
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isValid(trimmed) else {
+            return key(for: date, calendar: calendar)
+        }
+
+        return trimmed
+    }
+
+    static func startOfDay(for localDate: String, calendar: Calendar = .current) -> Date? {
+        guard let components = components(from: localDate) else {
+            return nil
+        }
+
+        return calendar.date(
+            from: DateComponents(
+                calendar: calendar,
+                timeZone: calendar.timeZone,
+                year: components.year,
+                month: components.month,
+                day: components.day
+            )
+        )
+    }
+
+    static func hourKey(for date: Date, calendar: Calendar = .current) -> String {
+        let components = calendar.dateComponents([.hour], from: date)
+        return String(format: "%02d", components.hour ?? 0)
+    }
+
+    private static func isValid(_ value: String) -> Bool {
+        guard let components = components(from: value) else {
+            return false
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let dateComponents = DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: components.year,
+            month: components.month,
+            day: components.day
+        )
+
+        guard let date = calendar.date(from: dateComponents) else {
+            return false
+        }
+
+        let resolved = calendar.dateComponents([.year, .month, .day], from: date)
+        return resolved.year == components.year &&
+            resolved.month == components.month &&
+            resolved.day == components.day
+    }
+
+    private static func components(from value: String) -> (year: Int, month: Int, day: Int)? {
+        let parts = value.split(separator: "-")
+        guard parts.count == 3,
+              parts[0].count == 4,
+              parts[1].count == 2,
+              parts[2].count == 2,
+              let year = Int(parts[0]),
+              let month = Int(parts[1]),
+              let day = Int(parts[2]) else {
+            return nil
+        }
+
+        return (year, month, day)
+    }
+
+    private static func key(year: Int, month: Int, day: Int) -> String {
+        String(format: "%04d-%02d-%02d", year, month, day)
+    }
+}
+
 struct BodyMetrics: Identifiable, Codable, Equatable {
     let id: String
     let userId: String
     let date: Date
+    let localDate: String
     let weight: Double?
     let weightUnit: String?
     let bodyFatPercentage: Double?
@@ -254,6 +345,7 @@ struct BodyMetrics: Identifiable, Codable, Equatable {
         id: String,
         userId: String,
         date: Date,
+        localDate: String? = nil,
         weight: Double?,
         weightUnit: String?,
         bodyFatPercentage: Double?,
@@ -273,6 +365,7 @@ struct BodyMetrics: Identifiable, Codable, Equatable {
         self.id = id
         self.userId = userId
         self.date = date
+        self.localDate = BodyMetricLocalDate.normalized(localDate, fallback: date)
         self.weight = weight
         self.weightUnit = weightUnit
         self.bodyFatPercentage = bodyFatPercentage
@@ -294,6 +387,7 @@ struct BodyMetrics: Identifiable, Codable, Equatable {
         case id
         case userId = "user_id"
         case date
+        case localDate = "local_date"
         case weight
         case weightUnit = "weight_unit"
         case bodyFatPercentage = "body_fat_percentage"
@@ -321,6 +415,10 @@ struct BodyMetrics: Identifiable, Codable, Equatable {
         id = try container.decode(String.self, forKey: .id)
         userId = try container.decode(String.self, forKey: .userId)
         date = try container.decode(Date.self, forKey: .date)
+        localDate = BodyMetricLocalDate.normalized(
+            try container.decodeIfPresent(String.self, forKey: .localDate),
+            fallback: date
+        )
         weight = try container.decodeIfPresent(Double.self, forKey: .weight)
         weightUnit = try container.decodeIfPresent(String.self, forKey: .weightUnit)
         bodyFatPercentage = try container.decodeIfPresent(Double.self, forKey: .bodyFatPercentage)

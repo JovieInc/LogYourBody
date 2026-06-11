@@ -1102,11 +1102,10 @@ class HealthKitManager: ObservableObject {
         var imported = 0
         var skipped = 0
 
-        // Create a dictionary of body fat data by date
-        var bodyFatByDate: [Date: HealthKitBodyFatImportSample] = [:]
+        // Create a dictionary of body fat data by logged local day
+        var bodyFatByDate: [String: HealthKitBodyFatImportSample] = [:]
         for sample in bodyFatHistory {
-            let normalizedDate = Calendar.current.startOfDay(for: sample.date)
-            bodyFatByDate[normalizedDate] = sample
+            bodyFatByDate[BodyMetricLocalDate.key(for: sample.date)] = sample
         }
 
         // Get existing entries for this date range to check for duplicates
@@ -1117,38 +1116,40 @@ class HealthKitManager: ObservableObject {
         let dateRange = weightHistory.map { $0.date } + bodyFatHistory.map { $0.date }
         let minDate = dateRange.min() ?? Date()
         let maxDate = dateRange.max() ?? Date()
+        let calendar = Calendar.current
+        let fetchStartDate = calendar.date(byAdding: .day, value: -1, to: minDate) ?? minDate
+        let fetchEndDate = calendar.date(byAdding: .day, value: 1, to: maxDate) ?? maxDate
 
-        let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId, from: minDate, to: maxDate)
+        let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(
+            for: userId,
+            from: fetchStartDate,
+            to: fetchEndDate
+        )
 
-        // Create a set of existing entries by date and hour for efficient lookup
+        // Create a set of existing entries by original logged local day and hour for efficient lookup
         var existingEntriesByHour = Set<String>()
         for metric in existingMetrics {
             if let date = metric.date {
-                let calendar = Calendar.current
-                let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
-                if let roundedDate = calendar.date(from: components) {
-                    let key = ISO8601DateFormatter().string(from: roundedDate)
-                    existingEntriesByHour.insert(key)
-                }
+                let localDate = BodyMetricLocalDate.normalized(metric.localDate, fallback: date)
+                let key = "\(localDate)-\(BodyMetricLocalDate.hourKey(for: date))"
+                existingEntriesByHour.insert(key)
             }
         }
 
         for sample in weightHistory {
             // Check if entry exists within the same hour
-            let calendar = Calendar.current
-            let components = calendar.dateComponents([.year, .month, .day, .hour], from: sample.date)
-            let roundedDate = calendar.date(from: components) ?? sample.date
-            let hourKey = ISO8601DateFormatter().string(from: roundedDate)
+            let localDate = BodyMetricLocalDate.key(for: sample.date)
+            let hourKey = "\(localDate)-\(BodyMetricLocalDate.hourKey(for: sample.date))"
 
             if !existingEntriesByHour.contains(hourKey) {
-                let normalizedDate = calendar.startOfDay(for: sample.date)
-                let bodyFatSample = bodyFatByDate[normalizedDate]
+                let bodyFatSample = bodyFatByDate[localDate]
                 let bodyFatPercentage = bodyFatSample?.percentage
 
                 let metrics = BodyMetrics(
                     id: UUID().uuidString,
                     userId: userId,
                     date: sample.date,
+                    localDate: localDate,
                     weight: sample.weight,
                     weightUnit: "kg",
                     bodyFatPercentage: bodyFatPercentage,
@@ -1201,6 +1202,7 @@ class HealthKitManager: ObservableObject {
             id: metrics.id,
             userId: userId,
             date: metrics.date,
+            localDate: metrics.localDate,
             weight: metrics.weight,
             weightUnit: metrics.weightUnit,
             bodyFatPercentage: metrics.bodyFatPercentage,
