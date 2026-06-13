@@ -1,14 +1,15 @@
-LogYourBody is a focused body metrics tracker for people who want a simple, private weight log that can grow into deeper body composition tracking.
+LogYourBody is a focused body-composition tracker for people who want a private progress-photo timeline with weight, body-fat, and Apple Health context.
 
 Start with the essentials:
 
-- Log today's weight in pounds or kilograms
-- See your latest entry at a glance
-- Review recent weight history
+- Add progress photos to a swipeable body timeline
+- Log weight and body-fat context in pounds or kilograms
+- Review Stats for weight, body fat, FFMI, and steps
+- Optionally connect Apple Health for weight, body-fat, height, and step context
 - Sync entries to your account
-- Export your weight log as CSV
+- Export your account data
 - Keep access managed through LogYourBody Pro
 
-LogYourBody is built for consistent tracking without noisy coaching. Your entries stay available on device and sync to your account when you are signed in.
+LogYourBody is built for consistent body-composition tracking without noisy coaching. Your photos and entries stay available on device and sync to your account when you are signed in.
 
 LogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.

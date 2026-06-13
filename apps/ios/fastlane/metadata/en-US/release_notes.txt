@@ -1,1 +1,1 @@
-Initial App Store release with paid access, weight logging, recent history, account sync, and CSV export.
+Photo-first MVP release with paid access, progress-photo timeline, weight and body-fat logging, optional HealthKit context, account sync, restore purchases, data export, and account deletion.

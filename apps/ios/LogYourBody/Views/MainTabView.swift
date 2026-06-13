@@ -56,6 +56,12 @@ struct MainTabView: View {
     private func updateSelectedSurface() {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-lybUITestWeightLoggerMVPFixture") {
+            selectedSurface = .weightLoggerMVP
+            HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
+            return
+        }
+
         if arguments.contains("-lybUITestPhotoTimelineHUDFixture") {
             selectedSurface = .photoTimelineHUD
             HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)

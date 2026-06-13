@@ -99,7 +99,9 @@ class PhotoMetadataService {
         photoUrl: String? = nil,
         weight: Double? = nil,
         bodyFatPercentage: Double? = nil,
-        userId: String
+        userId: String,
+        dataSource: String? = nil,
+        preserveExistingMeasurements: Bool = false
     ) async -> BodyMetrics {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
@@ -113,15 +115,20 @@ class PhotoMetadataService {
         .first?.toBodyMetrics()
 
         if let existing = existingMetrics {
+            let updatedWeight = preserveExistingMeasurements ? existing.weight ?? weight : weight ?? existing.weight
+            let updatedBodyFat = preserveExistingMeasurements
+                ? existing.bodyFatPercentage ?? bodyFatPercentage
+                : bodyFatPercentage ?? existing.bodyFatPercentage
+
             // Update existing metrics
             let updated = BodyMetrics(
                 id: existing.id,
                 userId: userId,
                 date: existing.date,
                 localDate: existing.localDate,
-                weight: weight ?? existing.weight,
+                weight: updatedWeight,
                 weightUnit: existing.weightUnit ?? "kg",
-                bodyFatPercentage: bodyFatPercentage ?? existing.bodyFatPercentage,
+                bodyFatPercentage: updatedBodyFat,
                 bodyFatMethod: existing.bodyFatMethod,
                 muscleMass: existing.muscleMass,
                 boneMass: existing.boneMass,
@@ -150,7 +157,7 @@ class PhotoMetadataService {
                 boneMass: nil,
                 notes: nil,
                 photoUrl: photoUrl,
-                dataSource: BodyMetricSource.photo.rawValue,
+                dataSource: dataSource ?? BodyMetricSource.photo.rawValue,
                 createdAt: Date(),
                 updatedAt: Date()
             )

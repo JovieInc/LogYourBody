@@ -131,6 +131,7 @@
 		ADA4B75D2ED1183900F4262A /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */; };
 		ADA600222ED2594300088042 /* DexaResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600212ED2594200088042 /* DexaResult.swift */; };
 		ADA600242ED2596700088042 /* BodyScoreProfileDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600232ED2596700088042 /* BodyScoreProfileDetailsView.swift */; };
+		ADA600502ED401000088042 /* BodyScoreFirstProgressPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6004F2ED401000088042 /* BodyScoreFirstProgressPhotoView.swift */; };
 		ADA600262ED259A700088042 /* BodyScoreShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600252ED259A700088042 /* BodyScoreShareCard.swift */; };
 		ADA600282ED259DB00088042 /* BodyScoreRecalculationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */; };
 		ADA6002C2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002B2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift */; };
@@ -519,6 +520,7 @@
 		ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		ADA600212ED2594200088042 /* DexaResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DexaResult.swift; sourceTree = "<group>"; };
 		ADA600232ED2596700088042 /* BodyScoreProfileDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreProfileDetailsView.swift; sourceTree = "<group>"; };
+		ADA6004F2ED401000088042 /* BodyScoreFirstProgressPhotoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreFirstProgressPhotoView.swift; sourceTree = "<group>"; };
 		ADA600252ED259A700088042 /* BodyScoreShareCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BodyScoreShareCard.swift; path = Components/BodyScoreShareCard.swift; sourceTree = "<group>"; };
 		ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreRecalculationService.swift; sourceTree = "<group>"; };
 		ADA600292ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HeroAndActions.swift"; sourceTree = "<group>"; };
@@ -1250,9 +1252,10 @@
 		ADBAF0492ECAD88A00A95F98 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				ADA600412ED35D8700088042 /* PreAuthBodyScoreOnboardingContainer.swift */,
-				ADA600422ED35D8700088042 /* ProfileCompletionGateView.swift */,
-				ADA600232ED2596700088042 /* BodyScoreProfileDetailsView.swift */,
+					ADA600412ED35D8700088042 /* PreAuthBodyScoreOnboardingContainer.swift */,
+					ADA600422ED35D8700088042 /* ProfileCompletionGateView.swift */,
+					ADA6004F2ED401000088042 /* BodyScoreFirstProgressPhotoView.swift */,
+					ADA600232ED2596700088042 /* BodyScoreProfileDetailsView.swift */,
 				ADBAF03D2ECAD88A00A95F98 /* BodyScoreAccountCreationView.swift */,
 				ADBAF03E2ECAD88A00A95F98 /* BodyScoreBasicsView.swift */,
 				ADA4B73A2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift */,
@@ -1656,10 +1659,11 @@
 				ADDC47EA2E2D89F3003C97E7 /* LogWeightView.swift in Sources */,
 				ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */,
 				AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */,
-				ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */,
-				AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */,
-				ADA600242ED2596700088042 /* BodyScoreProfileDetailsView.swift in Sources */,
-				ADDC47EE2E2D89F3003C97E7 /* SignUpView.swift in Sources */,
+					ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */,
+					AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */,
+					ADA600242ED2596700088042 /* BodyScoreProfileDetailsView.swift in Sources */,
+					ADA600502ED401000088042 /* BodyScoreFirstProgressPhotoView.swift in Sources */,
+					ADDC47EE2E2D89F3003C97E7 /* SignUpView.swift in Sources */,
 				ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */,
 				ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */,
 				ADDC47F72E2D89F3003C97E7 /* AnimatedTabView.swift in Sources */,

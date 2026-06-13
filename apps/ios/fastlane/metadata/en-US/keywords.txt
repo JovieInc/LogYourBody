@@ -1,1 +1,1 @@
-weight,body metrics,fitness tracker,body composition,progress,health log
+progress photos,body composition,weight tracker,body fat,fitness tracker,health log

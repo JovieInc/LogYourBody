@@ -194,15 +194,17 @@ struct LogYourBodyApp: App {
     private func applyPaidMVPUITestFixtureIfNeeded() async -> Bool {
         let arguments = ProcessInfo.processInfo.arguments
         let usesPaidFixture = arguments.contains("-lybUITestPaidMVPFixture")
+        let usesWeightLoggerFixture = arguments.contains("-lybUITestWeightLoggerMVPFixture")
         let usesPaywallFixture = arguments.contains("-lybUITestPaywallFixture")
         let usesFullDashboardFixture = arguments.contains("-lybUITestFullDashboardFixture")
         let usesPhotoTimelineHUDFixture = arguments.contains("-lybUITestPhotoTimelineHUDFixture")
 
-        guard usesPaidFixture || usesPaywallFixture || usesFullDashboardFixture || usesPhotoTimelineHUDFixture else {
+        guard usesPaidFixture || usesWeightLoggerFixture || usesPaywallFixture || usesFullDashboardFixture ||
+            usesPhotoTimelineHUDFixture else {
             return false
         }
 
-        let isSubscribed = usesPaidFixture || usesFullDashboardFixture || usesPhotoTimelineHUDFixture
+        let isSubscribed = usesPaidFixture || usesWeightLoggerFixture || usesFullDashboardFixture || usesPhotoTimelineHUDFixture
         let fixtureName: String
         let fixtureEmail: String
         let fixtureUsername: String
@@ -214,6 +216,10 @@ struct LogYourBodyApp: App {
             fixtureName = "Full Dashboard UI"
             fixtureEmail = "full-dashboard-ui@example.com"
             fixtureUsername = "full_dashboard_ui"
+        } else if usesWeightLoggerFixture {
+            fixtureName = "Weight Logger UI"
+            fixtureEmail = "weight-logger-ui@example.com"
+            fixtureUsername = "weight_logger_ui"
         } else if isSubscribed {
             fixtureName = "Paid MVP UI"
             fixtureEmail = "paid-mvp-ui@example.com"
@@ -228,6 +234,8 @@ struct LogYourBodyApp: App {
             fixtureSlug = "photo_hud"
         } else if usesFullDashboardFixture {
             fixtureSlug = "full_dashboard"
+        } else if usesWeightLoggerFixture {
+            fixtureSlug = "weight_logger"
         } else {
             fixtureSlug = isSubscribed ? "paid_mvp" : "paywall"
         }
