@@ -19,7 +19,8 @@ const demoData: DemoEntry[] = [
 ];
 
 function formatDate(dateStr: string, opts?: Intl.DateTimeFormatOptions) {
-  const date = new Date(dateStr);
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day, 12);
   return date.toLocaleDateString("en-US", opts);
 }
 
