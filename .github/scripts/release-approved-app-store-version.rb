@@ -229,24 +229,43 @@ def active_review_submission_for_version(token, app_id, app_store_version_id)
   end || active_submissions.first
 end
 
-def review_submission_targets_version?(token, review_submission_id, app_store_version_id)
+def review_submission_items(token, review_submission_id)
   query = URI.encode_www_form("limit" => "50")
   status, parsed = request(:get, "/v1/reviewSubmissions/#{review_submission_id}/items?#{query}", token)
 
   unless status == 200
     warn_with("Unable to inspect App Review submission #{review_submission_id}: App Store Connect returned #{status_with_error(status, parsed)}.")
-    return false
+    return []
   end
 
-  related_ids = parsed.fetch("data", []).filter_map do |item|
+  parsed.fetch("data", [])
+end
+
+def review_submission_targets_version?(token, review_submission_id, app_store_version_id)
+  items = review_submission_items(token, review_submission_id)
+  related_ids = items.filter_map do |item|
     relationship = item.dig("relationships", "appStoreVersion", "data")
     relationship.fetch("id") if relationship
   end
-  included_ids = parsed.fetch("included", []).filter_map do |resource|
-    resource.fetch("id") if resource.fetch("type", nil) == "appStoreVersions"
-  end
 
-  (related_ids + included_ids).include?(app_store_version_id)
+  related_ids.include?(app_store_version_id)
+end
+
+def review_submission_item_summary(items)
+  return "no App Review submission items returned by App Store Connect" if items.empty?
+
+  items.map do |item|
+    relationships = item.fetch("relationships", {}).filter_map do |name, relationship|
+      data = relationship["data"]
+      next unless data
+
+      ids = data.is_a?(Array) ? data.map { |resource| resource["id"] } : [data["id"]]
+      "#{name}=#{ids.compact.join(",")}"
+    end
+    state = item.dig("attributes", "state").to_s
+    details = ["id=#{item.fetch("id")}", "type=#{item.fetch("type")}", ("state=#{state}" unless state.empty?), relationships.join(" ")].compact
+    details.join(" ")
+  end.join("; ")
 end
 
 token = bearer_token
@@ -277,6 +296,7 @@ when "PREPARE_FOR_SUBMISSION"
   if active_review_submission
     review_state = active_review_submission.dig("attributes", "state")
     puts "App Store version #{version_string} has active App Review submission #{active_review_submission.fetch("id")} (#{review_state}); waiting for Apple review."
+    puts "App Review submission items: #{review_submission_item_summary(review_submission_items(token, active_review_submission.fetch("id")))}"
   else
     puts "App Store version #{version_string} is #{state}; waiting for App Store Connect review state to update."
   end
