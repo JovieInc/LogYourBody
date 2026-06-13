@@ -31,6 +31,16 @@ FAILURE_STATES = %w[
   PENDING_CONTRACT
 ].freeze
 
+TERMINAL_REVIEW_SUBMISSION_STATES = %w[
+  APPROVED
+  CANCELED
+  CANCELLED
+  COMPLETE
+  COMPLETED
+  REJECTED
+  RESOLVED
+].freeze
+
 def fail_with(message)
   warn "::error::#{message}"
   exit 1
@@ -167,6 +177,52 @@ def request_release(token, app_store_version_id)
   expect(:post, "/v1/appStoreVersionReleaseRequests", token, body: body, expected: [201])
 end
 
+def active_review_submission_for_version(token, app_id, app_store_version_id)
+  query = URI.encode_www_form(
+    "fields[reviewSubmissions]" => "state,submittedDate",
+    "limit" => "10",
+    "sort" => "-submittedDate"
+  )
+  status, parsed = request(:get, "/v1/apps/#{app_id}/reviewSubmissions?#{query}", token)
+
+  unless status == 200
+    warn_with("Unable to inspect App Review submissions for #{app_id}: App Store Connect returned #{status}.")
+    return nil
+  end
+
+  parsed.fetch("data", []).find do |submission|
+    submission_state = submission.dig("attributes", "state").to_s
+    next false if TERMINAL_REVIEW_SUBMISSION_STATES.include?(submission_state)
+
+    review_submission_targets_version?(token, submission.fetch("id"), app_store_version_id)
+  end
+end
+
+def review_submission_targets_version?(token, review_submission_id, app_store_version_id)
+  query = URI.encode_www_form(
+    "include" => "appStoreVersion",
+    "fields[reviewSubmissionItems]" => "state,appStoreVersion",
+    "fields[appStoreVersions]" => "versionString,appVersionState",
+    "limit" => "50"
+  )
+  status, parsed = request(:get, "/v1/reviewSubmissions/#{review_submission_id}/items?#{query}", token)
+
+  unless status == 200
+    warn_with("Unable to inspect App Review submission #{review_submission_id}: App Store Connect returned #{status}.")
+    return false
+  end
+
+  related_ids = parsed.fetch("data", []).filter_map do |item|
+    relationship = item.dig("relationships", "appStoreVersion", "data")
+    relationship.fetch("id") if relationship
+  end
+  included_ids = parsed.fetch("included", []).filter_map do |resource|
+    resource.fetch("id") if resource.fetch("type", nil) == "appStoreVersions"
+  end
+
+  (related_ids + included_ids).include?(app_store_version_id)
+end
+
 token = bearer_token
 id = app_id(token)
 version = selected_version(app_store_versions(token, id))
@@ -179,6 +235,7 @@ end
 version_id = version.fetch("id")
 version_string = version.dig("attributes", "versionString")
 state = version.dig("attributes", "appVersionState").to_s
+active_review_submission = active_review_submission_for_version(token, id, version_id)
 
 case state
 when "PENDING_DEVELOPER_RELEASE"
@@ -190,6 +247,13 @@ when *REVIEW_STATES
   puts "App Store version #{version_string} is #{state}; waiting for Apple approval."
 when *FAILURE_STATES
   fail_with("App Store version #{version_string} is #{state}; release needs remediation.")
+when "PREPARE_FOR_SUBMISSION"
+  if active_review_submission
+    review_state = active_review_submission.dig("attributes", "state")
+    puts "App Store version #{version_string} has active App Review submission #{active_review_submission.fetch("id")} (#{review_state}); waiting for Apple review."
+  else
+    warn_with("App Store version #{version_string} is #{state}; no release action taken.")
+  end
 else
   warn_with("App Store version #{version_string} is #{state}; no release action taken.")
 end
