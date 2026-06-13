@@ -1,49 +1,48 @@
-import { Metadata } from 'next'
-import Link from 'next/link'
-import { Mail, MessageCircle, FileText, ExternalLink } from 'lucide-react'
-import { Header } from '@/components/Header'
-import { Footer } from '@/components/Footer'
+import { Metadata } from 'next';
+import Link from 'next/link';
+import { Mail, MessageCircle, FileText, ExternalLink } from 'lucide-react';
+import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
   title: 'Support - LogYourBody',
-  description: 'Get help with LogYourBody. Contact our support team, browse FAQs, or find resources.',
-}
+  description:
+    'Get help with LogYourBody. Contact our support team, browse FAQs, or find resources.',
+};
 
 export default function SupportPage() {
   return (
-    <div className="min-h-screen bg-black flex flex-col">
+    <div className="flex min-h-screen flex-col bg-black">
       <Header />
       <main className="flex-1">
-        <div className="max-w-4xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-semibold text-white mb-4">
-              How can we help?
-            </h1>
+          <div className="mb-12 text-center">
+            <h1 className="mb-4 text-4xl font-semibold text-white">How can we help?</h1>
             <p className="text-lg text-gray-400">
               We're here to help you get the most out of LogYourBody
             </p>
           </div>
 
           {/* Support Options */}
-          <div className="grid md:grid-cols-2 gap-6 mb-12">
+          <div className="mb-12 grid gap-6 md:grid-cols-2">
             {/* Email Support */}
-            <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-              <div className="flex items-center mb-4">
-                <Mail className="w-6 h-6 text-white mr-3" />
+            <div className="rounded-lg border border-gray-800 bg-gray-900 p-6">
+              <div className="mb-4 flex items-center">
+                <Mail className="mr-3 h-6 w-6 text-white" />
                 <h2 className="text-xl font-medium text-white">Email Support</h2>
               </div>
-              <p className="text-gray-400 mb-4">
+              <p className="mb-4 text-gray-400">
                 Get help from our support team. We typically respond within 24 hours.
               </p>
               <a
                 href="mailto:support@logyourbody.com"
-                className="inline-flex items-center text-white hover:text-gray-300 transition-colors"
+                className="inline-flex items-center text-white transition-colors hover:text-gray-300"
               >
                 support@logyourbody.com
-                <ExternalLink className="w-4 h-4 ml-2" />
+                <ExternalLink className="ml-2 h-4 w-4" />
               </a>
-              <p className="text-sm text-gray-400 mt-3">
+              <p className="mt-3 text-sm text-gray-400">
                 Want a copy of your data?{' '}
                 <a
                   href={
@@ -53,8 +52,8 @@ export default function SupportPage() {
                     '&body=' +
                     encodeURIComponent(
                       'Hello LogYourBody Support,\n\n' +
-                      'I would like to request an export of my LogYourBody account data associated with this email address.\n\n' +
-                      'Thank you,'
+                        'I would like to request an export of my LogYourBody account data associated with this email address.\n\n' +
+                        'Thank you,',
                     )
                   }
                   className="text-white underline hover:text-gray-300"
@@ -66,87 +65,92 @@ export default function SupportPage() {
             </div>
 
             {/* Community */}
-            <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-              <div className="flex items-center mb-4">
-                <MessageCircle className="w-6 h-6 text-white mr-3" />
+            <div className="rounded-lg border border-gray-800 bg-gray-900 p-6">
+              <div className="mb-4 flex items-center">
+                <MessageCircle className="mr-3 h-6 w-6 text-white" />
                 <h2 className="text-xl font-medium text-white">Community</h2>
               </div>
-              <p className="text-gray-400 mb-4">
+              <p className="mb-4 text-gray-400">
                 Join our community to connect with other users and get tips.
               </p>
               <a
                 href="https://reddit.com/r/logyourbody"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center text-white hover:text-gray-300 transition-colors"
+                className="inline-flex items-center text-white transition-colors hover:text-gray-300"
               >
                 Visit Community
-                <ExternalLink className="w-4 h-4 ml-2" />
+                <ExternalLink className="ml-2 h-4 w-4" />
               </a>
             </div>
           </div>
 
           {/* Quick Links */}
-          <div className="bg-gray-900 rounded-lg p-8 border border-gray-800 mb-12">
-            <h2 className="text-2xl font-medium text-white mb-6">Quick Links</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
+          <div className="mb-12 rounded-lg border border-gray-800 bg-gray-900 p-8">
+            <h2 className="mb-6 text-2xl font-medium text-white">Quick Links</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
               <Link
                 href="/privacy"
-                className="flex items-center text-gray-400 hover:text-white transition-colors"
+                className="flex items-center text-gray-400 transition-colors hover:text-white"
               >
-                <FileText className="w-5 h-5 mr-3" />
+                <FileText className="mr-3 h-5 w-5" />
                 Privacy Policy
               </Link>
               <Link
                 href="/terms"
-                className="flex items-center text-gray-400 hover:text-white transition-colors"
+                className="flex items-center text-gray-400 transition-colors hover:text-white"
               >
-                <FileText className="w-5 h-5 mr-3" />
+                <FileText className="mr-3 h-5 w-5" />
                 Terms of Service
               </Link>
               <Link
                 href="/changelog"
-                className="flex items-center text-gray-400 hover:text-white transition-colors"
+                className="flex items-center text-gray-400 transition-colors hover:text-white"
               >
-                <FileText className="w-5 h-5 mr-3" />
+                <FileText className="mr-3 h-5 w-5" />
                 Changelog
               </Link>
               <Link
                 href="/download"
-                className="flex items-center text-gray-400 hover:text-white transition-colors"
+                className="flex items-center text-gray-400 transition-colors hover:text-white"
               >
-                <FileText className="w-5 h-5 mr-3" />
+                <FileText className="mr-3 h-5 w-5" />
                 Download Apps
+              </Link>
+              <Link
+                href="/delete-account"
+                className="flex items-center text-gray-400 transition-colors hover:text-white"
+              >
+                <FileText className="mr-3 h-5 w-5" />
+                Delete Account
               </Link>
             </div>
           </div>
 
           {/* FAQs */}
           <div className="mb-12">
-            <h2 className="text-2xl font-medium text-white mb-6">Frequently Asked Questions</h2>
+            <h2 className="mb-6 text-2xl font-medium text-white">Frequently Asked Questions</h2>
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-white mb-2">
+                <h3 className="mb-2 text-lg font-medium text-white">
                   How do I sync my data across devices?
                 </h3>
                 <p className="text-gray-400">
-                  Your data automatically syncs across all devices when you're signed in with the same account.
-                  Make sure you have an internet connection for syncing to work.
+                  Your data automatically syncs across all devices when you're signed in with the
+                  same account. Make sure you have an internet connection for syncing to work.
                 </p>
               </div>
 
               <div>
-                <h3 className="text-lg font-medium text-white mb-2">
-                  How do I export my data?
-                </h3>
+                <h3 className="mb-2 text-lg font-medium text-white">How do I export my data?</h3>
                 <p className="text-gray-400">
-                  You can export your data from the Settings page. Go to Settings → Account → Export Data.
-                  Your data will be downloaded as a CSV file.
+                  You can export your data from the Settings page. Go to Settings → Account → Export
+                  Data. Your data will be downloaded as a CSV file.
                 </p>
               </div>
 
               <div>
-                <h3 className="text-lg font-medium text-white mb-2">
+                <h3 className="mb-2 text-lg font-medium text-white">
                   Is my data private and secure?
                 </h3>
                 <p className="text-gray-400">
@@ -160,21 +164,24 @@ export default function SupportPage() {
               </div>
 
               <div>
-                <h3 className="text-lg font-medium text-white mb-2">
-                  How do I delete my account?
-                </h3>
+                <h3 className="mb-2 text-lg font-medium text-white">How do I delete my account?</h3>
                 <p className="text-gray-400">
-                  You can delete your account from the Settings page. Go to Settings → Account → Delete Account.
-                  Please note that this action is permanent and cannot be undone.
+                  You can delete your account from the Settings page. Go to Settings → Account →
+                  Delete Account. Please note that this action is permanent and cannot be undone.
+                  See the{' '}
+                  <Link href="/delete-account" className="text-white hover:text-gray-300">
+                    account deletion page
+                  </Link>{' '}
+                  for details and the email support fallback.
                 </p>
               </div>
             </div>
           </div>
 
           {/* Contact Form Placeholder */}
-          <div className="bg-gray-900 rounded-lg p-8 border border-gray-800">
-            <h2 className="text-2xl font-medium text-white mb-4">Need more help?</h2>
-            <p className="text-gray-400 mb-6">
+          <div className="rounded-lg border border-gray-800 bg-gray-900 p-8">
+            <h2 className="mb-4 text-2xl font-medium text-white">Need more help?</h2>
+            <p className="mb-6 text-gray-400">
               If you couldn't find what you're looking for, please email us at{' '}
               <a href="mailto:support@logyourbody.com" className="text-white hover:text-gray-300">
                 support@logyourbody.com
@@ -186,5 +193,5 @@ export default function SupportPage() {
       </main>
       <Footer />
     </div>
-  )
+  );
 }
