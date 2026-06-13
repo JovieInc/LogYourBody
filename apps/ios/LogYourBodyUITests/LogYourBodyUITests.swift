@@ -48,7 +48,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPaidMVPWeightEntrySavesWithKeyboardOpen() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPaidMVPFixture"]
+        app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
         app.launch()
 
         XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
@@ -100,7 +100,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testSubscribedMVPSettingsExposeSubscriptionEscapePaths() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPaidMVPFixture"]
+        app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
         app.launch()
 
         XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
@@ -129,8 +129,10 @@ final class LogYourBodyUITests: XCTestCase {
         app.launchArguments = ["-lybUITestPaidMVPFixture"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_pager"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud_empty_state"].exists)
+        XCTAssertFalse(app.staticTexts["Weight log"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
 
@@ -152,8 +154,14 @@ final class LogYourBodyUITests: XCTestCase {
         app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
         app.launch()
 
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_pager"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+        let statsButton = app.descendants(matching: .any)["photo_timeline_hud_stats_button"]
+        scrollUntilHittable(statsButton, in: app)
+        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+        statsButton.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_presence_summary"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_phase_insight"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
@@ -208,7 +216,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testBulkPhotoImportLockedByDefaultInIntegrations() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPaidMVPFixture"]
+        app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
         app.launch()
 
         try openIntegrations(in: app)
@@ -223,7 +231,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testBulkPhotoImportGateOpensScannerEntry() throws {
         let app = XCUIApplication()
         app.launchArguments = [
-            "-lybUITestPaidMVPFixture",
+            "-lybUITestWeightLoggerMVPFixture",
             "-lybUITestBulkPhotoImportEnabledFixture"
         ]
         app.launch()

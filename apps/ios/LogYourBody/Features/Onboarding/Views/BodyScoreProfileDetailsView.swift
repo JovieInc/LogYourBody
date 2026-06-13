@@ -421,6 +421,8 @@ struct BodyScoreProfileDetailsView: View {
         let trimmedFirst = trimmedFirstName
         let trimmedLast = trimmedLastName
         let fullName = "\(trimmedFirst) \(trimmedLast)".trimmingCharacters(in: .whitespacesAndNewlines)
+        let completesOnboardingNow = !viewModel.includesFirstPhotoStep ||
+            OnboardingStateManager.shared.hasCompletedCurrentVersion
 
         Task {
             do {
@@ -430,7 +432,7 @@ struct BodyScoreProfileDetailsView: View {
 
                 var updates: [String: Any] = [
                     "dateOfBirth": dateOfBirth,
-                    "onboardingCompleted": true
+                    "onboardingCompleted": completesOnboardingNow
                 ]
 
                 if let biologicalSex {
@@ -463,12 +465,12 @@ struct BodyScoreProfileDetailsView: View {
                             activityLevel: existingProfile?.activityLevel,
                             goalWeight: existingProfile?.goalWeight,
                             goalWeightUnit: existingProfile?.goalWeightUnit,
-                            onboardingCompleted: true
+                            onboardingCompleted: completesOnboardingNow
                         )
 
                         currentUser.name = fullName.isEmpty ? currentUser.name : fullName
                         currentUser.profile = updatedProfile
-                        currentUser.onboardingCompleted = true
+                        currentUser.onboardingCompleted = completesOnboardingNow
                         authManager.currentUser = currentUser
                     }
 

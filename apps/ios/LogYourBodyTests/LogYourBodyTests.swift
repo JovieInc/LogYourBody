@@ -10,7 +10,7 @@ import CoreData
 // swiftlint:disable single_test_class
 
 final class LaunchSurfacePolicyTests: XCTestCase {
-    func testMVPDefaultSkipsBodyCompositionOnboardingAndProfileGate() {
+    func testGateOffWeightLoggerFallbackSkipsBodyCompositionOnboardingAndProfileGate() {
         XCTAssertFalse(
             LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
                 hasCompletedOnboarding: false,
@@ -90,9 +90,9 @@ final class LaunchSurfacePolicyTests: XCTestCase {
 }
 
 final class PhotoTimelineHUDPolicyTests: XCTestCase {
-    func testPhotoTimelineHUDDefaultsOffBeforeGateLoads() {
-        XCTAssertFalse(PhotoTimelineHUDPolicy.defaultShowsPhotoTimelineHUD)
-        XCTAssertFalse(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: false))
+    func testPhotoTimelineHUDDefaultsOnForPhotoFirstMVP() {
+        XCTAssertTrue(PhotoTimelineHUDPolicy.defaultShowsPhotoTimelineHUD)
+        XCTAssertTrue(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: false))
         XCTAssertEqual(Constants.photoTimelineHUDFlagKey, "ios_photo_timeline_hud")
     }
 
@@ -121,6 +121,18 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
                 legacyFullDashboardBetaEnabled: false
             ),
             .weightLoggerMVP
+        )
+    }
+
+    func testProductionDefaultRoutingUsesPhotoTimelineHUD() {
+        let defaultHUDEnabled = PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: false)
+
+        XCTAssertEqual(
+            PaidAppSurfacePolicy.surface(
+                photoTimelineHUDEnabled: defaultHUDEnabled,
+                legacyFullDashboardBetaEnabled: false
+            ),
+            .photoTimelineHUD
         )
     }
 
@@ -668,6 +680,69 @@ final class ProgressPhotoAttachPolicyTests: XCTestCase {
     }
 }
 
+final class PhotoMetadataServiceTests: XCTestCase {
+    func testCreateOrUpdateMetricsPreservesExistingMeasurementsForFirstPhotoBaseline() async throws {
+        let userId = "photo_baseline_existing_\(UUID().uuidString)"
+        let date = Date(timeIntervalSince1970: 1_764_000_000)
+        let existing = BodyMetrics(
+            id: UUID().uuidString,
+            userId: userId,
+            date: date,
+            weight: 80.0,
+            weightUnit: "kg",
+            bodyFatPercentage: 18.0,
+            bodyFatMethod: "HealthKit",
+            muscleMass: nil,
+            boneMass: nil,
+            waistCm: nil,
+            hipCm: nil,
+            waistUnit: nil,
+            notes: "Imported from HealthKit",
+            photoUrl: nil,
+            dataSource: BodyMetricSource.healthKit.rawValue,
+            createdAt: date,
+            updatedAt: date
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(existing, userId: userId)
+
+        let updated = await PhotoMetadataService.shared.createOrUpdateMetrics(
+            for: date,
+            photoUrl: "file:///first-photo.jpg",
+            weight: 77.0,
+            bodyFatPercentage: 14.0,
+            userId: userId,
+            dataSource: BodyMetricSource.manual.rawValue,
+            preserveExistingMeasurements: true
+        )
+
+        XCTAssertEqual(updated.id, existing.id)
+        XCTAssertEqual(updated.weight, 80.0)
+        XCTAssertEqual(updated.bodyFatPercentage, 18.0)
+        XCTAssertEqual(updated.bodyFatMethod, "HealthKit")
+        XCTAssertEqual(updated.dataSource, BodyMetricSource.healthKit.rawValue)
+        XCTAssertEqual(updated.photoUrl, "file:///first-photo.jpg")
+    }
+
+    func testCreateOrUpdateMetricsAssignsDataSourceForNewFirstPhotoBaseline() async {
+        let userId = "photo_baseline_new_\(UUID().uuidString)"
+        let date = Date(timeIntervalSince1970: 1_765_000_000)
+
+        let created = await PhotoMetadataService.shared.createOrUpdateMetrics(
+            for: date,
+            weight: 79.5,
+            bodyFatPercentage: 16.5,
+            userId: userId,
+            dataSource: BodyMetricSource.manual.rawValue,
+            preserveExistingMeasurements: true
+        )
+
+        XCTAssertEqual(created.weight, 79.5)
+        XCTAssertEqual(created.bodyFatPercentage, 16.5)
+        XCTAssertEqual(created.dataSource, BodyMetricSource.manual.rawValue)
+        XCTAssertNil(created.photoUrl)
+    }
+}
+
 final class BulkProgressPhotoImportPolicyTests: XCTestCase {
     func testBulkProgressPhotoImportDefaultsLocked() {
         XCTAssertFalse(BulkProgressPhotoImportPolicy.defaultShowsBulkImport)
@@ -908,6 +983,16 @@ final class BodyMetricLocalDateContractTests: XCTestCase {
 
 @MainActor
 final class OnboardingFlowViewModelTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        OnboardingStateManager.shared.updateCompletionStatus(false)
+    }
+
+    override func tearDown() {
+        OnboardingStateManager.shared.updateCompletionStatus(false)
+        super.tearDown()
+    }
+
     func testAdvanceAfterHealthConfirmationSkipsToLoadingWhenMetricsExist() {
         let viewModel = OnboardingFlowViewModel()
         viewModel.bodyScoreInput.weight = WeightValue(value: 185, unit: .pounds)
@@ -961,6 +1046,56 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         viewModel.goToNextStep()
 
         XCTAssertEqual(viewModel.currentStep, .loading)
+    }
+
+    func testProfileDetailsAdvancesToFirstPhotoWhenEnabled() {
+        let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: true)
+        viewModel.currentStep = .profileDetails
+
+        viewModel.goToNextStep()
+
+        XCTAssertEqual(viewModel.currentStep, .firstPhoto)
+        XCTAssertFalse(OnboardingStateManager.shared.hasCompletedCurrentVersion)
+    }
+
+    func testProfileDetailsCompletesOnboardingWhenFirstPhotoDisabled() {
+        let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: false)
+        viewModel.currentStep = .profileDetails
+
+        viewModel.goToNextStep()
+
+        XCTAssertEqual(viewModel.currentStep, .paywall)
+        XCTAssertTrue(OnboardingStateManager.shared.hasCompletedCurrentVersion)
+    }
+
+    func testFirstPhotoStepCanCompleteToPaywall() {
+        let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: true)
+        viewModel.currentStep = .firstPhoto
+
+        viewModel.goToNextStep()
+
+        XCTAssertEqual(viewModel.currentStep, .paywall)
+        XCTAssertTrue(OnboardingStateManager.shared.hasCompletedCurrentVersion)
+    }
+
+    func testFirstPhotoBackNavigationAndPaywallBackNavigation() {
+        let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: true)
+        viewModel.currentStep = .firstPhoto
+
+        viewModel.goBack()
+        XCTAssertEqual(viewModel.currentStep, .profileDetails)
+
+        viewModel.currentStep = .paywall
+        viewModel.goBack()
+        XCTAssertEqual(viewModel.currentStep, .firstPhoto)
+    }
+
+    func testFirstPhotoProgressOnlyAppearsWhenEnabled() {
+        let enabledViewModel = OnboardingFlowViewModel(includesFirstPhotoStep: true)
+        let disabledViewModel = OnboardingFlowViewModel(includesFirstPhotoStep: false)
+
+        XCTAssertNotNil(enabledViewModel.progress(for: .firstPhoto))
+        XCTAssertNil(disabledViewModel.progress(for: .firstPhoto))
     }
 
     func testBuildOnboardingProfileUpdatesIncludesGenderDobAndHeight() {

@@ -1,1 +1,1 @@
-Log weight, keep recent history, sync to your account, and export your data from a focused tracker.
+Track progress photos, weight, body fat, and Apple Health context from a private photo-first timeline.

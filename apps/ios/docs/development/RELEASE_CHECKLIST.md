@@ -33,10 +33,14 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
   has physical-device proof.
 - Current JOV-2865 evidence keeps Apple Sign-In safely hidden; production
   enablement still requires physical Apple prompt and Clerk session proof.
-- `ios_full_body_composition_dashboard` stays off for the paid MVP App Store
-  launch unless the full dashboard has separate approval.
-- `ios_photo_timeline_hud` stays off until the photo-first HUD has separate
-  design, data, screenshot, and device proof.
+- `ios_full_body_composition_dashboard` stays off for the photo-first MVP App
+  Store launch; it remains a legacy/beta fallback only.
+- `ios_photo_timeline_hud` is the default paid MVP surface only after release
+  evidence proves HUD routing, progress-photo attach, metric/source states,
+  HealthKit-denied fallback, screenshot/device proof, and App Review notes.
+- `ios_phase_insight`, `ios_glp1_weekly_checkin`, and
+  `ios_bulk_progress_photo_import` stay off unless separately approved and
+  evidenced.
 
 ## Product Path
 
@@ -44,18 +48,23 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 - Apple Sign-In is hidden by default and appears only for users/cohorts covered
   by `ios_apple_sign_in_enabled`.
 - Unpaid authenticated user sees the paywall.
-- Purchase success unlocks the weight logger.
-- Restore success unlocks the weight logger.
-- Paid returning user opens directly to the weight logger after loading.
-- Paid user can log body weight without body-score onboarding or full profile completion.
-- Recent entries show the latest saved weight and history.
-- Paid user can prepare and share a weight-only CSV export.
+- Purchase success unlocks the photo-first HUD.
+- Restore success unlocks the photo-first HUD.
+- Paid returning user opens directly to the photo-first HUD after loading.
+- Paid user can add one progress photo, log or update weight/body-fat context,
+  scrub the timeline, and open Stats as a secondary surface.
+- Bulk progress-photo import remains locked or gated by
+  `ios_bulk_progress_photo_import`.
+- Paid user can export account data from Settings.
 - Signed-out user opens to auth.
 
 ## Data And Sync
 
-- User can save today's weight locally while online.
-- User can save today's weight locally while offline.
+- User can save today's weight/body-fat context locally while online.
+- User can save today's weight/body-fat context locally while offline.
+- User can attach a progress photo to an existing or newly created body metrics
+  timeline point.
+- HealthKit allow, deny, and skip paths all lead to a usable app state.
 - Sync retries after the device returns online.
 - Supabase rows use the Clerk user ID for `user_id` or profile `id`.
 - Sync failure shows recoverable UI and does not block local logging.
@@ -68,6 +77,9 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 - Native settings expose account deletion and data export paths, with support
   email fallback for export requests.
 - Camera, photo library, HealthKit, and Face ID usage strings are accurate for any enabled surfaces.
+- App Review notes explain the reviewer-accessible email OTP path, purchase
+  path, photo-first HUD, HealthKit skip/deny behavior, Restore Purchases, Export
+  Data, and Delete Account.
 - No secrets or local config files are committed.
 - Any credential previously exposed in setup docs or logs has been rotated
   before release.
@@ -100,11 +112,20 @@ xcodebuild -project LogYourBody.xcodeproj \
 
 ## PR Evidence
 
-- Include screenshots or a simulator recording for auth, paywall, purchase/restore, weight logging, recent history, and CSV export.
-- Include RevenueCat purchase and restore test results, or explicitly label
-  the account-owner sandbox/TestFlight credential blocker.
+- Include screenshots or a simulator recording for auth, paywall,
+  purchase/restore, photo-first HUD empty/populated states, add-photo
+  ready/permission/success states, timeline scrubber, Stats drilldown,
+  HealthKit allow/deny fallback, export, and account deletion.
+- Include real TestFlight purchase and restore proof: products loaded,
+  trial/purchase succeeds, Premium entitlement active, relaunch opens the HUD,
+  and restore works after logout/reinstall.
+- Include App Review login proof: email OTP path, terms/privacy/health
+  disclaimer acceptance, paywall, post-purchase HUD, Settings restore/export/delete.
 - Do not run App Store submission with `paywall_testflight_verified=true`
   until a real TestFlight build has loaded subscription products and completed
   purchase plus restore verification.
+- Include HealthKit/photo/analytics proof: `healthkit` and `photo` provenance,
+  photo upload/sync path, denied-permission fallback, Stats source-state quality,
+  and any Statsig/Sentry release events used as launch evidence.
 - Include Supabase sync test results.
 - Include validation command output and known risks.

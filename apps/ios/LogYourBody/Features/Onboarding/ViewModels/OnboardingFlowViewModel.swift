@@ -37,6 +37,7 @@ final class OnboardingFlowViewModel: ObservableObject {
         case emailCapture
         case account
         case profileDetails
+        case firstPhoto
         case paywall
     }
 
@@ -130,8 +131,12 @@ final class OnboardingFlowViewModel: ObservableObject {
     @Published var isCreatingAccount: Bool = false
     @Published var accountCreationError: String?
     @Published private(set) var accountCreationStage: AccountCreationStage = .idle
+    @Published private(set) var onboardingFirstPhotoMetric: BodyMetrics?
+    @Published private(set) var isPreparingFirstPhotoMetric = false
+    @Published var firstPhotoErrorMessage: String?
 
     let entryContext: EntryContext
+    let includesFirstPhotoStep: Bool
     private let healthKitManager: HealthKitManager
     private let calculator: BodyScoreCalculating
     private var hasMarkedOnboardingComplete = false
@@ -158,11 +163,21 @@ final class OnboardingFlowViewModel: ObservableObject {
     init(
         entryContext: EntryContext = .authenticated,
         healthKitManager: HealthKitManager = .shared,
-        calculator: BodyScoreCalculating = BodyScoreCalculator()
+        calculator: BodyScoreCalculating = BodyScoreCalculator(),
+        includesFirstPhotoStep: Bool? = nil
     ) {
         self.entryContext = entryContext
         self.healthKitManager = healthKitManager
         self.calculator = calculator
+        self.includesFirstPhotoStep = includesFirstPhotoStep
+            ?? (
+                entryContext == .authenticated &&
+                    PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
+                        gateEnabled: AnalyticsService.shared.isFeatureEnabled(
+                            flagKey: Constants.photoTimelineHUDFlagKey
+                        )
+                    )
+            )
 
         configureMeasurementPreference()
         hydrateHeightFields()
@@ -217,8 +232,14 @@ final class OnboardingFlowViewModel: ObservableObject {
                 currentStep = .profileDetails
             }
         case .profileDetails:
-            completeOnboardingIfNeeded()
-            currentStep = .paywall
+            if includesFirstPhotoStep {
+                currentStep = .firstPhoto
+            } else {
+                completeOnboardingIfNeeded()
+                currentStep = .paywall
+            }
+        case .firstPhoto:
+            completeFirstPhotoStep()
         case .paywall:
             break
         }
@@ -253,7 +274,8 @@ final class OnboardingFlowViewModel: ObservableObject {
             currentStep = hasAuthenticatedAccountEmail ? .bodyScore : .emailCapture
         case .profileDetails:
             currentStep = hasAuthenticatedAccountEmail ? .bodyScore : .account
-        case .paywall: currentStep = .profileDetails
+        case .firstPhoto: currentStep = .profileDetails
+        case .paywall: currentStep = includesFirstPhotoStep ? .firstPhoto : .profileDetails
         }
     }
 
@@ -374,6 +396,8 @@ final class OnboardingFlowViewModel: ObservableObject {
         switch step {
         case .hook, .basics, .height, .healthConnect, .bodyScore, .profileDetails:
             return true
+        case .firstPhoto:
+            return includesFirstPhotoStep
         case .emailCapture, .account:
             return !hasAuthenticatedAccountEmail
         case .healthConfirmation:
@@ -740,6 +764,46 @@ final class OnboardingFlowViewModel: ObservableObject {
         }
     }
 
+    func completeFirstPhotoStep() {
+        completeOnboardingIfNeeded()
+        currentStep = .paywall
+    }
+
+    func prepareFirstPhotoBaselineMetric() async -> BodyMetrics? {
+        guard entryContext == .authenticated else { return nil }
+        if let onboardingFirstPhotoMetric {
+            return onboardingFirstPhotoMetric
+        }
+
+        guard let userId = AuthManager.shared.currentUser?.id else {
+            firstPhotoErrorMessage = "Sign in again to add a progress photo."
+            return nil
+        }
+
+        isPreparingFirstPhotoMetric = true
+        firstPhotoErrorMessage = nil
+        defer { isPreparingFirstPhotoMetric = false }
+
+        let metric = await PhotoMetadataService.shared.createOrUpdateMetrics(
+            for: Date(),
+            weight: bodyScoreInput.weight.inKilograms,
+            bodyFatPercentage: bodyScoreInput.bodyFat.percentage,
+            userId: userId,
+            dataSource: firstPhotoBaselineDataSource,
+            preserveExistingMeasurements: true
+        )
+        onboardingFirstPhotoMetric = metric
+        return metric
+    }
+
+    private var firstPhotoBaselineDataSource: String {
+        if didRequestHealthSync || bodyScoreInput.bodyFat.source == .healthKit {
+            return BodyMetricSource.healthKit.rawValue
+        }
+
+        return BodyMetricSource.manual.rawValue
+    }
+
     private func scheduleDeferredHealthSync() {
         Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
@@ -1000,6 +1064,9 @@ final class OnboardingFlowViewModel: ObservableObject {
            currentStep == .emailCapture || currentStep == .account {
             currentStep = .profileDetails
         }
+        if currentStep == .firstPhoto, !includesFirstPhotoStep {
+            currentStep = .profileDetails
+        }
         isRestoringProgress = false
     }
 
@@ -1026,7 +1093,8 @@ private extension OnboardingFlowViewModel.Step {
             .bodyScore,
             .emailCapture,
             .account,
-            .profileDetails
+            .profileDetails,
+            .firstPhoto
         ]
     }
 
@@ -1043,6 +1111,7 @@ private extension OnboardingFlowViewModel.Step {
         case .emailCapture: return "Save Progress"
         case .account: return "Account"
         case .profileDetails: return "Profile"
+        case .firstPhoto: return "Photo"
         case .loading: return "Loading"
         case .paywall: return "Upgrade"
         }

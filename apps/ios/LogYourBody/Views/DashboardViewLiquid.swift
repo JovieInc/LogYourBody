@@ -77,6 +77,7 @@ struct DashboardViewLiquid: View {
     // Navigation state
     @State private var selectedTab: DashboardTab = .home
     @State private var isPhotosTabEnabled = true
+    @State private var selectedPhotoTimelineRootPage: PhotoTimelineRootPage = .timeline
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
     @State private var isStatsDestinationActive = false
@@ -99,6 +100,11 @@ struct DashboardViewLiquid: View {
         case home
         case photos
         case metrics
+    }
+
+    enum PhotoTimelineRootPage: Hashable {
+        case timeline
+        case analytics
     }
 
     enum MetricType {
@@ -506,6 +512,26 @@ struct DashboardViewLiquid: View {
         .accessibilityIdentifier("photo_timeline_hud")
     }
 
+    private var photoTimelineRoot: some View {
+        TabView(selection: $selectedPhotoTimelineRootPage) {
+            Group {
+                if bodyMetrics.isEmpty {
+                    photoTimelineHUDEmptyState
+                } else {
+                    photoTimelineHUD
+                }
+            }
+            .tag(PhotoTimelineRootPage.timeline)
+            .accessibilityIdentifier("photo_timeline_root_page_timeline")
+
+            photoTimelineAnalyticsPage
+                .tag(PhotoTimelineRootPage.analytics)
+                .accessibilityIdentifier("photo_timeline_root_page_analytics")
+        }
+        .tabViewStyle(.page(indexDisplayMode: .always))
+        .accessibilityIdentifier("photo_timeline_root_pager")
+    }
+
     private var hudPhotoStage: some View {
         ZStack(alignment: .bottomLeading) {
             ProgressPhotoCarouselView(
@@ -833,7 +859,9 @@ struct DashboardViewLiquid: View {
     private var hudStatsAction: some View {
         Button {
             HapticManager.shared.selection()
-            isStatsDestinationActive = true
+            withAnimation(.easeInOut(duration: 0.25)) {
+                selectedPhotoTimelineRootPage = .analytics
+            }
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "chart.line.uptrend.xyaxis")
@@ -877,6 +905,13 @@ struct DashboardViewLiquid: View {
     }
 
     private var photoTimelineStatsDestination: some View {
+        photoTimelineAnalyticsPage
+            .navigationTitle("Stats")
+            .navigationBarTitleDisplayMode(.inline)
+            .accessibilityIdentifier("photo_timeline_stats_destination")
+    }
+
+    private var photoTimelineAnalyticsPage: some View {
         ZStack {
             Color.metricCanvas.ignoresSafeArea()
 
@@ -894,9 +929,6 @@ struct DashboardViewLiquid: View {
                 .padding(.bottom, 32)
             }
         }
-        .navigationTitle("Stats")
-        .navigationBarTitleDisplayMode(.inline)
-        .accessibilityIdentifier("photo_timeline_stats_destination")
     }
 
     private var photoTimelineStatsHeader: some View {
@@ -1469,12 +1501,10 @@ struct DashboardViewLiquid: View {
     private var dashboardContent: some View {
         if viewModel.bodyMetrics.isEmpty && !viewModel.hasLoadedInitialData {
             DashboardSkeleton()
-        } else if viewModel.bodyMetrics.isEmpty && layoutMode == .photoTimelineHUD {
-            photoTimelineHUDEmptyState
+        } else if layoutMode == .photoTimelineHUD {
+            photoTimelineRoot
         } else if viewModel.bodyMetrics.isEmpty {
             emptyState
-        } else if layoutMode == .photoTimelineHUD {
-            photoTimelineHUD
         } else {
             TabView(selection: $selectedTab) {
                 homeTab
@@ -1636,7 +1666,7 @@ struct ProgressPhotoAttachPolicy {
     }
 }
 
-private struct ProgressPhotoAttachSheet: View {
+struct ProgressPhotoAttachSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authManager: AuthManager
     @ObservedObject private var uploadManager = PhotoUploadManager.shared

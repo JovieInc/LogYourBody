@@ -138,10 +138,10 @@ struct AuthSurfacePolicy {
 }
 
 enum PhotoTimelineHUDPolicy {
-    static let defaultShowsPhotoTimelineHUD = false
+    static let defaultShowsPhotoTimelineHUD = true
 
     static func shouldShowPhotoTimelineHUD(gateEnabled: Bool) -> Bool {
-        gateEnabled
+        defaultShowsPhotoTimelineHUD || gateEnabled
     }
 
     static func stateText(
