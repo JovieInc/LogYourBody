@@ -98,5 +98,8 @@ xcodebuild -project LogYourBody.xcodeproj \
 - Include screenshots or a simulator recording for auth, paywall, purchase/restore, weight logging, recent history, and CSV export.
 - Include RevenueCat purchase and restore test results, or explicitly label
   the account-owner sandbox/TestFlight credential blocker.
+- Do not run App Store submission with `paywall_testflight_verified=true`
+  until a real TestFlight build has loaded subscription products and completed
+  purchase plus restore verification.
 - Include Supabase sync test results.
 - Include validation command output and known risks.
