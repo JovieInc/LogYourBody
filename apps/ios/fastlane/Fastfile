@@ -871,22 +871,29 @@ platform :ios do
       notes: env_or_default.call("APP_REVIEW_NOTES", "LogYourBody lets users sign in, log their weight, sync their entries, export CSV data, and manage their subscription. No demo account is required; reviewers can create a test account in the app.")
     }.compact
 
-    # Upload to App Store Connect
-    upload_to_app_store(
-      ipa: options[:ipa_path],
-      force: true,
-      metadata_path: "fastlane/metadata",
-      screenshots_path: "fastlane/screenshots",
-      skip_metadata: false,
-      skip_screenshots: false,
-      submit_for_review: submit_for_review,
-      automatic_release: automatic_release,
-      phased_release: phased_release,
-      app_review_information: app_review_information,
-      run_precheck_before_submit: false,
-      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
-      team_id: ENV["APPLE_TEAM_ID"]
-    )
+    begin
+      upload_to_app_store(
+        ipa: options[:ipa_path],
+        force: true,
+        metadata_path: "fastlane/metadata",
+        screenshots_path: "fastlane/screenshots",
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: submit_for_review,
+        automatic_release: automatic_release,
+        phased_release: phased_release,
+        app_review_information: app_review_information,
+        run_precheck_before_submit: false,
+        app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
+        team_id: ENV["APPLE_TEAM_ID"]
+      )
+    rescue => e
+      if submit_for_review && e.message.include?("A review submission is already in progress")
+        UI.success("App Store review submission is already in progress; treating as submitted.")
+      else
+        raise
+      end
+    end
   end
 
   desc "Deploy to App Store (build + upload)"
