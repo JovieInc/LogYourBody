@@ -30,6 +30,11 @@ on:
         required: false
         type: boolean
         default: true
+      paywall_testflight_verified:
+        description: 'Required for App Store submission after a real TestFlight paywall purchase/restore passes'
+        required: false
+        type: boolean
+        default: false
   workflow_call:
 
 concurrency:
@@ -181,6 +186,14 @@ jobs:
 
           # Set API key path for subsequent steps
           echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> "$GITHUB_ENV"
+
+      - name: Verify App Store subscription products
+        run: |
+          cd apps/ios
+          bundle exec ruby ../../.github/scripts/verify-app-store-subscriptions.rb
+        env:
+          APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
+          APP_IDENTIFIER: ${{ env.LOGYOURBODY_APP_IDENTIFIER }}
 
       - name: Sync Certificates with Match
         uses: ./.github/actions/sync-match
@@ -344,6 +357,12 @@ jobs:
           SUBMIT_FOR_REVIEW="${{ github.event.inputs.submit_for_review || 'true' }}"
           AUTOMATIC_RELEASE="${{ github.event.inputs.automatic_release || 'true' }}"
           PHASED_RELEASE="${{ github.event.inputs.phased_release || 'true' }}"
+          PAYWALL_TESTFLIGHT_VERIFIED="${{ github.event.inputs.paywall_testflight_verified || 'false' }}"
+
+          if [ "$SUBMIT_FOR_REVIEW" = "true" ] && [ "$PAYWALL_TESTFLIGHT_VERIFIED" != "true" ]; then
+            echo "::error::App Store submission is blocked until a real TestFlight paywall purchase and restore have been verified. Re-run with paywall_testflight_verified=true only after that proof exists."
+            exit 1
+          fi
 
           IPA_PATH="$(find "$GITHUB_WORKSPACE/apps/ios/build" -name "*.ipa" -type f -print -quit)"
           if [ -z "$IPA_PATH" ]; then

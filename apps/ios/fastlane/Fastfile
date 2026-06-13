@@ -868,7 +868,7 @@ platform :ios do
       last_name: env_or_default.call("APP_REVIEW_LAST_NAME", "Team"),
       email_address: env_or_default.call("APP_REVIEW_EMAIL_ADDRESS", "support@logyourbody.com"),
       phone_number: ENV["APP_REVIEW_PHONE_NUMBER"],
-      notes: env_or_default.call("APP_REVIEW_NOTES", "LogYourBody lets users sign in, log their weight, sync their entries, export CSV data, and manage their subscription. No demo account is required; reviewers can create a test account in the app.")
+      notes: env_or_default.call("APP_REVIEW_NOTES", "Review access: choose Create Account, enter an email address that can receive a one-time code, accept Terms, Privacy Policy, and Health Disclaimer, then enter the email code. On LogYourBody Pro, tap Start trial; subscriptions use Apple's sandbox review environment and include a 3-day trial. After purchase or trial activation, log a weight, review recent history, and export CSV from Settings. If email codes or subscription products do not load, contact support@logyourbody.com.")
     }.compact
 
     begin
