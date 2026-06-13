@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 
 export default function AccountSettingsPage() {
-  const { user, loading, signOut } = useAuth();
+  const { user, session, loading, signOut } = useAuth();
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -70,11 +70,23 @@ export default function AccountSettingsPage() {
 
     setIsDeleting(true);
     try {
-      // TODO: Add actual API call to delete account
-      // const { error } = await supabase.rpc('delete_user_account')
+      const token = await session?.getToken();
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (!token) {
+        throw new Error('Missing authentication token');
+      }
+
+      const response = await fetch('/api/auth/delete-account', {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? 'Failed to delete account');
+      }
 
       toast({
         title: 'Account deleted',
