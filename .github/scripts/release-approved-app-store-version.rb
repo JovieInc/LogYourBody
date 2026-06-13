@@ -199,25 +199,34 @@ def review_submissions_for_app(token, app_id)
     "/v1/reviewSubmissions?#{URI.encode_www_form("filter[app]" => app_id, "limit" => "10")}"
   ]
   failures = []
+  submissions = []
 
   candidates.each do |path|
     status, parsed = request(:get, path, token)
-    return parsed.fetch("data", []) if status == 200
+    if status == 200
+      submissions.concat(parsed.fetch("data", []))
+      next
+    end
 
     failures << "#{path} returned #{status_with_error(status, parsed)}"
   end
 
-  warn_with("Unable to inspect App Review submissions for #{app_id}: #{failures.join("; ")}.")
-  []
+  if submissions.empty? && failures.length == candidates.length
+    warn_with("Unable to inspect App Review submissions for #{app_id}: #{failures.join("; ")}.")
+  end
+
+  submissions.uniq { |submission| submission.fetch("id") }
 end
 
 def active_review_submission_for_version(token, app_id, app_store_version_id)
-  review_submissions_for_app(token, app_id).find do |submission|
+  active_submissions = review_submissions_for_app(token, app_id).reject do |submission|
     submission_state = submission.dig("attributes", "state").to_s
-    next false if TERMINAL_REVIEW_SUBMISSION_STATES.include?(submission_state)
-
-    review_submission_targets_version?(token, submission.fetch("id"), app_store_version_id)
+    TERMINAL_REVIEW_SUBMISSION_STATES.include?(submission_state)
   end
+
+  active_submissions.find do |submission|
+    review_submission_targets_version?(token, submission.fetch("id"), app_store_version_id)
+  end || active_submissions.first
 end
 
 def review_submission_targets_version?(token, review_submission_id, app_store_version_id)
@@ -269,7 +278,7 @@ when "PREPARE_FOR_SUBMISSION"
     review_state = active_review_submission.dig("attributes", "state")
     puts "App Store version #{version_string} has active App Review submission #{active_review_submission.fetch("id")} (#{review_state}); waiting for Apple review."
   else
-    warn_with("App Store version #{version_string} is #{state}; no release action taken.")
+    puts "App Store version #{version_string} is #{state}; waiting for App Store Connect review state to update."
   end
 else
   warn_with("App Store version #{version_string} is #{state}; no release action taken.")
