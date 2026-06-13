@@ -50,6 +50,22 @@ def warn_with(message)
   warn "::warning::#{message}"
 end
 
+def api_error_message(parsed)
+  parsed.fetch("errors", []).filter_map do |error|
+    [
+      error["status"],
+      error["code"],
+      error["title"],
+      error["detail"]
+    ].compact.join(" ")
+  end.join("; ")
+end
+
+def status_with_error(status, parsed)
+  detail = api_error_message(parsed)
+  detail.empty? ? status.to_s : "#{status}: #{detail}"
+end
+
 def api_key
   path = ENV.fetch("APP_STORE_CONNECT_API_KEY_PATH", "fastlane/api_key.json")
   JSON.parse(File.read(path))
@@ -177,20 +193,26 @@ def request_release(token, app_store_version_id)
   expect(:post, "/v1/appStoreVersionReleaseRequests", token, body: body, expected: [201])
 end
 
-def active_review_submission_for_version(token, app_id, app_store_version_id)
-  query = URI.encode_www_form(
-    "fields[reviewSubmissions]" => "state,submittedDate",
-    "limit" => "10",
-    "sort" => "-submittedDate"
-  )
-  status, parsed = request(:get, "/v1/apps/#{app_id}/reviewSubmissions?#{query}", token)
+def review_submissions_for_app(token, app_id)
+  candidates = [
+    "/v1/apps/#{app_id}/reviewSubmissions?#{URI.encode_www_form("limit" => "10")}",
+    "/v1/reviewSubmissions?#{URI.encode_www_form("filter[app]" => app_id, "limit" => "10")}"
+  ]
+  failures = []
 
-  unless status == 200
-    warn_with("Unable to inspect App Review submissions for #{app_id}: App Store Connect returned #{status}.")
-    return nil
+  candidates.each do |path|
+    status, parsed = request(:get, path, token)
+    return parsed.fetch("data", []) if status == 200
+
+    failures << "#{path} returned #{status_with_error(status, parsed)}"
   end
 
-  parsed.fetch("data", []).find do |submission|
+  warn_with("Unable to inspect App Review submissions for #{app_id}: #{failures.join("; ")}.")
+  []
+end
+
+def active_review_submission_for_version(token, app_id, app_store_version_id)
+  review_submissions_for_app(token, app_id).find do |submission|
     submission_state = submission.dig("attributes", "state").to_s
     next false if TERMINAL_REVIEW_SUBMISSION_STATES.include?(submission_state)
 
@@ -199,16 +221,11 @@ def active_review_submission_for_version(token, app_id, app_store_version_id)
 end
 
 def review_submission_targets_version?(token, review_submission_id, app_store_version_id)
-  query = URI.encode_www_form(
-    "include" => "appStoreVersion",
-    "fields[reviewSubmissionItems]" => "state,appStoreVersion",
-    "fields[appStoreVersions]" => "versionString,appVersionState",
-    "limit" => "50"
-  )
+  query = URI.encode_www_form("limit" => "50")
   status, parsed = request(:get, "/v1/reviewSubmissions/#{review_submission_id}/items?#{query}", token)
 
   unless status == 200
-    warn_with("Unable to inspect App Review submission #{review_submission_id}: App Store Connect returned #{status}.")
+    warn_with("Unable to inspect App Review submission #{review_submission_id}: App Store Connect returned #{status_with_error(status, parsed)}.")
     return false
   end
 
