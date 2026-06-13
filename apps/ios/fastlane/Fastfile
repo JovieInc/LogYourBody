@@ -25,7 +25,7 @@ platform :ios do
   scheme = "LogYourBody"
   project = "LogYourBody.xcodeproj"
   default_app_identifier = "com.logyourbody.app"
-  default_app_store_app_id = "6739360530"
+  default_app_store_app_id = "6755209876"
 
   app_identifier = lambda do
     value = ENV["APP_IDENTIFIER"].to_s.strip

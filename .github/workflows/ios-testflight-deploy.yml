@@ -51,7 +51,7 @@ on:
 
 env:
   LOGYOURBODY_APP_IDENTIFIER: com.logyourbody.app
-  LOGYOURBODY_APP_STORE_APP_ID: "6739360530"
+  LOGYOURBODY_APP_STORE_APP_ID: "6755209876"
 
 jobs:
   deploy-testflight:
@@ -212,7 +212,7 @@ jobs:
           exit 1
         fi
 
-        if [ "$APP_STORE_APP_ID" != "6739360530" ]; then
+        if [ "$APP_STORE_APP_ID" != "6755209876" ]; then
           echo "::error::Unexpected App Store app id for production TestFlight deploy: $APP_STORE_APP_ID"
           exit 1
         fi
