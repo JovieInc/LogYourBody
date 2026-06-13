@@ -225,7 +225,7 @@ export default function ImportPage() {
         data = lines.map((line) => line.split(',').map((v) => v.trim()));
       } else {
         // Dynamically import Excel parser only when needed
-        const readXlsxFile = (await import('read-excel-file/web')).default;
+        const readXlsxFile = (await import('read-excel-file')).default;
 
         // Parse Excel into row data
         const rows = await readXlsxFile(file, { dateFormat: 'YYYY-MM-DD' });
@@ -871,7 +871,7 @@ export default function ImportPage() {
                               />
                             )}
                           </div>
-                          <div className="absolute top-2 right-2">
+                          <div className="absolute right-2 top-2">
                             <div
                               className={`flex h-6 w-6 items-center justify-center rounded-full border-2 ${
                                 selectedEntries.has(index)
