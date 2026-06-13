@@ -41,6 +41,19 @@ TERMINAL_REVIEW_SUBMISSION_STATES = %w[
   RESOLVED
 ].freeze
 
+REJECTED_REVIEW_ITEM_STATES = %w[
+  DEVELOPER_REJECTED
+  METADATA_REJECTED
+  REJECTED
+].freeze
+
+REVIEW_SUBMISSION_ITEM_RELATIONSHIPS = %w[
+  appStoreVersion
+  appCustomProductPageVersion
+  appStoreVersionExperiment
+  appEvent
+].freeze
+
 def fail_with(message)
   warn "::error::#{message}"
   exit 1
@@ -48,6 +61,19 @@ end
 
 def warn_with(message)
   warn "::warning::#{message}"
+end
+
+def error_with(message)
+  warn "::error::#{message}"
+end
+
+def append_step_summary(lines)
+  summary_path = ENV["GITHUB_STEP_SUMMARY"].to_s
+  return if summary_path.empty?
+
+  File.open(summary_path, "a") do |file|
+    lines.each { |line| file.puts(line) }
+  end
 end
 
 def api_error_message(parsed)
@@ -230,8 +256,17 @@ def active_review_submission_for_version(token, app_id, app_store_version_id)
 end
 
 def review_submission_items(token, review_submission_id)
-  query = URI.encode_www_form("limit" => "50")
+  query = URI.encode_www_form(
+    "limit" => "50",
+    "fields[reviewSubmissionItems]" => (["state"] + REVIEW_SUBMISSION_ITEM_RELATIONSHIPS).join(","),
+    "include" => REVIEW_SUBMISSION_ITEM_RELATIONSHIPS.join(",")
+  )
   status, parsed = request(:get, "/v1/reviewSubmissions/#{review_submission_id}/items?#{query}", token)
+
+  if status == 400
+    fallback_query = URI.encode_www_form("limit" => "50")
+    status, parsed = request(:get, "/v1/reviewSubmissions/#{review_submission_id}/items?#{fallback_query}", token)
+  end
 
   unless status == 200
     warn_with("Unable to inspect App Review submission #{review_submission_id}: App Store Connect returned #{status_with_error(status, parsed)}.")
@@ -268,6 +303,34 @@ def review_submission_item_summary(items)
   end.join("; ")
 end
 
+def rejected_review_submission_items(items)
+  items.select do |item|
+    REJECTED_REVIEW_ITEM_STATES.include?(item.dig("attributes", "state").to_s)
+  end
+end
+
+def emit_review_submission_remediation(submission_id, review_state, item_summary, rejected_items)
+  return unless review_state.to_s == "UNRESOLVED_ISSUES" || rejected_items.any?
+
+  rejected_ids = rejected_items.map { |item| item.fetch("id") }.join(", ")
+  detail = rejected_ids.empty? ? "no rejected item IDs returned" : "rejected item IDs: #{rejected_ids}"
+  message = "App Review submission #{submission_id} has unresolved issues (#{review_state}; #{detail}). Resolve the rejected item in App Store Connect, then resubmit for review."
+
+  error_with(message)
+  append_step_summary(
+    [
+      "## App Review action required",
+      "",
+      message,
+      "",
+      "Submission item summary: `#{item_summary}`",
+      "",
+      "Open App Store Connect, choose the LogYourBody app, then use **View App Review Issues & Messages** to inspect and resolve the rejection before resubmitting."
+    ]
+  )
+  exit 1
+end
+
 token = bearer_token
 id = app_id(token)
 version = selected_version(app_store_versions(token, id))
@@ -295,8 +358,16 @@ when *FAILURE_STATES
 when "PREPARE_FOR_SUBMISSION"
   if active_review_submission
     review_state = active_review_submission.dig("attributes", "state")
+    submission_items = review_submission_items(token, active_review_submission.fetch("id"))
+    item_summary = review_submission_item_summary(submission_items)
     puts "App Store version #{version_string} has active App Review submission #{active_review_submission.fetch("id")} (#{review_state}); waiting for Apple review."
-    puts "App Review submission items: #{review_submission_item_summary(review_submission_items(token, active_review_submission.fetch("id")))}"
+    puts "App Review submission items: #{item_summary}"
+    emit_review_submission_remediation(
+      active_review_submission.fetch("id"),
+      review_state,
+      item_summary,
+      rejected_review_submission_items(submission_items)
+    )
   else
     puts "App Store version #{version_string} is #{state}; waiting for App Store Connect review state to update."
   end
