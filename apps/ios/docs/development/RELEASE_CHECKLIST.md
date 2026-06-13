@@ -18,6 +18,11 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
 - RevenueCat `Premium` entitlement matches `Constants.proEntitlementID`.
 - StoreKit/App Store products are attached to the active RevenueCat offering.
 - Release workflow verifies the RevenueCat current iOS offering exposes `$rc_annual` -> `com.logyourbody.app.pro1.annual.3daytrial` and `$rc_monthly` -> `com.logyourbody.app.pro1.monthly.3daytrial`.
+- Release workflow verifies App Store Connect contains those subscription
+  products in a releasable setup state: `READY_TO_SUBMIT` before first review
+  or `APPROVED` after Apple approval.
+- App Store Connect Paid Apps Agreement, tax, and banking must be active before
+  relying on sandbox/TestFlight in-app purchase tests.
 - Release workflow validates the actual release ref/SHA instead of the unrelated `preview` branch.
 - App Store release workflow is run from `main` with `release_type=app_store`,
   `submit_for_review=true`, `automatic_release=true`, and phased release

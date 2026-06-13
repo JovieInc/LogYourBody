@@ -13,7 +13,7 @@ DEFAULT_REQUIRED_PRODUCTS = %w[
   com.logyourbody.app.pro1.annual.3daytrial
   com.logyourbody.app.pro1.monthly.3daytrial
 ].freeze
-DEFAULT_ALLOWED_STATES = %w[APPROVED].freeze
+DEFAULT_ALLOWED_STATES = %w[READY_TO_SUBMIT APPROVED].freeze
 
 def fail_with(message)
   warn "::error::#{message}"
