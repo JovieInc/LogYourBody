@@ -90,14 +90,43 @@ final class LaunchSurfacePolicyTests: XCTestCase {
 }
 
 final class PhotoTimelineHUDPolicyTests: XCTestCase {
-    func testPhotoTimelineHUDDefaultsOnForPhotoFirstMVP() {
-        XCTAssertTrue(PhotoTimelineHUDPolicy.defaultShowsPhotoTimelineHUD)
-        XCTAssertTrue(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: false))
+    func testPhotoTimelineHUDDefaultsOffUntilRolloutGateIsEnabled() {
+        XCTAssertFalse(PhotoTimelineHUDPolicy.defaultShowsPhotoTimelineHUD)
+        XCTAssertFalse(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: false))
         XCTAssertEqual(Constants.photoTimelineHUDFlagKey, "ios_photo_timeline_hud")
     }
 
     func testPhotoTimelineHUDCanBeEnabledByGate() {
         XCTAssertTrue(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: true))
+    }
+
+    func testDefaultHomeModeDefaultsToAvatar() {
+        XCTAssertEqual(Constants.defaultHomeModeKey, "defaultHomeMode")
+        XCTAssertEqual(DefaultHomeMode.default, .avatar)
+        XCTAssertEqual(DefaultHomeMode(storedValue: "photo"), .photo)
+        XCTAssertEqual(DefaultHomeMode(storedValue: "unexpected"), .avatar)
+        XCTAssertEqual(DefaultHomeMode.avatar.timelineMode, .avatar)
+        XCTAssertEqual(DefaultHomeMode.photo.timelineMode, .photo)
+        XCTAssertEqual(DefaultHomeMode(timelineMode: .avatar), .avatar)
+        XCTAssertEqual(DefaultHomeMode(timelineMode: .photo), .photo)
+    }
+
+    func testMVPLoggerFallbackGateOverridesPhotoTimelineDefault() {
+        XCTAssertEqual(Constants.mvpLoggerFallbackFlagKey, "ios_mvp_logger_fallback")
+        XCTAssertFalse(
+            PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
+                gateEnabled: true,
+                mvpLoggerFallbackEnabled: true
+            )
+        )
+        XCTAssertEqual(
+            PaidAppSurfacePolicy.surface(
+                photoTimelineHUDEnabled: true,
+                legacyFullDashboardBetaEnabled: true,
+                mvpLoggerFallbackEnabled: true
+            ),
+            .weightLoggerMVP
+        )
     }
 
     func testPhotoTimelineHUDTakesPrecedenceOverLegacyFullDashboard() {
@@ -124,7 +153,7 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         )
     }
 
-    func testProductionDefaultRoutingUsesPhotoTimelineHUD() {
+    func testGateOffRoutingUsesWeightLoggerFallback() {
         let defaultHUDEnabled = PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: false)
 
         XCTAssertEqual(
@@ -132,7 +161,7 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
                 photoTimelineHUDEnabled: defaultHUDEnabled,
                 legacyFullDashboardBetaEnabled: false
             ),
-            .photoTimelineHUD
+            .weightLoggerMVP
         )
     }
 
@@ -1774,6 +1803,18 @@ final class SyncIntegrationTests: XCTestCase {
         Date(timeIntervalSince1970: 1_735_000_000 + offset)
     }
 
+    private func cachedBodyMetric(id: String) async -> CachedBodyMetrics? {
+        let context = CoreDataManager.shared.viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            request.fetchLimit = 1
+
+            return try? context.fetch(request).first
+        }
+    }
+
     private func makeBodySpecSummary(
         resultId: String,
         startTime: Date,
@@ -2191,6 +2232,70 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertEqual(weight, 82.0, accuracy: 0.001)
         XCTAssertEqual(metric.weightUnit, "kg")
         XCTAssertEqual(metric.updatedAt.timeIntervalSince(updatedAt2), 0, accuracy: 0.001)
+    }
+
+    func testUpdateOrCreateBodyMetric_DoesNotOverwriteDeletedLocalTombstone() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_body_deleted_payload_\(UUID().uuidString)"
+        let date = wholeSecondDate(2_500)
+        let createdAt = date.addingTimeInterval(-300)
+        let updatedAt = date.addingTimeInterval(-120)
+
+        let metricModel = BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 81.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "local-tombstone",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+
+        try await coreData.saveBodyMetricsAndWait(metricModel, userId: userId, markAsSynced: true)
+        let didMarkDeleted = await coreData.markBodyMetricDeleted(id: id)
+        XCTAssertTrue(didMarkDeleted)
+
+        let formatter = ISO8601DateFormatter()
+        let serverDate = date.addingTimeInterval(60)
+        let payload: [String: Any] = [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: serverDate),
+            "weight": 99.0,
+            "weight_unit": "kg",
+            "notes": "server-resurrection",
+            "data_source": "manual",
+            "created_at": formatter.string(from: createdAt),
+            "updated_at": formatter.string(from: serverDate)
+        ]
+
+        coreData.updateOrCreateBodyMetric(from: payload)
+
+        let tombstoneResult = await cachedBodyMetric(id: id)
+        let tombstone = try XCTUnwrap(tombstoneResult)
+        XCTAssertTrue(tombstone.isMarkedDeleted)
+        XCTAssertFalse(tombstone.isSynced)
+        XCTAssertEqual(tombstone.syncStatus, "pending")
+        XCTAssertEqual(tombstone.notes, "local-tombstone")
+        XCTAssertEqual(tombstone.weight, 81.0, accuracy: 0.001)
+        let tombstoneDate = try XCTUnwrap(tombstone.date)
+        XCTAssertEqual(tombstoneDate.timeIntervalSince(date), 0, accuracy: 0.001)
+
+        let visibleMetrics = await coreData.fetchBodyMetrics(for: userId)
+        XCTAssertFalse(visibleMetrics.contains { $0.id == id })
+
+        let unsynced = await coreData.fetchUnsyncedEntries(for: userId)
+        XCTAssertEqual(unsynced.bodyMetrics.map(\.id), [id])
+        XCTAssertTrue(unsynced.bodyMetrics.allSatisfy(\.isMarkedDeleted))
     }
 
     func testUpdateOrCreateDailyMetric_IsIdempotentForSameId() async throws {

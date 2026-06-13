@@ -31,7 +31,9 @@ struct OnboardingOptionButton: View {
                         .foregroundStyle(Color.appText)
                         .multilineTextAlignment(.leading)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.9)
+                        .minimumScaleFactor(0.75)
+                        .allowsTightening(true)
+                        .layoutPriority(1)
 
                     if let subtitle {
                         Text(subtitle)
@@ -272,6 +274,62 @@ struct OnboardingProgressIndicator: View {
 
 // MARK: - Page Template
 
+struct OnboardingScaffold<Content: View, CTA: View>: View {
+    let showsCTA: Bool
+    let content: Content
+    let cta: CTA
+
+    init(
+        showsCTA: Bool = true,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder cta: () -> CTA
+    ) {
+        self.showsCTA = showsCTA
+        self.content = content()
+        self.cta = cta()
+    }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color.appBackground, Color.black], startPoint: .topLeading, endPoint: .bottomTrailing)
+                .ignoresSafeArea()
+
+            ScrollView {
+                content
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                    .padding(.bottom, showsCTA ? 24 : 40)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if showsCTA {
+                ctaContainer
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+    }
+
+    private var ctaContainer: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 1)
+
+            cta
+                .padding(.horizontal, 24)
+                .padding(.top, 14)
+                .padding(.bottom, 12)
+        }
+        .background(
+            Color.appBackground
+                .opacity(0.96)
+                .ignoresSafeArea(edges: .bottom)
+        )
+    }
+}
+
 struct OnboardingPageTemplate<Content: View, Footer: View>: View {
     let title: String
     let subtitle: String?
@@ -280,8 +338,7 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
     var content: Content
     var footer: Footer
     var progress: OnboardingFlowViewModel.ProgressContext?
-
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    var hasFooter: Bool
 
     init(
         title: String,
@@ -290,7 +347,7 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
         onBack: (() -> Void)? = nil,
         progress: OnboardingFlowViewModel.ProgressContext? = nil,
         @ViewBuilder content: () -> Content,
-        @ViewBuilder footer: () -> Footer = { EmptyView() }
+        @ViewBuilder footer: () -> Footer
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -299,25 +356,15 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
         self.content = content()
         self.footer = footer()
         self.progress = progress
+        self.hasFooter = true
     }
 
     var body: some View {
-        ZStack {
-            LinearGradient(colors: [Color.appBackground, Color.black], startPoint: .topLeading, endPoint: .bottomTrailing)
-                .ignoresSafeArea()
-
-            Group {
-                if dynamicTypeSize >= .accessibility1 {
-                    ScrollView {
-                        contentStack
-                    }
-                } else {
-                    contentStack
-                        .frame(maxHeight: .infinity, alignment: .top)
-                }
-            }
+        OnboardingScaffold(showsCTA: hasFooter) {
+            contentStack
+        } cta: {
+            footer
         }
-        .toolbar(.hidden, for: .navigationBar)
     }
 
     private var contentStack: some View {
@@ -325,12 +372,8 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
             header
 
             content
-
-            footer
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
-        .padding(.bottom, 40)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private var header: some View {
@@ -361,5 +404,25 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
                 OnboardingSubtitleText(text: subtitle, alignment: .leading)
             }
         }
+    }
+}
+
+extension OnboardingPageTemplate where Footer == EmptyView {
+    init(
+        title: String,
+        subtitle: String? = nil,
+        showsBackButton: Bool = true,
+        onBack: (() -> Void)? = nil,
+        progress: OnboardingFlowViewModel.ProgressContext? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.showsBackButton = showsBackButton
+        self.onBack = onBack
+        self.content = content()
+        self.footer = EmptyView()
+        self.progress = progress
+        self.hasFooter = false
     }
 }

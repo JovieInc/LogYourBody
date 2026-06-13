@@ -198,17 +198,26 @@ struct LogYourBodyApp: App {
         let usesPaywallFixture = arguments.contains("-lybUITestPaywallFixture")
         let usesFullDashboardFixture = arguments.contains("-lybUITestFullDashboardFixture")
         let usesPhotoTimelineHUDFixture = arguments.contains("-lybUITestPhotoTimelineHUDFixture")
+        let usesBodyScoreOnboardingFixture = arguments.contains("-lybUITestBodyScoreOnboardingFixture")
 
         guard usesPaidFixture || usesWeightLoggerFixture || usesPaywallFixture || usesFullDashboardFixture ||
-            usesPhotoTimelineHUDFixture else {
+            usesPhotoTimelineHUDFixture || usesBodyScoreOnboardingFixture else {
             return false
         }
 
-        let isSubscribed = usesPaidFixture || usesWeightLoggerFixture || usesFullDashboardFixture || usesPhotoTimelineHUDFixture
+        let isSubscribed = usesPaidFixture ||
+            usesWeightLoggerFixture ||
+            usesFullDashboardFixture ||
+            usesPhotoTimelineHUDFixture ||
+            usesBodyScoreOnboardingFixture
         let fixtureName: String
         let fixtureEmail: String
         let fixtureUsername: String
-        if usesPhotoTimelineHUDFixture {
+        if usesBodyScoreOnboardingFixture {
+            fixtureName = "Onboarding UI"
+            fixtureEmail = "onboarding-ui@example.com"
+            fixtureUsername = "onboarding_ui"
+        } else if usesPhotoTimelineHUDFixture {
             fixtureName = "Photo HUD UI"
             fixtureEmail = "photo-hud-ui@example.com"
             fixtureUsername = "photo_hud_ui"
@@ -230,7 +239,9 @@ struct LogYourBodyApp: App {
             fixtureUsername = "paywall_ui"
         }
         let fixtureSlug: String
-        if usesPhotoTimelineHUDFixture {
+        if usesBodyScoreOnboardingFixture {
+            fixtureSlug = "onboarding"
+        } else if usesPhotoTimelineHUDFixture {
             fixtureSlug = "photo_hud"
         } else if usesFullDashboardFixture {
             fixtureSlug = "full_dashboard"
@@ -252,14 +263,14 @@ struct LogYourBodyApp: App {
             activityLevel: "active",
             goalWeight: nil,
             goalWeightUnit: "kg",
-            onboardingCompleted: true
+            onboardingCompleted: !usesBodyScoreOnboardingFixture
         )
         authManager.currentUser = User(
             id: userId,
             email: fixtureEmail,
             name: fixtureName,
             profile: profile,
-            onboardingCompleted: true
+            onboardingCompleted: !usesBodyScoreOnboardingFixture
         )
         authManager.isAuthenticated = true
         authManager.isClerkLoaded = true
@@ -277,7 +288,7 @@ struct LogYourBodyApp: App {
             MeasurementSystem.imperial.rawValue,
             forKey: Constants.preferredMeasurementSystemKey
         )
-        OnboardingStateManager.shared.updateCompletionStatus(true)
+        OnboardingStateManager.shared.updateCompletionStatus(!usesBodyScoreOnboardingFixture)
 
         realtimeSyncManager.isOnline = false
         realtimeSyncManager.syncStatus = .offline
@@ -418,6 +429,9 @@ struct LogYourBodyApp: App {
             let photoTimelineHUDEnabled = PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
                 gateEnabled: AnalyticsService.shared.isFeatureEnabled(
                     flagKey: Constants.photoTimelineHUDFlagKey
+                ),
+                mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
+                    flagKey: Constants.mvpLoggerFallbackFlagKey
                 )
             )
             let requiresOnboarding = LaunchSurfacePolicy.requiresBodyCompositionOnboarding(

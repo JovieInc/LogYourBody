@@ -34,6 +34,7 @@ final class OnboardingFlowViewModel: ObservableObject {
         case bodyFatVisual
         case loading
         case bodyScore
+        case defaultHomeMode
         case emailCapture
         case account
         case profileDetails
@@ -94,6 +95,12 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
     @Published var canNavigateForward: Bool = false
     @Published var bodyScoreResult: BodyScoreResult?
+    @Published var defaultHomeMode: DefaultHomeMode = .default {
+        didSet {
+            UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)
+            persistProgress()
+        }
+    }
     @Published var showEmailCaptureSheet = false
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -175,6 +182,9 @@ final class OnboardingFlowViewModel: ObservableObject {
                     PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
                         gateEnabled: AnalyticsService.shared.isFeatureEnabled(
                             flagKey: Constants.photoTimelineHUDFlagKey
+                        ),
+                        mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
+                            flagKey: Constants.mvpLoggerFallbackFlagKey
                         )
                     )
             )
@@ -182,6 +192,7 @@ final class OnboardingFlowViewModel: ObservableObject {
         configureMeasurementPreference()
         hydrateHeightFields()
         hydrateWeightFields()
+        hydrateDefaultHomeMode()
 
         if let bodyFat = bodyScoreInput.bodyFat.percentage {
             bodyFatPercentageText = Self.formatNumber(bodyFat)
@@ -215,7 +226,9 @@ final class OnboardingFlowViewModel: ObservableObject {
         case .loading:
             currentStep = .bodyScore
         case .bodyScore:
-            advanceFromBodyScore()
+            currentStep = .defaultHomeMode
+        case .defaultHomeMode:
+            advanceFromDefaultHomeMode()
         case .emailCapture:
             advanceFromEmailCapture()
         case .account:
@@ -268,12 +281,14 @@ final class OnboardingFlowViewModel: ObservableObject {
             isLoading = false
             errorMessage = nil
             currentStep = .bodyFatChoice
-        case .emailCapture:
+        case .defaultHomeMode:
             currentStep = .bodyScore
+        case .emailCapture:
+            currentStep = .defaultHomeMode
         case .account:
             currentStep = hasAuthenticatedAccountEmail ? .bodyScore : .emailCapture
         case .profileDetails:
-            currentStep = hasAuthenticatedAccountEmail ? .bodyScore : .account
+            currentStep = hasAuthenticatedAccountEmail ? .defaultHomeMode : .account
         case .firstPhoto: currentStep = .profileDetails
         case .paywall: currentStep = includesFirstPhotoStep ? .firstPhoto : .profileDetails
         }
@@ -287,7 +302,9 @@ final class OnboardingFlowViewModel: ObservableObject {
         }
     }
 
-    private func advanceFromBodyScore() {
+    private func advanceFromDefaultHomeMode() {
+        UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)
+
         if entryContext == .preAuth {
             if let result = bodyScoreResult {
                 PreAuthOnboardingStore.shared.save(input: bodyScoreInput, result: result)
@@ -394,7 +411,7 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     private func shouldIncludeInProgress(_ step: Step) -> Bool {
         switch step {
-        case .hook, .basics, .height, .healthConnect, .bodyScore, .profileDetails:
+        case .hook, .basics, .height, .healthConnect, .bodyScore, .defaultHomeMode, .profileDetails:
             return true
         case .firstPhoto:
             return includesFirstPhotoStep
@@ -582,6 +599,10 @@ final class OnboardingFlowViewModel: ObservableObject {
         selectedVisualBodyFat != nil
     }
 
+    var canContinueDefaultHomeMode: Bool {
+        true
+    }
+
     private var trimmedEmailAddress: String {
         emailAddress.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -600,6 +621,10 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     func updateSex(_ sex: BiologicalSex) {
         bodyScoreInput.sex = sex
+    }
+
+    func updateDefaultHomeMode(_ mode: DefaultHomeMode) {
+        defaultHomeMode = mode
     }
 
     func updateBirthYear(_ year: Int) {
@@ -994,6 +1019,11 @@ final class OnboardingFlowViewModel: ObservableObject {
         UserDefaults.standard.set(system.weightUnit, forKey: Constants.preferredWeightUnitKey)
     }
 
+    private func hydrateDefaultHomeMode() {
+        let storedValue = UserDefaults.standard.string(forKey: Constants.defaultHomeModeKey) ?? DefaultHomeMode.default.rawValue
+        defaultHomeMode = DefaultHomeMode(storedValue: storedValue)
+    }
+
     // MARK: - Progress Persistence
 
     private func persistProgress() {
@@ -1091,6 +1121,7 @@ private extension OnboardingFlowViewModel.Step {
             .bodyFatNumeric,
             .bodyFatVisual,
             .bodyScore,
+            .defaultHomeMode,
             .emailCapture,
             .account,
             .profileDetails,
@@ -1108,6 +1139,7 @@ private extension OnboardingFlowViewModel.Step {
         case .manualWeight: return "Weight"
         case .bodyFatChoice, .bodyFatNumeric, .bodyFatVisual: return "Body Fat"
         case .bodyScore: return "Your Score"
+        case .defaultHomeMode: return "Default View"
         case .emailCapture: return "Save Progress"
         case .account: return "Account"
         case .profileDetails: return "Profile"

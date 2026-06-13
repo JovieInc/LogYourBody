@@ -78,22 +78,6 @@ struct BodyScoreHealthConnectView: View {
                             }
                         }
 
-                        Button {
-                            viewModel.startHealthKitImport()
-                        } label: {
-                            HStack {
-                                if viewModel.isRequestingHealthImport {
-                                    ProgressView()
-                                        .tint(.white)
-                                }
-                                Text(connectButtonTitle)
-                                    .font(.system(.headline, design: .rounded))
-                            }
-                        }
-                        .buttonStyle(OnboardingPrimaryButtonStyle())
-                        .disabled(viewModel.isRequestingHealthImport)
-                        .opacity(connectButtonOpacity)
-
                         if viewModel.isHealthKitConnected {
                             Button {
                                 if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -107,6 +91,25 @@ struct BodyScoreHealthConnectView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                }
+            },
+            footer: {
+                VStack(spacing: 12) {
+                    Button {
+                        viewModel.startHealthKitImport()
+                    } label: {
+                        HStack {
+                            if viewModel.isRequestingHealthImport {
+                                ProgressView()
+                                    .tint(.black)
+                            }
+                            Text(connectButtonTitle)
+                                .font(.system(.headline, design: .rounded))
+                        }
+                    }
+                    .buttonStyle(OnboardingPrimaryButtonStyle())
+                    .disabled(viewModel.isRequestingHealthImport)
+                    .opacity(connectButtonOpacity)
 
                     OnboardingTextButton(title: "Enter manually instead") {
                         viewModel.skipHealthKit()
