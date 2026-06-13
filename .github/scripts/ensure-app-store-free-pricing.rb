@@ -16,6 +16,10 @@ def fail_with(message)
   exit 1
 end
 
+def warn_with(message)
+  warn "::warning::#{message}"
+end
+
 def api_key
   path = ENV.fetch("APP_STORE_CONNECT_API_KEY_PATH", "fastlane/api_key.json")
   JSON.parse(File.read(path))
@@ -75,17 +79,33 @@ def expect(method, path, token, body: nil, expected: [200])
   fail_with("App Store Connect #{method.upcase} #{path} returned #{status}: #{JSON.pretty_generate(parsed)}")
 end
 
-def app_id(token)
-  configured = ENV["APP_STORE_APP_ID"].to_s.strip
-  return configured unless configured.empty?
-
+def app_by_bundle_id(token)
   bundle_id = ENV.fetch("APP_IDENTIFIER", "com.logyourbody.app")
   query = URI.encode_www_form("filter[bundleId]" => bundle_id, "limit" => "1")
   response = expect(:get, "/v1/apps?#{query}", token)
   app = response.fetch("data", []).first
   fail_with("No App Store Connect app found for bundle ID #{bundle_id}") unless app
 
-  app.fetch("id")
+  [app.fetch("id"), bundle_id]
+end
+
+def app_id(token)
+  configured = ENV["APP_STORE_APP_ID"].to_s.strip
+  unless configured.empty?
+    query = URI.encode_www_form("fields[apps]" => "bundleId")
+    status, parsed = request(:get, "/v1/apps/#{configured}?#{query}", token)
+    return configured if status == 200
+
+    unless status == 404
+      fail_with("App Store Connect GET /v1/apps/#{configured} returned #{status}: #{JSON.pretty_generate(parsed)}")
+    end
+
+    resolved_id, bundle_id = app_by_bundle_id(token)
+    warn_with("Configured APP_STORE_APP_ID #{configured} was not found in App Store Connect; using app #{resolved_id} resolved from bundle ID #{bundle_id}.")
+    return resolved_id
+  end
+
+  app_by_bundle_id(token).first
 end
 
 def pricing_configured?(token, app_id)
