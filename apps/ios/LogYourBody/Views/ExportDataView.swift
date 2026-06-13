@@ -11,7 +11,6 @@ struct ExportDataView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.openURL) private var openURL
     @State private var isExporting = false
-    @State private var exportProgress: Double = 0
     @State private var showShareSheet = false
     @State private var exportedFileURL: URL?
     @State private var showError = false
@@ -48,63 +47,137 @@ struct ExportDataView: View {
         }
     }
 
+    private var isDirectDownloadSupported: Bool {
+        exportMethod != .download || (selectedFormats == [.json] && !includePhotos)
+    }
+
+    private var isExportDisabled: Bool {
+        isExporting || (exportMethod == .download && (selectedFormats.isEmpty || !isDirectDownloadSupported))
+    }
+
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color.appBackground
-                    .ignoresSafeArea()
+        ZStack {
+            Color.appBackground
+                .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        VStack(spacing: 16) {
-                            Image(systemName: "square.and.arrow.up.on.square")
-                                .font(.system(size: 50))
-                                .foregroundColor(.appPrimary)
-                                .symbolRenderingMode(.hierarchical)
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 16) {
+                        Image(systemName: "square.and.arrow.up.on.square")
+                            .font(.system(size: 50))
+                            .foregroundColor(.appPrimary)
+                            .symbolRenderingMode(.hierarchical)
 
-                            Text("Export Your Data")
-                                .font(.title2)
-                                .fontWeight(.bold)
+                        Text("Export Your Data")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.appText)
+
+                        Text("Download all your LogYourBody data for your records or to transfer to another service")
+                            .font(.body)
+                            .foregroundColor(.appTextSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    .padding(.top, 20)
+
+                    // Export Options
+                    VStack(spacing: 16) {
+                        // Export Method Selection
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Export Method")
+                                .font(.headline)
                                 .foregroundColor(.appText)
-
-                            Text("Download all your LogYourBody data for your records or to transfer to another service")
-                                .font(.body)
-                                .foregroundColor(.appTextSecondary)
-                                .multilineTextAlignment(.center)
                                 .padding(.horizontal)
-                        }
-                        .padding(.top, 20)
 
-                        // Export Options
-                        VStack(spacing: 16) {
-                            // Export Method Selection
+                            VStack(spacing: 0) {
+                                ForEach(ExportMethod.allCases, id: \.self) { method in
+                                    Button(
+                                        action: {
+                                            exportMethod = method
+                                        },
+                                        label: {
+                                            HStack {
+                                                Image(systemName: exportMethod == method ? "checkmark.circle.fill" : "circle")
+                                                    .font(.system(size: 20))
+                                                    .foregroundColor(exportMethod == method ? .appPrimary : .appBorder)
+
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text(method.rawValue)
+                                                        .font(.body)
+                                                        .foregroundColor(.appText)
+
+                                                    Text(method.description)
+                                                        .font(.caption)
+                                                        .foregroundColor(.appTextSecondary)
+                                                }
+
+                                                Spacer()
+                                            }
+                                            .padding()
+                                            .background(Color.appCard)
+                                        }
+                                    )
+                                    .buttonStyle(PlainButtonStyle())
+
+                                    if method != ExportMethod.allCases.last {
+                                        Divider()
+                                            .background(Color.appBorder)
+                                    }
+                                }
+                            }
+                            .background(Color.appCard)
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                        }
+
+                        // Format Selection (only for direct download)
+                        if exportMethod == .download {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Export Method")
+                                Text("Export Format")
                                     .font(.headline)
                                     .foregroundColor(.appText)
                                     .padding(.horizontal)
 
                                 VStack(spacing: 0) {
-                                    ForEach(ExportMethod.allCases, id: \.self) { method in
+                                    ForEach(ExportFormat.allCases, id: \.self) { format in
                                         Button(
                                             action: {
-                                                exportMethod = method
+                                                guard format == .json else { return }
+
+                                                if selectedFormats.contains(format) {
+                                                    selectedFormats.remove(format)
+                                                } else {
+                                                    selectedFormats = [format]
+                                                }
                                             },
                                             label: {
                                                 HStack {
-                                                    Image(systemName: exportMethod == method ? "checkmark.circle.fill" : "circle")
-                                                        .font(.system(size: 20))
-                                                        .foregroundColor(exportMethod == method ? .appPrimary : .appBorder)
+                                                    Image(
+                                                        systemName: selectedFormats.contains(format)
+                                                            ? "checkmark.square.fill"
+                                                            : "square"
+                                                    )
+                                                    .font(.system(size: 20))
+                                                    .foregroundColor(
+                                                        selectedFormats.contains(format)
+                                                            ? .appPrimary
+                                                            : .appBorder
+                                                    )
 
                                                     VStack(alignment: .leading, spacing: 4) {
-                                                        Text(method.rawValue)
+                                                        Text(format.rawValue)
                                                             .font(.body)
-                                                            .foregroundColor(.appText)
+                                                            .foregroundColor(format == .json ? .appText : .appTextSecondary)
 
-                                                        Text(method.description)
-                                                            .font(.caption)
-                                                            .foregroundColor(.appTextSecondary)
+                                                        Text(
+                                                            format == .json
+                                                                ? "Complete data with all fields"
+                                                                : "Use the email request option for CSV export"
+                                                        )
+                                                        .font(.caption)
+                                                        .foregroundColor(.appTextSecondary)
                                                     }
 
                                                     Spacer()
@@ -114,8 +187,10 @@ struct ExportDataView: View {
                                             }
                                         )
                                         .buttonStyle(PlainButtonStyle())
+                                        .disabled(format != .json)
+                                        .opacity(format == .json ? 1 : 0.6)
 
-                                        if method != ExportMethod.allCases.last {
+                                        if format != ExportFormat.allCases.last {
                                             Divider()
                                                 .background(Color.appBorder)
                                         }
@@ -125,245 +200,188 @@ struct ExportDataView: View {
                                 .cornerRadius(12)
                                 .padding(.horizontal)
                             }
+                        }
 
-                            // Format Selection (only for direct download)
-                            if exportMethod == .download {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("Export Format")
-                                        .font(.headline)
-                                        .foregroundColor(.appText)
-                                        .padding(.horizontal)
+                        // Include Photos Option (only for direct download)
+                        if exportMethod == .download {
+                            Button(
+                                action: {
+                                    includePhotos = false
+                                },
+                                label: {
+                                    HStack {
+                                        Image(systemName: includePhotos ? "checkmark.square.fill" : "square")
+                                            .font(.system(size: 20))
+                                            .foregroundColor(includePhotos ? .appPrimary : .appBorder)
 
-                                    VStack(spacing: 0) {
-                                        ForEach(ExportFormat.allCases, id: \.self) { format in
-                                            Button(
-                                                action: {
-                                                    if selectedFormats.contains(format) {
-                                                        selectedFormats.remove(format)
-                                                    } else {
-                                                        selectedFormats.insert(format)
-                                                    }
-                                                },
-                                                label: {
-                                                    HStack {
-                                                        Image(
-                                                            systemName: selectedFormats.contains(format)
-                                                                ? "checkmark.square.fill"
-                                                                : "square"
-                                                        )
-                                                        .font(.system(size: 20))
-                                                        .foregroundColor(
-                                                            selectedFormats.contains(format)
-                                                                ? .appPrimary
-                                                                : .appBorder
-                                                        )
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Include Progress Photos")
+                                                .font(.body)
+                                                .foregroundColor(.appTextSecondary)
 
-                                                        VStack(alignment: .leading, spacing: 4) {
-                                                            Text(format.rawValue)
-                                                                .font(.body)
-                                                                .foregroundColor(.appText)
-
-                                                            Text(
-                                                                format == .json
-                                                                    ? "Complete data with all fields"
-                                                                    : "Spreadsheet-compatible format"
-                                                            )
-                                                            .font(.caption)
-                                                            .foregroundColor(.appTextSecondary)
-                                                        }
-
-                                                        Spacer()
-                                                    }
-                                                    .padding()
-                                                    .background(Color.appCard)
-                                                }
-                                            )
-                                            .buttonStyle(PlainButtonStyle())
-
-                                            if format != ExportFormat.allCases.last {
-                                                Divider()
-                                                    .background(Color.appBorder)
-                                            }
+                                            Text("Use the email request option for progress photos")
+                                                .font(.caption)
+                                                .foregroundColor(.appTextSecondary)
                                         }
+
+                                        Spacer()
                                     }
+                                    .padding()
                                     .background(Color.appCard)
                                     .cornerRadius(12)
-                                    .padding(.horizontal)
                                 }
-                            }
-
-                            // Include Photos Option (only for direct download)
-                            if exportMethod == .download {
-                                Button(
-                                    action: {
-                                        includePhotos.toggle()
-                                    },
-                                    label: {
-                                        HStack {
-                                            Image(systemName: includePhotos ? "checkmark.square.fill" : "square")
-                                                .font(.system(size: 20))
-                                                .foregroundColor(includePhotos ? .appPrimary : .appBorder)
-
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text("Include Progress Photos")
-                                                    .font(.body)
-                                                    .foregroundColor(.appText)
-
-                                                Text("Export will include all your progress photos")
-                                                    .font(.caption)
-                                                    .foregroundColor(.appTextSecondary)
-                                            }
-
-                                            Spacer()
-                                        }
-                                        .padding()
-                                        .background(Color.appCard)
-                                        .cornerRadius(12)
-                                    }
-                                )
-                                .buttonStyle(PlainButtonStyle())
-                                .padding(.horizontal)
-                            }
-                        }
-
-                        // Data Included Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Data Included")
-                                .font(.headline)
-                                .foregroundColor(.appText)
-                                .padding(.horizontal)
-
-                            VStack(alignment: .leading, spacing: 8) {
-                                DataTypeRow(
-                                    icon: "person.fill",
-                                    title: "Profile Information",
-                                    description: "Name, email, date of birth, height"
-                                )
-                                DataTypeRow(
-                                    icon: "scalemass",
-                                    title: "Body Metrics",
-                                    description: "Weight, body fat %, measurements"
-                                )
-                                DataTypeRow(
-                                    icon: "chart.line.uptrend.xyaxis",
-                                    title: "Progress History",
-                                    description: "All historical data points"
-                                )
-                                DataTypeRow(
-                                    icon: "calendar",
-                                    title: "Daily Logs",
-                                    description: "Activity, notes, and check-ins"
-                                )
-                                if exportMethod == .download && includePhotos {
-                                    DataTypeRow(
-                                        icon: "photo",
-                                        title: "Progress Photos",
-                                        description: "All uploaded photos"
-                                    )
-                                }
-                            }
-                            .padding()
-                            .background(Color.appCard)
-                            .cornerRadius(12)
+                            )
+                            .buttonStyle(PlainButtonStyle())
+                            .disabled(true)
+                            .opacity(0.6)
                             .padding(.horizontal)
                         }
+                    }
 
-                        // Export Button
-                        Button(action: exportData) {
-                            HStack {
-                                if isExporting {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "square.and.arrow.up")
-                                    Text("Export Data")
-                                        .fontWeight(.semibold)
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(exportMethod == .download && selectedFormats.isEmpty ? Color.appBorder : Color.white)
-                            .foregroundColor(exportMethod == .download && selectedFormats.isEmpty ? .appTextTertiary : .black)
-                            .cornerRadius(25)
-                        }
-                        .disabled((exportMethod == .download && selectedFormats.isEmpty) || isExporting)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
+                    // Data Included Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Data Included")
+                            .font(.headline)
+                            .foregroundColor(.appText)
+                            .padding(.horizontal)
 
-                        // Privacy Note
-                        VStack(spacing: 8) {
-                            Text(
-                                exportMethod == .email
-                                    ? "A secure download link will be sent to your registered email address. "
-                                    + "The link will expire after 24 hours."
-                                    : "Your data export will be prepared and saved to your device. You can then "
-                                    + "share it or save it to your preferred location."
+                        VStack(alignment: .leading, spacing: 8) {
+                            DataTypeRow(
+                                icon: "person.fill",
+                                title: "Profile Information",
+                                description: "Name, email, date of birth, height"
                             )
+                            DataTypeRow(
+                                icon: "scalemass",
+                                title: "Body Metrics",
+                                description: "Weight, body fat %, measurements"
+                            )
+                            DataTypeRow(
+                                icon: "chart.line.uptrend.xyaxis",
+                                title: "Progress History",
+                                description: "All historical data points"
+                            )
+                            DataTypeRow(
+                                icon: "calendar",
+                                title: "Daily Logs",
+                                description: "Activity, notes, and check-ins"
+                            )
+                            if exportMethod == .download && includePhotos {
+                                DataTypeRow(
+                                    icon: "photo",
+                                    title: "Progress Photos",
+                                    description: "All uploaded photos"
+                                )
+                            }
+                        }
+                        .padding()
+                        .background(Color.appCard)
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                    }
+
+                    // Export Button
+                    Button(action: exportData) {
+                        HStack {
+                            if isExporting {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "square.and.arrow.up")
+                                Text("Export Data")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(isExportDisabled ? Color.appBorder : Color.white)
+                        .foregroundColor(isExportDisabled ? .appTextTertiary : .black)
+                        .cornerRadius(25)
+                    }
+                    .disabled(isExportDisabled)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+
+                    if exportMethod == .download {
+                        Text(
+                            "Direct download currently exports one JSON file. "
+                            + "Use the email request link for CSV or progress photos."
+                        )
                             .font(.caption)
                             .foregroundColor(.appTextSecondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 40)
+                    }
 
-                            Button(action: requestExportViaEmail) {
-                                Text("Or email support to request a data export")
-                                    .font(.caption)
-                                    .foregroundColor(.appPrimary)
-                                    .underline()
-                            }
+                    // Privacy Note
+                    VStack(spacing: 8) {
+                        Text(
+                            exportMethod == .email
+                                ? "A secure download link will be sent to your registered email address. "
+                                + "The link will expire after 24 hours."
+                                : "Your data export will be prepared and saved to your device. You can then "
+                                + "share it or save it to your preferred location."
+                        )
+                        .font(.caption)
+                        .foregroundColor(.appTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+
+                        Button(action: requestExportViaEmail) {
+                            Text("Or email support to request a data export")
+                                .font(.caption)
+                                .foregroundColor(.appPrimary)
+                                .underline()
                         }
-                        .padding(.bottom, 20)
                     }
-                }
-
-                if isExporting {
-                    Color.black.opacity(0.5)
-                        .ignoresSafeArea()
-
-                    VStack(spacing: 20) {
-                        ProgressView(value: exportProgress)
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .scaleEffect(1.5)
-
-                        Text("Preparing your data...")
-                            .font(.headline)
-                            .foregroundColor(.white)
-
-                        Text("\(Int(exportProgress * 100))%")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-                    .padding(40)
-                    .background(Color.appCard)
-                    .cornerRadius(20)
+                    .padding(.bottom, 20)
                 }
             }
-            .navigationTitle("Export Data")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+
+            if isExporting {
+                Color.black.opacity(0.5)
+                    .ignoresSafeArea()
+
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+
+                    Text("Preparing your data...")
+                        .font(.headline)
+                        .foregroundColor(.white)
                 }
+                .padding(40)
+                .background(Color.appCard)
+                .cornerRadius(20)
             }
-            .alert("Export Error", isPresented: $showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage)
-            }
-            .alert("Export Successful", isPresented: $showSuccess) {
-                Button("OK", role: .cancel) {
+        }
+        .navigationTitle("Export Data")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
                     dismiss()
                 }
-            } message: {
-                Text(successMessage)
             }
-            .sheet(isPresented: $showShareSheet) {
-                if let url = exportedFileURL {
-                    ShareSheet(items: [url])
-                        .ignoresSafeArea()
-                }
+        }
+        .alert("Export Error", isPresented: $showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage)
+        }
+        .alert("Export Successful", isPresented: $showSuccess) {
+            Button("OK", role: .cancel) {
+                dismiss()
+            }
+        } message: {
+            Text(successMessage)
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let url = exportedFileURL {
+                ShareSheet(items: [url])
+                    .ignoresSafeArea()
             }
         }
     }
@@ -403,7 +421,6 @@ struct ExportDataView: View {
     @MainActor
     private func performExport() async {
         isExporting = true
-        exportProgress = 0
 
         if exportMethod == .email {
             // Use edge function for email export
@@ -421,9 +438,6 @@ struct ExportDataView: View {
                 throw ExportError.exportFailed("Authentication failed")
             }
 
-            // Progress: 50%
-            exportProgress = 0.5
-
             // Call edge function
             let url = URL(string: "\(Constants.supabaseURL)/functions/v1/export-user-data")!
             var request = URLRequest(url: url)
@@ -440,9 +454,6 @@ struct ExportDataView: View {
                   httpResponse.statusCode == 200 else {
                 throw ExportError.exportFailed("Server error")
             }
-
-            // Progress: 100%
-            exportProgress = 1.0
 
             // Parse response
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -467,20 +478,18 @@ struct ExportDataView: View {
     @MainActor
     private func performLocalExport() async {
         do {
+            guard isDirectDownloadSupported else {
+                throw ExportError.unsupportedDirectDownload
+            }
+
             // Get all user data
             guard let user = authManager.currentUser else {
                 throw ExportError.noUserData
             }
 
-            // Progress: 10%
-            exportProgress = 0.1
-
             // Fetch all data from Core Data
             let bodyMetrics = await CoreDataManager.shared.fetchAllBodyMetrics(for: user.id)
             let dailyLogs = await CoreDataManager.shared.fetchAllDailyLogs(for: user.id)
-
-            // Progress: 30%
-            exportProgress = 0.3
 
             // Create export data structure
             let exportData = ExportData(
@@ -490,9 +499,6 @@ struct ExportDataView: View {
                 dailyLogs: dailyLogs,
                 photoURLs: includePhotos ? extractPhotoURLs(from: bodyMetrics) : []
             )
-
-            // Progress: 50%
-            exportProgress = 0.5
 
             // Create temporary directory
             let tempDir = FileManager.default.temporaryDirectory
@@ -511,9 +517,6 @@ struct ExportDataView: View {
                     let csvURLs = try exportAsCSV(exportData, to: exportDir)
                     exportedFiles.append(contentsOf: csvURLs)
                 }
-
-                // Update progress
-                exportProgress = min(0.8, exportProgress + 0.2)
             }
 
             // Download photos if requested
@@ -529,19 +532,9 @@ struct ExportDataView: View {
                 exportedFiles.append(manifestURL)
             }
 
-            // Progress: 90%
-            exportProgress = 0.9
-
-            // Create zip file if multiple files
-            let finalExportURL: URL
-            if exportedFiles.count > 1 {
-                finalExportURL = try createZipArchive(from: exportDir, files: exportedFiles)
-            } else {
-                finalExportURL = exportedFiles.first!
+            guard exportedFiles.count == 1, let finalExportURL = exportedFiles.first else {
+                throw ExportError.unsupportedDirectDownload
             }
-
-            // Progress: 100%
-            exportProgress = 1.0
 
             // Show share sheet
             exportedFileURL = finalExportURL
@@ -655,15 +648,6 @@ struct ExportDataView: View {
         return csv
     }
 
-    private func createZipArchive(from directory: URL, files: [URL]) throws -> URL {
-        let zipFileName = "LogYourBody_Export_\(formatDate(Date())).zip"
-        let _zipURL = FileManager.default.temporaryDirectory.appendingPathComponent(zipFileName)
-
-        // Note: In a real implementation, you would use a zip library here
-        // For now, we'll just return the first file
-        return files.first!
-    }
-
     private func extractPhotoURLs(from metrics: [BodyMetrics]) -> [String] {
         return metrics.compactMap { $0.photoUrl }
     }
@@ -688,6 +672,7 @@ struct ExportData: Codable {
 enum ExportError: LocalizedError {
     case noUserData
     case exportFailed(String)
+    case unsupportedDirectDownload
 
     var errorDescription: String? {
         switch self {
@@ -695,6 +680,8 @@ enum ExportError: LocalizedError {
             return "No user data found to export"
         case .exportFailed(let reason):
             return "Export failed: \(reason)"
+        case .unsupportedDirectDownload:
+            return "Direct download currently supports one JSON file. Use the email request link for CSV or progress photos."
         }
     }
 }

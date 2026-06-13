@@ -7,6 +7,7 @@ import UIKit
 
 protocol Theme {
     var colors: ColorTheme { get }
+    var materials: MaterialTheme { get }
     var typography: TypographyTheme { get }
     var spacing: SpacingTheme { get }
     var radius: RadiusTheme { get }
@@ -34,6 +35,13 @@ struct ColorTheme {
     let primaryMuted: Color
     let primarySubtle: Color
 
+    // Accents
+    let accentViolet: Color
+    let accentPink: Color
+    let accentTeal: Color
+    let accentOrange: Color
+    let accentGreen: Color
+
     // Text
     let text: Color
     let textSecondary: Color
@@ -56,6 +64,14 @@ struct ColorTheme {
     let interactiveHover: Color
     let interactivePressed: Color
     let interactiveDisabled: Color
+}
+
+// MARK: - Material Theme
+
+struct MaterialTheme {
+    let glassUltraThin: Material = .ultraThin
+    let glassThin: Material = .thin
+    let glassRegular: Material = .regular
 }
 
 // MARK: - Typography Theme
@@ -116,35 +132,38 @@ struct SpacingTheme {
 
 struct RadiusTheme {
     let none: CGFloat = 0
-    let xs: CGFloat = 4
-    let sm: CGFloat = 6
-    let md: CGFloat = 8
-    let lg: CGFloat = 12
-    let xl: CGFloat = 16
-    let xxl: CGFloat = 24
-    let full: CGFloat = 9_999
+    let xs: CGFloat = 2
+    let sm: CGFloat = 4
+    let md: CGFloat = 10
+    let lg: CGFloat = 14
+    let xl: CGFloat = 48
+    let xxl: CGFloat = 48
+    let full: CGFloat = 48
 
     // Semantic radius
-    let button: CGFloat = 12
-    let card: CGFloat = 12
-    let input: CGFloat = 8
-    let chip: CGFloat = 16
-    let avatar: CGFloat = 9_999
+    let button: CGFloat = 48
+    let card: CGFloat = 14
+    let input: CGFloat = 10
+    let chip: CGFloat = 48
+    let avatar: CGFloat = 48
 }
 
 // MARK: - Animation Theme
 
 struct AnimationTheme {
-    let ultraFast: Animation = .easeInOut(duration: 0.1)
-    let fast: Animation = .easeInOut(duration: 0.2)
-    let medium: Animation = .easeInOut(duration: 0.3)
-    let slow: Animation = .easeInOut(duration: 0.5)
+    let subtle: Animation = .easeInOut(duration: 0.15)
+    let cinematic: Animation = .easeInOut(duration: 0.42)
 
-    let spring: Animation = .spring(response: 0.4, dampingFraction: 0.8)
-    let springBouncy: Animation = .spring(response: 0.5, dampingFraction: 0.7)
-    let springSmooth: Animation = .spring(response: 0.6, dampingFraction: 0.9)
+    let ultraFast: Animation = .easeInOut(duration: 0.15)
+    let fast: Animation = .easeInOut(duration: 0.15)
+    let medium: Animation = .easeInOut(duration: 0.42)
+    let slow: Animation = .easeInOut(duration: 0.42)
 
-    let interactive: Animation = .spring(response: 0.3, dampingFraction: 0.8)
+    let spring: Animation = .spring(response: 0.42, dampingFraction: 0.8)
+    let springBouncy: Animation = .spring(response: 0.42, dampingFraction: 0.7)
+    let springSmooth: Animation = .spring(response: 0.42, dampingFraction: 0.9)
+
+    let interactive: Animation = .easeInOut(duration: 0.15)
 }
 
 // MARK: - Haptics Theme
@@ -174,19 +193,26 @@ struct HapticsTheme {
 struct DefaultTheme: Theme {
     let colors = ColorTheme(
         // Background
-        background: Color(hex: "#111111"),
-        backgroundSecondary: Color(hex: "#0A0A0A"),
-        backgroundTertiary: Color(hex: "#050505"),
+        background: Color(hex: "#000000"),
+        backgroundSecondary: Color(hex: "#0b0b0b"),
+        backgroundTertiary: Color(hex: "#111111"),
 
         // Surface
-        surface: Color(hex: "#1A1A1A"),
-        surfaceSecondary: Color(hex: "#222222"),
-        surfaceTertiary: Color(hex: "#2A2A2A"),
+        surface: Color(hex: "#0b0b0b"),
+        surfaceSecondary: Color(hex: "#141414"),
+        surfaceTertiary: Color(hex: "#1f1f1f"),
 
         // Primary
-        primary: Color(hex: "#5B63D3"),
-        primaryMuted: Color(hex: "#5B63D3").opacity(0.8),
-        primarySubtle: Color(hex: "#5B63D3").opacity(0.3),
+        primary: Color(hex: "#2563FF"),
+        primaryMuted: Color(hex: "#2563FF").opacity(0.8),
+        primarySubtle: Color(hex: "#2563FF").opacity(0.3),
+
+        // Accents
+        accentViolet: Color(hex: "#8b1eff"),
+        accentPink: Color(hex: "#d61a7f"),
+        accentTeal: Color(hex: "#0f9b8e"),
+        accentOrange: Color(hex: "#ff9800"),
+        accentGreen: Color(hex: "#2f9e44"),
 
         // Text
         text: Color(hex: "#F7F8F8"),
@@ -195,23 +221,24 @@ struct DefaultTheme: Theme {
         textQuaternary: Color(hex: "#4A4D52"),
 
         // Borders
-        border: Color(hex: "#2A2A2A"),
-        borderSecondary: Color(hex: "#222222"),
-        borderFocused: Color(hex: "#5B63D3"),
+        border: Color(hex: "#1f1f1f"),
+        borderSecondary: Color(hex: "#141414"),
+        borderFocused: Color(hex: "#2563FF"),
 
         // States
-        success: Color(hex: "#4CAF50"),
-        warning: Color(hex: "#FF9800"),
-        error: Color(hex: "#F44336"),
-        info: Color(hex: "#2196F3"),
+        success: Color(hex: "#2F9E44"),
+        warning: Color(hex: "#ff9800"),
+        error: Color(hex: "#F3122D"),
+        info: Color(hex: "#2563FF"),
 
         // Interactive
-        interactive: Color(hex: "#5B63D3"),
-        interactiveHover: Color(hex: "#6B73E3"),
-        interactivePressed: Color(hex: "#4B53C3"),
-        interactiveDisabled: Color(hex: "#5B63D3").opacity(0.4)
+        interactive: Color(hex: "#2563FF"),
+        interactiveHover: Color(hex: "#3b74ff"),
+        interactivePressed: Color(hex: "#1d4ed8"),
+        interactiveDisabled: Color(hex: "#2563FF").opacity(0.4)
     )
 
+    let materials = MaterialTheme()
     let typography = TypographyTheme(
         // Display
         displayLarge: .system(size: 48, weight: .bold, design: .rounded),

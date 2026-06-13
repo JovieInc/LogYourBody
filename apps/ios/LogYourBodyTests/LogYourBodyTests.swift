@@ -581,6 +581,82 @@ final class PaidWeightLoggerMVPPolicyTests: XCTestCase {
     }
 }
 
+final class ValidationServiceTests: XCTestCase {
+    func testWeightBoundariesAreInclusiveForPoundsAndKilograms() throws {
+        let service = ValidationService.shared
+
+        XCTAssertEqual(try service.validateWeight("44", unit: "lbs"), 44)
+        XCTAssertEqual(try service.validateWeight("1100", unit: "lbs"), 1_100)
+        XCTAssertEqual(try service.validateWeight("20", unit: "kg"), 20)
+        XCTAssertEqual(try service.validateWeight("500", unit: "kg"), 500)
+
+        assertValidationError(
+            try service.validateWeight("43.9", unit: "lbs"),
+            expectedMessage: "Weight must be between 44-1100 lbs"
+        )
+        assertValidationError(
+            try service.validateWeight("1100.1", unit: "lbs"),
+            expectedMessage: "Weight must be between 44-1100 lbs"
+        )
+        assertValidationError(
+            try service.validateWeight("19.9", unit: "kg"),
+            expectedMessage: "Weight must be between 20-500 kg"
+        )
+        assertValidationError(
+            try service.validateWeight("500.1", unit: "kg"),
+            expectedMessage: "Weight must be between 20-500 kg"
+        )
+    }
+
+    func testBodyFatBoundariesAreInclusive() throws {
+        let service = ValidationService.shared
+
+        XCTAssertEqual(try service.validateBodyFat("3"), 3)
+        XCTAssertEqual(try service.validateBodyFat("50"), 50)
+
+        assertValidationError(
+            try service.validateBodyFat("2.9"),
+            expectedMessage: "Body fat must be between 3-50%"
+        )
+        assertValidationError(
+            try service.validateBodyFat("50.1"),
+            expectedMessage: "Body fat must be between 3-50%"
+        )
+    }
+
+    func testRejectsBadNumericStrings() {
+        let service = ValidationService.shared
+
+        assertValidationError(
+            try service.validateWeight("abc", unit: "lbs"),
+            expectedMessage: "Please enter a valid number"
+        )
+        assertValidationError(
+            try service.validateWeight("1..2", unit: "kg"),
+            expectedMessage: "Please enter a valid number"
+        )
+        assertValidationError(
+            try service.validateBodyFat("not a percentage"),
+            expectedMessage: "Please enter a valid percentage"
+        )
+        assertValidationError(
+            try service.validateBodyFat("5..0"),
+            expectedMessage: "Please enter a valid percentage"
+        )
+    }
+
+    private func assertValidationError<T>(
+        _ expression: @autoclosure () throws -> T,
+        expectedMessage: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertThrowsError(try expression(), file: file, line: line) { error in
+            XCTAssertEqual((error as? ValidationError)?.errorDescription, expectedMessage, file: file, line: line)
+        }
+    }
+}
+
 final class LogWeightFormValidatorTests: XCTestCase {
     func testRejectsOutOfRangeWeightValues() {
         let zeroPounds = LogWeightFormValidator.validate(weight: "0", bodyFat: "", unit: "lbs")
@@ -622,6 +698,48 @@ final class LogWeightFormValidatorTests: XCTestCase {
 
         XCTAssertFalse(validation.isValid)
         XCTAssertEqual(validation.formError, "Please enter at least one measurement")
+    }
+
+    func testRoutesFieldAndSubmitValidationThroughValidationService() throws {
+        let expectedWeight = try ValidationService.shared.validateWeight("175.04", unit: "lbs")
+        let expectedBodyFat = try ValidationService.shared.validateBodyFat("18.04")
+
+        let validation = LogWeightFormValidator.validate(weight: "175.04", bodyFat: "18.04", unit: "lbs")
+
+        XCTAssertTrue(validation.isValid)
+        XCTAssertEqual(validation.weightValue, expectedWeight)
+        XCTAssertEqual(validation.bodyFatValue, expectedBodyFat)
+        XCTAssertNil(validation.weightError)
+        XCTAssertNil(validation.bodyFatError)
+
+        let expectedKgError = validationErrorDescription {
+            _ = try ValidationService.shared.validateWeight("500.1", unit: "kg")
+        }
+        let expectedBodyFatError = validationErrorDescription {
+            _ = try ValidationService.shared.validateBodyFat("50.1")
+        }
+
+        XCTAssertEqual(
+            LogWeightFormValidator.fieldError(for: "500.1", field: .weight, unit: "kg"),
+            expectedKgError
+        )
+        XCTAssertEqual(
+            LogWeightFormValidator.fieldError(for: "50.1", field: .bodyFat, unit: "kg"),
+            expectedBodyFatError
+        )
+    }
+
+    private func validationErrorDescription(_ expression: () throws -> Void) -> String? {
+        do {
+            try expression()
+            XCTFail("Expected validation to fail")
+            return nil
+        } catch let error as ValidationError {
+            return error.errorDescription
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+            return nil
+        }
     }
 }
 
@@ -852,6 +970,34 @@ final class BodyMetricLocalDateContractTests: XCTestCase {
         XCTAssertEqual(BodyMetricLocalDate.key(for: losAngelesLateNight, calendar: newYork), "2026-06-10")
     }
 
+    func testLocalDateCaptures2358AcrossUtcOffsetRange() throws {
+        for offsetHours in -12...14 {
+            let calendar = try makeCalendar(secondsFromGMT: offsetHours * 3_600)
+            let lateNight = try makeDate(
+                year: 2_026,
+                month: 6,
+                day: 9,
+                hour: 23,
+                minute: 58,
+                calendar: calendar
+            )
+            let label = offsetHours >= 0 ? "UTC+\(offsetHours)" : "UTC\(offsetHours)"
+
+            XCTAssertEqual(
+                BodyMetricLocalDate.key(for: lateNight, calendar: calendar),
+                "2026-06-09",
+                "\(label) should keep the user's 23:58 local calendar day"
+            )
+
+            let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: lateNight)
+            XCTAssertEqual(components.year, 2_026, label)
+            XCTAssertEqual(components.month, 6, label)
+            XCTAssertEqual(components.day, 9, label)
+            XCTAssertEqual(components.hour, 23, label)
+            XCTAssertEqual(components.minute, 58, label)
+        }
+    }
+
     func testStartOfDayUsesStoredLocalDateAfterTimezoneChange() throws {
         let tokyo = try makeCalendar(timeZoneIdentifier: "Asia/Tokyo")
         let startOfDay = try XCTUnwrap(BodyMetricLocalDate.startOfDay(for: "2026-06-09", calendar: tokyo))
@@ -954,6 +1100,12 @@ final class BodyMetricLocalDateContractTests: XCTestCase {
     private func makeCalendar(timeZoneIdentifier: String) throws -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: timeZoneIdentifier))
+        return calendar
+    }
+
+    private func makeCalendar(secondsFromGMT: Int) throws -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: secondsFromGMT))
         return calendar
     }
 
@@ -2621,9 +2773,11 @@ final class SyncIntegrationTests: XCTestCase {
         let id = UUID().uuidString
         let userId = "sync_test_user_dexa_realtime_\(UUID().uuidString)"
         let bodyMetricsId = UUID().uuidString
-        let now = Date()
+        let now = Date(timeIntervalSince1970: 1_780_000_000)
         let createdAt = now.addingTimeInterval(-120)
         let updatedAt = now
+        let acquireTime = now.addingTimeInterval(-3_600)
+        let analyzeTime = now.addingTimeInterval(-1_800)
 
         let context = coreData.viewContext
         await context.perform {
@@ -2637,8 +2791,8 @@ final class SyncIntegrationTests: XCTestCase {
             result.scannerModel = "TestScanner"
             result.locationId = "loc-123"
             result.locationName = "Test Location"
-            result.acquireTime = now.addingTimeInterval(-3_600)
-            result.analyzeTime = now.addingTimeInterval(-1_800)
+            result.acquireTime = acquireTime
+            result.analyzeTime = analyzeTime
             result.vatMassKg = 1.23
             result.vatVolumeCm3 = 456.0
             result.resultPdfUrl = "https://example.com/result.pdf"
@@ -2688,13 +2842,12 @@ final class SyncIntegrationTests: XCTestCase {
             XCTFail("Expected vat_volume_cm3 in payload")
         }
 
-        if let acquireTimeString = payload["acquire_time"] as? String {
-            let formatter = ISO8601DateFormatter()
-            let parsed = formatter.date(from: acquireTimeString)
-            XCTAssertNotNil(parsed)
-        } else {
-            XCTFail("Expected acquire_time field in payload")
-        }
+        let formatter = ISO8601DateFormatter()
+        let acquireTimeString = try XCTUnwrap(payload["acquire_time"] as? String)
+        XCTAssertTrue(acquireTimeString.hasSuffix("Z"))
+        XCTAssertEqual(acquireTimeString, formatter.string(from: acquireTime))
+        let parsedAcquireTime = try XCTUnwrap(formatter.date(from: acquireTimeString))
+        XCTAssertEqual(parsedAcquireTime.timeIntervalSince1970, acquireTime.timeIntervalSince1970, accuracy: 0.001)
 
         // Verify there are no remaining unsynced Dexa results for this user
         let unsyncedDexa = await coreData.fetchUnsyncedDexaResults()

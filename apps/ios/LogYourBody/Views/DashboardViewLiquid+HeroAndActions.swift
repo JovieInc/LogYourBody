@@ -289,10 +289,28 @@ extension DashboardViewLiquid {
     }
 
     func heroBodyScoreDeltaText() -> String? {
-        guard latestBodyScoreResult() != nil else {
+        let scorePoints = filteredMetrics(for: .month1)
+            .sorted { $0.date < $1.date }
+            .compactMap { metric -> (date: Date, score: Int)? in
+                guard let result = bodyScoreResult(for: metric) else {
+                    return nil
+                }
+                return (metric.date, result.score)
+            }
+
+        guard let first = scorePoints.first,
+              let last = scorePoints.last,
+              scorePoints.count >= 2,
+              first.date < last.date else {
             return nil
         }
-        return "+0.0 last 30d"
+
+        let delta = last.score - first.score
+        guard delta != 0 else {
+            return nil
+        }
+
+        return "\(formatDelta(delta: Double(delta), unit: "")) last 30d"
     }
 
     // MARK: - Hero Tile 30d Trends
