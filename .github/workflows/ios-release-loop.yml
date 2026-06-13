@@ -38,7 +38,7 @@ concurrency:
 
 env:
   LOGYOURBODY_APP_IDENTIFIER: com.logyourbody.app
-  LOGYOURBODY_APP_STORE_APP_ID: "6739360530"
+  LOGYOURBODY_APP_STORE_APP_ID: "6755209876"
 
 jobs:
   validate-release:
@@ -265,7 +265,7 @@ jobs:
     timeout-minutes: 30
     environment:
       name: production-app-store
-      url: https://apps.apple.com/us/app/logyourbody/id6739360530
+      url: https://apps.apple.com/us/app/logyourbody/id6755209876
 
     steps:
       - uses: actions/checkout@v6

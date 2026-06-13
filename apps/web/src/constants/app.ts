@@ -8,7 +8,7 @@ export const APP_CONFIG = {
   companyName: 'LogYourBody, Inc.',
 
   // App Store Links
-  appStoreUrl: 'https://apps.apple.com/us/app/logyourbody/id6739360530',
+  appStoreUrl: 'https://apps.apple.com/us/app/logyourbody/id6755209876',
   playStoreUrl: 'https://play.google.com/store/apps/details?id=com.logyourbody.app', // Coming soon
 
   // Trial & Subscription
