@@ -15,6 +15,7 @@ struct BodyScoreProfileDetailsView: View {
     @State private var isSaving: Bool = false
     @State private var errorMessage: String?
     @State private var activeSubstep: ProfileSubstep = .firstName
+    @State private var shouldAskSexInProfile: Bool = false
     @FocusState private var focusedNameField: NameField?
 
     private var trimmedFirstName: String {
@@ -146,7 +147,7 @@ struct BodyScoreProfileDetailsView: View {
                     }
                 case .height:
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        activeSubstep = .sex
+                        activeSubstep = shouldAskSexInProfile ? .sex : .dateOfBirth
                     }
                 }
             },
@@ -170,7 +171,7 @@ struct BodyScoreProfileDetailsView: View {
                     Button(action: handlePrimaryAction) {
                         if isSaving {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
                         } else {
                             Text(primaryButtonTitle)
                                 .font(.system(size: 18, weight: .semibold))
@@ -291,7 +292,7 @@ struct BodyScoreProfileDetailsView: View {
 
     private var sexSection: some View {
         OnboardingFormSection(title: nil, caption: nil) {
-            HStack(spacing: 16) {
+            VStack(spacing: 12) {
                 ForEach(BiologicalSex.allCases, id: \.self) { sex in
                     OnboardingOptionButton(
                         title: sex.description,
@@ -299,10 +300,10 @@ struct BodyScoreProfileDetailsView: View {
                         isSelected: biologicalSex == sex,
                         action: {
                             biologicalSex = sex
+                            viewModel.updateSex(sex)
                             HapticManager.shared.selection()
                         }
                     )
-                    .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -376,6 +377,8 @@ struct BodyScoreProfileDetailsView: View {
 
     private func hydrateFromCurrentUser() {
         guard let user = authManager.currentUser else {
+            biologicalSex = viewModel.bodyScoreInput.sex
+            shouldAskSexInProfile = biologicalSex == nil
             recomputeActiveSubstep()
             return
         }
@@ -396,6 +399,12 @@ struct BodyScoreProfileDetailsView: View {
         if let existingGender = user.profile?.gender {
             biologicalSex = Self.biologicalSex(from: existingGender)
         }
+
+        if biologicalSex == nil {
+            biologicalSex = viewModel.bodyScoreInput.sex
+        }
+
+        shouldAskSexInProfile = biologicalSex == nil
 
         if let existingHeight = user.profile?.height, existingHeight > 0 {
             if user.profile?.heightUnit?.lowercased() == "in" {
@@ -497,7 +506,7 @@ private extension BodyScoreProfileDetailsView {
             handleLastNameContinue()
         case .dateOfBirth:
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                activeSubstep = .sex
+                activeSubstep = shouldAskSexInProfile ? .sex : .height
             }
         case .sex:
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -531,7 +540,7 @@ private extension BodyScoreProfileDetailsView {
             activeSubstep = .lastName
         } else if !isDateOfBirthWithinValidRange {
             activeSubstep = .dateOfBirth
-        } else if biologicalSex == nil {
+        } else if shouldAskSexInProfile && biologicalSex == nil {
             activeSubstep = .sex
         } else if !isHeightValid {
             activeSubstep = .height

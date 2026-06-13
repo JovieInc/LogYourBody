@@ -3,9 +3,6 @@ import SwiftUI
 struct BodyScoreBasicsView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @State private var showWhyWeAsk = false
-    private var continueButtonOpacity: Double {
-        viewModel.canContinueBasics ? 1 : 0.4
-    }
 
     var body: some View {
         OnboardingPageTemplate(
@@ -16,7 +13,7 @@ struct BodyScoreBasicsView: View {
             content: {
                 VStack(spacing: 24) {
                     OnboardingFormSection {
-                        HStack(spacing: 16) {
+                        VStack(spacing: 12) {
                             ForEach(BiologicalSex.allCases, id: \.self) { sex in
                                 OnboardingOptionButton(
                                     title: sex.description,
@@ -26,7 +23,6 @@ struct BodyScoreBasicsView: View {
                                         handleSexSelection(sex)
                                     }
                                 )
-                                .frame(maxWidth: .infinity)
                             }
                         }
 
@@ -63,23 +59,14 @@ struct BodyScoreBasicsView: View {
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueBasics)
-                .opacity(continueButtonOpacity)
+                .opacity(viewModel.canContinueBasics ? 1 : 0.4)
             }
         )
     }
 
     private func handleSexSelection(_ sex: BiologicalSex) {
-        let previousSex = viewModel.bodyScoreInput.sex
         viewModel.updateSex(sex)
-
-        guard previousSex != sex else { return }
-
-        let delay: TimeInterval = 0.35
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            if viewModel.canContinueBasics && viewModel.currentStep == .basics {
-                viewModel.goToNextStep()
-            }
-        }
+        HapticManager.shared.selection()
     }
 }
 

@@ -104,6 +104,9 @@ struct ContentView: View {
         return PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
             gateEnabled: AnalyticsService.shared.isFeatureEnabled(
                 flagKey: Constants.photoTimelineHUDFlagKey
+            ),
+            mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
+                flagKey: Constants.mvpLoggerFallbackFlagKey
             )
         )
     }

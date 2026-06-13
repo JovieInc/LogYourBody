@@ -14,8 +14,13 @@ enum PaidAppSurface: Equatable {
 enum PaidAppSurfacePolicy {
     static func surface(
         photoTimelineHUDEnabled: Bool,
-        legacyFullDashboardBetaEnabled: Bool
+        legacyFullDashboardBetaEnabled: Bool,
+        mvpLoggerFallbackEnabled: Bool = false
     ) -> PaidAppSurface {
+        if mvpLoggerFallbackEnabled {
+            return .weightLoggerMVP
+        }
+
         if photoTimelineHUDEnabled {
             return .photoTimelineHUD
         }
@@ -79,12 +84,18 @@ struct MainTabView: View {
             photoTimelineHUDEnabled: PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
                 gateEnabled: AnalyticsService.shared.isFeatureEnabled(
                     flagKey: Constants.photoTimelineHUDFlagKey
+                ),
+                mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
+                    flagKey: Constants.mvpLoggerFallbackFlagKey
                 )
             ),
             legacyFullDashboardBetaEnabled: LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(
                 gateEnabled: AnalyticsService.shared.isFeatureEnabled(
                     flagKey: Constants.fullBodyCompositionDashboardFlagKey
                 )
+            ),
+            mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
+                flagKey: Constants.mvpLoggerFallbackFlagKey
             )
         )
 

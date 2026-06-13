@@ -9,6 +9,8 @@ import SwiftUI
 
 /// Liquid glass card with backdrop blur, subtle highlights, and soft shadows
 struct LiquidGlassCard<Content: View>: View {
+    @Environment(\.theme) private var theme
+
     let content: Content
     let cornerRadius: CGFloat
     let blurRadius: CGFloat
@@ -39,7 +41,7 @@ struct LiquidGlassCard<Content: View>: View {
                 ZStack {
                     // Base glass layer with backdrop blur + subtle white tint
                     RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(.ultraThinMaterial)
+                        .fill(theme.materials.glassUltraThin)
                         .overlay(
                             RoundedRectangle(cornerRadius: cornerRadius)
                                 .fill(Color.white.opacity(0.03))
@@ -96,6 +98,8 @@ struct CompactGlassCard<Content: View>: View {
 
 /// Hero glass card for main photo/avatar (16pt radius, uses regularMaterial)
 struct HeroGlassCard<Content: View>: View {
+    @Environment(\.theme) private var theme
+
     let content: Content
 
     init(@ViewBuilder content: () -> Content) {
@@ -108,7 +112,7 @@ struct HeroGlassCard<Content: View>: View {
                 ZStack {
                     // Use regularMaterial for viewport + subtle white tint
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(.regularMaterial)
+                        .fill(theme.materials.glassRegular)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(Color.white.opacity(0.03))
@@ -145,6 +149,8 @@ struct HeroGlassCard<Content: View>: View {
 
 /// Pill-style button with glass effect
 struct GlassPillButton: View {
+    @Environment(\.theme) private var theme
+
     let icon: String
     let title: String
     let action: () -> Void
@@ -167,7 +173,7 @@ struct GlassPillButton: View {
             .padding(.vertical, 12)
             .background(
                 Capsule()
-                    .fill(.ultraThinMaterial)
+                    .fill(theme.materials.glassUltraThin)
                     .overlay(
                         Capsule()
                             .fill(Color.black.opacity(0.2))

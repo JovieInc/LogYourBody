@@ -7,6 +7,64 @@
 
 import Foundation
 
+enum DefaultHomeMode: String, Codable, CaseIterable, Identifiable {
+    case avatar
+    case photo
+
+    static let `default`: DefaultHomeMode = .avatar
+
+    var id: String { rawValue }
+
+    init(storedValue: String) {
+        self = DefaultHomeMode(rawValue: storedValue) ?? Self.default
+    }
+
+    init(timelineMode: TimelineMode) {
+        switch timelineMode {
+        case .avatar:
+            self = .avatar
+        case .photo:
+            self = .photo
+        }
+    }
+
+    var timelineMode: TimelineMode {
+        switch self {
+        case .avatar:
+            return .avatar
+        case .photo:
+            return .photo
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .avatar:
+            return "Avatar"
+        case .photo:
+            return "Photo"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .avatar:
+            return "Privacy-safe body timeline"
+        case .photo:
+            return "Real progress photos"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .avatar:
+            return "figure.stand"
+        case .photo:
+            return "photo.fill"
+        }
+    }
+}
+
 enum DashboardDisplayMode: String, Codable, CaseIterable {
     case photo          // Photo carousel view (default)
     case bodyFatChart   // Body fat percentage chart

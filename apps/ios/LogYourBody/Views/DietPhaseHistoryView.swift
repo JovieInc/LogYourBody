@@ -11,52 +11,6 @@ enum PhaseType: String, CaseIterable {
 }
 
 struct DietPhaseHistoryView: View {
-    @EnvironmentObject var authManager: AuthManager
-
-    // Sample data for now
-    private let samplePhases: [(
-        phase: PhaseType,
-        startDate: Date,
-        endDate: Date,
-        startWeight: Double,
-        endWeight: Double,
-        startBodyFat: Double?,
-        endBodyFat: Double?
-    )] = [
-        // Current maintenance phase (ongoing)
-        (
-            .maintenance,
-            Date().addingTimeInterval(-60 * 60 * 24 * 14),
-            Date(),
-            180.5,
-            181.2,
-            15.2,
-            15.0
-        ),
-
-        // Recent cut phase (completed)
-        (
-            .cut,
-            Date().addingTimeInterval(-60 * 60 * 24 * 98),
-            Date().addingTimeInterval(-60 * 60 * 24 * 14),
-            195.0,
-            180.5,
-            20.5,
-            15.2
-        ),
-
-        // Previous bulk phase (completed)
-        (
-            .bulk,
-            Date().addingTimeInterval(-60 * 60 * 24 * 154),
-            Date().addingTimeInterval(-60 * 60 * 24 * 98),
-            175.0,
-            195.0,
-            14.0,
-            20.5
-        )
-    ]
-
     var body: some View {
         NavigationView {
             ZStack {
@@ -80,44 +34,9 @@ struct DietPhaseHistoryView: View {
                         .padding(.top, 20)
                         .padding(.bottom, 8)
 
-                        // Phase cards
-                        ForEach(Array(samplePhases.enumerated()), id: \.offset) { index, phase in
-                            // Temporary inline card until DietPhaseCard is added to project
-                            PhaseCardView(
-                                phase: phase.phase,
-                                startDate: phase.startDate,
-                                endDate: phase.endDate,
-                                startWeight: phase.startWeight,
-                                endWeight: phase.endWeight,
-                                startBodyFat: phase.startBodyFat,
-                                endBodyFat: phase.endBodyFat,
-                                weightUnit: "lbs"
-                            )
+                        emptyState
                             .padding(.horizontal, 20)
-
-                            // Add label for current phase
-                            if index == 0 {
-                                HStack {
-                                    Capsule()
-                                        .fill(Color.green.opacity(0.2))
-                                        .frame(width: 80, height: 24)
-                                        .overlay(
-                                            HStack(spacing: 4) {
-                                                Circle()
-                                                    .fill(Color.green)
-                                                    .frame(width: 6, height: 6)
-                                                Text("Current")
-                                                    .font(.system(size: 12, weight: .medium))
-                                                    .foregroundColor(.green)
-                                            }
-                                        )
-                                        .padding(.leading, 20)
-                                        .padding(.top, -8)
-
-                                    Spacer()
-                                }
-                            }
-                        }
+                            .padding(.top, 24)
 
                         // Bottom padding
                         Color.clear.frame(height: 100)
@@ -126,6 +45,35 @@ struct DietPhaseHistoryView: View {
             }
             .navigationBarHidden(true)
         }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundColor(.appTextSecondary)
+
+            VStack(spacing: 6) {
+                Text("No phase history yet")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.appText)
+
+                Text("Real bulk, cut, and maintenance phases will appear here once phase tracking is available.")
+                    .font(.system(size: 14))
+                    .foregroundColor(.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 28)
+        .background(Color.appCard)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.appBorder.opacity(0.1), lineWidth: 1)
+        )
     }
 }
 
@@ -198,6 +146,10 @@ struct PhaseCardView: View {
         case .cut: return "arrow.down.circle.fill"
         case .maintenance: return "equal.circle.fill"
         }
+    }
+
+    private func bodyFatChangeColor(for change: Double) -> Color {
+        change <= 0 ? .green : .red
     }
 
     var body: some View {
@@ -276,13 +228,13 @@ struct PhaseCardView: View {
                         HStack(spacing: 4) {
                             Image(systemName: change > 0 ? "arrow.up" : "arrow.down")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor((phase == .cut ? change < 0 : change < 0) ? .green : .red)
+                                .foregroundColor(bodyFatChangeColor(for: change))
                             Text(String(format: "%.1f", abs(change)))
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
-                                .foregroundColor((phase == .cut ? change < 0 : change < 0) ? .green : .red)
+                                .foregroundColor(bodyFatChangeColor(for: change))
                             Text("%")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor((phase == .cut ? change < 0 : change < 0) ? .green : .red)
+                                .foregroundColor(bodyFatChangeColor(for: change))
                         }
                     }
                 }

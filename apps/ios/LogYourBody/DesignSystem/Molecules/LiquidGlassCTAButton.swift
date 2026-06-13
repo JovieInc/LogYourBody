@@ -125,6 +125,8 @@ struct LiquidGlassSecondaryCTAButton: View {
 // MARK: - View Modifier for existing buttons
 
 struct LiquidGlassCTAModifier: ViewModifier {
+    @Environment(\.theme) private var theme
+
     let isEnabled: Bool
 
     func body(content: Content) -> some View {
@@ -145,7 +147,7 @@ struct LiquidGlassCTAModifier: ViewModifier {
                     .fill(Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 28)
-                            .fill(Material.ultraThin)
+                            .fill(theme.materials.glassUltraThin)
                             .opacity(0.1)
                     )
             } else {
@@ -153,7 +155,7 @@ struct LiquidGlassCTAModifier: ViewModifier {
                     .fill(Color.white.opacity(0.1))
                     .overlay(
                         RoundedRectangle(cornerRadius: 28)
-                            .fill(Material.ultraThin)
+                            .fill(theme.materials.glassUltraThin)
                             .opacity(0.2)
                     )
             }

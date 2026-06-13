@@ -73,6 +73,8 @@ struct DashboardViewLiquid: View {
     // Timeline mode
     @State private var timelineMode: TimelineMode = .photo
     @State private var photoDisplayMode: DashboardDisplayMode = .photo
+    @AppStorage(Constants.defaultHomeModeKey)
+    private var defaultHomeModeRawValue = DefaultHomeMode.default.rawValue
 
     // Navigation state
     @State private var selectedTab: DashboardTab = .home
@@ -263,7 +265,12 @@ struct DashboardViewLiquid: View {
                 syncStatusBanner
             },
             metricContent: {
-                heroSection
+                VStack(spacing: 14) {
+                    homeModeSwitch
+                        .padding(.horizontal, 20)
+
+                    heroSection
+                }
             },
             quickActions: {
                 quickActions
@@ -381,13 +388,112 @@ struct DashboardViewLiquid: View {
     }
 
     private var heroSection: some View {
-        DashboardHeroSection(
-            metric: currentMetric,
-            heroCard: { metric in
-                heroCard(metric: metric)
+        Group {
+            if let metric = currentMetric {
+                VStack(spacing: 16) {
+                    homeTimelineHero(metric: metric)
+
+                    stepsCard
+                        .padding(.horizontal, 20)
+                }
+            }
+        }
+    }
+
+    private var selectedDefaultHomeMode: DefaultHomeMode {
+        DefaultHomeMode(storedValue: defaultHomeModeRawValue)
+    }
+
+    private var selectedHomeTimelineMode: TimelineMode {
+        selectedDefaultHomeMode.timelineMode
+    }
+
+    private var homeTimelineModeBinding: Binding<TimelineMode> {
+        Binding(
+            get: { selectedHomeTimelineMode },
+            set: { newValue in
+                defaultHomeModeRawValue = DefaultHomeMode(timelineMode: newValue).rawValue
+            }
+        )
+    }
+
+    private var homeModeSwitch: some View {
+        HStack(spacing: 4) {
+            ForEach(DefaultHomeMode.allCases) { mode in
+                homeModeButton(mode)
+            }
+        }
+        .padding(4)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.white.opacity(0.08))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home_mode_switch")
+    }
+
+    private func homeModeButton(_ mode: DefaultHomeMode) -> some View {
+        let isSelected = selectedDefaultHomeMode == mode
+
+        return Button {
+            defaultHomeModeRawValue = mode.rawValue
+            HapticManager.shared.selection()
+        } label: {
+            Label(mode.title, systemImage: mode.iconName)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .frame(height: 34)
+                .foregroundColor(isSelected ? .black : Color.white.opacity(0.72))
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(isSelected ? Color.white : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("home_mode_\(mode.rawValue)_button")
+    }
+
+    private func homeTimelineHero(metric: BodyMetrics) -> some View {
+        let bodyScore = bodyScoreText()
+
+        return DashboardHomeTimelineHero(
+            metric: metric,
+            bodyMetrics: bodyMetrics,
+            selectedIndex: $selectedIndex,
+            displayMode: $photoDisplayMode,
+            homeMode: selectedDefaultHomeMode,
+            dateText: formatHUDDate(metric.date),
+            gender: authManager.currentUser?.profile?.gender,
+            bodyScoreText: bodyScore.scoreText,
+            bodyScoreTagline: bodyScore.tagline,
+            bodyScoreDeltaText: heroBodyScoreDeltaText(),
+            weightValue: heroWeightValue(),
+            weightCaption: heroWeightCaption(),
+            bodyFatValue: heroBodyFatValue(),
+            bodyFatCaption: heroBodyFatCaption(),
+            ffmiValue: heroFFMIValue(),
+            ffmiCaption: heroFFMICaption(),
+            onTapBodyScore: bodyScore.score > 0 ? {
+                selectedMetricType = .bodyScore
+                isMetricDetailActive = true
+            } : nil,
+            onTapWeight: {
+                selectedMetricType = .weight
+                isMetricDetailActive = true
             },
-            stepsCard: {
-                stepsCard
+            onTapBodyFat: {
+                selectedMetricType = .bodyFat
+                isMetricDetailActive = true
+            },
+            onTapFFMI: {
+                selectedMetricType = .ffmi
+                isMetricDetailActive = true
             }
         )
     }
@@ -473,8 +579,12 @@ struct DashboardViewLiquid: View {
                 syncStatusBanner
                     .padding(.horizontal, 20)
 
-                hudPhotoStage
+                homeModeSwitch
                     .padding(.horizontal, 20)
+
+                if let metric = currentMetric {
+                    homeTimelineHero(metric: metric)
+                }
 
                 hudTimelineSection
                     .padding(.horizontal, 20)
@@ -483,9 +593,6 @@ struct DashboardViewLiquid: View {
                     hudGlp1WeeklyCheckIn
                         .padding(.horizontal, 20)
                 }
-
-                hudMetricsStrip
-                    .padding(.horizontal, 20)
 
                 if isPhaseInsightEnabled {
                     hudPhaseInsight
@@ -638,7 +745,7 @@ struct DashboardViewLiquid: View {
             DashboardTimelineScrubber(
                 bodyMetrics: bodyMetrics,
                 selectedIndex: $selectedIndex,
-                timelineMode: $timelineMode
+                timelineMode: homeTimelineModeBinding
             )
         }
         .padding(.vertical, 10)

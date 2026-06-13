@@ -28,11 +28,11 @@ struct BodyScoreAccountCreationView: View {
                     if viewModel.isCreatingAccount {
                         VStack(spacing: 8) {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
                             if let status = viewModel.accountCreationStatusMessage {
                                 Text(status)
                                     .font(OnboardingTypography.caption)
-                                    .foregroundStyle(Color.white.opacity(0.8))
+                                    .foregroundStyle(Color.black.opacity(0.65))
                             }
                         }
                     } else {

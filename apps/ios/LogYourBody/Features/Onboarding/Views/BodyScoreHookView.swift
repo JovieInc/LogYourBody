@@ -21,20 +21,20 @@ struct BodyScoreHookView: View {
                 OnboardingBadge(text: "Body Score Early Access")
 
                 OnboardingBulletList(items: bulletItems)
+            }
+        } footer: {
+            VStack(spacing: 12) {
+                Button {
+                    viewModel.goToNextStep()
+                } label: {
+                    Text("Start my 60-sec Body Score")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .buttonStyle(OnboardingPrimaryButtonStyle())
 
-                VStack(spacing: 12) {
-                    Button {
-                        viewModel.goToNextStep()
-                    } label: {
-                        Text("Start my 60-sec Body Score")
-                            .font(.system(size: 18, weight: .semibold))
-                    }
-                    .buttonStyle(OnboardingPrimaryButtonStyle())
-
-                    if viewModel.entryContext == .preAuth {
-                        OnboardingTextButton(title: "I already have an account") {
-                            dismiss()
-                        }
+                if viewModel.entryContext == .preAuth {
+                    OnboardingTextButton(title: "I already have an account") {
+                        dismiss()
                     }
                 }
             }

@@ -1321,6 +1321,10 @@ class CoreDataManager: ObservableObject {
 
             do {
                 let results = try context.fetch(request)
+                if results.first?.isMarkedDeleted == true {
+                    return
+                }
+
                 let metric = results.first ?? CachedBodyMetrics(context: context)
 
                 let formatter = ISO8601DateFormatter()

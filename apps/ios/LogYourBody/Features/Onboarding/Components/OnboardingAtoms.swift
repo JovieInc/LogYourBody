@@ -49,22 +49,30 @@ struct OnboardingCaptionText: View {
 // MARK: - Buttons
 
 struct OnboardingPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Self.Configuration) -> some View {
         configuration.label
             .font(.system(.headline, design: .rounded))
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .foregroundStyle(Color.white)
+            .frame(minHeight: 56)
+            .padding(.vertical, 2)
+            .foregroundStyle(isEnabled ? Color.black : Color.black.opacity(0.55))
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.appPrimary.opacity(configuration.isPressed ? 0.9 : 1))
+                Capsule(style: .continuous)
+                    .fill(Color.white.opacity(buttonOpacity(isPressed: configuration.isPressed)))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(0.08))
+                Capsule(style: .continuous)
+                    .stroke(Color.white.opacity(0.16))
             )
             .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+
+    private func buttonOpacity(isPressed: Bool) -> Double {
+        guard isEnabled else { return 0.35 }
+        return isPressed ? 0.92 : 1
     }
 }
 

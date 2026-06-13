@@ -22,6 +22,7 @@ struct Constants {
     // Legacy beta fallback; the intended post-MVP dashboard route is `ios_photo_timeline_hud`.
     static let fullBodyCompositionDashboardFlagKey = "ios_full_body_composition_dashboard"
     static let photoTimelineHUDFlagKey = "ios_photo_timeline_hud"
+    static let mvpLoggerFallbackFlagKey = "ios_mvp_logger_fallback"
     static let phaseInsightFlagKey = "ios_phase_insight"
     static let glp1WeeklyCheckInFlagKey = "ios_glp1_weekly_checkin"
     static let bulkProgressPhotoImportFlagKey = "ios_bulk_progress_photo_import"
@@ -73,6 +74,7 @@ struct Constants {
     static let currentUserKey = "currentUser"
     static let preferredWeightUnitKey = "preferredWeightUnit"
     static let preferredMeasurementSystemKey = "preferredMeasurementSystem"
+    static let defaultHomeModeKey = "defaultHomeMode"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
     static let onboardingCompletedVersionKey = "onboardingCompletedVersion"
 
@@ -138,10 +140,17 @@ struct AuthSurfacePolicy {
 }
 
 enum PhotoTimelineHUDPolicy {
-    static let defaultShowsPhotoTimelineHUD = true
+    static let defaultShowsPhotoTimelineHUD = false
 
-    static func shouldShowPhotoTimelineHUD(gateEnabled: Bool) -> Bool {
-        defaultShowsPhotoTimelineHUD || gateEnabled
+    static func shouldShowPhotoTimelineHUD(
+        gateEnabled: Bool,
+        mvpLoggerFallbackEnabled: Bool = false
+    ) -> Bool {
+        guard !mvpLoggerFallbackEnabled else {
+            return false
+        }
+
+        return gateEnabled
     }
 
     static func stateText(

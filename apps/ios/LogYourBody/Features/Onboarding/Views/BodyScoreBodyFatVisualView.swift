@@ -120,17 +120,8 @@ extension BodyScoreBodyFatVisualView {
     }
 
     private func handleSelection(_ estimate: VisualEstimate) {
-        let previousSelection = viewModel.selectedVisualBodyFat
         viewModel.selectVisualBodyFat(estimate.percentage)
-
-        guard previousSelection != estimate.percentage else { return }
-
-        let delay: TimeInterval = 0.35
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            if viewModel.canContinueBodyFatVisual && viewModel.currentStep == .bodyFatVisual {
-                viewModel.goToNextStep()
-            }
-        }
+        HapticManager.shared.selection()
     }
 }
 

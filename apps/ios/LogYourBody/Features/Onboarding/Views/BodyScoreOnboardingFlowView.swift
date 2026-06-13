@@ -37,6 +37,8 @@ struct BodyScoreOnboardingFlowView: View {
                 BodyScoreLoadingView(viewModel: viewModel)
             case .bodyScore:
                 BodyScoreRevealView(viewModel: viewModel)
+            case .defaultHomeMode:
+                BodyScoreDefaultHomeModeView(viewModel: viewModel)
             case .emailCapture:
                 BodyScoreEmailCaptureView(viewModel: viewModel)
             case .account:
@@ -65,6 +67,41 @@ struct BodyScoreOnboardingFlowView: View {
                 ]
             )
         }
+    }
+}
+
+private struct BodyScoreDefaultHomeModeView: View {
+    @ObservedObject var viewModel: OnboardingFlowViewModel
+
+    var body: some View {
+        OnboardingPageTemplate(
+            title: "Choose your home view",
+            subtitle: "You can switch anytime.",
+            onBack: { viewModel.goBack() },
+            progress: viewModel.progress(for: .defaultHomeMode),
+            content: {
+                VStack(spacing: 12) {
+                    ForEach(DefaultHomeMode.allCases) { mode in
+                        OnboardingOptionButton(
+                            title: mode.title,
+                            subtitle: mode.subtitle,
+                            isSelected: viewModel.defaultHomeMode == mode,
+                            action: {
+                                viewModel.updateDefaultHomeMode(mode)
+                                HapticManager.shared.selection()
+                            }
+                        )
+                    }
+                }
+            },
+            footer: {
+                Button("Continue") {
+                    viewModel.goToNextStep()
+                }
+                .buttonStyle(OnboardingPrimaryButtonStyle())
+                .disabled(!viewModel.canContinueDefaultHomeMode)
+            }
+        )
     }
 }
 
