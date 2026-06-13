@@ -1,111 +1,112 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
+import { createClerkSupabaseClient } from '@/lib/supabase/clerk-client';
 
-export async function DELETE(request: NextRequest) {
+type DeleteTarget = {
+  table: string;
+  column: string;
+};
+
+const deleteTargets: DeleteTarget[] = [
+  { table: 'progress_photos', column: 'user_id' },
+  { table: 'daily_metrics', column: 'user_id' },
+  { table: 'body_metrics', column: 'user_id' },
+  { table: 'user_goals', column: 'user_id' },
+  { table: 'profiles', column: 'id' },
+];
+
+function describeDeletionError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const record = error as Record<string, unknown>;
+    const message = record.message ?? record.details ?? record.code;
+
+    if (typeof message === 'string' && message.length > 0) {
+      return message;
+    }
+  }
+
+  return String(error);
+}
+
+function cleanupFailureResponse() {
+  return NextResponse.json(
+    { error: 'Unable to delete all account data. Please try again or contact support.' },
+    { status: 502 },
+  );
+}
+
+export async function DELETE() {
   try {
-    const authHeader = request.headers.get('authorization')
+    const { userId, getToken } = await auth();
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Missing or invalid authorization header' },
-        { status: 401 }
-      )
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.substring(7)
-    const supabase = await createClient()
+    const token = await getToken();
 
-    // Verify the token and get the user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      )
+    if (!token) {
+      return NextResponse.json({ error: 'Missing authentication token' }, { status: 401 });
     }
 
-    // Best-effort deletion of Supabase storage objects and Cloudinary assets
+    const supabase = await createClerkSupabaseClient(() => Promise.resolve(token));
+
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
       if (!supabaseUrl || !supabaseAnonKey) {
-        console.error('Missing Supabase environment variables for delete-user-assets function')
+        console.error('Missing Supabase environment variables for delete-user-assets function');
+        return cleanupFailureResponse();
       } else {
-        const response = await fetch(
-          `${supabaseUrl}/functions/v1/delete-user-assets`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              apikey: supabaseAnonKey,
-              Authorization: `Bearer ${token}`,
-            },
+        const response = await fetch(`${supabaseUrl}/functions/v1/delete-user-assets`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${token}`,
           },
-        )
+        });
 
         if (!response.ok) {
-          const text = await response.text().catch(() => '')
+          const text = await response.text().catch(() => '');
           console.error('delete-user-assets function failed', {
             status: response.status,
             body: text,
-          })
+          });
+
+          return cleanupFailureResponse();
         }
       }
     } catch (error) {
-      console.error('Error calling delete-user-assets function', error)
+      console.error('Error calling delete-user-assets function', error);
+      return cleanupFailureResponse();
     }
 
-    // Delete user's data from various tables
-    // Note: Order matters due to foreign key constraints
+    for (const target of deleteTargets) {
+      const { error } = await supabase.from(target.table).delete().eq(target.column, userId);
 
-    // Delete body metrics
-    await supabase
-      .from('body_metrics')
-      .delete()
-      .eq('user_id', user.id)
+      if (error) {
+        console.error('Failed to delete account data before Clerk user deletion', {
+          table: target.table,
+          column: target.column,
+          error: describeDeletionError(error),
+        });
 
-    // Delete daily metrics
-    await supabase
-      .from('daily_metrics')
-      .delete()
-      .eq('user_id', user.id)
+        return cleanupFailureResponse();
+      }
+    }
 
-    // Delete progress photos
-    await supabase
-      .from('progress_photos')
-      .delete()
-      .eq('user_id', user.id)
+    const client = await clerkClient();
+    await client.users.deleteUser(userId);
 
-    // Delete user goals
-    await supabase
-      .from('user_goals')
-      .delete()
-      .eq('user_id', user.id)
-
-    // Delete profile
-    await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', user.id)
-
-    // Sign out the user (this invalidates their session)
-    await supabase.auth.signOut()
-
-    // Note: Full user deletion from auth requires service role key
-    // For now, we've deleted all user data and invalidated their session
-    // You can implement a background job with service role key to fully delete auth records
-
-    return NextResponse.json(
-      { message: 'Account deleted successfully' },
-      { status: 200 }
-    )
+    return NextResponse.json({ message: 'Account deleted successfully' }, { status: 200 });
   } catch (error) {
-    console.error('Delete account error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('Delete account error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
