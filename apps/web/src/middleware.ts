@@ -1,5 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
-import { NextResponse } from 'next/server';
+import { NextFetchEvent, NextRequest, NextResponse } from 'next/server';
 
 const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
@@ -61,7 +61,15 @@ export function shouldBlockProductionDebugRoute(
   return env['VERCEL_ENV'] === 'production' && isProductionDebugRoute(pathname);
 }
 
-export default clerkMiddleware(async (auth, req) => {
+const protectedRouteMiddleware = clerkMiddleware(async (auth) => {
+  await auth.protect();
+});
+
+export function shouldUseClerkMiddleware(req: NextRequest) {
+  return isProtectedRoute(req);
+}
+
+export default function middleware(req: NextRequest, event: NextFetchEvent) {
   if (shouldBlockProductionDebugRoute(req.nextUrl.pathname)) {
     return new NextResponse(null, {
       status: 404,
@@ -71,10 +79,12 @@ export default clerkMiddleware(async (auth, req) => {
     });
   }
 
-  if (isProtectedRoute(req)) {
-    await auth.protect();
+  if (!shouldUseClerkMiddleware(req)) {
+    return NextResponse.next();
   }
-});
+
+  return protectedRouteMiddleware(req, event);
+}
 
 export const config = {
   matcher: [
