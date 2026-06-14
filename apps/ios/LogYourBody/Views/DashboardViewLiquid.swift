@@ -892,6 +892,7 @@ struct DashboardViewLiquid: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("photo_timeline_hud_phase_insight")
+        .accessibilityLabel(phaseInsightAccessibilityLabel(for: insight))
     }
 
     private var hudGlp1WeeklyCheckIn: some View {
@@ -1314,6 +1315,16 @@ struct DashboardViewLiquid: View {
         case .insufficientData:
             return Color.metricTextTertiary
         }
+    }
+
+    private func phaseInsightAccessibilityLabel(for insight: PhaseInsight) -> String {
+        [
+            insight.title,
+            insight.message,
+            insight.detail
+        ]
+        .compactMap { $0 }
+        .joined(separator: ". ")
     }
 
     private func glp1WeeklyCheckInColor(for status: Glp1WeeklyCheckInStatus) -> Color {

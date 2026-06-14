@@ -1672,6 +1672,77 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertNil(PreAuthOnboardingStore.shared.load())
     }
 
+    func testPersistedProgressRestoresProfileDetailsDraft() throws {
+        let userId = "onboarding-profile-draft-\(UUID().uuidString)"
+        let previousUser = AuthManager.shared.currentUser
+        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+        let dateOfBirth = try XCTUnwrap(
+            Calendar.current.date(from: DateComponents(year: 1_992, month: 7, day: 4))
+        )
+
+        defer {
+            AuthManager.shared.currentUser = previousUser
+            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            OnboardingProgressStore.shared.clearProgress(for: userId)
+        }
+
+        let initialUser = User(
+            id: userId,
+            email: "profile-draft@example.com",
+            name: "Seed User"
+        )
+        AuthManager.shared.currentUser = initialUser
+        AuthManager.shared.isAuthenticated = true
+
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.currentStep = .profileDetails
+        viewModel.hydrateProfileDetailsDraftIfNeeded(from: initialUser)
+        viewModel.profileFirstName = "Avery"
+        viewModel.profileLastName = "Stone"
+        viewModel.profileDateOfBirth = dateOfBirth
+        viewModel.updateProfileBiologicalSex(.female)
+        viewModel.profileHeightUnit = .inches
+        viewModel.profileHeightFeet = 5
+        viewModel.profileHeightInches = 7
+        viewModel.profileHeightCentimetersText = "170"
+        viewModel.profileDetailsActiveSubstep = .height
+
+        let savedSnapshot = OnboardingProgressStore.shared.snapshotForTesting(for: userId)
+        XCTAssertEqual(savedSnapshot?.currentStep, .profileDetails)
+        XCTAssertEqual(savedSnapshot?.profileFirstName, "Avery")
+        XCTAssertEqual(savedSnapshot?.profileLastName, "Stone")
+        XCTAssertEqual(savedSnapshot?.profileDateOfBirth, dateOfBirth)
+        XCTAssertEqual(savedSnapshot?.profileBiologicalSex, .female)
+        XCTAssertEqual(savedSnapshot?.profileHeightUnit, .inches)
+        XCTAssertEqual(savedSnapshot?.profileHeightFeet, 5)
+        XCTAssertEqual(savedSnapshot?.profileHeightInches, 7)
+        XCTAssertEqual(savedSnapshot?.profileDetailsActiveSubstep, .height)
+
+        let restoredViewModel = OnboardingFlowViewModel()
+
+        XCTAssertEqual(restoredViewModel.currentStep, .profileDetails)
+        XCTAssertEqual(restoredViewModel.profileFirstName, "Avery")
+        XCTAssertEqual(restoredViewModel.profileLastName, "Stone")
+        XCTAssertEqual(restoredViewModel.profileDateOfBirth, dateOfBirth)
+        XCTAssertEqual(restoredViewModel.profileBiologicalSex, .female)
+        XCTAssertEqual(restoredViewModel.profileHeightUnit, .inches)
+        XCTAssertEqual(restoredViewModel.profileHeightFeet, 5)
+        XCTAssertEqual(restoredViewModel.profileHeightInches, 7)
+        XCTAssertEqual(restoredViewModel.profileHeightCentimetersText, "170")
+        XCTAssertEqual(restoredViewModel.profileDetailsActiveSubstep, .height)
+
+        let laterUserSnapshot = User(
+            id: userId,
+            email: "profile-draft@example.com",
+            name: "Server Override"
+        )
+        restoredViewModel.hydrateProfileDetailsDraftIfNeeded(from: laterUserSnapshot)
+
+        XCTAssertEqual(restoredViewModel.profileFirstName, "Avery")
+        XCTAssertEqual(restoredViewModel.profileLastName, "Stone")
+        XCTAssertEqual(restoredViewModel.profileDetailsActiveSubstep, .height)
+    }
+
     func testAdvanceAfterHealthConfirmationRequestsBodyFatWhenMissing() {
         let viewModel = OnboardingFlowViewModel()
         viewModel.bodyScoreInput.weight = WeightValue(value: 185, unit: .pounds)
@@ -1811,6 +1882,57 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         }
 
         XCTAssertEqual(updates["heightUnit"] as? String, "in")
+    }
+
+    func testBuildOnboardingProfileUpdatesPrefersPersistedProfileDetailsDraft() throws {
+        let userId = "onboarding-profile-update-draft-\(UUID().uuidString)"
+        let previousUser = AuthManager.shared.currentUser
+        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+        let profileDateOfBirth = try XCTUnwrap(
+            Calendar.current.date(from: DateComponents(year: 1_991, month: 3, day: 22))
+        )
+
+        defer {
+            AuthManager.shared.currentUser = previousUser
+            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            OnboardingProgressStore.shared.clearProgress(for: userId)
+        }
+
+        let user = User(
+            id: userId,
+            email: "profile-update-draft@example.com",
+            name: "Profile Draft"
+        )
+        AuthManager.shared.currentUser = user
+        AuthManager.shared.isAuthenticated = true
+
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.updateSex(.male)
+        viewModel.updateBirthYear(1_979)
+        viewModel.bodyScoreInput.height = HeightValue(value: 180, unit: .centimeters)
+        viewModel.setHeightUnit(.centimeters)
+        viewModel.hydrateProfileDetailsDraftIfNeeded(from: user)
+        viewModel.updateProfileBiologicalSex(.female)
+        viewModel.profileDateOfBirth = profileDateOfBirth
+        viewModel.profileHeightUnit = .inches
+        viewModel.profileHeightFeet = 5
+        viewModel.profileHeightInches = 7
+
+        let updates = viewModel.buildOnboardingProfileUpdates()
+
+        XCTAssertEqual(updates["gender"] as? String, "Female")
+
+        let dateOfBirth = updates["dateOfBirth"] as? Date
+        XCTAssertEqual(dateOfBirth, profileDateOfBirth)
+
+        let height = updates["height"] as? Double
+        XCTAssertNotNil(height)
+        if let height {
+            XCTAssertEqual(height, 67 * 2.54, accuracy: 0.01)
+        }
+
+        XCTAssertEqual(updates["heightUnit"] as? String, "in")
+        XCTAssertEqual(updates["onboardingCompleted"] as? Bool, true)
     }
 
     func testBuildOnboardingProfileUpdatesAlwaysMarksOnboardingCompleted() {

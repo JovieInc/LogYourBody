@@ -180,7 +180,7 @@ final class LogYourBodyUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_pager"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
         let statsButton = app.descendants(matching: .any)["photo_timeline_hud_stats_button"]
         scrollUntilHittable(statsButton, in: app)
         XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
@@ -209,19 +209,18 @@ final class LogYourBodyUITests: XCTestCase {
         ]
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
 
         let insight = app.descendants(matching: .any)["photo_timeline_hud_phase_insight"]
-        if !insight.waitForExistence(timeout: 2) {
-            app.scrollViews["photo_timeline_hud"].swipeUp()
-        }
+        scrollUntilExists(insight, in: app)
         XCTAssertTrue(insight.waitForExistence(timeout: 8))
-        XCTAssertTrue(app.staticTexts["Cutting"].exists)
-
-        let trendMessage = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS %@", "Weight is trending down")
-        ).firstMatch
-        XCTAssertTrue(trendMessage.exists)
+        let expectedInsight = NSPredicate(
+            format: "label CONTAINS %@ AND label CONTAINS %@",
+            "Cutting",
+            "Weight is trending down"
+        )
+        expectation(for: expectedInsight, evaluatedWith: insight)
+        waitForExpectations(timeout: 5)
     }
 
     func testGlp1WeeklyCheckInFixtureShowsPromptAndOpensDoseFlow() throws {
@@ -232,12 +231,10 @@ final class LogYourBodyUITests: XCTestCase {
         ]
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
 
         let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
-        if !prompt.waitForExistence(timeout: 2) {
-            app.scrollViews["photo_timeline_hud"].swipeUp()
-        }
+        scrollUntilExists(prompt, in: app)
         XCTAssertTrue(prompt.waitForExistence(timeout: 8))
 
         scrollUntilHittable(prompt, in: app)
@@ -304,6 +301,18 @@ final class LogYourBodyUITests: XCTestCase {
     ) {
         var remainingSwipes = maxSwipes
         while !element.isHittable && remainingSwipes > 0 {
+            app.swipeUp()
+            remainingSwipes -= 1
+        }
+    }
+
+    private func scrollUntilExists(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maxSwipes: Int = 8
+    ) {
+        var remainingSwipes = maxSwipes
+        while !element.exists && remainingSwipes > 0 {
             app.swipeUp()
             remainingSwipes -= 1
         }
