@@ -1554,6 +1554,69 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertEqual(restoredViewModel.defaultHomeMode, .photo)
     }
 
+    func testAuthenticatedFlowConsumesPreAuthDefaultHomeModeChoice() {
+        let userId = "preauth-default-mode-\(UUID().uuidString)"
+        let previousUser = AuthManager.shared.currentUser
+        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+        let previousDefaultHomeMode = UserDefaults.standard.string(forKey: Constants.defaultHomeModeKey)
+
+        defer {
+            AuthManager.shared.currentUser = previousUser
+            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            if let previousDefaultHomeMode {
+                UserDefaults.standard.set(previousDefaultHomeMode, forKey: Constants.defaultHomeModeKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Constants.defaultHomeModeKey)
+            }
+            OnboardingProgressStore.shared.clearProgress(for: userId)
+            PreAuthOnboardingStore.shared.clear()
+        }
+
+        PreAuthOnboardingStore.shared.clear()
+        AuthManager.shared.currentUser = User(
+            id: userId,
+            email: "preauth-default-mode@example.com",
+            name: "Pre Auth"
+        )
+        AuthManager.shared.isAuthenticated = true
+        UserDefaults.standard.set(DefaultHomeMode.avatar.rawValue, forKey: Constants.defaultHomeModeKey)
+
+        let input = BodyScoreInput(
+            sex: .male,
+            birthYear: 1_990,
+            height: HeightValue(value: 70, unit: .inches),
+            weight: WeightValue(value: 185, unit: .pounds),
+            bodyFat: BodyFatValue(percentage: 18, source: .manualValue)
+        )
+        let result = BodyScoreResult(
+            score: 82,
+            ffmi: 21.4,
+            leanPercentile: 0.72,
+            ffmiStatus: "Strong",
+            targetBodyFat: .init(lowerBound: 10, upperBound: 15, label: "Athletic"),
+            statusTagline: "Strong base"
+        )
+
+        PreAuthOnboardingStore.shared.save(
+            input: input,
+            result: result,
+            defaultHomeMode: .photo
+        )
+
+        let viewModel = OnboardingFlowViewModel()
+
+        XCTAssertEqual(viewModel.currentStep, .profileDetails)
+        XCTAssertEqual(viewModel.bodyScoreInput, input)
+        XCTAssertEqual(viewModel.bodyScoreResult, result)
+        XCTAssertEqual(viewModel.defaultHomeMode, .photo)
+        XCTAssertEqual(UserDefaults.standard.string(forKey: Constants.defaultHomeModeKey), DefaultHomeMode.photo.rawValue)
+
+        let savedSnapshot = OnboardingProgressStore.shared.snapshotForTesting(for: userId)
+        XCTAssertEqual(savedSnapshot?.currentStep, .profileDetails)
+        XCTAssertEqual(savedSnapshot?.defaultHomeMode, .photo)
+        XCTAssertNil(PreAuthOnboardingStore.shared.load())
+    }
+
     func testAdvanceAfterHealthConfirmationRequestsBodyFatWhenMissing() {
         let viewModel = OnboardingFlowViewModel()
         viewModel.bodyScoreInput.weight = WeightValue(value: 185, unit: .pounds)

@@ -296,7 +296,11 @@ final class OnboardingFlowViewModel: ObservableObject {
 
         if entryContext == .preAuth {
             if let result = bodyScoreResult {
-                PreAuthOnboardingStore.shared.save(input: bodyScoreInput, result: result)
+                PreAuthOnboardingStore.shared.save(
+                    input: bodyScoreInput,
+                    result: result,
+                    defaultHomeMode: defaultHomeMode
+                )
             }
             currentStep = .emailCapture
         } else {
@@ -767,11 +771,13 @@ final class OnboardingFlowViewModel: ObservableObject {
         guard !hasMarkedOnboardingComplete else { return }
         hasMarkedOnboardingComplete = true
         OnboardingStateManager.shared.markCompleted()
+        UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)
         let updates = buildOnboardingProfileUpdates()
         Task {
             await AuthManager.shared.updateProfile(updates)
         }
         clearPersistedProgress()
+        PreAuthOnboardingStore.shared.clear()
 
         if didRequestHealthSync, UserDefaults.standard.bool(forKey: "healthKitSyncEnabled") {
             scheduleDeferredHealthSync()
@@ -1052,10 +1058,16 @@ final class OnboardingFlowViewModel: ObservableObject {
             progressStore.clearProgress(for: userId)
             return
         }
-        guard let snapshot = progressStore.loadProgress(for: userId), snapshot.currentStep != .paywall else {
+
+        if let snapshot = progressStore.loadProgress(for: userId), snapshot.currentStep != .paywall {
+            restore(snapshot)
             return
         }
 
+        restorePreAuthSnapshotIfNeeded(for: userId)
+    }
+
+    private func restore(_ snapshot: OnboardingProgressSnapshot) {
         isRestoringProgress = true
         currentStep = snapshot.currentStep
         bodyScoreInput = snapshot.bodyScoreInput
@@ -1078,6 +1090,24 @@ final class OnboardingFlowViewModel: ObservableObject {
             currentStep = .profileDetails
         }
         isRestoringProgress = false
+    }
+
+    private func restorePreAuthSnapshotIfNeeded(for userId: String) {
+        guard let snapshot = PreAuthOnboardingStore.shared.load() else { return }
+
+        isRestoringProgress = true
+        bodyScoreInput = snapshot.input
+        bodyScoreResult = snapshot.result
+        defaultHomeMode = snapshot.defaultHomeMode
+        if emailAddress.isEmpty {
+            emailAddress = AuthManager.shared.currentUser?.email ?? ""
+        }
+        currentStep = hasAuthenticatedAccountEmail ? .profileDetails : .emailCapture
+        isRestoringProgress = false
+
+        BodyScoreCache.shared.store(snapshot.result, for: userId)
+        persistProgress()
+        PreAuthOnboardingStore.shared.clear()
     }
 
     private func clearPersistedProgress() {
