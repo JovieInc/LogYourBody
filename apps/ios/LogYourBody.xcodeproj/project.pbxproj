@@ -35,6 +35,8 @@
 		AD3145C12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift */; };
 		AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift */; };
 		AD3145C32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */; };
+		AD3145E22F0A030100ABCDEF /* DashboardMetricsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */; };
+		AD3145E42F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */; };
 		AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */; };
 		AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134002F01313400D134A1 /* NotificationManager.swift */; };
 		AD3134032F01313400D134A1 /* DailyWeighInReminderPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */; };
@@ -390,6 +392,8 @@
 		AD3145B12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineHUD.swift"; sourceTree = "<group>"; };
 		AD3145B22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineAnalytics.swift"; sourceTree = "<group>"; };
 		AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineInsights.swift"; sourceTree = "<group>"; };
+		AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricsSection.swift; sourceTree = "<group>"; };
+		AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+Glp1MetricCard.swift"; sourceTree = "<group>"; };
 		AD723AE82E15FA5C002376C6 /* LoadingManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingManager.swift; sourceTree = "<group>"; };
 		AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseDataClient.swift; sourceTree = "<group>"; };
 		AD723AEE2E15FA5C002376C6 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
@@ -986,8 +990,10 @@
 				AD3145B12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift */,
 				AD3145B22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift */,
 				AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */,
+				AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */,
 				ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */,
 				ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */,
+				AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */,
 				ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */,
 				ADA6002B2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift */,
 				ADA600292ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift */,
@@ -1594,6 +1600,8 @@
 				AD3145C12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift in Sources */,
 				AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */,
 				AD3145C32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift in Sources */,
+				AD3145E22F0A030100ABCDEF /* DashboardMetricsSection.swift in Sources */,
+				AD3145E42F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift in Sources */,
 				ADDC487C2E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift in Sources */,
 				ADDC487D2E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift in Sources */,
 				AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */,
