@@ -131,7 +131,7 @@ struct DashboardMetricsSection: View {
                         chartAccessibilityLabel: "Weight trend for the past week",
                         chartAccessibilityValue: "Latest value \(formatTrendWeightHeadline(currentMetric, weightUsesTrend)) \(weightUnit)",
                         trend: stats.flatMap { makeTrend($0.delta, weightUnit, selectedRange) },
-                        footnote: combinedAverageAndGoal(averageText, weightGoalText)
+                        footnote: metricSummaryFootnote(averageText: averageText, goalText: weightGoalText)
                     )),
                     isButtonContext: true
                 )
@@ -163,7 +163,7 @@ struct DashboardMetricsSection: View {
                         chartAccessibilityLabel: "Body fat percentage trend for the past week",
                         chartAccessibilityValue: "Latest value \(formatBodyFatValue(currentMetric.bodyFatPercentage))%",
                         trend: stats.flatMap { makeTrend($0.delta, "%", selectedRange) },
-                        footnote: combinedAverageAndGoal(averageText, bodyFatGoalText)
+                        footnote: metricSummaryFootnote(averageText: averageText, goalText: bodyFatGoalText)
                     )),
                     isButtonContext: true
                 )
@@ -195,25 +195,12 @@ struct DashboardMetricsSection: View {
                         chartAccessibilityLabel: "FFMI trend for the past week",
                         chartAccessibilityValue: "Latest value \(formatFFMIValue(currentMetric))",
                         trend: stats.flatMap { makeTrend($0.delta, "", selectedRange) },
-                        footnote: combinedAverageAndGoal(averageText, ffmiGoalText)
+                        footnote: metricSummaryFootnote(averageText: averageText, goalText: ffmiGoalText)
                     )),
                     isButtonContext: true
                 )
             }
             .buttonStyle(MetricCardButtonStyle())
         }
-    }
-}
-
-private func combinedAverageAndGoal(_ averageText: String?, _ goalText: String?) -> String? {
-    switch (averageText, goalText) {
-    case let (avg?, goal?):
-        return "\(avg) · \(goal)"
-    case let (avg?, nil):
-        return avg
-    case let (nil, goal?):
-        return goal
-    default:
-        return nil
     }
 }

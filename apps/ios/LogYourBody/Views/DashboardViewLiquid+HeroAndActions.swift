@@ -10,11 +10,8 @@ extension DashboardViewLiquid {
             scoreText: bodyScore.scoreText,
             tagline: bodyScore.tagline,
             ffmiValue: heroFFMIValue(),
-            ffmiCaption: heroFFMICaption(),
             bodyFatValue: heroBodyFatValue(),
-            bodyFatCaption: heroBodyFatCaption(),
             weightValue: heroWeightValue(),
-            weightCaption: heroWeightCaption(),
             deltaText: heroBodyScoreDeltaText(),
             onTapBodyScore: bodyScore.score > 0 ? {
                 selectedMetricType = .bodyScore
@@ -422,59 +419,35 @@ extension DashboardViewLiquid {
 
     func stepsProgressBar(steps: Int, goal: Int) -> some View {
         let clampedGoal = max(goal, 1)
-        let progress = max(0, min(Double(steps) / Double(clampedGoal), 1))
+        let progress = min(Double(steps), Double(clampedGoal))
 
-        return GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 999)
-                    .fill(Color.white.opacity(0.15))
-
-                RoundedRectangle(cornerRadius: 999)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#6EE7F0"),
-                                Color(hex: "#22C1C3")
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: geometry.size.width * CGFloat(progress))
-            }
+        return Gauge(value: progress, in: 0...Double(clampedGoal)) {
+            Text("Steps progress")
         }
+        .gaugeStyle(.accessoryLinearCapacity)
+        .tint(Color.metricAccentSteps)
+        .labelsHidden()
+        .accessibilityHidden(true)
     }
 
     func bodyFatProgressBar(current: Double, goal: Double) -> some View {
         // Body fat range: 0% to 40% (human range)
         let minBF: Double = 0
         let maxBF: Double = 40
-        let range = maxBF - minBF
 
-        // Calculate positions (0.0 to 1.0)
-        let currentPosition = max(0, min(1, (current - minBF) / range))
-        let goalPosition = max(0, min(1, (goal - minBF) / range))
-
-        return VStack(spacing: 0) {
-            ZStack(alignment: .leading) {
-                // Background track
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.white.opacity(0.15))
-                    .frame(height: 4)
-
-                // Progress fill (from min to current value)
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color(hex: "#6EE7F0"))
-                    .frame(width: max(0, currentPosition * 60), height: 4)
-
-                // Goal indicator tick
-                Rectangle()
-                    .fill(Color.white.opacity(0.90))
-                    .frame(width: 2, height: 8)
-                    .offset(x: goalPosition * 60 - 1)
-            }
-            .frame(width: 60, height: 8)
+        return Gauge(value: max(minBF, min(current, maxBF)), in: minBF...maxBF) {
+            Text("Body fat progress")
+        } currentValueLabel: {
+            Text(String(format: "%.1f%%", current))
+        } minimumValueLabel: {
+            Text("0%")
+        } maximumValueLabel: {
+            Text(String(format: "Target %.1f%%", goal))
         }
+        .gaugeStyle(.accessoryLinearCapacity)
+        .tint(Color.metricAccentBodyFat)
+        .labelsHidden()
+        .accessibilityLabel("Body fat \(String(format: "%.1f%%", current)), target \(String(format: "%.1f%%", goal))")
     }
 
     func weightProgressBar(current: Double, goal: Double?, unit: String) -> some View {
@@ -484,31 +457,22 @@ extension DashboardViewLiquid {
             let minWeight = goal - (range / 2)
             let maxWeight = goal + (range / 2)
 
-            // Calculate positions (0.0 to 1.0)
-            let currentPosition = max(0, min(1, (current - minWeight) / (maxWeight - minWeight)))
-            let goalPosition: Double = 0.5  // Goal is always in the middle
-
             return AnyView(
-                VStack(spacing: 0) {
-                    ZStack(alignment: .leading) {
-                        // Background track
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.white.opacity(0.15))
-                            .frame(height: 4)
-
-                        // Progress fill (from min to current value)
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color(hex: "#6EE7F0"))
-                            .frame(width: max(0, currentPosition * 60), height: 4)
-
-                        // Goal indicator tick
-                        Rectangle()
-                            .fill(Color.white.opacity(0.90))
-                            .frame(width: 2, height: 8)
-                            .offset(x: goalPosition * 60 - 1)
-                    }
-                    .frame(width: 60, height: 8)
+                Gauge(value: max(minWeight, min(current, maxWeight)), in: minWeight...maxWeight) {
+                    Text("Weight progress")
+                } currentValueLabel: {
+                    Text(String(format: "%.1f %@", current, unit))
+                } minimumValueLabel: {
+                    Text("")
+                } maximumValueLabel: {
+                    Text(String(format: "Target %.1f %@", goal, unit))
                 }
+                .gaugeStyle(.accessoryLinearCapacity)
+                .tint(Color.metricAccentWeight)
+                .labelsHidden()
+                .accessibilityLabel(
+                    "Weight \(String(format: "%.1f %@", current, unit)), target \(String(format: "%.1f %@", goal, unit))"
+                )
             )
         } else {
             // No goal set - show "Tap to set" placeholder
@@ -522,7 +486,7 @@ extension DashboardViewLiquid {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(Color.liquidTextPrimary.opacity(0.40))
                 }
-                .frame(width: 60, height: 8)
+                .frame(maxWidth: .infinity, minHeight: 8, alignment: .leading)
             )
         }
     }

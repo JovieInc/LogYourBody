@@ -72,13 +72,15 @@ struct BodyScoreShareCardView: View {
                 }
 
                 VStack(spacing: 20) {
-                    BodyScoreGaugeView(score: payload.score)
+                    BodyScoreGaugeView(score: payload.score, scoreText: payload.scoreText)
+                        .scaleEffect(1.35)
                         .frame(maxWidth: .infinity)
+                        .frame(height: 160)
 
-                    Text(payload.scoreText)
-                        .font(.system(size: 72, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .monospacedDigit()
+                    Text(payload.tagline)
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundColor(Color.white.opacity(0.82))
+                        .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
                 }
 

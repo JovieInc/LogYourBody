@@ -117,6 +117,18 @@ func formatAverageFootnote(value: Double, unit: String) -> String {
     return "\(formatted) \(unit) average"
 }
 
+func metricSummaryFootnote(averageText: String?, goalText: String?) -> String? {
+    if let goalText, !goalText.isEmpty {
+        return goalText
+    }
+
+    if let averageText, !averageText.isEmpty {
+        return averageText
+    }
+
+    return nil
+}
+
 extension TimeRange {
     var shortRelativeLabel: String {
         switch self {

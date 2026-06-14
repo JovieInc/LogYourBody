@@ -67,31 +67,20 @@ struct DashboardFFMITile: View {
         // Human FFMI range: 10 (very low) to 30 (elite bodybuilder)
         let minFFMI: Double = 10
         let maxFFMI: Double = 30
-        let range = maxFFMI - minFFMI
 
-        // Calculate positions (0.0 to 1.0)
-        let currentPosition = max(0, min(1, (current - minFFMI) / range))
-        let goalPosition = max(0, min(1, (goal - minFFMI) / range))
-
-        return VStack(spacing: 0) {
-            ZStack(alignment: .leading) {
-                // Background track
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.white.opacity(0.15))
-                    .frame(height: 4)
-
-                // Progress fill (from min to current value)
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color(hex: "#6EE7F0"))
-                    .frame(width: max(0, currentPosition * 60), height: 4)  // 60pt total width
-
-                // Goal indicator tick
-                Rectangle()
-                    .fill(Color.white.opacity(0.90))
-                    .frame(width: 2, height: 8)
-                    .offset(x: goalPosition * 60 - 1)  // Center the tick on goal position
-            }
-            .frame(width: 60, height: 8)  // Container for the bar
+        return Gauge(value: max(minFFMI, min(current, maxFFMI)), in: minFFMI...maxFFMI) {
+            Text("FFMI progress")
+        } currentValueLabel: {
+            Text(String(format: "%.1f", current))
+        } minimumValueLabel: {
+            Text("")
+        } maximumValueLabel: {
+            Text(String(format: "Target %.1f", goal))
         }
+        .gaugeStyle(.accessoryLinearCapacity)
+        .tint(Color.metricAccentFFMI)
+        .labelsHidden()
+        .frame(width: 88, height: 8)
+        .accessibilityLabel("FFMI \(String(format: "%.1f", current)), target \(String(format: "%.1f", goal))")
     }
 }

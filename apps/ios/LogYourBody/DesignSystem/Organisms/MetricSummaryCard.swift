@@ -259,6 +259,9 @@ public struct MetricSummaryCard: View {
                     .foregroundStyle(
                         colorScheme == .dark ? Color.metricTextSecondary : secondaryTextColor
                     )
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

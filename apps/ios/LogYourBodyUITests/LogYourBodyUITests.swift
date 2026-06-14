@@ -213,7 +213,11 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
         statsButton.tap()
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_presence_summary"].exists)
+        let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]
+        XCTAssertTrue(presenceSummary.exists)
+        XCTAssertTrue(presenceSummary.label.contains("Measured"))
+        XCTAssertTrue(presenceSummary.label.contains("Interpolated"))
+        XCTAssertFalse(app.staticTexts["Timeline states"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_phase_insight"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
