@@ -16,13 +16,8 @@ struct Constants {
     static let appVersion = "1.0.0"
     static let buildNumber = "1"
 
-    // MARK: - Feature Flags
+    // MARK: - Product Capabilities
     static let isBodySpecEnabled = true
-    static let appleSignInEnabledFlagKey = "ios_apple_sign_in_enabled"
-    static let phaseInsightFlagKey = "ios_phase_insight"
-    static let glp1WeeklyCheckInFlagKey = "ios_glp1_weekly_checkin"
-    static let bulkProgressPhotoImportFlagKey = "ios_bulk_progress_photo_import"
-    static let photosTabFlagKey = "photos_tab"
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)
     static var baseURL: String {
@@ -131,11 +126,11 @@ struct Constants {
 }
 
 struct AuthSurfacePolicy {
-    static let defaultShowsAppleSignIn = false
+    static let defaultShowsAppleSignIn = true
     static let primarySignInMethod = "email_otp"
 
-    static func shouldShowAppleSignIn(gateEnabled: Bool) -> Bool {
-        gateEnabled
+    static func shouldShowAppleSignIn() -> Bool {
+        true
     }
 }
 
@@ -177,11 +172,8 @@ enum BulkProgressPhotoImportPolicy {
     static let defaultShowsBulkImport = false
     static let activationProgressPhotoCount = 2
 
-    static func shouldShowBulkImport(
-        gateEnabled: Bool,
-        existingProgressPhotoCount: Int
-    ) -> Bool {
-        gateEnabled || existingProgressPhotoCount >= activationProgressPhotoCount
+    static func shouldShowBulkImport(existingProgressPhotoCount: Int) -> Bool {
+        existingProgressPhotoCount >= activationProgressPhotoCount
     }
 
     static func footerText(

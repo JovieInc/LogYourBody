@@ -18,7 +18,7 @@ final class LogYourBodyUITests: XCTestCase {
         // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
-    func testSignedOutAppleSignInHiddenByDefault() throws {
+    func testSignedOutAppleSignInVisibleByDefault() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestSignedOutFixture"]
         app.launch()
@@ -26,7 +26,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["LogYourBody"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.descendants(matching: .any)["login_email_field"].exists)
         XCTAssertTrue(app.buttons["login_email_code_button"].exists)
-        XCTAssertFalse(app.buttons["Continue with Apple"].exists)
+        XCTAssertTrue(app.buttons["Continue with Apple"].exists)
     }
 
     func testEmailVerificationFixtureShowsOTPReadyState() throws {
@@ -218,7 +218,6 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(presenceSummary.label.contains("Measured"))
         XCTAssertTrue(presenceSummary.label.contains("Interpolated"))
         XCTAssertFalse(app.staticTexts["Timeline states"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_phase_insight"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
 
@@ -295,7 +294,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Coming Soon"].exists)
     }
 
-    func testBulkPhotoImportGateOpensScannerEntry() throws {
+    func testBulkPhotoImportActivationOpensScannerEntry() throws {
         let app = XCUIApplication()
         app.launchArguments = [
             "-lybUITestWeightLoggerMVPFixture",

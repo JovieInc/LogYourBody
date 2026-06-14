@@ -60,12 +60,12 @@ struct Glp1WeeklyCheckInSummary: Equatable {
 }
 
 enum Glp1WeeklyCheckInPolicy {
-    static let defaultShowsWeeklyCheckIn = false
+    static let defaultShowsWeeklyCheckIn = true
 
     private static let weeklyDueDays = 6
 
-    static func shouldShowWeeklyCheckIn(gateEnabled: Bool) -> Bool {
-        gateEnabled
+    static func shouldShowWeeklyCheckIn() -> Bool {
+        true
     }
 
     static func summary(

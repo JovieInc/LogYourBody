@@ -109,7 +109,7 @@ struct PhaseInsight: Equatable {
 }
 
 enum PhaseInsightPolicy {
-    static let defaultShowsPhaseInsight = false
+    static let defaultShowsPhaseInsight = true
 
     private static let trendWindowDays: Double = 42
     private static let minimumTrendDays: Double = 14
@@ -117,8 +117,8 @@ enum PhaseInsightPolicy {
     private static let weightChangeThresholdPercentPerWeek = 0.25
     private static let bodyFatChangeThresholdPercentagePoints = 0.3
 
-    static func shouldShowPhaseInsight(gateEnabled: Bool) -> Bool {
-        gateEnabled
+    static func shouldShowPhaseInsight() -> Bool {
+        true
     }
 
     static func insight(for metrics: [BodyMetrics]) -> PhaseInsight {

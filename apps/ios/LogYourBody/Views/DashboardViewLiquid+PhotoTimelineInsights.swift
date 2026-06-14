@@ -191,11 +191,7 @@ extension DashboardViewLiquid {
         }
         #endif
 
-        return PhaseInsightPolicy.shouldShowPhaseInsight(
-            gateEnabled: AnalyticsService.shared.isFeatureEnabled(
-                flagKey: Constants.phaseInsightFlagKey
-            )
-        )
+        return PhaseInsightPolicy.shouldShowPhaseInsight()
     }
 
     var isGlp1WeeklyCheckInEnabled: Bool {
@@ -207,11 +203,7 @@ extension DashboardViewLiquid {
         }
         #endif
 
-        return Glp1WeeklyCheckInPolicy.shouldShowWeeklyCheckIn(
-            gateEnabled: AnalyticsService.shared.isFeatureEnabled(
-                flagKey: Constants.glp1WeeklyCheckInFlagKey
-            )
-        )
+        return Glp1WeeklyCheckInPolicy.shouldShowWeeklyCheckIn()
     }
 
     func loadGlp1WeeklyCheckInDataIfNeeded() {

@@ -112,10 +112,7 @@ struct LoginView: View {
     }
 
     private func refreshAppleSignInVisibility() {
-        let gateEnabled = AnalyticsService.shared.isFeatureEnabled(
-            flagKey: Constants.appleSignInEnabledFlagKey
-        )
-        showsAppleSignIn = AuthSurfacePolicy.shouldShowAppleSignIn(gateEnabled: gateEnabled)
+        showsAppleSignIn = AuthSurfacePolicy.shouldShowAppleSignIn()
     }
 
     private var sessionStatusBanner: some View {

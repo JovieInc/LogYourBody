@@ -44,12 +44,6 @@ final class BugReportManager: ObservableObject {
     }
 
     func handleShakeGesture() {
-        #if canImport(Statsig)
-        if !AnalyticsService.shared.isFeatureEnabled(flagKey: "bug_report_shake_v1") {
-            return
-        }
-        #endif
-
         guard isShakeToReportEnabled else { return }
         guard !isPromptPresented, !isFormPresented else { return }
         guard !isCapturingScreenshot else { return }
