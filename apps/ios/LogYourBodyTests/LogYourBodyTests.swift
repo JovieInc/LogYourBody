@@ -1155,6 +1155,46 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.currentStep, .loading)
     }
 
+    func testPersistedProgressRestoresDefaultHomeModeChoice() {
+        let userId = "onboarding-default-mode-\(UUID().uuidString)"
+        let previousUser = AuthManager.shared.currentUser
+        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+        let previousDefaultHomeMode = UserDefaults.standard.string(forKey: Constants.defaultHomeModeKey)
+
+        defer {
+            AuthManager.shared.currentUser = previousUser
+            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            if let previousDefaultHomeMode {
+                UserDefaults.standard.set(previousDefaultHomeMode, forKey: Constants.defaultHomeModeKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Constants.defaultHomeModeKey)
+            }
+            OnboardingProgressStore.shared.clearProgress(for: userId)
+        }
+
+        AuthManager.shared.currentUser = User(
+            id: userId,
+            email: "default-mode@example.com",
+            name: "Default Mode"
+        )
+        AuthManager.shared.isAuthenticated = true
+        UserDefaults.standard.set(DefaultHomeMode.avatar.rawValue, forKey: Constants.defaultHomeModeKey)
+
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.currentStep = .defaultHomeMode
+        viewModel.updateDefaultHomeMode(.photo)
+
+        let savedSnapshot = OnboardingProgressStore.shared.snapshotForTesting(for: userId)
+        XCTAssertEqual(savedSnapshot?.currentStep, .defaultHomeMode)
+        XCTAssertEqual(savedSnapshot?.defaultHomeMode, .photo)
+
+        UserDefaults.standard.set(DefaultHomeMode.avatar.rawValue, forKey: Constants.defaultHomeModeKey)
+        let restoredViewModel = OnboardingFlowViewModel()
+
+        XCTAssertEqual(restoredViewModel.currentStep, .defaultHomeMode)
+        XCTAssertEqual(restoredViewModel.defaultHomeMode, .photo)
+    }
+
     func testAdvanceAfterHealthConfirmationRequestsBodyFatWhenMissing() {
         let viewModel = OnboardingFlowViewModel()
         viewModel.bodyScoreInput.weight = WeightValue(value: 185, unit: .pounds)
