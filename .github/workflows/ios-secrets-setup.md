@@ -44,8 +44,8 @@ Both environments need these secrets:
 
 Optional production integrations:
 
-- `STATSIG_CLIENT_SDK_KEY`
 - `SENTRY_DSN`
+- `STATSIG_CLIENT_SDK_KEY`
 
 ## Match Setup
 

@@ -28,16 +28,17 @@ Use this checklist before sending a LogYourBody iOS build to TestFlight or App S
   `submit_for_review=true`, `automatic_release=true`, and phased release
   enabled after the TestFlight build is accepted.
 - The approved-release monitor is enabled so Apple-approved builds that enter `PENDING_DEVELOPER_RELEASE` are released without a manual App Store Connect click.
-- Optional GitHub `Production` secrets `STATSIG_CLIENT_SDK_KEY` and `SENTRY_DSN` are real values if present.
+- Optional GitHub `Production` secret `STATSIG_CLIENT_SDK_KEY` is set to the
+  real production client SDK key when Statsig analytics or experiments are
+  needed. V1 launch surfaces must not depend on feature gates.
+- Optional GitHub `Production` secret `SENTRY_DSN` is a real value if present.
 - `ios_apple_sign_in_enabled` stays off for production users until Apple Sign-In
   has physical-device proof.
 - Current JOV-2865 evidence keeps Apple Sign-In safely hidden; production
   enablement still requires physical Apple prompt and Clerk session proof.
-- `ios_full_body_composition_dashboard` stays off for the photo-first MVP App
-  Store launch; it remains a legacy/beta fallback only.
-- `ios_photo_timeline_hud` is the default paid MVP surface only after release
-  evidence proves HUD routing, progress-photo attach, metric/source states,
-  HealthKit-denied fallback, screenshot/device proof, and App Review notes.
+- The photo-first HUD is the default paid MVP surface. V1 launch routing,
+  static avatar buckets, and daily weigh-in reminders must not depend on
+  Statsig feature gates.
 - `ios_phase_insight`, `ios_glp1_weekly_checkin`, and
   `ios_bulk_progress_photo_import` stay off unless separately approved and
   evidenced.

@@ -1703,7 +1703,6 @@ struct DashboardViewLiquid: View {
             Spacer(minLength: 80)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .accessibilityIdentifier("photo_timeline_hud_empty_state")
     }
 }
 

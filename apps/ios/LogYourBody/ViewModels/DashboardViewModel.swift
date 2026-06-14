@@ -52,6 +52,10 @@ final class DashboardViewModel: ObservableObject {
 
                 // Defer full list assignment to a follow-up task so the UI can show something quickly
                 scheduleHistoricalLoadIfNeeded(for: userId)
+            } else {
+                bodyMetrics = []
+                sortedBodyMetricsAscending = []
+                hasLoadedInitialData = true
             }
         } else {
             let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)

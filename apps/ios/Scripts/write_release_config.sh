@@ -92,10 +92,6 @@ case "$REVENUE_CAT_PUBLIC_KEY" in
   *) fail "REVENUE_CAT_PUBLIC_KEY must be a RevenueCat iOS public SDK key that starts with appl_." ;;
 esac
 
-if [ -n "$STATSIG_CLIENT_SDK_KEY" ] && is_placeholder "$STATSIG_CLIENT_SDK_KEY"; then
-  fail "STATSIG_CLIENT_SDK_KEY must be empty or set to a real production value."
-fi
-
 if [ -n "$SENTRY_DSN" ]; then
   require_https_url "SENTRY_DSN" "$SENTRY_DSN"
 fi

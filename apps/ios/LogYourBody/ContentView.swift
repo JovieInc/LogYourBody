@@ -5,24 +5,16 @@
 import SwiftUI
 
 enum LaunchSurfacePolicy {
-    static func shouldShowLegacyFullDashboardBeta(gateEnabled: Bool) -> Bool {
-        gateEnabled
-    }
-
     static func requiresBodyCompositionOnboarding(
-        hasCompletedOnboarding: Bool,
-        legacyFullDashboardBetaEnabled: Bool,
-        photoTimelineHUDEnabled: Bool = false
+        hasCompletedOnboarding: Bool
     ) -> Bool {
-        (legacyFullDashboardBetaEnabled || photoTimelineHUDEnabled) && !hasCompletedOnboarding
+        !hasCompletedOnboarding
     }
 
     static func requiresCompleteProfile(
-        isProfileComplete: Bool,
-        legacyFullDashboardBetaEnabled: Bool,
-        photoTimelineHUDEnabled: Bool = false
+        isProfileComplete: Bool
     ) -> Bool {
-        (legacyFullDashboardBetaEnabled || photoTimelineHUDEnabled) && !isProfileComplete
+        !isProfileComplete
     }
 }
 
@@ -40,7 +32,6 @@ struct ContentView: View {
     @State private var isLoadingComplete = false
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
-    @State private var featureGateRefreshToken = UUID()
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
 
     init() {
@@ -77,58 +68,18 @@ struct ContentView: View {
 
     private var shouldShowOnboarding: Bool {
         LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
-            hasCompletedOnboarding: hasCompletedOnboarding,
-            legacyFullDashboardBetaEnabled: isLegacyFullDashboardBetaEnabled,
-            photoTimelineHUDEnabled: isPhotoTimelineHUDEnabled
+            hasCompletedOnboarding: hasCompletedOnboarding
         )
     }
 
     private var shouldShowProfileCompletion: Bool {
         LaunchSurfacePolicy.requiresCompleteProfile(
-            isProfileComplete: isProfileComplete,
-            legacyFullDashboardBetaEnabled: isLegacyFullDashboardBetaEnabled,
-            photoTimelineHUDEnabled: isPhotoTimelineHUDEnabled
-        )
-    }
-
-    private var isLegacyFullDashboardBetaEnabled: Bool {
-        _ = featureGateRefreshToken
-        return LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(
-            gateEnabled: AnalyticsService.shared.isFeatureEnabled(
-                flagKey: Constants.fullBodyCompositionDashboardFlagKey
-            )
-        )
-    }
-
-    private var isPhotoTimelineHUDEnabled: Bool {
-        _ = featureGateRefreshToken
-        return PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
-            gateEnabled: AnalyticsService.shared.isFeatureEnabled(
-                flagKey: Constants.photoTimelineHUDFlagKey
-            ),
-            mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
-                flagKey: Constants.mvpLoggerFallbackFlagKey
-            )
-        )
-    }
-
-    private var isDailyWeighInReminderGateEnabled: Bool {
-        _ = featureGateRefreshToken
-
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-lybUITestDailyReminderPromptFixture") {
-            return true
-        }
-        #endif
-
-        return AnalyticsService.shared.isFeatureEnabled(
-            flagKey: Constants.dailyWeighInReminderFlagKey
+            isProfileComplete: isProfileComplete
         )
     }
 
     private var shouldShowDailyReminderPrompt: Bool {
         notificationManager.shouldShowPostPaywallPrompt(
-            featureEnabled: isDailyWeighInReminderGateEnabled,
             isSubscribed: revenueCatManager.isSubscribed
         )
     }
@@ -177,9 +128,6 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: OnboardingStateManager.onboardingStateDidChange)) { _ in
             hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
-            featureGateRefreshToken = UUID()
         }
         .onChange(of: authManager.isAuthenticated) { _, newValue in
             currentUserId = authManager.currentUser?.id

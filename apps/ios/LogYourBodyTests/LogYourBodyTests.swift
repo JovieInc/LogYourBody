@@ -10,94 +10,38 @@ import CoreData
 // swiftlint:disable single_test_class
 
 final class LaunchSurfacePolicyTests: XCTestCase {
-    func testGateOffWeightLoggerFallbackSkipsBodyCompositionOnboardingAndProfileGate() {
-        XCTAssertFalse(
+    func testIncompleteOnboardingRequiresBodyCompositionOnboarding() {
+        XCTAssertTrue(
             LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
-                hasCompletedOnboarding: false,
-                legacyFullDashboardBetaEnabled: false
+                hasCompletedOnboarding: false
             )
         )
         XCTAssertFalse(
-            LaunchSurfacePolicy.requiresCompleteProfile(
-                isProfileComplete: false,
-                legacyFullDashboardBetaEnabled: false
+            LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+                hasCompletedOnboarding: true
             )
         )
     }
 
-    func testLegacyFullDashboardBetaGateRestoresBodyCompositionRequirements() {
-        XCTAssertTrue(
-            LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
-                hasCompletedOnboarding: false,
-                legacyFullDashboardBetaEnabled: true
-            )
-        )
+    func testIncompleteProfileRequiresProfileCompletion() {
         XCTAssertTrue(
             LaunchSurfacePolicy.requiresCompleteProfile(
-                isProfileComplete: false,
-                legacyFullDashboardBetaEnabled: true
-            )
-        )
-        XCTAssertFalse(
-            LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
-                hasCompletedOnboarding: true,
-                legacyFullDashboardBetaEnabled: true
+                isProfileComplete: false
             )
         )
         XCTAssertFalse(
             LaunchSurfacePolicy.requiresCompleteProfile(
-                isProfileComplete: true,
-                legacyFullDashboardBetaEnabled: true
-            )
-        )
-    }
-
-    func testLegacyFullDashboardBetaPolicyMirrorsFeatureGate() {
-        XCTAssertTrue(LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(gateEnabled: true))
-        XCTAssertFalse(LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(gateEnabled: false))
-    }
-
-    func testPhotoTimelineHUDGateRestoresBodyCompositionRequirements() {
-        XCTAssertTrue(
-            LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
-                hasCompletedOnboarding: false,
-                legacyFullDashboardBetaEnabled: false,
-                photoTimelineHUDEnabled: true
-            )
-        )
-        XCTAssertTrue(
-            LaunchSurfacePolicy.requiresCompleteProfile(
-                isProfileComplete: false,
-                legacyFullDashboardBetaEnabled: false,
-                photoTimelineHUDEnabled: true
-            )
-        )
-        XCTAssertFalse(
-            LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
-                hasCompletedOnboarding: true,
-                legacyFullDashboardBetaEnabled: false,
-                photoTimelineHUDEnabled: true
-            )
-        )
-        XCTAssertFalse(
-            LaunchSurfacePolicy.requiresCompleteProfile(
-                isProfileComplete: true,
-                legacyFullDashboardBetaEnabled: false,
-                photoTimelineHUDEnabled: true
+                isProfileComplete: true
             )
         )
     }
 }
 
 final class PhotoTimelineHUDPolicyTests: XCTestCase {
-    func testPhotoTimelineHUDDefaultsOffUntilRolloutGateIsEnabled() {
-        XCTAssertFalse(PhotoTimelineHUDPolicy.defaultShowsPhotoTimelineHUD)
-        XCTAssertFalse(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: false))
-        XCTAssertEqual(Constants.photoTimelineHUDFlagKey, "ios_photo_timeline_hud")
-    }
-
-    func testPhotoTimelineHUDCanBeEnabledByGate() {
-        XCTAssertTrue(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: true))
+    func testPhotoTimelineHUDIsDefaultV1Surface() {
+        XCTAssertTrue(PhotoTimelineHUDPolicy.defaultShowsPhotoTimelineHUD)
+        XCTAssertTrue(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD())
+        XCTAssertEqual(PaidAppSurfacePolicy.surface(), .photoTimelineHUD)
     }
 
     func testDefaultHomeModeDefaultsToAvatar() {
@@ -156,76 +100,6 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         )
     }
 
-    func testMVPLoggerFallbackGateOverridesPhotoTimelineDefault() {
-        XCTAssertEqual(Constants.mvpLoggerFallbackFlagKey, "ios_mvp_logger_fallback")
-        XCTAssertFalse(
-            PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
-                gateEnabled: true,
-                mvpLoggerFallbackEnabled: true
-            )
-        )
-        XCTAssertEqual(
-            PaidAppSurfacePolicy.surface(
-                photoTimelineHUDEnabled: true,
-                legacyFullDashboardBetaEnabled: true,
-                mvpLoggerFallbackEnabled: true
-            ),
-            .weightLoggerMVP
-        )
-    }
-
-    func testPhotoTimelineHUDTakesPrecedenceOverLegacyFullDashboard() {
-        XCTAssertEqual(
-            PaidAppSurfacePolicy.surface(
-                photoTimelineHUDEnabled: true,
-                legacyFullDashboardBetaEnabled: true
-            ),
-            .photoTimelineHUD
-        )
-        XCTAssertEqual(
-            PaidAppSurfacePolicy.surface(
-                photoTimelineHUDEnabled: false,
-                legacyFullDashboardBetaEnabled: true
-            ),
-            .legacyFullDashboardBeta
-        )
-        XCTAssertEqual(
-            PaidAppSurfacePolicy.surface(
-                photoTimelineHUDEnabled: false,
-                legacyFullDashboardBetaEnabled: false
-            ),
-            .weightLoggerMVP
-        )
-    }
-
-    func testGateOffRoutingUsesWeightLoggerFallback() {
-        let defaultHUDEnabled = PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(gateEnabled: false)
-
-        XCTAssertEqual(
-            PaidAppSurfacePolicy.surface(
-                photoTimelineHUDEnabled: defaultHUDEnabled,
-                legacyFullDashboardBetaEnabled: false
-            ),
-            .weightLoggerMVP
-        )
-    }
-
-    func testLegacyFullDashboardIsOnlyBetaFallbackWhenHUDIsOff() {
-        XCTAssertEqual(Constants.fullBodyCompositionDashboardFlagKey, "ios_full_body_composition_dashboard")
-
-        let hudPrimary = PaidAppSurfacePolicy.surface(
-            photoTimelineHUDEnabled: true,
-            legacyFullDashboardBetaEnabled: false
-        )
-        let legacyFallback = PaidAppSurfacePolicy.surface(
-            photoTimelineHUDEnabled: false,
-            legacyFullDashboardBetaEnabled: true
-        )
-
-        XCTAssertEqual(hudPrimary, .photoTimelineHUD)
-        XCTAssertEqual(legacyFallback, .legacyFullDashboardBeta)
-    }
-
     func testPhotoTimelineHUDMetricStateCopyIsExplicit() {
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .present), "Measured")
         XCTAssertEqual(
@@ -238,31 +112,21 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
 }
 
 final class DailyReminderPolicyTests: XCTestCase {
-    func testPromptRequiresGateSubscriptionAndIncompletePrompt() {
+    func testPromptRequiresSubscriptionAndIncompletePrompt() {
         XCTAssertTrue(
             DailyReminderPolicy.shouldShowPostPaywallPrompt(
-                featureEnabled: true,
                 isSubscribed: true,
                 hasCompletedPrompt: false
             )
         )
         XCTAssertFalse(
             DailyReminderPolicy.shouldShowPostPaywallPrompt(
-                featureEnabled: false,
-                isSubscribed: true,
-                hasCompletedPrompt: false
-            )
-        )
-        XCTAssertFalse(
-            DailyReminderPolicy.shouldShowPostPaywallPrompt(
-                featureEnabled: true,
                 isSubscribed: false,
                 hasCompletedPrompt: false
             )
         )
         XCTAssertFalse(
             DailyReminderPolicy.shouldShowPostPaywallPrompt(
-                featureEnabled: true,
                 isSubscribed: true,
                 hasCompletedPrompt: true
             )
@@ -270,7 +134,6 @@ final class DailyReminderPolicyTests: XCTestCase {
     }
 
     func testDailyWeighInReminderDefaultsToSevenAM() {
-        XCTAssertEqual(Constants.dailyWeighInReminderFlagKey, "ios_daily_weigh_in_reminders")
         XCTAssertEqual(DailyReminderPolicy.defaultHour, 7)
         XCTAssertEqual(DailyReminderPolicy.defaultMinute, 0)
         XCTAssertEqual(
