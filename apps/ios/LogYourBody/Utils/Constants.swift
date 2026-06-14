@@ -19,15 +19,10 @@ struct Constants {
     // MARK: - Feature Flags
     static let isBodySpecEnabled = true
     static let appleSignInEnabledFlagKey = "ios_apple_sign_in_enabled"
-    // Legacy beta fallback; the intended post-MVP dashboard route is `ios_photo_timeline_hud`.
-    static let fullBodyCompositionDashboardFlagKey = "ios_full_body_composition_dashboard"
-    static let photoTimelineHUDFlagKey = "ios_photo_timeline_hud"
-    static let mvpLoggerFallbackFlagKey = "ios_mvp_logger_fallback"
     static let phaseInsightFlagKey = "ios_phase_insight"
     static let glp1WeeklyCheckInFlagKey = "ios_glp1_weekly_checkin"
     static let bulkProgressPhotoImportFlagKey = "ios_bulk_progress_photo_import"
     static let photosTabFlagKey = "photos_tab"
-    static let dailyWeighInReminderFlagKey = "ios_daily_weigh_in_reminders"
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)
     static var baseURL: String {
@@ -145,17 +140,10 @@ struct AuthSurfacePolicy {
 }
 
 enum PhotoTimelineHUDPolicy {
-    static let defaultShowsPhotoTimelineHUD = false
+    static let defaultShowsPhotoTimelineHUD = true
 
-    static func shouldShowPhotoTimelineHUD(
-        gateEnabled: Bool,
-        mvpLoggerFallbackEnabled: Bool = false
-    ) -> Bool {
-        guard !mvpLoggerFallbackEnabled else {
-            return false
-        }
-
-        return gateEnabled
+    static func shouldShowPhotoTimelineHUD() -> Bool {
+        true
     }
 
     static func stateText(

@@ -177,17 +177,7 @@ final class OnboardingFlowViewModel: ObservableObject {
         self.healthKitManager = healthKitManager
         self.calculator = calculator
         self.includesFirstPhotoStep = includesFirstPhotoStep
-            ?? (
-                entryContext == .authenticated &&
-                    PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
-                        gateEnabled: AnalyticsService.shared.isFeatureEnabled(
-                            flagKey: Constants.photoTimelineHUDFlagKey
-                        ),
-                        mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
-                            flagKey: Constants.mvpLoggerFallbackFlagKey
-                        )
-                    )
-            )
+            ?? (entryContext == .authenticated && PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD())
 
         configureMeasurementPreference()
         hydrateHeightFields()

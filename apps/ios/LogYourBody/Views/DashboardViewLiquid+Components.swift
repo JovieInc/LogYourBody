@@ -312,13 +312,10 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .frame(
-                        width: min(geometry.size.width * 0.88, 360),
-                        height: geometry.size.height * 0.82
-                    )
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 18)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                     .shadow(color: Color.metricAccent.opacity(0.42), radius: 24)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .offset(y: -geometry.size.height * 0.04)
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 6) {

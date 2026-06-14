@@ -124,14 +124,14 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(restoreButton.exists)
     }
 
-    func testPaidMVPFixtureRoutesToGateOffDefaultSurface() throws {
+    func testPaidMVPFixtureRoutesToDefaultTimelineSurface() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestPaidMVPFixture"]
         app.launch()
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_pager"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_hud_empty_state"].exists)
+        XCTAssertTrue(app.staticTexts["Start with a photo"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Weight log"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }

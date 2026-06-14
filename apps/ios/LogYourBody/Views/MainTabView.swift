@@ -12,24 +12,8 @@ enum PaidAppSurface: Equatable {
 }
 
 enum PaidAppSurfacePolicy {
-    static func surface(
-        photoTimelineHUDEnabled: Bool,
-        legacyFullDashboardBetaEnabled: Bool,
-        mvpLoggerFallbackEnabled: Bool = false
-    ) -> PaidAppSurface {
-        if mvpLoggerFallbackEnabled {
-            return .weightLoggerMVP
-        }
-
-        if photoTimelineHUDEnabled {
-            return .photoTimelineHUD
-        }
-
-        if legacyFullDashboardBetaEnabled {
-            return .legacyFullDashboardBeta
-        }
-
-        return .weightLoggerMVP
+    static func surface() -> PaidAppSurface {
+        .photoTimelineHUD
     }
 }
 
@@ -51,9 +35,6 @@ struct MainTabView: View {
             }
         }
         .onAppear {
-            updateSelectedSurface()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
             updateSelectedSurface()
         }
     }
@@ -80,24 +61,7 @@ struct MainTabView: View {
         }
         #endif
 
-        selectedSurface = PaidAppSurfacePolicy.surface(
-            photoTimelineHUDEnabled: PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
-                gateEnabled: AnalyticsService.shared.isFeatureEnabled(
-                    flagKey: Constants.photoTimelineHUDFlagKey
-                ),
-                mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
-                    flagKey: Constants.mvpLoggerFallbackFlagKey
-                )
-            ),
-            legacyFullDashboardBetaEnabled: LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(
-                gateEnabled: AnalyticsService.shared.isFeatureEnabled(
-                    flagKey: Constants.fullBodyCompositionDashboardFlagKey
-                )
-            ),
-            mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
-                flagKey: Constants.mvpLoggerFallbackFlagKey
-            )
-        )
+        selectedSurface = PaidAppSurfacePolicy.surface()
 
         HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
     }

@@ -25,8 +25,8 @@ Required for paid iOS release config:
 
 Optional integrations:
 
-- `STATSIG_CLIENT_SDK_KEY`
 - `SENTRY_DSN`
+- `STATSIG_CLIENT_SDK_KEY`
 
 ## Setup
 

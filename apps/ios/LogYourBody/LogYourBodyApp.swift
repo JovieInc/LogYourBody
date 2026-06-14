@@ -66,7 +66,7 @@ struct LogYourBodyApp: App {
                     Task {
                         await bootstrapHealthKit()
 
-                        if isFullBodyCompositionDashboardEnabled, healthKitManager.isAuthorized {
+                        if healthKitManager.isAuthorized {
                             try? await HealthSyncCoordinator.shared.syncStepsFromHealthKit()
                         }
                     }
@@ -75,10 +75,6 @@ struct LogYourBodyApp: App {
     }
 
     // MARK: - Startup Helpers
-
-    private var isFullBodyCompositionDashboardEnabled: Bool {
-        AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.fullBodyCompositionDashboardFlagKey)
-    }
 
     @MainActor
     private func performStartupSequence() async {
@@ -199,6 +195,7 @@ struct LogYourBodyApp: App {
         let usesFullDashboardFixture = arguments.contains("-lybUITestFullDashboardFixture")
         let usesPhotoTimelineHUDFixture = arguments.contains("-lybUITestPhotoTimelineHUDFixture")
         let usesBodyScoreOnboardingFixture = arguments.contains("-lybUITestBodyScoreOnboardingFixture")
+        let usesDailyReminderPromptFixture = arguments.contains("-lybUITestDailyReminderPromptFixture")
 
         guard usesPaidFixture || usesWeightLoggerFixture || usesPaywallFixture || usesFullDashboardFixture ||
             usesPhotoTimelineHUDFixture || usesBodyScoreOnboardingFixture else {
@@ -283,6 +280,9 @@ struct LogYourBodyApp: App {
             revenueCatManager.applyCachedPaywallOfferingUITestFixture()
         }
         UserDefaults.standard.set(isSubscribed, forKey: "revenuecat_isSubscribed")
+        if isSubscribed && !usesDailyReminderPromptFixture {
+            NotificationManager.shared.skipDailyWeighInPrompt()
+        }
 
         UserDefaults.standard.set(
             MeasurementSystem.imperial.rawValue,
@@ -418,31 +418,14 @@ struct LogYourBodyApp: App {
                 return
             }
 
-            // Check if body-composition onboarding/profile gates apply to this launch surface.
+            // Check if body-composition onboarding/profile requirements apply before logging.
             let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Constants.hasCompletedOnboardingKey)
             let isProfileComplete = checkProfileComplete()
-            let legacyFullDashboardBetaEnabled = LaunchSurfacePolicy.shouldShowLegacyFullDashboardBeta(
-                gateEnabled: AnalyticsService.shared.isFeatureEnabled(
-                    flagKey: Constants.fullBodyCompositionDashboardFlagKey
-                )
-            )
-            let photoTimelineHUDEnabled = PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD(
-                gateEnabled: AnalyticsService.shared.isFeatureEnabled(
-                    flagKey: Constants.photoTimelineHUDFlagKey
-                ),
-                mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
-                    flagKey: Constants.mvpLoggerFallbackFlagKey
-                )
-            )
             let requiresOnboarding = LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
-                hasCompletedOnboarding: hasCompletedOnboarding,
-                legacyFullDashboardBetaEnabled: legacyFullDashboardBetaEnabled,
-                photoTimelineHUDEnabled: photoTimelineHUDEnabled
+                hasCompletedOnboarding: hasCompletedOnboarding
             )
             let requiresProfile = LaunchSurfacePolicy.requiresCompleteProfile(
-                isProfileComplete: isProfileComplete,
-                legacyFullDashboardBetaEnabled: legacyFullDashboardBetaEnabled,
-                photoTimelineHUDEnabled: photoTimelineHUDEnabled
+                isProfileComplete: isProfileComplete
             )
 
             if requiresOnboarding || requiresProfile {

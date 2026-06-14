@@ -17,20 +17,18 @@ struct AvatarBodyRenderer: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.black
-
+        GeometryReader { geometry in
             Image(avatar.assetName)
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
-                .padding(.horizontal, 10)
-                .padding(.vertical, 14)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(width: geometry.size.width, height: geometry.size.height)
                 .shadow(color: Color.metricAccent.opacity(0.36), radius: 16)
                 .accessibilityHidden(true)
         }
         .frame(height: height)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityLabel(avatar.accessibilityLabel)
     }
 }

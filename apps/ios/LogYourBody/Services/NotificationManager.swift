@@ -14,11 +14,10 @@ enum DailyReminderPolicy {
     static let defaultMinute = 0
 
     static func shouldShowPostPaywallPrompt(
-        featureEnabled: Bool,
         isSubscribed: Bool,
         hasCompletedPrompt: Bool
     ) -> Bool {
-        featureEnabled && isSubscribed && !hasCompletedPrompt
+        isSubscribed && !hasCompletedPrompt
     }
 
     static func normalizedTime(hour: Int, minute: Int) -> (hour: Int, minute: Int) {
@@ -106,9 +105,8 @@ final class NotificationManager: ObservableObject {
         return Calendar.current.date(from: components) ?? Date()
     }
 
-    func shouldShowPostPaywallPrompt(featureEnabled: Bool, isSubscribed: Bool) -> Bool {
+    func shouldShowPostPaywallPrompt(isSubscribed: Bool) -> Bool {
         DailyReminderPolicy.shouldShowPostPaywallPrompt(
-            featureEnabled: featureEnabled,
             isSubscribed: isSubscribed,
             hasCompletedPrompt: hasCompletedDailyWeighInPrompt
         )

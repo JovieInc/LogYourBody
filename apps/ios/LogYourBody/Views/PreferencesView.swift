@@ -47,7 +47,6 @@ struct PreferencesView: View {
     @State private var isTriggeringHealthResync = false
     @State private var isHealthSyncSetupInProgress = false
     @State private var dailyReminderDate = Date()
-    @State private var featureGateRefreshToken = UUID()
 
     // Cached computed properties for performance
     @State private var cachedUserGender: String = ""
@@ -99,20 +98,6 @@ struct PreferencesView: View {
 
     private var currentFFMIGoal: Double {
         customFFMIGoal ?? defaultFFMIGoal
-    }
-
-    private var isDailyWeighInReminderGateEnabled: Bool {
-        _ = featureGateRefreshToken
-
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-lybUITestDailyReminderPromptFixture") {
-            return true
-        }
-        #endif
-
-        return AnalyticsService.shared.isFeatureEnabled(
-            flagKey: Constants.dailyWeighInReminderFlagKey
-        )
     }
 
     // Update cached values when user profile changes
@@ -174,9 +159,7 @@ struct PreferencesView: View {
                     accountSection
                     profileSection
                     trackingGoalsSection
-                    if isDailyWeighInReminderGateEnabled {
-                        remindersSection
-                    }
+                    remindersSection
                     integrationsSection
                     securitySection
                     subscriptionSection
@@ -246,9 +229,6 @@ struct PreferencesView: View {
             Task {
                 await notificationManager.refreshAuthorizationStatus()
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
-            featureGateRefreshToken = UUID()
         }
     }
 
