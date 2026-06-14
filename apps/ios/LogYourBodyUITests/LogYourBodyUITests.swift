@@ -191,6 +191,16 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
 
+    func testPhotoHUDFixtureDefaultsToAvatarHeroWhenNoPhotoExists() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_avatar"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["dashboard_home_timeline_photo_stage"].exists)
+    }
+
     func testPhaseInsightFixtureShowsDeterministicCuttingInsight() throws {
         let app = XCUIApplication()
         app.launchArguments = [
