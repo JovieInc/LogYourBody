@@ -43,9 +43,9 @@ extension DashboardViewLiquid {
     }
 
     var photoTimelinePresenceSummary: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Timeline states")
+                Text("Timeline data")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
 
@@ -56,21 +56,13 @@ extension DashboardViewLiquid {
                     .foregroundColor(Color.metricTextTertiary)
             }
 
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8)
-                ],
-                spacing: 8
-            ) {
-                ForEach(MetricPresence.allCases, id: \.rawValue) { presence in
-                    photoTimelinePresenceChip(
-                        title: photoTimelinePresenceLabel(for: presence),
-                        count: timelinePresenceCounts[presence] ?? 0,
-                        color: photoTimelinePresenceColor(for: presence)
-                    )
-                }
-            }
+            Text(photoTimelinePresenceLegendText)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color.metricTextSecondary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("photo_timeline_stats_presence_legend")
         }
         .padding(14)
         .background(
@@ -81,35 +73,17 @@ extension DashboardViewLiquid {
             RoundedRectangle(cornerRadius: 18)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Timeline data. \(photoTimelinePresenceLegendText). \(timelinePresenceValueCount) values.")
         .accessibilityIdentifier("photo_timeline_stats_presence_summary")
     }
 
-    func photoTimelinePresenceChip(
-        title: String,
-        count: Int,
-        color: Color
-    ) -> some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color.metricTextSecondary)
-
-            Spacer(minLength: 4)
-
-            Text("\(count)")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(.white)
+    var photoTimelinePresenceLegendText: String {
+        MetricPresence.allCases.map { presence in
+            let label = photoTimelinePresenceLabel(for: presence)
+            let count = timelinePresenceCounts[presence] ?? 0
+            return "\(label) \(count)"
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.055))
-        )
-        .accessibilityLabel("\(title), \(count) timeline values")
+        .joined(separator: " • ")
     }
 }

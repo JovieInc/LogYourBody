@@ -291,17 +291,4 @@ extension DashboardViewLiquid {
             return "Missing"
         }
     }
-
-    func photoTimelinePresenceColor(for presence: MetricPresence) -> Color {
-        switch presence {
-        case .present:
-            return Color.metricChartLine
-        case .interpolated:
-            return Color.metricAccentBodyFat
-        case .lastKnown:
-            return Color.metricAccentFFMI
-        case .missing:
-            return Color.metricTextTertiary
-        }
-    }
 }
