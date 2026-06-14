@@ -64,9 +64,144 @@ struct RevenueCatSubscriptionAnalyticsTransition {
     }
 }
 
+struct RevenueCatEntitlementSnapshot: Equatable {
+    let isActive: Bool
+    let expirationDate: Date?
+    let periodType: PeriodType
+    let willRenew: Bool
+    let productIdentifier: String
+    let unsubscribeDetectedAt: Date?
+}
+
+struct RevenueCatCustomerSnapshot {
+    let customerInfo: CustomerInfo?
+    let originalAppUserId: String
+    let entitlement: RevenueCatEntitlementSnapshot?
+
+    init(
+        customerInfo: CustomerInfo? = nil,
+        originalAppUserId: String,
+        entitlement: RevenueCatEntitlementSnapshot?
+    ) {
+        self.customerInfo = customerInfo
+        self.originalAppUserId = originalAppUserId
+        self.entitlement = entitlement
+    }
+
+    init(customerInfo: CustomerInfo, entitlementID: String) {
+        let entitlement = customerInfo.entitlements[entitlementID]
+        self.init(
+            customerInfo: customerInfo,
+            originalAppUserId: customerInfo.originalAppUserId,
+            entitlement: entitlement.map {
+                RevenueCatEntitlementSnapshot(
+                    isActive: $0.isActive,
+                    expirationDate: $0.expirationDate,
+                    periodType: $0.periodType,
+                    willRenew: $0.willRenew,
+                    productIdentifier: $0.productIdentifier,
+                    unsubscribeDetectedAt: $0.unsubscribeDetectedAt
+                )
+            }
+        )
+    }
+}
+
+enum RevenueCatPurchasingError: Error, Equatable {
+    case purchaseCancelled
+    case storeProblem
+    case purchaseNotAllowed
+    case purchaseInvalid
+    case unexpected(String)
+
+    static func from(_ error: Error) -> RevenueCatPurchasingError {
+        guard let errorCode = error as? ErrorCode else {
+            return .unexpected(error.localizedDescription)
+        }
+
+        switch errorCode {
+        case .purchaseCancelledError:
+            return .purchaseCancelled
+        case .storeProblemError:
+            return .storeProblem
+        case .purchaseNotAllowedError:
+            return .purchaseNotAllowed
+        case .purchaseInvalidError:
+            return .purchaseInvalid
+        default:
+            return .unexpected(error.localizedDescription)
+        }
+    }
+}
+
+@MainActor
+protocol RevenueCatPurchasesProtocol: AnyObject {
+    func configure(apiKey: String, delegate: PurchasesDelegate)
+    func logIn(userId: String, entitlementID: String) async throws -> RevenueCatCustomerSnapshot
+    func logOut() async throws
+    func customerInfo(entitlementID: String) async throws -> RevenueCatCustomerSnapshot
+    func offerings() async throws -> Offerings
+    func purchase(package: Package, entitlementID: String) async throws -> RevenueCatCustomerSnapshot
+    func restorePurchases(entitlementID: String) async throws -> RevenueCatCustomerSnapshot
+}
+
+@MainActor
+final class LiveRevenueCatPurchasesClient: RevenueCatPurchasesProtocol {
+    func configure(apiKey: String, delegate: PurchasesDelegate) {
+        Purchases.logLevel = .debug
+        Purchases.configure(withAPIKey: apiKey)
+        Purchases.shared.delegate = delegate
+    }
+
+    func logIn(userId: String, entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
+        let (customerInfo, _) = try await Purchases.shared.logIn(userId)
+        return RevenueCatCustomerSnapshot(customerInfo: customerInfo, entitlementID: entitlementID)
+    }
+
+    func logOut() async throws {
+        _ = try await Purchases.shared.logOut()
+    }
+
+    func customerInfo(entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
+        let customerInfo = try await Purchases.shared.customerInfo()
+        return RevenueCatCustomerSnapshot(customerInfo: customerInfo, entitlementID: entitlementID)
+    }
+
+    func offerings() async throws -> Offerings {
+        try await Purchases.shared.offerings()
+    }
+
+    func purchase(package: Package, entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
+        do {
+            let (_, customerInfo, _) = try await Purchases.shared.purchase(package: package)
+            return RevenueCatCustomerSnapshot(customerInfo: customerInfo, entitlementID: entitlementID)
+        } catch {
+            throw RevenueCatPurchasingError.from(error)
+        }
+    }
+
+    func restorePurchases(entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
+        do {
+            let customerInfo = try await Purchases.shared.restorePurchases()
+            return RevenueCatCustomerSnapshot(customerInfo: customerInfo, entitlementID: entitlementID)
+        } catch {
+            throw RevenueCatPurchasingError.from(error)
+        }
+    }
+}
+
 @MainActor
 class RevenueCatManager: NSObject, ObservableObject {
     static let shared = RevenueCatManager()
+
+    private enum DefaultsKey {
+        static let isSubscribed = "revenuecat_isSubscribed"
+        static let lastFetchTimestamp = "revenuecat_lastFetchTimestamp"
+        static let subscriptionAnalyticsPhase = "revenuecat_subscriptionAnalyticsPhase"
+        static let subscriptionAnalyticsAppUserId = "revenuecat_subscriptionAnalyticsAppUserId"
+        static let trialExpirationTimestamp = "revenuecat_trialExpirationTimestamp"
+        static let cachedPaywallOfferingDisplay = "revenuecat_cachedPaywallOfferingDisplay"
+    }
 
     // MARK: - Published Properties
 
@@ -88,38 +223,53 @@ class RevenueCatManager: NSObject, ObservableObject {
     /// Last successfully loaded offering shape, used only for display when offerings fail to load.
     @Published private(set) var cachedPaywallOfferingDisplay: CachedPaywallOfferingDisplay?
 
-    // MARK: - Cached Properties (AppStorage)
-
-    /// Cached subscription status for faster app startup
-    @AppStorage("revenuecat_isSubscribed") private var cachedIsSubscribed: Bool = false
-
-    /// Timestamp of last successful customer info fetch
-    @AppStorage("revenuecat_lastFetchTimestamp") private var lastFetchTimestamp: Double = 0
-
-    /// Last locally observed subscription analytics phase for idempotent trial funnel events.
-    @AppStorage("revenuecat_subscriptionAnalyticsPhase") private var cachedSubscriptionAnalyticsPhase: String =
-        RevenueCatSubscriptionAnalyticsPhase.none.rawValue
-
-    /// RevenueCat app user associated with the cached analytics phase.
-    @AppStorage("revenuecat_subscriptionAnalyticsAppUserId") private var cachedSubscriptionAnalyticsAppUserId: String = ""
-
-    /// Last observed trial expiration used to classify canceled trials after they expire.
-    @AppStorage("revenuecat_trialExpirationTimestamp") private var cachedTrialExpirationTimestamp: Double = 0
-
     // MARK: - Constants
 
     /// The entitlement identifier that grants pro access
     /// IMPORTANT: This must match the entitlement lookup_key in RevenueCat dashboard
-    private let proEntitlementID = Constants.proEntitlementID
+    static let entitlementID = Constants.proEntitlementID
+
+    private let proEntitlementID = RevenueCatManager.entitlementID
 
     /// Cache expiry duration (24 hours)
     private let cacheExpiryDuration: TimeInterval = 24 * 60 * 60
 
-    /// Last successful paywall offering display snapshot.
-    private let cachedPaywallOfferingDisplayKey = "revenuecat_cachedPaywallOfferingDisplay"
-
     /// Flag to track if SDK has been configured
     private var isConfigured: Bool = false
+
+    private let purchasesClient: RevenueCatPurchasesProtocol
+    private let userDefaults: UserDefaults
+    private var currentEntitlementSnapshot: RevenueCatEntitlementSnapshot?
+
+    // MARK: - Cached Properties
+
+    private var cachedIsSubscribed: Bool {
+        get { userDefaults.bool(forKey: DefaultsKey.isSubscribed) }
+        set { userDefaults.set(newValue, forKey: DefaultsKey.isSubscribed) }
+    }
+
+    private var lastFetchTimestamp: Double {
+        get { userDefaults.double(forKey: DefaultsKey.lastFetchTimestamp) }
+        set { userDefaults.set(newValue, forKey: DefaultsKey.lastFetchTimestamp) }
+    }
+
+    private var cachedSubscriptionAnalyticsPhase: String {
+        get {
+            userDefaults.string(forKey: DefaultsKey.subscriptionAnalyticsPhase)
+                ?? RevenueCatSubscriptionAnalyticsPhase.none.rawValue
+        }
+        set { userDefaults.set(newValue, forKey: DefaultsKey.subscriptionAnalyticsPhase) }
+    }
+
+    private var cachedSubscriptionAnalyticsAppUserId: String {
+        get { userDefaults.string(forKey: DefaultsKey.subscriptionAnalyticsAppUserId) ?? "" }
+        set { userDefaults.set(newValue, forKey: DefaultsKey.subscriptionAnalyticsAppUserId) }
+    }
+
+    private var cachedTrialExpirationTimestamp: Double {
+        get { userDefaults.double(forKey: DefaultsKey.trialExpirationTimestamp) }
+        set { userDefaults.set(newValue, forKey: DefaultsKey.trialExpirationTimestamp) }
+    }
 
     #if DEBUG
     /// Keeps the paywall unavailable-state fixture deterministic without touching production purchase paths.
@@ -128,7 +278,16 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     // MARK: - Initialization
 
-    override private init() {
+    override private convenience init() {
+        self.init(purchasesClient: LiveRevenueCatPurchasesClient(), userDefaults: .standard)
+    }
+
+    init(
+        purchasesClient: RevenueCatPurchasesProtocol,
+        userDefaults: UserDefaults = .standard
+    ) {
+        self.purchasesClient = purchasesClient
+        self.userDefaults = userDefaults
         super.init()
         // print("💰 RevenueCatManager initialized")
 
@@ -146,12 +305,7 @@ class RevenueCatManager: NSObject, ObservableObject {
         Task { @MainActor in
             // print("💰 Configuring RevenueCat SDK")
 
-            // Configure SDK
-            Purchases.logLevel = .debug
-            Purchases.configure(withAPIKey: apiKey)
-
-            // Set up delegate to listen for customer info updates
-            Purchases.shared.delegate = self
+            purchasesClient.configure(apiKey: apiKey, delegate: self)
 
             // Mark configured only after delegate wiring finishes to avoid race conditions
             self.markAsConfigured()
@@ -177,9 +331,9 @@ class RevenueCatManager: NSObject, ObservableObject {
         // print("💰 Identifying user: \(userId)")
 
         do {
-            let (customerInfo, _) = try await Purchases.shared.logIn(userId)
+            let customer = try await purchasesClient.logIn(userId: userId, entitlementID: proEntitlementID)
             await MainActor.run {
-                self.updateSubscriptionStatus(customerInfo: customerInfo)
+                self.updateSubscriptionStatus(customer: customer)
             }
             // print("💰 User identified successfully")
         } catch {
@@ -207,17 +361,19 @@ class RevenueCatManager: NSObject, ObservableObject {
             isSubscribed = false
             cachedIsSubscribed = false
             currentOffering = nil
+            currentEntitlementSnapshot = nil
             resetSubscriptionAnalyticsCache()
             return
         }
 
         do {
-            _ = try await Purchases.shared.logOut()
+            try await purchasesClient.logOut()
             await MainActor.run {
                 self.customerInfo = nil
                 self.isSubscribed = false
                 self.cachedIsSubscribed = false
                 self.currentOffering = nil
+                self.currentEntitlementSnapshot = nil
                 self.resetSubscriptionAnalyticsCache()
             }
         } catch {
@@ -244,9 +400,9 @@ class RevenueCatManager: NSObject, ObservableObject {
         // print("💰 Refreshing customer info")
 
         do {
-            let customerInfo = try await Purchases.shared.customerInfo()
+            let customer = try await purchasesClient.customerInfo(entitlementID: proEntitlementID)
             await MainActor.run {
-                self.updateSubscriptionStatus(customerInfo: customerInfo)
+                self.updateSubscriptionStatus(customer: customer)
                 // print("💰 Subscription status: \(self.isSubscribed ? "Active" : "Inactive")")
             }
         } catch {
@@ -261,6 +417,8 @@ class RevenueCatManager: NSObject, ObservableObject {
 
             await MainActor.run {
                 self.isSubscribed = false
+                self.cachedIsSubscribed = false
+                self.currentEntitlementSnapshot = nil
             }
         }
     }
@@ -272,12 +430,12 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     /// Get subscription expiration date
     var subscriptionExpirationDate: Date? {
-        return customerInfo?.entitlements[proEntitlementID]?.expirationDate
+        return currentEntitlementSnapshot?.expirationDate
     }
 
     /// Check if subscription is in trial period
     var isInTrialPeriod: Bool {
-        return customerInfo?.entitlements[proEntitlementID]?.periodType == .trial
+        return currentEntitlementSnapshot?.periodType == .trial
     }
 
     // MARK: - Offerings & Purchases
@@ -311,7 +469,7 @@ class RevenueCatManager: NSObject, ObservableObject {
         // print("💰 Fetching offerings")
 
         do {
-            let offerings = try await Purchases.shared.offerings()
+            let offerings = try await purchasesClient.offerings()
             await MainActor.run {
                 self.currentOffering = offerings.current
                 if let current = offerings.current {
@@ -358,17 +516,20 @@ class RevenueCatManager: NSObject, ObservableObject {
         }
 
         do {
-            let (_, customerInfo, _) = try await Purchases.shared.purchase(package: package)
+            let customer = try await purchasesClient.purchase(
+                package: package,
+                entitlementID: proEntitlementID
+            )
 
             await MainActor.run {
-                self.updateSubscriptionStatus(customerInfo: customerInfo)
+                self.updateSubscriptionStatus(customer: customer)
                 self.isPurchasing = false
             }
 
             // print("💰 Purchase successful!")
             return true
-        } catch let error as ErrorCode {
-            if error != .purchaseCancelledError {
+        } catch let error as RevenueCatPurchasingError {
+            if error != .purchaseCancelled {
                 let appError = AppError.billing(operation: "purchase", underlying: error)
                 let context = ErrorContext(
                     feature: "billing",
@@ -383,21 +544,21 @@ class RevenueCatManager: NSObject, ObservableObject {
                 self.isPurchasing = false
 
                 switch error {
-                case .purchaseCancelledError:
+                case .purchaseCancelled:
                     // print("💰 Purchase cancelled by user")
                     // Don't show error for user cancellation
                     break
-                case .storeProblemError:
+                case .storeProblem:
                     self.errorMessage = "There was a problem with the App Store. Please try again."
-                case .purchaseNotAllowedError:
+                case .purchaseNotAllowed:
                     self.errorMessage = "Purchases are not allowed on this device."
-                case .purchaseInvalidError:
+                case .purchaseInvalid:
                     self.errorMessage = "Purchase failed. Please try again."
-                default:
-                    self.errorMessage = "Purchase failed: \(error.localizedDescription)"
+                case .unexpected(let message):
+                    self.errorMessage = "Purchase failed: \(message)"
                 }
 
-                // print("❌ Purchase failed: \(error.localizedDescription)")
+                // print("❌ Purchase failed: \(error)")
             }
             return false
         } catch {
@@ -437,10 +598,10 @@ class RevenueCatManager: NSObject, ObservableObject {
         }
 
         do {
-            let customerInfo = try await Purchases.shared.restorePurchases()
+            let customer = try await purchasesClient.restorePurchases(entitlementID: proEntitlementID)
 
             await MainActor.run {
-                self.updateSubscriptionStatus(customerInfo: customerInfo)
+                self.updateSubscriptionStatus(customer: customer)
                 self.isPurchasing = false
             }
 
@@ -506,7 +667,7 @@ class RevenueCatManager: NSObject, ObservableObject {
 
         do {
             let data = try JSONEncoder().encode(display)
-            UserDefaults.standard.set(data, forKey: cachedPaywallOfferingDisplayKey)
+            userDefaults.set(data, forKey: DefaultsKey.cachedPaywallOfferingDisplay)
         } catch {
             ErrorReporter.shared.capture(
                 AppError.billing(operation: "cachePaywallOfferingDisplay", underlying: error),
@@ -629,7 +790,7 @@ class RevenueCatManager: NSObject, ObservableObject {
     }
 
     private func loadCachedPaywallOfferingDisplay() -> CachedPaywallOfferingDisplay? {
-        guard let data = UserDefaults.standard.data(forKey: cachedPaywallOfferingDisplayKey) else {
+        guard let data = userDefaults.data(forKey: DefaultsKey.cachedPaywallOfferingDisplay) else {
             return nil
         }
 
@@ -656,11 +817,12 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     /// Update subscription status and cache it for faster app startup
     /// Call this method whenever customerInfo is updated to keep cache in sync
-    private func updateSubscriptionStatus(customerInfo: CustomerInfo) {
-        self.customerInfo = customerInfo
-        let entitlement = customerInfo.entitlements[proEntitlementID]
+    private func updateSubscriptionStatus(customer: RevenueCatCustomerSnapshot) {
+        self.customerInfo = customer.customerInfo
+        let entitlement = customer.entitlement
         let isActive = entitlement?.isActive == true
-        trackTrialAnalyticsIfNeeded(customerInfo: customerInfo, entitlement: entitlement, now: Date())
+        self.currentEntitlementSnapshot = entitlement
+        trackTrialAnalyticsIfNeeded(customer: customer, entitlement: entitlement, now: Date())
         self.isSubscribed = isActive
         self.cachedIsSubscribed = isActive
         self.lastFetchTimestamp = Date().timeIntervalSince1970
@@ -674,11 +836,11 @@ class RevenueCatManager: NSObject, ObservableObject {
     }
 
     private func trackTrialAnalyticsIfNeeded(
-        customerInfo: CustomerInfo,
-        entitlement: EntitlementInfo?,
+        customer: RevenueCatCustomerSnapshot,
+        entitlement: RevenueCatEntitlementSnapshot?,
         now: Date
     ) {
-        resetSubscriptionAnalyticsCacheIfNeeded(for: customerInfo.originalAppUserId)
+        resetSubscriptionAnalyticsCacheIfNeeded(for: customer.originalAppUserId)
 
         let previousPhase = RevenueCatSubscriptionAnalyticsPhase(rawValue: cachedSubscriptionAnalyticsPhase) ?? .none
         let currentPhase = subscriptionAnalyticsPhase(
@@ -691,7 +853,7 @@ class RevenueCatManager: NSObject, ObservableObject {
             AnalyticsService.shared.track(
                 event: event.rawValue,
                 properties: trialAnalyticsProperties(
-                    customerInfo: customerInfo,
+                    customer: customer,
                     entitlement: entitlement,
                     previousPhase: previousPhase,
                     currentPhase: currentPhase
@@ -701,7 +863,7 @@ class RevenueCatManager: NSObject, ObservableObject {
 
         persistSubscriptionAnalyticsPhase(
             currentPhase,
-            appUserId: customerInfo.originalAppUserId,
+            appUserId: customer.originalAppUserId,
             entitlement: entitlement
         )
     }
@@ -722,7 +884,7 @@ class RevenueCatManager: NSObject, ObservableObject {
     }
 
     private func subscriptionAnalyticsPhase(
-        entitlement: EntitlementInfo?,
+        entitlement: RevenueCatEntitlementSnapshot?,
         previousPhase: RevenueCatSubscriptionAnalyticsPhase,
         now: Date
     ) -> RevenueCatSubscriptionAnalyticsPhase {
@@ -751,7 +913,7 @@ class RevenueCatManager: NSObject, ObservableObject {
     private func persistSubscriptionAnalyticsPhase(
         _ phase: RevenueCatSubscriptionAnalyticsPhase,
         appUserId: String,
-        entitlement: EntitlementInfo?
+        entitlement: RevenueCatEntitlementSnapshot?
     ) {
         cachedSubscriptionAnalyticsPhase = phase.rawValue
         cachedSubscriptionAnalyticsAppUserId = appUserId
@@ -764,8 +926,8 @@ class RevenueCatManager: NSObject, ObservableObject {
     }
 
     private func trialAnalyticsProperties(
-        customerInfo: CustomerInfo,
-        entitlement: EntitlementInfo?,
+        customer: RevenueCatCustomerSnapshot,
+        entitlement: RevenueCatEntitlementSnapshot?,
         previousPhase: RevenueCatSubscriptionAnalyticsPhase,
         currentPhase: RevenueCatSubscriptionAnalyticsPhase
     ) -> [String: String] {
@@ -773,7 +935,7 @@ class RevenueCatManager: NSObject, ObservableObject {
             "entitlement_id": proEntitlementID,
             "previous_phase": previousPhase.rawValue,
             "current_phase": currentPhase.rawValue,
-            "app_user_id": customerInfo.originalAppUserId
+            "app_user_id": customer.originalAppUserId
         ]
 
         if let entitlement {
@@ -820,7 +982,12 @@ extension RevenueCatManager: PurchasesDelegate {
     nonisolated func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
         Task { @MainActor in
             // print("💰 Received updated customer info")
-            self.updateSubscriptionStatus(customerInfo: customerInfo)
+            self.updateSubscriptionStatus(
+                customer: RevenueCatCustomerSnapshot(
+                    customerInfo: customerInfo,
+                    entitlementID: RevenueCatManager.entitlementID
+                )
+            )
         }
     }
 }
