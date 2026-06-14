@@ -306,7 +306,9 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
                 bodyFatPercentage: bodyFatPercentage,
                 gender: gender,
                 height: geometry.size.height,
-                padding: 18,
+                padding: 8,
+                verticalPadding: 0,
+                horizontalFillScale: 1.04,
                 alignment: .bottom
             )
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
