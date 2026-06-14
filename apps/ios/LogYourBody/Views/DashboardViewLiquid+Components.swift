@@ -83,6 +83,9 @@ struct DashboardHomeTimelineHero: View {
                     displayMode: $displayMode
                 )
 
+                timelineGradient
+                    .allowsHitTesting(false)
+
                 if !shouldShowPhoto {
                     DashboardHomeTimelineAvatarPlaceholder(
                         bodyFatPercentage: metric.bodyFatPercentage,
@@ -91,9 +94,6 @@ struct DashboardHomeTimelineHero: View {
                     )
                     .allowsHitTesting(false)
                 }
-
-                timelineGradient
-                    .allowsHitTesting(false)
             }
             .aspectRatio(4.0 / 5.0, contentMode: .fit)
             .frame(maxWidth: .infinity)
@@ -287,6 +287,10 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
     let gender: String?
     let mode: DefaultHomeMode
 
+    private var avatar: AvatarBodyFatCatalog.Match {
+        AvatarBodyFatCatalog.match(bodyFatPercentage: bodyFatPercentage, gender: gender)
+    }
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -304,42 +308,39 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
 
                 timelineGrid
 
-                if let bodyFatPercentage {
-                    DashboardHomeTimelineSilhouette(
-                        bodyFatPercentage: bodyFatPercentage,
-                        gender: gender ?? "male"
-                    )
-                    .stroke(Color.white.opacity(0.64), lineWidth: 2)
+                Image(avatar.assetName)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
                     .frame(
-                        width: min(geometry.size.width * 0.62, 260),
-                        height: geometry.size.height * 0.58
+                        width: min(geometry.size.width * 0.88, 360),
+                        height: geometry.size.height * 0.82
                     )
-                    .shadow(color: Color.metricAccent.opacity(0.35), radius: 18)
+                    .shadow(color: Color.metricAccent.opacity(0.42), radius: 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .offset(y: -geometry.size.height * 0.04)
-                } else {
-                    Image(systemName: "figure.stand")
-                        .font(.system(size: min(geometry.size.width * 0.24, 92), weight: .thin))
-                        .foregroundColor(Color.white.opacity(0.56))
-                        .shadow(color: Color.metricAccent.opacity(0.34), radius: 18)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .offset(y: -geometry.size.height * 0.04)
-                }
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(mode == .avatar ? "Avatar mode" : "Metrics only")
+                    Text(mode == .avatar ? "Avatar" : "Avatar fallback")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(Color.white.opacity(0.82))
+                        .foregroundColor(Color.white.opacity(0.9))
                         .textCase(.uppercase)
 
-                    Text(mode == .avatar ? "Private body timeline" : "Private avatar fallback")
+                    Text(avatar.badgeText)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.58))
+                        .foregroundColor(Color.white.opacity(0.76))
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .padding(.top, geometry.size.height * 0.24)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.black.opacity(0.58))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(.leading, 20)
+                .padding(.bottom, 18)
             }
         }
+        .accessibilityLabel(avatar.accessibilityLabel)
     }
 
     private var timelineGrid: some View {
@@ -360,109 +361,6 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
             }
             .stroke(Color.white.opacity(0.045), lineWidth: 1)
         }
-    }
-}
-
-private struct DashboardHomeTimelineSilhouette: Shape {
-    let bodyFatPercentage: Double
-    let gender: String
-
-    func path(in rect: CGRect) -> Path {
-        let proportions = proportions(for: bodyFatPercentage, gender: gender)
-        let centerX = rect.midX
-        let width = rect.width * 0.68
-        let headTop = rect.minY + rect.height * 0.05
-        let headHeight = rect.height * 0.14
-        let neckTop = headTop + headHeight
-        let shoulderTop = neckTop + rect.height * 0.06
-        let chestMid = shoulderTop + rect.height * 0.16
-        let waistTop = shoulderTop + rect.height * 0.32
-        let hipTop = waistTop + rect.height * 0.12
-        let bottom = rect.maxY - rect.height * 0.06
-        let headRadius = width * 0.12
-        let shoulderX = width * proportions.shoulder / 2
-        let waistX = width * proportions.waist / 2
-        let hipX = width * proportions.hip / 2
-        let neckX = width * 0.11
-        let armReach = width * 0.16
-
-        var path = Path()
-
-        path.addEllipse(in: CGRect(
-            x: centerX - headRadius,
-            y: headTop,
-            width: headRadius * 2,
-            height: headHeight
-        ))
-
-        path.move(to: CGPoint(x: centerX - neckX, y: neckTop))
-        path.addLine(to: CGPoint(x: centerX - neckX, y: shoulderTop))
-        path.move(to: CGPoint(x: centerX + neckX, y: neckTop))
-        path.addLine(to: CGPoint(x: centerX + neckX, y: shoulderTop))
-
-        path.move(to: CGPoint(x: centerX - shoulderX, y: shoulderTop))
-        path.addCurve(
-            to: CGPoint(x: centerX - waistX, y: waistTop),
-            control1: CGPoint(x: centerX - shoulderX, y: chestMid),
-            control2: CGPoint(x: centerX - waistX, y: chestMid)
-        )
-
-        path.move(to: CGPoint(x: centerX + shoulderX, y: shoulderTop))
-        path.addCurve(
-            to: CGPoint(x: centerX + waistX, y: waistTop),
-            control1: CGPoint(x: centerX + shoulderX, y: chestMid),
-            control2: CGPoint(x: centerX + waistX, y: chestMid)
-        )
-
-        path.move(to: CGPoint(x: centerX - waistX, y: waistTop))
-        path.addLine(to: CGPoint(x: centerX - hipX, y: hipTop))
-        path.addLine(to: CGPoint(x: centerX - hipX * 0.72, y: bottom))
-
-        path.move(to: CGPoint(x: centerX + waistX, y: waistTop))
-        path.addLine(to: CGPoint(x: centerX + hipX, y: hipTop))
-        path.addLine(to: CGPoint(x: centerX + hipX * 0.72, y: bottom))
-
-        path.move(to: CGPoint(x: centerX - shoulderX, y: shoulderTop))
-        path.addLine(to: CGPoint(x: centerX - shoulderX - armReach, y: waistTop))
-
-        path.move(to: CGPoint(x: centerX + shoulderX, y: shoulderTop))
-        path.addLine(to: CGPoint(x: centerX + shoulderX + armReach, y: waistTop))
-
-        return path
-    }
-
-    private func proportions(
-        for bodyFatPercentage: Double,
-        gender: String
-    ) -> (shoulder: CGFloat, waist: CGFloat, hip: CGFloat) {
-        let lower: Double
-        let upper: Double
-        let normalizedGender = gender.lowercased()
-        let isFemale = normalizedGender.contains("female") || normalizedGender.contains("woman")
-
-        if isFemale {
-            lower = 15
-            upper = 32
-        } else {
-            lower = 10
-            upper = 28
-        }
-
-        let ratio = CGFloat(min(max((bodyFatPercentage - lower) / (upper - lower), 0), 1))
-
-        if isFemale {
-            return (
-                shoulder: 0.74 - ratio * 0.08,
-                waist: 0.58 + ratio * 0.24,
-                hip: 0.76 + ratio * 0.10
-            )
-        }
-
-        return (
-            shoulder: 0.94 - ratio * 0.14,
-            waist: 0.60 + ratio * 0.27,
-            hip: 0.66 + ratio * 0.14
-        )
     }
 }
 
