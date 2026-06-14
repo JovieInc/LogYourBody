@@ -231,6 +231,15 @@
 		ADDC47EA2E2D89F3003C97E7 /* LogWeightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B042E15FA5C002376C6 /* LogWeightView.swift */; };
 		ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B052E15FA5C002376C6 /* MainTabView.swift */; };
 		ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B062E15FA5C002376C6 /* PreferencesView.swift */; };
+		AD3147B12F0B000100ABCDEF /* PreferenceGoalEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3147A12F0B000100ABCDEF /* PreferenceGoalEditing.swift */; };
+		AD3147B22F0B000200ABCDEF /* PreferenceGoalRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3147A22F0B000200ABCDEF /* PreferenceGoalRows.swift */; };
+		AD3147B32F0B000300ABCDEF /* PreferencesView+TrackingGoalsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3147A32F0B000300ABCDEF /* PreferencesView+TrackingGoalsSection.swift */; };
+		AD3147B42F0B000400ABCDEF /* PreferencesView+AccountSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3147A42F0B000400ABCDEF /* PreferencesView+AccountSection.swift */; };
+		AD3147B52F0B000500ABCDEF /* PreferencesView+Header.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3147A52F0B000500ABCDEF /* PreferencesView+Header.swift */; };
+		AD3147B62F0B000600ABCDEF /* PreferencesView+RemindersSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3147A62F0B000600ABCDEF /* PreferencesView+RemindersSection.swift */; };
+		AD3147B72F0B000700ABCDEF /* PreferencesView+SecuritySubscriptionSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3147A72F0B000700ABCDEF /* PreferencesView+SecuritySubscriptionSection.swift */; };
+		AD3147B82F0B000800ABCDEF /* PreferencesView+PhotosAdvancedSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3147A82F0B000800ABCDEF /* PreferencesView+PhotosAdvancedSection.swift */; };
+		AD3147B92F0B000900ABCDEF /* PreferencesView+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3147A92F0B000900ABCDEF /* PreferencesView+Helpers.swift */; };
 		ADDC47EE2E2D89F3003C97E7 /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B092E15FA5C002376C6 /* SignUpView.swift */; };
 		ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B0E2E15FA5C002376C6 /* ContentView.swift */; };
 		ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B122E15FA5C002376C6 /* LogYourBodyApp.swift */; };
@@ -414,6 +423,15 @@
 		AD723B042E15FA5C002376C6 /* LogWeightView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogWeightView.swift; sourceTree = "<group>"; };
 		AD723B052E15FA5C002376C6 /* MainTabView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		AD723B062E15FA5C002376C6 /* PreferencesView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
+		AD3147A12F0B000100ABCDEF /* PreferenceGoalEditing.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferenceGoalEditing.swift; sourceTree = "<group>"; };
+		AD3147A22F0B000200ABCDEF /* PreferenceGoalRows.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferenceGoalRows.swift; sourceTree = "<group>"; };
+		AD3147A32F0B000300ABCDEF /* PreferencesView+TrackingGoalsSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "PreferencesView+TrackingGoalsSection.swift"; sourceTree = "<group>"; };
+		AD3147A42F0B000400ABCDEF /* PreferencesView+AccountSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "PreferencesView+AccountSection.swift"; sourceTree = "<group>"; };
+		AD3147A52F0B000500ABCDEF /* PreferencesView+Header.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "PreferencesView+Header.swift"; sourceTree = "<group>"; };
+		AD3147A62F0B000600ABCDEF /* PreferencesView+RemindersSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "PreferencesView+RemindersSection.swift"; sourceTree = "<group>"; };
+		AD3147A72F0B000700ABCDEF /* PreferencesView+SecuritySubscriptionSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "PreferencesView+SecuritySubscriptionSection.swift"; sourceTree = "<group>"; };
+		AD3147A82F0B000800ABCDEF /* PreferencesView+PhotosAdvancedSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "PreferencesView+PhotosAdvancedSection.swift"; sourceTree = "<group>"; };
+		AD3147A92F0B000900ABCDEF /* PreferencesView+Helpers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "PreferencesView+Helpers.swift"; sourceTree = "<group>"; };
 		AD723B092E15FA5C002376C6 /* SignUpView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		AD723B0B2E15FA5C002376C6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AD723B0C2E15FA5C002376C6 /* Config.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
@@ -1044,6 +1062,15 @@
 				AD723B042E15FA5C002376C6 /* LogWeightView.swift */,
 				AD723B052E15FA5C002376C6 /* MainTabView.swift */,
 				AD723B062E15FA5C002376C6 /* PreferencesView.swift */,
+				AD3147A12F0B000100ABCDEF /* PreferenceGoalEditing.swift */,
+				AD3147A22F0B000200ABCDEF /* PreferenceGoalRows.swift */,
+				AD3147A42F0B000400ABCDEF /* PreferencesView+AccountSection.swift */,
+				AD3147A52F0B000500ABCDEF /* PreferencesView+Header.swift */,
+				AD3147A92F0B000900ABCDEF /* PreferencesView+Helpers.swift */,
+				AD3147A82F0B000800ABCDEF /* PreferencesView+PhotosAdvancedSection.swift */,
+				AD3147A62F0B000600ABCDEF /* PreferencesView+RemindersSection.swift */,
+				AD3147A72F0B000700ABCDEF /* PreferencesView+SecuritySubscriptionSection.swift */,
+				AD3147A32F0B000300ABCDEF /* PreferencesView+TrackingGoalsSection.swift */,
 				AD723B092E15FA5C002376C6 /* SignUpView.swift */,
 			);
 			path = Views;
@@ -1708,6 +1735,15 @@
 				ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */,
 				AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */,
 					ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */,
+					AD3147B12F0B000100ABCDEF /* PreferenceGoalEditing.swift in Sources */,
+					AD3147B22F0B000200ABCDEF /* PreferenceGoalRows.swift in Sources */,
+					AD3147B42F0B000400ABCDEF /* PreferencesView+AccountSection.swift in Sources */,
+					AD3147B52F0B000500ABCDEF /* PreferencesView+Header.swift in Sources */,
+					AD3147B92F0B000900ABCDEF /* PreferencesView+Helpers.swift in Sources */,
+					AD3147B82F0B000800ABCDEF /* PreferencesView+PhotosAdvancedSection.swift in Sources */,
+					AD3147B62F0B000600ABCDEF /* PreferencesView+RemindersSection.swift in Sources */,
+					AD3147B72F0B000700ABCDEF /* PreferencesView+SecuritySubscriptionSection.swift in Sources */,
+					AD3147B32F0B000300ABCDEF /* PreferencesView+TrackingGoalsSection.swift in Sources */,
 					AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */,
 					ADA600242ED2596700088042 /* BodyScoreProfileDetailsView.swift in Sources */,
 					ADA600502ED401000088042 /* BodyScoreFirstProgressPhotoView.swift in Sources */,

@@ -7,6 +7,11 @@
 
 import SwiftUI
 
+enum AvatarBodyRenderMode {
+    case fit
+    case fillWidth
+}
+
 struct AvatarBodyRenderer: View {
     let bodyFatPercentage: Double?
     let gender: String?
@@ -15,6 +20,7 @@ struct AvatarBodyRenderer: View {
     var verticalPadding: CGFloat = 0
     var horizontalFillScale: CGFloat = 1
     var alignment: Alignment = .center
+    var renderMode: AvatarBodyRenderMode = .fit
 
     private var avatar: AvatarBodyFatCatalog.Match {
         AvatarBodyFatCatalog.match(bodyFatPercentage: bodyFatPercentage, gender: gender)
@@ -32,7 +38,7 @@ struct AvatarBodyRenderer: View {
             Image(avatar.assetName)
                 .resizable()
                 .interpolation(.high)
-                .scaledToFit()
+                .aspectRatio(contentMode: renderMode == .fillWidth ? .fill : .fit)
                 .frame(
                     width: contentWidth * clampedHorizontalFillScale,
                     height: contentHeight,

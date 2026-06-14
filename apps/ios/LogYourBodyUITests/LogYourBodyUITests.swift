@@ -128,13 +128,7 @@ final class LogYourBodyUITests: XCTestCase {
         app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
-
-        let settingsButton = app.buttons["mvp_settings_button"]
-        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
-        settingsButton.tap()
-
-        XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 5))
+        try openSettings(in: app)
 
         let logoutButton = app.descendants(matching: .any)["settings_logout_button"]
         XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
@@ -147,6 +141,39 @@ final class LogYourBodyUITests: XCTestCase {
         let restoreButton = app.descendants(matching: .any)["settings_restore_purchases_button"]
         scrollUntilHittable(restoreButton, in: app)
         XCTAssertTrue(restoreButton.exists)
+    }
+
+    func testSubscribedMVPSettingsWeightGoalUsesNativeValidatedEditor() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
+        app.launch()
+
+        try openSettings(in: app)
+
+        let weightGoalButton = app.buttons["settings_weight_goal_edit_button"]
+        scrollUntilHittable(weightGoalButton, in: app)
+        XCTAssertTrue(weightGoalButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(weightGoalButton.isHittable)
+        weightGoalButton.tap()
+
+        let field = app.descendants(matching: .any)["settings_goal_editor_text_field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+
+        let error = app.staticTexts["settings_goal_editor_error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 3))
+        XCTAssertEqual(error.label, "Enter a value.")
+        XCTAssertFalse(app.buttons["Save"].isEnabled)
+
+        field.tap()
+        field.typeText("180")
+
+        let saveButton = app.buttons["Save"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(saveButton.isEnabled)
+        saveButton.tap()
+
+        XCTAssertTrue(weightGoalButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(weightGoalButton.label.contains("180.0 lbs"))
     }
 
     func testPaidMVPFixtureRoutesToDefaultTimelineSurface() throws {
@@ -323,13 +350,7 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func openIntegrations(in app: XCUIApplication) throws {
-        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
-
-        let settingsButton = app.buttons["mvp_settings_button"]
-        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
-        settingsButton.tap()
-
-        XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 5))
+        try openSettings(in: app)
 
         let integrationsButton = app.buttons.matching(
             NSPredicate(format: "label CONTAINS %@", "Integrations")
@@ -340,5 +361,15 @@ final class LogYourBodyUITests: XCTestCase {
         integrationsButton.tap()
 
         XCTAssertTrue(app.navigationBars["Integrations"].waitForExistence(timeout: 5))
+    }
+
+    private func openSettings(in app: XCUIApplication) throws {
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
+
+        let settingsButton = app.buttons["mvp_settings_button"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
+        settingsButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 5))
     }
 }
