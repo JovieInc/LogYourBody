@@ -59,6 +59,7 @@ class LoadingManager: ObservableObject {
             || arguments.contains("-lybUITestEmailVerificationFixture")
             || arguments.contains("-lybUITestPaidMVPFixture")
             || arguments.contains("-lybUITestPaywallFixture")
+            || arguments.contains("-lybUITestPaywallPlansFixture")
             || arguments.contains("-lybUITestFullDashboardFixture")
             || arguments.contains("-lybUITestPhotoTimelineHUDFixture")
     }
