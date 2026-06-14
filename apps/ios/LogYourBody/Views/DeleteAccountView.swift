@@ -161,57 +161,10 @@ struct DeleteAccountView: View {
 
         Task {
             do {
-                // Log out from RevenueCat (this will dissociate the user from their subscription)
-                // Note: The subscription itself will remain active until expiration
-                // RevenueCat webhooks will handle backend cleanup
-                await RevenueCatManager.shared.logoutUser()
-
-                await HealthSyncCoordinator.shared.resetForCurrentUser()
-
-                // Best-effort call to backend pipeline to delete Supabase data and assets
-                await authManager.notifyBackendOfAccountDeletion()
-
-                // Delete from Clerk
-                try await deleteClerkAccount()
-
-                // Clear local data
-                await MainActor.run {
-                    // Clear Core Data
-                    CoreDataManager.shared.deleteAllData()
-
-                    // Clear UserDefaults
-                    UserDefaults.standard.removeObject(forKey: Constants.currentUserKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.authTokenKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.hasCompletedOnboardingKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.onboardingCompletedVersionKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.preferredWeightUnitKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.preferredMeasurementSystemKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.goalWeightKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.goalBodyFatPercentageKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.goalFFMIKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.timelineModeKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.deletePhotosAfterImportKey)
-                    UserDefaults.standard.removeObject(forKey: Constants.hasPromptedDeletePhotosKey)
-                    UserDefaults.standard.removeObject(forKey: "stepGoal")
-                    UserDefaults.standard.removeObject(forKey: "metricsOrder")
-                    UserDefaults.standard.removeObject(forKey: "dashboard_selected_time_range")
-                    UserDefaults.standard.removeObject(forKey: "dashboard_weight_uses_trend")
-                    UserDefaults.standard.removeObject(forKey: "biometricLockEnabled")
-                    UserDefaults.standard.removeObject(forKey: "revenuecat_isSubscribed")
-                    UserDefaults.standard.removeObject(forKey: "revenuecat_lastFetchTimestamp")
-                    UserDefaults.standard.removeObject(forKey: "healthKitSyncEnabled")
-                    UserDefaults.standard.removeObject(forKey: "HasSyncedHistoricalSteps")
-                    UserDefaults.standard.removeObject(forKey: "lastSupabaseSyncDate")
-                    UserDefaults.standard.removeObject(forKey: "lastHealthKitWeightSyncDate")
-                    UserDefaults.standard.removeObject(forKey: "appleSignInName")
-                    UserDefaults.standard.removeObject(forKey: "lastSyncDate")
-                    UserDefaults.standard.removeObject(forKey: "hasSeenWhatsNew")
-
-                    // Sign out
-                    Task {
-                        await authManager.logout()
-                    }
-                }
+                try await AccountDeletionCleanupService.live(
+                    authManager: authManager,
+                    deleteClerkAccount: deleteClerkAccount
+                ).performDeletion()
             } catch {
                 await MainActor.run {
                     isDeleting = false
@@ -230,6 +183,125 @@ struct DeleteAccountView: View {
 
         // Delete the user through Clerk
         try await user.delete()
+    }
+}
+
+struct AccountDeletionCleanupService {
+    struct Dependencies {
+        var logoutRevenueCat: () async -> Void
+        var resetHealthKitAnchors: () async -> Void
+        var notifyBackendOfAccountDeletion: () async -> Void
+        var deleteClerkAccount: () async throws -> Void
+        var deleteCoreData: () async throws -> Void
+        var clearKeychain: () -> Void
+        var deleteSpotlightMetrics: () -> Void
+        var clearUserDefaults: () -> [String]
+        var logoutAuthSession: () async -> Void
+    }
+
+    static let accountUserDefaultsKeys: [String] = [
+        Constants.hasCompletedOnboardingKey,
+        Constants.onboardingCompletedVersionKey,
+        Constants.preferredWeightUnitKey,
+        Constants.preferredMeasurementSystemKey,
+        Constants.goalWeightKey,
+        Constants.goalBodyFatPercentageKey,
+        Constants.goalFFMIKey,
+        Constants.timelineModeKey,
+        Constants.defaultHomeModeKey,
+        Constants.deletePhotosAfterImportKey,
+        Constants.hasPromptedDeletePhotosKey,
+        "stepGoal",
+        "metricsOrder",
+        "dashboard_selected_time_range",
+        "dashboard_weight_uses_trend",
+        "biometricLockEnabled",
+        "revenuecat_isSubscribed",
+        "revenuecat_lastFetchTimestamp",
+        "healthKitSyncEnabled",
+        "HasSyncedHistoricalSteps",
+        "lastSupabaseSyncDate",
+        "lastHealthKitWeightSyncDate",
+        "appleSignInName",
+        "lastSyncDate",
+        "hasSeenWhatsNew"
+    ]
+
+    private let dependencies: Dependencies
+
+    init(dependencies: Dependencies) {
+        self.dependencies = dependencies
+    }
+
+    static func live(
+        authManager: AuthManager,
+        deleteClerkAccount: @escaping () async throws -> Void
+    ) -> AccountDeletionCleanupService {
+        AccountDeletionCleanupService(
+            dependencies: Dependencies(
+                logoutRevenueCat: {
+                    // Dissociates RevenueCat from the deleted account; subscriptions expire normally.
+                    await RevenueCatManager.shared.logoutUser()
+                },
+                resetHealthKitAnchors: {
+                    await HealthSyncCoordinator.shared.resetForCurrentUser()
+                },
+                notifyBackendOfAccountDeletion: {
+                    await authManager.notifyBackendOfAccountDeletion()
+                },
+                deleteClerkAccount: deleteClerkAccount,
+                deleteCoreData: {
+                    try await CoreDataManager.shared.deleteAllDataAndWait()
+                },
+                clearKeychain: {
+                    try? KeychainManager.shared.clearAll()
+                },
+                deleteSpotlightMetrics: {
+                    BodyMetricSpotlightIndexer.deleteAllIndexedMetrics()
+                },
+                clearUserDefaults: {
+                    clearAccountUserDefaults(in: .standard)
+                },
+                logoutAuthSession: {
+                    await authManager.logout()
+                }
+            )
+        )
+    }
+
+    func performDeletion() async throws {
+        await dependencies.logoutRevenueCat()
+        await dependencies.resetHealthKitAnchors()
+        await dependencies.notifyBackendOfAccountDeletion()
+        try await dependencies.deleteClerkAccount()
+
+        var localCleanupError: Error?
+        do {
+            try await dependencies.deleteCoreData()
+        } catch {
+            localCleanupError = error
+        }
+
+        dependencies.clearKeychain()
+        _ = dependencies.clearUserDefaults()
+        dependencies.deleteSpotlightMetrics()
+        await dependencies.logoutAuthSession()
+
+        if let localCleanupError {
+            throw localCleanupError
+        }
+    }
+
+    @discardableResult
+    static func clearAccountUserDefaults(in defaults: UserDefaults) -> [String] {
+        var removedKeys = AuthManager.migrateLegacyAuthStorage(in: defaults)
+
+        for key in accountUserDefaultsKeys where defaults.object(forKey: key) != nil {
+            defaults.removeObject(forKey: key)
+            removedKeys.append(key)
+        }
+
+        return removedKeys
     }
 }
 
