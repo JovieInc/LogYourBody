@@ -85,8 +85,6 @@ struct DashboardHomeTimelineHero: View {
                     )
                     .accessibilityIdentifier("dashboard_home_timeline_photo_stage")
                 } else {
-                    Color.black
-
                     DashboardHomeTimelineAvatarPlaceholder(
                         bodyFatPercentage: metric.bodyFatPercentage,
                         gender: gender,
@@ -95,12 +93,12 @@ struct DashboardHomeTimelineHero: View {
                     .allowsHitTesting(false)
                 }
 
-                timelineGradient
+                timelineGradient(isPhoto: shouldShowPhoto)
                     .allowsHitTesting(false)
             }
             .aspectRatio(4.0 / 5.0, contentMode: .fit)
             .frame(maxWidth: .infinity)
-            .background(Color.black)
+            .background(shouldShowPhoto ? Color.black : Color.clear)
             .clipped()
             .overlay(alignment: .top) {
                 timelineDateBar
@@ -117,12 +115,16 @@ struct DashboardHomeTimelineHero: View {
         .accessibilityIdentifier("dashboard_home_timeline_hero")
     }
 
-    private var timelineGradient: some View {
+    private func timelineGradient(isPhoto: Bool) -> some View {
         LinearGradient(
-            colors: [
+            colors: isPhoto ? [
                 Color.black.opacity(0.62),
                 Color.black.opacity(0.05),
                 Color.black.opacity(0.86)
+            ] : [
+                Color.black.opacity(0.34),
+                Color.black.opacity(0.00),
+                Color.black.opacity(0.38)
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -300,14 +302,16 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
 
     var body: some View {
         GeometryReader { geometry in
-            Image(avatar.assetName)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFill()
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
-                .clipped()
-                .accessibilityHidden(true)
+            AvatarBodyRenderer(
+                bodyFatPercentage: bodyFatPercentage,
+                gender: gender,
+                height: geometry.size.height,
+                padding: 18,
+                alignment: .bottom
+            )
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
         }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityIdentifier("dashboard_home_timeline_avatar")
     }

@@ -32,6 +32,10 @@
 		AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */; };
 		AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */; };
 		AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145A12F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift */; };
+		AD3145C12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift */; };
+		AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift */; };
+		AD3145C32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */; };
+		AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */; };
 		AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134002F01313400D134A1 /* NotificationManager.swift */; };
 		AD3134032F01313400D134A1 /* DailyWeighInReminderPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */; };
 		AD0B7BF52EC552FA008B29E7 /* LogYourBody.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */; };
@@ -383,6 +387,9 @@
 		AD3134002F01313400D134A1 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyWeighInReminderPromptView.swift; sourceTree = "<group>"; };
 		AD3145A12F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoAttachSheet.swift; sourceTree = "<group>"; };
+		AD3145B12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineHUD.swift"; sourceTree = "<group>"; };
+		AD3145B22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineAnalytics.swift"; sourceTree = "<group>"; };
+		AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineInsights.swift"; sourceTree = "<group>"; };
 		AD723AE82E15FA5C002376C6 /* LoadingManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingManager.swift; sourceTree = "<group>"; };
 		AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseDataClient.swift; sourceTree = "<group>"; };
 		AD723AEE2E15FA5C002376C6 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
@@ -522,6 +529,7 @@
 		ADA4B7522ED0E61600F4262A /* ErrorReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorReporter.swift; sourceTree = "<group>"; };
 		ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardFFMITile.swift; path = Components/DashboardFFMITile.swift; sourceTree = "<group>"; };
 		ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardPrimaryMetricCard.swift; path = Components/DashboardPrimaryMetricCard.swift; sourceTree = "<group>"; };
+		AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AvatarBodyRenderer.swift; path = Components/AvatarBodyRenderer.swift; sourceTree = "<group>"; };
 		ADA4B75A2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+MetricsHelpers.swift"; sourceTree = "<group>"; };
 		ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		ADA600212ED2594200088042 /* DexaResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DexaResult.swift; sourceTree = "<group>"; };
@@ -732,6 +740,7 @@
 			children = (
 				ADF1F6B72ED4C63900745F33 /* GlobalTimelineHeader.swift */,
 				ADA600252ED259A700088042 /* BodyScoreShareCard.swift */,
+				AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */,
 				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
 				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
 				ADA4B74E2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift */,
@@ -974,6 +983,9 @@
 			children = (
 				AD8F12F22ED7C97B003C4559 /* BugReportViews.swift */,
 				ADA6003F2ED2D32C00088042 /* DashboardViewLiquid+HeroAndActions.swift */,
+				AD3145B12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift */,
+				AD3145B22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift */,
+				AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */,
 				ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */,
 				ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */,
 				ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */,
@@ -1574,10 +1586,14 @@
 				AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */,
 				AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */,
 				AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */,
+				AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */,
 				AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
 				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,
+				AD3145C12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift in Sources */,
+				AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */,
+				AD3145C32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift in Sources */,
 				ADDC487C2E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift in Sources */,
 				ADDC487D2E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift in Sources */,
 				AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */,
