@@ -48,7 +48,7 @@ final class ValidationService {
             throw ValidationError.invalidBodyFat("Please enter a valid percentage")
         }
 
-        let range = 3.0...50.0
+        let range = 3.0...60.0
         guard range.contains(bodyFat) else {
             throw ValidationError.invalidBodyFat("Body fat must be between \(Int(range.lowerBound))-\(Int(range.upperBound))%")
         }

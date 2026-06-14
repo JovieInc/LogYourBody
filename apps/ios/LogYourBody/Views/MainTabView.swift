@@ -89,7 +89,7 @@ enum PaidWeightLoggerMVPPolicy {
     static func syncStatusText(status: RealtimeSyncManager.SyncStatus, pendingCount: Int) -> String {
         switch status {
         case .syncing:
-            return "Syncing now"
+            return "Syncing"
         case .success:
             return "Synced"
         case .error:
@@ -97,12 +97,12 @@ enum PaidWeightLoggerMVPPolicy {
         case .offline:
             return pendingCount > 0 ? "Saved offline" : "Offline"
         case .idle:
-            return pendingCount > 0 ? "Sync queued" : "Ready"
+            return pendingCount > 0 ? "Pending sync" : "Synced"
         }
     }
 
     static func savedConfirmationText(isOnline: Bool) -> String {
-        isOnline ? "Saved locally. Sync queued." : "Saved locally. Will sync when online."
+        isOnline ? "Saved locally. Pending sync." : "Saved locally. Will sync when online."
     }
 }
 

@@ -260,17 +260,11 @@ struct EnhancedOTPInputView: View {
         // Check if it's a valid OTP code
         if numbers.count == numberOfDigits {
             clipboardCode = numbers
+            showPasteButton = true
 
-            // Only show paste button if clipboard changed recently (within 3 seconds)
-            if let changeTime = UIPasteboard.general.changeCount.description.data(using: .utf8),
-               let lastChange = try? JSONDecoder().decode(Date.self, from: changeTime),
-               Date().timeIntervalSince(lastChange) < 3 {
-                showPasteButton = true
-
-                // Hide paste button after 10 seconds
-                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                    showPasteButton = false
-                }
+            // Hide paste affordance after a short grace period if the user ignores it.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                showPasteButton = false
             }
         } else {
             showPasteButton = false

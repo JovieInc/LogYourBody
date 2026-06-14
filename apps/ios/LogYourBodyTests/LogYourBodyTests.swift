@@ -990,7 +990,7 @@ final class PaidWeightLoggerMVPPolicyTests: XCTestCase {
     func testSyncStatusCopyAvoidsRawPendingState() {
         XCTAssertEqual(
             PaidWeightLoggerMVPPolicy.syncStatusText(status: .idle, pendingCount: 1),
-            "Sync queued"
+            "Pending sync"
         )
         XCTAssertEqual(
             PaidWeightLoggerMVPPolicy.syncStatusText(status: .offline, pendingCount: 1),
@@ -1034,15 +1034,15 @@ final class ValidationServiceTests: XCTestCase {
         let service = ValidationService.shared
 
         XCTAssertEqual(try service.validateBodyFat("3"), 3)
-        XCTAssertEqual(try service.validateBodyFat("50"), 50)
+        XCTAssertEqual(try service.validateBodyFat("60"), 60)
 
         assertValidationError(
             try service.validateBodyFat("2.9"),
-            expectedMessage: "Body fat must be between 3-50%"
+            expectedMessage: "Body fat must be between 3-60%"
         )
         assertValidationError(
-            try service.validateBodyFat("50.1"),
-            expectedMessage: "Body fat must be between 3-50%"
+            try service.validateBodyFat("60.1"),
+            expectedMessage: "Body fat must be between 3-60%"
         )
     }
 
@@ -1095,12 +1095,12 @@ final class LogWeightFormValidatorTests: XCTestCase {
     func testRejectsOutOfRangeBodyFatValues() {
         let tooLow = LogWeightFormValidator.validate(weight: "", bodyFat: "1", unit: "lbs")
         XCTAssertFalse(tooLow.isValid)
-        XCTAssertEqual(tooLow.bodyFatError, "Body fat must be between 3-50%")
+        XCTAssertEqual(tooLow.bodyFatError, "Body fat must be between 3-60%")
         XCTAssertNil(tooLow.bodyFatValue)
 
-        let tooHigh = LogWeightFormValidator.validate(weight: "", bodyFat: "60", unit: "lbs")
+        let tooHigh = LogWeightFormValidator.validate(weight: "", bodyFat: "60.1", unit: "lbs")
         XCTAssertFalse(tooHigh.isValid)
-        XCTAssertEqual(tooHigh.bodyFatError, "Body fat must be between 3-50%")
+        XCTAssertEqual(tooHigh.bodyFatError, "Body fat must be between 3-60%")
         XCTAssertNil(tooHigh.bodyFatValue)
     }
 
@@ -1138,7 +1138,7 @@ final class LogWeightFormValidatorTests: XCTestCase {
             _ = try ValidationService.shared.validateWeight("500.1", unit: "kg")
         }
         let expectedBodyFatError = validationErrorDescription {
-            _ = try ValidationService.shared.validateBodyFat("50.1")
+            _ = try ValidationService.shared.validateBodyFat("60.1")
         }
 
         XCTAssertEqual(
@@ -1146,7 +1146,7 @@ final class LogWeightFormValidatorTests: XCTestCase {
             expectedKgError
         )
         XCTAssertEqual(
-            LogWeightFormValidator.fieldError(for: "50.1", field: .bodyFat, unit: "kg"),
+            LogWeightFormValidator.fieldError(for: "60.1", field: .bodyFat, unit: "kg"),
             expectedBodyFatError
         )
     }

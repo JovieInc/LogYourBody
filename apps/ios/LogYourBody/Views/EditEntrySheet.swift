@@ -139,7 +139,7 @@ struct EditEntrySheet: View {
     }
 
     private var validationMessage: String? {
-        guard !primaryValue.isEmpty else { return "" }
+        guard !primaryValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         guard let value = Double(primaryValue) else { return "Enter a valid number" }
 
         switch metricType {
@@ -150,7 +150,7 @@ struct EditEntrySheet: View {
             }
         case .bodyFat:
             if value < 3 || value > 60 {
-                return "Body fat must be between 3% and 60%"
+                return "Body fat must be between 3-60%"
             }
         default:
             break
@@ -159,7 +159,8 @@ struct EditEntrySheet: View {
     }
 
     private var canSave: Bool {
-        validationMessage?.isEmpty ?? false ? false : validationMessage == nil
+        guard !primaryValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        return validationMessage == nil
     }
 
     private var showsHealthBanner: Bool {

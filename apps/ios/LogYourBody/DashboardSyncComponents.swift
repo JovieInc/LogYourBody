@@ -146,13 +146,13 @@ struct DashboardSyncDetailsSheet: View {
         case .offline:
             return "Offline"
         case .error:
-            return "Error"
+            return "Sync needs retry"
         case .success:
             return "Synced"
         case .syncing:
             return "Syncing…"
         case .idle:
-            return "Idle"
+            return syncManager.pendingSyncCount > 0 ? "Pending sync" : "Synced"
         }
     }
 }
