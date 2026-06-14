@@ -32,6 +32,7 @@ struct ContentView: View {
     @EnvironmentObject var revenueCatManager: RevenueCatManager
     @EnvironmentObject var bugReportManager: BugReportManager
     @StateObject private var loadingManager: LoadingManager
+    @StateObject private var notificationManager = NotificationManager.shared
     private let onboardingStateManager = OnboardingStateManager.shared
     @State private var currentUserId: String?
     @State private var hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion
@@ -108,6 +109,27 @@ struct ContentView: View {
             mvpLoggerFallbackEnabled: AnalyticsService.shared.isFeatureEnabled(
                 flagKey: Constants.mvpLoggerFallbackFlagKey
             )
+        )
+    }
+
+    private var isDailyWeighInReminderGateEnabled: Bool {
+        _ = featureGateRefreshToken
+
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestDailyReminderPromptFixture") {
+            return true
+        }
+        #endif
+
+        return AnalyticsService.shared.isFeatureEnabled(
+            flagKey: Constants.dailyWeighInReminderFlagKey
+        )
+    }
+
+    private var shouldShowDailyReminderPrompt: Bool {
+        notificationManager.shouldShowPostPaywallPrompt(
+            featureEnabled: isDailyWeighInReminderGateEnabled,
+            isSubscribed: revenueCatManager.isSubscribed
         )
     }
 
@@ -227,6 +249,8 @@ struct ContentView: View {
                 PaywallView()
                     .environmentObject(authManager)
                     .environmentObject(revenueCatManager)
+            } else if shouldShowDailyReminderPrompt {
+                DailyWeighInReminderPromptView(notificationManager: notificationManager)
             } else {
                 MainTabView()
                     .onAppear {

@@ -31,6 +31,8 @@
 		AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */; };
 		AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */; };
 		AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */; };
+		AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134002F01313400D134A1 /* NotificationManager.swift */; };
+		AD3134032F01313400D134A1 /* DailyWeighInReminderPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */; };
 		AD0B7BF52EC552FA008B29E7 /* LogYourBody.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */; };
 		AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */; };
 		AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */; };
@@ -377,6 +379,8 @@
 		AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricAppIntents.swift; sourceTree = "<group>"; };
 		AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricLoggingService.swift; sourceTree = "<group>"; };
 		AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricSpotlightIndexer.swift; sourceTree = "<group>"; };
+		AD3134002F01313400D134A1 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyWeighInReminderPromptView.swift; sourceTree = "<group>"; };
 		AD723AE82E15FA5C002376C6 /* LoadingManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingManager.swift; sourceTree = "<group>"; };
 		AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseDataClient.swift; sourceTree = "<group>"; };
 		AD723AEE2E15FA5C002376C6 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
@@ -906,6 +910,7 @@
 				AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */,
 				AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */,
 				AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */,
+				AD3134002F01313400D134A1 /* NotificationManager.swift */,
 				ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */,
 				ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */,
 				AD050C482EC12E390082A313 /* RevenueCatManager.swift */,
@@ -1002,6 +1007,7 @@
 				AD723AFF2E15FA5C002376C6 /* EmailVerificationView.swift */,
 				ADF5C1B12E1CD2FD00E3FB4D /* AddEntrySheet.swift */,
 				AD723B002E15FA5C002376C6 /* ExportDataView.swift */,
+				AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */,
 				AD723B012E15FA5C002376C6 /* HealthKitPromptView.swift */,
 				AD723B022E15FA5C002376C6 /* LoadingView.swift */,
 				AD723B032E15FA5C002376C6 /* LoginView.swift */,
@@ -1565,6 +1571,7 @@
 				AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */,
 				AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */,
 				AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */,
+				AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
 				ADDC487C2E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift in Sources */,
@@ -1651,6 +1658,7 @@
 				ADDC47E42E2D89F3003C97E7 /* EmailVerificationView.swift in Sources */,
 				ADDC47E52E2D89F3003C97E7 /* AddEntrySheet.swift in Sources */,
 				ADDC47E62E2D89F3003C97E7 /* ExportDataView.swift in Sources */,
+				AD3134032F01313400D134A1 /* DailyWeighInReminderPromptView.swift in Sources */,
 				ADDC47E72E2D89F3003C97E7 /* HealthKitPromptView.swift in Sources */,
 				ADDC47E82E2D89F3003C97E7 /* LoadingView.swift in Sources */,
 				ADDC47E92E2D89F3003C97E7 /* LoginView.swift in Sources */,

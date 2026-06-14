@@ -27,6 +27,7 @@ struct Constants {
     static let glp1WeeklyCheckInFlagKey = "ios_glp1_weekly_checkin"
     static let bulkProgressPhotoImportFlagKey = "ios_bulk_progress_photo_import"
     static let photosTabFlagKey = "photos_tab"
+    static let dailyWeighInReminderFlagKey = "ios_daily_weigh_in_reminders"
 
     // MARK: - API Configuration (from Config.xcconfig via Info.plist)
     static var baseURL: String {
@@ -77,6 +78,10 @@ struct Constants {
     static let defaultHomeModeKey = "defaultHomeMode"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
     static let onboardingCompletedVersionKey = "onboardingCompletedVersion"
+    static let dailyWeighInReminderEnabledKey = "dailyWeighInReminderEnabled"
+    static let dailyWeighInReminderHourKey = "dailyWeighInReminderHour"
+    static let dailyWeighInReminderMinuteKey = "dailyWeighInReminderMinute"
+    static let dailyWeighInReminderPromptCompletedKey = "dailyWeighInReminderPromptCompleted"
 
     // Goal Keys
     static let goalBodyFatPercentageKey = "goalBodyFatPercentage"
