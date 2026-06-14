@@ -3211,6 +3211,102 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertEqual(sourceMetadata.quantityType, "HKQuantityTypeIdentifierBodyMass")
     }
 
+    func testProcessBatchHealthKitData_DeduplicatesLateNightWeightsAndPreservesLocalDate() async throws {
+        let coreData = CoreDataManager.shared
+        let healthKitManager = HealthKitManager.shared
+
+        let userId = "healthkit_test_user_late_night_dedup_\(UUID().uuidString)"
+        let user = LocalUser(
+            id: userId,
+            email: "hk_late_night@example.com",
+            name: "HK Late Night",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: false
+        )
+        AuthManager.shared.currentUser = user
+
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: Date())
+        let firstDate = calendar.date(byAdding: DateComponents(hour: 23, minute: 30), to: day) ?? day
+        let duplicateDate = calendar.date(byAdding: DateComponents(hour: 23, minute: 55), to: day) ?? day
+        let expectedLocalDate = BodyMetricLocalDate.key(for: firstDate)
+
+        let result = await healthKitManager.processBatchHealthKitData(
+            weightHistory: [
+                (weight: 84.0, date: firstDate),
+                (weight: 84.3, date: duplicateDate)
+            ],
+            bodyFatHistory: []
+        )
+
+        XCTAssertEqual(result.imported, 1)
+        XCTAssertEqual(result.skipped, 1)
+
+        let metrics = await coreData.fetchAllBodyMetrics(for: userId)
+        XCTAssertEqual(metrics.count, 1)
+
+        let metric = try XCTUnwrap(metrics.first)
+        XCTAssertEqual(metric.weight, 84.0)
+        XCTAssertEqual(metric.localDate, expectedLocalDate)
+        XCTAssertEqual(BodyMetricLocalDate.hourKey(for: metric.date), "23")
+    }
+
+    func testProcessBatchHealthKitData_PairsBodyFatByLocalDateAcrossMidnight() async throws {
+        let coreData = CoreDataManager.shared
+        let healthKitManager = HealthKitManager.shared
+
+        let userId = "healthkit_test_user_midnight_pairing_\(UUID().uuidString)"
+        let user = LocalUser(
+            id: userId,
+            email: "hk_midnight_pairing@example.com",
+            name: "HK Midnight Pairing",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: false
+        )
+        AuthManager.shared.currentUser = user
+
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: Date())
+        let lateNightWeight = calendar.date(byAdding: DateComponents(hour: 23, minute: 30), to: day) ?? day
+        let duplicateLateNightWeight = calendar.date(byAdding: DateComponents(hour: 23, minute: 55), to: day) ?? day
+        let sameLocalDateBodyFat = calendar.date(byAdding: DateComponents(hour: 23, minute: 45), to: day) ?? day
+        let nextDayWeight = calendar.date(byAdding: DateComponents(day: 1, hour: 0, minute: 10), to: day) ?? day
+        let nextLocalDateBodyFat = calendar.date(byAdding: DateComponents(day: 1, hour: 0, minute: 5), to: day) ?? day
+
+        let result = await healthKitManager.processBatchHealthKitData(
+            weightHistory: [
+                (weight: 84.0, date: lateNightWeight),
+                (weight: 84.3, date: duplicateLateNightWeight),
+                (weight: 83.8, date: nextDayWeight)
+            ],
+            bodyFatHistory: [
+                (percentage: 18.2, date: sameLocalDateBodyFat),
+                (percentage: 22.5, date: nextLocalDateBodyFat)
+            ]
+        )
+
+        XCTAssertEqual(result.imported, 2)
+        XCTAssertEqual(result.skipped, 1)
+
+        let metrics = await coreData.fetchAllBodyMetrics(for: userId)
+        XCTAssertEqual(metrics.count, 2)
+
+        let lateNightLocalDate = BodyMetricLocalDate.key(for: lateNightWeight)
+        let nextLocalDate = BodyMetricLocalDate.key(for: nextDayWeight)
+
+        let lateNightMetric = try XCTUnwrap(metrics.first { $0.localDate == lateNightLocalDate })
+        XCTAssertEqual(lateNightMetric.weight, 84.0)
+        XCTAssertEqual(lateNightMetric.bodyFatPercentage, 18.2)
+        XCTAssertEqual(lateNightMetric.bodyFatMethod, "HealthKit")
+
+        let nextDayMetric = try XCTUnwrap(metrics.first { $0.localDate == nextLocalDate })
+        XCTAssertEqual(nextDayMetric.weight, 83.8)
+        XCTAssertEqual(nextDayMetric.bodyFatPercentage, 22.5)
+        XCTAssertEqual(nextDayMetric.bodyFatMethod, "HealthKit")
+    }
+
     func testSyncLocalChanges_UsesSupabaseAndMarksBodyMetricSynced() async throws {
         let coreData = CoreDataManager.shared
 
