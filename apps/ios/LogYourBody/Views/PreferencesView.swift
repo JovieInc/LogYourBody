@@ -11,6 +11,7 @@ import UIKit
 struct PreferencesView: View {
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var revenueCatManager = RevenueCatManager.shared
+    @StateObject private var notificationManager = NotificationManager.shared
     @AppStorage(Constants.preferredMeasurementSystemKey) private var measurementSystem = PreferencesView.defaultMeasurementSystem
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
@@ -45,6 +46,8 @@ struct PreferencesView: View {
     @State private var showingLogoutConfirmation = false
     @State private var isTriggeringHealthResync = false
     @State private var isHealthSyncSetupInProgress = false
+    @State private var dailyReminderDate = Date()
+    @State private var featureGateRefreshToken = UUID()
 
     // Cached computed properties for performance
     @State private var cachedUserGender: String = ""
@@ -96,6 +99,20 @@ struct PreferencesView: View {
 
     private var currentFFMIGoal: Double {
         customFFMIGoal ?? defaultFFMIGoal
+    }
+
+    private var isDailyWeighInReminderGateEnabled: Bool {
+        _ = featureGateRefreshToken
+
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestDailyReminderPromptFixture") {
+            return true
+        }
+        #endif
+
+        return AnalyticsService.shared.isFeatureEnabled(
+            flagKey: Constants.dailyWeighInReminderFlagKey
+        )
     }
 
     // Update cached values when user profile changes
@@ -157,6 +174,9 @@ struct PreferencesView: View {
                     accountSection
                     profileSection
                     trackingGoalsSection
+                    if isDailyWeighInReminderGateEnabled {
+                        remindersSection
+                    }
                     integrationsSection
                     securitySection
                     subscriptionSection
@@ -222,6 +242,13 @@ struct PreferencesView: View {
         .onAppear {
             checkBiometricAvailability()
             updateCachedValues() // Cache computed properties for performance
+            dailyReminderDate = notificationManager.dailyWeighInReminderDate
+            Task {
+                await notificationManager.refreshAuthorizationStatus()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            featureGateRefreshToken = UUID()
         }
     }
 
@@ -604,6 +631,72 @@ struct PreferencesView: View {
                 IntegrationsView()
             }
         }
+    }
+
+    private var remindersSection: some View {
+        SettingsSection(header: "Reminders") {
+            VStack(spacing: 0) {
+                SettingsToggleRow(
+                    icon: "bell.badge.fill",
+                    title: "Daily weigh-in",
+                    isOn: dailyWeighInReminderBinding,
+                    tintColor: .appText,
+                    subtitle: dailyReminderSubtitle
+                )
+                .accessibilityIdentifier("settings_daily_weigh_in_reminder_toggle")
+
+                if notificationManager.isDailyWeighInReminderEnabled {
+                    DSDivider().insetted(16)
+
+                    DatePicker(
+                        "Reminder time",
+                        selection: $dailyReminderDate,
+                        displayedComponents: .hourAndMinute
+                    )
+                    .datePickerStyle(.compact)
+                    .padding(.horizontal, SettingsDesign.horizontalPadding)
+                    .padding(.vertical, SettingsDesign.verticalPadding)
+                    .onChange(of: dailyReminderDate) { _, newValue in
+                        Task {
+                            await notificationManager.updateDailyWeighInReminderTime(to: newValue)
+                        }
+                    }
+                    .accessibilityIdentifier("settings_daily_weigh_in_reminder_time_picker")
+                }
+            }
+        }
+    }
+
+    private var dailyReminderSubtitle: String {
+        if notificationManager.isDailyWeighInReminderEnabled {
+            return "On at \(notificationManager.dailyWeighInDisplayTime)"
+        }
+
+        if notificationManager.authorizationStatus == .denied {
+            return "Off. Enable notifications in iOS Settings."
+        }
+
+        return "Off"
+    }
+
+    private var dailyWeighInReminderBinding: Binding<Bool> {
+        Binding(
+            get: {
+                notificationManager.isDailyWeighInReminderEnabled
+            },
+            set: { isEnabled in
+                HapticManager.shared.selection()
+                Task {
+                    let didApply = await notificationManager.setDailyWeighInReminderEnabled(isEnabled)
+                    await MainActor.run {
+                        dailyReminderDate = notificationManager.dailyWeighInReminderDate
+                        if isEnabled && !didApply {
+                            HapticManager.shared.notification(type: .warning)
+                        }
+                    }
+                }
+            }
+        )
     }
 
     private var securitySection: some View {
