@@ -33,13 +33,11 @@ extension DashboardViewLiquid {
                         .padding(.horizontal, 20)
                 }
 
-                hudStatsAction
-                    .padding(.horizontal, 20)
-
                 Spacer(minLength: 120)
             }
             .padding(.bottom, 24)
         }
+        .scrollBounceBehavior(.basedOnSize)
         .refreshable {
             await viewModel.refreshData(
                 authManager: authManager,
@@ -70,6 +68,7 @@ extension DashboardViewLiquid {
                 .accessibilityIdentifier("photo_timeline_root_page_analytics")
         }
         .tabViewStyle(.page(indexDisplayMode: .always))
+        .indexViewStyle(.page(backgroundDisplayMode: .interactive))
         .accessibilityIdentifier("photo_timeline_root_pager")
     }
 

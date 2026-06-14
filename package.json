@@ -20,7 +20,8 @@
     "prepare": "husky install",
     "check": "pnpm --filter apps/web check",
     "format": "prettier --write .",
-    "lint:swift": "cd apps/ios && swiftlint lint --strict"
+    "lint:swift": "cd apps/ios && swiftlint lint --strict",
+    "ios:launch-quality-audit": "bash scripts/ios/launch-quality-audit.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",

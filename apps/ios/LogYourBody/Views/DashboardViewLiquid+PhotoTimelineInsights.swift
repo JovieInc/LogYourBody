@@ -134,54 +134,6 @@ extension DashboardViewLiquid {
         .accessibilityLabel("\(summary.title). \(summary.message). \(summary.actionTitle)")
     }
 
-    var hudStatsAction: some View {
-        Button {
-            HapticManager.shared.selection()
-            withAnimation(.easeInOut(duration: 0.25)) {
-                selectedPhotoTimelineRootPage = .analytics
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Color.metricAccent)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(0.08))
-                    )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Stats")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(Color.liquidTextPrimary)
-
-                    Text("Charts, sources, and history")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.58))
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color.liquidTextPrimary.opacity(0.42))
-            }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(Color.white.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("photo_timeline_hud_stats_button")
-        .accessibilityLabel("Open stats")
-    }
-
     var isPhaseInsightEnabled: Bool {
         _ = featureGateRefreshToken
 

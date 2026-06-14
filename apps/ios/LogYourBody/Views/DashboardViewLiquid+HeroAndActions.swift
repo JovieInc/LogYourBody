@@ -547,7 +547,9 @@ extension DashboardViewLiquid {
             bodyFatCaption: bodyFatCaption,
             weightValue: weightValue,
             weightCaption: weightCaption,
-            deltaText: deltaText
+            deltaText: deltaText,
+            bodyFatPercentage: currentMetric?.bodyFatPercentage,
+            gender: authManager.currentUser?.profile?.gender
         )
     }
 

@@ -208,13 +208,16 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_pager"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
-        let statsButton = app.descendants(matching: .any)["photo_timeline_hud_stats_button"]
-        scrollUntilHittable(statsButton, in: app)
-        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
-        statsButton.tap()
+
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+
+        let pager = app.collectionViews["photo_timeline_root_pager"]
+        XCTAssertTrue(pager.waitForExistence(timeout: 5))
+        pager.swipeLeft()
+
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 5))
         let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]
-        XCTAssertTrue(presenceSummary.exists)
+        XCTAssertTrue(presenceSummary.waitForExistence(timeout: 5))
         XCTAssertTrue(presenceSummary.label.contains("Measured"))
         XCTAssertTrue(presenceSummary.label.contains("Interpolated"))
         XCTAssertFalse(app.staticTexts["Timeline states"].exists)

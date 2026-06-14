@@ -365,6 +365,7 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
                 )
             }
             .coordinateSpace(name: "dashboardHomeScroll")
+            .scrollBounceBehavior(.basedOnSize)
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                 scrollOffset = value
             }
@@ -432,6 +433,7 @@ struct DashboardPhotosTab<Header: View, SyncBanner: View, PhotosContent: View>: 
             }
             .padding(.top, 8)
         }
+        .scrollBounceBehavior(.basedOnSize)
         .refreshable {
             await onRefresh()
         }
@@ -464,6 +466,7 @@ struct DashboardMetricsTab<Header: View, SyncBanner: View, TitleBlock: View, Met
                 }
                 .padding(.top, 16)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .refreshable {
                 await onRefresh()
             }
