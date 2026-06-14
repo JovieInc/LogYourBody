@@ -11,34 +11,47 @@ final class PreAuthOnboardingStore {
         self.userDefaults = userDefaults
     }
 
-    func save(input: BodyScoreInput, result: BodyScoreResult) {
+    struct StoredSnapshot: Equatable {
+        let input: BodyScoreInput
+        let result: BodyScoreResult
+        let defaultHomeMode: DefaultHomeMode
+    }
+
+    func save(
+        input: BodyScoreInput,
+        result: BodyScoreResult,
+        defaultHomeMode: DefaultHomeMode = .default
+    ) {
         let snapshot = Snapshot(
             input: input,
             result: PreAuthBodyScoreResultCodable(result: result),
+            defaultHomeMode: defaultHomeMode,
             lastUpdated: Date()
         )
 
-        queue.async { [weak self] in
-            guard let self else { return }
+        queue.sync {
             let encoder = JSONEncoder()
             if let data = try? encoder.encode(snapshot) {
-                self.userDefaults.set(data, forKey: self.storageKey)
+                userDefaults.set(data, forKey: storageKey)
             }
         }
     }
 
-    func load() -> (BodyScoreInput, BodyScoreResult)? {
+    func load() -> StoredSnapshot? {
         queue.sync {
             guard let data = userDefaults.data(forKey: storageKey) else { return nil }
             let decoder = JSONDecoder()
             guard let snapshot = try? decoder.decode(Snapshot.self, from: data) else { return nil }
-            return (snapshot.input, snapshot.result.result)
+            return StoredSnapshot(
+                input: snapshot.input,
+                result: snapshot.result.result,
+                defaultHomeMode: snapshot.defaultHomeMode
+            )
         }
     }
 
     func clear() {
-        queue.async { [weak self] in
-            guard let self else { return }
+        queue.sync {
             userDefaults.removeObject(forKey: storageKey)
         }
     }
@@ -46,7 +59,35 @@ final class PreAuthOnboardingStore {
     private struct Snapshot: Codable {
         let input: BodyScoreInput
         let result: PreAuthBodyScoreResultCodable
+        let defaultHomeMode: DefaultHomeMode
         let lastUpdated: Date
+
+        private enum CodingKeys: String, CodingKey {
+            case input
+            case result
+            case defaultHomeMode
+            case lastUpdated
+        }
+
+        init(
+            input: BodyScoreInput,
+            result: PreAuthBodyScoreResultCodable,
+            defaultHomeMode: DefaultHomeMode,
+            lastUpdated: Date
+        ) {
+            self.input = input
+            self.result = result
+            self.defaultHomeMode = defaultHomeMode
+            self.lastUpdated = lastUpdated
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            input = try container.decode(BodyScoreInput.self, forKey: .input)
+            result = try container.decode(PreAuthBodyScoreResultCodable.self, forKey: .result)
+            defaultHomeMode = try container.decodeIfPresent(DefaultHomeMode.self, forKey: .defaultHomeMode) ?? .default
+            lastUpdated = try container.decode(Date.self, forKey: .lastUpdated)
+        }
     }
 }
 
