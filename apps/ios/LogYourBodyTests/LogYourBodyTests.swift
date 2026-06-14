@@ -779,11 +779,9 @@ final class PhaseInsightPolicyTests: XCTestCase {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     }
 
-    func testPhaseInsightDefaultsOffBeforeGateLoads() {
-        XCTAssertFalse(PhaseInsightPolicy.defaultShowsPhaseInsight)
-        XCTAssertFalse(PhaseInsightPolicy.shouldShowPhaseInsight(gateEnabled: false))
-        XCTAssertTrue(PhaseInsightPolicy.shouldShowPhaseInsight(gateEnabled: true))
-        XCTAssertEqual(Constants.phaseInsightFlagKey, "ios_phase_insight")
+    func testPhaseInsightShowsByDefaultForV1Launch() {
+        XCTAssertTrue(PhaseInsightPolicy.defaultShowsPhaseInsight)
+        XCTAssertTrue(PhaseInsightPolicy.shouldShowPhaseInsight())
     }
 
     func testClassifiesCuttingWithBodyFatContext() {
@@ -902,11 +900,9 @@ final class Glp1WeeklyCheckInPolicyTests: XCTestCase {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     }
 
-    func testWeeklyCheckInDefaultsOffBeforeGateLoads() {
-        XCTAssertFalse(Glp1WeeklyCheckInPolicy.defaultShowsWeeklyCheckIn)
-        XCTAssertFalse(Glp1WeeklyCheckInPolicy.shouldShowWeeklyCheckIn(gateEnabled: false))
-        XCTAssertTrue(Glp1WeeklyCheckInPolicy.shouldShowWeeklyCheckIn(gateEnabled: true))
-        XCTAssertEqual(Constants.glp1WeeklyCheckInFlagKey, "ios_glp1_weekly_checkin")
+    func testWeeklyCheckInShowsByDefaultForV1Launch() {
+        XCTAssertTrue(Glp1WeeklyCheckInPolicy.defaultShowsWeeklyCheckIn)
+        XCTAssertTrue(Glp1WeeklyCheckInPolicy.shouldShowWeeklyCheckIn())
     }
 
     func testSetupStateWhenNoDoseExists() {
@@ -1016,18 +1012,13 @@ final class Glp1WeeklyCheckInPolicyTests: XCTestCase {
 }
 
 final class AuthSurfacePolicyTests: XCTestCase {
-    func testAppleSignInDefaultsHiddenBeforeFeatureGateLoads() {
-        XCTAssertFalse(AuthSurfacePolicy.defaultShowsAppleSignIn)
-        XCTAssertFalse(AuthSurfacePolicy.shouldShowAppleSignIn(gateEnabled: false))
-    }
-
-    func testAppleSignInCanBeEnabledByFeatureGate() {
-        XCTAssertTrue(AuthSurfacePolicy.shouldShowAppleSignIn(gateEnabled: true))
+    func testAppleSignInShowsByDefaultForV1Launch() {
+        XCTAssertTrue(AuthSurfacePolicy.defaultShowsAppleSignIn)
+        XCTAssertTrue(AuthSurfacePolicy.shouldShowAppleSignIn())
     }
 
     func testEmailOTPRemainsPrimaryLaunchMethod() {
         XCTAssertEqual(AuthSurfacePolicy.primarySignInMethod, "email_otp")
-        XCTAssertEqual(Constants.appleSignInEnabledFlagKey, "ios_apple_sign_in_enabled")
     }
 }
 
@@ -1363,21 +1354,10 @@ final class PhotoMetadataServiceTests: XCTestCase {
 }
 
 final class BulkProgressPhotoImportPolicyTests: XCTestCase {
-    func testBulkProgressPhotoImportDefaultsLocked() {
+    func testBulkProgressPhotoImportRequiresActivationEvidence() {
         XCTAssertFalse(BulkProgressPhotoImportPolicy.defaultShowsBulkImport)
-        XCTAssertEqual(Constants.bulkProgressPhotoImportFlagKey, "ios_bulk_progress_photo_import")
         XCTAssertFalse(
             BulkProgressPhotoImportPolicy.shouldShowBulkImport(
-                gateEnabled: false,
-                existingProgressPhotoCount: 0
-            )
-        )
-    }
-
-    func testBulkProgressPhotoImportUnlocksForMigrationGate() {
-        XCTAssertTrue(
-            BulkProgressPhotoImportPolicy.shouldShowBulkImport(
-                gateEnabled: true,
                 existingProgressPhotoCount: 0
             )
         )
@@ -1386,13 +1366,11 @@ final class BulkProgressPhotoImportPolicyTests: XCTestCase {
     func testBulkProgressPhotoImportUnlocksAfterActivationEvidence() {
         XCTAssertFalse(
             BulkProgressPhotoImportPolicy.shouldShowBulkImport(
-                gateEnabled: false,
                 existingProgressPhotoCount: BulkProgressPhotoImportPolicy.activationProgressPhotoCount - 1
             )
         )
         XCTAssertTrue(
             BulkProgressPhotoImportPolicy.shouldShowBulkImport(
-                gateEnabled: false,
                 existingProgressPhotoCount: BulkProgressPhotoImportPolicy.activationProgressPhotoCount
             )
         )

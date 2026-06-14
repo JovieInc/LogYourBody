@@ -260,9 +260,6 @@ extension IntegrationsView {
         #endif
 
         return BulkProgressPhotoImportPolicy.shouldShowBulkImport(
-            gateEnabled: AnalyticsService.shared.isFeatureEnabled(
-                flagKey: Constants.bulkProgressPhotoImportFlagKey
-            ),
             existingProgressPhotoCount: progressPhotoCount
         )
     }
