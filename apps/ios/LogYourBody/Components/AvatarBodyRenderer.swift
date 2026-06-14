@@ -11,6 +11,7 @@ struct AvatarBodyRenderer: View {
     let bodyFatPercentage: Double?
     let gender: String?
     let height: CGFloat
+    var padding: CGFloat = 12
 
     private var avatar: AvatarBodyFatCatalog.Match {
         AvatarBodyFatCatalog.match(bodyFatPercentage: bodyFatPercentage, gender: gender)
@@ -22,10 +23,12 @@ struct AvatarBodyRenderer: View {
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .frame(
+                    width: max(0, geometry.size.width - padding * 2)
+                )
+                .padding(padding)
                 .frame(width: geometry.size.width, height: geometry.size.height)
-                .shadow(color: Color.metricAccent.opacity(0.36), radius: 16)
+                .clipped()
                 .accessibilityHidden(true)
         }
         .frame(height: height)

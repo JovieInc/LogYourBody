@@ -76,17 +76,17 @@ struct DashboardHomeTimelineHero: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ZStack {
-                ProgressPhotoCarouselView(
-                    currentMetric: metric,
-                    historicalMetrics: bodyMetrics,
-                    selectedMetricsIndex: $selectedIndex,
-                    displayMode: $displayMode
-                )
+                if shouldShowPhoto {
+                    ProgressPhotoCarouselView(
+                        currentMetric: metric,
+                        historicalMetrics: bodyMetrics,
+                        selectedMetricsIndex: $selectedIndex,
+                        displayMode: $displayMode
+                    )
+                    .accessibilityIdentifier("dashboard_home_timeline_photo_stage")
+                } else {
+                    Color.black
 
-                timelineGradient
-                    .allowsHitTesting(false)
-
-                if !shouldShowPhoto {
                     DashboardHomeTimelineAvatarPlaceholder(
                         bodyFatPercentage: metric.bodyFatPercentage,
                         gender: gender,
@@ -94,6 +94,9 @@ struct DashboardHomeTimelineHero: View {
                     )
                     .allowsHitTesting(false)
                 }
+
+                timelineGradient
+                    .allowsHitTesting(false)
             }
             .aspectRatio(4.0 / 5.0, contentMode: .fit)
             .frame(maxWidth: .infinity)
@@ -300,19 +303,17 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
             Image(avatar.assetName)
                 .resizable()
                 .interpolation(.high)
-                .scaledToFill()
+                .scaledToFit()
                 .frame(
-                    width: max(0, geometry.size.width - 24),
-                    height: max(0, geometry.size.height - 56)
+                    width: max(0, geometry.size.width - 24)
                 )
-                .padding(.top, 42)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 14)
+                .padding(12)
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .clipped()
                 .accessibilityHidden(true)
         }
         .accessibilityLabel(accessibilityText)
+        .accessibilityIdentifier("dashboard_home_timeline_avatar")
     }
 }
 
