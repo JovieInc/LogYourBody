@@ -7,6 +7,9 @@ import SwiftUI
 // MARK: - SocialLoginButton Molecule
 
 struct SocialLoginButton: View {
+    @Environment(\.theme)
+    private var theme
+
     enum Provider {
         case apple
         case google
@@ -36,12 +39,10 @@ struct SocialLoginButton: View {
 
         var backgroundColor: Color {
             switch self {
-            case .apple:
-                return Color.metricSurface
-            case .google:
-                return Color.metricSurface
+            case .apple, .google:
+                return .clear
             case .facebook:
-                return Color(red: 0.258, green: 0.406, blue: 0.697)
+                return .appPrimary
             }
         }
 
@@ -57,7 +58,7 @@ struct SocialLoginButton: View {
         var borderColor: Color {
             switch self {
             case .apple, .google:
-                return Color.white.opacity(0.14)
+                return Color.appBorder
             case .facebook:
                 return Color.clear
             }
@@ -103,9 +104,13 @@ struct SocialLoginButton: View {
             ),
             action: action
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 9_999, style: .continuous)
-                .stroke(provider.borderColor, lineWidth: provider.borderWidth)
+        .systemBGlassSurface(
+            cornerRadius: theme.radius.button,
+            tint: theme.colors.text,
+            tintOpacity: 0.035,
+            borderColor: provider.borderColor,
+            borderOpacity: 0.75,
+            borderWidth: provider.borderWidth
         )
     }
 }

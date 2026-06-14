@@ -68,6 +68,10 @@ public extension Color {
     static let appTextTertiary = linearTextTertiary
     static let appDisabled = linearDisabled
     static let appDisabledText = linearDisabledText
+    static let appSuccess = success
+    static let appWarning = warning
+    static let appError = error
+    static let appInfo = appPrimary
 }
 
 // MARK: - Hex Color Extension

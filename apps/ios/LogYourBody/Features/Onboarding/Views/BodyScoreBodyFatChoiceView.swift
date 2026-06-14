@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct BodyScoreBodyFatChoiceView: View {
+    @Environment(\.theme)
+    private var theme
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
     private let options: [(title: String, subtitle: String, source: BodyFatInputSource, icon: String)] = [
@@ -43,13 +46,12 @@ struct BodyScoreBodyFatChoiceView: View {
                                     .foregroundStyle(Color.appTextSecondary)
                             }
                             .padding(20)
-                            .background(
-                                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                    .fill(Color.appCard.opacity(0.6))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                    .stroke(Color.appBorder.opacity(0.4))
+                            .systemBGlassSurface(
+                                cornerRadius: 24,
+                                tint: theme.colors.text,
+                                tintOpacity: 0.035,
+                                borderColor: theme.colors.border,
+                                borderOpacity: 0.6
                             )
                         }
                         .buttonStyle(.plain)
@@ -64,7 +66,7 @@ struct BodyScoreBodyFatChoiceView: View {
                     if let error = viewModel.errorMessage {
                         Text(error)
                             .font(OnboardingTypography.caption)
-                            .foregroundStyle(Color.red)
+                            .foregroundStyle(theme.colors.error)
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity)
                     }

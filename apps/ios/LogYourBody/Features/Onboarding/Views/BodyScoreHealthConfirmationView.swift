@@ -49,7 +49,7 @@ struct BodyScoreHealthConfirmationView: View {
                                         .foregroundStyle(Color.appTextSecondary)
 
                                     Text(metric.value)
-                                        .font(.system(.title2, design: .rounded).weight(.semibold))
+                                        .font(OnboardingTypography.title)
                                         .foregroundStyle(Color.appText)
 
                                     Text(metric.subtitle)

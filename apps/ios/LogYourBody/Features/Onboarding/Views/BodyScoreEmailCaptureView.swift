@@ -32,7 +32,7 @@ struct BodyScoreEmailCaptureView: View {
                         if let error = emailError {
                             Text(error)
                                 .font(OnboardingTypography.caption)
-                                .foregroundStyle(Color.red)
+                                .foregroundStyle(Color.appError)
                         } else {
                             Button {
                                 withAnimation(.easeInOut(duration: 0.2)) {

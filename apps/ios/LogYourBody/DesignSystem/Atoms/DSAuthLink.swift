@@ -7,14 +7,17 @@ import SwiftUI
 // MARK: - DSAuthLink Atom
 
 struct DSAuthLink: View {
+    @Environment(\.theme)
+    private var theme
+
     let title: String
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 15))
-                .foregroundColor(.appTextSecondary)
+                .font(theme.typography.labelMedium)
+                .foregroundColor(theme.colors.primary)
                 .underline()
         }
         .buttonStyle(PlainButtonStyle())
@@ -24,14 +27,17 @@ struct DSAuthLink: View {
 // MARK: - Navigation Link Variant
 
 struct DSAuthNavigationLink<Destination: View>: View {
+    @Environment(\.theme)
+    private var theme
+
     let title: String
     let destination: Destination
 
     var body: some View {
         NavigationLink(destination: destination) {
             Text(title)
-                .font(.system(size: 15))
-                .foregroundColor(.appTextSecondary)
+                .font(theme.typography.labelMedium)
+                .foregroundColor(theme.colors.primary)
                 .underline()
         }
         .buttonStyle(PlainButtonStyle())

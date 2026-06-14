@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct BodyScoreHeightView: View {
+    @Environment(\.theme)
+    private var theme
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var centimetersFocused: Bool
     @State private var heightError: String?
@@ -96,13 +99,12 @@ struct BodyScoreHeightView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.appCard.opacity(0.7))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(centimetersFocused ? Color.appPrimary : Color.appBorder.opacity(0.5))
+            .systemBGlassSurface(
+                cornerRadius: theme.radius.input,
+                tint: centimetersFocused ? theme.colors.primary : theme.colors.text,
+                tintOpacity: centimetersFocused ? 0.07 : 0.03,
+                borderColor: centimetersFocused ? theme.colors.primary : theme.colors.border,
+                borderOpacity: centimetersFocused ? 0.9 : 0.65
             )
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
@@ -113,7 +115,7 @@ struct BodyScoreHeightView: View {
             if let error = heightError {
                 Text(error)
                     .font(OnboardingTypography.caption)
-                    .foregroundStyle(Color.red)
+                    .foregroundStyle(theme.colors.error)
             } else {
                 Text("Most adults fall between 100–250 cm.")
                     .font(OnboardingTypography.caption)
@@ -154,13 +156,12 @@ struct BodyScoreHeightView: View {
                 }
             }
             .frame(height: 160)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.appCard.opacity(0.6))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.appBorder.opacity(0.5))
+            .systemBGlassSurface(
+                cornerRadius: 20,
+                tint: theme.colors.text,
+                tintOpacity: 0.03,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.65
             )
 
             Text("We’ll convert everything into centimeters automatically.")

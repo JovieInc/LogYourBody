@@ -17,6 +17,9 @@ struct OnboardingBulletList: View {
 // MARK: - Option Buttons
 
 struct OnboardingOptionButton: View {
+    @Environment(\.theme)
+    private var theme
+
     let title: String
     let subtitle: String?
     let isSelected: Bool
@@ -28,7 +31,7 @@ struct OnboardingOptionButton: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(OnboardingTypography.headline)
-                        .foregroundStyle(Color.appText)
+                        .foregroundStyle(theme.colors.text)
                         .multilineTextAlignment(.leading)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -38,7 +41,7 @@ struct OnboardingOptionButton: View {
                     if let subtitle {
                         Text(subtitle)
                             .font(OnboardingTypography.caption)
-                            .foregroundStyle(Color.appTextSecondary)
+                            .foregroundStyle(theme.colors.textSecondary)
                     }
                 }
 
@@ -46,16 +49,16 @@ struct OnboardingOptionButton: View {
 
                 Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.appPrimary : Color.appTextSecondary.opacity(0.6))
+                    .foregroundStyle(isSelected ? theme.colors.primary : theme.colors.textSecondary.opacity(0.6))
             }
             .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(isSelected ? Color.appPrimary.opacity(0.18) : Color.appCard.opacity(0.7))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(isSelected ? Color.appPrimary : Color.appBorder.opacity(0.6), lineWidth: isSelected ? 2 : 1)
-                    )
+            .systemBGlassSurface(
+                cornerRadius: 20,
+                tint: isSelected ? theme.colors.primary : theme.colors.text,
+                tintOpacity: isSelected ? 0.16 : 0.035,
+                borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                borderOpacity: isSelected ? 0.85 : 0.65,
+                borderWidth: isSelected ? 2 : 1
             )
         })
         .buttonStyle(.plain)
@@ -65,6 +68,9 @@ struct OnboardingOptionButton: View {
 // MARK: - Segmented Control
 
 struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: View {
+    @Environment(\.theme)
+    private var theme
+
     let options: [Option]
     @Binding var selection: Option
 
@@ -73,43 +79,48 @@ struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: V
             ForEach(options, id: \.self) { option in
                 Button(action: { selection = option }, label: {
                     Text(option.description)
-                        .font(.system(.callout, design: .rounded).weight(.medium))
+                        .font(theme.typography.labelMedium)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .foregroundStyle(selection == option ? Color.white : Color.appText)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(selection == option ? Color.appPrimary : Color.appCard.opacity(0.7))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(selection == option ? Color.appPrimary : Color.appBorder.opacity(0.6))
+                        .foregroundStyle(selection == option ? theme.colors.text : theme.colors.textSecondary)
+                        .systemBGlassSurface(
+                            cornerRadius: 14,
+                            tint: selection == option ? theme.colors.primary : theme.colors.text,
+                            tintOpacity: selection == option ? 0.28 : 0.02,
+                            borderColor: selection == option ? theme.colors.primary : theme.colors.border,
+                            borderOpacity: selection == option ? 0.9 : 0.5
                         )
                 })
                 .buttonStyle(.plain)
             }
         }
         .padding(4)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.appCard.opacity(0.4))
+        .systemBGlassSurface(
+            cornerRadius: 18,
+            tint: theme.colors.text,
+            tintOpacity: 0.02,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.45
         )
     }
 }
 
 struct OnboardingInfoRow: View {
+    @Environment(\.theme)
+    private var theme
+
     let text: String
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "questionmark.circle")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.appTextSecondary)
+                .foregroundStyle(theme.colors.textSecondary)
                 .padding(.top, 2)
 
             Text(text)
                 .font(OnboardingTypography.caption)
-                .foregroundStyle(Color.appTextSecondary)
+                .foregroundStyle(theme.colors.textSecondary)
                 .multilineTextAlignment(.leading)
         }
     }
@@ -118,6 +129,9 @@ struct OnboardingInfoRow: View {
 // MARK: - Input Rows
 
 struct OnboardingTextFieldRow: View {
+    @Environment(\.theme)
+    private var theme
+
     let title: String
     let placeholder: String
     @Binding var text: String
@@ -129,7 +143,7 @@ struct OnboardingTextFieldRow: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(OnboardingTypography.caption)
-                .foregroundStyle(Color.appTextSecondary)
+                .foregroundStyle(theme.colors.textSecondary)
 
             TextField(placeholder, text: $text)
                 .keyboardType(keyboardType)
@@ -138,19 +152,21 @@ struct OnboardingTextFieldRow: View {
                 .focused($isFocused)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.appCard.opacity(0.6))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(isFocused ? Color.appPrimary : Color.appBorder.opacity(0.6), lineWidth: 1)
+                .systemBGlassSurface(
+                    cornerRadius: theme.radius.input,
+                    tint: isFocused ? theme.colors.primary : theme.colors.text,
+                    tintOpacity: isFocused ? 0.07 : 0.03,
+                    borderColor: isFocused ? theme.colors.primary : theme.colors.border,
+                    borderOpacity: isFocused ? 0.9 : 0.65
                 )
         }
     }
 }
 
 struct OnboardingValueRow: View {
+    @Environment(\.theme)
+    private var theme
+
     let label: String
     let value: String
     let helper: String?
@@ -161,17 +177,17 @@ struct OnboardingValueRow: View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(label.uppercased())
-                    .font(.system(.caption2, design: .rounded).weight(.medium))
-                    .foregroundStyle(Color.appTextSecondary)
+                    .font(theme.typography.labelSmall)
+                    .foregroundStyle(theme.colors.textSecondary)
 
                 Text(value)
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
-                    .foregroundStyle(Color.appText)
+                    .font(theme.typography.headlineSmall)
+                    .foregroundStyle(theme.colors.text)
 
                 if let helper {
                     Text(helper)
                         .font(OnboardingTypography.caption)
-                        .foregroundStyle(Color.appTextTertiary)
+                        .foregroundStyle(theme.colors.textTertiary)
                 }
             }
 
@@ -180,20 +196,19 @@ struct OnboardingValueRow: View {
             if let actionTitle, let action {
                 Button(action: action, label: {
                     Text(actionTitle)
-                        .font(.system(.callout, design: .rounded).weight(.medium))
-                        .foregroundStyle(Color.appPrimary)
+                        .font(theme.typography.labelMedium)
+                        .foregroundStyle(theme.colors.primary)
                 })
                 .buttonStyle(.plain)
             }
         }
         .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.ultraThinMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.appBorder.opacity(0.4))
+        .systemBGlassSurface(
+            cornerRadius: 20,
+            tint: theme.colors.text,
+            tintOpacity: 0.035,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.55
         )
     }
 }
@@ -201,6 +216,9 @@ struct OnboardingValueRow: View {
 // MARK: - Form Section Wrapper
 
 struct OnboardingFormSection<Content: View>: View {
+    @Environment(\.theme)
+    private var theme
+
     let title: String?
     let caption: String?
     let content: Content
@@ -216,26 +234,25 @@ struct OnboardingFormSection<Content: View>: View {
             if let title {
                 Text(title)
                     .font(OnboardingTypography.headline)
-                    .foregroundStyle(Color.appText)
+                    .foregroundStyle(theme.colors.text)
             }
 
             if let caption {
                 Text(caption)
                     .font(OnboardingTypography.caption)
-                    .foregroundStyle(Color.appTextSecondary)
+                    .foregroundStyle(theme.colors.textSecondary)
             }
 
             VStack(spacing: 16) {
                 content
             }
             .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(.ultraThinMaterial)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Color.white.opacity(0.08))
+            .systemBGlassSurface(
+                cornerRadius: 24,
+                tint: theme.colors.text,
+                tintOpacity: 0.035,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.6
             )
         }
     }
@@ -244,21 +261,24 @@ struct OnboardingFormSection<Content: View>: View {
 // MARK: - Progress Indicator
 
 struct OnboardingProgressIndicator: View {
+    @Environment(\.theme)
+    private var theme
+
     let context: OnboardingFlowViewModel.ProgressContext
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Step \(context.currentIndex) of \(context.totalCount)")
-                .font(.system(.caption, design: .rounded).weight(.medium))
-                .foregroundStyle(Color.appTextSecondary)
+                .font(theme.typography.labelSmall)
+                .foregroundStyle(theme.colors.textSecondary)
 
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color.appCard.opacity(0.45))
+                        .fill(theme.colors.surfaceTertiary.opacity(0.55))
 
                     Capsule()
-                        .fill(Color.appPrimary)
+                        .fill(theme.colors.primary)
                         .frame(
                             width: min(
                                 max(geometry.size.width * context.fractionComplete, 12),
@@ -275,6 +295,9 @@ struct OnboardingProgressIndicator: View {
 // MARK: - Page Template
 
 struct OnboardingScaffold<Content: View, CTA: View>: View {
+    @Environment(\.theme)
+    private var theme
+
     let showsCTA: Bool
     let content: Content
     let cta: CTA
@@ -291,7 +314,11 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color.appBackground, Color.black], startPoint: .topLeading, endPoint: .bottomTrailing)
+            LinearGradient(
+                colors: [theme.colors.background, theme.colors.backgroundSecondary],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
                 .ignoresSafeArea()
 
             ScrollView {
@@ -314,7 +341,7 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
     private var ctaContainer: some View {
         VStack(spacing: 0) {
             Rectangle()
-                .fill(Color.white.opacity(0.08))
+                .fill(theme.colors.text.opacity(0.08))
                 .frame(height: 1)
 
             cta
@@ -323,7 +350,7 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
                 .padding(.bottom, 12)
         }
         .background(
-            Color.appBackground
+            theme.colors.background
                 .opacity(0.96)
                 .ignoresSafeArea(edges: .bottom)
         )
@@ -331,6 +358,9 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
 }
 
 struct OnboardingPageTemplate<Content: View, Footer: View>: View {
+    @Environment(\.theme)
+    private var theme
+
     let title: String
     let subtitle: String?
     var showsBackButton: Bool
@@ -384,11 +414,14 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
                 }, label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.appText)
+                        .foregroundStyle(theme.colors.text)
                         .padding(10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.white.opacity(0.08))
+                        .systemBGlassSurface(
+                            cornerRadius: 14,
+                            tint: theme.colors.text,
+                            tintOpacity: 0.05,
+                            borderColor: theme.colors.border,
+                            borderOpacity: 0.5
                         )
                 })
                 .buttonStyle(.plain)

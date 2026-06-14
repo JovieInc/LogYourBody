@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct BodyScoreAccountCreationView: View {
+    @Environment(\.theme)
+    private var theme
+
     @EnvironmentObject var authManager: AuthManager
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
@@ -28,11 +31,11 @@ struct BodyScoreAccountCreationView: View {
                     if viewModel.isCreatingAccount {
                         VStack(spacing: 8) {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.background))
                             if let status = viewModel.accountCreationStatusMessage {
                                 Text(status)
                                     .font(OnboardingTypography.caption)
-                                    .foregroundStyle(Color.black.opacity(0.65))
+                                    .foregroundStyle(theme.colors.background.opacity(0.65))
                             }
                         }
                     } else {
@@ -47,7 +50,7 @@ struct BodyScoreAccountCreationView: View {
                 if let error = viewModel.accountCreationError {
                     Text(error)
                         .font(OnboardingTypography.caption)
-                        .foregroundStyle(Color.red)
+                        .foregroundStyle(theme.colors.error)
                         .multilineTextAlignment(.center)
                         .padding(.top, 8)
                 }

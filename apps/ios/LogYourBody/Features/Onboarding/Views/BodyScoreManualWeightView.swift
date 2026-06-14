@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct BodyScoreManualWeightView: View {
+    @Environment(\.theme)
+    private var theme
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var weightFieldFocused: Bool
     @State private var weightError: String?
@@ -37,13 +40,12 @@ struct BodyScoreManualWeightView: View {
                             }
                             .padding(.horizontal, 18)
                             .padding(.vertical, 14)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(Color.appCard.opacity(0.6))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(weightFieldBorderColor)
+                            .systemBGlassSurface(
+                                cornerRadius: theme.radius.input,
+                                tint: weightFieldFocused ? theme.colors.primary : theme.colors.text,
+                                tintOpacity: weightFieldFocused ? 0.07 : 0.03,
+                                borderColor: weightFieldBorderColor,
+                                borderOpacity: 1
                             )
                             .overlay(
                                 HStack {
@@ -61,11 +63,14 @@ struct BodyScoreManualWeightView: View {
                                 } label: {
                                     Image(systemName: "minus")
                                         .font(.system(size: 14, weight: .medium))
-                                        .foregroundStyle(Color.appText)
+                                        .foregroundStyle(theme.colors.text)
                                         .frame(width: 32, height: 32)
-                                        .background(
-                                            Circle()
-                                                .fill(Color.appCard.opacity(0.6))
+                                        .systemBGlassSurface(
+                                            cornerRadius: 16,
+                                            tint: theme.colors.text,
+                                            tintOpacity: 0.03,
+                                            borderColor: theme.colors.border,
+                                            borderOpacity: 0.55
                                         )
                                 }
                                 .buttonStyle(.plain)
@@ -75,11 +80,14 @@ struct BodyScoreManualWeightView: View {
                                 } label: {
                                     Image(systemName: "plus")
                                         .font(.system(size: 14, weight: .medium))
-                                        .foregroundStyle(Color.appText)
+                                        .foregroundStyle(theme.colors.text)
                                         .frame(width: 32, height: 32)
-                                        .background(
-                                            Circle()
-                                                .fill(Color.appCard.opacity(0.8))
+                                        .systemBGlassSurface(
+                                            cornerRadius: 16,
+                                            tint: theme.colors.text,
+                                            tintOpacity: 0.05,
+                                            borderColor: theme.colors.border,
+                                            borderOpacity: 0.65
                                         )
                                 }
                                 .buttonStyle(.plain)
@@ -89,7 +97,7 @@ struct BodyScoreManualWeightView: View {
                         if let error = weightError {
                             Text(error)
                                 .font(OnboardingTypography.caption)
-                                .foregroundStyle(Color.red)
+                                .foregroundStyle(theme.colors.error)
                         }
 
                         Button {

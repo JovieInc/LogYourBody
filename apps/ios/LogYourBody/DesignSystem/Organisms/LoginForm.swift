@@ -7,6 +7,9 @@ import SwiftUI
 // MARK: - LoginForm Organism
 
 struct LoginForm: View {
+    @Environment(\.theme)
+    private var theme
+
     @Binding var email: String
     @Binding var isLoading: Bool
 
@@ -42,14 +45,14 @@ struct LoginForm: View {
             }
 
             Text("We'll email you a one-time code to sign you in.")
-                .font(.system(size: 13))
-                .foregroundColor(.appTextSecondary)
+                .font(theme.typography.captionLarge)
+                .foregroundColor(theme.colors.textSecondary)
 
             // Login Button
             BaseButton(
                 "Email me a code",
                 configuration: ButtonConfiguration(
-                    style: .custom(background: .appCard, foreground: .appText),
+                    style: .custom(background: theme.colors.text, foreground: theme.colors.background),
                     isLoading: isLoading,
                     isEnabled: isFormValid,
                     fullWidth: true,

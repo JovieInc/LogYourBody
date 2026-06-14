@@ -68,7 +68,7 @@ struct BaseTextField: View {
 
     private var effectiveBorderColor: Color {
         if hasError {
-            return .red
+            return .appError
         } else if isFocused {
             return .appPrimary
         } else {
@@ -141,7 +141,7 @@ struct BaseTextField: View {
                     if hasError {
                         Image(systemName: "exclamationmark.circle.fill")
                             .font(.system(size: 18))
-                            .foregroundColor(.red)
+                            .foregroundColor(.appError)
                     }
                 }
             }
@@ -156,7 +156,7 @@ struct BaseTextField: View {
             if let errorMessage = configuration.errorMessage {
                 Text(errorMessage)
                     .font(.caption)
-                    .foregroundColor(.red)
+                    .foregroundColor(.appError)
                     .padding(.horizontal, 4)
             } else if let helperText = configuration.helperText {
                 Text(helperText)

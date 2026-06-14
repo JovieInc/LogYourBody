@@ -7,6 +7,9 @@ import SwiftUI
 // MARK: - DSAuthDivider Molecule
 
 struct DSAuthDivider: View {
+    @Environment(\.theme)
+    private var theme
+
     let text: String
 
     init(text: String = "or") {
@@ -16,15 +19,15 @@ struct DSAuthDivider: View {
     var body: some View {
         HStack(spacing: 16) {
             Rectangle()
-                .fill(Color.appBorder)
+                .fill(theme.colors.border)
                 .frame(height: 1)
 
             Text(text)
-                .font(.system(size: 14))
-                .foregroundColor(.appTextSecondary)
+                .font(theme.typography.captionLarge)
+                .foregroundColor(theme.colors.textSecondary)
 
             Rectangle()
-                .fill(Color.appBorder)
+                .fill(theme.colors.border)
                 .frame(height: 1)
         }
         .padding(.vertical, 20)

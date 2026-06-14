@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct BodyScoreProfileDetailsView: View {
+    @Environment(\.theme)
+    private var theme
+
     @EnvironmentObject var authManager: AuthManager
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
@@ -184,7 +187,7 @@ struct BodyScoreProfileDetailsView: View {
                     if let errorMessage {
                         Text(errorMessage)
                             .font(OnboardingTypography.caption)
-                            .foregroundStyle(Color.red)
+                            .foregroundStyle(theme.colors.error)
                             .multilineTextAlignment(.center)
                     }
                 }
@@ -219,16 +222,12 @@ struct BodyScoreProfileDetailsView: View {
                         .focused($focusedNameField, equals: .firstName)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(Color.appCard.opacity(0.6))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(
-                                    focusedNameField == .firstName ? Color.appPrimary : Color.appBorder.opacity(0.6),
-                                    lineWidth: 1
-                                )
+                        .systemBGlassSurface(
+                            cornerRadius: theme.radius.input,
+                            tint: focusedNameField == .firstName ? theme.colors.primary : theme.colors.text,
+                            tintOpacity: focusedNameField == .firstName ? 0.07 : 0.03,
+                            borderColor: focusedNameField == .firstName ? theme.colors.primary : theme.colors.border,
+                            borderOpacity: focusedNameField == .firstName ? 0.9 : 0.65
                         )
                         .onSubmit {
                             handleFirstNameContinue()
@@ -256,16 +255,12 @@ struct BodyScoreProfileDetailsView: View {
                         .focused($focusedNameField, equals: .lastName)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(Color.appCard.opacity(0.6))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(
-                                    focusedNameField == .lastName ? Color.appPrimary : Color.appBorder.opacity(0.6),
-                                    lineWidth: 1
-                                )
+                        .systemBGlassSurface(
+                            cornerRadius: theme.radius.input,
+                            tint: focusedNameField == .lastName ? theme.colors.primary : theme.colors.text,
+                            tintOpacity: focusedNameField == .lastName ? 0.07 : 0.03,
+                            borderColor: focusedNameField == .lastName ? theme.colors.primary : theme.colors.border,
+                            borderOpacity: focusedNameField == .lastName ? 0.9 : 0.65
                         )
                         .onSubmit {
                             handleLastNameContinue()
@@ -326,17 +321,16 @@ struct BodyScoreProfileDetailsView: View {
                 case .centimeters:
                     TextField("178", text: $heightCentimetersText)
                         .keyboardType(.decimalPad)
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .font(theme.typography.displayMedium)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(Color.appCard.opacity(0.6))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.appBorder.opacity(0.6), lineWidth: 1)
+                        .systemBGlassSurface(
+                            cornerRadius: theme.radius.input,
+                            tint: theme.colors.text,
+                            tintOpacity: 0.03,
+                            borderColor: theme.colors.border,
+                            borderOpacity: 0.65
                         )
                         .accessibilityLabel("Height in centimeters")
 
