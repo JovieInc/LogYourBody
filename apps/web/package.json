@@ -21,6 +21,7 @@
     "db:push:local": "supabase db push --local",
     "db:status": "supabase db remote list",
     "test:e2e": "playwright test",
+    "test:visual-qa": "playwright test --config playwright.config.visual-qa.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:update": "playwright test --update-snapshots",
     "seed": "tsx scripts/seed-database.ts",
