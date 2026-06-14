@@ -461,17 +461,18 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
     }
 
     func testAvatarBodyFatAssetsHaveTransparentSourceBackgrounds() throws {
-        let representativeAssets = [
-            AvatarBodyFatCatalog.match(bodyFatPercentage: 18, gender: "male").assetName,
-            AvatarBodyFatCatalog.match(bodyFatPercentage: 28, gender: "female").assetName
-        ]
+        let assetNames = AvatarBodyFatCatalog.Sex.male.buckets.map {
+            AvatarBodyFatCatalog.Match(sex: .male, bucket: $0).assetName
+        } + AvatarBodyFatCatalog.Sex.female.buckets.map {
+            AvatarBodyFatCatalog.Match(sex: .female, bucket: $0).assetName
+        }
 
-        for assetName in representativeAssets {
+        for assetName in assetNames {
             let image = try XCTUnwrap(UIImage(named: assetName), "\(assetName) should exist in the app asset catalog")
-            let cornerAlphaValues = try renderedCornerAlphaValues(for: image)
+            let perimeterAlphaValues = try renderedPerimeterAlphaValues(for: image)
 
             XCTAssertTrue(
-                cornerAlphaValues.allSatisfy { $0 <= 4 },
+                perimeterAlphaValues.allSatisfy { $0 <= 4 },
                 "\(assetName) should not retain the black source-image rectangle"
             )
         }
@@ -487,7 +488,7 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .missing), "Missing")
     }
 
-    private func renderedCornerAlphaValues(for image: UIImage) throws -> [UInt8] {
+    private func renderedPerimeterAlphaValues(for image: UIImage) throws -> [UInt8] {
         let cgImage = try XCTUnwrap(image.cgImage)
         let width = cgImage.width
         let height = cgImage.height
@@ -510,12 +511,20 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
 
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-        return [
-            alphaValue(in: pixels, width: width, x: 0, y: 0),
-            alphaValue(in: pixels, width: width, x: width - 1, y: 0),
-            alphaValue(in: pixels, width: width, x: 0, y: height - 1),
-            alphaValue(in: pixels, width: width, x: width - 1, y: height - 1)
-        ]
+        var alphaValues: [UInt8] = []
+        alphaValues.reserveCapacity((width * 2) + (height * 2))
+
+        for xValue in 0..<width {
+            alphaValues.append(alphaValue(in: pixels, width: width, x: xValue, y: 0))
+            alphaValues.append(alphaValue(in: pixels, width: width, x: xValue, y: height - 1))
+        }
+
+        for yValue in 0..<height {
+            alphaValues.append(alphaValue(in: pixels, width: width, x: 0, y: yValue))
+            alphaValues.append(alphaValue(in: pixels, width: width, x: width - 1, y: yValue))
+        }
+
+        return alphaValues
     }
 
     private func alphaValue(in pixels: [UInt8], width: Int, x: Int, y: Int) -> UInt8 {

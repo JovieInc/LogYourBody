@@ -31,6 +31,7 @@
 		AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */; };
 		AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */; };
 		AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */; };
+		AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145A12F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift */; };
 		AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134002F01313400D134A1 /* NotificationManager.swift */; };
 		AD3134032F01313400D134A1 /* DailyWeighInReminderPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */; };
 		AD0B7BF52EC552FA008B29E7 /* LogYourBody.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */; };
@@ -381,6 +382,7 @@
 		AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricSpotlightIndexer.swift; sourceTree = "<group>"; };
 		AD3134002F01313400D134A1 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyWeighInReminderPromptView.swift; sourceTree = "<group>"; };
+		AD3145A12F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoAttachSheet.swift; sourceTree = "<group>"; };
 		AD723AE82E15FA5C002376C6 /* LoadingManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingManager.swift; sourceTree = "<group>"; };
 		AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseDataClient.swift; sourceTree = "<group>"; };
 		AD723AEE2E15FA5C002376C6 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
@@ -989,6 +991,7 @@
 				ADDC48742E2D8A6B003C97E7 /* LegalConsentView.swift */,
 				ADDC48752E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift */,
 				ADDC48762E2D8A6B003C97E7 /* OTPInputView.swift */,
+				AD3145A12F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift */,
 				ADDC48772E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift */,
 				ADDC48782E2D8A6B003C97E7 /* ProgressPhotoCutoutView.swift */,
 				ADDC48792E2D8A6B003C97E7 /* VersionRow.swift */,
@@ -1574,6 +1577,7 @@
 				AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
+				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,
 				ADDC487C2E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift in Sources */,
 				ADDC487D2E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift in Sources */,
 				AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */,
