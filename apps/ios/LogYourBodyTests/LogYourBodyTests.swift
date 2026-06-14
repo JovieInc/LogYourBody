@@ -6,6 +6,7 @@ import XCTest
 import AVFoundation
 import CoreData
 import RevenueCat
+import SwiftUI
 import UIKit
 @testable import LogYourBody
 
@@ -531,6 +532,54 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         let bytesPerPixel = 4
         let index = (y * width + x) * bytesPerPixel + 3
         return pixels[index]
+    }
+}
+
+@MainActor
+final class BodyScoreShareCardTests: XCTestCase {
+    func testSharePayloadUsesSameNearestAvatarBucketAsHomeHero() {
+        let payload = makePayload(bodyFatPercentage: 16.4, gender: "male")
+
+        XCTAssertEqual(payload.avatarMatch.assetName, "avatar_male_15")
+        XCTAssertEqual(payload.avatarMatch.badgeText, "Male 15% body fat")
+    }
+
+    func testShareCardRendersRequestedExportSize() throws {
+        let size = BodyScoreShareAspect.portrait.pixelSize
+        let renderer = ImageRenderer(
+            content: BodyScoreShareCardView(
+                payload: makePayload(bodyFatPercentage: 22.4, gender: "female"),
+                aspect: .portrait
+            )
+            .frame(width: size.width, height: size.height)
+            .environment(\.colorScheme, .dark)
+        )
+        renderer.scale = 1.0
+
+        let image = try XCTUnwrap(renderer.uiImage)
+
+        XCTAssertEqual(image.size.width, size.width, accuracy: 0.5)
+        XCTAssertEqual(image.size.height, size.height, accuracy: 0.5)
+    }
+
+    private func makePayload(
+        bodyFatPercentage: Double?,
+        gender: String?
+    ) -> BodyScoreSharePayload {
+        BodyScoreSharePayload(
+            score: 82,
+            scoreText: "82",
+            tagline: "Athletic and trending leaner",
+            ffmiValue: "21.8",
+            ffmiCaption: "Strong",
+            bodyFatValue: "16.4",
+            bodyFatCaption: "%",
+            weightValue: "181.0",
+            weightCaption: "lb",
+            deltaText: "+4 over 30 days",
+            bodyFatPercentage: bodyFatPercentage,
+            gender: gender
+        )
     }
 }
 

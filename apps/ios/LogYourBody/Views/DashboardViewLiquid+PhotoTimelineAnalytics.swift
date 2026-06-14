@@ -27,6 +27,7 @@ extension DashboardViewLiquid {
                 .padding(.top, 14)
                 .padding(.bottom, 32)
             }
+            .scrollBounceBehavior(.basedOnSize)
         }
     }
 
