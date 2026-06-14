@@ -15,12 +15,27 @@ class TimelineDataProvider: ObservableObject {
 
     private let photoSearchWindow: TimeInterval = 7 * 24 * 60 * 60  // ±7 days
     private let metricSearchWindow: TimeInterval = 7 * 24 * 60 * 60  // ±7 days
+    private var metricsWithPhotos: [BodyMetrics] = []
+    private var metricsWithBodyData: [BodyMetrics] = []
+    private var metricsWithWeightOrBodyFat: [BodyMetrics] = []
+    private var dataDates: [Date] = []
+    private var metricsByLocalDate: [String: BodyMetrics] = [:]
 
     // MARK: - Data Loading
 
     /// Load all body metrics (would integrate with your existing data layer)
     func loadMetrics(_ metrics: [BodyMetrics]) {
-        self.bodyMetrics = metrics.sorted { $0.date < $1.date }
+        let sortedMetrics = metrics.sorted { $0.date < $1.date }
+        self.bodyMetrics = sortedMetrics
+        metricsWithPhotos = TimelinePhotoSampler.metricsWithPhotos(from: sortedMetrics)
+        metricsWithBodyData = TimelinePhotoSampler.metricsWithData(from: sortedMetrics)
+        metricsWithWeightOrBodyFat = sortedMetrics.filter {
+            $0.weight != nil || $0.bodyFatPercentage != nil
+        }
+        dataDates = metricsWithBodyData.map(\.date)
+        metricsByLocalDate = sortedMetrics.reduce(into: [:]) { lookup, metric in
+            lookup[metric.localDate] = metric
+        }
     }
 
     // MARK: - Photo Mode - Find Nearest Photo and Metrics
@@ -39,11 +54,6 @@ class TimelineDataProvider: ObservableObject {
     }
 
     private func findNearestPhoto(to date: Date, within window: TimeInterval) -> TimelineDataResult.PhotoResult? {
-        let metricsWithPhotos = bodyMetrics.filter { metric in
-            guard let photoUrl = metric.photoUrl else { return false }
-            return !photoUrl.isEmpty
-        }
-
         guard !metricsWithPhotos.isEmpty else { return nil }
 
         // Find nearest photo within window
@@ -69,10 +79,7 @@ class TimelineDataProvider: ObservableObject {
         var nearest: BodyMetrics?
         var smallestDiff: TimeInterval = window
 
-        for metric in bodyMetrics {
-            let hasData = metric.weight != nil || metric.bodyFatPercentage != nil
-            guard hasData else { continue }
-
+        for metric in metricsWithWeightOrBodyFat {
             let diff = abs(metric.date.timeIntervalSince(date))
             if diff <= window && diff < smallestDiff {
                 nearest = metric
@@ -100,36 +107,18 @@ class TimelineDataProvider: ObservableObject {
     /// Get all dates that have any data (weight OR BF% OR photo)
     /// Used for snap points in Avatar Mode
     func getAllDataDates() -> [Date] {
-        let metricsWithData = TimelinePhotoSampler.metricsWithData(from: bodyMetrics)
-        return metricsWithData.map { $0.date }.sorted()
+        dataDates
     }
 
     /// Find nearest data date for snapping in Avatar Mode
     func findNearestDataDate(to scrubDate: Date) -> Date? {
-        let dataDates = getAllDataDates()
-        guard !dataDates.isEmpty else { return nil }
-
-        var nearest: Date?
-        var smallestDiff: TimeInterval = .infinity
-
-        for date in dataDates {
-            let diff = abs(date.timeIntervalSince(scrubDate))
-            if diff < smallestDiff {
-                nearest = date
-                smallestDiff = diff
-            }
-        }
-
-        return nearest
+        nearestDate(in: dataDates, to: scrubDate)
     }
 
     /// Get metric for a specific date (exact match)
     func getMetric(for date: Date) -> BodyMetrics? {
-        // Find metric with matching date (within same day)
         let localDate = BodyMetricLocalDate.key(for: date)
-        return bodyMetrics.first { metric in
-            metric.localDate == localDate
-        }
+        return metricsByLocalDate[localDate]
     }
 
     // MARK: - Timeline Anchors Generation
@@ -139,9 +128,8 @@ class TimelineDataProvider: ObservableObject {
     func generateAnchors(mode: TimelineMode, zoomLevel: TimelineZoomLevel) -> [TimelineAnchor] {
         guard !bodyMetrics.isEmpty else { return [] }
 
-        let sortedMetrics = bodyMetrics.sorted { $0.date < $1.date }
-        guard let firstDate = sortedMetrics.first?.date,
-              let lastDate = sortedMetrics.last?.date else {
+        guard let firstDate = bodyMetrics.first?.date,
+              let lastDate = bodyMetrics.last?.date else {
             return []
         }
 
@@ -153,7 +141,7 @@ class TimelineDataProvider: ObservableObject {
         )
 
         // Distribute metrics to buckets
-        TimelineBucketCalculator.distributeToBuckets(metrics: sortedMetrics, buckets: &buckets)
+        TimelineBucketCalculator.distributeToBuckets(metrics: bodyMetrics, buckets: &buckets)
 
         // Sample based on mode
         let sampledMetrics: [BodyMetrics]
@@ -167,7 +155,7 @@ class TimelineDataProvider: ObservableObject {
             sampledMetrics = TimelinePhotoSampler.samplePhotos(
                 from: photoBuckets,
                 maxThumbnails: zoomLevel.maxVisibleThumbnails,
-                sortedMetrics: sortedMetrics
+                sortedMetrics: bodyMetrics
             )
         } else {
             // Avatar mode: show all data points (may need thinning for very dense data)
@@ -179,7 +167,7 @@ class TimelineDataProvider: ObservableObject {
             sampledMetrics = TimelinePhotoSampler.samplePhotos(
                 from: dataBuckets,
                 maxThumbnails: zoomLevel.maxVisibleThumbnails * 2,  // Allow more in avatar mode
-                sortedMetrics: sortedMetrics
+                sortedMetrics: bodyMetrics
             )
         }
 
@@ -260,6 +248,29 @@ class TimelineDataProvider: ObservableObject {
         } else {
             return .yearly
         }
+    }
+
+    private func nearestDate(in dates: [Date], to target: Date) -> Date? {
+        guard !dates.isEmpty else { return nil }
+
+        var low = 0
+        var high = dates.count
+
+        while low < high {
+            let mid = (low + high) / 2
+            if dates[mid] < target {
+                low = mid + 1
+            } else {
+                high = mid
+            }
+        }
+
+        if low == 0 { return dates[0] }
+        if low == dates.count { return dates[dates.count - 1] }
+
+        let before = dates[low - 1]
+        let after = dates[low]
+        return abs(before.timeIntervalSince(target)) <= abs(after.timeIntervalSince(target)) ? before : after
     }
 
     // MARK: - Date Conversion

@@ -583,6 +583,119 @@ final class BodyScoreShareCardTests: XCTestCase {
     }
 }
 
+final class DashboardTimelineProviderPerformanceTests: XCTestCase {
+    func testLoadMetricsBuildsSortedTimelineIndexesOnce() {
+        let provider = TimelineDataProvider()
+        let baseDate = Date(timeIntervalSince1970: 1_800_000_000)
+        let oldest = makeMetric(id: "oldest", date: baseDate.addingTimeInterval(-86_400 * 2), weight: 181, bodyFat: nil)
+        let photo = makeMetric(
+            id: "photo",
+            date: baseDate.addingTimeInterval(-86_400),
+            weight: nil,
+            bodyFat: nil,
+            photoUrl: "https://example.com/photo.jpg"
+        )
+        let bodyData = makeMetric(id: "body-data", date: baseDate, weight: nil, bodyFat: 18.4)
+
+        provider.loadMetrics([bodyData, photo, oldest])
+
+        XCTAssertEqual(provider.bodyMetrics.map(\.id), ["oldest", "photo", "body-data"])
+        XCTAssertEqual(provider.getAllDataDates(), [oldest.date, photo.date, bodyData.date])
+        XCTAssertEqual(provider.findNearestDataDate(to: baseDate.addingTimeInterval(-3_600)), bodyData.date)
+    }
+
+    func testLocalDateLookupHandlesMultipleMetricsOnSameDay() throws {
+        let provider = TimelineDataProvider()
+        let calendar = Calendar(identifier: .gregorian)
+        let morningDate = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2_026,
+            month: 6,
+            day: 14,
+            hour: 8
+        )))
+        let eveningDate = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2_026,
+            month: 6,
+            day: 14,
+            hour: 16
+        )))
+        let morning = makeMetric(
+            id: "morning",
+            date: morningDate,
+            localDate: "2026-06-14",
+            weight: 181,
+            bodyFat: nil
+        )
+        let evening = makeMetric(
+            id: "evening",
+            date: eveningDate,
+            localDate: "2026-06-14",
+            weight: 180.5,
+            bodyFat: nil
+        )
+
+        provider.loadMetrics([evening, morning])
+
+        XCTAssertEqual(provider.getMetric(for: morning.date)?.id, "evening")
+    }
+
+    private func makeMetric(
+        id: String,
+        date: Date,
+        localDate: String? = nil,
+        weight: Double?,
+        bodyFat: Double?,
+        photoUrl: String? = nil
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: "timeline-performance-user",
+            date: date,
+            localDate: localDate,
+            weight: weight,
+            weightUnit: "lbs",
+            bodyFatPercentage: bodyFat,
+            bodyFatMethod: bodyFat == nil ? nil : "scale",
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: photoUrl,
+            dataSource: BodyMetricSource.manual.rawValue,
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+}
+
+@MainActor
+final class ProgressPhotoImagePipelineTests: XCTestCase {
+    func testOptimizeImageDownsamplesLargeImages() {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 2_400, height: 1_800), format: format).image { context in
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2_400, height: 1_800))
+        }
+
+        let optimized = ProgressPhotoImagePipeline.optimizeImage(image, maxDimension: 1_200)
+
+        XCTAssertLessThanOrEqual(max(optimized.size.width, optimized.size.height), 1_200)
+        XCTAssertEqual(optimized.size.width, 1_200, accuracy: 1)
+        XCTAssertEqual(optimized.size.height, 900, accuracy: 1)
+    }
+
+    func testCacheCostUsesPixelBytesWithoutEncodingImageData() {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 100, height: 50), format: format).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 100, height: 50))
+        }
+
+        XCTAssertEqual(ProgressPhotoImagePipeline.cacheCost(for: image), 20_000)
+    }
+}
+
 final class DashboardDataVizPolicyTests: XCTestCase {
     func testMetricSummaryFootnoteKeepsOneGoalStatWhenGoalExists() {
         XCTAssertEqual(
