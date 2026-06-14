@@ -303,11 +303,7 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
             Image(avatar.assetName)
                 .resizable()
                 .interpolation(.high)
-                .scaledToFit()
-                .frame(
-                    width: max(0, geometry.size.width - 32)
-                )
-                .padding(16)
+                .scaledToFill()
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
                 .clipped()
                 .accessibilityHidden(true)
