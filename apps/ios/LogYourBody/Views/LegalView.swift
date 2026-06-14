@@ -108,16 +108,6 @@ extension LegalView {
                         isExternal: true
                     )
                 }
-
-                DSDivider().insetted(16)
-
-                // Mailing Address
-                SettingsRow(
-                    icon: "location",
-                    title: "Mailing Address",
-                    value: "View",
-                    showChevron: false
-                )
             }
         }
     }

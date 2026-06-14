@@ -77,16 +77,14 @@ struct SyncStatusView: View {
 
         switch syncManager.syncStatus {
         case .syncing:
-            return "Syncing..."
+            return "Syncing…"
         case .error:
-            return "Sync Error"
+            return "Sync needs retry"
         case .offline:
             return "Offline"
         default:
             if syncManager.pendingSyncCount > 0 {
-                return "\(syncManager.pendingSyncCount) pending"
-            } else if syncManager.realtimeConnected {
-                return "Live"
+                return "Pending sync"
             } else {
                 return "Synced"
             }

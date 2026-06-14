@@ -6,14 +6,14 @@ struct BodyScoreHookView: View {
 
     private let bulletItems: [OnboardingBulletItem] = [
         .init(iconName: "chart.xyaxis.line", text: "Track weight, body fat, and FFMI together."),
-        .init(iconName: "person.3", text: "See where you land vs similar men."),
+        .init(iconName: "person.3", text: "See where you land vs similar bodies."),
         .init(iconName: "arrow.triangle.2.circlepath", text: "Update your score anytime as you progress.")
     ]
 
     var body: some View {
         OnboardingPageTemplate(
             title: "Get your Body Score in 60 seconds.",
-            subtitle: "See your muscle, body fat, and FFMI vs similar men.",
+            subtitle: "See your muscle, body fat, and FFMI in one score.",
             showsBackButton: false,
             progress: viewModel.progress(for: .hook)
         ) {

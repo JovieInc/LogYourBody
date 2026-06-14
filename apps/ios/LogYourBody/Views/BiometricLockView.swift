@@ -33,6 +33,32 @@ struct BiometricLockView: View {
         }
     }
 
+    private var biometricScanningText: String {
+        switch biometricType {
+        case .faceID:
+            return "Scanning your face…"
+        case .touchID:
+            return "Reading your fingerprint…"
+        }
+    }
+
+    private var biometricReadyText: String {
+        "\(biometricType.title) is ready"
+    }
+
+    private var biometricPromptText: String {
+        switch biometricType {
+        case .faceID:
+            return "Look at your iPhone to continue"
+        case .touchID:
+            return "Touch the sensor to continue"
+        }
+    }
+
+    private var biometricProtectionText: String {
+        "Your data stays encrypted on this device. \(biometricType.title) adds another lock on LogYourBody."
+    }
+
     var body: some View {
         ZStack {
             Color.liquidBg
@@ -154,11 +180,11 @@ struct BiometricLockView: View {
             }
 
             VStack(spacing: 6) {
-                Text(isAuthenticating ? "Scanning your face…" : "Face ID is ready")
+                Text(isAuthenticating ? biometricScanningText : biometricReadyText)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.linearText)
 
-                Text("Look at your iPhone to continue")
+                Text(biometricPromptText)
                     .font(.system(size: 15))
                     .foregroundColor(.linearTextSecondary)
             }
@@ -178,7 +204,7 @@ struct BiometricLockView: View {
             }
             .opacity(isAuthenticating ? 1 : 0.4)
 
-            Text("Your data stays encrypted on this device. Face ID adds another lock on LogYourBody.")
+            Text(biometricProtectionText)
                 .font(.system(size: 14))
                 .multilineTextAlignment(.center)
                 .foregroundColor(.linearTextTertiary)
@@ -206,7 +232,7 @@ struct BiometricLockView: View {
                     Image(systemName: "lock.shield")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.linearTextSecondary)
-                    Text("Protected by Face ID")
+                    Text("Protected by \(biometricType.title)")
                         .font(.system(size: 14))
                         .foregroundColor(.linearTextSecondary)
                 }

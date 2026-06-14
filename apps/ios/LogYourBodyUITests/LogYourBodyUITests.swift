@@ -258,6 +258,10 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Locked"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["integrations_bulk_photo_import_link"].exists)
         XCTAssertFalse(app.staticTexts["Bulk Photo Import"].exists)
+        XCTAssertFalse(app.staticTexts["Google Fit"].exists)
+        XCTAssertFalse(app.staticTexts["Export as JSON"].exists)
+        XCTAssertFalse(app.staticTexts["API Access"].exists)
+        XCTAssertFalse(app.staticTexts["Coming Soon"].exists)
     }
 
     func testBulkPhotoImportGateOpensScannerEntry() throws {

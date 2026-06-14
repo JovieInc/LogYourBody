@@ -3,6 +3,7 @@
 // LogYourBody
 //
 import SwiftUI
+import UIKit
 
 struct IntegrationsView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -26,7 +27,6 @@ struct IntegrationsView: View {
                     healthAndFitnessSection
                     photoImportSection
                     dataExportSection
-                    developerAccessSection
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
@@ -35,15 +35,15 @@ struct IntegrationsView: View {
         }
         .navigationTitle("Integrations")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showHealthKitConnect) {
-            // HealthKit authorization handled inline
-            Text("")
-                .onAppear {
-                    Task {
-                        _ = await healthKitManager.requestAuthorization()
-                        showHealthKitConnect = false
-                    }
+        .alert("Apple Health Permission Needed", isPresented: $showHealthKitConnect) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
                 }
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("Enable Apple Health access in Settings to sync weight and body-composition data.")
         }
         .onAppear {
             // Check HealthKit authorization status
@@ -152,31 +152,9 @@ struct IntegrationsView: View {
                     )
                 }
 
-                Divider()
-
-                // Google Fit (Coming Soon)
-                HStack {
-                    Image(systemName: "figure.run")
-                        .foregroundColor(.green)
-                        .font(.system(size: SettingsDesign.iconSize))
-                        .frame(width: SettingsDesign.iconFrame)
-
-                    Text("Google Fit")
-                        .font(SettingsDesign.titleFont)
-
-                    Spacer()
-
-                    Text("Coming Soon")
-                        .font(SettingsDesign.valueFont)
-                        .foregroundColor(.appTextSecondary)
-                }
-                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                .padding(.vertical, SettingsDesign.verticalPadding)
-                .opacity(0.6)
-
-                Divider()
-
                 if Constants.isBodySpecEnabled {
+                    Divider()
+
                     NavigationLink(
                         destination: BodySpecIntegrationView()
                             .environmentObject(authManager)
@@ -209,26 +187,6 @@ struct IntegrationsView: View {
                     }
                     .padding(.horizontal, SettingsDesign.horizontalPadding)
                     .padding(.vertical, SettingsDesign.verticalPadding)
-                } else {
-                    // BodySpec (Coming Soon)
-                    HStack {
-                        Image(systemName: "waveform.path.ecg")
-                            .foregroundColor(.blue)
-                            .font(.system(size: SettingsDesign.iconSize))
-                            .frame(width: SettingsDesign.iconFrame)
-
-                        Text("BodySpec")
-                            .font(SettingsDesign.titleFont)
-
-                        Spacer()
-
-                        Text("Coming Soon")
-                            .font(SettingsDesign.valueFont)
-                            .foregroundColor(.appTextSecondary)
-                    }
-                    .padding(.horizontal, SettingsDesign.horizontalPadding)
-                    .padding(.vertical, SettingsDesign.verticalPadding)
-                    .opacity(0.6)
                 }
             }
         }
@@ -268,66 +226,16 @@ struct IntegrationsView: View {
     private var dataExportSection: some View {
         SettingsSection(
             header: "Data Export",
-            footer: "Export your data to other platforms"
+            footer: "Export your data in available formats"
         ) {
-            VStack(spacing: 0) {
-                // CSV Export
-                NavigationLink(destination: ExportDataView()) {
-                    SettingsRow(
-                        icon: "doc.text",
-                        title: "Export as CSV",
-                        showChevron: true
-                    )
-                }
-
-                Divider()
-
-                // JSON Export (Coming Soon)
-                HStack {
-                    Image(systemName: "doc.badge.gearshape")
-                        .foregroundColor(.appTextSecondary)
-                        .font(.system(size: SettingsDesign.iconSize))
-                        .frame(width: SettingsDesign.iconFrame)
-
-                    Text("Export as JSON")
-                        .font(SettingsDesign.titleFont)
-
-                    Spacer()
-
-                    Text("Coming Soon")
-                        .font(SettingsDesign.valueFont)
-                        .foregroundColor(.appTextSecondary)
-                }
-                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                .padding(.vertical, SettingsDesign.verticalPadding)
-                .opacity(0.6)
+            NavigationLink(destination: ExportDataView()) {
+                SettingsRow(
+                    icon: "doc.text",
+                    title: "Export Data",
+                    value: "CSV",
+                    showChevron: true
+                )
             }
-        }
-    }
-
-    private var developerAccessSection: some View {
-        SettingsSection(
-            header: "Developer Access",
-            footer: "API access for third-party developers will be available in the future"
-        ) {
-            HStack {
-                Image(systemName: "network")
-                    .foregroundColor(.appTextSecondary)
-                    .font(.system(size: SettingsDesign.iconSize))
-                    .frame(width: SettingsDesign.iconFrame)
-
-                Text("API Access")
-                    .font(SettingsDesign.titleFont)
-
-                Spacer()
-
-                Text("Coming Soon")
-                    .font(SettingsDesign.valueFont)
-                    .foregroundColor(.appTextSecondary)
-            }
-            .padding(.horizontal, SettingsDesign.horizontalPadding)
-            .padding(.vertical, SettingsDesign.verticalPadding)
-            .opacity(0.6)
         }
     }
 }

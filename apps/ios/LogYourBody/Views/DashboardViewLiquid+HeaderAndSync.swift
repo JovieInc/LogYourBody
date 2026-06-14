@@ -119,8 +119,7 @@ extension DashboardViewLiquid {
         case .offline:
             return "Offline"
         case .error:
-            // Keep header copy neutral; red banner handles the explicit error messaging
-            return "Sync"
+            return "Sync needs retry"
         case .success, .idle:
             return "Synced"
         case .syncing:

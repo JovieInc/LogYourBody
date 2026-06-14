@@ -439,7 +439,7 @@ struct AddEntrySheet: View {
                         .foregroundColor(.error)
                         .accessibilityLabel("Body fat validation error: \(error)")
                 } else {
-                    Text("Valid range: 3-50%")
+                    Text("Valid range: 3-60%")
                         .font(.appBodySmall)
                         .foregroundColor(.appTextTertiary)
                 }
