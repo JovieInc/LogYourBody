@@ -548,6 +548,63 @@ class RevenueCatManager: NSObject, ObservableObject {
             )
         )
     }
+
+    func applyPaywallPlansUITestFixture() {
+        shouldForceOfferingsUnavailableForUITests = false
+        errorMessage = nil
+
+        let monthlyProduct = TestStoreProduct(
+            localizedTitle: "LogYourBody Pro Monthly",
+            price: fixtureDecimal("9.99"),
+            localizedPriceString: "$9.99",
+            productIdentifier: "com.logyourbody.app.pro1.monthly.3daytrial",
+            productType: .autoRenewableSubscription,
+            localizedDescription: "Monthly LogYourBody Pro subscription",
+            subscriptionGroupIdentifier: "logyourbody_pro",
+            subscriptionPeriod: SubscriptionPeriod(value: 1, unit: .month),
+            locale: Locale(identifier: "en_US")
+        ).toStoreProduct()
+        let annualProduct = TestStoreProduct(
+            localizedTitle: "LogYourBody Pro Annual",
+            price: fixtureDecimal("69.99"),
+            localizedPriceString: "$69.99",
+            productIdentifier: "com.logyourbody.app.pro1.annual.3daytrial",
+            productType: .autoRenewableSubscription,
+            localizedDescription: "Annual LogYourBody Pro subscription",
+            subscriptionGroupIdentifier: "logyourbody_pro",
+            subscriptionPeriod: SubscriptionPeriod(value: 1, unit: .year),
+            locale: Locale(identifier: "en_US")
+        ).toStoreProduct()
+        let packages = [
+            Package(
+                identifier: "$rc_monthly",
+                packageType: .monthly,
+                storeProduct: monthlyProduct,
+                offeringIdentifier: "ui_test_paywall",
+                webCheckoutUrl: nil
+            ),
+            Package(
+                identifier: "$rc_annual",
+                packageType: .annual,
+                storeProduct: annualProduct,
+                offeringIdentifier: "ui_test_paywall",
+                webCheckoutUrl: nil
+            )
+        ]
+        let offering = Offering(
+            identifier: "ui_test_paywall",
+            serverDescription: "UI test paywall",
+            availablePackages: packages,
+            webCheckoutUrl: nil
+        )
+
+        currentOffering = offering
+        cachePaywallOfferingDisplay(from: offering)
+    }
+
+    private func fixtureDecimal(_ value: String) -> Decimal {
+        Decimal(string: value) ?? 0
+    }
     #endif
 
     // MARK: - Private Helper Methods

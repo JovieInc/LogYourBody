@@ -192,13 +192,14 @@ struct LogYourBodyApp: App {
         let usesPaidFixture = arguments.contains("-lybUITestPaidMVPFixture")
         let usesWeightLoggerFixture = arguments.contains("-lybUITestWeightLoggerMVPFixture")
         let usesPaywallFixture = arguments.contains("-lybUITestPaywallFixture")
+        let usesPaywallPlansFixture = arguments.contains("-lybUITestPaywallPlansFixture")
         let usesFullDashboardFixture = arguments.contains("-lybUITestFullDashboardFixture")
         let usesPhotoTimelineHUDFixture = arguments.contains("-lybUITestPhotoTimelineHUDFixture")
         let usesBodyScoreOnboardingFixture = arguments.contains("-lybUITestBodyScoreOnboardingFixture")
         let usesDailyReminderPromptFixture = arguments.contains("-lybUITestDailyReminderPromptFixture")
 
-        guard usesPaidFixture || usesWeightLoggerFixture || usesPaywallFixture || usesFullDashboardFixture ||
-            usesPhotoTimelineHUDFixture || usesBodyScoreOnboardingFixture else {
+        guard usesPaidFixture || usesWeightLoggerFixture || usesPaywallFixture || usesPaywallPlansFixture ||
+            usesFullDashboardFixture || usesPhotoTimelineHUDFixture || usesBodyScoreOnboardingFixture else {
             return false
         }
 
@@ -278,6 +279,8 @@ struct LogYourBodyApp: App {
         revenueCatManager.isPurchasing = false
         if usesPaywallFixture {
             revenueCatManager.applyCachedPaywallOfferingUITestFixture()
+        } else if usesPaywallPlansFixture {
+            revenueCatManager.applyPaywallPlansUITestFixture()
         }
         UserDefaults.standard.set(isSubscribed, forKey: "revenuecat_isSubscribed")
         if isSubscribed && !usesDailyReminderPromptFixture {

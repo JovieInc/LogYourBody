@@ -18,6 +18,7 @@ struct PaywallView: View {
     @State private var showTermsSheet = false
     @State private var showPrivacySheet = false
     @State private var showLogoutConfirmation = false
+    @State private var selectedPackageIdentifier = "$rc_annual"
 
     var body: some View {
         ZStack {
@@ -33,8 +34,8 @@ struct PaywallView: View {
                     header
                     featuresSection
 
-                    if let package = firstAvailablePackage {
-                        pricingCard(package: package)
+                    if !availablePrimaryPackages.isEmpty {
+                        pricingOptionsSection(packages: availablePrimaryPackages)
                     } else if isLoading {
                         ProgressView()
                             .tint(.appPrimary)
@@ -44,7 +45,7 @@ struct PaywallView: View {
                         )
                     }
 
-                    if let package = firstAvailablePackage {
+                    if let package = selectedPackage {
                         purchaseButton(package: package)
                     }
 
@@ -126,18 +127,34 @@ struct PaywallView: View {
 
     // MARK: - Computed Properties
 
-    /// Returns the first available package, preferring annual but falling back to any available package
-    private var firstAvailablePackage: Package? {
-        // Try annual first (preferred)
-        if let annual = revenueCatManager.currentOffering?.package(identifier: "$rc_annual") {
+    private var availablePrimaryPackages: [Package] {
+        guard let offering = revenueCatManager.currentOffering else {
+            return []
+        }
+
+        let monthly = offering.package(identifier: "$rc_monthly")
+        let annual = offering.package(identifier: "$rc_annual")
+        let primaryPackages = [monthly, annual].compactMap { $0 }
+
+        if !primaryPackages.isEmpty {
+            return primaryPackages
+        }
+
+        return Array(offering.availablePackages.prefix(1))
+    }
+
+    private var selectedPackage: Package? {
+        let packages = availablePrimaryPackages
+
+        if let selected = packages.first(where: { $0.identifier == selectedPackageIdentifier }) {
+            return selected
+        }
+
+        if let annual = packages.first(where: { $0.identifier == "$rc_annual" }) {
             return annual
         }
-        // Fallback to monthly
-        if let monthly = revenueCatManager.currentOffering?.package(identifier: "$rc_monthly") {
-            return monthly
-        }
-        // Fallback to first available package of any type
-        return revenueCatManager.currentOffering?.availablePackages.first
+
+        return packages.first
     }
 
     // MARK: - Components
@@ -184,53 +201,120 @@ struct PaywallView: View {
         .padding(.horizontal, 8)
     }
 
-    private func pricingCard(package: Package) -> some View {
-        VStack(spacing: 14) {
-            if let trialText = revenueCatManager.getTrialDurationText(package: package) {
-                HStack(spacing: 8) {
-                    Image(systemName: "gift.fill")
-                        .font(.system(size: 14, weight: .semibold))
-
-                    Text(trialText.uppercased())
-                        .font(.system(size: 13, weight: .bold))
-                        .tracking(1)
+    private func pricingOptionsSection(packages: [Package]) -> some View {
+        VStack(spacing: 12) {
+            if packages.count > 1 {
+                HStack(spacing: 10) {
+                    ForEach(packages, id: \.identifier) { package in
+                        pricingOptionCard(
+                            package: package,
+                            isSelected: package.identifier == selectedPackage?.identifier
+                        )
+                    }
                 }
-                .foregroundColor(.black)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.appPrimary)
-                .clipShape(Capsule())
-            }
-
-            VStack(spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(revenueCatManager.formatPrice(package: package))
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                        .foregroundColor(.appText)
-
-                    Text(billingPeriodSuffix(for: package))
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.appTextSecondary)
-                }
-
-                Text(packageSummaryText(for: package))
-                    .font(.system(size: 15))
-                    .foregroundColor(.appTextSecondary)
+            } else if let package = packages.first {
+                pricingOptionCard(
+                    package: package,
+                    isSelected: package.identifier == selectedPackage?.identifier
+                )
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal, 24)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.appCard.opacity(0.95))
+    }
 
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.appBorder.opacity(0.8), lineWidth: 1)
+    private func pricingOptionCard(package: Package, isSelected: Bool) -> some View {
+        Button {
+            selectedPackageIdentifier = package.identifier
+            HapticManager.shared.impact(style: .light)
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(planTitle(for: package))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.appText)
+
+                        if let trialText = revenueCatManager.getTrialDurationText(package: package) {
+                            Text(trialText.uppercased())
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.appPrimary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                        }
+                    }
+
+                    Spacer(minLength: 4)
+
+                    selectionIndicator(isSelected: isSelected)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(revenueCatManager.formatPrice(package: package))
+                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                            .foregroundColor(.appText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+
+                        Text(billingPeriodShortSuffix(for: package))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.appTextSecondary)
+                    }
+
+                    Text(packageSummaryText(for: package))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.appTextSecondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let savingsText = savingsBadgeText(for: package) {
+                    Text(savingsText)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.black)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.appPrimary)
+                        .clipShape(Capsule())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("Flexible")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.appTextSecondary)
+                        .lineLimit(1)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.appCard.opacity(0.8))
+                        .clipShape(Capsule())
+                }
             }
-        )
-        .shadow(color: .black.opacity(0.25), radius: 18, x: 0, y: 12)
+            .frame(maxWidth: .infinity, minHeight: 166, alignment: .topLeading)
+            .padding(14)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(isSelected ? Color.appCard : Color.appCard.opacity(0.68))
+
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(
+                            isSelected ? Color.appPrimary : Color.appBorder.opacity(0.75),
+                            lineWidth: isSelected ? 2 : 1
+                        )
+                }
+            )
+            .shadow(color: isSelected ? Color.appPrimary.opacity(0.18) : .clear, radius: 14, x: 0, y: 8)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(planTitle(for: package)) plan")
+        .accessibilityHint(isSelected ? "Selected" : "Double tap to select this plan")
+        .accessibilityIdentifier("paywall_plan_\(planIdentifierSuffix(for: package))")
+    }
+
+    private func selectionIndicator(isSelected: Bool) -> some View {
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundColor(isSelected ? .appPrimary : .appTextSecondary.opacity(0.65))
     }
 
     private func purchaseButton(package: Package) -> some View {
@@ -436,18 +520,35 @@ struct PaywallView: View {
         .accessibilityIdentifier("paywall_cached_pricing_card")
     }
 
-    private func billingPeriodSuffix(for package: Package) -> String {
+    private func billingPeriodShortSuffix(for package: Package) -> String {
         let period = billingPeriodLabel(for: package)
-        return period.isEmpty ? "" : "/\(period)"
+        switch period {
+        case "year":
+            return "/yr"
+        case "month":
+            return "/mo"
+        case "week":
+            return "/wk"
+        default:
+            return ""
+        }
     }
 
     private func packageSummaryText(for package: Package) -> String {
         let period = billingPeriodLabel(for: package)
-        if period.isEmpty {
-            return "Billed by the App Store."
+        switch period {
+        case "year":
+            if let monthlyEquivalent = annualMonthlyEquivalentText(for: package) {
+                return "\(monthlyEquivalent)/mo, billed yearly"
+            }
+            return "Billed yearly"
+        case "month":
+            return "Billed monthly"
+        case "week":
+            return "Billed weekly"
+        default:
+            return "Billed by the App Store"
         }
-
-        return "Billed \(period)ly by the App Store."
     }
 
     private func purchaseButtonTitle(for package: Package) -> String {
@@ -470,6 +571,55 @@ struct PaywallView: View {
         }
 
         return ""
+    }
+
+    private func planTitle(for package: Package) -> String {
+        switch billingPeriodLabel(for: package) {
+        case "year":
+            return "Annual"
+        case "month":
+            return "Monthly"
+        case "week":
+            return "Weekly"
+        default:
+            return "Plan"
+        }
+    }
+
+    private func planIdentifierSuffix(for package: Package) -> String {
+        switch billingPeriodLabel(for: package) {
+        case "year":
+            return "annual"
+        case "month":
+            return "monthly"
+        case "week":
+            return "weekly"
+        default:
+            return "fallback"
+        }
+    }
+
+    private func savingsBadgeText(for package: Package) -> String? {
+        guard package.identifier == "$rc_annual",
+              let monthly = availablePrimaryPackages.first(where: { $0.identifier == "$rc_monthly" }),
+              let savingsPercent = PaywallSavingsPolicy.savingsPercent(
+                monthlyPrice: monthly.storeProduct.price,
+                annualPrice: package.storeProduct.price
+              ) else {
+            return nil
+        }
+
+        return "Save \(savingsPercent)%"
+    }
+
+    private func annualMonthlyEquivalentText(for package: Package) -> String? {
+        guard package.identifier == "$rc_annual",
+              let monthlyEquivalent = PaywallSavingsPolicy.monthlyEquivalent(annualPrice: package.storeProduct.price),
+              let formatter = package.storeProduct.priceFormatter else {
+            return nil
+        }
+
+        return formatter.string(from: monthlyEquivalent)
     }
 
     private func contactSupportAboutUnavailablePlans() {
@@ -522,6 +672,50 @@ private struct PaywallFeatureRow: View {
 
             Spacer()
         }
+    }
+}
+
+enum PaywallSavingsPolicy {
+    static func monthlyEquivalent(annualPrice: Decimal) -> NSDecimalNumber? {
+        let annual = NSDecimalNumber(decimal: annualPrice)
+        guard annual.compare(NSDecimalNumber.zero) == .orderedDescending else {
+            return nil
+        }
+
+        return annual.dividing(by: NSDecimalNumber(value: 12))
+    }
+
+    static func savingsPercent(monthlyPrice: Decimal, annualPrice: Decimal) -> Int? {
+        let monthly = NSDecimalNumber(decimal: monthlyPrice)
+        let annual = NSDecimalNumber(decimal: annualPrice)
+
+        guard monthly.compare(NSDecimalNumber.zero) == .orderedDescending,
+              annual.compare(NSDecimalNumber.zero) == .orderedDescending else {
+            return nil
+        }
+
+        let fullYearAtMonthlyPrice = monthly.multiplying(by: NSDecimalNumber(value: 12))
+        guard fullYearAtMonthlyPrice.compare(annual) == .orderedDescending else {
+            return nil
+        }
+
+        let rawPercent = fullYearAtMonthlyPrice
+            .subtracting(annual)
+            .dividing(by: fullYearAtMonthlyPrice)
+            .multiplying(by: NSDecimalNumber(value: 100))
+
+        let roundedPercent = rawPercent.rounding(
+            accordingToBehavior: NSDecimalNumberHandler(
+                roundingMode: .plain,
+                scale: 0,
+                raiseOnExactness: false,
+                raiseOnOverflow: false,
+                raiseOnUnderflow: false,
+                raiseOnDivideByZero: false
+            )
+        )
+
+        return max(roundedPercent.intValue, 0)
     }
 }
 

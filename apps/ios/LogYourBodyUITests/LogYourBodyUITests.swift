@@ -98,6 +98,31 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(logoutButton.isHittable)
     }
 
+    func testPaywallPlansFixtureShowsMonthlyAnnualAndSavings() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestPaywallPlansFixture"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 10))
+
+        let monthlyPlan = app.buttons["Monthly plan"]
+        XCTAssertTrue(monthlyPlan.waitForExistence(timeout: 3))
+        XCTAssertTrue(monthlyPlan.isHittable)
+
+        let annualPlan = app.buttons["Annual plan"]
+        XCTAssertTrue(annualPlan.waitForExistence(timeout: 3))
+        XCTAssertTrue(annualPlan.isHittable)
+
+        XCTAssertTrue(app.staticTexts["$9.99"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["$69.99"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Save 42%"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["$5.83/mo, billed yearly"].waitForExistence(timeout: 3))
+
+        let purchaseButton = app.buttons["paywall_purchase_button"]
+        XCTAssertTrue(purchaseButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(purchaseButton.isHittable)
+    }
+
     func testSubscribedMVPSettingsExposeSubscriptionEscapePaths() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
