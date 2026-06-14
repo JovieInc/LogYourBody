@@ -93,8 +93,10 @@ struct DashboardHomeTimelineHero: View {
                     .allowsHitTesting(false)
                 }
 
-                timelineGradient(isPhoto: shouldShowPhoto)
-                    .allowsHitTesting(false)
+                if shouldShowPhoto {
+                    timelineGradient
+                        .allowsHitTesting(false)
+                }
             }
             .aspectRatio(4.0 / 5.0, contentMode: .fit)
             .frame(maxWidth: .infinity)
@@ -115,16 +117,12 @@ struct DashboardHomeTimelineHero: View {
         .accessibilityIdentifier("dashboard_home_timeline_hero")
     }
 
-    private func timelineGradient(isPhoto: Bool) -> some View {
+    private var timelineGradient: some View {
         LinearGradient(
-            colors: isPhoto ? [
+            colors: [
                 Color.black.opacity(0.62),
                 Color.black.opacity(0.05),
                 Color.black.opacity(0.86)
-            ] : [
-                Color.black.opacity(0.34),
-                Color.black.opacity(0.00),
-                Color.black.opacity(0.38)
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -306,10 +304,11 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
                 bodyFatPercentage: bodyFatPercentage,
                 gender: gender,
                 height: geometry.size.height,
-                padding: 8,
-                verticalPadding: 0,
-                horizontalFillScale: 1.04,
-                alignment: .bottom
+                padding: 18,
+                verticalPadding: 10,
+                horizontalFillScale: 1,
+                alignment: .bottom,
+                renderMode: .fillWidth
             )
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
         }
