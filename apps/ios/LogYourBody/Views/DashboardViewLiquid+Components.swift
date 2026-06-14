@@ -305,10 +305,10 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
                 .interpolation(.high)
                 .scaledToFit()
                 .frame(
-                    width: max(0, geometry.size.width - 24)
+                    width: max(0, geometry.size.width - 32)
                 )
-                .padding(12)
-                .frame(width: geometry.size.width, height: geometry.size.height)
+                .padding(16)
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
                 .clipped()
                 .accessibilityHidden(true)
         }

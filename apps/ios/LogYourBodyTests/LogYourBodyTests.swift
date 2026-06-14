@@ -6,6 +6,7 @@ import XCTest
 import AVFoundation
 import CoreData
 import RevenueCat
+import UIKit
 @testable import LogYourBody
 
 // swiftlint:disable single_test_class
@@ -459,6 +460,23 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         )
     }
 
+    func testAvatarBodyFatAssetsHaveTransparentSourceBackgrounds() throws {
+        let representativeAssets = [
+            AvatarBodyFatCatalog.match(bodyFatPercentage: 18, gender: "male").assetName,
+            AvatarBodyFatCatalog.match(bodyFatPercentage: 28, gender: "female").assetName
+        ]
+
+        for assetName in representativeAssets {
+            let image = try XCTUnwrap(UIImage(named: assetName), "\(assetName) should exist in the app asset catalog")
+            let cornerAlphaValues = try renderedCornerAlphaValues(for: image)
+
+            XCTAssertTrue(
+                cornerAlphaValues.allSatisfy { $0 <= 4 },
+                "\(assetName) should not retain the black source-image rectangle"
+            )
+        }
+    }
+
     func testPhotoTimelineHUDMetricStateCopyIsExplicit() {
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .present), "Measured")
         XCTAssertEqual(
@@ -467,6 +485,43 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         )
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .lastKnown), "Last known")
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .missing), "Missing")
+    }
+
+    private func renderedCornerAlphaValues(for image: UIImage) throws -> [UInt8] {
+        let cgImage = try XCTUnwrap(image.cgImage)
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+
+        let context = try XCTUnwrap(CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ))
+
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        return [
+            alphaValue(in: pixels, width: width, x: 0, y: 0),
+            alphaValue(in: pixels, width: width, x: width - 1, y: 0),
+            alphaValue(in: pixels, width: width, x: 0, y: height - 1),
+            alphaValue(in: pixels, width: width, x: width - 1, y: height - 1)
+        ]
+    }
+
+    private func alphaValue(in pixels: [UInt8], width: Int, x: Int, y: Int) -> UInt8 {
+        let bytesPerPixel = 4
+        let index = (y * width + x) * bytesPerPixel + 3
+        return pixels[index]
     }
 }
 
