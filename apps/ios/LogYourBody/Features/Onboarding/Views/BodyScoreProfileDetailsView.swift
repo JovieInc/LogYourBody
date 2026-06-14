@@ -7,26 +7,16 @@ struct BodyScoreProfileDetailsView: View {
     @EnvironmentObject var authManager: AuthManager
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
-    @State private var firstName: String = ""
-    @State private var lastName: String = ""
-    @State private var dateOfBirth: Date = Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
-    @State private var biologicalSex: BiologicalSex?
-    @State private var heightUnit: HeightUnit = .centimeters
-    @State private var heightCentimetersText: String = ""
-    @State private var heightFeet: Int = 5
-    @State private var heightInches: Int = 10
     @State private var isSaving: Bool = false
     @State private var errorMessage: String?
-    @State private var activeSubstep: ProfileSubstep = .firstName
-    @State private var shouldAskSexInProfile: Bool = false
     @FocusState private var focusedNameField: NameField?
 
     private var trimmedFirstName: String {
-        firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        viewModel.profileFirstName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var trimmedLastName: String {
-        lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        viewModel.profileLastName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var isFirstNameValid: Bool {
@@ -38,7 +28,7 @@ struct BodyScoreProfileDetailsView: View {
     }
 
     private var canContinue: Bool {
-        switch activeSubstep {
+        switch viewModel.profileDetailsActiveSubstep {
         case .firstName:
             return isFirstNameValid
         case .lastName:
@@ -46,7 +36,7 @@ struct BodyScoreProfileDetailsView: View {
         case .dateOfBirth:
             return isFirstNameValid && isLastNameValid && isDateOfBirthWithinValidRange
         case .sex:
-            return biologicalSex != nil
+            return viewModel.profileBiologicalSex != nil
         case .height:
             return isHeightValid
         }
@@ -54,34 +44,34 @@ struct BodyScoreProfileDetailsView: View {
 
     private var isDateOfBirthWithinValidRange: Bool {
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.year], from: dateOfBirth, to: Date())
+        let components = calendar.dateComponents([.year], from: viewModel.profileDateOfBirth, to: Date())
         guard let age = components.year else { return false }
         return age >= 16 && age <= 80
     }
 
     private var heightInCentimeters: Double? {
-        switch heightUnit {
+        switch viewModel.profileHeightUnit {
         case .centimeters:
-            return Double(heightCentimetersText)
+            return Double(viewModel.profileHeightCentimetersText)
         case .inches:
-            let totalInches = Double((heightFeet * 12) + heightInches)
+            let totalInches = Double((viewModel.profileHeightFeet * 12) + viewModel.profileHeightInches)
             return totalInches > 0 ? totalInches * 2.54 : nil
         }
     }
 
     private var isHeightValid: Bool {
-        switch heightUnit {
+        switch viewModel.profileHeightUnit {
         case .centimeters:
-            let value = Double(heightCentimetersText) ?? 0
+            let value = Double(viewModel.profileHeightCentimetersText) ?? 0
             return value >= 100 && value <= 250
         case .inches:
-            let totalInches = (heightFeet * 12) + heightInches
+            let totalInches = (viewModel.profileHeightFeet * 12) + viewModel.profileHeightInches
             return totalInches >= 48 && totalInches <= 96
         }
     }
 
     private var heightUnitStorageValue: String {
-        switch heightUnit {
+        switch viewModel.profileHeightUnit {
         case .centimeters:
             return "cm"
         case .inches:
@@ -90,7 +80,7 @@ struct BodyScoreProfileDetailsView: View {
     }
 
     private var currentTitle: String {
-        switch activeSubstep {
+        switch viewModel.profileDetailsActiveSubstep {
         case .firstName:
             return "What's your first name?"
         case .lastName:
@@ -105,7 +95,7 @@ struct BodyScoreProfileDetailsView: View {
     }
 
     private var currentSubtitle: String {
-        switch activeSubstep {
+        switch viewModel.profileDetailsActiveSubstep {
         case .firstName:
             return "We'll use this to personalize your experience."
         case .lastName:
@@ -120,7 +110,7 @@ struct BodyScoreProfileDetailsView: View {
     }
 
     private var primaryButtonTitle: String {
-        switch activeSubstep {
+        switch viewModel.profileDetailsActiveSubstep {
         case .firstName, .lastName, .dateOfBirth, .sex:
             return "Continue"
         case .height:
@@ -133,31 +123,31 @@ struct BodyScoreProfileDetailsView: View {
             title: currentTitle,
             subtitle: currentSubtitle,
             onBack: {
-                switch activeSubstep {
+                switch viewModel.profileDetailsActiveSubstep {
                 case .firstName:
                     viewModel.goBack()
                 case .lastName:
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        activeSubstep = .firstName
+                        viewModel.profileDetailsActiveSubstep = .firstName
                     }
                 case .dateOfBirth:
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        activeSubstep = .lastName
+                        viewModel.profileDetailsActiveSubstep = .lastName
                     }
                 case .sex:
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        activeSubstep = .dateOfBirth
+                        viewModel.profileDetailsActiveSubstep = .dateOfBirth
                     }
                 case .height:
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        activeSubstep = shouldAskSexInProfile ? .sex : .dateOfBirth
+                        viewModel.profileDetailsActiveSubstep = viewModel.profileShouldAskSex ? .sex : .dateOfBirth
                     }
                 }
             },
             progress: viewModel.progress(for: .profileDetails),
             content: {
                 VStack(spacing: 24) {
-                    switch activeSubstep {
+                    switch viewModel.profileDetailsActiveSubstep {
                     case .firstName, .lastName:
                         nameSection
                     case .dateOfBirth:
@@ -194,12 +184,12 @@ struct BodyScoreProfileDetailsView: View {
             }
         )
         .onAppear {
-            hydrateFromCurrentUser()
+            viewModel.hydrateProfileDetailsDraftIfNeeded(from: authManager.currentUser)
             DispatchQueue.main.async {
                 focusNameFieldIfNeeded()
             }
         }
-        .onChange(of: activeSubstep) { _, newValue in
+        .onChange(of: viewModel.profileDetailsActiveSubstep) { _, newValue in
             DispatchQueue.main.async {
                 focusNameFieldIfNeeded(newValue)
             }
@@ -209,13 +199,13 @@ struct BodyScoreProfileDetailsView: View {
     private var nameSection: some View {
         OnboardingFormSection(title: "Name", caption: "We use this to personalize your experience.") {
             VStack(alignment: .leading, spacing: 16) {
-                switch activeSubstep {
+                switch viewModel.profileDetailsActiveSubstep {
                 case .firstName:
                     Text("First name")
                         .font(OnboardingTypography.caption)
                         .foregroundStyle(Color.appTextSecondary)
 
-                    TextField("First name", text: $firstName)
+                    TextField("First name", text: $viewModel.profileFirstName)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled(true)
                         .submitLabel(.next)
@@ -248,7 +238,7 @@ struct BodyScoreProfileDetailsView: View {
                         .font(OnboardingTypography.headline)
                         .foregroundStyle(Color.appText)
 
-                    TextField("Last name", text: $lastName)
+                    TextField("Last name", text: $viewModel.profileLastName)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled(true)
                         .submitLabel(.next)
@@ -277,7 +267,7 @@ struct BodyScoreProfileDetailsView: View {
         OnboardingFormSection(title: nil, caption: nil) {
             DatePicker(
                 "Date of Birth",
-                selection: $dateOfBirth,
+                selection: $viewModel.profileDateOfBirth,
                 displayedComponents: .date
             )
             .datePickerStyle(.wheel)
@@ -292,10 +282,9 @@ struct BodyScoreProfileDetailsView: View {
                     OnboardingOptionButton(
                         title: sex.description,
                         subtitle: nil,
-                        isSelected: biologicalSex == sex,
+                        isSelected: viewModel.profileBiologicalSex == sex,
                         action: {
-                            biologicalSex = sex
-                            viewModel.updateSex(sex)
+                            viewModel.updateProfileBiologicalSex(sex)
                             HapticManager.shared.selection()
                         }
                     )
@@ -307,19 +296,19 @@ struct BodyScoreProfileDetailsView: View {
     private var heightSection: some View {
         OnboardingFormSection(title: nil, caption: "You can update this later in Settings.") {
             VStack(alignment: .leading, spacing: 18) {
-                Picker("Height unit", selection: $heightUnit) {
+                Picker("Height unit", selection: $viewModel.profileHeightUnit) {
                     ForEach(HeightUnit.allCases, id: \.self) { unit in
                         Text(unit.description).tag(unit)
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: heightUnit) { oldValue, newValue in
+                .onChange(of: viewModel.profileHeightUnit) { oldValue, newValue in
                     convertHeightFields(from: oldValue, to: newValue)
                 }
 
-                switch heightUnit {
+                switch viewModel.profileHeightUnit {
                 case .centimeters:
-                    TextField("178", text: $heightCentimetersText)
+                    TextField("178", text: $viewModel.profileHeightCentimetersText)
                         .keyboardType(.decimalPad)
                         .font(theme.typography.displayMedium)
                         .multilineTextAlignment(.center)
@@ -340,7 +329,7 @@ struct BodyScoreProfileDetailsView: View {
 
                 case .inches:
                     HStack(spacing: 12) {
-                        Picker("Feet", selection: $heightFeet) {
+                        Picker("Feet", selection: $viewModel.profileHeightFeet) {
                             ForEach(3...8, id: \.self) { feet in
                                 Text("\(feet) ft").tag(feet)
                             }
@@ -350,7 +339,7 @@ struct BodyScoreProfileDetailsView: View {
                         .frame(height: 150)
                         .clipped()
 
-                        Picker("Inches", selection: $heightInches) {
+                        Picker("Inches", selection: $viewModel.profileHeightInches) {
                             ForEach(0...11, id: \.self) { inches in
                                 Text("\(inches) in").tag(inches)
                             }
@@ -367,53 +356,6 @@ struct BodyScoreProfileDetailsView: View {
                 }
             }
         }
-    }
-
-    private func hydrateFromCurrentUser() {
-        guard let user = authManager.currentUser else {
-            biologicalSex = viewModel.bodyScoreInput.sex
-            shouldAskSexInProfile = biologicalSex == nil
-            recomputeActiveSubstep()
-            return
-        }
-
-        let baseName = user.profile?.fullName ?? user.name ?? ""
-        let components = baseName.split(separator: " ")
-        if !components.isEmpty {
-            firstName = String(components.first ?? "")
-            if components.count > 1 {
-                lastName = components.dropFirst().joined(separator: " ")
-            }
-        }
-
-        if let existingDob = user.profile?.dateOfBirth {
-            dateOfBirth = existingDob
-        }
-
-        if let existingGender = user.profile?.gender {
-            biologicalSex = Self.biologicalSex(from: existingGender)
-        }
-
-        if biologicalSex == nil {
-            biologicalSex = viewModel.bodyScoreInput.sex
-        }
-
-        shouldAskSexInProfile = biologicalSex == nil
-
-        if let existingHeight = user.profile?.height, existingHeight > 0 {
-            if user.profile?.heightUnit?.lowercased() == "in" {
-                heightUnit = .inches
-                let totalInches = Int((existingHeight / 2.54).rounded())
-                heightFeet = max(3, min(8, totalInches / 12))
-                heightInches = max(0, min(11, totalInches % 12))
-            } else {
-                heightUnit = .centimeters
-            }
-
-            heightCentimetersText = String(format: "%.0f", existingHeight)
-        }
-
-        recomputeActiveSubstep()
     }
 
     private func submit() {
@@ -434,11 +376,11 @@ struct BodyScoreProfileDetailsView: View {
                 }
 
                 var updates: [String: Any] = [
-                    "dateOfBirth": dateOfBirth,
+                    "dateOfBirth": viewModel.profileDateOfBirth,
                     "onboardingCompleted": completesOnboardingNow
                 ]
 
-                if let biologicalSex {
+                if let biologicalSex = viewModel.profileBiologicalSex {
                     updates["gender"] = biologicalSex.description
                 }
 
@@ -461,10 +403,10 @@ struct BodyScoreProfileDetailsView: View {
                             email: existingProfile?.email ?? currentUser.email,
                             username: existingProfile?.username,
                             fullName: fullName.isEmpty ? existingProfile?.fullName ?? currentUser.name : fullName,
-                            dateOfBirth: dateOfBirth,
+                            dateOfBirth: viewModel.profileDateOfBirth,
                             height: heightInCentimeters ?? existingProfile?.height,
                             heightUnit: heightInCentimeters == nil ? existingProfile?.heightUnit : heightUnitStorageValue,
-                            gender: biologicalSex?.description ?? existingProfile?.gender,
+                            gender: viewModel.profileBiologicalSex?.description ?? existingProfile?.gender,
                             activityLevel: existingProfile?.activityLevel,
                             goalWeight: existingProfile?.goalWeight,
                             goalWeightUnit: existingProfile?.goalWeightUnit,
@@ -493,18 +435,18 @@ struct BodyScoreProfileDetailsView: View {
 
 private extension BodyScoreProfileDetailsView {
     func handlePrimaryAction() {
-        switch activeSubstep {
+        switch viewModel.profileDetailsActiveSubstep {
         case .firstName:
             handleFirstNameContinue()
         case .lastName:
             handleLastNameContinue()
         case .dateOfBirth:
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                activeSubstep = shouldAskSexInProfile ? .sex : .height
+                viewModel.profileDetailsActiveSubstep = viewModel.profileShouldAskSex ? .sex : .height
             }
         case .sex:
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                activeSubstep = .height
+                viewModel.profileDetailsActiveSubstep = .height
             }
         case .height:
             submit()
@@ -515,7 +457,7 @@ private extension BodyScoreProfileDetailsView {
         guard isFirstNameValid else { return }
         HapticManager.shared.selection()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            activeSubstep = .lastName
+            viewModel.profileDetailsActiveSubstep = .lastName
         }
     }
 
@@ -523,28 +465,12 @@ private extension BodyScoreProfileDetailsView {
         guard isLastNameValid else { return }
         HapticManager.shared.selection()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            activeSubstep = .dateOfBirth
+            viewModel.profileDetailsActiveSubstep = .dateOfBirth
         }
     }
 
-    func recomputeActiveSubstep() {
-        if !isFirstNameValid {
-            activeSubstep = .firstName
-        } else if !isLastNameValid {
-            activeSubstep = .lastName
-        } else if !isDateOfBirthWithinValidRange {
-            activeSubstep = .dateOfBirth
-        } else if shouldAskSexInProfile && biologicalSex == nil {
-            activeSubstep = .sex
-        } else if !isHeightValid {
-            activeSubstep = .height
-        } else {
-            activeSubstep = .height
-        }
-    }
-
-    func focusNameFieldIfNeeded(_ step: ProfileSubstep? = nil) {
-        switch step ?? activeSubstep {
+    func focusNameFieldIfNeeded(_ step: OnboardingFlowViewModel.ProfileDetailsSubstep? = nil) {
+        switch step ?? viewModel.profileDetailsActiveSubstep {
         case .firstName:
             focusedNameField = .firstName
         case .lastName:
@@ -559,39 +485,20 @@ private extension BodyScoreProfileDetailsView {
 
         switch (oldUnit, newUnit) {
         case (.centimeters, .inches):
-            guard let centimeters = Double(heightCentimetersText) else { return }
+            guard let centimeters = Double(viewModel.profileHeightCentimetersText) else { return }
             let totalInches = Int((centimeters / 2.54).rounded())
-            heightFeet = max(3, min(8, totalInches / 12))
-            heightInches = max(0, min(11, totalInches % 12))
+            viewModel.profileHeightFeet = max(3, min(8, totalInches / 12))
+            viewModel.profileHeightInches = max(0, min(11, totalInches % 12))
         case (.inches, .centimeters):
-            let totalInches = Double((heightFeet * 12) + heightInches)
-            heightCentimetersText = String(format: "%.0f", totalInches * 2.54)
+            let totalInches = Double((viewModel.profileHeightFeet * 12) + viewModel.profileHeightInches)
+            viewModel.profileHeightCentimetersText = String(format: "%.0f", totalInches * 2.54)
         default:
             break
         }
     }
-
-    static func biologicalSex(from gender: String) -> BiologicalSex? {
-        let normalized = gender.lowercased()
-        if normalized.contains("female") || normalized.contains("woman") {
-            return .female
-        }
-        if normalized.contains("male") || normalized.contains("man") {
-            return .male
-        }
-        return nil
-    }
 }
 
 // MARK: - Local Types
-
-private enum ProfileSubstep {
-    case firstName
-    case lastName
-    case dateOfBirth
-    case sex
-    case height
-}
 
 private enum NameField: Hashable {
     case firstName

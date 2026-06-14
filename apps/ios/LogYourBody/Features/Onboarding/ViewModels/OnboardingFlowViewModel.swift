@@ -1,6 +1,10 @@
 import SwiftUI
 import Combine
 
+private func defaultProfileDateOfBirth() -> Date {
+    Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
+}
+
 @MainActor
 final class OnboardingFlowViewModel: ObservableObject {
     enum AccountCreationStage {
@@ -54,6 +58,14 @@ final class OnboardingFlowViewModel: ObservableObject {
                 return "pre_auth"
             }
         }
+    }
+
+    enum ProfileDetailsSubstep: String, Codable {
+        case firstName
+        case lastName
+        case dateOfBirth
+        case sex
+        case height
     }
 
     struct ProgressContext: Equatable {
@@ -141,6 +153,39 @@ final class OnboardingFlowViewModel: ObservableObject {
     @Published private(set) var onboardingFirstPhotoMetric: BodyMetrics?
     @Published private(set) var isPreparingFirstPhotoMetric = false
     @Published var firstPhotoErrorMessage: String?
+    @Published var profileFirstName: String = "" {
+        didSet { persistProgress() }
+    }
+    @Published var profileLastName: String = "" {
+        didSet { persistProgress() }
+    }
+    @Published var profileDateOfBirth: Date = defaultProfileDateOfBirth() {
+        didSet { persistProgress() }
+    }
+    @Published var profileBiologicalSex: BiologicalSex? {
+        didSet { persistProgress() }
+    }
+    @Published var profileHeightUnit: HeightUnit = .centimeters {
+        didSet { persistProgress() }
+    }
+    @Published var profileHeightCentimetersText: String = "" {
+        didSet { persistProgress() }
+    }
+    @Published var profileHeightFeet: Int = 5 {
+        didSet { persistProgress() }
+    }
+    @Published var profileHeightInches: Int = 10 {
+        didSet { persistProgress() }
+    }
+    @Published var profileDetailsActiveSubstep: ProfileDetailsSubstep = .firstName {
+        didSet { persistProgress() }
+    }
+    @Published var profileShouldAskSex: Bool = false {
+        didSet { persistProgress() }
+    }
+    @Published private(set) var hasHydratedProfileDetailsDraft = false {
+        didSet { persistProgress() }
+    }
 
     let entryContext: EntryContext
     let includesFirstPhotoStep: Bool
@@ -766,6 +811,57 @@ final class OnboardingFlowViewModel: ObservableObject {
         accountCreationStage.statusMessage
     }
 
+    func hydrateProfileDetailsDraftIfNeeded(from user: User?) {
+        guard !hasHydratedProfileDetailsDraft else { return }
+
+        isRestoringProgress = true
+
+        guard let user else {
+            if profileBiologicalSex == nil {
+                profileBiologicalSex = bodyScoreInput.sex
+            }
+
+            profileShouldAskSex = profileBiologicalSex == nil
+            recomputeProfileDetailsActiveSubstep()
+            isRestoringProgress = false
+            persistProgress()
+            return
+        }
+
+        hydrateProfileName(from: user)
+
+        if let existingDob = user.profile?.dateOfBirth {
+            profileDateOfBirth = existingDob
+        }
+
+        if let existingGender = user.profile?.gender {
+            profileBiologicalSex = Self.biologicalSex(from: existingGender)
+        }
+
+        if let existingHeight = user.profile?.height, existingHeight > 0 {
+            hydrateProfileHeight(
+                centimeters: existingHeight,
+                storedUnit: user.profile?.heightUnit
+            )
+        }
+
+        if profileBiologicalSex == nil {
+            profileBiologicalSex = bodyScoreInput.sex
+        }
+
+        profileShouldAskSex = profileBiologicalSex == nil
+        recomputeProfileDetailsActiveSubstep()
+        hasHydratedProfileDetailsDraft = true
+
+        isRestoringProgress = false
+        persistProgress()
+    }
+
+    func updateProfileBiologicalSex(_ sex: BiologicalSex) {
+        profileBiologicalSex = sex
+        updateSex(sex)
+    }
+
     func completeOnboardingIfNeeded() {
         guard entryContext == .authenticated else { return }
         guard !hasMarkedOnboardingComplete else { return }
@@ -839,10 +935,27 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     func buildOnboardingProfileUpdates() -> [String: Any] {
-        OnboardingProfileUpdateBuilder.buildUpdates(
+        var updates = OnboardingProfileUpdateBuilder.buildUpdates(
             bodyScoreInput: bodyScoreInput,
             heightUnit: heightUnit
         )
+
+        guard hasHydratedProfileDetailsDraft else {
+            return updates
+        }
+
+        if let profileBiologicalSex {
+            updates["gender"] = profileBiologicalSex.description
+        }
+
+        updates["dateOfBirth"] = profileDateOfBirth
+
+        if let profileHeightInCentimeters {
+            updates["height"] = profileHeightInCentimeters
+            updates["heightUnit"] = profileHeightUnitStorageValue
+        }
+
+        return updates
     }
 
     var weightFieldTitle: String {
@@ -941,6 +1054,78 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     private static func formatHeight(_ centimeters: Double) -> String {
         String(format: "%.1f", centimeters)
+    }
+
+    private static func biologicalSex(from gender: String) -> BiologicalSex? {
+        let normalized = gender.lowercased()
+        if normalized.contains("female") || normalized.contains("woman") {
+            return .female
+        }
+        if normalized.contains("male") || normalized.contains("man") {
+            return .male
+        }
+        return nil
+    }
+
+    private func hydrateProfileName(from user: User) {
+        let baseName = user.profile?.fullName ?? user.name ?? ""
+        let components = baseName.split(separator: " ")
+        guard !components.isEmpty else { return }
+
+        profileFirstName = String(components.first ?? "")
+        if components.count > 1 {
+            profileLastName = components.dropFirst().joined(separator: " ")
+        }
+    }
+
+    private func hydrateProfileHeight(centimeters: Double, storedUnit: String?) {
+        if storedUnit?.lowercased() == "in" {
+            profileHeightUnit = .inches
+            let totalInches = Int((centimeters / 2.54).rounded())
+            profileHeightFeet = max(3, min(8, totalInches / 12))
+            profileHeightInches = max(0, min(11, totalInches % 12))
+        } else {
+            profileHeightUnit = .centimeters
+        }
+
+        profileHeightCentimetersText = String(format: "%.0f", centimeters)
+    }
+
+    private var profileHeightInCentimeters: Double? {
+        switch profileHeightUnit {
+        case .centimeters:
+            return Double(profileHeightCentimetersText)
+        case .inches:
+            let totalInches = Double((profileHeightFeet * 12) + profileHeightInches)
+            return totalInches > 0 ? totalInches * 2.54 : nil
+        }
+    }
+
+    private var profileHeightUnitStorageValue: String {
+        switch profileHeightUnit {
+        case .centimeters:
+            return "cm"
+        case .inches:
+            return "in"
+        }
+    }
+
+    private func recomputeProfileDetailsActiveSubstep() {
+        let trimmedFirstName = profileFirstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLastName = profileLastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let age = Calendar.current.dateComponents([.year], from: profileDateOfBirth, to: Date()).year
+
+        if trimmedFirstName.isEmpty {
+            profileDetailsActiveSubstep = .firstName
+        } else if trimmedLastName.isEmpty {
+            profileDetailsActiveSubstep = .lastName
+        } else if (age ?? 0) < 16 || (age ?? 0) > 80 {
+            profileDetailsActiveSubstep = .dateOfBirth
+        } else if profileShouldAskSex && profileBiologicalSex == nil {
+            profileDetailsActiveSubstep = .sex
+        } else {
+            profileDetailsActiveSubstep = .height
+        }
     }
 
     private func applyMeasurementSystem(_ system: MeasurementSystem, skipHeight: Bool = false, skipWeight: Bool = false) {
@@ -1045,6 +1230,17 @@ final class OnboardingFlowViewModel: ObservableObject {
             defaultHomeMode: defaultHomeMode,
             didRequestHealthSync: didRequestHealthSync,
             emailAddress: emailAddress,
+            profileFirstName: profileFirstName,
+            profileLastName: profileLastName,
+            profileDateOfBirth: profileDateOfBirth,
+            profileBiologicalSex: profileBiologicalSex,
+            profileHeightUnit: profileHeightUnit,
+            profileHeightCentimetersText: profileHeightCentimetersText,
+            profileHeightFeet: profileHeightFeet,
+            profileHeightInches: profileHeightInches,
+            profileDetailsActiveSubstep: profileDetailsActiveSubstep,
+            profileShouldAskSex: profileShouldAskSex,
+            hasHydratedProfileDetailsDraft: hasHydratedProfileDetailsDraft,
             lastUpdated: Date()
         )
 
@@ -1082,6 +1278,17 @@ final class OnboardingFlowViewModel: ObservableObject {
         defaultHomeMode = snapshot.defaultHomeMode
         didRequestHealthSync = snapshot.didRequestHealthSync
         emailAddress = snapshot.emailAddress
+        profileFirstName = snapshot.profileFirstName
+        profileLastName = snapshot.profileLastName
+        profileDateOfBirth = snapshot.profileDateOfBirth
+        profileBiologicalSex = snapshot.profileBiologicalSex
+        profileHeightUnit = snapshot.profileHeightUnit
+        profileHeightCentimetersText = snapshot.profileHeightCentimetersText
+        profileHeightFeet = snapshot.profileHeightFeet
+        profileHeightInches = snapshot.profileHeightInches
+        profileDetailsActiveSubstep = snapshot.profileDetailsActiveSubstep
+        profileShouldAskSex = snapshot.profileShouldAskSex
+        hasHydratedProfileDetailsDraft = snapshot.hasHydratedProfileDetailsDraft
         if hasAuthenticatedAccountEmail,
            currentStep == .emailCapture || currentStep == .account {
             currentStep = .profileDetails
@@ -1176,6 +1383,17 @@ private struct OnboardingProgressSnapshot: Codable {
     let defaultHomeMode: DefaultHomeMode
     let didRequestHealthSync: Bool
     let emailAddress: String
+    let profileFirstName: String
+    let profileLastName: String
+    let profileDateOfBirth: Date
+    let profileBiologicalSex: BiologicalSex?
+    let profileHeightUnit: HeightUnit
+    let profileHeightCentimetersText: String
+    let profileHeightFeet: Int
+    let profileHeightInches: Int
+    let profileDetailsActiveSubstep: OnboardingFlowViewModel.ProfileDetailsSubstep
+    let profileShouldAskSex: Bool
+    let hasHydratedProfileDetailsDraft: Bool
     let lastUpdated: Date
 }
 
@@ -1195,6 +1413,17 @@ private extension OnboardingProgressSnapshot {
         case defaultHomeMode
         case didRequestHealthSync
         case emailAddress
+        case profileFirstName
+        case profileLastName
+        case profileDateOfBirth
+        case profileBiologicalSex
+        case profileHeightUnit
+        case profileHeightCentimetersText
+        case profileHeightFeet
+        case profileHeightInches
+        case profileDetailsActiveSubstep
+        case profileShouldAskSex
+        case hasHydratedProfileDetailsDraft
         case lastUpdated
     }
 
@@ -1214,6 +1443,27 @@ private extension OnboardingProgressSnapshot {
         defaultHomeMode = try container.decodeIfPresent(DefaultHomeMode.self, forKey: .defaultHomeMode) ?? .default
         didRequestHealthSync = try container.decode(Bool.self, forKey: .didRequestHealthSync)
         emailAddress = try container.decode(String.self, forKey: .emailAddress)
+        profileFirstName = try container.decodeIfPresent(String.self, forKey: .profileFirstName) ?? ""
+        profileLastName = try container.decodeIfPresent(String.self, forKey: .profileLastName) ?? ""
+        profileDateOfBirth = try container.decodeIfPresent(Date.self, forKey: .profileDateOfBirth)
+            ?? defaultProfileDateOfBirth()
+        profileBiologicalSex = try container.decodeIfPresent(BiologicalSex.self, forKey: .profileBiologicalSex)
+        profileHeightUnit = try container.decodeIfPresent(HeightUnit.self, forKey: .profileHeightUnit) ?? .centimeters
+        profileHeightCentimetersText = try container.decodeIfPresent(
+            String.self,
+            forKey: .profileHeightCentimetersText
+        ) ?? ""
+        profileHeightFeet = try container.decodeIfPresent(Int.self, forKey: .profileHeightFeet) ?? 5
+        profileHeightInches = try container.decodeIfPresent(Int.self, forKey: .profileHeightInches) ?? 10
+        profileDetailsActiveSubstep = try container.decodeIfPresent(
+            OnboardingFlowViewModel.ProfileDetailsSubstep.self,
+            forKey: .profileDetailsActiveSubstep
+        ) ?? .firstName
+        profileShouldAskSex = try container.decodeIfPresent(Bool.self, forKey: .profileShouldAskSex) ?? false
+        hasHydratedProfileDetailsDraft = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .hasHydratedProfileDetailsDraft
+        ) ?? false
         lastUpdated = try container.decode(Date.self, forKey: .lastUpdated)
     }
 
@@ -1233,6 +1483,17 @@ private extension OnboardingProgressSnapshot {
         try container.encode(defaultHomeMode, forKey: .defaultHomeMode)
         try container.encode(didRequestHealthSync, forKey: .didRequestHealthSync)
         try container.encode(emailAddress, forKey: .emailAddress)
+        try container.encode(profileFirstName, forKey: .profileFirstName)
+        try container.encode(profileLastName, forKey: .profileLastName)
+        try container.encode(profileDateOfBirth, forKey: .profileDateOfBirth)
+        try container.encodeIfPresent(profileBiologicalSex, forKey: .profileBiologicalSex)
+        try container.encode(profileHeightUnit, forKey: .profileHeightUnit)
+        try container.encode(profileHeightCentimetersText, forKey: .profileHeightCentimetersText)
+        try container.encode(profileHeightFeet, forKey: .profileHeightFeet)
+        try container.encode(profileHeightInches, forKey: .profileHeightInches)
+        try container.encode(profileDetailsActiveSubstep, forKey: .profileDetailsActiveSubstep)
+        try container.encode(profileShouldAskSex, forKey: .profileShouldAskSex)
+        try container.encode(hasHydratedProfileDetailsDraft, forKey: .hasHydratedProfileDetailsDraft)
         try container.encode(lastUpdated, forKey: .lastUpdated)
     }
 }
@@ -1305,11 +1566,32 @@ final class OnboardingProgressStore {
     #if DEBUG
     func snapshotForTesting(for userId: String) -> (
         currentStep: OnboardingFlowViewModel.Step,
-        defaultHomeMode: DefaultHomeMode
+        defaultHomeMode: DefaultHomeMode,
+        profileFirstName: String,
+        profileLastName: String,
+        profileDateOfBirth: Date,
+        profileBiologicalSex: BiologicalSex?,
+        profileHeightUnit: HeightUnit,
+        profileHeightCentimetersText: String,
+        profileHeightFeet: Int,
+        profileHeightInches: Int,
+        profileDetailsActiveSubstep: OnboardingFlowViewModel.ProfileDetailsSubstep
     )? {
         queue.sync {
             guard let snapshot = snapshots[userId], snapshot.version == Self.snapshotVersion else { return nil }
-            return (snapshot.currentStep, snapshot.defaultHomeMode)
+            return (
+                snapshot.currentStep,
+                snapshot.defaultHomeMode,
+                snapshot.profileFirstName,
+                snapshot.profileLastName,
+                snapshot.profileDateOfBirth,
+                snapshot.profileBiologicalSex,
+                snapshot.profileHeightUnit,
+                snapshot.profileHeightCentimetersText,
+                snapshot.profileHeightFeet,
+                snapshot.profileHeightInches,
+                snapshot.profileDetailsActiveSubstep
+            )
         }
     }
     #endif
