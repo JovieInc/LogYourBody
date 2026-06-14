@@ -104,7 +104,7 @@ struct BodyScoreHealthConnectView: View {
                                     .tint(.black)
                             }
                             Text(connectButtonTitle)
-                                .font(.system(.headline, design: .rounded))
+                                .font(OnboardingTypography.headline)
                         }
                     }
                     .buttonStyle(OnboardingPrimaryButtonStyle())

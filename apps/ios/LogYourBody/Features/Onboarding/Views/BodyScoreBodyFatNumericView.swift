@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct BodyScoreBodyFatNumericView: View {
+    @Environment(\.theme)
+    private var theme
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var percentageFieldFocused: Bool
     @State private var bodyFatError: String?
@@ -34,19 +37,18 @@ struct BodyScoreBodyFatNumericView: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(Color.appCard.opacity(0.65))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .stroke(percentageFieldStrokeColor)
+                        .systemBGlassSurface(
+                            cornerRadius: 20,
+                            tint: percentageFieldFocused ? theme.colors.primary : theme.colors.text,
+                            tintOpacity: percentageFieldFocused ? 0.07 : 0.03,
+                            borderColor: percentageFieldStrokeColor,
+                            borderOpacity: 1
                         )
 
                         if let error = bodyFatError {
                             Text(error)
                                 .font(OnboardingTypography.caption)
-                                .foregroundStyle(Color.red)
+                                .foregroundStyle(theme.colors.error)
                         } else {
                             OnboardingCaptionText(
                                 text: "Most people fall between 4–60% body fat.",

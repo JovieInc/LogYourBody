@@ -7,6 +7,9 @@ import SwiftUI
 // MARK: - AuthFormField Molecule
 
 struct AuthFormField: View {
+    @Environment(\.theme)
+    private var theme
+
     let label: String
     @Binding var text: String
     var placeholder: String = ""
@@ -20,20 +23,29 @@ struct AuthFormField: View {
         VStack(alignment: .leading, spacing: 8) {
             // Label
             Text(label)
-                .font(.system(size: 14))
-                .foregroundColor(.appTextSecondary)
+                .font(theme.typography.captionLarge)
+                .foregroundColor(theme.colors.textSecondary)
 
             // Input Field
             BaseTextField(
                 text: $text,
                 placeholder: placeholder.isEmpty ? label : placeholder,
                 configuration: TextFieldConfiguration(
+                    style: .custom(background: .clear, border: nil),
                     isSecure: isSecure,
-                    showToggle: isSecure
+                    showToggle: isSecure,
+                    cornerRadius: theme.radius.input
                 ),
                 keyboardType: keyboardType,
                 textContentType: textContentType,
                 autocapitalization: autocapitalization
+            )
+            .systemBGlassSurface(
+                cornerRadius: theme.radius.input,
+                tint: theme.colors.text,
+                tintOpacity: 0.03,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.65
             )
             .disabled(isDisabled)
         }

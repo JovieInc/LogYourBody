@@ -7,6 +7,9 @@ import SwiftUI
 // MARK: - AuthHeader Molecule
 
 struct AuthHeader: View {
+    @Environment(\.theme)
+    private var theme
+
     let title: String
     let subtitle: String?
 
@@ -18,13 +21,13 @@ struct AuthHeader: View {
     var body: some View {
         VStack(spacing: 12) {
             Text(title)
-                .font(.system(size: 36, weight: .bold, design: .default))
-                .foregroundColor(.appText)
+                .font(theme.typography.displayMedium)
+                .foregroundColor(theme.colors.text)
 
             if let subtitle = subtitle {
                 Text(subtitle)
-                    .font(.system(size: 16))
-                    .foregroundColor(.appTextSecondary)
+                    .font(theme.typography.bodyMedium)
+                    .foregroundColor(theme.colors.textSecondary)
                     .multilineTextAlignment(.center)
             }
         }

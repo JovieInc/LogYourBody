@@ -8,6 +8,9 @@ import SwiftUI
 import AuthenticationServices
 
 struct SignUpView: View {
+    @Environment(\.theme)
+    private var theme
+
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss) var dismiss
     @State private var email = ""
@@ -56,7 +59,7 @@ struct SignUpView: View {
 
     private var background: some View {
         // Atom: Background
-        Color.appBackground
+        theme.colors.background
             .ignoresSafeArea()
     }
 
@@ -109,14 +112,14 @@ struct SignUpView: View {
                 // Sign In Link
                 HStack(spacing: 4) {
                     Text("Already have an account?")
-                        .font(.system(size: 15))
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.bodySmall)
+                        .foregroundColor(theme.colors.textSecondary)
 
                     Button("Sign in") {
                         dismiss()
                     }
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.appPrimary)
+                    .font(theme.typography.labelMedium)
+                    .foregroundColor(theme.colors.primary)
                 }
                 .padding(.top, 8)
 
@@ -142,9 +145,16 @@ struct SignUpView: View {
         HStack {
             Button(action: { dismiss() }, label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 20))
-                    .foregroundColor(.appText)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(theme.colors.text)
                     .frame(width: 44, height: 44)
+                    .systemBGlassSurface(
+                        cornerRadius: theme.radius.full,
+                        tint: theme.colors.text,
+                        tintOpacity: 0.045,
+                        borderColor: theme.colors.border,
+                        borderOpacity: 0.55
+                    )
             })
 
             Spacer()
@@ -161,63 +171,67 @@ struct SignUpView: View {
                 VStack(spacing: 8) {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.red)
+                            .foregroundColor(theme.colors.error)
                         Text("Connection Error")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.appText)
+                            .font(theme.typography.labelMedium)
+                            .foregroundColor(theme.colors.text)
                         Spacer()
                     }
 
                     Text(error)
-                        .font(.system(size: 13))
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.captionLarge)
+                        .foregroundColor(theme.colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     Button(action: retryClerkInit) {
                         HStack {
                             if isRetrying {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.background))
                                     .scaleEffect(0.8)
                             } else {
                                 Image(systemName: "arrow.clockwise")
                             }
                             Text(isRetrying ? "Retrying..." : "Retry Connection")
-                                .font(.system(size: 15, weight: .medium))
+                                .font(theme.typography.labelMedium)
                         }
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.colors.background)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.blue)
-                        .cornerRadius(8)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(theme.colors.text)
+                        )
                     }
                     .disabled(isRetrying)
                 }
                 .padding(16)
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                .systemBGlassSurface(
+                    cornerRadius: theme.radius.lg,
+                    tint: theme.colors.error,
+                    tintOpacity: 0.08,
+                    borderColor: theme.colors.error,
+                    borderOpacity: 0.32
                 )
             } else {
                 // Loading state
                 VStack(spacing: 8) {
                     HStack {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
+                            .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.info))
                         Text("Connecting to authentication service...")
-                            .font(.system(size: 14))
-                            .foregroundColor(.appTextSecondary)
+                            .font(theme.typography.captionLarge)
+                            .foregroundColor(theme.colors.textSecondary)
                         Spacer()
                     }
                 }
                 .padding(16)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                .systemBGlassSurface(
+                    cornerRadius: theme.radius.lg,
+                    tint: theme.colors.info,
+                    tintOpacity: 0.08,
+                    borderColor: theme.colors.info,
+                    borderOpacity: 0.3
                 )
             }
         }

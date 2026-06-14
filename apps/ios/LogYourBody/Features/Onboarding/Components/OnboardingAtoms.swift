@@ -3,45 +3,56 @@ import SwiftUI
 // MARK: - Typography Tokens
 
 enum OnboardingTypography {
-    static var title: Font { .system(.title2, design: .rounded).weight(.semibold) }
-    static var headline: Font { .system(.title3, design: .rounded).weight(.semibold) }
-    static var body: Font { .system(.body, design: .rounded) }
-    static var caption: Font { .system(.footnote, design: .rounded) }
+    private static let theme = DefaultTheme()
+
+    static var title: Font { theme.typography.headlineMedium }
+    static var headline: Font { theme.typography.headlineSmall }
+    static var body: Font { theme.typography.bodyMedium }
+    static var caption: Font { theme.typography.captionLarge }
 }
 
 struct OnboardingTitleText: View {
+    @Environment(\.theme)
+    private var theme
+
     let text: String
     var alignment: TextAlignment = .center
 
     var body: some View {
         Text(text)
-            .font(OnboardingTypography.title)
+            .font(theme.typography.headlineMedium)
             .multilineTextAlignment(alignment)
-            .foregroundStyle(Color.appText)
+            .foregroundStyle(theme.colors.text)
             .accessibilityAddTraits(.isHeader)
     }
 }
 
 struct OnboardingSubtitleText: View {
+    @Environment(\.theme)
+    private var theme
+
     let text: String
     var alignment: TextAlignment = .center
 
     var body: some View {
         Text(text)
-            .font(OnboardingTypography.body)
-            .foregroundStyle(Color.appTextSecondary)
+            .font(theme.typography.bodyMedium)
+            .foregroundStyle(theme.colors.textSecondary)
             .multilineTextAlignment(alignment)
     }
 }
 
 struct OnboardingCaptionText: View {
+    @Environment(\.theme)
+    private var theme
+
     let text: String
     var alignment: TextAlignment = .center
 
     var body: some View {
         Text(text)
-            .font(OnboardingTypography.caption)
-            .foregroundStyle(Color.appTextTertiary)
+            .font(theme.typography.captionLarge)
+            .foregroundStyle(theme.colors.textTertiary)
             .multilineTextAlignment(alignment)
     }
 }
@@ -49,25 +60,28 @@ struct OnboardingCaptionText: View {
 // MARK: - Buttons
 
 struct OnboardingPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.theme)
+    private var theme
+
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Self.Configuration) -> some View {
         configuration.label
-            .font(.system(.headline, design: .rounded))
+            .font(theme.typography.labelLarge)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 56)
             .padding(.vertical, 2)
-            .foregroundStyle(isEnabled ? Color.black : Color.black.opacity(0.55))
+            .foregroundStyle(isEnabled ? theme.colors.background : theme.colors.background.opacity(0.55))
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.white.opacity(buttonOpacity(isPressed: configuration.isPressed)))
+                    .fill(theme.colors.text.opacity(buttonOpacity(isPressed: configuration.isPressed)))
             )
             .overlay(
                 Capsule(style: .continuous)
-                    .stroke(Color.white.opacity(0.16))
+                    .stroke(theme.colors.text.opacity(0.16))
             )
             .opacity(configuration.isPressed ? 0.85 : 1)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .animation(theme.animation.fast, value: configuration.isPressed)
     }
 
     private func buttonOpacity(isPressed: Bool) -> Double {
@@ -77,34 +91,38 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
 }
 
 struct OnboardingSecondaryButtonStyle: ButtonStyle {
+    @Environment(\.theme)
+    private var theme
+
     func makeBody(configuration: Self.Configuration) -> some View {
         configuration.label
-            .font(.system(.body, design: .rounded))
+            .font(theme.typography.labelLarge)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .foregroundStyle(Color.appText)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .opacity(configuration.isPressed ? 0.7 : 1)
+            .foregroundStyle(theme.colors.text)
+            .systemBGlassSurface(
+                cornerRadius: theme.radius.button,
+                tint: theme.colors.text,
+                tintOpacity: configuration.isPressed ? 0.05 : 0.035,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.65
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.appBorder.opacity(0.5))
-            )
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .animation(theme.animation.fast, value: configuration.isPressed)
     }
 }
 
 struct OnboardingTextButton: View {
+    @Environment(\.theme)
+    private var theme
+
     let title: String
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(.footnote, design: .rounded).weight(.medium))
-                .foregroundStyle(Color.appPrimary)
+                .font(theme.typography.labelMedium)
+                .foregroundStyle(theme.colors.primary)
                 .padding(.vertical, 8)
         }
     }
@@ -119,22 +137,25 @@ struct OnboardingBulletItem: Identifiable, Hashable {
 }
 
 struct OnboardingIconBullet: View {
+    @Environment(\.theme)
+    private var theme
+
     let item: OnboardingBulletItem
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: item.iconName)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.appPrimary)
+                .foregroundStyle(theme.colors.primary)
                 .frame(width: 24, height: 24)
                 .background(
                     Circle()
-                        .fill(Color.appPrimary.opacity(0.15))
+                        .fill(theme.colors.primary.opacity(0.15))
                 )
 
             Text(item.text)
-                .font(OnboardingTypography.body)
-                .foregroundStyle(Color.appText)
+                .font(theme.typography.bodyMedium)
+                .foregroundStyle(theme.colors.text)
                 .multilineTextAlignment(.leading)
         }
         .padding(.vertical, 4)
@@ -142,22 +163,28 @@ struct OnboardingIconBullet: View {
 }
 
 struct OnboardingBadge: View {
+    @Environment(\.theme)
+    private var theme
+
     let text: String
 
     var body: some View {
         Text(text.uppercased())
-            .font(.system(.caption2, design: .rounded).weight(.medium))
-            .foregroundStyle(Color.appPrimary)
+            .font(theme.typography.labelSmall)
+            .foregroundStyle(theme.colors.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.appPrimary.opacity(0.12))
+                    .fill(theme.colors.primary.opacity(0.12))
             )
     }
 }
 
 struct OnboardingCard<Content: View>: View {
+    @Environment(\.theme)
+    private var theme
+
     let content: Content
 
     init(@ViewBuilder content: () -> Content) {
@@ -167,14 +194,15 @@ struct OnboardingCard<Content: View>: View {
     var body: some View {
         content
             .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: Color.black.opacity(0.18), radius: 14, x: 0, y: 8)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.white.opacity(0.06))
+            .systemBGlassSurface(
+                cornerRadius: 20,
+                tint: theme.colors.text,
+                tintOpacity: 0.04,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.7,
+                shadowOpacity: 0.18,
+                shadowRadius: 14,
+                shadowY: 8
             )
     }
 }
@@ -182,19 +210,22 @@ struct OnboardingCard<Content: View>: View {
 // MARK: - FFMI Helper
 
 struct FFMIInfoContent: View {
+    @Environment(\.theme)
+    private var theme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("What's FFMI?")
-                .font(OnboardingTypography.headline)
-                .foregroundStyle(Color.appText)
+                .font(theme.typography.headlineSmall)
+                .foregroundStyle(theme.colors.text)
 
             Text("Fat-Free Mass Index compares your lean mass to your height, so bigger frames don’t get penalized.")
-                .font(OnboardingTypography.body)
-                .foregroundStyle(Color.appTextSecondary)
+                .font(theme.typography.bodyMedium)
+                .foregroundStyle(theme.colors.textSecondary)
 
             Text("We pair FFMI with body fat and percentile bands to surface your Body Score and coaching cues.")
-                .font(OnboardingTypography.body)
-                .foregroundStyle(Color.appTextSecondary)
+                .font(theme.typography.bodyMedium)
+                .foregroundStyle(theme.colors.textSecondary)
         }
     }
 }

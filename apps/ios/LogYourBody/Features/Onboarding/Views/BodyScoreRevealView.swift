@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct BodyScoreRevealView: View {
+    @Environment(\.theme)
+    private var theme
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @State private var animateScore = false
     @State private var isSharePresented = false
@@ -85,12 +88,12 @@ struct BodyScoreRevealView: View {
     private func scoreHero(result: BodyScoreResult) -> some View {
         VStack(spacing: 8) {
             Text("\(result.score)")
-                .font(.system(size: 56, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.appText)
+                .font(.system(size: 56, weight: .bold, design: .default))
+                .foregroundStyle(theme.colors.text)
 
             Text("Starting point")
-                .font(.system(.subheadline, design: .rounded).weight(.medium))
-                .foregroundStyle(Color.appTextSecondary)
+                .font(theme.typography.labelMedium)
+                .foregroundStyle(theme.colors.textSecondary)
 
             Text("Based on FFMI, body fat %, and trends.")
                 .font(OnboardingTypography.caption)
@@ -125,9 +128,12 @@ struct BodyScoreRevealView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(
-            Capsule(style: .continuous)
-                .fill(Color.appCard.opacity(0.6))
+        .systemBGlassSurface(
+            cornerRadius: theme.radius.full,
+            tint: theme.colors.text,
+            tintOpacity: 0.035,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.55
         )
     }
 

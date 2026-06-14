@@ -7,6 +7,9 @@ import SwiftUI
 // MARK: - AuthConsentCheckbox Molecule
 
 struct AuthConsentCheckbox: View {
+    @Environment(\.theme)
+    private var theme
+
     @Binding var isChecked: Bool
     let text: String
     let linkText: String
@@ -35,7 +38,7 @@ struct AuthConsentCheckbox: View {
             Button(action: { isChecked.toggle() }, label: {
                 Image(systemName: isChecked ? "checkmark.square.fill" : "square")
                     .font(.system(size: 20))
-                    .foregroundColor(isChecked ? .appPrimary : .appBorder)
+                    .foregroundColor(isChecked ? theme.colors.primary : theme.colors.border)
             })
             .buttonStyle(PlainButtonStyle())
 
@@ -43,13 +46,13 @@ struct AuthConsentCheckbox: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
                     Text("I agree to the")
-                        .font(.system(size: 14))
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.bodySmall)
+                        .foregroundColor(theme.colors.textSecondary)
 
                     Button(action: handleLinkTap) {
                         Text(linkText)
-                            .font(.system(size: 14))
-                            .foregroundColor(.appPrimary)
+                            .font(theme.typography.labelMedium)
+                            .foregroundColor(theme.colors.primary)
                             .underline()
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -57,8 +60,8 @@ struct AuthConsentCheckbox: View {
                 .multilineTextAlignment(.leading)
 
                 Text(text)
-                    .font(.system(size: 12))
-                    .foregroundColor(.appTextTertiary)
+                    .font(theme.typography.captionMedium)
+                    .foregroundColor(theme.colors.textTertiary)
                     .multilineTextAlignment(.leading)
             }
 

@@ -307,6 +307,32 @@ extension View {
     func surfaceStyle() -> some View {
         self.modifier(SurfaceStyleModifier())
     }
+
+    func systemBGlassSurface(
+        cornerRadius: CGFloat? = nil,
+        tint: Color = .white,
+        tintOpacity: Double = 0.035,
+        borderColor: Color? = nil,
+        borderOpacity: Double = 1,
+        borderWidth: CGFloat = 1,
+        shadowOpacity: Double = 0,
+        shadowRadius: CGFloat = 0,
+        shadowY: CGFloat = 0
+    ) -> some View {
+        modifier(
+            SystemBGlassSurfaceModifier(
+                cornerRadius: cornerRadius,
+                tint: tint,
+                tintOpacity: tintOpacity,
+                borderColor: borderColor,
+                borderOpacity: borderOpacity,
+                borderWidth: borderWidth,
+                shadowOpacity: shadowOpacity,
+                shadowRadius: shadowRadius,
+                shadowY: shadowY
+            )
+        )
+    }
 }
 
 // MARK: - Common View Modifiers
@@ -334,6 +360,49 @@ struct SurfaceStyleModifier: ViewModifier {
         content
             .background(theme.colors.surface)
             .cornerRadius(theme.radius.md)
+    }
+}
+
+private struct SystemBGlassSurfaceModifier: ViewModifier {
+    @Environment(\.theme)
+    private var theme
+
+    let cornerRadius: CGFloat?
+    let tint: Color
+    let tintOpacity: Double
+    let borderColor: Color?
+    let borderOpacity: Double
+    let borderWidth: CGFloat
+    let shadowOpacity: Double
+    let shadowRadius: CGFloat
+    let shadowY: CGFloat
+
+    func body(content: Content) -> some View {
+        let radius = cornerRadius ?? theme.radius.card
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+
+        content
+            .background(
+                shape
+                    .fill(theme.materials.glassUltraThin)
+                    .overlay(
+                        shape
+                            .fill(tint.opacity(tintOpacity))
+                    )
+            )
+            .overlay(
+                shape
+                    .stroke(
+                        (borderColor ?? theme.colors.border).opacity(borderOpacity),
+                        lineWidth: borderWidth
+                    )
+            )
+            .shadow(
+                color: Color.black.opacity(shadowOpacity),
+                radius: shadowRadius,
+                x: 0,
+                y: shadowY
+            )
     }
 }
 

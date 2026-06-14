@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct BodyScoreFirstProgressPhotoView: View {
+    @Environment(\.theme)
+    private var theme
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @EnvironmentObject private var authManager: AuthManager
     @State private var isAttachSheetPresented = false
@@ -39,7 +42,7 @@ struct BodyScoreFirstProgressPhotoView: View {
         VStack(alignment: .leading, spacing: 16) {
             Image(systemName: "camera.metering.center.weighted")
                 .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.82))
+                .foregroundStyle(theme.colors.text.opacity(0.82))
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Photos make the timeline useful.")
@@ -67,13 +70,15 @@ struct BodyScoreFirstProgressPhotoView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.appCard.opacity(0.72))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.appBorder.opacity(0.55), lineWidth: 1)
+        .systemBGlassSurface(
+            cornerRadius: 22,
+            tint: theme.colors.text,
+            tintOpacity: 0.04,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.65,
+            shadowOpacity: 0.12,
+            shadowRadius: 12,
+            shadowY: 6
         )
         .accessibilityIdentifier("onboarding_first_photo_card")
     }
@@ -111,7 +116,7 @@ struct BodyScoreFirstProgressPhotoView: View {
             if let errorMessage = viewModel.firstPhotoErrorMessage {
                 Text(errorMessage)
                     .font(OnboardingTypography.caption)
-                    .foregroundStyle(Color.red)
+                    .foregroundStyle(theme.colors.error)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
             }

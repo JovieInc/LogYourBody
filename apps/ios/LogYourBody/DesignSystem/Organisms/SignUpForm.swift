@@ -7,6 +7,9 @@ import SwiftUI
 // MARK: - SignUpForm Organism
 
 struct SignUpForm: View {
+    @Environment(\.theme)
+    private var theme
+
     @Binding var email: String
     @Binding var isLoading: Bool
     @Binding var agreedToTerms: Bool
@@ -78,7 +81,7 @@ struct SignUpForm: View {
             BaseButton(
                 "Create Account",
                 configuration: ButtonConfiguration(
-                    style: .custom(background: .white, foreground: .black),
+                    style: .custom(background: theme.colors.text, foreground: theme.colors.background),
                     isLoading: isLoading,
                     isEnabled: isFormValid,
                     fullWidth: true
