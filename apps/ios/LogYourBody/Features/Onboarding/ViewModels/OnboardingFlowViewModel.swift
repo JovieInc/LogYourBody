@@ -149,9 +149,6 @@ final class OnboardingFlowViewModel: ObservableObject {
     private var hasMarkedOnboardingComplete = false
     private let progressStore = OnboardingProgressStore.shared
     private var isRestoringProgress = false
-    private var progressPersistenceWorkItem: DispatchWorkItem?
-    private let persistenceQueue = DispatchQueue(label: "com.logyourbody.onboarding.progressPersistence", qos: .utility)
-    private let persistenceDebounceInterval: TimeInterval = 0.4
 
     private var hasWeightEntry: Bool {
         bodyScoreInput.weight.value != nil
@@ -179,10 +176,12 @@ final class OnboardingFlowViewModel: ObservableObject {
         self.includesFirstPhotoStep = includesFirstPhotoStep
             ?? (entryContext == .authenticated && PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD())
 
+        isRestoringProgress = true
         configureMeasurementPreference()
         hydrateHeightFields()
         hydrateWeightFields()
         hydrateDefaultHomeMode()
+        isRestoringProgress = false
 
         if let bodyFat = bodyScoreInput.bodyFat.percentage {
             bodyFatPercentageText = Self.formatNumber(bodyFat)
@@ -1020,7 +1019,6 @@ final class OnboardingFlowViewModel: ObservableObject {
         guard entryContext == .authenticated else { return }
         guard !isRestoringProgress else { return }
         guard !OnboardingStateManager.shared.hasCompletedCurrentVersion else {
-            progressPersistenceWorkItem?.cancel()
             clearPersistedProgress()
             return
         }
@@ -1038,22 +1036,13 @@ final class OnboardingFlowViewModel: ObservableObject {
             manualWeightText: manualWeightText,
             bodyFatPercentageText: bodyFatPercentageText,
             selectedVisualBodyFat: selectedVisualBodyFat,
+            defaultHomeMode: defaultHomeMode,
             didRequestHealthSync: didRequestHealthSync,
             emailAddress: emailAddress,
             lastUpdated: Date()
         )
 
-        progressPersistenceWorkItem?.cancel()
-
-        let pendingWorkItem = DispatchWorkItem { [progressStore] in
-            progressStore.save(snapshot, for: userId)
-        }
-        progressPersistenceWorkItem = pendingWorkItem
-
-        persistenceQueue.asyncAfter(
-            deadline: .now() + persistenceDebounceInterval,
-            execute: pendingWorkItem
-        )
+        progressStore.save(snapshot, for: userId)
     }
 
     private func restorePersistedProgressIfNeeded() {
@@ -1078,6 +1067,7 @@ final class OnboardingFlowViewModel: ObservableObject {
         manualWeightText = snapshot.manualWeightText
         bodyFatPercentageText = snapshot.bodyFatPercentageText
         selectedVisualBodyFat = snapshot.selectedVisualBodyFat
+        defaultHomeMode = snapshot.defaultHomeMode
         didRequestHealthSync = snapshot.didRequestHealthSync
         emailAddress = snapshot.emailAddress
         if hasAuthenticatedAccountEmail,
@@ -1092,7 +1082,6 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     private func clearPersistedProgress() {
         guard entryContext == .authenticated else { return }
-        progressPersistenceWorkItem?.cancel()
         guard let userId = AuthManager.shared.currentUser?.id else { return }
         progressStore.clearProgress(for: userId)
     }
@@ -1154,9 +1143,68 @@ private struct OnboardingProgressSnapshot: Codable {
     let manualWeightText: String
     let bodyFatPercentageText: String
     let selectedVisualBodyFat: Double?
+    let defaultHomeMode: DefaultHomeMode
     let didRequestHealthSync: Bool
     let emailAddress: String
     let lastUpdated: Date
+}
+
+private extension OnboardingProgressSnapshot {
+    enum CodingKeys: String, CodingKey {
+        case version
+        case currentStep
+        case bodyScoreInput
+        case heightUnit
+        case weightUnit
+        case heightCentimetersText
+        case heightFeet
+        case heightInches
+        case manualWeightText
+        case bodyFatPercentageText
+        case selectedVisualBodyFat
+        case defaultHomeMode
+        case didRequestHealthSync
+        case emailAddress
+        case lastUpdated
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(Int.self, forKey: .version)
+        currentStep = try container.decode(OnboardingFlowViewModel.Step.self, forKey: .currentStep)
+        bodyScoreInput = try container.decode(BodyScoreInput.self, forKey: .bodyScoreInput)
+        heightUnit = try container.decode(HeightUnit.self, forKey: .heightUnit)
+        weightUnit = try container.decode(WeightUnit.self, forKey: .weightUnit)
+        heightCentimetersText = try container.decode(String.self, forKey: .heightCentimetersText)
+        heightFeet = try container.decode(Int.self, forKey: .heightFeet)
+        heightInches = try container.decode(Int.self, forKey: .heightInches)
+        manualWeightText = try container.decode(String.self, forKey: .manualWeightText)
+        bodyFatPercentageText = try container.decode(String.self, forKey: .bodyFatPercentageText)
+        selectedVisualBodyFat = try container.decodeIfPresent(Double.self, forKey: .selectedVisualBodyFat)
+        defaultHomeMode = try container.decodeIfPresent(DefaultHomeMode.self, forKey: .defaultHomeMode) ?? .default
+        didRequestHealthSync = try container.decode(Bool.self, forKey: .didRequestHealthSync)
+        emailAddress = try container.decode(String.self, forKey: .emailAddress)
+        lastUpdated = try container.decode(Date.self, forKey: .lastUpdated)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encode(currentStep, forKey: .currentStep)
+        try container.encode(bodyScoreInput, forKey: .bodyScoreInput)
+        try container.encode(heightUnit, forKey: .heightUnit)
+        try container.encode(weightUnit, forKey: .weightUnit)
+        try container.encode(heightCentimetersText, forKey: .heightCentimetersText)
+        try container.encode(heightFeet, forKey: .heightFeet)
+        try container.encode(heightInches, forKey: .heightInches)
+        try container.encode(manualWeightText, forKey: .manualWeightText)
+        try container.encode(bodyFatPercentageText, forKey: .bodyFatPercentageText)
+        try container.encodeIfPresent(selectedVisualBodyFat, forKey: .selectedVisualBodyFat)
+        try container.encode(defaultHomeMode, forKey: .defaultHomeMode)
+        try container.encode(didRequestHealthSync, forKey: .didRequestHealthSync)
+        try container.encode(emailAddress, forKey: .emailAddress)
+        try container.encode(lastUpdated, forKey: .lastUpdated)
+    }
 }
 
 struct OnboardingProfileUpdateBuilder {
@@ -1210,11 +1258,10 @@ final class OnboardingProgressStore {
     }
 
     fileprivate func save(_ snapshot: OnboardingProgressSnapshot, for userId: String) {
-        queue.async { [weak self] in
-            guard let self else { return }
+        queue.sync {
             guard snapshot.version == Self.snapshotVersion else { return }
-            self.snapshots[userId] = snapshot
-            self.persistToDiskLocked()
+            snapshots[userId] = snapshot
+            persistToDiskLocked()
         }
     }
 
@@ -1225,11 +1272,22 @@ final class OnboardingProgressStore {
         }
     }
 
+    #if DEBUG
+    func snapshotForTesting(for userId: String) -> (
+        currentStep: OnboardingFlowViewModel.Step,
+        defaultHomeMode: DefaultHomeMode
+    )? {
+        queue.sync {
+            guard let snapshot = snapshots[userId], snapshot.version == Self.snapshotVersion else { return nil }
+            return (snapshot.currentStep, snapshot.defaultHomeMode)
+        }
+    }
+    #endif
+
     func clearProgress(for userId: String) {
-        queue.async { [weak self] in
-            guard let self else { return }
-            guard self.snapshots.removeValue(forKey: userId) != nil else { return }
-            self.persistToDiskLocked()
+        queue.sync {
+            guard snapshots.removeValue(forKey: userId) != nil else { return }
+            persistToDiskLocked()
         }
     }
 

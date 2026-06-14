@@ -291,73 +291,28 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
         AvatarBodyFatCatalog.match(bodyFatPercentage: bodyFatPercentage, gender: gender)
     }
 
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                Color.black
-
-                LinearGradient(
-                    colors: [
-                        Color.metricAccent.opacity(0.22),
-                        Color.black.opacity(0.15),
-                        Color.metricAccentBodyFat.opacity(0.18)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                timelineGrid
-
-                Image(avatar.assetName)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 18)
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .shadow(color: Color.metricAccent.opacity(0.42), radius: 24)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(mode == .avatar ? "Avatar" : "Avatar fallback")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(Color.white.opacity(0.9))
-                        .textCase(.uppercase)
-
-                    Text(avatar.badgeText)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.76))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Color.black.opacity(0.58))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                .padding(.leading, 20)
-                .padding(.bottom, 18)
-            }
-        }
-        .accessibilityLabel(avatar.accessibilityLabel)
+    private var accessibilityText: String {
+        mode == .avatar ? avatar.accessibilityLabel : "\(avatar.accessibilityLabel), photo fallback"
     }
 
-    private var timelineGrid: some View {
+    var body: some View {
         GeometryReader { geometry in
-            Path { path in
-                let horizontalSpacing: CGFloat = 34
-                let verticalSpacing: CGFloat = 40
-
-                stride(from: CGFloat(0), through: geometry.size.width, by: horizontalSpacing).forEach { x in
-                    path.move(to: CGPoint(x: x, y: 0))
-                    path.addLine(to: CGPoint(x: x, y: geometry.size.height))
-                }
-
-                stride(from: CGFloat(0), through: geometry.size.height, by: verticalSpacing).forEach { y in
-                    path.move(to: CGPoint(x: 0, y: y))
-                    path.addLine(to: CGPoint(x: geometry.size.width, y: y))
-                }
-            }
-            .stroke(Color.white.opacity(0.045), lineWidth: 1)
+            Image(avatar.assetName)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFill()
+                .frame(
+                    width: max(0, geometry.size.width - 24),
+                    height: max(0, geometry.size.height - 56)
+                )
+                .padding(.top, 42)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 14)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
+                .accessibilityHidden(true)
         }
+        .accessibilityLabel(accessibilityText)
     }
 }
 
