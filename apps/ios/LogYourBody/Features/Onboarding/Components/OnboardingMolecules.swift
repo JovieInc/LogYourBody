@@ -329,6 +329,7 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
                     .padding(.bottom, showsCTA ? 24 : 40)
             }
             .scrollIndicators(.hidden)
+            .accessibilityIdentifier("onboarding_scaffold_scroll")
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if showsCTA {
@@ -336,6 +337,7 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .accessibilityIdentifier("onboarding_scaffold")
     }
 
     private var ctaContainer: some View {
@@ -354,6 +356,7 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
                 .opacity(0.96)
                 .ignoresSafeArea(edges: .bottom)
         )
+        .accessibilityIdentifier("onboarding_fixed_cta_container")
     }
 }
 

@@ -515,6 +515,7 @@ extension DashboardViewLiquid {
                     isBodyScoreSharePresented = true
                 }
             }
+            .accessibilityIdentifier("body_score_share_button")
 
             Spacer()
         }
