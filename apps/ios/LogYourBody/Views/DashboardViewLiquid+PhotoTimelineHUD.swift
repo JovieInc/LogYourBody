@@ -78,7 +78,6 @@ extension DashboardViewLiquid {
             .highPriorityGesture(photoTimelineRootSwipeGesture)
             .simultaneousGesture(photoTimelineRootSwipeGesture)
         }
-        .accessibilityIdentifier("photo_timeline_root_pager")
     }
 
     private var photoTimelineRootNavigation: some View {

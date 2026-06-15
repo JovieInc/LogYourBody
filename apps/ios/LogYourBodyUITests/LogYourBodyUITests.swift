@@ -453,10 +453,10 @@ final class LogYourBodyUITests: XCTestCase {
     private func waitForTimelineRoot(in app: XCUIApplication, timeout: TimeInterval) -> Bool {
         waitForOneOf(
             [
-                app.descendants(matching: .any)["photo_timeline_root_pager"],
                 app.descendants(matching: .any)["photo_timeline_root_nav"],
                 app.descendants(matching: .any)["photo_timeline_root_page_timeline"],
                 app.descendants(matching: .any)["dashboard_home_timeline_hero"],
+                app.buttons["Stats"],
                 app.staticTexts["Start with a photo"]
             ],
             timeout: timeout
