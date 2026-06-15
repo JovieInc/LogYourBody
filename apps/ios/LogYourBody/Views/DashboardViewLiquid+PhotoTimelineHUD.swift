@@ -4,44 +4,50 @@ extension DashboardViewLiquid {
     // MARK: - Photo Timeline HUD
 
     var photoTimelineHUD: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 16) {
-                compactHeader
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
+        GeometryReader { geometry in
+            let viewportWidth = max(1, geometry.size.width)
 
-                syncStatusBanner
-                    .padding(.horizontal, 20)
-
-                homeModeSwitch
-                    .padding(.horizontal, 20)
-
-                if let metric = currentMetric {
-                    homeTimelineHero(metric: metric)
-                }
-
-                hudTimelineSection
-                    .padding(.horizontal, 20)
-
-                if isGlp1WeeklyCheckInEnabled {
-                    hudGlp1WeeklyCheckIn
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    compactHeader
                         .padding(.horizontal, 20)
-                }
+                        .padding(.top, 8)
 
-                if isPhaseInsightEnabled {
-                    hudPhaseInsight
+                    syncStatusBanner
                         .padding(.horizontal, 20)
+
+                    homeModeSwitch
+                        .padding(.horizontal, 20)
+
+                    if let metric = currentMetric {
+                        homeTimelineHero(metric: metric)
+                            .frame(width: viewportWidth, alignment: .top)
+                    }
+
+                    hudTimelineSection
+                        .padding(.horizontal, 20)
+
+                    if isGlp1WeeklyCheckInEnabled {
+                        hudGlp1WeeklyCheckIn
+                            .padding(.horizontal, 20)
+                    }
+
+                    if isPhaseInsightEnabled {
+                        hudPhaseInsight
+                            .padding(.horizontal, 20)
+                    }
                 }
+                .frame(width: viewportWidth, alignment: .top)
+                .padding(.bottom, 28)
             }
-            .padding(.bottom, 28)
-        }
-        .scrollBounceBehavior(.basedOnSize)
-        .refreshable {
-            await viewModel.refreshData(
-                authManager: authManager,
-                realtimeSyncManager: realtimeSyncManager
-            )
-            scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
+            .scrollBounceBehavior(.basedOnSize)
+            .refreshable {
+                await viewModel.refreshData(
+                    authManager: authManager,
+                    realtimeSyncManager: realtimeSyncManager
+                )
+                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
+            }
         }
         .accessibilityIdentifier("photo_timeline_hud")
     }
