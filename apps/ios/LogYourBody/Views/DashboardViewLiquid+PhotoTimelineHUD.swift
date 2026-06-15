@@ -43,10 +43,7 @@ extension DashboardViewLiquid {
                 authManager: authManager,
                 realtimeSyncManager: realtimeSyncManager
             )
-            refreshGlobalTimelineStore()
-            if !viewModel.bodyMetrics.isEmpty {
-                updateAnimatedValues(for: selectedIndex)
-            }
+            scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
         }
         .accessibilityIdentifier("photo_timeline_hud")
     }

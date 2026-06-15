@@ -147,8 +147,9 @@ struct DashboardViewLiquid: View {
 
         let withLifecycle = base
             .onAppear {
-                // Load saved metrics order from AppStorage
-                handleOnAppear()
+                DispatchQueue.main.async {
+                    handleOnAppear()
+                }
             }
             .onDisappear {
                 syncBannerDismissTask?.cancel()
@@ -163,17 +164,16 @@ struct DashboardViewLiquid: View {
                 handleCoreDataContextChange(notification)
             }
             .onReceive(viewModel.$recentDailyMetrics) { _ in
-                rebuildDailyMetricsLookupCache()
-                refreshGlobalTimelineStore()
+                scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
             }
             .onReceive(viewModel.$bodyMetrics) { _ in
-                refreshGlobalTimelineStore()
+                scheduleDashboardDerivedStateRefresh()
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
             }
             .onChange(of: selectedIndex) { _, newIndex in
-                updateAnimatedValues(for: newIndex)
+                scheduleDashboardDerivedStateRefresh(animatedIndex: newIndex)
             }
             .onChange(of: selectedTab) { _, newTab in
                 if newTab == .photos {
@@ -293,9 +293,7 @@ struct DashboardViewLiquid: View {
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
+                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
             }
         )
     }
@@ -311,10 +309,7 @@ struct DashboardViewLiquid: View {
                     loadOnlyNewest: true,
                     selectedIndex: selectedIndex
                 )
-                refreshGlobalTimelineStore()
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
+                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
             }
         }
 
@@ -326,10 +321,7 @@ struct DashboardViewLiquid: View {
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
-                refreshGlobalTimelineStore()
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
+                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
             }
         }
 
@@ -371,9 +363,23 @@ struct DashboardViewLiquid: View {
                 loadOnlyNewest: true,
                 selectedIndex: selectedIndex
             )
+            scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
+        }
+    }
+
+    func scheduleDashboardDerivedStateRefresh(
+        rebuildDailyMetricsLookup: Bool = false,
+        animatedIndex: Int? = nil
+    ) {
+        DispatchQueue.main.async {
+            if rebuildDailyMetricsLookup {
+                rebuildDailyMetricsLookupCache()
+            }
+
             refreshGlobalTimelineStore()
-            if !viewModel.bodyMetrics.isEmpty {
-                updateAnimatedValues(for: selectedIndex)
+
+            if let animatedIndex, !viewModel.bodyMetrics.isEmpty {
+                updateAnimatedValues(for: animatedIndex)
             }
         }
     }
@@ -435,9 +441,7 @@ struct DashboardViewLiquid: View {
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
+                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
             }
         )
     }

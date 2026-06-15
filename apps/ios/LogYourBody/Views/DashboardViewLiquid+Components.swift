@@ -384,7 +384,7 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
             .coordinateSpace(name: "dashboardHomeScroll")
             .scrollBounceBehavior(.basedOnSize)
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                scrollOffset = value
+                updateScrollOffset(value)
             }
             .refreshable {
                 await onRefresh()
@@ -402,10 +402,10 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
                 GeometryReader { geo in
                     Color.clear
                         .onAppear {
-                            headerStackHeight = geo.size.height
+                            updateHeaderStackHeight(geo.size.height)
                         }
                         .onChange(of: geo.size.height) { newValue in
-                            headerStackHeight = newValue
+                            updateHeaderStackHeight(newValue)
                         }
                 }
             )
@@ -425,6 +425,24 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
                 x: 0,
                 y: 10
             )
+        }
+    }
+
+    private func updateScrollOffset(_ value: CGFloat) {
+        guard abs(scrollOffset - value) > 0.5 else { return }
+
+        DispatchQueue.main.async {
+            guard abs(scrollOffset - value) > 0.5 else { return }
+            scrollOffset = value
+        }
+    }
+
+    private func updateHeaderStackHeight(_ value: CGFloat) {
+        guard value > 0, abs(headerStackHeight - value) > 0.5 else { return }
+
+        DispatchQueue.main.async {
+            guard abs(headerStackHeight - value) > 0.5 else { return }
+            headerStackHeight = value
         }
     }
 }
