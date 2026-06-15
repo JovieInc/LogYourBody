@@ -343,7 +343,7 @@ struct BodySpecIntegrationView: View {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         BodySpecIntegrationView()
             .environmentObject(AuthManager.shared)
     }

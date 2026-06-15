@@ -114,12 +114,12 @@ struct PaywallView: View {
             AnalyticsService.shared.track(event: "paywall_view")
         }
         .sheet(isPresented: $showTermsSheet) {
-            NavigationView {
+            NavigationStack {
                 LegalDocumentView(documentType: .terms)
             }
         }
         .sheet(isPresented: $showPrivacySheet) {
-            NavigationView {
+            NavigationStack {
                 LegalDocumentView(documentType: .privacy)
             }
         }

@@ -28,7 +28,7 @@ struct LogWeightView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Background
                 Color.appBackground

@@ -241,7 +241,7 @@ struct IntegrationsView: View {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         IntegrationsView()
             .environmentObject(AuthManager.shared)
     }

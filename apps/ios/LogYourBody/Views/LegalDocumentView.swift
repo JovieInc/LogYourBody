@@ -204,21 +204,21 @@ struct LegalDocumentView: View {
 // MARK: - Preview
 
 #Preview("Terms of Service") {
-    NavigationView {
+    NavigationStack {
         LegalDocumentView(documentType: .terms)
     }
     .preferredColorScheme(.dark)
 }
 
 #Preview("Privacy Policy") {
-    NavigationView {
+    NavigationStack {
         LegalDocumentView(documentType: .privacy)
     }
     .preferredColorScheme(.dark)
 }
 
 #Preview("Health Disclosure") {
-    NavigationView {
+    NavigationStack {
         LegalDocumentView(documentType: .healthDisclosure)
     }
     .preferredColorScheme(.dark)

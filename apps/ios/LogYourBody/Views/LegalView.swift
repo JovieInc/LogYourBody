@@ -126,7 +126,7 @@ extension LegalView {
 // MARK: - Preview
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         LegalView()
     }
     .preferredColorScheme(.dark)

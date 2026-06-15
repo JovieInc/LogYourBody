@@ -109,12 +109,12 @@ struct LegalConsentView: View {
         }
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
         .sheet(isPresented: $showTermsSheet) {
-            NavigationView {
+            NavigationStack {
                 LegalDocumentView(documentType: .terms)
             }
         }
         .sheet(isPresented: $showPrivacySheet) {
-            NavigationView {
+            NavigationStack {
                 LegalDocumentView(documentType: .privacy)
             }
         }

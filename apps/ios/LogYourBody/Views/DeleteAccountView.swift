@@ -306,7 +306,7 @@ struct AccountDeletionCleanupService {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         DeleteAccountView()
             .environmentObject(AuthManager())
     }

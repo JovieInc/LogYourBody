@@ -347,7 +347,7 @@ struct SessionRowView: View {
 // MARK: - Preview
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         SecuritySessionsView()
             .environmentObject(AuthManager.shared)
     }

@@ -233,30 +233,12 @@ struct DashboardViewLiquid: View {
                 )
                 .environmentObject(authManager)
             }
-            .background(
-                ZStack {
-                    NavigationLink(
-                        isActive: $isMetricDetailActive,
-                        destination: {
-                            fullMetricChartView
-                        },
-                        label: {
-                            EmptyView()
-                        }
-                    )
-
-                    NavigationLink(
-                        isActive: $isStatsDestinationActive,
-                        destination: {
-                            photoTimelineStatsDestination
-                        },
-                        label: {
-                            EmptyView()
-                        }
-                    )
-                }
-                    .hidden()
-            )
+            .navigationDestination(isPresented: $isMetricDetailActive) {
+                fullMetricChartView
+            }
+            .navigationDestination(isPresented: $isStatsDestinationActive) {
+                photoTimelineStatsDestination
+            }
             .toolbarBackground(Material.ultraThinMaterial, for: ToolbarPlacement.tabBar)
             .toolbarBackground(Visibility.visible, for: ToolbarPlacement.tabBar)
             .onScreenshot {

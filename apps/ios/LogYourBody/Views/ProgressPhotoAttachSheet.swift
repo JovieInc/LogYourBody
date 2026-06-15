@@ -114,7 +114,7 @@ struct ProgressPhotoAttachSheet: View {
     #endif
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 Color.metricCanvas.ignoresSafeArea()
 
