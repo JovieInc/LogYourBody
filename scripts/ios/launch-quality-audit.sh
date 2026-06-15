@@ -16,6 +16,7 @@ TEST_TIMEOUTS_ENABLED="${TEST_TIMEOUTS_ENABLED:-YES}"
 DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="${DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90}"
 MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180}"
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-420}"
+BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 read -r -a XCODEBUILD_SETTINGS_ARRAY <<< "$XCODEBUILD_SETTINGS"
@@ -76,7 +77,7 @@ run_xcodebuild_test() {
       -resultBundlePath "$result_bundle"
       "$@"
       "${XCODEBUILD_SETTINGS_ARRAY[@]}"
-      test
+      test-without-building
     )
 
     set +e
@@ -109,15 +110,59 @@ run_xcodebuild_test() {
   done
 }
 
-run_ui_test() {
-  local test_name="$1"
-  local result_bundle="$2"
+build_for_testing_once() {
+  local log_file="$ARTIFACT_DIR/launch-quality-build-for-testing.log"
+  local status
+  local -a xcodebuild_command
 
+  : > "$log_file"
+  cleanup_booted_simulator_apps
+
+  echo "Building launch-quality test bundle once" | tee -a "$log_file"
+  xcodebuild_command=(
+    xcodebuild
+    "${COMMON_XCODEBUILD_ARGS[@]}"
+    "${XCODEBUILD_SETTINGS_ARRAY[@]}"
+    build-for-testing
+  )
+
+  set +e
+  if [[ -n "$TIMEOUT_BIN" ]]; then
+    "$TIMEOUT_BIN" \
+      --kill-after=30s \
+      "${BUILD_FOR_TESTING_TIMEOUT_SECONDS}s" \
+      "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
+  else
+    "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
+  fi
+  status="${PIPESTATUS[0]}"
+  set -e
+
+  if [[ "$status" -eq 124 ]]; then
+    echo "build-for-testing timed out after ${BUILD_FOR_TESTING_TIMEOUT_SECONDS}s" | tee -a "$log_file"
+  fi
+
+  return "$status"
+}
+
+run_ui_test_group() {
+  local label="$1"
+  local result_bundle="$ARTIFACT_DIR/$label.xcresult"
+  local log_file="$ARTIFACT_DIR/$label.log"
+  local test_name
+  local -a only_testing_args=()
+  shift
+
+  for test_name in "$@"; do
+    only_testing_args+=("-only-testing:LogYourBodyUITests/LogYourBodyUITests/$test_name")
+  done
+
+  UI_RESULT_BUNDLES+=("$result_bundle")
   run_xcodebuild_test \
-    "$test_name" \
+    "$label" \
     "$result_bundle" \
-    "$ARTIFACT_DIR/launch-quality-ui-$test_name.log" \
-    "-only-testing:LogYourBodyUITests/LogYourBodyUITests/$test_name"
+    "$log_file" \
+    "${only_testing_args[@]}"
 }
 
 cd "$IOS_DIR"
@@ -126,6 +171,8 @@ if [[ "$RUN_SWIFTLINT" == "true" ]]; then
   swiftlint lint --strict | tee "$ARTIFACT_DIR/swiftlint.log"
 fi
 
+build_for_testing_once
+
 run_xcodebuild_test \
   "launch-quality-unit-tests" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" \
@@ -133,20 +180,10 @@ run_xcodebuild_test \
   -only-testing:LogYourBodyTests/PhotoTimelineHUDPolicyTests \
   -only-testing:LogYourBodyTests/BodyScoreShareCardTests
 
-UI_TESTS=(
-  "testLaunchQualityGateCapturesOnboardingFixedCTA"
-  "testLaunchQualityGateCapturesTimelineHomeSurface"
-  "testPhotoHUDFixtureRoutesToIntendedPostMVPDashboard"
-  "testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
-  "testLaunchQualityGateCapturesBodyScoreShareSheet"
-)
-
 UI_RESULT_BUNDLES=()
-for test_name in "${UI_TESTS[@]}"; do
-  result_bundle="$ARTIFACT_DIR/launch-quality-ui-$test_name.xcresult"
-  UI_RESULT_BUNDLES+=("$result_bundle")
-  run_ui_test "$test_name" "$result_bundle"
-done
+run_ui_test_group \
+  "launch-quality-ui-critical-surfaces" \
+  "testLaunchQualityGateCapturesCriticalSurfaces"
 
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
@@ -164,8 +201,8 @@ fi
   printf -- '- Unit coverage: photo timeline HUD policy, Body Score share card layout\n'
   printf -- '- UI coverage: timeline routing, no bottom stats switch card, home/analytics/onboarding/share screenshot attachments\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
-  printf -- '- Build strategy: unit and UI selectors run separately with simulator parallelism disabled\n'
-  printf -- '- Command timeout: `%ss` per xcodebuild invocation\n' "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
+  printf -- '- Build strategy: one `build-for-testing`, unit selectors in one `test-without-building` run, and one composite launch-quality UI selector that captures all required screenshot surfaces with simulator parallelism disabled\n'
+  printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"
 

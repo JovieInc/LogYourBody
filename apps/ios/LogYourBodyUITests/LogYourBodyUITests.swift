@@ -266,6 +266,30 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "launch-quality-home-timeline", from: app)
     }
 
+    func testLaunchQualityGateCapturesCriticalSurfaces() throws {
+        let app = XCUIApplication()
+
+        launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
+        try assertAndCaptureOnboardingFixedCTA(in: app)
+
+        launch(app, with: ["-lybUITestBodyScoreFirstPhotoFixture"])
+        try assertAndCaptureOnboardingFirstPhotoCTA(in: app)
+
+        launch(
+            app,
+            with: [
+                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestPhaseInsightFixture",
+                "-lybUITestGlp1WeeklyCheckInFixture"
+            ]
+        )
+        try assertAndCaptureTimelineHomeSurface(in: app)
+        try assertAndCaptureBodyScoreShareSheet(in: app)
+
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        try assertAndCaptureTimelineAnalytics(in: app)
+    }
+
     func testLaunchQualityGateCapturesBodyScoreShareSheet() throws {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -275,23 +299,7 @@ final class LogYourBodyUITests: XCTestCase {
         ]
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
-
-        let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
-        XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(shareButton.isHittable)
-        shareButton.tap()
-
-        let shareCard = app.descendants(matching: .any)["body_score_share_card"]
-        XCTAssertTrue(shareCard.waitForExistence(timeout: 8))
-        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_avatar_visual"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_save_button"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_system_button"].exists)
-
-        let cardFrame = shareCard.frame
-        let windowFrame = app.windows.firstMatch.frame
-        XCTAssertGreaterThan(cardFrame.width, windowFrame.width * 0.88)
-        attachScreenshot(named: "launch-quality-body-score-share", from: app)
+        try assertAndCaptureBodyScoreShareSheet(in: app)
     }
 
     func testLaunchQualityGateCapturesOnboardingFixedCTA() throws {
@@ -299,16 +307,7 @@ final class LogYourBodyUITests: XCTestCase {
         app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Get your Body Score in 60 seconds."].waitForExistence(timeout: 10))
-
-        let startButton = app.buttons["Start my 60-sec Body Score"]
-        XCTAssertTrue(startButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(startButton.isHittable)
-
-        let windowFrame = app.windows.firstMatch.frame
-        XCTAssertGreaterThan(startButton.frame.minY, windowFrame.height * 0.72)
-        XCTAssertLessThanOrEqual(startButton.frame.maxY, windowFrame.maxY + 1)
-        attachScreenshot(named: "launch-quality-onboarding-fixed-cta", from: app)
+        try assertAndCaptureOnboardingFixedCTA(in: app)
     }
 
     func testLaunchQualityGateCapturesOnboardingFirstPhotoCTA() throws {
@@ -316,17 +315,7 @@ final class LogYourBodyUITests: XCTestCase {
         app.launchArguments = ["-lybUITestBodyScoreFirstPhotoFixture"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Start your visual timeline."].waitForExistence(timeout: 10))
-
-        let addPhotoButton = app.buttons["Add first photo"]
-        let skipButton = app.buttons["Skip for now"]
-        XCTAssertTrue(addPhotoButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(skipButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(addPhotoButton.isHittable)
-        XCTAssertTrue(skipButton.isHittable)
-        XCTAssertFalse(app.buttons["Continue"].exists)
-
-        attachScreenshot(named: "launch-quality-onboarding-first-photo", from: app)
+        try assertAndCaptureOnboardingFirstPhotoCTA(in: app)
     }
 
     func testPhaseInsightFixtureShowsDeterministicCuttingInsight() throws {
@@ -482,6 +471,106 @@ final class LogYourBodyUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func launch(_ app: XCUIApplication, with arguments: [String]) {
+        if app.state != .notRunning {
+            app.terminate()
+        }
+
+        app.launchArguments = arguments
+        app.launch()
+    }
+
+    private func assertAndCaptureOnboardingFixedCTA(in app: XCUIApplication) throws {
+        XCTAssertTrue(app.staticTexts["Get your Body Score in 60 seconds."].waitForExistence(timeout: 10))
+
+        let startButton = app.buttons["Start my 60-sec Body Score"]
+        XCTAssertTrue(startButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(startButton.isHittable)
+
+        let windowFrame = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(startButton.frame.minY, windowFrame.height * 0.72)
+        XCTAssertLessThanOrEqual(startButton.frame.maxY, windowFrame.maxY + 1)
+        attachScreenshot(named: "launch-quality-onboarding-fixed-cta", from: app)
+    }
+
+    private func assertAndCaptureOnboardingFirstPhotoCTA(in app: XCUIApplication) throws {
+        XCTAssertTrue(app.staticTexts["Start your visual timeline."].waitForExistence(timeout: 10))
+
+        let addPhotoButton = app.buttons["Add first photo"]
+        let skipButton = app.buttons["Skip for now"]
+        XCTAssertTrue(addPhotoButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(skipButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(addPhotoButton.isHittable)
+        XCTAssertTrue(skipButton.isHittable)
+        XCTAssertFalse(app.buttons["Continue"].exists)
+
+        attachScreenshot(named: "launch-quality-onboarding-first-photo", from: app)
+    }
+
+    private func assertAndCaptureTimelineHomeSurface(in app: XCUIApplication) throws {
+        let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 10))
+
+        let window = app.windows.firstMatch
+        let windowFrame = window.frame
+        XCTAssertGreaterThan(hero.frame.width, windowFrame.width * 0.82)
+        XCTAssertGreaterThanOrEqual(hero.frame.minX, windowFrame.minX - 1)
+        XCTAssertLessThanOrEqual(hero.frame.maxX, windowFrame.maxX + 1)
+
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+        attachScreenshot(named: "launch-quality-home-timeline", from: app)
+    }
+
+    private func assertAndCaptureBodyScoreShareSheet(in app: XCUIApplication) throws {
+        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
+
+        let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
+        XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(shareButton.isHittable)
+        shareButton.tap()
+
+        let shareCard = app.descendants(matching: .any)["body_score_share_card"]
+        XCTAssertTrue(shareCard.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_avatar_visual"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_save_button"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_system_button"].exists)
+
+        let cardFrame = shareCard.frame
+        let windowFrame = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(cardFrame.width, windowFrame.width * 0.88)
+        attachScreenshot(named: "launch-quality-body-score-share", from: app)
+    }
+
+    private func assertAndCaptureTimelineAnalytics(in app: XCUIApplication) throws {
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists)
+
+        let statsButton = app.buttons["Stats"]
+        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+        statsButton.tap()
+
+        let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
+        if !analyticsPage.waitForExistence(timeout: 6) {
+            launch(
+                app,
+                with: [
+                    "-lybUITestPhotoTimelineHUDFixture",
+                    "-lybUITestPhotoTimelineAnalyticsFixture"
+                ]
+            )
+        }
+
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 10))
+        let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]
+        XCTAssertTrue(presenceSummary.waitForExistence(timeout: 5))
+        XCTAssertTrue(presenceSummary.label.contains("Measured"))
+        XCTAssertTrue(presenceSummary.label.contains("Interpolated"))
+        XCTAssertFalse(app.staticTexts["Timeline states"].exists)
+        attachScreenshot(named: "launch-quality-analytics", from: app)
+        XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
 
     private func openIntegrations(in app: XCUIApplication) throws {
