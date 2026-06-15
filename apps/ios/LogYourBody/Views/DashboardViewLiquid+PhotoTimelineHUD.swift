@@ -49,38 +49,104 @@ extension DashboardViewLiquid {
     }
 
     var photoTimelineRoot: some View {
-        ZStack {
-            switch selectedPhotoTimelineRootPage {
-            case .timeline:
-                Group {
-                    if bodyMetrics.isEmpty {
-                        photoTimelineHUDEmptyState
-                    } else {
-                        photoTimelineHUD
+        VStack(spacing: 0) {
+            photoTimelineRootNavigation
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            ZStack {
+                switch selectedPhotoTimelineRootPage {
+                case .timeline:
+                    Group {
+                        if bodyMetrics.isEmpty {
+                            photoTimelineHUDEmptyState
+                        } else {
+                            photoTimelineHUD
+                        }
                     }
+                    .accessibilityIdentifier("photo_timeline_root_page_timeline")
+                case .analytics:
+                    photoTimelineAnalyticsPage
+                        .accessibilityIdentifier("photo_timeline_root_page_analytics")
                 }
-                .accessibilityIdentifier("photo_timeline_root_page_timeline")
-            case .analytics:
-                photoTimelineAnalyticsPage
-                    .accessibilityIdentifier("photo_timeline_root_page_analytics")
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .contentShape(Rectangle())
         .highPriorityGesture(photoTimelineRootSwipeGesture)
+        .simultaneousGesture(photoTimelineRootSwipeGesture)
         .accessibilityIdentifier("photo_timeline_root_pager")
     }
 
-    private var photoTimelineRootSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 18, coordinateSpace: .local)
-            .onEnded { value in
-                let horizontal = value.translation.width
-                let vertical = value.translation.height
-                guard abs(horizontal) > abs(vertical), abs(horizontal) > 44 else { return }
+    private var photoTimelineRootNavigation: some View {
+        HStack(spacing: 22) {
+            photoTimelineRootNavigationButton(page: .timeline)
+                .accessibilityIdentifier("photo_timeline_root_nav_timeline")
 
-                withAnimation(.easeOut(duration: 0.2)) {
-                    selectedPhotoTimelineRootPage = horizontal < 0 ? .analytics : .timeline
-                }
+            photoTimelineRootNavigationButton(page: .analytics)
+                .accessibilityIdentifier("photo_timeline_root_nav_stats")
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("photo_timeline_root_nav")
+    }
+
+    private func photoTimelineRootNavigationButton(page: PhotoTimelineRootPage) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.2)) {
+                selectedPhotoTimelineRootPage = page
             }
+        } label: {
+            VStack(spacing: 6) {
+                Text(page.navigationTitle)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(
+                        selectedPhotoTimelineRootPage == page
+                            ? Color.white
+                            : Color.white.opacity(0.58)
+                    )
+
+                Capsule()
+                    .fill(
+                        selectedPhotoTimelineRootPage == page
+                            ? Color.white
+                            : Color.clear
+                    )
+                    .frame(width: 24, height: 2)
+            }
+            .frame(minHeight: 32, alignment: .bottom)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var photoTimelineRootSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+            .onChanged { value in
+                updatePhotoTimelineRootPage(from: value.translation, isFinal: false)
+            }
+            .onEnded { value in
+                updatePhotoTimelineRootPage(from: value.translation, isFinal: true)
+                hasHandledPhotoTimelineRootSwipe = false
+            }
+    }
+
+    private func updatePhotoTimelineRootPage(from translation: CGSize, isFinal: Bool) {
+        let horizontal = translation.width
+        let vertical = translation.height
+        let threshold: CGFloat = isFinal ? 44 : 72
+        guard abs(horizontal) > abs(vertical), abs(horizontal) > threshold else { return }
+        guard isFinal || !hasHandledPhotoTimelineRootSwipe else { return }
+
+        let nextPage: PhotoTimelineRootPage = horizontal < 0 ? .analytics : .timeline
+        guard selectedPhotoTimelineRootPage != nextPage else { return }
+
+        hasHandledPhotoTimelineRootSwipe = true
+        withAnimation(.easeOut(duration: 0.2)) {
+            selectedPhotoTimelineRootPage = nextPage
+        }
     }
 
     var hudTimelineSection: some View {

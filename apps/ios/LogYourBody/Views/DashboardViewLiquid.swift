@@ -77,6 +77,7 @@ struct DashboardViewLiquid: View {
     @State private var selectedTab: DashboardTab = .home
     @State private var isPhotosTabEnabled = true
     @State var selectedPhotoTimelineRootPage: PhotoTimelineRootPage = .timeline
+    @State var hasHandledPhotoTimelineRootSwipe = false
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
     @State private var isStatsDestinationActive = false
@@ -110,6 +111,15 @@ struct DashboardViewLiquid: View {
     enum PhotoTimelineRootPage: Hashable {
         case timeline
         case analytics
+
+        var navigationTitle: String {
+            switch self {
+            case .timeline:
+                "Timeline"
+            case .analytics:
+                "Stats"
+            }
+        }
     }
 
     enum MetricType {
