@@ -82,10 +82,8 @@ extension DashboardViewLiquid {
     private var photoTimelineRootNavigation: some View {
         HStack(spacing: 22) {
             photoTimelineRootNavigationButton(page: .timeline)
-                .accessibilityIdentifier("photo_timeline_root_nav_timeline")
 
             photoTimelineRootNavigationButton(page: .analytics)
-                .accessibilityIdentifier("photo_timeline_root_nav_stats")
 
             Spacer(minLength: 0)
         }
@@ -120,6 +118,10 @@ extension DashboardViewLiquid {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(page.navigationTitle)
+        .accessibilityAddTraits(selectedPhotoTimelineRootPage == page ? [.isSelected] : [])
+        .accessibilityIdentifier(page.accessibilityIdentifier)
     }
 
     private var photoTimelineRootSwipeGesture: some Gesture {

@@ -120,6 +120,15 @@ struct DashboardViewLiquid: View {
                 "Stats"
             }
         }
+
+        var accessibilityIdentifier: String {
+            switch self {
+            case .timeline:
+                "photo_timeline_root_nav_timeline"
+            case .analytics:
+                "photo_timeline_root_nav_stats"
+            }
+        }
     }
 
     enum MetricType {

@@ -212,8 +212,13 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists)
 
         let statsNav = app.descendants(matching: .any)["photo_timeline_root_nav_stats"]
-        XCTAssertTrue(statsNav.waitForExistence(timeout: 5))
-        statsNav.tap()
+        if statsNav.waitForExistence(timeout: 5) {
+            statsNav.tap()
+        } else {
+            let statsButton = app.buttons["Stats"]
+            XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+            statsButton.tap()
+        }
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 10))
         let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]

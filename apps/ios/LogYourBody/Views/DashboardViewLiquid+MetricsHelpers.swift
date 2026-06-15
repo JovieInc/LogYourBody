@@ -543,9 +543,7 @@ extension DashboardViewLiquid {
         if let cached = metricEntriesCache[type] {
             return cached
         }
-        let payload = metricEntriesPayload(for: type)
-        metricEntriesCache[type] = payload
-        return payload
+        return metricEntriesPayload(for: type)
     }
 
     func cachedChartData(
@@ -555,9 +553,7 @@ extension DashboardViewLiquid {
         if let cached = fullChartCache[type] {
             return cached
         }
-        let data = generator()
-        fullChartCache[type] = data
-        return data
+        return generator()
     }
 
     func weightRangeStats() -> MetricRangeStats? {
