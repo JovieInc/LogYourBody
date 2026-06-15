@@ -74,6 +74,27 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(savedWeight.waitForExistence(timeout: 5))
     }
 
+    func testPaidMVPWeightEntryRejectsImplausibleWeight() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
+
+        let weightField = app.textFields["mvp_weight_text_field"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 5))
+        weightField.tap()
+        weightField.typeText("999")
+
+        let validationMessage = app.descendants(matching: .any)["mvp_weight_validation_message"]
+        XCTAssertTrue(validationMessage.waitForExistence(timeout: 3))
+        XCTAssertEqual(validationMessage.label, "Enter a weight between 70 and 660 lbs")
+
+        let keyboardSaveButton = app.buttons["mvp_keyboard_save_weight_bar_button"]
+        XCTAssertTrue(keyboardSaveButton.waitForExistence(timeout: 3))
+        XCTAssertFalse(keyboardSaveButton.isEnabled)
+    }
+
     func testPaywallFixtureShowsRestoreAndLogoutEscapePaths() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestPaywallFixture"]
