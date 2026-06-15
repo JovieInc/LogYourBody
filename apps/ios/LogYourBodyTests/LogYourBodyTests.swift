@@ -544,6 +544,18 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
 
 @MainActor
 final class BodyScoreShareCardTests: XCTestCase {
+    func testShareSheetDefaultsToPortraitExportAspect() {
+        XCTAssertEqual(BodyScoreShareAspect.defaultExportAspect, .portrait)
+    }
+
+    func testShareCardLayoutScalesDownForNarrowStoryPreview() {
+        let layout = ShareCardLayout(size: CGSize(width: 260, height: 462), aspect: .story)
+
+        XCTAssertLessThan(layout.scale, 0.7)
+        XCTAssertLessThan(layout.scoreFontSize, 42)
+        XCTAssertLessThan(layout.metricValueFontSize, 14)
+    }
+
     func testSharePayloadUsesSameNearestAvatarBucketAsHomeHero() {
         let payload = makePayload(bodyFatPercentage: 16.4, gender: "male")
 
