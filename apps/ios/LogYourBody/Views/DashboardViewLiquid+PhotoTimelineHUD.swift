@@ -49,24 +49,38 @@ extension DashboardViewLiquid {
     }
 
     var photoTimelineRoot: some View {
-        TabView(selection: $selectedPhotoTimelineRootPage) {
-            Group {
-                if bodyMetrics.isEmpty {
-                    photoTimelineHUDEmptyState
-                } else {
-                    photoTimelineHUD
+        ZStack {
+            switch selectedPhotoTimelineRootPage {
+            case .timeline:
+                Group {
+                    if bodyMetrics.isEmpty {
+                        photoTimelineHUDEmptyState
+                    } else {
+                        photoTimelineHUD
+                    }
+                }
+                .accessibilityIdentifier("photo_timeline_root_page_timeline")
+            case .analytics:
+                photoTimelineAnalyticsPage
+                    .accessibilityIdentifier("photo_timeline_root_page_analytics")
+            }
+        }
+        .contentShape(Rectangle())
+        .gesture(photoTimelineRootSwipeGesture)
+        .accessibilityIdentifier("photo_timeline_root_pager")
+    }
+
+    private var photoTimelineRootSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 28)
+            .onEnded { value in
+                let horizontal = value.translation.width
+                let vertical = value.translation.height
+                guard abs(horizontal) > abs(vertical), abs(horizontal) > 44 else { return }
+
+                withAnimation(.easeOut(duration: 0.2)) {
+                    selectedPhotoTimelineRootPage = horizontal < 0 ? .analytics : .timeline
                 }
             }
-            .tag(PhotoTimelineRootPage.timeline)
-            .accessibilityIdentifier("photo_timeline_root_page_timeline")
-
-            photoTimelineAnalyticsPage
-                .tag(PhotoTimelineRootPage.analytics)
-                .accessibilityIdentifier("photo_timeline_root_page_analytics")
-        }
-        .tabViewStyle(.page(indexDisplayMode: .always))
-        .indexViewStyle(.page(backgroundDisplayMode: .interactive))
-        .accessibilityIdentifier("photo_timeline_root_pager")
     }
 
     var hudTimelineSection: some View {

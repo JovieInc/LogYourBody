@@ -15,13 +15,12 @@ struct ProgressTimelineView: View {
     @Binding var selectedIndex: Int
     @Binding var mode: TimelineMode
 
-    @StateObject private var dataProvider = TimelineDataProvider()
+    @State private var dataProvider = TimelineDataProvider()
     @State private var anchors: [TimelineAnchor] = []
     @State private var zoomLevel: TimelineZoomLevel = .month
     @State private var isDragging: Bool = false
     @State private var dragPosition: Double = 0.5
     @State private var currentDateLabel: String = ""
-    @State private var timelineSetupTask: Task<Void, Never>?
 
     private let timelineHeight: CGFloat = 50
     private let scrubberHandleSize: CGFloat = 44
@@ -69,9 +68,6 @@ struct ProgressTimelineView: View {
         }
         .onChange(of: selectedIndex) { _, _ in
             scheduleTimelineSetup()
-        }
-        .onDisappear {
-            timelineSetupTask?.cancel()
         }
     }
 
@@ -200,10 +196,13 @@ struct ProgressTimelineView: View {
         let modeSnapshot = mode
         let selectedIndexSnapshot = selectedIndex
 
-        timelineSetupTask?.cancel()
-        timelineSetupTask = Task { @MainActor in
+        Task { @MainActor in
             await Task.yield()
-            guard !Task.isCancelled else { return }
+            guard mode == modeSnapshot,
+                  selectedIndex == selectedIndexSnapshot,
+                  bodyMetrics.map(\.id) == metricsSnapshot.map(\.id) else {
+                return
+            }
             setupTimeline(
                 metrics: metricsSnapshot,
                 mode: modeSnapshot,

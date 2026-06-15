@@ -6,12 +6,11 @@
 //
 
 import Foundation
-import Combine
 
 /// Provides data for the timeline with intelligent caching and nearest-match logic
-class TimelineDataProvider: ObservableObject {
-    @Published private(set) var bodyMetrics: [BodyMetrics] = []
-    @Published private(set) var isLoading: Bool = false
+final class TimelineDataProvider {
+    private(set) var bodyMetrics: [BodyMetrics] = []
+    private(set) var isLoading: Bool = false
 
     private let photoSearchWindow: TimeInterval = 7 * 24 * 60 * 60  // ±7 days
     private let metricSearchWindow: TimeInterval = 7 * 24 * 60 * 60  // ±7 days

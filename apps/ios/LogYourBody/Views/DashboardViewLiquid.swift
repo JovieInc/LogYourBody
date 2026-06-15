@@ -147,7 +147,8 @@ struct DashboardViewLiquid: View {
 
         let withLifecycle = base
             .onAppear {
-                DispatchQueue.main.async {
+                Task { @MainActor in
+                    await Task.yield()
                     handleOnAppear()
                 }
             }
@@ -371,7 +372,9 @@ struct DashboardViewLiquid: View {
         rebuildDailyMetricsLookup: Bool = false,
         animatedIndex: Int? = nil
     ) {
-        DispatchQueue.main.async {
+        Task { @MainActor in
+            await Task.yield()
+
             if rebuildDailyMetricsLookup {
                 rebuildDailyMetricsLookupCache()
             }
