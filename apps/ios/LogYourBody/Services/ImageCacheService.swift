@@ -21,8 +21,6 @@ class ImageCacheService: ObservableObject {
     // MARK: - Configuration
 
     private let maxCacheSizeMB = 100
-    private let maxImageDimension: CGFloat = 1_200
-    private let compressionQuality: CGFloat = 0.8
 
     // MARK: - Initialization
 
@@ -53,12 +51,18 @@ class ImageCacheService: ObservableObject {
 
     // MARK: - Public API
 
+    /// Return a cached image without starting network or disk work.
+    func cachedImage(for urlString: String?) -> UIImage? {
+        guard let urlString, !urlString.isEmpty else { return nil }
+        return cache.object(forKey: NSString(string: urlString))
+    }
+
     /// Load image from URL with automatic caching and deduplication
     func loadImage(from urlString: String) async -> UIImage? {
         let cacheKey = NSString(string: urlString)
 
         // Check cache first
-        if let cachedImage = cache.object(forKey: cacheKey) {
+        if let cachedImage = cachedImage(for: urlString) {
             return cachedImage
         }
 
@@ -107,66 +111,84 @@ class ImageCacheService: ObservableObject {
     // MARK: - Private Helpers
 
     private func fetchAndCacheImage(from urlString: String, cacheKey: NSString) async -> UIImage? {
-        guard let url = URL(string: urlString) else {
+        guard let optimizedImage = try? await ProgressPhotoImagePipeline.loadImage(urlString: urlString) else {
             return nil
         }
 
-        do {
-            let data: Data
-            if url.isFileURL {
-                data = try Data(contentsOf: url)
-            } else {
-                let (remoteData, _) = try await URLSession.shared.data(from: url)
-                data = remoteData
+        let cost = ProgressPhotoImagePipeline.cacheCost(for: optimizedImage)
+        cache.setObject(optimizedImage, forKey: cacheKey, cost: cost)
+        return optimizedImage
+    }
+}
+
+enum ProgressPhotoImagePipeline {
+    enum ImageLoadError: Error {
+        case invalidURL
+        case invalidResponse
+        case decodeFailed
+    }
+
+    static func loadImage(urlString: String) async throws -> UIImage {
+        guard let url = URL(string: urlString) else {
+            throw ImageLoadError.invalidURL
+        }
+
+        let data: Data
+        if url.isFileURL {
+            data = try await Task.detached(priority: .userInitiated) {
+                try Data(contentsOf: url)
+            }.value
+        } else {
+            let (responseData, response) = try await URLSession.shared.data(from: url)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                throw ImageLoadError.invalidResponse
             }
+            data = responseData
+        }
 
-            guard let originalImage = UIImage(data: data) else {
-                return nil
+        guard let image = await decodeAndOptimizeImage(from: data) else {
+            throw ImageLoadError.decodeFailed
+        }
+
+        return image
+    }
+
+    static func decodeAndOptimizeImage(from data: Data) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            autoreleasepool {
+                guard let image = UIImage(data: data) else {
+                    return nil
+                }
+                return optimizeImage(image)
             }
+        }.value
+    }
 
-            // Optimize image size
-            let optimizedImage = optimizeImage(originalImage)
+    static func optimizeImage(_ image: UIImage, maxDimension: CGFloat = 1_200.0) -> UIImage {
+        let orientedImage = image.fixedOrientation()
+        let size = orientedImage.size
 
-            // Calculate memory cost (4 bytes per pixel for RGBA)
-            let cost = Int(optimizedImage.size.width * optimizedImage.size.height * 4)
+        guard size.width > maxDimension || size.height > maxDimension else {
+            return orientedImage
+        }
 
-            // Cache with cost
-            cache.setObject(optimizedImage, forKey: cacheKey, cost: cost)
+        let scale = min(maxDimension / size.width, maxDimension / size.height)
+        let targetSize = CGSize(width: size.width * scale, height: size.height * scale)
 
-            return optimizedImage
-        } catch {
-            // print("[ImageCacheService] Failed to load image from \(urlString): \(error)")
-            return nil
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0
+        format.opaque = false
+
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
+        return renderer.image { _ in
+            orientedImage.draw(in: CGRect(origin: .zero, size: targetSize))
         }
     }
 
-    private func optimizeImage(_ image: UIImage) -> UIImage {
-        let size = image.size
-
-        // Check if resize needed
-        let maxDimension = max(size.width, size.height)
-        if maxDimension <= maxImageDimension {
-            return image
-        }
-
-        // Calculate new size maintaining aspect ratio
-        let scale = maxImageDimension / maxDimension
-        let newSize = CGSize(
-            width: size.width * scale,
-            height: size.height * scale
-        )
-
-        // Resize using high-quality rendering
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1.0
-        format.opaque = true
-
-        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
-        let resizedImage = renderer.image { _ in
-            image.draw(in: CGRect(origin: .zero, size: newSize))
-        }
-
-        return resizedImage
+    static func cacheCost(for image: UIImage) -> Int {
+        let scale = max(image.scale, 1)
+        return Int(image.size.width * scale * image.size.height * scale * 4)
     }
 }
 

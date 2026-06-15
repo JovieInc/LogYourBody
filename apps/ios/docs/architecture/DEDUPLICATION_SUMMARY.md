@@ -1,14 +1,17 @@
 # Design System Deduplication Summary
 
 ## Overview
+
 This document summarizes the deduplication and consolidation of SwiftUI components in the LogYourBody design system. All redundant components have been refactored to use generic base components while maintaining backward compatibility.
 
 ## New Base Components Created
 
 ### 1. BaseButton
+
 **Location**: `/DesignSystem/Atoms/BaseButton.swift`
 
 A highly configurable button component that consolidates all button variations:
+
 - **Configuration Properties**:
   - `style`: Primary, secondary, tertiary, destructive, ghost, social, or custom
   - `size`: Small, medium, large, or custom dimensions
@@ -19,9 +22,11 @@ A highly configurable button component that consolidates all button variations:
   - `hapticFeedback`: Configurable haptic feedback style
 
 ### 2. BaseTextField
+
 **Location**: `/DesignSystem/Atoms/BaseTextField.swift`
 
 A unified text input component supporting all field variations:
+
 - **Configuration Properties**:
   - `style`: Default, outlined, underlined, or custom styling
   - `hasIcon`: Shows leading icon
@@ -32,9 +37,11 @@ A unified text input component supporting all field variations:
   - Custom padding and corner radius
 
 ### 3. BaseIconButton
+
 **Location**: `/DesignSystem/Atoms/BaseButton.swift`
 
 A specialized icon-only button component:
+
 - **Styles**: Filled, outlined, or plain
 - Configurable size and haptic feedback
 - Proper accessibility support
@@ -42,6 +49,7 @@ A specialized icon-only button component:
 ## Refactored Components (Now Legacy Wrappers)
 
 ### Button Components
+
 1. **DSButton** → Uses `BaseButton`
    - Maintains original API for backward compatibility
    - Maps ButtonStyle and ButtonSize enums to BaseButton configuration
@@ -68,6 +76,7 @@ A specialized icon-only button component:
    - Custom red styling with system background
 
 ### TextField Components
+
 1. **DSTextField** → Uses `BaseTextField`
    - Standard text field with default styling
 
@@ -81,21 +90,25 @@ A specialized icon-only button component:
 ## Benefits Achieved
 
 ### 1. Code Reduction
+
 - Eliminated ~500+ lines of duplicate button code
 - Reduced text field implementations from 3 to 1 base component
 - Centralized styling and behavior logic
 
 ### 2. Consistency
+
 - All buttons now share the same interaction patterns
 - Unified animation timing and easing curves
 - Consistent haptic feedback across all interactive elements
 
 ### 3. Maintainability
+
 - Single source of truth for button and text field behavior
 - Easy to add new button styles without creating new components
 - Simplified testing - test base components once
 
 ### 4. Flexibility
+
 - Custom styling through configuration objects
 - ViewBuilder support for complex button content
 - Extensible design for future requirements
@@ -103,7 +116,9 @@ A specialized icon-only button component:
 ## Migration Guide
 
 ### For New Code
+
 Use base components directly:
+
 ```swift
 // Instead of: DSButton("Save", style: .primary, size: .medium) {}
 BaseButton("Save", configuration: ButtonConfiguration(style: .primary)) {}
@@ -113,11 +128,13 @@ BaseTextField(text: $email, placeholder: "Email", configuration: .email)
 ```
 
 ### For Existing Code
+
 No changes required - all existing components continue to work as legacy wrappers.
 
 ## Component Hierarchy Alignment
 
 ### Atoms (Pure, Generic UI Elements)
+
 - ✅ BaseButton
 - ✅ BaseTextField
 - ✅ BaseIconButton
@@ -131,12 +148,14 @@ No changes required - all existing components continue to work as legacy wrapper
 - ✅ DSMetricValue
 
 ### Molecules (Small Reusable Groups)
+
 - ✅ UserGreeting (uses atoms)
 - ✅ StepsIndicator (uses atoms)
 - ✅ SocialLoginButton (uses BaseButton)
 - ✅ LogoutButton (uses BaseButton)
 
 ### Organisms (Larger Semantic Structures)
+
 - ✅ MetricSummaryCard (replaces legacy MetricCard/CompactMetricCard)
 - ✅ DashboardHeader (uses molecules + atoms)
 - ✅ LoadingScreen (uses atoms)
@@ -230,7 +249,7 @@ No changes required - all existing components continue to work as legacy wrapper
 
 - `DashboardViewSimple`
   - File: `Views/DashboardViewSimple.swift`
-  - Status: Removed from the app build; no remaining call sites.
+  - Status: Deleted; no remaining call sites.
   - Rationale: Early placeholder dashboard, superseded by `DashboardViewLiquid`.
 
 - `MetricDetailView`
@@ -245,6 +264,26 @@ No changes required - all existing components continue to work as legacy wrapper
 - Route **all** dashboard flows through `DashboardViewLiquid` and its view model.
 - For full-screen metric details, present `FullMetricChartView` instead of creating new detail screens.
 - Do **not** reintroduce `DashboardViewV2`, `DashboardViewSimple`, or `MetricDetailView` without explicitly deprecating and updating all entry points.
+
+## Weight Logging Deduplication
+
+### Canonical View
+
+- **Manual body metrics entry**: `AddEntrySheet`
+  - Location: `/Views/AddEntrySheet.swift`
+  - Entry point: presented from the dashboard, global add-entry command, and metric cards.
+
+### Removed / Legacy Implementations
+
+- `LogWeightView`
+  - File: `Views/LogWeightView.swift`
+  - Status: Deleted; no remaining call sites.
+  - Rationale: Superseded by `AddEntrySheet`, which handles weight, body fat, measurements, photos, and GLP-1 logging in one runtime sheet.
+
+### Guidance for New Code
+
+- Route all manual body-metric entry through `AddEntrySheet`.
+- Do **not** reintroduce a separate full-screen weight logger unless every add-entry call site is migrated and the old sheet is explicitly deprecated.
 
 ## Onboarding Flow Deduplication
 
