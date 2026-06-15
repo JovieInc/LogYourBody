@@ -26,7 +26,7 @@ struct DashboardMetricsList<CardContent: View>: View {
     }
 
     var body: some View {
-        VStack(spacing: 14) {
+        LazyVStack(spacing: 12) {
             ForEach(metricsOrder) { metricId in
                 cardContent(metricId)
                     .overlay(
@@ -69,7 +69,7 @@ struct DashboardMetricsList<CardContent: View>: View {
             }
         }
         .animation(
-            .interactiveSpring(response: 0.30, dampingFraction: 0.85),
+            .easeOut(duration: 0.16),
             value: metricsOrder
         )
         .animation(

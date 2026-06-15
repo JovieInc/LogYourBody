@@ -13,9 +13,9 @@ import Charts
 /// Apple Health-style metric card with inline chart, states, and accessibility support.
 public struct MetricSummaryCard: View {
     public struct DataPoint: Identifiable {
-        public let id = UUID()
         public let index: Int
         public let value: Double
+        public var id: Int { index }
 
         public init(index: Int, value: Double) {
             self.index = index

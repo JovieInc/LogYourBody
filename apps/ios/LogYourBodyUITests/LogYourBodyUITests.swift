@@ -284,6 +284,9 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertLessThanOrEqual(hero.frame.maxX, windowFrame.maxX + 1)
 
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+        let statsButton = app.buttons["Stats"]
+        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+        XCTAssertLessThan(statsButton.frame.midY, windowFrame.height * 0.18)
         attachScreenshot(named: "launch-quality-home-timeline", from: app)
     }
 
@@ -612,6 +615,8 @@ final class LogYourBodyUITests: XCTestCase {
         let windowFrame = app.windows.firstMatch.frame
         XCTAssertGreaterThan(cardFrame.width, windowFrame.width * 0.88)
         XCTAssertGreaterThan(cardFrame.height, cardFrame.width * 1.18)
+        XCTAssertGreaterThan(cardFrame.minY, windowFrame.minY + 72)
+        XCTAssertLessThanOrEqual(cardFrame.maxY, windowFrame.maxY - 72)
         attachScreenshot(named: "launch-quality-body-score-share", from: app)
     }
 
@@ -622,6 +627,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         let statsButton = app.buttons["Stats"]
         XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+        XCTAssertLessThan(statsButton.frame.midY, app.windows.firstMatch.frame.height * 0.18)
         statsButton.tap()
 
         let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
@@ -640,6 +646,10 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(presenceSummary.waitForExistence(timeout: 5))
         XCTAssertTrue(presenceSummary.label.contains("Measured"))
         XCTAssertTrue(presenceSummary.label.contains("Interpolated"))
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_stack"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_card_body_fat"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_card_ffmi"].exists)
         XCTAssertFalse(app.staticTexts["Timeline states"].exists)
         attachScreenshot(named: "launch-quality-analytics", from: app)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)

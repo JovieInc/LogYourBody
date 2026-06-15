@@ -107,7 +107,7 @@ struct BodyScoreShareCardView: View {
             if let photoImage = payload.photoImage {
                 Image(uiImage: photoImage)
                     .resizable()
-                    .scaledToFit()
+                    .scaledToFill()
                     .frame(maxWidth: .infinity)
                     .frame(height: layout.visualHeight, alignment: .center)
                     .clipped()
@@ -196,10 +196,20 @@ struct BodyScoreShareCardView: View {
                 Spacer(minLength: 0)
             }
 
-            HStack(spacing: layout.metricSpacing) {
-                shareMetric("Weight", payload.weightValue, payload.weightCaption, layout: layout)
-                shareMetric("Body Fat", payload.bodyFatValue, payload.bodyFatCaption, layout: layout)
-                shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, layout: layout)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: layout.metricSpacing) {
+                    shareMetric("Weight", payload.weightValue, payload.weightCaption, layout: layout)
+                    shareMetric("Body Fat", payload.bodyFatValue, payload.bodyFatCaption, layout: layout)
+                    shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, layout: layout)
+                }
+
+                VStack(spacing: layout.metricSpacing * 0.55) {
+                    HStack(spacing: layout.metricSpacing) {
+                        shareMetric("Weight", payload.weightValue, payload.weightCaption, layout: layout)
+                        shareMetric("Body Fat", payload.bodyFatValue, payload.bodyFatCaption, layout: layout)
+                    }
+                    shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, layout: layout)
+                }
             }
 
             Text("Shared from LogYourBody")
@@ -307,36 +317,36 @@ struct ShareCardLayout {
     var summarySpacing: CGFloat { 17 * scale }
     var scoreSpacing: CGFloat { 13 * scale }
     var scoreLabelSpacing: CGFloat { 4 * scale }
-    var scoreFontSize: CGFloat { 58 * scale }
+    var scoreFontSize: CGFloat { 54 * scale }
     var scoreLabelFontSize: CGFloat { 11 * scale }
     var taglineFontSize: CGFloat { 15 * scale }
     var deltaFontSize: CGFloat { 12 * scale }
     var metricSpacing: CGFloat { 13 * scale }
     var metricTextSpacing: CGFloat { 4 * scale }
     var metricTitleFontSize: CGFloat { 10 * scale }
-    var metricValueFontSize: CGFloat { 20 * scale }
+    var metricValueFontSize: CGFloat { 18 * scale }
     var metricCaptionFontSize: CGFloat { 10 * scale }
     var footerFontSize: CGFloat { 11 * scale }
 
     var visualTopOffset: CGFloat {
         switch aspect {
         case .square:
-            return size.height * 0.18
-        case .portrait:
-            return size.height * 0.14
-        case .story:
             return size.height * 0.12
+        case .portrait:
+            return size.height * 0.08
+        case .story:
+            return size.height * 0.08
         }
     }
 
     var visualHeight: CGFloat {
         switch aspect {
         case .square:
-            return size.height * 0.55
+            return size.height * 0.60
         case .portrait:
-            return size.height * 0.58
+            return size.height * 0.66
         case .story:
-            return size.height * 0.54
+            return size.height * 0.62
         }
     }
 
@@ -354,11 +364,11 @@ struct ShareCardLayout {
     var summaryMatteHeight: CGFloat {
         switch aspect {
         case .square:
-            return size.height * 0.58
+            return size.height * 0.60
         case .portrait:
-            return size.height * 0.52
+            return size.height * 0.54
         case .story:
-            return size.height * 0.42
+            return size.height * 0.46
         }
     }
 
@@ -407,7 +417,7 @@ struct BodyScoreShareSheet: View {
 
                 BodyScoreShareCardView(payload: payload, aspect: selectedAspect)
                     .frame(width: size.width, height: size.height)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .frame(maxWidth: .infinity)
 
