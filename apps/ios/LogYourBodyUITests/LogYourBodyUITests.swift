@@ -264,6 +264,48 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["dashboard_home_timeline_photo_stage"].exists)
     }
 
+    func testMetricDetailOpensFromStatsAndShowsSharedTimelineContext() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhaseInsightFixture"
+        ]
+        app.launch()
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+
+        let statsButton = app.buttons["Stats"]
+        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+        statsButton.tap()
+
+        let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
+        XCTAssertTrue(analyticsPage.waitForExistence(timeout: 8))
+
+        let weightCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"]
+        scrollUntilHittable(weightCard, in: app)
+        XCTAssertTrue(weightCard.waitForExistence(timeout: 8))
+        XCTAssertTrue(weightCard.isHittable)
+        weightCard.tap()
+
+        let detail = app.descendants(matching: .any)["metric_detail_screen"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["metric_detail_headline"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["metric_detail_chart"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["metric_detail_related_metrics"].exists)
+        let relatedMetricIds = ["steps", "weight", "body_fat", "ffmi", "body_score"]
+        var visibleRelatedMetricCount = countVisibleRelatedMetrics(relatedMetricIds, in: app)
+        var remainingSwipes = 4
+        while visibleRelatedMetricCount < 2 && remainingSwipes > 0 {
+            swipeMetricDetailUp(in: app)
+            visibleRelatedMetricCount = countVisibleRelatedMetrics(relatedMetricIds, in: app)
+            remainingSwipes -= 1
+        }
+        XCTAssertGreaterThanOrEqual(visibleRelatedMetricCount, 2)
+        XCTAssertFalse(app.descendants(matching: .any)["metric_detail_chart_card"].exists)
+
+        attachScreenshot(named: "launch-quality-metric-detail", from: app)
+    }
+
     func testLaunchQualityGateCapturesTimelineHomeSurface() throws {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -488,6 +530,20 @@ final class LogYourBodyUITests: XCTestCase {
             app.swipeUp()
             remainingSwipes -= 1
         }
+    }
+
+    private func countVisibleRelatedMetrics(_ ids: [String], in app: XCUIApplication) -> Int {
+        ids
+            .map { app.descendants(matching: .any)["metric_detail_related_metric_\($0)"] }
+            .filter(\.exists)
+            .count
+    }
+
+    private func swipeMetricDetailUp(in app: XCUIApplication) {
+        let window = app.windows.firstMatch
+        let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.84))
+        let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.36))
+        start.press(forDuration: 0.01, thenDragTo: end)
     }
 
     private func waitForTimelineRoot(in app: XCUIApplication, timeout: TimeInterval) -> Bool {

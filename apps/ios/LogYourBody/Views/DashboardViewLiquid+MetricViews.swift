@@ -6,6 +6,18 @@
 import SwiftUI
 
 extension DashboardViewLiquid {
+    var metricDetailSelectedDateBinding: Binding<Date?> {
+        Binding(
+            get: {
+                currentMetric?.date
+            },
+            set: { newDate in
+                guard let newDate else { return }
+                selectClosestMetric(to: newDate)
+            }
+        )
+    }
+
     var metricsView: some View {
         let stepsGoalText: String? = {
             let formatted = FormatterCache.stepsFormatter.string(from: NSNumber(value: stepGoal)) ?? "\(stepGoal)"
@@ -83,8 +95,10 @@ extension DashboardViewLiquid {
                     showAddEntrySheet = true
                 },
                 metricEntries: cachedMetricEntries(for: .steps),
+                relatedMetrics: metricDetailRelatedMetrics(excluding: .steps),
                 goalValue: Double(stepGoal),
-                selectedTimeRange: $selectedRange
+                selectedTimeRange: $selectedRange,
+                selectedTimelineDate: metricDetailSelectedDateBinding
             )
 
         case .weight:
@@ -100,8 +114,10 @@ extension DashboardViewLiquid {
                     showAddEntrySheet = true
                 },
                 metricEntries: cachedMetricEntries(for: .weight),
+                relatedMetrics: metricDetailRelatedMetrics(excluding: .weight),
                 goalValue: weightGoal,
-                selectedTimeRange: $selectedRange
+                selectedTimeRange: $selectedRange,
+                selectedTimelineDate: metricDetailSelectedDateBinding
             )
 
         case .bodyFat:
@@ -117,8 +133,10 @@ extension DashboardViewLiquid {
                     showAddEntrySheet = true
                 },
                 metricEntries: cachedMetricEntries(for: .bodyFat),
+                relatedMetrics: metricDetailRelatedMetrics(excluding: .bodyFat),
                 goalValue: bodyFatGoal,
-                selectedTimeRange: $selectedRange
+                selectedTimeRange: $selectedRange,
+                selectedTimelineDate: metricDetailSelectedDateBinding
             )
 
         case .ffmi:
@@ -134,8 +152,10 @@ extension DashboardViewLiquid {
                     showAddEntrySheet = true
                 },
                 metricEntries: cachedMetricEntries(for: .ffmi),
+                relatedMetrics: metricDetailRelatedMetrics(excluding: .ffmi),
                 goalValue: ffmiGoal,
-                selectedTimeRange: $selectedRange
+                selectedTimeRange: $selectedRange,
+                selectedTimelineDate: metricDetailSelectedDateBinding
             )
 
         case .bodyScore:
@@ -152,8 +172,10 @@ extension DashboardViewLiquid {
                     showAddEntrySheet = true
                 },
                 metricEntries: cachedMetricEntries(for: .bodyScore),
+                relatedMetrics: metricDetailRelatedMetrics(excluding: .bodyScore),
                 goalValue: nil,
-                selectedTimeRange: $selectedRange
+                selectedTimeRange: $selectedRange,
+                selectedTimelineDate: metricDetailSelectedDateBinding
             )
 
         case .glp1:
@@ -176,9 +198,87 @@ extension DashboardViewLiquid {
                     showAddEntrySheet = true
                 },
                 metricEntries: nil,
+                relatedMetrics: metricDetailRelatedMetrics(excluding: .glp1),
                 goalValue: nil,
-                selectedTimeRange: $selectedRange
+                selectedTimeRange: $selectedRange,
+                selectedTimelineDate: metricDetailSelectedDateBinding
             )
         }
+    }
+
+    func metricDetailRelatedMetrics(excluding selected: MetricType) -> [MetricDetailRelatedMetric] {
+        guard let currentMetric else { return [] }
+
+        var items: [MetricDetailRelatedMetric] = []
+
+        func append(
+            _ metricType: MetricType,
+            id: String,
+            title: String,
+            value: String,
+            caption: String,
+            systemImageName: String
+        ) {
+            guard metricType != selected else { return }
+            items.append(
+                MetricDetailRelatedMetric(
+                    id: id,
+                    title: title,
+                    value: value,
+                    caption: caption,
+                    systemImageName: systemImageName
+                )
+            )
+        }
+
+        let latestSteps = latestStepsSnapshot()
+        append(
+            .steps,
+            id: "steps",
+            title: "Steps",
+            value: formatSteps(latestSteps.value),
+            caption: formatCardDateOnly(latestSteps.date) ?? "No steps yet",
+            systemImageName: "flame.fill"
+        )
+
+        append(
+            .weight,
+            id: "weight",
+            title: "Weight",
+            value: "\(formatTrendWeightHeadline(currentMetric, usesTrend: weightUsesTrend)) \(weightUnit)",
+            caption: formatCardDate(currentMetric.date),
+            systemImageName: "figure.stand"
+        )
+
+        append(
+            .bodyFat,
+            id: "body_fat",
+            title: "Body Fat",
+            value: "\(formatBodyFatValue(currentMetric.bodyFatPercentage))%",
+            caption: formatCardDate(currentMetric.date),
+            systemImageName: "percent"
+        )
+
+        append(
+            .ffmi,
+            id: "ffmi",
+            title: "FFMI",
+            value: formatFFMIValue(currentMetric),
+            caption: formatCardDate(currentMetric.date),
+            systemImageName: "figure.arms.open"
+        )
+
+        if let bodyScore = bodyScoreResult(for: currentMetric) {
+            append(
+                .bodyScore,
+                id: "body_score",
+                title: "Body Score",
+                value: "\(bodyScore.score)",
+                caption: bodyScore.statusTagline,
+                systemImageName: "star.fill"
+            )
+        }
+
+        return items
     }
 }
