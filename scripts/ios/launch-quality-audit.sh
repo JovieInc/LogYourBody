@@ -31,6 +31,40 @@ if [[ "$DESTINATION" == "auto" ]]; then
   DESTINATION="$(IOS_DIR="$IOS_DIR" PROJECT="$PROJECT" SCHEME="$SCHEME" bash "$ROOT_DIR/scripts/ios/resolve-simulator-destination.sh")"
 fi
 
+run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+
+  if [[ -n "$TIMEOUT_BIN" ]]; then
+    "$TIMEOUT_BIN" --kill-after=30s "${timeout_seconds}s" "$@"
+    return $?
+  fi
+
+  python3 - "$timeout_seconds" "$@" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+
+timeout_seconds = float(sys.argv[1])
+command = sys.argv[2:]
+
+process = subprocess.Popen(command, start_new_session=True)
+try:
+    sys.exit(process.wait(timeout=timeout_seconds))
+except subprocess.TimeoutExpired:
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+        process.wait(timeout=30)
+    except ProcessLookupError:
+        pass
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+    sys.exit(124)
+PY
+}
+
 COMMON_XCODEBUILD_ARGS=(
   -project "$PROJECT"
   -scheme "$SCHEME"
@@ -81,14 +115,9 @@ run_xcodebuild_test() {
     )
 
     set +e
-    if [[ -n "$TIMEOUT_BIN" ]]; then
-      "$TIMEOUT_BIN" \
-        --kill-after=30s \
-        "${XCODEBUILD_COMMAND_TIMEOUT_SECONDS}s" \
-        "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
-    else
+    run_with_timeout \
+      "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" \
       "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
-    fi
     status="${PIPESTATUS[0]}"
     set -e
 
@@ -127,14 +156,9 @@ build_for_testing_once() {
   )
 
   set +e
-  if [[ -n "$TIMEOUT_BIN" ]]; then
-    "$TIMEOUT_BIN" \
-      --kill-after=30s \
-      "${BUILD_FOR_TESTING_TIMEOUT_SECONDS}s" \
-      "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
-  else
+  run_with_timeout \
+    "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" \
     "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
-  fi
   status="${PIPESTATUS[0]}"
   set -e
 
