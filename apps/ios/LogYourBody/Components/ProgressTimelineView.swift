@@ -66,6 +66,7 @@ struct ProgressTimelineView: View {
             }
             .frame(height: timelineHeight)
         }
+        .accessibilityIdentifier("dashboard_timeline_scrubber")
     }
 
     // MARK: - Subviews
@@ -188,6 +189,7 @@ struct ProgressTimelineView: View {
                 .frame(width: scrubberHandleSize, height: scrubberHandleSize)
         }
         .frame(width: scrubberHandleSize, height: scrubberHandleSize)
+        .accessibilityIdentifier("dashboard_timeline_scrubber_handle")
     }
 
     // MARK: - Logic

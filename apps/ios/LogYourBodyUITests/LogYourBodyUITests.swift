@@ -415,6 +415,34 @@ final class LogYourBodyUITests: XCTestCase {
         }
     }
 
+    func testTimelinePerformanceTraceWorkflow() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestTimelinePerformanceTraceFixture",
+            "-lybUITestPhaseInsightFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture"
+        ]
+        app.launch()
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
+
+        let avatarButton = app.buttons["home_mode_avatar_button"]
+        XCTAssertTrue(avatarButton.waitForExistence(timeout: 5))
+        if avatarButton.isHittable {
+            avatarButton.tap()
+        }
+
+        let photoButton = app.buttons["home_mode_photo_button"]
+        XCTAssertTrue(photoButton.waitForExistence(timeout: 5))
+        if photoButton.isHittable {
+            photoButton.tap()
+        }
+
+        try exerciseTimelineRootNavigation(in: app)
+    }
+
     private func scrollUntilHittable(
         _ element: XCUIElement,
         in app: XCUIApplication,
@@ -464,6 +492,29 @@ final class LogYourBodyUITests: XCTestCase {
         }
 
         return elements.contains(where: { $0.exists })
+    }
+
+    private func exerciseTimelineRootNavigation(in app: XCUIApplication) throws {
+        let timelinePage = app.descendants(matching: .any)["photo_timeline_root_page_timeline"]
+        XCTAssertTrue(timelinePage.waitForExistence(timeout: 5))
+
+        let start = timelinePage.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.48))
+        let end = timelinePage.coordinate(withNormalizedOffset: CGVector(dx: 0.18, dy: 0.48))
+        start.press(forDuration: 0.05, thenDragTo: end)
+
+        let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
+        if !analyticsPage.waitForExistence(timeout: 5) {
+            let statsButton = app.buttons["Stats"]
+            XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+            statsButton.tap()
+        }
+
+        XCTAssertTrue(analyticsPage.waitForExistence(timeout: 8))
+
+        let timelineButton = app.buttons["Timeline"]
+        XCTAssertTrue(timelineButton.waitForExistence(timeout: 5))
+        timelineButton.tap()
+        XCTAssertTrue(timelinePage.waitForExistence(timeout: 8))
     }
 
     private func attachScreenshot(named name: String, from app: XCUIApplication) {

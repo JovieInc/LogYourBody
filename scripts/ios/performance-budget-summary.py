@@ -191,6 +191,7 @@ def write_summary(
     checks: list[BudgetCheck],
     unit_cases: list[TestCaseDuration],
     launch_cases: list[TestCaseDuration],
+    timeline_workflow_cases: list[TestCaseDuration],
     launch_metrics_available: bool,
 ) -> int:
     failed_checks = [check for check in checks if check.status == "failed"]
@@ -211,6 +212,7 @@ def write_summary(
         "checks": [asdict(check) for check in checks],
         "unitCases": [asdict(case) for case in unit_cases],
         "launchCases": [asdict(case) for case in launch_cases],
+        "timelineWorkflowCases": [asdict(case) for case in timeline_workflow_cases],
         "launchMetricStatisticsAvailable": launch_metrics_available,
     }
 
@@ -266,8 +268,11 @@ def main() -> int:
     parser.add_argument("--unit-log", type=Path)
     parser.add_argument("--launch-xcresult", type=Path)
     parser.add_argument("--launch-log", type=Path)
+    parser.add_argument("--timeline-workflow-xcresult", type=Path)
+    parser.add_argument("--timeline-workflow-log", type=Path)
     parser.add_argument("--unit-skipped", action="store_true")
     parser.add_argument("--launch-skipped", action="store_true")
+    parser.add_argument("--timeline-workflow-skipped", action="store_true")
     parser.add_argument("--summary-md", type=Path)
     parser.add_argument("--summary-json", type=Path)
     args = parser.parse_args()
@@ -280,14 +285,25 @@ def main() -> int:
         "unitTotalCaseSeconds": env_float("PERF_MAX_UNIT_TEST_TOTAL_SECONDS", 2.0),
         "launchMaxTestSeconds": env_float("PERF_MAX_LAUNCH_TEST_SECONDS", 90.0),
         "launchWarnTestSeconds": env_float("PERF_WARN_LAUNCH_TEST_SECONDS", 60.0),
+        "timelineWorkflowMaxSeconds": env_float("PERF_MAX_TIMELINE_TRACE_WORKFLOW_SECONDS", 35.0),
+        "timelineWorkflowWarnSeconds": env_float("PERF_WARN_TIMELINE_TRACE_WORKFLOW_SECONDS", 28.0),
         "failOnMissingLaunchMetrics": env_bool("PERF_FAIL_ON_MISSING_LAUNCH_METRICS", False),
     }
 
     unit_cases = [] if args.unit_skipped else collect_cases(args.unit_xcresult, args.unit_log)
     launch_cases = [] if args.launch_skipped else collect_cases(args.launch_xcresult, args.launch_log)
+    timeline_workflow_cases = (
+        []
+        if args.timeline_workflow_skipped
+        else collect_cases(args.timeline_workflow_xcresult, args.timeline_workflow_log)
+    )
     launch_case = next(
         (case for case in launch_cases if "testLaunchPerformance" in case.identifier),
         launch_cases[0] if launch_cases else None,
+    )
+    timeline_workflow_case = next(
+        (case for case in timeline_workflow_cases if "testTimelinePerformanceTraceWorkflow" in case.identifier),
+        timeline_workflow_cases[0] if timeline_workflow_cases else None,
     )
     launch_metrics_available = False if args.launch_skipped else has_xctest_metric_statistics(args.launch_xcresult)
 
@@ -411,7 +427,55 @@ def main() -> int:
             )
         )
 
-    return write_summary(args, budgets, checks, unit_cases, launch_cases, launch_metrics_available)
+    if args.timeline_workflow_skipped:
+        checks.append(
+            BudgetCheck(
+                id="timeline.trace_workflow_duration",
+                label="Timeline trace workflow",
+                observed_seconds=None,
+                budget_seconds=float(budgets["timelineWorkflowMaxSeconds"]),
+                status="skipped",
+                detail="Timeline trace workflow XCTest was disabled for this run.",
+            )
+        )
+    else:
+        timeline_workflow_duration = (
+            timeline_workflow_case.duration_seconds if timeline_workflow_case else None
+        )
+        timeline_workflow_status = "warning"
+        if timeline_workflow_duration is not None:
+            if timeline_workflow_duration > float(budgets["timelineWorkflowMaxSeconds"]):
+                timeline_workflow_status = "failed"
+            elif timeline_workflow_duration > float(budgets["timelineWorkflowWarnSeconds"]):
+                timeline_workflow_status = "warning"
+            else:
+                timeline_workflow_status = "passed"
+
+        checks.append(
+            BudgetCheck(
+                id="timeline.trace_workflow_duration",
+                label="Timeline trace workflow",
+                observed_seconds=timeline_workflow_duration,
+                budget_seconds=float(budgets["timelineWorkflowMaxSeconds"]),
+                status=timeline_workflow_status,
+                detail=(
+                    f"{timeline_workflow_case.identifier} reported "
+                    f"{timeline_workflow_duration:.3f}s end-to-end XCTest duration."
+                    if timeline_workflow_case and timeline_workflow_duration is not None
+                    else "No timeline trace workflow duration was found in the result bundle or log."
+                ),
+            )
+        )
+
+    return write_summary(
+        args,
+        budgets,
+        checks,
+        unit_cases,
+        launch_cases,
+        timeline_workflow_cases,
+        launch_metrics_available,
+    )
 
 
 if __name__ == "__main__":

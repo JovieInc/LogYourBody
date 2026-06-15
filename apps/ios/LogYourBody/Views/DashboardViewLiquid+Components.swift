@@ -16,6 +16,7 @@ struct DashboardTimelineScrubber: View {
                     mode: $timelineMode
                 )
                 .frame(height: 80)
+                .accessibilityIdentifier("dashboard_timeline_scrubber")
             }
         }
     }
