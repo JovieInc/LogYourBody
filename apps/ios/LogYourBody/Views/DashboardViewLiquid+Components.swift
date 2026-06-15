@@ -58,6 +58,7 @@ struct DashboardHomeTimelineHero: View {
     let onTapWeight: () -> Void
     let onTapBodyFat: () -> Void
     let onTapFFMI: () -> Void
+    let onShareBodyScore: (() -> Void)?
 
     private var hasUsablePhoto: Bool {
         PhotoTimelineHUDPolicy.hasUsablePhoto(metric)
@@ -106,7 +107,6 @@ struct DashboardHomeTimelineHero: View {
                 timelineDateBar
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
-                    .allowsHitTesting(false)
             }
 
             timelineMetricsHUD
@@ -137,8 +137,24 @@ struct DashboardHomeTimelineHero: View {
                 .padding(.horizontal, 11)
                 .padding(.vertical, 7)
                 .background(Capsule().fill(Color.black.opacity(0.42)))
+                .allowsHitTesting(false)
 
             Spacer(minLength: 0)
+
+            if let onShareBodyScore {
+                Button {
+                    onShareBodyScore()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(Color.black.opacity(0.42)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Share Body Score")
+                .accessibilityIdentifier("body_score_hero_share_button")
+            }
 
             Text(timelinePositionText)
                 .font(.system(size: 12, weight: .semibold))
@@ -147,6 +163,7 @@ struct DashboardHomeTimelineHero: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Capsule().fill(Color.black.opacity(0.34)))
+                .allowsHitTesting(false)
         }
     }
 
@@ -367,7 +384,7 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
             .coordinateSpace(name: "dashboardHomeScroll")
             .scrollBounceBehavior(.basedOnSize)
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                scrollOffset = value
+                updateScrollOffset(value)
             }
             .refreshable {
                 await onRefresh()
@@ -385,10 +402,10 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
                 GeometryReader { geo in
                     Color.clear
                         .onAppear {
-                            headerStackHeight = geo.size.height
+                            updateHeaderStackHeight(geo.size.height)
                         }
                         .onChange(of: geo.size.height) { newValue in
-                            headerStackHeight = newValue
+                            updateHeaderStackHeight(newValue)
                         }
                 }
             )
@@ -408,6 +425,24 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
                 x: 0,
                 y: 10
             )
+        }
+    }
+
+    private func updateScrollOffset(_ value: CGFloat) {
+        guard abs(scrollOffset - value) > 0.5 else { return }
+
+        DispatchQueue.main.async {
+            guard abs(scrollOffset - value) > 0.5 else { return }
+            scrollOffset = value
+        }
+    }
+
+    private func updateHeaderStackHeight(_ value: CGFloat) {
+        guard value > 0, abs(headerStackHeight - value) > 0.5 else { return }
+
+        DispatchQueue.main.async {
+            guard abs(headerStackHeight - value) > 0.5 else { return }
+            headerStackHeight = value
         }
     }
 }

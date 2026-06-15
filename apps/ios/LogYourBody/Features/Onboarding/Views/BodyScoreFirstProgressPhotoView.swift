@@ -29,9 +29,7 @@ struct BodyScoreFirstProgressPhotoView: View {
                 targetMetric: viewModel.onboardingFirstPhotoMetric,
                 fallbackDate: Date(),
                 onComplete: {
-                    await MainActor.run {
-                        viewModel.completeFirstPhotoStep()
-                    }
+                    await viewModel.completeFirstPhotoStep()
                 }
             )
             .environmentObject(authManager)
@@ -88,7 +86,7 @@ struct BodyScoreFirstProgressPhotoView: View {
             Button {
                 presentAttachSheet()
             } label: {
-                if viewModel.isPreparingFirstPhotoMetric {
+                if viewModel.isPreparingFirstPhotoMetric || viewModel.isCompletingOnboarding {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 } else {
@@ -96,22 +94,30 @@ struct BodyScoreFirstProgressPhotoView: View {
                 }
             }
             .buttonStyle(OnboardingPrimaryButtonStyle())
-            .disabled(viewModel.isPreparingFirstPhotoMetric)
+            .disabled(viewModel.isPreparingFirstPhotoMetric || viewModel.isCompletingOnboarding)
             .accessibilityIdentifier("onboarding_first_photo_add_button")
 
             Button {
-                viewModel.completeFirstPhotoStep()
+                Task {
+                    await viewModel.completeFirstPhotoStep()
+                }
             } label: {
-                Text("Continue")
-                    .font(.system(size: 18, weight: .semibold))
+                if viewModel.isCompletingOnboarding {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: Color.appTextSecondary))
+                } else {
+                    Text("Skip for now")
+                }
             }
             .buttonStyle(OnboardingSecondaryButtonStyle())
-            .accessibilityIdentifier("onboarding_first_photo_continue_button")
-
-            OnboardingTextButton(title: "Skip for now") {
-                viewModel.completeFirstPhotoStep()
-            }
+            .disabled(viewModel.isCompletingOnboarding)
             .accessibilityIdentifier("onboarding_first_photo_skip_button")
+
+            Text("You can add progress photos later from Home.")
+                .font(OnboardingTypography.caption)
+                .foregroundStyle(Color.appTextTertiary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
 
             if let errorMessage = viewModel.firstPhotoErrorMessage {
                 Text(errorMessage)

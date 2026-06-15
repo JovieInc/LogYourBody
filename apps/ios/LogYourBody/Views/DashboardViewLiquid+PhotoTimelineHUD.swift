@@ -43,33 +43,112 @@ extension DashboardViewLiquid {
                 authManager: authManager,
                 realtimeSyncManager: realtimeSyncManager
             )
-            refreshGlobalTimelineStore()
-            if !viewModel.bodyMetrics.isEmpty {
-                updateAnimatedValues(for: selectedIndex)
-            }
+            scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
         }
         .accessibilityIdentifier("photo_timeline_hud")
     }
 
     var photoTimelineRoot: some View {
-        TabView(selection: $selectedPhotoTimelineRootPage) {
-            Group {
-                if bodyMetrics.isEmpty {
-                    photoTimelineHUDEmptyState
-                } else {
-                    photoTimelineHUD
+        VStack(spacing: 0) {
+            photoTimelineRootNavigation
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            ZStack {
+                switch selectedPhotoTimelineRootPage {
+                case .timeline:
+                    Group {
+                        if bodyMetrics.isEmpty {
+                            photoTimelineHUDEmptyState
+                        } else {
+                            photoTimelineHUD
+                        }
+                    }
+                    .accessibilityIdentifier("photo_timeline_root_page_timeline")
+                case .analytics:
+                    photoTimelineAnalyticsPage
+                        .accessibilityIdentifier("photo_timeline_root_page_analytics")
                 }
             }
-            .tag(PhotoTimelineRootPage.timeline)
-            .accessibilityIdentifier("photo_timeline_root_page_timeline")
-
-            photoTimelineAnalyticsPage
-                .tag(PhotoTimelineRootPage.analytics)
-                .accessibilityIdentifier("photo_timeline_root_page_analytics")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .highPriorityGesture(photoTimelineRootSwipeGesture)
+            .simultaneousGesture(photoTimelineRootSwipeGesture)
         }
-        .tabViewStyle(.page(indexDisplayMode: .always))
-        .indexViewStyle(.page(backgroundDisplayMode: .interactive))
         .accessibilityIdentifier("photo_timeline_root_pager")
+    }
+
+    private var photoTimelineRootNavigation: some View {
+        HStack(spacing: 22) {
+            photoTimelineRootNavigationButton(page: .timeline)
+
+            photoTimelineRootNavigationButton(page: .analytics)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("photo_timeline_root_nav")
+    }
+
+    private func photoTimelineRootNavigationButton(page: PhotoTimelineRootPage) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.2)) {
+                selectedPhotoTimelineRootPage = page
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Text(page.navigationTitle)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(
+                        selectedPhotoTimelineRootPage == page
+                            ? Color.white
+                            : Color.white.opacity(0.58)
+                    )
+
+                Capsule()
+                    .fill(
+                        selectedPhotoTimelineRootPage == page
+                            ? Color.white
+                            : Color.clear
+                    )
+                    .frame(width: 24, height: 2)
+            }
+            .frame(minHeight: 32, alignment: .bottom)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(page.navigationTitle)
+        .accessibilityAddTraits(selectedPhotoTimelineRootPage == page ? [.isSelected] : [])
+        .accessibilityIdentifier(page.accessibilityIdentifier)
+    }
+
+    private var photoTimelineRootSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+            .onChanged { value in
+                updatePhotoTimelineRootPage(from: value.translation, isFinal: false)
+            }
+            .onEnded { value in
+                updatePhotoTimelineRootPage(from: value.translation, isFinal: true)
+                hasHandledPhotoTimelineRootSwipe = false
+            }
+    }
+
+    private func updatePhotoTimelineRootPage(from translation: CGSize, isFinal: Bool) {
+        let horizontal = translation.width
+        let vertical = translation.height
+        let threshold: CGFloat = isFinal ? 44 : 72
+        guard abs(horizontal) > abs(vertical), abs(horizontal) > threshold else { return }
+        guard isFinal || !hasHandledPhotoTimelineRootSwipe else { return }
+
+        let nextPage: PhotoTimelineRootPage = horizontal < 0 ? .analytics : .timeline
+        guard selectedPhotoTimelineRootPage != nextPage else { return }
+
+        hasHandledPhotoTimelineRootSwipe = true
+        withAnimation(.easeOut(duration: 0.2)) {
+            selectedPhotoTimelineRootPage = nextPage
+        }
     }
 
     var hudTimelineSection: some View {

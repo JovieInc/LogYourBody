@@ -17,8 +17,6 @@ struct DSCircularProgress: View {
     var showPercentage: Bool = false
     var percentageFontSize: CGFloat = 14
 
-    @State private var animatedProgress: Double = 0
-
     private var normalizedProgress: Double {
         min(1.0, max(0.0, progress))
     }
@@ -32,7 +30,7 @@ struct DSCircularProgress: View {
 
             // Progress arc
             Circle()
-                .trim(from: 0, to: animatedProgress)
+                .trim(from: 0, to: normalizedProgress)
                 .stroke(
                     foregroundColor,
                     style: StrokeStyle(
@@ -44,21 +42,15 @@ struct DSCircularProgress: View {
                 .rotationEffect(.degrees(-90))
                 .animation(
                     .spring(response: animationDuration, dampingFraction: 0.8),
-                    value: animatedProgress
+                    value: normalizedProgress
                 )
 
             // Optional percentage display
             if showPercentage {
-                Text("\(Int(animatedProgress * 100))%")
+                Text("\(Int(normalizedProgress * 100))%")
                     .font(.system(size: percentageFontSize, weight: .semibold))
                     .foregroundColor(foregroundColor)
             }
-        }
-        .onAppear {
-            animatedProgress = normalizedProgress
-        }
-        .onChange(of: normalizedProgress) { newValue in
-            animatedProgress = newValue
         }
     }
 }

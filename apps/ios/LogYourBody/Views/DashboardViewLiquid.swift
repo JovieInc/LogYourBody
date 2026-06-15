@@ -77,6 +77,7 @@ struct DashboardViewLiquid: View {
     @State private var selectedTab: DashboardTab = .home
     @State private var isPhotosTabEnabled = true
     @State var selectedPhotoTimelineRootPage: PhotoTimelineRootPage = .timeline
+    @State var hasHandledPhotoTimelineRootSwipe = false
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
     @State private var isStatsDestinationActive = false
@@ -84,7 +85,6 @@ struct DashboardViewLiquid: View {
     @State var progressPhotoAttachTarget: BodyMetrics?
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
-    @State var isBodyScoreSharePresented = false
     @State var bodyScoreSharePayload: BodyScoreSharePayload?
     @State private var hasPerformedInitialRefresh = false
     @State var featureGateRefreshToken = UUID()
@@ -111,6 +111,24 @@ struct DashboardViewLiquid: View {
     enum PhotoTimelineRootPage: Hashable {
         case timeline
         case analytics
+
+        var navigationTitle: String {
+            switch self {
+            case .timeline:
+                "Timeline"
+            case .analytics:
+                "Stats"
+            }
+        }
+
+        var accessibilityIdentifier: String {
+            switch self {
+            case .timeline:
+                "photo_timeline_root_nav_timeline"
+            case .analytics:
+                "photo_timeline_root_nav_stats"
+            }
+        }
     }
 
     enum MetricType {
@@ -143,12 +161,15 @@ struct DashboardViewLiquid: View {
         let base = ZStack {
             dashboardBackground
             dashboardContent
+            bodyScoreShareOverlay
         }
 
         let withLifecycle = base
             .onAppear {
-                // Load saved metrics order from AppStorage
-                handleOnAppear()
+                Task { @MainActor in
+                    await Task.yield()
+                    handleOnAppear()
+                }
             }
             .onDisappear {
                 syncBannerDismissTask?.cancel()
@@ -163,17 +184,16 @@ struct DashboardViewLiquid: View {
                 handleCoreDataContextChange(notification)
             }
             .onReceive(viewModel.$recentDailyMetrics) { _ in
-                rebuildDailyMetricsLookupCache()
-                refreshGlobalTimelineStore()
+                scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
             }
             .onReceive(viewModel.$bodyMetrics) { _ in
-                refreshGlobalTimelineStore()
+                scheduleDashboardDerivedStateRefresh()
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
             }
             .onChange(of: selectedIndex) { _, newIndex in
-                updateAnimatedValues(for: newIndex)
+                scheduleDashboardDerivedStateRefresh(animatedIndex: newIndex)
             }
             .onChange(of: selectedTab) { _, newTab in
                 if newTab == .photos {
@@ -239,17 +259,13 @@ struct DashboardViewLiquid: View {
             )
             .toolbarBackground(Material.ultraThinMaterial, for: ToolbarPlacement.tabBar)
             .toolbarBackground(Visibility.visible, for: ToolbarPlacement.tabBar)
-            .sheet(isPresented: $isBodyScoreSharePresented) {
-                if let payload = bodyScoreSharePayload {
-                    BodyScoreShareSheet(payload: payload)
-                }
-            }
             .onScreenshot {
                 guard selectedTab == .home else { return }
                 guard !isMetricDetailActive else { return }
                 guard let payload = makeBodyScoreSharePayload() else { return }
-                bodyScoreSharePayload = payload
-                isBodyScoreSharePresented = true
+                DispatchQueue.main.async {
+                    bodyScoreSharePayload = payload
+                }
             }
             .onChange(of: showAddEntrySheet) { _, isPresented in
                 guard !isPresented else { return }
@@ -258,6 +274,18 @@ struct DashboardViewLiquid: View {
             }
 
         return withSheetsAndNavigation
+    }
+
+    @ViewBuilder
+    private var bodyScoreShareOverlay: some View {
+        if let payload = bodyScoreSharePayload {
+            BodyScoreShareSheet(payload: payload) {
+                bodyScoreSharePayload = nil
+            }
+            .ignoresSafeArea()
+            .zIndex(20)
+            .transition(.opacity)
+        }
     }
 
     private var homeTab: some View {
@@ -285,9 +313,7 @@ struct DashboardViewLiquid: View {
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
+                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
             }
         )
     }
@@ -303,10 +329,7 @@ struct DashboardViewLiquid: View {
                     loadOnlyNewest: true,
                     selectedIndex: selectedIndex
                 )
-                refreshGlobalTimelineStore()
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
+                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
             }
         }
 
@@ -318,10 +341,7 @@ struct DashboardViewLiquid: View {
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
-                refreshGlobalTimelineStore()
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
+                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
             }
         }
 
@@ -363,9 +383,25 @@ struct DashboardViewLiquid: View {
                 loadOnlyNewest: true,
                 selectedIndex: selectedIndex
             )
+            scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
+        }
+    }
+
+    func scheduleDashboardDerivedStateRefresh(
+        rebuildDailyMetricsLookup: Bool = false,
+        animatedIndex: Int? = nil
+    ) {
+        Task { @MainActor in
+            await Task.yield()
+
+            if rebuildDailyMetricsLookup {
+                rebuildDailyMetricsLookupCache()
+            }
+
             refreshGlobalTimelineStore()
-            if !viewModel.bodyMetrics.isEmpty {
-                updateAnimatedValues(for: selectedIndex)
+
+            if let animatedIndex, !viewModel.bodyMetrics.isEmpty {
+                updateAnimatedValues(for: animatedIndex)
             }
         }
     }
@@ -427,9 +463,7 @@ struct DashboardViewLiquid: View {
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
+                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
             }
         )
     }

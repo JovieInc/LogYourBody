@@ -152,6 +152,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     @Published private(set) var accountCreationStage: AccountCreationStage = .idle
     @Published private(set) var onboardingFirstPhotoMetric: BodyMetrics?
     @Published private(set) var isPreparingFirstPhotoMetric = false
+    @Published private(set) var isCompletingOnboarding = false
     @Published var firstPhotoErrorMessage: String?
     @Published var profileFirstName: String = "" {
         didSet { persistProgress() }
@@ -235,6 +236,8 @@ final class OnboardingFlowViewModel: ObservableObject {
         if entryContext == .authenticated {
             restorePersistedProgressIfNeeded()
         }
+
+        applyFirstPhotoUITestFixtureIfNeeded()
     }
 
     func goToNextStep() {
@@ -282,11 +285,16 @@ final class OnboardingFlowViewModel: ObservableObject {
             if includesFirstPhotoStep {
                 currentStep = .firstPhoto
             } else {
-                completeOnboardingIfNeeded()
-                currentStep = .paywall
+                Task {
+                    await finishOnboardingAndShowPaywall(from: previousStep)
+                }
+                return
             }
         case .firstPhoto:
-            completeFirstPhotoStep()
+            Task {
+                await finishOnboardingAndShowPaywall(from: previousStep)
+            }
+            return
         case .paywall:
             break
         }
@@ -862,16 +870,53 @@ final class OnboardingFlowViewModel: ObservableObject {
         updateSex(sex)
     }
 
-    func completeOnboardingIfNeeded() {
+    private func applyFirstPhotoUITestFixtureIfNeeded() {
+        guard entryContext == .authenticated else { return }
+        guard ProcessInfo.processInfo.arguments.contains("-lybUITestBodyScoreFirstPhotoFixture") else { return }
+
+        isRestoringProgress = true
+        bodyScoreInput = BodyScoreInput(
+            sex: .male,
+            birthYear: 1_990,
+            height: HeightValue(value: 178, unit: .centimeters),
+            weight: WeightValue(value: 185, unit: .pounds),
+            bodyFat: BodyFatValue(percentage: 18, source: .manualValue)
+        )
+        bodyScoreResult = BodyScoreResult(
+            score: 82,
+            ffmi: 21.4,
+            leanPercentile: 0.72,
+            ffmiStatus: "Strong",
+            targetBodyFat: .init(lowerBound: 10, upperBound: 15, label: "Athletic"),
+            statusTagline: "Strong base"
+        )
+        defaultHomeMode = .photo
+        profileFirstName = "Onboarding"
+        profileLastName = "UI"
+        profileDateOfBirth = Calendar.current.date(from: DateComponents(year: 1_990, month: 1, day: 1))
+            ?? defaultProfileDateOfBirth()
+        profileBiologicalSex = .male
+        profileHeightUnit = .centimeters
+        profileHeightCentimetersText = "178"
+        profileShouldAskSex = false
+        hasHydratedProfileDetailsDraft = true
+        currentStep = .firstPhoto
+        isRestoringProgress = false
+        persistProgress()
+    }
+
+    func completeOnboardingIfNeeded() async {
         guard entryContext == .authenticated else { return }
         guard !hasMarkedOnboardingComplete else { return }
         hasMarkedOnboardingComplete = true
+        isCompletingOnboarding = true
+        defer { isCompletingOnboarding = false }
+
+        let updates = buildOnboardingProfileUpdates()
+        await AuthManager.shared.updateProfile(updates)
+        applyCompletedOnboardingLocally(with: updates)
         OnboardingStateManager.shared.markCompleted()
         UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)
-        let updates = buildOnboardingProfileUpdates()
-        Task {
-            await AuthManager.shared.updateProfile(updates)
-        }
         clearPersistedProgress()
         PreAuthOnboardingStore.shared.clear()
 
@@ -880,9 +925,42 @@ final class OnboardingFlowViewModel: ObservableObject {
         }
     }
 
-    func completeFirstPhotoStep() {
-        completeOnboardingIfNeeded()
+    func completeFirstPhotoStep() async {
+        await finishOnboardingAndShowPaywall(from: currentStep)
+    }
+
+    func finishOnboardingAndShowPaywall() async {
+        await finishOnboardingAndShowPaywall(from: currentStep)
+    }
+
+    private func finishOnboardingAndShowPaywall(from previousStep: Step) async {
+        await completeOnboardingIfNeeded()
         currentStep = .paywall
+        trackStepTransition(from: previousStep, to: currentStep)
+    }
+
+    private func applyCompletedOnboardingLocally(with updates: [String: Any]) {
+        guard var currentUser = AuthManager.shared.currentUser else { return }
+
+        let existingProfile = currentUser.profile
+        let updatedProfile = UserProfile(
+            id: existingProfile?.id ?? currentUser.id,
+            email: existingProfile?.email ?? currentUser.email,
+            username: existingProfile?.username,
+            fullName: existingProfile?.fullName ?? currentUser.name,
+            dateOfBirth: updates["dateOfBirth"] as? Date ?? existingProfile?.dateOfBirth,
+            height: updates["height"] as? Double ?? existingProfile?.height,
+            heightUnit: updates["heightUnit"] as? String ?? existingProfile?.heightUnit,
+            gender: updates["gender"] as? String ?? existingProfile?.gender,
+            activityLevel: existingProfile?.activityLevel,
+            goalWeight: existingProfile?.goalWeight,
+            goalWeightUnit: existingProfile?.goalWeightUnit,
+            onboardingCompleted: true
+        )
+
+        currentUser.profile = updatedProfile
+        currentUser.onboardingCompleted = true
+        AuthManager.shared.currentUser = currentUser
     }
 
     func prepareFirstPhotoBaselineMetric() async -> BodyMetrics? {
