@@ -16,9 +16,14 @@ struct BodyScoreSharePayload: Identifiable {
     let deltaText: String?
     let bodyFatPercentage: Double?
     let gender: String?
+    let photoImage: UIImage?
 
     var avatarMatch: AvatarBodyFatCatalog.Match {
         AvatarBodyFatCatalog.match(bodyFatPercentage: bodyFatPercentage, gender: gender)
+    }
+
+    var visualBadgeText: String {
+        photoImage == nil ? avatarMatch.badgeText : "Progress photo"
     }
 }
 
@@ -63,7 +68,7 @@ struct BodyScoreShareCardView: View {
             ZStack {
                 Color.black
 
-                avatarStage(layout: layout)
+                visualStage(layout: layout)
                     .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
 
                 LinearGradient(
@@ -100,22 +105,33 @@ struct BodyScoreShareCardView: View {
         return size.width / size.height
     }
 
-    private func avatarStage(layout: ShareCardLayout) -> some View {
+    private func visualStage(layout: ShareCardLayout) -> some View {
         VStack(spacing: 0) {
             Spacer(minLength: layout.visualTopOffset)
 
-            AvatarBodyRenderer(
-                bodyFatPercentage: payload.bodyFatPercentage,
-                gender: payload.gender,
-                height: layout.visualHeight,
-                padding: 0,
-                verticalPadding: 0,
-                horizontalFillScale: 1.04,
-                alignment: .bottom,
-                renderMode: .fillWidth
-            )
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("body_score_share_avatar_visual")
+            if let photoImage = payload.photoImage {
+                Image(uiImage: photoImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: layout.visualHeight, alignment: .center)
+                    .clipped()
+                    .accessibilityLabel("Progress photo")
+                    .accessibilityIdentifier("body_score_share_photo_visual")
+            } else {
+                AvatarBodyRenderer(
+                    bodyFatPercentage: payload.bodyFatPercentage,
+                    gender: payload.gender,
+                    height: layout.visualHeight,
+                    padding: 0,
+                    verticalPadding: 0,
+                    horizontalFillScale: 1.04,
+                    alignment: .bottom,
+                    renderMode: .fillWidth
+                )
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("body_score_share_avatar_visual")
+            }
 
             Spacer(minLength: 0)
         }
@@ -132,7 +148,7 @@ struct BodyScoreShareCardView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
 
-                Text(payload.avatarMatch.badgeText)
+                Text(payload.visualBadgeText)
                     .font(.system(size: layout.badgeFontSize, weight: .medium))
                     .foregroundColor(Color.white.opacity(0.62))
                     .lineLimit(1)

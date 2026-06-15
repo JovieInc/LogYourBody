@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension DashboardViewLiquid {
     // MARK: - Hero Card
@@ -561,8 +562,19 @@ extension DashboardViewLiquid {
             weightCaption: weightCaption,
             deltaText: deltaText,
             bodyFatPercentage: selectedMetric?.bodyFatPercentage ?? currentMetric?.bodyFatPercentage,
-            gender: authManager.currentUser?.profile?.gender
+            gender: authManager.currentUser?.profile?.gender,
+            photoImage: sharePhotoImage(for: selectedMetric)
         )
+    }
+
+    private func sharePhotoImage(for metric: BodyMetrics?) -> UIImage? {
+        guard selectedDefaultHomeMode == .photo,
+              let photoUrl = metric?.photoUrl,
+              !photoUrl.isEmpty else {
+            return nil
+        }
+
+        return OptimizedProgressPhotoView.cachedImage(for: photoUrl)
     }
 
     // MARK: - Visual Divider

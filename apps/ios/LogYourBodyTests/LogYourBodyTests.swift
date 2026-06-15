@@ -542,6 +542,19 @@ final class BodyScoreShareCardTests: XCTestCase {
 
         XCTAssertEqual(payload.avatarMatch.assetName, "avatar_male_15")
         XCTAssertEqual(payload.avatarMatch.badgeText, "Male 15% body fat")
+        XCTAssertEqual(payload.visualBadgeText, "Male 15% body fat")
+        XCTAssertNil(payload.photoImage)
+    }
+
+    func testPhotoBackedSharePayloadUsesProgressPhotoBadge() {
+        let payload = makePayload(
+            bodyFatPercentage: 16.4,
+            gender: "male",
+            photoImage: makeShareTestImage()
+        )
+
+        XCTAssertEqual(payload.visualBadgeText, "Progress photo")
+        XCTAssertNotNil(payload.photoImage)
     }
 
     func testShareCardRendersRequestedExportSize() throws {
@@ -582,9 +595,34 @@ final class BodyScoreShareCardTests: XCTestCase {
         }
     }
 
+    func testPhotoBackedShareCardRendersEveryLaunchExportAspect() throws {
+        for aspect in BodyScoreShareAspect.allCases {
+            let size = aspect.pixelSize
+            let renderer = ImageRenderer(
+                content: BodyScoreShareCardView(
+                    payload: makePayload(
+                        bodyFatPercentage: 18.6,
+                        gender: "male",
+                        photoImage: makeShareTestImage()
+                    ),
+                    aspect: aspect
+                )
+                .frame(width: size.width, height: size.height)
+                .environment(\.colorScheme, .dark)
+            )
+            renderer.scale = 1.0
+
+            let image = try XCTUnwrap(renderer.uiImage, "Missing rendered photo image for \(aspect.rawValue)")
+
+            XCTAssertEqual(image.size.width, size.width, accuracy: 0.5)
+            XCTAssertEqual(image.size.height, size.height, accuracy: 0.5)
+        }
+    }
+
     private func makePayload(
         bodyFatPercentage: Double?,
-        gender: String?
+        gender: String?,
+        photoImage: UIImage? = nil
     ) -> BodyScoreSharePayload {
         BodyScoreSharePayload(
             score: 82,
@@ -598,8 +636,26 @@ final class BodyScoreShareCardTests: XCTestCase {
             weightCaption: "lb",
             deltaText: "+4 over 30 days",
             bodyFatPercentage: bodyFatPercentage,
-            gender: gender
+            gender: gender,
+            photoImage: photoImage
         )
+    }
+
+    private func makeShareTestImage() -> UIImage {
+        let size = CGSize(width: 480, height: 640)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { context in
+            // swiftlint:disable:next object_literal
+            UIColor(red: 0.05, green: 0.11, blue: 0.18, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+
+            // swiftlint:disable:next object_literal
+            UIColor(red: 0.12, green: 0.55, blue: 1.0, alpha: 1).setFill()
+            context.fill(CGRect(x: 110, y: 80, width: 260, height: 460))
+
+            UIColor.white.withAlphaComponent(0.82).setFill()
+            context.fill(CGRect(x: 170, y: 120, width: 140, height: 320))
+        }
     }
 }
 

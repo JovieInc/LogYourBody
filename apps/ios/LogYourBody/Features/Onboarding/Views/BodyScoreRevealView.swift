@@ -179,7 +179,8 @@ struct BodyScoreRevealView: View {
             weightCaption: weightUnit,
             deltaText: nil,
             bodyFatPercentage: input.bodyFat.percentage,
-            gender: input.sex?.rawValue
+            gender: input.sex?.rawValue,
+            photoImage: nil
         )
     }
 
