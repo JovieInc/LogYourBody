@@ -196,6 +196,12 @@ enum ProgressPhotoImagePipeline {
 
 // Extension to preload images for smooth scrolling
 extension OptimizedProgressPhotoView {
+    @MainActor
+    static func cachedImage(for urlString: String?) -> UIImage? {
+        guard let urlString, !urlString.isEmpty else { return nil }
+        return imageCache.object(forKey: NSString(string: urlString))
+    }
+
     static func preloadImages(urls: [String]) {
         for urlString in urls {
             let cacheKey = NSString(string: urlString)
