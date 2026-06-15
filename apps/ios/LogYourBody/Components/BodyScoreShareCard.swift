@@ -101,34 +101,35 @@ struct BodyScoreShareCardView: View {
     }
 
     private func visualStage(layout: ShareCardLayout) -> some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: layout.visualTopOffset)
-
+        Group {
             if let photoImage = payload.photoImage {
                 Image(uiImage: photoImage)
                     .resizable()
                     .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: layout.visualHeight, alignment: .center)
+                    .frame(width: layout.size.width, height: layout.size.height, alignment: .center)
                     .clipped()
                     .accessibilityLabel("Progress photo")
                     .accessibilityIdentifier("body_score_share_photo_visual")
             } else {
-                AvatarBodyRenderer(
-                    bodyFatPercentage: payload.bodyFatPercentage,
-                    gender: payload.gender,
-                    height: layout.visualHeight,
-                    padding: 0,
-                    verticalPadding: 0,
-                    horizontalFillScale: 1.04,
-                    alignment: .bottom,
-                    renderMode: .fillWidth
-                )
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("body_score_share_avatar_visual")
-            }
+                VStack(spacing: 0) {
+                    Spacer(minLength: layout.visualTopOffset)
 
-            Spacer(minLength: 0)
+                    AvatarBodyRenderer(
+                        bodyFatPercentage: payload.bodyFatPercentage,
+                        gender: payload.gender,
+                        height: layout.visualHeight,
+                        padding: 0,
+                        verticalPadding: 0,
+                        horizontalFillScale: 1.04,
+                        alignment: .bottom,
+                        renderMode: .fillWidth
+                    )
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("body_score_share_avatar_visual")
+
+                    Spacer(minLength: 0)
+                }
+            }
         }
     }
 
@@ -143,6 +144,7 @@ struct BodyScoreShareCardView: View {
                     .lineLimit(1)
                     .allowsTightening(true)
                     .minimumScaleFactor(0.78)
+                    .accessibilityIdentifier("body_score_share_brand")
 
                 Text(payload.visualBadgeText)
                     .font(.system(size: layout.badgeFontSize, weight: .medium))
@@ -150,6 +152,7 @@ struct BodyScoreShareCardView: View {
                     .lineLimit(1)
                     .allowsTightening(true)
                     .minimumScaleFactor(0.72)
+                    .accessibilityIdentifier("body_score_share_badge")
             }
 
             Spacer(minLength: 0)
@@ -166,6 +169,7 @@ struct BodyScoreShareCardView: View {
                     .lineLimit(1)
                     .allowsTightening(true)
                     .minimumScaleFactor(0.58)
+                    .accessibilityIdentifier("body_score_share_score")
 
                 VStack(alignment: .leading, spacing: layout.scoreLabelSpacing) {
                     Text("Body Score")
@@ -182,6 +186,7 @@ struct BodyScoreShareCardView: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("body_score_share_tagline")
 
                     if let deltaText = payload.deltaText {
                         Text(deltaText)
@@ -190,6 +195,7 @@ struct BodyScoreShareCardView: View {
                             .lineLimit(1)
                             .allowsTightening(true)
                             .minimumScaleFactor(0.72)
+                            .accessibilityIdentifier("body_score_share_delta")
                     }
                 }
 
@@ -198,18 +204,26 @@ struct BodyScoreShareCardView: View {
 
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: layout.metricSpacing) {
-                    shareMetric("Weight", payload.weightValue, payload.weightCaption, layout: layout)
-                    shareMetric("Body Fat", payload.bodyFatValue, payload.bodyFatCaption, layout: layout)
-                    shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, layout: layout)
+                    shareMetric("Weight", payload.weightValue, payload.weightCaption, identifier: "weight", layout: layout)
+                    shareMetric("Body Fat", payload.bodyFatValue, payload.bodyFatCaption, identifier: "body_fat", layout: layout)
+                    shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, identifier: "ffmi", layout: layout)
                 }
+                .accessibilityIdentifier("body_score_share_metrics")
 
                 VStack(spacing: layout.metricSpacing * 0.55) {
                     HStack(spacing: layout.metricSpacing) {
-                        shareMetric("Weight", payload.weightValue, payload.weightCaption, layout: layout)
-                        shareMetric("Body Fat", payload.bodyFatValue, payload.bodyFatCaption, layout: layout)
+                        shareMetric("Weight", payload.weightValue, payload.weightCaption, identifier: "weight", layout: layout)
+                        shareMetric(
+                            "Body Fat",
+                            payload.bodyFatValue,
+                            payload.bodyFatCaption,
+                            identifier: "body_fat",
+                            layout: layout
+                        )
                     }
-                    shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, layout: layout)
+                    shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, identifier: "ffmi", layout: layout)
                 }
+                .accessibilityIdentifier("body_score_share_metrics_stacked")
             }
 
             Text("Shared from LogYourBody")
@@ -218,8 +232,10 @@ struct BodyScoreShareCardView: View {
                 .lineLimit(1)
                 .allowsTightening(true)
                 .minimumScaleFactor(0.74)
+                .accessibilityIdentifier("body_score_share_footer")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("body_score_share_summary")
     }
 
     private func shareScrims(layout: ShareCardLayout) -> some View {
@@ -254,6 +270,7 @@ struct BodyScoreShareCardView: View {
         _ title: String,
         _ value: String,
         _ caption: String,
+        identifier: String,
         layout: ShareCardLayout
     ) -> some View {
         VStack(alignment: .leading, spacing: layout.metricTextSpacing) {
@@ -280,6 +297,8 @@ struct BodyScoreShareCardView: View {
                 .minimumScaleFactor(0.68)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("body_score_share_metric_\(identifier)")
     }
 }
 
@@ -340,14 +359,31 @@ struct ShareCardLayout {
     }
 
     var visualHeight: CGFloat {
+        let baseHeight: CGFloat
         switch aspect {
         case .square:
-            return size.height * 0.60
+            baseHeight = size.height * 0.60
         case .portrait:
-            return size.height * 0.66
+            baseHeight = size.height * 0.66
         case .story:
-            return size.height * 0.62
+            baseHeight = size.height * 0.62
         }
+
+        let maximumBottom = summaryTopY - textVisualGap
+        return max(0, min(baseHeight, maximumBottom - visualTopOffset))
+    }
+
+    var textVisualGap: CGFloat { max(10 * scale, size.height * 0.018) }
+
+    var estimatedSummaryContentHeight: CGFloat {
+        let scoreLabelStack = scoreLabelFontSize + taglineFontSize * 2.2 + deltaFontSize + scoreLabelSpacing * 3
+        let scoreRow = max(scoreFontSize * 1.02, scoreLabelStack)
+        let metricRow = metricTitleFontSize + metricValueFontSize + metricCaptionFontSize + metricTextSpacing * 2
+        return scoreRow + summarySpacing + metricRow + summarySpacing + footerFontSize
+    }
+
+    var summaryTopY: CGFloat {
+        max(headerMatteHeight + textVisualGap, size.height - bottomPadding - estimatedSummaryContentHeight)
     }
 
     var headerMatteHeight: CGFloat {
@@ -413,11 +449,17 @@ struct BodyScoreShareSheet: View {
             .padding(.horizontal, 20)
 
             GeometryReader { geometry in
-                let size = fittedSize(for: geometry.size, target: selectedAspect.pixelSize)
+                let verticalInset = previewVerticalInset
+                let availableSize = CGSize(
+                    width: geometry.size.width,
+                    height: max(0, geometry.size.height - verticalInset * 2)
+                )
+                let size = fittedSize(for: availableSize, target: selectedAspect.pixelSize)
 
                 BodyScoreShareCardView(payload: payload, aspect: selectedAspect)
                     .frame(width: size.width, height: size.height)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(.vertical, verticalInset)
             }
             .frame(maxWidth: .infinity)
 
@@ -488,6 +530,8 @@ struct BodyScoreShareSheet: View {
         }
         .padding(.horizontal, 20)
     }
+
+    private var previewVerticalInset: CGFloat { 8 }
 
     private func fittedSize(for container: CGSize, target: CGSize) -> CGSize {
         guard container.width > 0, container.height > 0 else {

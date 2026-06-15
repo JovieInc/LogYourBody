@@ -582,6 +582,25 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertLessThan(layout.visualTopOffset + layout.visualHeight, layout.size.height * 0.72)
     }
 
+    func testShareCardLayoutKeepsAvatarVisualClearOfSummaryText() {
+        let previewSizes: [(BodyScoreShareAspect, CGSize)] = [
+            (.square, CGSize(width: 320, height: 320)),
+            (.portrait, CGSize(width: 320, height: 400)),
+            (.story, CGSize(width: 260, height: 462))
+        ]
+
+        for (aspect, size) in previewSizes {
+            let layout = ShareCardLayout(size: size, aspect: aspect)
+            let avatarBottom = layout.visualTopOffset + layout.visualHeight
+
+            XCTAssertLessThanOrEqual(
+                avatarBottom + layout.textVisualGap,
+                layout.summaryTopY + 0.5,
+                "Avatar visual overlaps text budget for \(aspect.rawValue)"
+            )
+        }
+    }
+
     func testSharePayloadUsesSameNearestAvatarBucketAsHomeHero() {
         let payload = makePayload(bodyFatPercentage: 16.4, gender: "male")
 
@@ -915,6 +934,26 @@ final class ProgressPhotoImagePipelineTests: XCTestCase {
         }
 
         XCTAssertEqual(ProgressPhotoImagePipeline.cacheCost(for: image), 20_000)
+    }
+
+    func testResolvedImageLoadsAndCachesLocalPhotoForShareExport() async throws {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 120, height: 180)).image { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 120, height: 180))
+        }
+        let data = try XCTUnwrap(image.pngData())
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("lyb-share-cache-\(UUID().uuidString).png")
+        try data.write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let first = await OptimizedProgressPhotoView.resolvedImage(for: url.absoluteString)
+        let second = await OptimizedProgressPhotoView.resolvedImage(for: url.absoluteString)
+
+        XCTAssertNotNil(first)
+        XCTAssertNotNil(second)
+        XCTAssertEqual(first?.size.width, second?.size.width)
+        XCTAssertEqual(first?.size.height, second?.size.height)
     }
 }
 

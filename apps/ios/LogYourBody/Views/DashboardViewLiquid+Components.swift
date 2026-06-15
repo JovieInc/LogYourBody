@@ -369,9 +369,9 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
                     metricContent()
 
                     quickActions()
-                    Spacer(minLength: 160)
                 }
                 .padding(.top, headerHeight + 16)
+                .padding(.bottom, 28)
                 .background(
                     GeometryReader { geo in
                         Color.clear
@@ -464,10 +464,9 @@ struct DashboardPhotosTab<Header: View, SyncBanner: View, PhotosContent: View>: 
                     .padding(.horizontal, 20)
 
                 photosContent()
-
-                Spacer(minLength: 160)
             }
             .padding(.top, 8)
+            .padding(.bottom, 28)
         }
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
@@ -497,10 +496,9 @@ struct DashboardMetricsTab<Header: View, SyncBanner: View, TitleBlock: View, Met
                     titleBlock()
 
                     metricsContent()
-
-                    Spacer(minLength: 160)
                 }
                 .padding(.top, 16)
+                .padding(.bottom, 28)
             }
             .scrollBounceBehavior(.basedOnSize)
             .refreshable {

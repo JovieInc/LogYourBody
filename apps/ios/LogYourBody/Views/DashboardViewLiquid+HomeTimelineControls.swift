@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 extension DashboardViewLiquid {
     var selectedDefaultHomeMode: DefaultHomeMode {
@@ -109,9 +110,28 @@ extension DashboardViewLiquid {
         if let score, score <= 0 { return nil }
 
         return {
-            if let payload = makeBodyScoreSharePayload(metric: metric) {
-                bodyScoreSharePayload = payload
+            Task { @MainActor in
+                if let payload = await makeBodyScoreSharePayloadResolvingPhoto(metric: metric) {
+                    bodyScoreSharePayload = payload
+                }
             }
         }
+    }
+
+    @MainActor
+    func makeBodyScoreSharePayloadResolvingPhoto(metric: BodyMetrics? = nil) async -> BodyScoreSharePayload? {
+        let selectedMetric = metric ?? currentMetric
+        let photoImage = await sharePhotoImageResolvingCache(for: selectedMetric)
+        return makeBodyScoreSharePayload(metric: selectedMetric, photoImageOverride: photoImage)
+    }
+
+    private func sharePhotoImageResolvingCache(for metric: BodyMetrics?) async -> UIImage? {
+        guard selectedDefaultHomeMode == .photo,
+              let photoUrl = metric?.photoUrl,
+              !photoUrl.isEmpty else {
+            return nil
+        }
+
+        return await OptimizedProgressPhotoView.resolvedImage(for: photoUrl)
     }
 }

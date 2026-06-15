@@ -5,27 +5,30 @@
 import SwiftUI
 
 struct PreferenceMeasurementSystemRow: View {
+    @Environment(\.theme)
+    private var theme
+
     @Binding var measurementSystem: String
     let currentSystem: MeasurementSystem
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: theme.spacing.sm) {
             Image(systemName: "globe")
-                .font(.system(size: SettingsDesign.iconSize))
-                .foregroundColor(.appText)
-                .frame(width: SettingsDesign.iconFrame)
+                .font(theme.typography.headlineSmall)
+                .foregroundColor(theme.colors.text)
+                .frame(width: 24)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                 Text("Units")
-                    .font(SettingsDesign.titleFont)
-                    .foregroundColor(.appText)
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(theme.colors.text)
 
                 Text(currentSystem == .metric ? "Metric (kg, cm)" : "Imperial (lbs, ft)")
-                    .font(.caption)
-                    .foregroundColor(.appTextSecondary)
+                    .font(theme.typography.captionLarge)
+                    .foregroundColor(theme.colors.textSecondary)
             }
 
-            Spacer(minLength: 12)
+            Spacer(minLength: theme.spacing.sm)
 
             Picker("Units", selection: $measurementSystem) {
                 Text("Metric").tag(MeasurementSystem.metric.rawValue)
@@ -34,43 +37,49 @@ struct PreferenceMeasurementSystemRow: View {
             .pickerStyle(.segmented)
             .frame(maxWidth: 210)
         }
-        .padding(.horizontal, SettingsDesign.horizontalPadding)
-        .padding(.vertical, SettingsDesign.verticalPadding)
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("settings_units_row")
     }
 }
 
 struct PreferenceStepGoalRow: View {
+    @Environment(\.theme)
+    private var theme
+
     @Binding var stepGoal: Int
     let formattedValue: String
 
     var body: some View {
         Stepper(value: $stepGoal, in: 0...100_000, step: 1_000) {
-            HStack(spacing: 12) {
+            HStack(spacing: theme.spacing.sm) {
                 Image(systemName: "figure.walk")
-                    .font(.system(size: SettingsDesign.iconSize))
-                    .foregroundColor(.appText)
-                    .frame(width: SettingsDesign.iconFrame)
+                    .font(theme.typography.headlineSmall)
+                    .foregroundColor(theme.colors.text)
+                    .frame(width: 24)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                     Text("Daily step goal")
-                        .font(SettingsDesign.titleFont)
-                        .foregroundColor(.appText)
+                        .font(theme.typography.labelLarge)
+                        .foregroundColor(theme.colors.text)
 
                     Text(formattedValue)
-                        .font(.caption)
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.captionLarge)
+                        .foregroundColor(theme.colors.textSecondary)
                 }
             }
         }
-        .padding(.horizontal, SettingsDesign.horizontalPadding)
-        .padding(.vertical, SettingsDesign.verticalPadding)
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
         .accessibilityIdentifier("settings_step_goal_row")
     }
 }
 
 struct PreferenceGoalRow: View {
+    @Environment(\.theme)
+    private var theme
+
     let goal: PreferenceGoalKind
     let valueText: String
     let isCustom: Bool
@@ -78,29 +87,29 @@ struct PreferenceGoalRow: View {
     let reset: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: theme.spacing.sm) {
             Button(action: edit) {
-                HStack(spacing: 12) {
+                HStack(spacing: theme.spacing.sm) {
                     Image(systemName: goal.icon)
-                        .font(.system(size: SettingsDesign.iconSize))
-                        .foregroundColor(.appTextSecondary)
-                        .frame(width: SettingsDesign.iconFrame)
+                        .font(theme.typography.headlineSmall)
+                        .foregroundColor(theme.colors.textSecondary)
+                        .frame(width: 24)
 
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                         Text(goal.title)
-                            .font(SettingsDesign.titleFont)
-                            .foregroundColor(.appText)
+                            .font(theme.typography.labelLarge)
+                            .foregroundColor(theme.colors.text)
 
                         Text(valueText)
-                            .font(.caption)
-                            .foregroundColor(.appTextSecondary)
+                            .font(theme.typography.captionLarge)
+                            .foregroundColor(theme.colors.textSecondary)
                     }
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundColor(.appTextSecondary.opacity(0.5))
+                        .foregroundColor(theme.colors.textTertiary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -111,8 +120,8 @@ struct PreferenceGoalRow: View {
             if isCustom {
                 Button(action: reset) {
                     Image(systemName: "arrow.counterclockwise.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.appTextSecondary.opacity(0.7))
+                        .font(theme.typography.headlineSmall)
+                        .foregroundColor(theme.colors.textSecondary)
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
@@ -120,7 +129,7 @@ struct PreferenceGoalRow: View {
                 .accessibilityIdentifier("settings_\(goal.rawValue)_goal_reset_button")
             }
         }
-        .padding(.horizontal, SettingsDesign.horizontalPadding)
-        .padding(.vertical, SettingsDesign.verticalPadding)
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
     }
 }

@@ -7,6 +7,8 @@ import UIKit
 
 struct IntegrationsView: View {
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.theme)
+    private var theme
     @StateObject private var healthKitManager = HealthKitManager.shared
     @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
     @State private var showHealthKitConnect = false
@@ -19,19 +21,20 @@ struct IntegrationsView: View {
     var dismiss
     var body: some View {
         ZStack {
-            Color.appBackground
+            theme.colors.background
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: theme.spacing.sectionSpacing) {
                     healthAndFitnessSection
                     photoImportSection
                     dataExportSection
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
+                .padding(.horizontal, theme.spacing.screenPadding)
+                .padding(.top, theme.spacing.md)
                 .padding(.bottom, 40)
             }
+            .scrollBounceBehavior(.basedOnSize)
         }
         .navigationTitle("Integrations")
         .navigationBarTitleDisplayMode(.inline)
@@ -70,19 +73,20 @@ struct IntegrationsView: View {
                 if healthKitManager.isHealthKitAvailable {
                     HStack {
                         Image(systemName: "heart.fill")
-                            .foregroundColor(.red)
-                            .font(.system(size: SettingsDesign.iconSize))
-                            .frame(width: SettingsDesign.iconFrame)
+                            .foregroundColor(theme.colors.error)
+                            .font(theme.typography.headlineSmall)
+                            .frame(width: 24)
 
                         Text("Apple Health")
-                            .font(SettingsDesign.titleFont)
+                            .font(theme.typography.labelLarge)
+                            .foregroundColor(theme.colors.text)
 
                         Spacer()
 
                         if healthKitManager.isAuthorized {
                             Label("Connected", systemImage: "checkmark.circle.fill")
-                                .font(SettingsDesign.valueFont)
-                                .foregroundColor(.green)
+                                .font(theme.typography.captionLarge)
+                                .foregroundColor(theme.colors.success)
                                 .labelStyle(.titleAndIcon)
                         } else {
                             Button("Connect") {
@@ -96,12 +100,12 @@ struct IntegrationsView: View {
                                     }
                                 }
                             }
-                            .font(SettingsDesign.valueFont)
-                            .foregroundColor(.appPrimary)
+                            .font(theme.typography.captionLarge)
+                            .foregroundColor(theme.colors.primary)
                         }
                     }
-                    .padding(.horizontal, SettingsDesign.horizontalPadding)
-                    .padding(.vertical, SettingsDesign.verticalPadding)
+                    .padding(.horizontal, theme.spacing.md)
+                    .padding(.vertical, theme.spacing.sm)
 
                     if healthKitManager.isAuthorized {
                         Divider()
@@ -148,7 +152,7 @@ struct IntegrationsView: View {
                         icon: "exclamationmark.triangle",
                         title: "Apple Health Not Available",
                         description: "Apple Health is not available on this device",
-                        iconColor: .orange
+                        iconColor: theme.colors.warning
                     )
                 }
 
@@ -161,32 +165,33 @@ struct IntegrationsView: View {
                     ) {
                         HStack {
                             Image(systemName: "waveform.path.ecg")
-                                .foregroundColor(.blue)
-                                .font(.system(size: SettingsDesign.iconSize))
-                                .frame(width: SettingsDesign.iconFrame)
+                                .foregroundColor(theme.colors.info)
+                                .font(theme.typography.headlineSmall)
+                                .frame(width: 24)
 
                             Text("BodySpec")
-                                .font(SettingsDesign.titleFont)
+                                .font(theme.typography.labelLarge)
+                                .foregroundColor(theme.colors.text)
 
                             Spacer()
 
                             if isLoadingBodySpecLastSynced {
                                 Text("Checking…")
-                                    .font(SettingsDesign.valueFont)
-                                    .foregroundColor(.appTextSecondary)
+                                    .font(theme.typography.captionLarge)
+                                    .foregroundColor(theme.colors.textSecondary)
                             } else if let bodySpecLastSyncedText {
                                 Text(bodySpecLastSyncedText)
-                                    .font(SettingsDesign.valueFont)
-                                    .foregroundColor(.appTextSecondary)
+                                    .font(theme.typography.captionLarge)
+                                    .foregroundColor(theme.colors.textSecondary)
                             } else {
                                 Text("Not synced yet")
-                                    .font(SettingsDesign.valueFont)
-                                    .foregroundColor(.appTextSecondary)
+                                    .font(theme.typography.captionLarge)
+                                    .foregroundColor(theme.colors.textSecondary)
                             }
                         }
                     }
-                    .padding(.horizontal, SettingsDesign.horizontalPadding)
-                    .padding(.vertical, SettingsDesign.verticalPadding)
+                    .padding(.horizontal, theme.spacing.md)
+                    .padding(.vertical, theme.spacing.sm)
                 }
             }
         }
@@ -215,7 +220,7 @@ struct IntegrationsView: View {
                     icon: "photo.stack",
                     title: "Import Progress Photos",
                     value: "Locked",
-                    tintColor: .appTextSecondary
+                    tintColor: theme.colors.textSecondary
                 )
                 .opacity(0.6)
                 .accessibilityIdentifier("integrations_bulk_photo_import_locked")

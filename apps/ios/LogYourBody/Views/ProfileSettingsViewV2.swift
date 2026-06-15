@@ -9,6 +9,8 @@ struct ProfileSettingsViewV2: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss)
     var dismiss
+    @Environment(\.theme)
+    private var theme
     // Editable fields
     @State private var editableName: String = ""
     @State private var editableFirstName: String = ""
@@ -30,20 +32,18 @@ struct ProfileSettingsViewV2: View {
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(spacing: SettingsDesign.sectionSpacing) {
-                    // Profile Header
+                VStack(spacing: theme.spacing.sectionSpacing) {
                     profileHeader
                         .padding(.top)
 
-                    // Basic Information Card
                     basicInformationCard
 
-                    // Physical Information Card
                     physicalInformationCard
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, theme.spacing.screenPadding)
                 .padding(.bottom, 40)
             }
+            .scrollBounceBehavior(.basedOnSize)
         }
         .settingsBackground()
         .navigationTitle("Edit Profile")
@@ -53,13 +53,13 @@ struct ProfileSettingsViewV2: View {
                 if isSaving {
                     ProgressView()
                         .scaleEffect(0.8)
-                        .tint(.appPrimary)
+                        .tint(theme.colors.primary)
                 } else if hasChanges {
                     Button("Save") {
                         saveProfile()
                     }
                     .fontWeight(.medium)
-                    .foregroundColor(.appPrimary)
+                    .foregroundColor(theme.colors.primary)
                 }
             }
         }
@@ -94,7 +94,7 @@ struct ProfileSettingsViewV2: View {
             VStack(spacing: 0) {
                 // First Name Field
                 settingsRow(
-                    label: "First Name",
+                    label: "First name",
                     value: editableFirstName.isEmpty ? "Not set" : editableFirstName,
                     showDisclosure: false
                 ) {
@@ -117,7 +117,7 @@ struct ProfileSettingsViewV2: View {
 
                 // Last Name Field
                 settingsRow(
-                    label: "Last Name",
+                    label: "Last name",
                     value: editableLastName.isEmpty ? "Not set" : editableLastName,
                     showDisclosure: false
                 ) {
@@ -157,9 +157,9 @@ struct ProfileSettingsViewV2: View {
 
     private var genderSelector: some View {
         HStack {
-            Text("Biological Sex")
-                .foregroundColor(.primary)
-                .font(.system(size: 16))
+            Text("Biological sex")
+                .foregroundColor(theme.colors.text)
+                .font(theme.typography.labelLarge)
 
             Spacer()
 
@@ -178,8 +178,8 @@ struct ProfileSettingsViewV2: View {
                 hasChanges = true
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Biological sex")
         .accessibilityValue(editableGender.description)
@@ -194,22 +194,23 @@ struct ProfileSettingsViewV2: View {
                 } label: {
                     HStack {
                         Text("Height")
-                            .foregroundColor(.primary)
+                            .font(theme.typography.labelLarge)
+                            .foregroundColor(theme.colors.text)
                         Spacer()
-                        HStack(spacing: 4) {
+                        HStack(spacing: theme.spacing.xxs) {
                             Text(formattedHeight)
-                                .foregroundColor(.primary)
-                                .fontWeight(.medium)
+                                .font(theme.typography.labelMedium)
+                                .foregroundColor(theme.colors.text)
                             Image(systemName: "ruler")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(theme.typography.captionLarge)
+                                .foregroundColor(theme.colors.textSecondary)
                         }
                         Image(systemName: "chevron.right")
-                            .font(.caption2)
-                            .foregroundColor(Color(.tertiaryLabel))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundColor(theme.colors.textTertiary)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, theme.spacing.md)
+                    .padding(.vertical, theme.spacing.sm)
                 }
                 .accessibilityLabel("Height")
                 .accessibilityValue(formattedHeight)
@@ -224,22 +225,23 @@ struct ProfileSettingsViewV2: View {
                 } label: {
                     HStack {
                         Text("Age")
-                            .foregroundColor(.primary)
+                            .font(theme.typography.labelLarge)
+                            .foregroundColor(theme.colors.text)
                         Spacer()
-                        HStack(spacing: 4) {
+                        HStack(spacing: theme.spacing.xxs) {
                             Text(formattedAge)
-                                .foregroundColor(.primary)
-                                .fontWeight(.medium)
+                                .font(theme.typography.labelMedium)
+                                .foregroundColor(theme.colors.text)
                             Image(systemName: "calendar")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(theme.typography.captionLarge)
+                                .foregroundColor(theme.colors.textSecondary)
                         }
                         Image(systemName: "chevron.right")
-                            .font(.caption2)
-                            .foregroundColor(Color(.tertiaryLabel))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundColor(theme.colors.textTertiary)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, theme.spacing.md)
+                    .padding(.vertical, theme.spacing.sm)
                 }
                 .accessibilityLabel("Age")
                 .accessibilityValue(formattedAge)
@@ -249,8 +251,7 @@ struct ProfileSettingsViewV2: View {
     }
 
     private var profileHeader: some View {
-        VStack(spacing: 16) {
-            // Avatar
+        VStack(spacing: theme.spacing.md) {
             ZStack {
                 if let avatarUrl = authManager.currentUser?.avatarUrl,
                    !avatarUrl.isEmpty,
@@ -263,7 +264,7 @@ struct ProfileSettingsViewV2: View {
                             .clipShape(Circle())
                     } placeholder: {
                         Circle()
-                            .fill(Color(.systemGray5))
+                            .fill(theme.colors.surfaceTertiary)
                             .frame(width: 80, height: 80)
                             .overlay(
                                 ProgressView()
@@ -272,26 +273,26 @@ struct ProfileSettingsViewV2: View {
                     }
                 } else {
                     Circle()
-                        .fill(Color(.systemGray5))
+                        .fill(theme.colors.surfaceTertiary)
                         .frame(width: 80, height: 80)
                         .overlay(
                             Text(profileInitials)
-                                .font(.system(size: 32, weight: .semibold))
-                                .foregroundColor(.secondary)
+                                .font(theme.typography.displaySmall)
+                                .foregroundColor(theme.colors.textSecondary)
                         )
                 }
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Profile photo")
 
-            // Name and email
-            VStack(spacing: 4) {
+            VStack(spacing: theme.spacing.xxs) {
                 Text(authManager.currentUser?.displayName ?? authManager.currentUser?.name ?? "User")
-                    .font(.headline)
+                    .font(theme.typography.headlineSmall)
+                    .foregroundColor(theme.colors.text)
 
                 Text(authManager.currentUser?.email ?? "")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(theme.typography.captionLarge)
+                    .foregroundColor(theme.colors.textSecondary)
             }
         }
     }
@@ -306,7 +307,8 @@ struct ProfileSettingsViewV2: View {
     ) -> some View {
         HStack {
             Text(label)
-                .foregroundColor(isDisabled ? .secondary : .primary)
+                .font(theme.typography.labelLarge)
+                .foregroundColor(isDisabled ? theme.colors.textSecondary : theme.colors.text)
 
             Spacer()
 
@@ -314,17 +316,18 @@ struct ProfileSettingsViewV2: View {
                 customContent()
             } else {
                 Text(value)
-                    .foregroundColor(isDisabled ? Color(.tertiaryLabel) : .secondary)
+                    .font(theme.typography.labelMedium)
+                    .foregroundColor(isDisabled ? theme.colors.textTertiary : theme.colors.textSecondary)
             }
 
             if showDisclosure && !isDisabled {
                 Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundColor(Color(.tertiaryLabel))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(theme.colors.textTertiary)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(label)
         .accessibilityValue(value)
@@ -471,6 +474,8 @@ struct ProfileHeightPickerSheet: View {
     @Binding var hasChanges: Bool
     @Environment(\.dismiss)
     var dismiss
+    @Environment(\.theme)
+    private var theme
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -509,11 +514,12 @@ struct ProfileHeightPickerSheet: View {
     private var heightDisplay: some View {
         VStack(spacing: 8) {
             Text(formattedHeight)
-                .font(.system(size: 36, weight: .semibold))
+                .font(theme.typography.displayMedium)
+                .foregroundColor(theme.colors.text)
 
             Text(alternateHeight)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(theme.typography.captionLarge)
+                .foregroundColor(theme.colors.textSecondary)
         }
         .padding()
     }

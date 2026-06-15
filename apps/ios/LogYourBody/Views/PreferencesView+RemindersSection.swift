@@ -12,7 +12,6 @@ extension PreferencesView {
                     icon: "bell.badge.fill",
                     title: "Daily weigh-in",
                     isOn: dailyWeighInReminderBinding,
-                    tintColor: .appText,
                     subtitle: dailyReminderSubtitle
                 )
                 .accessibilityIdentifier("settings_daily_weigh_in_reminder_toggle")
@@ -26,8 +25,8 @@ extension PreferencesView {
                         displayedComponents: .hourAndMinute
                     )
                     .datePickerStyle(.compact)
-                    .padding(.horizontal, SettingsDesign.horizontalPadding)
-                    .padding(.vertical, SettingsDesign.verticalPadding)
+                    .padding(.horizontal, theme.spacing.md)
+                    .padding(.vertical, theme.spacing.sm)
                     .onChange(of: dailyReminderDate) { _, newValue in
                         Task {
                             await notificationManager.updateDailyWeighInReminderTime(to: newValue)

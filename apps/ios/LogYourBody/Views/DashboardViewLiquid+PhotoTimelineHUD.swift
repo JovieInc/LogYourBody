@@ -32,10 +32,8 @@ extension DashboardViewLiquid {
                     hudPhaseInsight
                         .padding(.horizontal, 20)
                 }
-
-                Spacer(minLength: 120)
             }
-            .padding(.bottom, 24)
+            .padding(.bottom, 28)
         }
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
@@ -126,26 +124,20 @@ extension DashboardViewLiquid {
 
     private var photoTimelineRootSwipeGesture: some Gesture {
         DragGesture(minimumDistance: 12, coordinateSpace: .local)
-            .onChanged { value in
-                updatePhotoTimelineRootPage(from: value.translation, isFinal: false)
-            }
             .onEnded { value in
-                updatePhotoTimelineRootPage(from: value.translation, isFinal: true)
-                hasHandledPhotoTimelineRootSwipe = false
+                updatePhotoTimelineRootPage(from: value.translation)
             }
     }
 
-    private func updatePhotoTimelineRootPage(from translation: CGSize, isFinal: Bool) {
+    private func updatePhotoTimelineRootPage(from translation: CGSize) {
         let horizontal = translation.width
         let vertical = translation.height
-        let threshold: CGFloat = isFinal ? 44 : 72
+        let threshold: CGFloat = 44
         guard abs(horizontal) > abs(vertical), abs(horizontal) > threshold else { return }
-        guard isFinal || !hasHandledPhotoTimelineRootSwipe else { return }
 
         let nextPage: PhotoTimelineRootPage = horizontal < 0 ? .analytics : .timeline
         guard selectedPhotoTimelineRootPage != nextPage else { return }
 
-        hasHandledPhotoTimelineRootSwipe = true
         withAnimation(.easeOut(duration: 0.2)) {
             selectedPhotoTimelineRootPage = nextPage
         }

@@ -223,9 +223,8 @@ struct LogWeightView: View {
                                 }
                             }
                             .padding(.horizontal, 20)
-
-                            Spacer(minLength: 120)
                         }
+                        .padding(.bottom, 28)
                     }
 
                     // Save button (fixed at bottom)

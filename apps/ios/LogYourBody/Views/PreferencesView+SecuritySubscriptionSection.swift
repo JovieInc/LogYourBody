@@ -56,7 +56,7 @@ extension PreferencesView {
             icon: "crown.fill",
             title: subscriptionStatusText,
             subtitle: subscriptionPlanDisplay,
-            tintColor: revenueCatManager.isSubscribed ? .appText : .orange
+            tintColor: revenueCatManager.isSubscribed ? nil : theme.colors.warning
         )
         .accessibilityIdentifier("settings_subscription_status_row")
     }
@@ -65,8 +65,7 @@ extension PreferencesView {
         SettingsRow(
             icon: "calendar.badge.clock",
             title: "Renews",
-            value: renewal,
-            tintColor: .appText
+            value: renewal
         )
     }
 
@@ -80,8 +79,7 @@ extension PreferencesView {
                 icon: "creditcard.fill",
                 title: "Manage subscription",
                 subtitle: "Opens App Store",
-                showChevron: true,
-                tintColor: .appText
+                showChevron: true
             )
         }
         .buttonStyle(.plain)
