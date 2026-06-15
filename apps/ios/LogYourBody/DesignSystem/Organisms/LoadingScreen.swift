@@ -11,6 +11,7 @@ struct LoadingScreen: View {
     @Binding var progress: Double
     @Binding var loadingStatus: String
     let onComplete: () -> Void
+    @State private var didScheduleCompletion = false
 
     var backgroundColor = Color("LaunchScreenBackground")
     var showPercentage: Bool = true
@@ -76,16 +77,24 @@ struct LoadingScreen: View {
         .onAppear {
             checkCompletion()
         }
-        .onChange(of: progress) { _ in
+        .onChange(of: clampedProgress) { _ in
             checkCompletion()
         }
     }
 
     private func checkCompletion() {
-        if clampedProgress >= 1.0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                onComplete()
+        guard clampedProgress >= 1.0, !didScheduleCompletion else {
+            return
+        }
+
+        Task { @MainActor in
+            await Task.yield()
+            guard clampedProgress >= 1.0, !didScheduleCompletion else {
+                return
             }
+            didScheduleCompletion = true
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            onComplete()
         }
     }
 }

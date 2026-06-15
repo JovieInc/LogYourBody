@@ -55,9 +55,12 @@ struct DSLogoAnimated: View {
         .scaleEffect(logoScale)
         .opacity(logoOpacity)
         .onAppear {
-            withAnimation(.easeOut(duration: animationDuration)) {
-                logoScale = 1.0
-                logoOpacity = 1.0
+            Task { @MainActor in
+                await Task.yield()
+                withAnimation(.easeOut(duration: animationDuration)) {
+                    logoScale = 1.0
+                    logoOpacity = 1.0
+                }
             }
         }
     }

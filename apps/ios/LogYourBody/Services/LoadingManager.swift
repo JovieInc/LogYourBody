@@ -225,10 +225,7 @@ class LoadingManager: ObservableObject {
         let stepProgress = step.weight * partial
         completedWeight = min(max(completedWeight + stepProgress, 0), 1.0)
 
-        // Animate progress update
-        withAnimation(.easeInOut(duration: 0.2)) { // Faster animation
-            progress = min(max(completedWeight, 0), 0.99) // Keep at 99% until truly complete
-        }
+        progress = min(max(completedWeight, 0), 0.99) // Keep at 99% until truly complete
 
         // Minimal delay only for UI responsiveness
         try? await Task.sleep(nanoseconds: 10_000_000) // 0.01s

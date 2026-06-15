@@ -203,14 +203,17 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPhotoHUDFixtureRoutesToIntendedPostMVPDashboard() throws {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "-lybUITestPhotoTimelineHUDFixture",
-            "-lybUITestPhotoTimelineAnalyticsFixture"
-        ]
+        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_pager"].waitForExistence(timeout: 10))
+        let pager = app.descendants(matching: .any)["photo_timeline_root_pager"]
+        XCTAssertTrue(pager.waitForExistence(timeout: 10))
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists)
+
+        let swipeStart = pager.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        let swipeEnd = pager.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5))
+        swipeStart.press(forDuration: 0.05, thenDragTo: swipeEnd)
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 10))
         let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]

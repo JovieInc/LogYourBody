@@ -15,8 +15,6 @@ struct DSProgressBar: View {
     var cornerRadius: CGFloat = 4
     var animationDuration: Double = 0.4
 
-    @State private var animatedProgress: Double = 0
-
     private var normalizedProgress: Double {
         min(1.0, max(0.0, progress))
     }
@@ -32,20 +30,14 @@ struct DSProgressBar: View {
                 // Progress
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(foregroundColor)
-                    .frame(width: geometry.size.width * animatedProgress, height: height)
+                    .frame(width: geometry.size.width * normalizedProgress, height: height)
                     .animation(
                         .spring(response: animationDuration, dampingFraction: 0.8),
-                        value: animatedProgress
+                        value: normalizedProgress
                     )
             }
         }
         .frame(height: height)
-        .onAppear {
-            animatedProgress = normalizedProgress
-        }
-        .onChange(of: normalizedProgress) { newValue in
-            animatedProgress = newValue
-        }
     }
 }
 

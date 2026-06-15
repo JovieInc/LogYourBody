@@ -15,9 +15,6 @@ struct ProgressTimelineView: View {
     @Binding var selectedIndex: Int
     @Binding var mode: TimelineMode
 
-    @State private var dataProvider = TimelineDataProvider()
-    @State private var anchors: [TimelineAnchor] = []
-    @State private var zoomLevel: TimelineZoomLevel = .month
     @State private var isDragging: Bool = false
     @State private var dragPosition: Double = 0.5
     @State private var currentDateLabel: String = ""
@@ -28,6 +25,12 @@ struct ProgressTimelineView: View {
     // MARK: - Body
 
     var body: some View {
+        let renderData = makeRenderData(metrics: bodyMetrics, mode: mode)
+        let handlePosition = isDragging ? dragPosition : selectedPosition(
+            in: renderData,
+            selectedIndex: selectedIndex
+        )
+
         VStack(spacing: 0) {
             // Date label (shows when dragging)
             if isDragging {
@@ -42,32 +45,26 @@ struct ProgressTimelineView: View {
                     timelineTrack
 
                     // Anchors (photos/metrics)
-                    anchorsView(width: geometry.size.width)
+                    anchorsView(
+                        width: geometry.size.width,
+                        anchors: renderData.anchors,
+                        zoomLevel: renderData.zoomLevel
+                    )
 
                     // Scrubber handle
                     scrubberHandle
-                        .offset(x: dragPosition * geometry.size.width - scrubberHandleSize / 2)
+                        .offset(x: handlePosition * geometry.size.width - scrubberHandleSize / 2)
                         .gesture(
                             DragGesture(minimumDistance: 0)
-                                .onChanged { handleDrag($0, width: geometry.size.width) }
+                                .onChanged {
+                                    handleDrag($0, width: geometry.size.width, renderData: renderData)
+                                }
                                 .onEnded { _ in handleDragEnd() }
                         )
                 }
                 .frame(height: timelineHeight)
             }
             .frame(height: timelineHeight)
-        }
-        .onAppear {
-            scheduleTimelineSetup()
-        }
-        .onChange(of: bodyMetrics) { _, _ in
-            scheduleTimelineSetup()
-        }
-        .onChange(of: mode) { _, _ in
-            scheduleTimelineSetup()
-        }
-        .onChange(of: selectedIndex) { _, _ in
-            scheduleTimelineSetup()
         }
     }
 
@@ -101,9 +98,13 @@ struct ProgressTimelineView: View {
             .padding(.vertical, (timelineHeight - 6) / 2)
     }
 
-    private func anchorsView(width: CGFloat) -> some View {
+    private func anchorsView(
+        width: CGFloat,
+        anchors: [TimelineAnchor],
+        zoomLevel: TimelineZoomLevel
+    ) -> some View {
         ForEach(anchors) { anchor in
-            anchorView(for: anchor)
+            anchorView(for: anchor, zoomLevel: zoomLevel)
                 .position(
                     x: anchor.position * width,
                     y: timelineHeight / 2
@@ -112,16 +113,16 @@ struct ProgressTimelineView: View {
     }
 
     @ViewBuilder
-    private func anchorView(for anchor: TimelineAnchor) -> some View {
+    private func anchorView(for anchor: TimelineAnchor, zoomLevel: TimelineZoomLevel) -> some View {
         switch mode {
         case .photo:
-            photoModeAnchor(for: anchor)
+            photoModeAnchor(for: anchor, zoomLevel: zoomLevel)
         case .avatar:
             avatarModeAnchor(for: anchor)
         }
     }
 
-    private func photoModeAnchor(for anchor: TimelineAnchor) -> some View {
+    private func photoModeAnchor(for anchor: TimelineAnchor, zoomLevel: TimelineZoomLevel) -> some View {
         Group {
             if anchor.anchorType == .photo || anchor.anchorType == .photoWithMetrics {
                 if let photoUrl = anchor.bodyMetrics.photoUrl,
@@ -138,7 +139,7 @@ struct ProgressTimelineView: View {
                             .stroke(Color.white.opacity(0.5), lineWidth: 2)
                     )
                 } else {
-                    photoPlaceholder
+                    photoPlaceholder(zoomLevel: zoomLevel)
                 }
             } else if zoomLevel.showMetricTicks {
                 Circle()
@@ -150,7 +151,7 @@ struct ProgressTimelineView: View {
         }
     }
 
-    private var photoPlaceholder: some View {
+    private func photoPlaceholder(zoomLevel: TimelineZoomLevel) -> some View {
         Circle()
             .fill(Color.white.opacity(0.2))
             .frame(width: zoomLevel.thumbnailSize, height: zoomLevel.thumbnailSize)
@@ -191,69 +192,49 @@ struct ProgressTimelineView: View {
 
     // MARK: - Logic
 
-    private func scheduleTimelineSetup() {
-        let metricsSnapshot = bodyMetrics
-        let modeSnapshot = mode
-        let selectedIndexSnapshot = selectedIndex
-
-        Task { @MainActor in
-            await Task.yield()
-            guard mode == modeSnapshot,
-                  selectedIndex == selectedIndexSnapshot,
-                  bodyMetrics.map(\.id) == metricsSnapshot.map(\.id) else {
-                return
-            }
-            setupTimeline(
-                metrics: metricsSnapshot,
-                mode: modeSnapshot,
-                selectedIndex: selectedIndexSnapshot
+    private func makeRenderData(metrics: [BodyMetrics], mode: TimelineMode) -> TimelineRenderData {
+        let provider = TimelineDataProvider()
+        provider.loadMetrics(metrics)
+        guard !metrics.isEmpty else {
+            return TimelineRenderData(
+                metrics: [],
+                provider: provider,
+                anchors: [],
+                zoomLevel: .month
             )
         }
-    }
 
-    private func setupTimeline(metrics: [BodyMetrics], mode: TimelineMode, selectedIndex: Int) {
-        dataProvider.loadMetrics(metrics)
-
-        guard !metrics.isEmpty else {
-            anchors = []
-            return
+        guard let firstDate = provider.bodyMetrics.first?.date,
+              let lastDate = provider.bodyMetrics.last?.date else {
+            return TimelineRenderData(
+                metrics: [],
+                provider: provider,
+                anchors: [],
+                zoomLevel: .month
+            )
         }
 
-        let sortedMetrics = metrics.sorted { $0.date < $1.date }
-        guard let firstDate = sortedMetrics.first?.date,
-              let lastDate = sortedMetrics.last?.date else {
-            return
-        }
+        let zoomLevel = TimelineZoomLevel.calculate(from: firstDate, to: lastDate)
+        let anchors = provider.generateAnchors(mode: mode, zoomLevel: zoomLevel)
 
-        // Calculate zoom level
-        zoomLevel = TimelineZoomLevel.calculate(from: firstDate, to: lastDate)
-
-        // Generate anchors
-        anchors = dataProvider.generateAnchors(mode: mode, zoomLevel: zoomLevel)
-
-        // Set initial position
-        updateDragPosition(for: selectedIndex, in: metrics, using: anchors)
+        return TimelineRenderData(
+            metrics: provider.bodyMetrics,
+            provider: provider,
+            anchors: anchors,
+            zoomLevel: zoomLevel
+        )
     }
 
-    private func updateDragPosition(for index: Int, in metrics: [BodyMetrics], using anchors: [TimelineAnchor]) {
-        guard index >= 0, index < metrics.count else { return }
-        let metric = metrics[index]
-
-        guard let anchor = anchors.first(where: { $0.bodyMetrics.id == metric.id }) else {
-            // If not an anchor, calculate position manually
-            guard let firstDate = metrics.first?.date,
-                  let lastDate = metrics.last?.date else {
-                return
-            }
-            let midpointDate = dataProvider.dateFromPosition(0.5, from: firstDate, to: lastDate)
-            dragPosition = midpointDate.timeIntervalSince1970 / metric.date.timeIntervalSince1970
-            return
+    private func selectedPosition(in renderData: TimelineRenderData, selectedIndex: Int) -> Double {
+        guard selectedIndex >= 0, selectedIndex < bodyMetrics.count else {
+            return dragPosition
         }
 
-        dragPosition = anchor.position
+        let metric = bodyMetrics[selectedIndex]
+        return renderData.anchors.first(where: { $0.bodyMetrics.id == metric.id })?.position ?? dragPosition
     }
 
-    private func handleDrag(_ value: DragGesture.Value, width: CGFloat) {
+    private func handleDrag(_ value: DragGesture.Value, width: CGFloat, renderData: TimelineRenderData) {
         isDragging = true
 
         // Calculate position (0.0 to 1.0)
@@ -261,26 +242,26 @@ struct ProgressTimelineView: View {
         dragPosition = position
 
         // Convert position to date
-        guard !bodyMetrics.isEmpty,
-              let firstDate = bodyMetrics.first?.date,
-              let lastDate = bodyMetrics.last?.date else {
+        guard !renderData.metrics.isEmpty,
+              let firstDate = renderData.metrics.first?.date,
+              let lastDate = renderData.metrics.last?.date else {
             return
         }
 
-        let scrubDate = dataProvider.dateFromPosition(position, from: firstDate, to: lastDate)
+        let scrubDate = renderData.provider.dateFromPosition(position, from: firstDate, to: lastDate)
 
         // Update based on mode
         switch mode {
         case .photo:
-            handlePhotoModeScrub(scrubDate: scrubDate)
+            handlePhotoModeScrub(scrubDate: scrubDate, provider: renderData.provider)
         case .avatar:
-            handleAvatarModeScrub(scrubDate: scrubDate)
+            handleAvatarModeScrub(scrubDate: scrubDate, provider: renderData.provider)
         }
     }
 
-    private func handlePhotoModeScrub(scrubDate: Date) {
+    private func handlePhotoModeScrub(scrubDate: Date, provider: TimelineDataProvider) {
         // Find data for photo mode (continuous time-based)
-        let result = dataProvider.findDataForPhotoMode(scrubDate: scrubDate)
+        let result = provider.findDataForPhotoMode(scrubDate: scrubDate)
         currentDateLabel = result.formattedDateLabel()
 
         // Update selected index to nearest entry
@@ -295,9 +276,9 @@ struct ProgressTimelineView: View {
         }
     }
 
-    private func handleAvatarModeScrub(scrubDate: Date) {
+    private func handleAvatarModeScrub(scrubDate: Date, provider: TimelineDataProvider) {
         // Snap to nearest data date
-        guard let nearestDate = dataProvider.findNearestDataDate(to: scrubDate) else {
+        guard let nearestDate = provider.findNearestDataDate(to: scrubDate) else {
             return
         }
 
@@ -307,7 +288,7 @@ struct ProgressTimelineView: View {
         currentDateLabel = formatter.string(from: nearestDate)
 
         // Update selected index
-        if let metric = dataProvider.getMetric(for: nearestDate),
+        if let metric = provider.getMetric(for: nearestDate),
            let index = bodyMetrics.firstIndex(where: { $0.id == metric.id }) {
             selectedIndex = index
         }
@@ -322,6 +303,13 @@ struct ProgressTimelineView: View {
         let impact = UIImpactFeedbackGenerator(style: .light)
         impact.impactOccurred()
     }
+}
+
+private struct TimelineRenderData {
+    let metrics: [BodyMetrics]
+    let provider: TimelineDataProvider
+    let anchors: [TimelineAnchor]
+    let zoomLevel: TimelineZoomLevel
 }
 
 // MARK: - Preview
