@@ -68,6 +68,7 @@ struct Constants {
     static let defaultHomeModeKey = "defaultHomeMode"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
     static let onboardingCompletedVersionKey = "onboardingCompletedVersion"
+    static let onboardingCompletedUserIdKey = "onboardingCompletedUserId"
     static let dailyWeighInReminderEnabledKey = "dailyWeighInReminderEnabled"
     static let dailyWeighInReminderHourKey = "dailyWeighInReminderHour"
     static let dailyWeighInReminderMinuteKey = "dailyWeighInReminderMinute"

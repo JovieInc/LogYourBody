@@ -915,7 +915,7 @@ final class OnboardingFlowViewModel: ObservableObject {
         let updates = buildOnboardingProfileUpdates()
         await AuthManager.shared.updateProfile(updates)
         applyCompletedOnboardingLocally(with: updates)
-        OnboardingStateManager.shared.markCompleted()
+        OnboardingStateManager.shared.markCompleted(userId: AuthManager.shared.currentUser?.id)
         UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)
         clearPersistedProgress()
         PreAuthOnboardingStore.shared.clear()
@@ -1287,7 +1287,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     private func persistProgress() {
         guard entryContext == .authenticated else { return }
         guard !isRestoringProgress else { return }
-        guard !OnboardingStateManager.shared.hasCompletedCurrentVersion else {
+        guard !OnboardingStateManager.shared.hasCompletedCurrentVersion(for: AuthManager.shared.currentUser?.id) else {
             clearPersistedProgress()
             return
         }
@@ -1328,7 +1328,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     private func restorePersistedProgressIfNeeded() {
         guard entryContext == .authenticated else { return }
         guard let userId = AuthManager.shared.currentUser?.id else { return }
-        guard !OnboardingStateManager.shared.hasCompletedCurrentVersion else {
+        guard !OnboardingStateManager.shared.hasCompletedCurrentVersion(for: AuthManager.shared.currentUser?.id) else {
             progressStore.clearProgress(for: userId)
             return
         }
