@@ -11,6 +11,17 @@ ARTIFACT_DIR="${ARTIFACT_DIR:-$IOS_DIR/test_results/performance-audit/$STAMP}"
 RUN_SWIFTLINT="${RUN_SWIFTLINT:-true}"
 RUN_LAUNCH_PERFORMANCE="${RUN_LAUNCH_PERFORMANCE:-true}"
 XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO}"
+TEST_TIMEOUTS_ENABLED="${TEST_TIMEOUTS_ENABLED:-YES}"
+DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="${DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90}"
+MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180}"
+
+if [[ -z "${RUN_PERFORMANCE_UNIT_TESTS+x}" ]]; then
+  if [[ "${GITHUB_ACTIONS:-false}" == "true" && "$RUN_LAUNCH_PERFORMANCE" == "false" ]]; then
+    RUN_PERFORMANCE_UNIT_TESTS="false"
+  else
+    RUN_PERFORMANCE_UNIT_TESTS="true"
+  fi
+fi
 
 read -r -a XCODEBUILD_SETTINGS_ARRAY <<< "$XCODEBUILD_SETTINGS"
 
@@ -24,27 +35,39 @@ if [[ "$DESTINATION" == "auto" ]]; then
   DESTINATION="$(IOS_DIR="$IOS_DIR" PROJECT="$PROJECT" SCHEME="$SCHEME" bash "$ROOT_DIR/scripts/ios/resolve-simulator-destination.sh")"
 fi
 
+COMMON_XCODEBUILD_ARGS=(
+  -project "$PROJECT"
+  -scheme "$SCHEME"
+  -destination "$DESTINATION"
+  -parallel-testing-enabled NO
+  -maximum-concurrent-test-simulator-destinations 1
+  -test-timeouts-enabled "$TEST_TIMEOUTS_ENABLED"
+  -default-test-execution-time-allowance "$DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE"
+  -maximum-test-execution-time-allowance "$MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE"
+)
+
 cd "$IOS_DIR"
 
 if [[ "$RUN_SWIFTLINT" == "true" ]]; then
   swiftlint lint --strict | tee "$ARTIFACT_DIR/swiftlint.log"
 fi
 
-xcodebuild \
-  -project "$PROJECT" \
-  -scheme "$SCHEME" \
-  -destination "$DESTINATION" \
-  -resultBundlePath "$ARTIFACT_DIR/performance-unit-tests.xcresult" \
-  -only-testing:LogYourBodyTests/DashboardTimelineProviderPerformanceTests \
-  -only-testing:LogYourBodyTests/ProgressPhotoImagePipelineTests \
-  "${XCODEBUILD_SETTINGS_ARRAY[@]}" \
-  test | tee "$ARTIFACT_DIR/performance-unit-tests.log"
+if [[ "$RUN_PERFORMANCE_UNIT_TESTS" == "true" ]]; then
+  xcodebuild \
+    "${COMMON_XCODEBUILD_ARGS[@]}" \
+    -resultBundlePath "$ARTIFACT_DIR/performance-unit-tests.xcresult" \
+    -skip-testing:LogYourBodyUITests \
+    -only-testing:LogYourBodyTests/DashboardTimelineProviderPerformanceTests \
+    -only-testing:LogYourBodyTests/ProgressPhotoImagePipelineTests \
+    "${XCODEBUILD_SETTINGS_ARRAY[@]}" \
+    test | tee "$ARTIFACT_DIR/performance-unit-tests.log"
+else
+  echo "Skipping performance-unit XCTest because RUN_PERFORMANCE_UNIT_TESTS=false" | tee "$ARTIFACT_DIR/performance-unit-tests.log"
+fi
 
 if [[ "$RUN_LAUNCH_PERFORMANCE" == "true" ]]; then
   xcodebuild \
-    -project "$PROJECT" \
-    -scheme "$SCHEME" \
-    -destination "$DESTINATION" \
+    "${COMMON_XCODEBUILD_ARGS[@]}" \
     -resultBundlePath "$ARTIFACT_DIR/launch-performance.xcresult" \
     -only-testing:LogYourBodyUITests/LogYourBodyUITests/testLaunchPerformance \
     "${XCODEBUILD_SETTINGS_ARRAY[@]}" \
@@ -67,6 +90,10 @@ if [[ "$RUN_LAUNCH_PERFORMANCE" == "true" ]]; then
   )
 else
   SUMMARY_ARGS+=(--launch-skipped)
+fi
+
+if [[ "$RUN_PERFORMANCE_UNIT_TESTS" != "true" ]]; then
+  SUMMARY_ARGS+=(--unit-skipped)
 fi
 
 python3 "$ROOT_DIR/scripts/ios/performance-budget-summary.py" "${SUMMARY_ARGS[@]}"

@@ -205,6 +205,8 @@ def write_summary(
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "destination": args.destination,
         "status": status,
+        "unitSkipped": args.unit_skipped,
+        "launchSkipped": args.launch_skipped,
         "budgets": budgets,
         "checks": [asdict(check) for check in checks],
         "unitCases": [asdict(case) for case in unit_cases],
@@ -264,6 +266,7 @@ def main() -> int:
     parser.add_argument("--unit-log", type=Path)
     parser.add_argument("--launch-xcresult", type=Path)
     parser.add_argument("--launch-log", type=Path)
+    parser.add_argument("--unit-skipped", action="store_true")
     parser.add_argument("--launch-skipped", action="store_true")
     parser.add_argument("--summary-md", type=Path)
     parser.add_argument("--summary-json", type=Path)
@@ -280,7 +283,7 @@ def main() -> int:
         "failOnMissingLaunchMetrics": env_bool("PERF_FAIL_ON_MISSING_LAUNCH_METRICS", False),
     }
 
-    unit_cases = collect_cases(args.unit_xcresult, args.unit_log)
+    unit_cases = [] if args.unit_skipped else collect_cases(args.unit_xcresult, args.unit_log)
     launch_cases = [] if args.launch_skipped else collect_cases(args.launch_xcresult, args.launch_log)
     launch_case = next(
         (case for case in launch_cases if "testLaunchPerformance" in case.identifier),
@@ -295,39 +298,62 @@ def main() -> int:
     unit_total_budget = float(budgets["unitTotalCaseSeconds"])
     unit_case_budget = float(budgets["unitMaxCaseSeconds"])
 
-    checks.append(
-        BudgetCheck(
-            id="unit.total_case_duration",
-            label="Performance unit total",
-            observed_seconds=unit_total if unit_cases else None,
-            budget_seconds=unit_total_budget,
-            status="failed" if unit_cases and unit_total > unit_total_budget else ("passed" if unit_cases else "warning"),
-            detail=(
-                f"{len(unit_cases)} test cases reported {unit_total:.3f}s total XCTest runtime."
-                if unit_cases
-                else "No unit-test durations were found in the result bundle or log."
-            ),
+    if args.unit_skipped:
+        checks.append(
+            BudgetCheck(
+                id="unit.total_case_duration",
+                label="Performance unit total",
+                observed_seconds=None,
+                budget_seconds=unit_total_budget,
+                status="skipped",
+                detail="Performance unit XCTest was disabled for this run.",
+            )
         )
-    )
 
-    checks.append(
-        BudgetCheck(
-            id="unit.slowest_case_duration",
-            label="Slowest performance unit",
-            observed_seconds=unit_slowest.duration_seconds if unit_slowest else None,
-            budget_seconds=unit_case_budget,
-            status=(
-                "failed"
-                if unit_slowest and unit_slowest.duration_seconds > unit_case_budget
-                else ("passed" if unit_slowest else "warning")
-            ),
-            detail=(
-                f"{unit_slowest.identifier} reported {unit_slowest.duration_seconds:.3f}s."
-                if unit_slowest
-                else "No unit-test case duration was available."
-            ),
+        checks.append(
+            BudgetCheck(
+                id="unit.slowest_case_duration",
+                label="Slowest performance unit",
+                observed_seconds=None,
+                budget_seconds=unit_case_budget,
+                status="skipped",
+                detail="Performance unit XCTest was disabled for this run.",
+            )
         )
-    )
+    else:
+        checks.append(
+            BudgetCheck(
+                id="unit.total_case_duration",
+                label="Performance unit total",
+                observed_seconds=unit_total if unit_cases else None,
+                budget_seconds=unit_total_budget,
+                status="failed" if unit_cases and unit_total > unit_total_budget else ("passed" if unit_cases else "warning"),
+                detail=(
+                    f"{len(unit_cases)} test cases reported {unit_total:.3f}s total XCTest runtime."
+                    if unit_cases
+                    else "No unit-test durations were found in the result bundle or log."
+                ),
+            )
+        )
+
+        checks.append(
+            BudgetCheck(
+                id="unit.slowest_case_duration",
+                label="Slowest performance unit",
+                observed_seconds=unit_slowest.duration_seconds if unit_slowest else None,
+                budget_seconds=unit_case_budget,
+                status=(
+                    "failed"
+                    if unit_slowest and unit_slowest.duration_seconds > unit_case_budget
+                    else ("passed" if unit_slowest else "warning")
+                ),
+                detail=(
+                    f"{unit_slowest.identifier} reported {unit_slowest.duration_seconds:.3f}s."
+                    if unit_slowest
+                    else "No unit-test case duration was available."
+                ),
+            )
+        )
 
     if args.launch_skipped:
         checks.append(
