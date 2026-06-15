@@ -525,7 +525,10 @@ extension DashboardViewLiquid {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    func makeBodyScoreSharePayload(metric: BodyMetrics? = nil) -> BodyScoreSharePayload? {
+    func makeBodyScoreSharePayload(
+        metric: BodyMetrics? = nil,
+        photoImageOverride: UIImage? = nil
+    ) -> BodyScoreSharePayload? {
         let selectedMetric = metric ?? currentMetric
         let calculatedResult = selectedMetric.flatMap { bodyScoreResult(for: $0) }
         let cachedResult = latestBodyScoreResult()
@@ -563,7 +566,7 @@ extension DashboardViewLiquid {
             deltaText: deltaText,
             bodyFatPercentage: selectedMetric?.bodyFatPercentage ?? currentMetric?.bodyFatPercentage,
             gender: authManager.currentUser?.profile?.gender,
-            photoImage: sharePhotoImage(for: selectedMetric)
+            photoImage: photoImageOverride ?? sharePhotoImage(for: selectedMetric)
         )
     }
 

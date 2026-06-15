@@ -40,23 +40,22 @@ extension PreferencesView {
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.appCard)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.appBorder, lineWidth: 1)
-                            )
+                    .padding(.vertical, theme.spacing.sm)
+                    .systemBGlassSurface(
+                        cornerRadius: theme.radius.input,
+                        tint: theme.colors.text,
+                        tintOpacity: 0.045,
+                        borderColor: theme.colors.border,
+                        borderOpacity: 0.75
                     )
                 }
                 .accessibilityLabel("Restore purchases")
                 .accessibilityHint("Attempts to restore your active subscription.")
                 .accessibilityIdentifier("settings_restore_purchases_button")
             }
-            .padding(.top, 4)
-            .padding(.bottom, 8)
-            .padding(.horizontal, SettingsDesign.horizontalPadding)
+            .padding(.top, theme.spacing.xxs)
+            .padding(.bottom, theme.spacing.xs)
+            .padding(.horizontal, theme.spacing.md)
         }
     }
 
@@ -69,12 +68,13 @@ extension PreferencesView {
                 DeleteAccountView()
             } label: {
                 Text("Delete account")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(theme.colors.error)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                    .padding(.vertical, theme.spacing.md)
                     .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.red.opacity(0.15))
+                        RoundedRectangle(cornerRadius: theme.radius.card)
+                            .fill(theme.colors.error.opacity(0.14))
                     )
             }
             .accessibilityLabel("Delete account")
@@ -85,7 +85,7 @@ extension PreferencesView {
                 }
             )
             .buttonStyle(.plain)
-            .padding(.horizontal, SettingsDesign.horizontalPadding)
+            .padding(.horizontal, theme.spacing.md)
         }
     }
 }

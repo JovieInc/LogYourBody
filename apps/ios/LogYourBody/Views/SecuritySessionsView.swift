@@ -9,6 +9,8 @@ struct SecuritySessionsView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss)
     var dismiss
+    @Environment(\.theme)
+    private var theme
     @State private var sessions: [SessionInfo] = []
     @State private var isLoading = true
     @State private var showError = false
@@ -29,26 +31,24 @@ struct SecuritySessionsView: View {
                 LoadingOverlay(message: "Loading sessions...")
             } else {
                 ScrollView {
-                    VStack(spacing: SettingsDesign.sectionSpacing) {
-                        // Security Info Section
+                    VStack(spacing: theme.spacing.sectionSpacing) {
                         SettingsSection {
                             DataInfoRow(
                                 icon: "lock.shield.fill",
-                                title: "Session Management",
-                                description: "View and manage devices signed into your account",
-                                iconColor: .blue
+                                title: "Signed-in devices",
+                                description: "Review the devices currently using your account.",
+                                iconColor: theme.colors.info
                             )
                         }
 
-                        // Sessions List
                         if sessions.isEmpty {
                             SettingsEmptyState(
                                 icon: "checkmark.shield.fill",
-                                title: "No Other Sessions",
-                                message: "Only this device is currently signed in",
-                                iconColor: .green
+                                title: "Only this device",
+                                message: "No other devices are signed in.",
+                                iconColor: theme.colors.success
                             )
-                            .padding(.top, 40)
+                            .padding(.top, theme.spacing.lg)
                         } else {
                             SettingsSection(header: "Active Sessions") {
                                 VStack(spacing: 0) {
@@ -71,15 +71,16 @@ struct SecuritySessionsView: View {
                         // Last Updated
                         if !sessions.isEmpty {
                             Text("Last updated: \(Date().formatted(date: .omitted, time: .shortened))")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(theme.typography.captionMedium)
+                                .foregroundColor(theme.colors.textTertiary)
                                 .frame(maxWidth: .infinity)
-                                .padding(.top, 8)
+                                .padding(.top, theme.spacing.xs)
                         }
                     }
-                    .padding(.vertical)
+                    .padding(.vertical, theme.spacing.md)
                     .settingsSectionStyle()
                 }
+                .scrollBounceBehavior(.basedOnSize)
                 .refreshable {
                     await loadSessions()
                 }
@@ -199,6 +200,9 @@ struct SecuritySessionsView: View {
 // MARK: - Session Row View
 
 struct SessionRowView: View {
+    @Environment(\.theme)
+    private var theme
+
     let session: SessionInfo
     let onRevoke: () -> Void
     @State private var isExpanded = false
@@ -208,72 +212,69 @@ struct SessionRowView: View {
             // Main Content
             Button(
                 action: {
-                    withAnimation(SettingsDesign.animation) {
+                    withAnimation(theme.animation.spring) {
                         isExpanded.toggle()
                     }
                 },
                 label: {
-                    HStack(spacing: 12) {
-                        // Device Icon
+                    HStack(spacing: theme.spacing.sm) {
                         Image(systemName: deviceIcon)
-                            .font(.system(size: SettingsDesign.iconSize))
+                            .font(theme.typography.headlineSmall)
                             .foregroundColor(iconColor)
-                            .frame(width: SettingsDesign.iconFrame)
-                            .padding(8)
+                            .frame(width: 24)
+                            .padding(theme.spacing.xs)
                             .background(iconBackgroundColor)
                             .clipShape(Circle())
 
-                        // Session Details
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                             HStack {
                                 Text(session.deviceName)
-                                    .font(SettingsDesign.titleFont)
-                                    .foregroundColor(.primary)
+                                    .font(theme.typography.labelLarge)
+                                    .foregroundColor(theme.colors.text)
 
                                 if session.isCurrentSession {
                                     Text("THIS DEVICE")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.green)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.green.opacity(0.15))
-                                        .cornerRadius(4)
+                                        .font(theme.typography.captionSmall.weight(.bold))
+                                        .foregroundColor(theme.colors.success)
+                                        .padding(.horizontal, theme.spacing.xs)
+                                        .padding(.vertical, theme.spacing.xxxs)
+                                        .background(theme.colors.success.opacity(0.15))
+                                        .clipShape(Capsule())
                                 }
                             }
 
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: theme.spacing.xxxs) {
                                 Text(session.location)
-                                    .font(SettingsDesign.valueFont)
-                                    .foregroundColor(.secondary)
+                                    .font(theme.typography.captionLarge)
+                                    .foregroundColor(theme.colors.textSecondary)
 
-                                HStack(spacing: 4) {
+                                HStack(spacing: theme.spacing.xxs) {
                                     Image(systemName: "clock")
-                                        .font(.system(size: 11))
+                                        .font(theme.typography.captionSmall)
                                     Text(timeAgoString(from: session.lastActiveAt))
-                                        .font(SettingsDesign.valueFont)
+                                        .font(theme.typography.captionLarge)
                                 }
-                                .foregroundColor(.secondary)
+                                .foregroundColor(theme.colors.textSecondary)
                             }
                         }
 
                         Spacer()
 
-                        // Revoke Button or Chevron
                         if !session.isCurrentSession {
                             Button(action: onRevoke) {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.red)
+                                    .font(theme.typography.headlineSmall)
+                                    .foregroundColor(theme.colors.error)
                             }
                             .buttonStyle(PlainButtonStyle())
                         } else if !session.ipAddress.isEmpty {
                             Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                .font(SettingsDesign.chevronSize)
-                                .foregroundColor(Color(.tertiaryLabel))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(theme.colors.textTertiary)
                         }
                     }
-                    .padding(.horizontal, SettingsDesign.horizontalPadding)
-                    .padding(.vertical, SettingsDesign.verticalPadding)
+                    .padding(.horizontal, theme.spacing.md)
+                    .padding(.vertical, theme.spacing.sm)
                     .contentShape(Rectangle())
                 }
             )
@@ -284,29 +285,29 @@ struct SessionRowView: View {
                 VStack(spacing: 0) {
                     Divider()
 
-                    VStack(spacing: 8) {
+                    VStack(spacing: theme.spacing.xs) {
                         HStack {
                             Label("IP Address", systemImage: "network")
-                                .font(SettingsDesign.valueFont)
-                                .foregroundColor(.secondary)
+                                .font(theme.typography.captionLarge)
+                                .foregroundColor(theme.colors.textSecondary)
                             Spacer()
                             Text(session.ipAddress)
-                                .font(SettingsDesign.valueFont)
-                                .foregroundColor(.secondary)
+                                .font(theme.typography.captionLarge)
+                                .foregroundColor(theme.colors.textSecondary)
                         }
 
                         HStack {
                             Label("First Signed In", systemImage: "calendar")
-                                .font(SettingsDesign.valueFont)
-                                .foregroundColor(.secondary)
+                                .font(theme.typography.captionLarge)
+                                .foregroundColor(theme.colors.textSecondary)
                             Spacer()
                             Text(session.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                .font(SettingsDesign.valueFont)
-                                .foregroundColor(.secondary)
+                                .font(theme.typography.captionLarge)
+                                .foregroundColor(theme.colors.textSecondary)
                         }
                     }
-                    .padding(.horizontal, SettingsDesign.horizontalPadding)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, theme.spacing.md)
+                    .padding(.vertical, theme.spacing.sm)
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -329,11 +330,11 @@ struct SessionRowView: View {
     }
 
     private var iconColor: Color {
-        session.isCurrentSession ? .green : .blue
+        session.isCurrentSession ? theme.colors.success : theme.colors.info
     }
 
     private var iconBackgroundColor: Color {
-        session.isCurrentSession ? Color.green.opacity(0.15) : Color.blue.opacity(0.15)
+        session.isCurrentSession ? theme.colors.success.opacity(0.15) : theme.colors.info.opacity(0.15)
     }
 
     private func timeAgoString(from date: Date) -> String {

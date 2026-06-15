@@ -4,32 +4,18 @@
 //
 import SwiftUI
 
-struct SettingsDesign {
-    // Spacing
-    static let sectionSpacing: CGFloat = 24
-    static let rowSpacing: CGFloat = 0
-    static let horizontalPadding: CGFloat = 16
-    static let verticalPadding: CGFloat = 12
-
-    // Sizing
-    static let rowHeight: CGFloat = 48
+private enum SettingsLayout {
+    static let rowMinHeight: CGFloat = 50
     static let iconSize: CGFloat = 20
     static let iconFrame: CGFloat = 24
-    static let chevronSize: Font = .caption2
-    static let cornerRadius: CGFloat = 12
-
-    // Typography
-    static let titleFont: Font = .system(size: 16)
-    static let valueFont: Font = .caption
-    static let sectionHeaderFont: Font = .system(size: 13, weight: .medium)
-
-    // Animation
-    static let animation: Animation = .spring(response: 0.3, dampingFraction: 0.8)
 }
 
 // MARK: - Section Component
 
 struct SettingsSection<Content: View>: View {
+    @Environment(\.theme)
+    private var theme
+
     let header: String?
     let footer: String?
     @ViewBuilder let content: Content
@@ -46,34 +32,36 @@ struct SettingsSection<Content: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Section Header
             if let header = header {
                 HStack {
                     Text(header)
-                        .font(SettingsDesign.sectionHeaderFont)
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.captionLarge.weight(.semibold))
+                        .foregroundColor(theme.colors.textSecondary)
                         .textCase(.uppercase)
                         .tracking(0.5)
                     Spacer()
                 }
-                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                .padding(.bottom, 8)
+                .padding(.horizontal, theme.spacing.md)
+                .padding(.bottom, theme.spacing.xs)
             }
 
-            // Section Content
-            VStack(spacing: SettingsDesign.rowSpacing) {
+            VStack(spacing: 0) {
                 content
             }
-            .background(Color.appCard)
-            .cornerRadius(SettingsDesign.cornerRadius)
+            .systemBGlassSurface(
+                cornerRadius: theme.radius.card,
+                tint: theme.colors.text,
+                tintOpacity: 0.045,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.75
+            )
 
-            // Section Footer
             if let footer = footer {
                 Text(footer)
-                    .font(.caption)
-                    .foregroundColor(.appTextTertiary)
-                    .padding(.horizontal, SettingsDesign.horizontalPadding)
-                    .padding(.top, 8)
+                    .font(theme.typography.captionMedium)
+                    .foregroundColor(theme.colors.textTertiary)
+                    .padding(.horizontal, theme.spacing.md)
+                    .padding(.top, theme.spacing.xs)
             }
         }
     }
@@ -82,13 +70,16 @@ struct SettingsSection<Content: View>: View {
 // MARK: - Row Component
 
 struct SettingsRow: View {
+    @Environment(\.theme)
+    private var theme
+
     let icon: String?
     let title: String
     var subtitle: String?
     var value: String?
     var showChevron: Bool
     var isExternal: Bool
-    var tintColor: Color
+    var tintColor: Color?
 
     init(
         icon: String? = nil,
@@ -97,7 +88,7 @@ struct SettingsRow: View {
         value: String? = nil,
         showChevron: Bool = false,
         isExternal: Bool = false,
-        tintColor: Color = .primary
+        tintColor: Color? = nil
     ) {
         self.icon = icon
         self.title = title
@@ -109,49 +100,53 @@ struct SettingsRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Icon
+        HStack(spacing: theme.spacing.sm) {
             if let icon = icon {
                 Image(systemName: icon)
-                    .font(.system(size: SettingsDesign.iconSize))
-                    .foregroundColor(tintColor)
-                    .frame(width: SettingsDesign.iconFrame)
+                    .font(theme.typography.headlineSmall)
+                    .foregroundColor(resolvedTint)
+                    .frame(width: SettingsLayout.iconFrame)
             }
 
-            // Title + Subtitle stack
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
                 Text(title)
-                    .font(SettingsDesign.titleFont)
-                    .foregroundColor(tintColor)
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(resolvedTint)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 if let subtitle = subtitle {
                     Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.captionLarge)
+                        .foregroundColor(theme.colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
             Spacer()
 
-            // Value
             if let value = value {
                 Text(value)
-                    .font(SettingsDesign.valueFont)
-                    .foregroundColor(.secondary)
+                    .font(theme.typography.captionLarge)
+                    .foregroundColor(theme.colors.textSecondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             }
 
-            // Chevron or External Link
             if showChevron {
                 Image(systemName: isExternal ? "arrow.up.right.square" : "chevron.right")
-                    .font(SettingsDesign.chevronSize)
-                    .foregroundColor(Color(.tertiaryLabel))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(theme.colors.textTertiary)
             }
         }
-        .padding(.horizontal, SettingsDesign.horizontalPadding)
-        .padding(.vertical, SettingsDesign.verticalPadding)
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
+        .frame(minHeight: SettingsLayout.rowMinHeight)
         .contentShape(Rectangle())
+    }
+
+    private var resolvedTint: Color {
+        tintColor ?? theme.colors.text
     }
 }
 
@@ -163,14 +158,14 @@ struct SettingsNavigationLink<Destination: View>: View {
     let subtitle: String?
     let value: String?
     let destination: Destination
-    var tintColor: Color
+    var tintColor: Color?
 
     init(
         icon: String? = nil,
         title: String,
         subtitle: String? = nil,
         value: String? = nil,
-        tintColor: Color = .primary,
+        tintColor: Color? = nil,
         @ViewBuilder destination: () -> Destination
     ) {
         self.icon = icon
@@ -198,10 +193,13 @@ struct SettingsNavigationLink<Destination: View>: View {
 // MARK: - Toggle Row
 
 struct SettingsToggleRow: View {
+    @Environment(\.theme)
+    private var theme
+
     let icon: String?
     let title: String
     @Binding var isOn: Bool
-    var tintColor: Color
+    var tintColor: Color?
     var subtitle: String?
     var onToggle: ((Bool) -> Void)?
 
@@ -209,7 +207,7 @@ struct SettingsToggleRow: View {
         icon: String? = nil,
         title: String,
         isOn: Binding<Bool>,
-        tintColor: Color = .primary,
+        tintColor: Color? = nil,
         subtitle: String? = nil,
         onToggle: ((Bool) -> Void)? = nil
     ) {
@@ -222,23 +220,25 @@ struct SettingsToggleRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: theme.spacing.sm) {
             if let icon = icon {
                 Image(systemName: icon)
-                    .font(.system(size: SettingsDesign.iconSize))
-                    .foregroundColor(tintColor)
-                    .frame(width: SettingsDesign.iconFrame)
+                    .font(theme.typography.headlineSmall)
+                    .foregroundColor(resolvedTint)
+                    .frame(width: SettingsLayout.iconFrame)
             }
 
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
                 Text(title)
-                    .font(SettingsDesign.titleFont)
-                    .foregroundColor(tintColor)
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(resolvedTint)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 if let subtitle = subtitle {
                     Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.captionLarge)
+                        .foregroundColor(theme.colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -247,19 +247,27 @@ struct SettingsToggleRow: View {
 
             Toggle("", isOn: $isOn)
                 .labelsHidden()
-                .tint(.appPrimary)
+                .tint(theme.colors.primary)
         }
-        .padding(.horizontal, SettingsDesign.horizontalPadding)
-        .padding(.vertical, SettingsDesign.verticalPadding)
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
+        .frame(minHeight: SettingsLayout.rowMinHeight)
         .onChange(of: isOn) { _, newValue in
             onToggle?(newValue)
         }
+    }
+
+    private var resolvedTint: Color {
+        tintColor ?? theme.colors.text
     }
 }
 
 // MARK: - Button Row
 
 struct SettingsButtonRow: View {
+    @Environment(\.theme)
+    private var theme
+
     let icon: String?
     let title: String
     let role: ButtonRole?
@@ -283,7 +291,7 @@ struct SettingsButtonRow: View {
                 icon: icon,
                 title: title,
                 showChevron: false,
-                tintColor: role == .destructive ? .red : .primary
+                tintColor: role == .destructive ? theme.colors.error : nil
             )
         }
     }
@@ -292,6 +300,9 @@ struct SettingsButtonRow: View {
 // MARK: - Picker Row
 
 struct SettingsPickerRow<SelectionValue: Hashable>: View {
+    @Environment(\.theme)
+    private var theme
+
     let icon: String?
     let title: String
     @Binding var selection: SelectionValue
@@ -303,28 +314,32 @@ struct SettingsPickerRow<SelectionValue: Hashable>: View {
                 Text(option.label).tag(option.value)
             }
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: theme.spacing.sm) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: SettingsDesign.iconSize))
-                        .foregroundColor(.primary)
-                        .frame(width: SettingsDesign.iconFrame)
+                        .font(theme.typography.headlineSmall)
+                        .foregroundColor(theme.colors.text)
+                        .frame(width: SettingsLayout.iconFrame)
                 }
 
                 Text(title)
-                    .font(SettingsDesign.titleFont)
-                    .foregroundColor(.primary)
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(theme.colors.text)
             }
         }
         .pickerStyle(.menu)
-        .padding(.horizontal, SettingsDesign.horizontalPadding)
-        .padding(.vertical, SettingsDesign.verticalPadding)
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
+        .frame(minHeight: SettingsLayout.rowMinHeight)
     }
 }
 
 // MARK: - Success Overlay
 
 struct SuccessOverlay: View {
+    @Environment(\.theme)
+    private var theme
+
     @Binding var isShowing: Bool
     let message: String
     let icon: String
@@ -344,20 +359,26 @@ struct SuccessOverlay: View {
 
     var body: some View {
         if isShowing {
-            VStack(spacing: 16) {
+            VStack(spacing: theme.spacing.md) {
                 Image(systemName: icon)
-                    .font(.system(size: 60))
-                    .foregroundColor(.green)
+                    .font(theme.typography.displayMedium)
+                    .foregroundColor(theme.colors.success)
 
                 Text(message)
-                    .font(.headline)
+                    .font(theme.typography.headlineSmall)
+                    .foregroundColor(theme.colors.text)
                     .multilineTextAlignment(.center)
             }
-            .padding(32)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.appCard)
-                    .shadow(radius: 20)
+            .padding(theme.spacing.xl)
+            .systemBGlassSurface(
+                cornerRadius: theme.radius.lg,
+                tint: theme.colors.text,
+                tintOpacity: 0.055,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.8,
+                shadowOpacity: 0.32,
+                shadowRadius: 20,
+                shadowY: 10
             )
             .transition(.scale.combined(with: .opacity))
             .onAppear {
@@ -374,6 +395,9 @@ struct SuccessOverlay: View {
 // MARK: - Loading Overlay
 
 struct LoadingOverlay: View {
+    @Environment(\.theme)
+    private var theme
+
     let message: String
     let progress: Double?
 
@@ -384,28 +408,31 @@ struct LoadingOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.5)
+            theme.colors.background.opacity(0.58)
                 .ignoresSafeArea()
 
-            VStack(spacing: 20) {
+            VStack(spacing: theme.spacing.lg) {
                 if let progress = progress {
                     ProgressView(value: progress)
                         .progressViewStyle(.linear)
-                        .tint(.appPrimary)
+                        .tint(theme.colors.primary)
                 } else {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .appPrimary))
+                        .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.primary))
                         .scaleEffect(1.5)
                 }
 
                 Text(message)
-                    .font(.headline)
-                    .foregroundColor(.primary)
+                    .font(theme.typography.headlineSmall)
+                    .foregroundColor(theme.colors.text)
             }
-            .padding(32)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.appCard)
+            .padding(theme.spacing.xl)
+            .systemBGlassSurface(
+                cornerRadius: theme.radius.lg,
+                tint: theme.colors.text,
+                tintOpacity: 0.055,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.8
             )
         }
     }
@@ -414,6 +441,9 @@ struct LoadingOverlay: View {
 // MARK: - Empty State
 
 struct SettingsEmptyState: View {
+    @Environment(\.theme)
+    private var theme
+
     let icon: String
     let title: String
     let message: String
@@ -423,7 +453,7 @@ struct SettingsEmptyState: View {
         icon: String,
         title: String,
         message: String,
-        iconColor: Color = .appTextSecondary
+        iconColor: Color = DefaultTheme().colors.textSecondary
     ) {
         self.icon = icon
         self.title = title
@@ -432,21 +462,21 @@ struct SettingsEmptyState: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: theme.spacing.md) {
             Image(systemName: icon)
-                .font(.system(size: 48))
+                .font(theme.typography.displayLarge)
                 .foregroundColor(iconColor)
 
             Text(title)
-                .font(.headline)
-                .foregroundColor(.primary)
+                .font(theme.typography.headlineSmall)
+                .foregroundColor(theme.colors.text)
 
             Text(message)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(theme.typography.bodySmall)
+                .foregroundColor(theme.colors.textSecondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(32)
+        .padding(theme.spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
@@ -454,6 +484,9 @@ struct SettingsEmptyState: View {
 // MARK: - Data Info Row
 
 struct DataInfoRow: View {
+    @Environment(\.theme)
+    private var theme
+
     let icon: String
     let title: String
     let description: String?
@@ -463,7 +496,7 @@ struct DataInfoRow: View {
         icon: String,
         title: String,
         description: String? = nil,
-        iconColor: Color = .appPrimary
+        iconColor: Color = DefaultTheme().colors.primary
     ) {
         self.icon = icon
         self.title = title
@@ -472,29 +505,30 @@ struct DataInfoRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
+        HStack(alignment: .center, spacing: theme.spacing.md) {
             Image(systemName: icon)
-                .font(.system(size: 24))
+                .font(theme.typography.headlineMedium)
                 .foregroundColor(iconColor)
                 .frame(width: 32)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.primary)
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(theme.colors.text)
 
                 if let description = description {
                     Text(description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(theme.typography.captionLarge)
+                        .foregroundColor(theme.colors.textSecondary)
                         .lineLimit(2)
                 }
             }
 
             Spacer()
         }
-        .padding(.horizontal, SettingsDesign.horizontalPadding)
-        .padding(.vertical, SettingsDesign.verticalPadding)
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
+        .frame(minHeight: SettingsLayout.rowMinHeight)
     }
 }
 
@@ -502,24 +536,84 @@ struct DataInfoRow: View {
 
 extension View {
     func settingsRowStyle() -> some View {
-        self
-            .frame(minHeight: SettingsDesign.rowHeight)
-            .contentShape(Rectangle())
+        modifier(SettingsRowStyleModifier())
     }
 
     func settingsCardStyle() -> some View {
-        self
-            .background(Color.appCard)
-            .cornerRadius(SettingsDesign.cornerRadius)
+        modifier(SettingsCardStyleModifier())
     }
 
     func settingsSectionStyle() -> some View {
-        self
-            .padding(.horizontal, 20)
+        modifier(SettingsSectionStyleModifier())
     }
 
     func settingsBackground() -> some View {
-        self
-            .background(Color.appBackground.ignoresSafeArea())
+        modifier(SettingsBackgroundModifier())
+    }
+
+    func settingsInputStyle() -> some View {
+        modifier(SettingsInputStyleModifier())
+    }
+}
+
+private struct SettingsRowStyleModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .frame(minHeight: SettingsLayout.rowMinHeight)
+            .contentShape(Rectangle())
+    }
+}
+
+private struct SettingsCardStyleModifier: ViewModifier {
+    @Environment(\.theme)
+    private var theme
+
+    func body(content: Content) -> some View {
+        content.systemBGlassSurface(
+            cornerRadius: theme.radius.card,
+            tint: theme.colors.text,
+            tintOpacity: 0.045,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.75
+        )
+    }
+}
+
+private struct SettingsSectionStyleModifier: ViewModifier {
+    @Environment(\.theme)
+    private var theme
+
+    func body(content: Content) -> some View {
+        content.padding(.horizontal, theme.spacing.screenPadding)
+    }
+}
+
+private struct SettingsBackgroundModifier: ViewModifier {
+    @Environment(\.theme)
+    private var theme
+
+    func body(content: Content) -> some View {
+        content.background(theme.colors.background.ignoresSafeArea())
+    }
+}
+
+private struct SettingsInputStyleModifier: ViewModifier {
+    @Environment(\.theme)
+    private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .font(theme.typography.bodyMedium)
+            .foregroundColor(theme.colors.text)
+            .tint(theme.colors.primary)
+            .padding(.horizontal, theme.spacing.md)
+            .padding(.vertical, theme.spacing.sm)
+            .systemBGlassSurface(
+                cornerRadius: theme.radius.input,
+                tint: theme.colors.text,
+                tintOpacity: 0.045,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.75
+            )
     }
 }

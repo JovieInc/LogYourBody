@@ -6,23 +6,25 @@ import SwiftUI
 
 extension PreferencesView {
     var heroHeader: some View {
-        VStack(spacing: 16) {
-            HStack(alignment: .center, spacing: 16) {
+        VStack(spacing: theme.spacing.md) {
+            HStack(alignment: .center, spacing: theme.spacing.md) {
                 heroAvatar
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                     Text(userDisplayName)
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(.appText)
+                        .font(theme.typography.headlineMedium)
+                        .foregroundColor(theme.colors.text)
 
                     Text(userEmail)
-                        .font(.subheadline)
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.bodySmall)
+                        .foregroundColor(theme.colors.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
 
                     if let memberSinceText {
                         Text(memberSinceText)
-                            .font(.caption)
-                            .foregroundColor(.appTextSecondary)
+                            .font(theme.typography.captionMedium)
+                            .foregroundColor(theme.colors.textSecondary)
                     }
                 }
 
@@ -31,9 +33,14 @@ extension PreferencesView {
 
             statusBadge
         }
-        .padding(20)
-        .background(Color.appCard)
-        .cornerRadius(16)
+        .padding(theme.spacing.md)
+        .systemBGlassSurface(
+            cornerRadius: theme.radius.card,
+            tint: theme.colors.text,
+            tintOpacity: 0.05,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.75
+        )
     }
 
     var compactHeader: some View {
@@ -41,18 +48,19 @@ extension PreferencesView {
             HStack {
                 heroAvatarSmall
                 Text(userDisplayName)
-                    .font(.headline)
-                    .foregroundColor(.appText)
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(theme.colors.text)
+                    .lineLimit(1)
                 Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.top, topSafeArea + 8)
-            .padding(.bottom, 12)
-            .background(Color.appBackground.opacity(0.95))
+            .padding(.horizontal, theme.spacing.screenPadding)
+            .padding(.top, topSafeArea + theme.spacing.xs)
+            .padding(.bottom, theme.spacing.sm)
+            .background(theme.colors.background.opacity(0.95))
             .opacity(scrollOffset < -60 ? 1 : 0)
         }
         .ignoresSafeArea(edges: .top)
-        .animation(.easeInOut(duration: 0.2), value: scrollOffset)
+        .animation(theme.animation.fast, value: scrollOffset)
     }
 
     var heroAvatar: some View {
@@ -75,11 +83,11 @@ extension PreferencesView {
 
             if isUploadingPhoto {
                 Circle()
-                    .fill(Color.black.opacity(0.45))
+                    .fill(theme.colors.background.opacity(0.58))
                     .frame(width: 72, height: 72)
 
                 ProgressView(value: avatarUploadProgress)
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.text))
                     .scaleEffect(0.8)
             }
         }
@@ -106,22 +114,21 @@ extension PreferencesView {
     }
 
     var statusBadge: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: theme.spacing.xs) {
             Circle()
-                .fill(revenueCatManager.isSubscribed ? Color.green : Color.orange)
+                .fill(revenueCatManager.isSubscribed ? theme.colors.success : theme.colors.warning)
                 .frame(width: 8, height: 8)
 
             Text(subscriptionStatusText)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.appTextSecondary)
+                .font(theme.typography.captionLarge)
+                .foregroundColor(theme.colors.textSecondary)
 
             if let planDisplay = subscriptionPlanDisplay {
                 Text("•")
-                    .foregroundColor(.appTextTertiary)
+                    .foregroundColor(theme.colors.textTertiary)
                 Text(planDisplay)
-                    .font(.caption)
-                    .foregroundColor(.appTextSecondary)
+                    .font(theme.typography.captionLarge)
+                    .foregroundColor(theme.colors.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -129,11 +136,11 @@ extension PreferencesView {
 
     var avatarPlaceholder: some View {
         Circle()
-            .fill(Color.white.opacity(0.1))
+            .fill(theme.colors.surfaceTertiary)
             .overlay(
                 Text(userInitials)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(theme.typography.headlineMedium)
+                    .foregroundColor(theme.colors.text)
             )
     }
 }

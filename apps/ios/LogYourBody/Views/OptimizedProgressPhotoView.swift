@@ -202,6 +202,25 @@ extension OptimizedProgressPhotoView {
         return imageCache.object(forKey: NSString(string: urlString))
     }
 
+    static func resolvedImage(for urlString: String?) async -> UIImage? {
+        guard let urlString, !urlString.isEmpty else { return nil }
+
+        let cacheKey = NSString(string: urlString)
+        if let cached = await MainActor.run(body: { imageCache.object(forKey: cacheKey) }) {
+            return cached
+        }
+
+        guard let image = try? await ProgressPhotoImagePipeline.loadImage(urlString: urlString) else {
+            return nil
+        }
+
+        let cost = ProgressPhotoImagePipeline.cacheCost(for: image)
+        await MainActor.run {
+            imageCache.setObject(image, forKey: cacheKey, cost: cost)
+        }
+        return image
+    }
+
     static func preloadImages(urls: [String]) {
         for urlString in urls {
             let cacheKey = NSString(string: urlString)

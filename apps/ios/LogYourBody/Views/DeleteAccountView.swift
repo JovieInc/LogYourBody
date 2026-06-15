@@ -9,6 +9,8 @@ struct DeleteAccountView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss)
     private var dismiss
+    @Environment(\.theme)
+    private var theme
     @State private var showConfirmation = false
     @State private var confirmationText = ""
     @State private var isDeleting = false
@@ -21,36 +23,34 @@ struct DeleteAccountView: View {
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(spacing: SettingsDesign.sectionSpacing) {
-                    // Header Section
-                    VStack(spacing: 20) {
+                VStack(spacing: theme.spacing.sectionSpacing) {
+                    VStack(spacing: theme.spacing.md) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(.red)
-                            .padding(.top, 20)
+                            .font(theme.typography.displayMedium)
+                            .foregroundColor(theme.colors.error)
+                            .padding(.top, theme.spacing.lg)
 
                         Text("Delete Account")
-                            .font(.title2)
-                            .fontWeight(.bold)
+                            .font(theme.typography.headlineMedium)
+                            .foregroundColor(theme.colors.text)
 
                         Text(
                             "This action cannot be undone. Your LogYourBody data will be permanently deleted. " +
                                 "Data in Apple Health stays in the Health app."
                         )
-                        .font(.body)
-                        .foregroundColor(.secondary)
+                        .font(theme.typography.bodyMedium)
+                        .foregroundColor(theme.colors.textSecondary)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                        .padding(.horizontal, theme.spacing.lg)
                     }
-                    .padding(.bottom, 20)
+                    .padding(.bottom, theme.spacing.lg)
 
-                    // What will be deleted section
                     SettingsSection(header: "What will be deleted") {
                         VStack(spacing: 0) {
                             DataInfoRow(
                                 icon: "scalemass",
                                 title: "All weight entries",
-                                iconColor: .red
+                                iconColor: theme.colors.error
                             )
 
                             Divider()
@@ -58,7 +58,7 @@ struct DeleteAccountView: View {
                             DataInfoRow(
                                 icon: "person.circle",
                                 title: "Your profile information",
-                                iconColor: .red
+                                iconColor: theme.colors.error
                             )
 
                             Divider()
@@ -66,7 +66,7 @@ struct DeleteAccountView: View {
                             DataInfoRow(
                                 icon: "heart.fill",
                                 title: "Health data stored in LogYourBody",
-                                iconColor: .red
+                                iconColor: theme.colors.error
                             )
 
                             Divider()
@@ -74,7 +74,7 @@ struct DeleteAccountView: View {
                             DataInfoRow(
                                 icon: "creditcard.fill",
                                 title: "Active subscription (if any)",
-                                iconColor: .red
+                                iconColor: theme.colors.error
                             )
                         }
                     }
@@ -86,7 +86,7 @@ struct DeleteAccountView: View {
                     ) {
                         VStack(spacing: 12) {
                             TextField("Type \(confirmationPhrase)", text: $confirmationText)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .textFieldStyle(.plain)
                                 .autocapitalization(.allCharacters)
                                 .disableAutocorrection(true)
                                 .focused($isTextFieldFocused)
@@ -94,18 +94,18 @@ struct DeleteAccountView: View {
                                 .onSubmit {
                                     isTextFieldFocused = false
                                 }
-                                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                                .padding(.vertical, 8)
+                                .settingsInputStyle()
+                                .padding(.horizontal, theme.spacing.md)
+                                .padding(.vertical, theme.spacing.xs)
                         }
                     }
 
-                    // Delete Button
                     BaseButton(
                         "Delete My Account",
                         configuration: ButtonConfiguration(
                             style: confirmationText == confirmationPhrase
-                                ? .custom(background: .red, foreground: .white)
-                                : .custom(background: .gray, foreground: .white),
+                                ? .custom(background: theme.colors.error, foreground: theme.colors.text)
+                                : .custom(background: theme.colors.interactiveDisabled, foreground: theme.colors.text),
                             isLoading: isDeleting,
                             isEnabled: confirmationText == confirmationPhrase,
                             fullWidth: true
@@ -115,14 +115,14 @@ struct DeleteAccountView: View {
                             deleteAccount()
                         }
                     )
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, theme.spacing.screenPadding)
 
-                    // Bottom padding
                     Color.clear
                         .frame(height: 100)
                 }
-                .padding(.vertical)
+                .padding(.vertical, theme.spacing.md)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .scrollDismissesKeyboard(.interactively)
             .settingsBackground()
 

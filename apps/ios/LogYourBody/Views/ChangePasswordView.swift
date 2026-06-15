@@ -8,6 +8,8 @@ import Clerk
 struct ChangePasswordView: View {
     @Environment(\.dismiss)
     var dismiss
+    @Environment(\.theme)
+    private var theme
     @State private var currentPassword = ""
     @State private var newPassword = ""
     @State private var confirmPassword = ""
@@ -48,62 +50,62 @@ struct ChangePasswordView: View {
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(spacing: SettingsDesign.sectionSpacing) {
-                    // Header Icon
-                    VStack(spacing: 20) {
+                VStack(spacing: theme.spacing.sectionSpacing) {
+                    VStack(spacing: theme.spacing.md) {
                         ZStack {
                             Circle()
-                                .fill(Color.appPrimary.opacity(0.1))
+                                .fill(theme.colors.primary.opacity(0.12))
                                 .frame(width: 80, height: 80)
 
                             Image(systemName: "lock.shield")
-                                .font(.system(size: 36, weight: .medium))
-                                .foregroundColor(.appPrimary)
+                                .font(theme.typography.displayMedium)
+                                .foregroundColor(theme.colors.primary)
                         }
-                        .padding(.top, 20)
+                        .padding(.top, theme.spacing.lg)
 
                         Text("Change Password")
-                            .font(.title2)
-                            .fontWeight(.bold)
+                            .font(theme.typography.headlineMedium)
+                            .foregroundColor(theme.colors.text)
 
                         Text("Create a strong password to protect your account")
-                            .font(.body)
-                            .foregroundColor(.secondary)
+                            .font(theme.typography.bodyMedium)
+                            .foregroundColor(theme.colors.textSecondary)
                             .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
+                            .padding(.horizontal, theme.spacing.lg)
                     }
-                    .padding(.bottom, 20)
+                    .padding(.bottom, theme.spacing.lg)
 
                     // Form Fields
                     SettingsSection(header: "Current Password") {
                         SecureField("Enter current password", text: $currentPassword)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .textFieldStyle(.plain)
                             .textContentType(.password)
                             .focused($focusedField, equals: .current)
                             .onSubmit {
                                 focusedField = .new
                             }
-                            .padding(.horizontal, SettingsDesign.horizontalPadding)
-                            .padding(.vertical, 8)
+                            .settingsInputStyle()
+                            .padding(.horizontal, theme.spacing.md)
+                            .padding(.vertical, theme.spacing.xs)
                     }
 
                     SettingsSection(
                         header: "New Password",
                         footer: "Password must meet all requirements below"
                     ) {
-                        VStack(spacing: 12) {
+                        VStack(spacing: theme.spacing.sm) {
                             SecureField("Enter new password", text: $newPassword)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .textFieldStyle(.plain)
                                 .textContentType(.newPassword)
                                 .focused($focusedField, equals: .new)
                                 .onSubmit {
                                     focusedField = .confirm
                                 }
-                                .padding(.horizontal, SettingsDesign.horizontalPadding)
-                                .padding(.top, 8)
+                                .settingsInputStyle()
+                                .padding(.horizontal, theme.spacing.md)
+                                .padding(.top, theme.spacing.xs)
 
-                            // Password Requirements
-                            VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: theme.spacing.xs) {
                                 PasswordRequirement(
                                     text: "At least 8 characters",
                                     isMet: newPassword.count >= 8
@@ -119,8 +121,8 @@ struct ChangePasswordView: View {
                                     isMet: hasNumberOrSymbol
                                 )
                             }
-                            .padding(.horizontal, SettingsDesign.horizontalPadding)
-                            .padding(.bottom, 8)
+                            .padding(.horizontal, theme.spacing.md)
+                            .padding(.bottom, theme.spacing.xs)
                         }
                     }
 
@@ -129,7 +131,7 @@ struct ChangePasswordView: View {
                         footer: !confirmPassword.isEmpty && !passwordsMatch ? "Passwords don't match" : nil
                     ) {
                         SecureField("Re-enter new password", text: $confirmPassword)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .textFieldStyle(.plain)
                             .textContentType(.newPassword)
                             .focused($focusedField, equals: .confirm)
                             .onSubmit {
@@ -137,31 +139,32 @@ struct ChangePasswordView: View {
                                     changePassword()
                                 }
                             }
-                            .padding(.horizontal, SettingsDesign.horizontalPadding)
-                            .padding(.vertical, 8)
+                            .settingsInputStyle()
+                            .padding(.horizontal, theme.spacing.md)
+                            .padding(.vertical, theme.spacing.xs)
                     }
 
-                    // Submit Button
                     BaseButton(
                         "Update Password",
                         configuration: ButtonConfiguration(
                             style: isValidForm
-                                ? .custom(background: .appPrimary, foreground: .white)
-                                : .custom(background: .gray, foreground: .white),
+                                ? .custom(background: theme.colors.primary, foreground: theme.colors.text)
+                                : .custom(background: theme.colors.interactiveDisabled, foreground: theme.colors.text),
                             isLoading: isLoading,
                             isEnabled: isValidForm,
                             fullWidth: true
                         ),
                         action: changePassword
                     )
-                    .animation(.easeInOut(duration: 0.2), value: isValidForm)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
+                    .animation(theme.animation.fast, value: isValidForm)
+                    .padding(.horizontal, theme.spacing.screenPadding)
+                    .padding(.top, theme.spacing.lg)
 
                     Spacer(minLength: 40)
                 }
-                .padding(.vertical)
+                .padding(.vertical, theme.spacing.md)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .settingsBackground()
 
             // Loading overlay
@@ -237,18 +240,21 @@ struct ChangePasswordView: View {
 }
 
 struct PasswordRequirement: View {
+    @Environment(\.theme)
+    private var theme
+
     let text: String
     let isMet: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: theme.spacing.xs) {
             Image(systemName: isMet ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 14))
-                .foregroundColor(isMet ? .green : .secondary)
+                .font(theme.typography.captionLarge)
+                .foregroundColor(isMet ? theme.colors.success : theme.colors.textTertiary)
 
             Text(text)
-                .font(SettingsDesign.valueFont)
-                .foregroundColor(isMet ? .primary : .secondary)
+                .font(theme.typography.captionLarge)
+                .foregroundColor(isMet ? theme.colors.text : theme.colors.textSecondary)
         }
     }
 }

@@ -9,6 +9,7 @@ DESTINATION="${DESTINATION:-platform=iOS Simulator,name=LYB Golden iPhone 16}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$IOS_DIR/test_results/launch-quality-audit/$STAMP}"
 RUN_SWIFTLINT="${RUN_SWIFTLINT:-true}"
+RUN_STATIC_UI_REGRESSION_AUDIT="${RUN_STATIC_UI_REGRESSION_AUDIT:-true}"
 RUN_RUNTIME_WARNING_AUDIT="${RUN_RUNTIME_WARNING_AUDIT:-true}"
 FAIL_ON_RUNTIME_WARNINGS="${FAIL_ON_RUNTIME_WARNINGS:-false}"
 XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO}"
@@ -20,6 +21,10 @@ BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 read -r -a XCODEBUILD_SETTINGS_ARRAY <<< "$XCODEBUILD_SETTINGS"
+
+if [[ "$ARTIFACT_DIR" != /* ]]; then
+  ARTIFACT_DIR="$ROOT_DIR/$ARTIFACT_DIR"
+fi
 
 mkdir -p "$ARTIFACT_DIR"
 
@@ -195,6 +200,15 @@ if [[ "$RUN_SWIFTLINT" == "true" ]]; then
   swiftlint lint --strict | tee "$ARTIFACT_DIR/swiftlint.log"
 fi
 
+if [[ "$RUN_STATIC_UI_REGRESSION_AUDIT" == "true" ]]; then
+  python3 "$ROOT_DIR/scripts/ios/launch-ui-regression-audit.py" \
+    --root "$ROOT_DIR" \
+    --artifact-dir "$ARTIFACT_DIR" |
+    tee "$ARTIFACT_DIR/launch-ui-regression-audit.log"
+else
+  echo "Skipping static launch UI regression audit" | tee "$ARTIFACT_DIR/launch-ui-regression-audit.log"
+fi
+
 build_for_testing_once
 
 run_xcodebuild_test \
@@ -222,6 +236,7 @@ fi
 {
   printf '# iOS Launch Quality Audit\n\n'
   printf -- '- Destination: `%s`\n' "$DESTINATION"
+  printf -- '- Static UI regression audit: `launch-ui-regression-audit.md`\n'
   printf -- '- Unit coverage: photo timeline HUD policy, Body Score share card layout\n'
   printf -- '- UI coverage: timeline routing, no bottom stats switch card, home/analytics/onboarding/share screenshot attachments\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"

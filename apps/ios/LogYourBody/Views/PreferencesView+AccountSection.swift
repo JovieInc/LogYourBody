@@ -21,8 +21,7 @@ extension PreferencesView {
         SettingsRow(
             icon: "envelope.fill",
             title: "Email",
-            value: userEmail,
-            tintColor: .appText
+            value: userEmail
         )
     }
 
@@ -33,8 +32,7 @@ extension PreferencesView {
             SettingsRow(
                 icon: "camera.fill",
                 title: isUploadingPhoto ? "Uploading..." : "Change profile photo",
-                value: isUploadingPhoto ? "\(Int(avatarUploadProgress * 100))%" : nil,
-                tintColor: .appText
+                value: isUploadingPhoto ? "\(Int(avatarUploadProgress * 100))%" : nil
             )
         }
         .buttonStyle(.plain)
@@ -101,20 +99,20 @@ extension PreferencesView {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: theme.spacing.sm) {
                 Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(.appTextSecondary)
+                    .font(theme.typography.headlineSmall)
+                    .foregroundColor(theme.colors.textSecondary)
                     .frame(width: 30)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                     Text(title)
-                        .font(SettingsDesign.titleFont)
-                        .foregroundColor(.appText)
+                        .font(theme.typography.labelLarge)
+                        .foregroundColor(theme.colors.text)
 
                     Text(value)
-                        .font(.system(size: 13))
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.captionLarge)
+                        .foregroundColor(theme.colors.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -123,10 +121,10 @@ extension PreferencesView {
 
                 Image(systemName: "chevron.right")
                     .font(.caption)
-                    .foregroundColor(.appTextSecondary.opacity(0.5))
+                    .foregroundColor(theme.colors.textTertiary)
             }
-            .padding(.horizontal, SettingsDesign.horizontalPadding)
-            .padding(.vertical, SettingsDesign.verticalPadding)
+            .padding(.horizontal, theme.spacing.md)
+            .padding(.vertical, theme.spacing.sm)
             .background(Color.clear)
         }
         .buttonStyle(.plain)

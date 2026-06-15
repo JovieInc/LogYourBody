@@ -10,6 +10,7 @@ import PhotosUI
 struct PreferencesView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.openURL) var openURL
+    @Environment(\.theme) var theme
     @StateObject var revenueCatManager = RevenueCatManager.shared
     @StateObject var notificationManager = NotificationManager.shared
     @AppStorage(Constants.preferredMeasurementSystemKey) var measurementSystem = PreferencesView.defaultMeasurementSystem
@@ -55,7 +56,7 @@ struct PreferencesView: View {
     var body: some View {
         ZStack(alignment: .top) {
             ScrollView {
-                VStack(spacing: SettingsDesign.sectionSpacing) {
+                VStack(spacing: theme.spacing.sectionSpacing) {
                     heroHeader
                     accountSection
                     profileSection
@@ -68,8 +69,8 @@ struct PreferencesView: View {
                     advancedSection
                     dangerSection
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical)
+                .padding(.horizontal, theme.spacing.screenPadding)
+                .padding(.vertical, theme.spacing.md)
                 .background(
                     GeometryReader { geo in
                         Color.clear.preference(
@@ -80,6 +81,7 @@ struct PreferencesView: View {
                 )
             }
             .coordinateSpace(name: "settingsScroll")
+            .scrollBounceBehavior(.basedOnSize)
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                 scrollOffset = value
             }
