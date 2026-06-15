@@ -27,7 +27,7 @@
     "test:seed": "tsx scripts/test-seeded-users.ts"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.35.5",
+    "@clerk/nextjs": "^7.5.2",
     "@headlessui/react": "^2.2.9",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
