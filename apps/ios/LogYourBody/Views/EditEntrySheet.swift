@@ -140,17 +140,15 @@ struct EditEntrySheet: View {
 
     private var validationMessage: String? {
         guard !primaryValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        guard let value = Double(primaryValue) else { return "Enter a valid number" }
 
         switch metricType {
         case .weight:
-            let bounds: (Double, Double) = measurementSystem == .metric ? (30, 300) : (70, 660)
-            if value < bounds.0 || value > bounds.1 {
-                return "Weight must be between \(Int(bounds.0)) and \(Int(bounds.1)) \(measurementSystem.weightUnit)"
+            return validationErrorDescription {
+                _ = try ValidationService.shared.validateWeight(primaryValue, unit: measurementSystem.weightUnit)
             }
         case .bodyFat:
-            if value < 3 || value > 60 {
-                return "Body fat must be between 3-60%"
+            return validationErrorDescription {
+                _ = try ValidationService.shared.validateBodyFat(primaryValue)
             }
         default:
             break
@@ -194,10 +192,6 @@ struct EditEntrySheet: View {
 
     private func saveChanges() async {
         guard errorMessage == nil else { return }
-        guard let parsedValue = Double(primaryValue) else {
-            errorMessage = "Enter a valid number"
-            return
-        }
 
         isSaving = true
         defer { isSaving = false }
@@ -210,11 +204,25 @@ struct EditEntrySheet: View {
 
         switch metricType {
         case .weight:
-            weightKg = convertToKilograms(parsedValue)
-            bodyFat = nil
+            do {
+                let validatedWeight = try ValidationService.shared.validateWeight(
+                    primaryValue,
+                    unit: measurementSystem.weightUnit
+                )
+                weightKg = convertToKilograms(validatedWeight)
+                bodyFat = nil
+            } catch {
+                errorMessage = error.localizedDescription
+                return
+            }
         case .bodyFat:
-            weightKg = nil
-            bodyFat = parsedValue
+            do {
+                weightKg = nil
+                bodyFat = try ValidationService.shared.validateBodyFat(primaryValue)
+            } catch {
+                errorMessage = error.localizedDescription
+                return
+            }
         default:
             break
         }
@@ -240,5 +248,14 @@ struct EditEntrySheet: View {
 
     private func convertToKilograms(_ value: Double) -> Double {
         measurementSystem == .metric ? value : value / 2.20462
+    }
+
+    private func validationErrorDescription(_ expression: () throws -> Void) -> String? {
+        do {
+            try expression()
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
     }
 }

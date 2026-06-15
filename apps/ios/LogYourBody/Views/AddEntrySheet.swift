@@ -385,6 +385,9 @@ struct AddEntrySheet: View {
                     .pickerStyle(MenuPickerStyle())
                     .frame(width: 80)
                     .accessibilityLabel("Weight unit")
+                    .onChange(of: weightUnit) { _, _ in
+                        validateWeight(weight)
+                    }
                 }
 
                 // Helper text
@@ -394,7 +397,7 @@ struct AddEntrySheet: View {
                         .foregroundColor(.error)
                         .accessibilityLabel("Weight validation error: \(error)")
                 } else {
-                    Text(resolvedWeightUnit == "kg" ? "Valid range: 20-500 kg" : "Valid range: 44-1100 lbs")
+                    Text("Use today's scale weight.")
                         .font(.appBodySmall)
                         .foregroundColor(.appTextTertiary)
                 }

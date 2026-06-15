@@ -237,11 +237,11 @@ struct UnitConversion {
 
     // MARK: - Validation
 
-    /// Validate weight value is within reasonable range
+    /// Validate weight value is within reasonable adult tracking range
     /// - Parameter weightKg: Weight in kilograms
-    /// - Returns: True if valid (20-300 kg)
+    /// - Returns: True if valid (32-300 kg)
     static func isValidWeight(_ weightKg: Double) -> Bool {
-        return weightKg >= 20 && weightKg <= 300
+        return weightKg >= 32 && weightKg <= 300
     }
 
     /// Validate height value is within reasonable range

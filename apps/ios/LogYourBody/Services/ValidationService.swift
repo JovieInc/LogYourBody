@@ -35,7 +35,9 @@ final class ValidationService {
 
         let range = weightRange(for: unit)
         guard range.contains(weight) else {
-            throw ValidationError.invalidWeight("Weight must be between \(Int(range.lowerBound))-\(Int(range.upperBound)) \(unit)")
+            throw ValidationError.invalidWeight(
+                "Enter a weight between \(Int(range.lowerBound)) and \(Int(range.upperBound)) \(unit)"
+            )
         }
 
         return roundedToOneDecimal(weight)
@@ -86,9 +88,9 @@ final class ValidationService {
     private func weightRange(for unit: String) -> ClosedRange<Double> {
         switch unit.lowercased() {
         case "lbs":
-            return 44...1_100
+            return 70...660
         default:
-            return 20...500
+            return 32...300
         }
     }
 
