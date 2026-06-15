@@ -25,8 +25,8 @@
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
     "@commitlint/config-conventional": "^19.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.48.0",
-    "@typescript-eslint/parser": "^8.48.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.1",
+    "@typescript-eslint/parser": "^8.61.1",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.31.0",
@@ -34,9 +34,9 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "husky": "^9.0.0",
     "lint-staged": "^15.0.0",
-    "prettier": "^3.4.0",
-    "prettier-plugin-tailwindcss": "^0.7.1",
-    "turbo": "^2.6.1",
+    "prettier": "^3.8.4",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "turbo": "^2.9.18",
     "typescript": "^5.9.3",
     "vitest": "^2.1.4"
   },
