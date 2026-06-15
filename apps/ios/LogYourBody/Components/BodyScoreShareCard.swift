@@ -71,15 +71,7 @@ struct BodyScoreShareCardView: View {
                 visualStage(layout: layout)
                     .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
 
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.62),
-                        Color.black.opacity(0.04),
-                        Color.black.opacity(0.94)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+                shareScrims(layout: layout)
 
                 VStack(spacing: 0) {
                     shareHeader(layout: layout)
@@ -139,7 +131,7 @@ struct BodyScoreShareCardView: View {
 
     private func shareHeader(layout: ShareCardLayout) -> some View {
         HStack(spacing: layout.headerSpacing) {
-            DSLogo(size: layout.logoSize, textSize: layout.logoTextSize)
+            DSLogo(size: layout.logoSize, showText: false)
 
             VStack(alignment: .leading, spacing: layout.headerTextSpacing) {
                 Text("LogYourBody")
@@ -211,6 +203,34 @@ struct BodyScoreShareCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func shareScrims(layout: ShareCardLayout) -> some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.98),
+                    Color.black.opacity(0.82),
+                    Color.black.opacity(0.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: layout.headerMatteHeight)
+
+            Spacer(minLength: 0)
+
+            LinearGradient(
+                colors: [
+                    Color.black,
+                    Color.black,
+                    Color.black
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: layout.summaryMatteHeight)
+        }
+    }
+
     private func shareMetric(
         _ title: String,
         _ value: String,
@@ -275,9 +295,9 @@ private struct ShareCardLayout {
     var visualTopOffset: CGFloat {
         switch aspect {
         case .square:
-            return size.height * 0.11
+            return size.height * 0.18
         case .portrait:
-            return size.height * 0.10
+            return size.height * 0.14
         case .story:
             return size.height * 0.12
         }
@@ -286,11 +306,33 @@ private struct ShareCardLayout {
     var visualHeight: CGFloat {
         switch aspect {
         case .square:
-            return size.height * 0.64
+            return size.height * 0.55
         case .portrait:
-            return size.height * 0.66
+            return size.height * 0.58
         case .story:
-            return size.height * 0.62
+            return size.height * 0.54
+        }
+    }
+
+    var headerMatteHeight: CGFloat {
+        switch aspect {
+        case .square:
+            return size.height * 0.25
+        case .portrait:
+            return size.height * 0.20
+        case .story:
+            return size.height * 0.18
+        }
+    }
+
+    var summaryMatteHeight: CGFloat {
+        switch aspect {
+        case .square:
+            return size.height * 0.58
+        case .portrait:
+            return size.height * 0.52
+        case .story:
+            return size.height * 0.42
         }
     }
 
@@ -323,75 +365,92 @@ struct BodyScoreShareSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                Picker("Format", selection: $selectedAspect) {
-                    ForEach(BodyScoreShareAspect.allCases) { aspect in
-                        Text(aspect.displayName).tag(aspect)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 20)
+        VStack(spacing: 18) {
+            sheetHeader
 
-                GeometryReader { geometry in
-                    let size = fittedSize(for: geometry.size, target: selectedAspect.pixelSize)
-
-                    BodyScoreShareCardView(payload: payload, aspect: selectedAspect)
-                        .frame(width: size.width, height: size.height)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                }
-                .frame(maxWidth: .infinity)
-
-                HStack(spacing: 12) {
-                    GlassPillButton(icon: "square.and.arrow.down", title: "Save") {
-                        Task { await saveToPhotos() }
-                    }
-                    .accessibilityIdentifier("body_score_share_save_button")
-
-                    GlassPillButton(icon: "square.and.arrow.up", title: "Share") {
-                        Task { await shareImage() }
-                    }
-                    .accessibilityIdentifier("body_score_share_system_button")
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
-                .disabled(isRendering)
-            }
-            .background(Color.appBackground.ignoresSafeArea())
-            .overlay {
-                if isRendering {
-                    ZStack {
-                        Color.black.opacity(0.35)
-                            .ignoresSafeArea()
-
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    }
+            Picker("Format", selection: $selectedAspect) {
+                ForEach(BodyScoreShareAspect.allCases) { aspect in
+                    Text(aspect.displayName).tag(aspect)
                 }
             }
-            .navigationTitle("Share Body Score")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        if let onClose {
-                            onClose()
-                        } else {
-                            dismiss()
-                        }
-                    }
-                }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+
+            GeometryReader { geometry in
+                let size = fittedSize(for: geometry.size, target: selectedAspect.pixelSize)
+
+                BodyScoreShareCardView(payload: payload, aspect: selectedAspect)
+                    .frame(width: size.width, height: size.height)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
-            .sheet(isPresented: $showSystemShareSheet) {
-                if let image = renderedImage {
-                    ShareSheet(items: [image])
+            .frame(maxWidth: .infinity)
+
+            HStack(spacing: 12) {
+                GlassPillButton(icon: "square.and.arrow.down", title: "Save") {
+                    Task { await saveToPhotos() }
+                }
+                .accessibilityIdentifier("body_score_share_save_button")
+
+                GlassPillButton(icon: "square.and.arrow.up", title: "Share") {
+                    Task { await shareImage() }
+                }
+                .accessibilityIdentifier("body_score_share_system_button")
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
+            .disabled(isRendering)
+        }
+        .padding(.top, 62)
+        .background(Color.appBackground.ignoresSafeArea())
+        .overlay {
+            if isRendering {
+                ZStack {
+                    Color.black.opacity(0.35)
                         .ignoresSafeArea()
+
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 }
-            }
-            .onChange(of: selectedAspect) { _, _ in
-                renderedImage = nil
             }
         }
+        .sheet(isPresented: $showSystemShareSheet) {
+            if let image = renderedImage {
+                ShareSheet(items: [image])
+                    .ignoresSafeArea()
+            }
+        }
+        .onChange(of: selectedAspect) { _, _ in
+            renderedImage = nil
+        }
+    }
+
+    private var sheetHeader: some View {
+        HStack {
+            Button("Close") {
+                if let onClose {
+                    onClose()
+                } else {
+                    dismiss()
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .tint(.white.opacity(0.12))
+            .foregroundColor(.white)
+
+            Spacer()
+
+            Text("Share Body Score")
+                .font(.headline.weight(.semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            Spacer()
+
+            Color.clear
+                .frame(width: 72, height: 1)
+        }
+        .padding(.horizontal, 20)
     }
 
     private func fittedSize(for container: CGSize, target: CGSize) -> CGSize {
