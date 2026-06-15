@@ -645,9 +645,12 @@ final class LogYourBodyUITests: XCTestCase {
 
         let window = app.windows.firstMatch
         let windowFrame = window.frame
+        let allowedHeroBleed: CGFloat = 24
         XCTAssertGreaterThan(hero.frame.width, windowFrame.width * 0.82)
-        XCTAssertGreaterThanOrEqual(hero.frame.minX, windowFrame.minX - 1)
-        XCTAssertLessThanOrEqual(hero.frame.maxX, windowFrame.maxX + 1)
+        XCTAssertLessThanOrEqual(hero.frame.minX, windowFrame.minX + 1)
+        XCTAssertGreaterThanOrEqual(hero.frame.maxX, windowFrame.maxX - 1)
+        XCTAssertGreaterThanOrEqual(hero.frame.minX, windowFrame.minX - allowedHeroBleed)
+        XCTAssertLessThanOrEqual(hero.frame.maxX, windowFrame.maxX + allowedHeroBleed)
 
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
         attachScreenshot(named: "launch-quality-home-timeline", from: app)
