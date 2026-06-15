@@ -46,10 +46,13 @@ enum TimeRange: String, CaseIterable {
 }
 
 struct MetricChartDataPoint: Identifiable, Sendable {
-    let id = UUID()
     let date: Date
     let value: Double
     let presence: MetricPresence
+
+    var id: String {
+        "\(date.timeIntervalSince1970)-\(value)-\(presence.rawValue)"
+    }
 
     var isEstimated: Bool {
         presence != .present
@@ -239,6 +242,14 @@ struct MetricEntriesPayload {
     let entries: [MetricHistoryEntry]
 }
 
+struct MetricDetailRelatedMetric: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let value: String
+    let caption: String
+    let systemImageName: String
+}
+
 func makeMetricFormatter(minFractionDigits: Int = 0, maxFractionDigits: Int = 1) -> NumberFormatter {
     MetricFormatterCache.formatter(minFractionDigits: minFractionDigits, maxFractionDigits: maxFractionDigits)
 }
@@ -272,10 +283,12 @@ struct FullMetricChartView: View {
     let chartData: [MetricChartDataPoint]
     let onAdd: () -> Void
     let metricEntries: MetricEntriesPayload?
+    let relatedMetrics: [MetricDetailRelatedMetric]
 
     let goalValue: Double?
 
     @Binding var selectedTimeRange: TimeRange
+    @Binding var selectedTimelineDate: Date?
     @State private var cachedSeries: [TimeRange: [MetricChartDataPoint]] = [:]
     @State private var isLoadingData = false
     @State private var lastFingerprint: String = ""
@@ -289,7 +302,39 @@ struct FullMetricChartView: View {
     @State private var historyEntryPendingDeletion: MetricHistoryEntry?
     @State private var showingHistoryDeleteConfirmation = false
 
-    private let chartHeight: CGFloat = 300
+    @ScaledMetric(relativeTo: .largeTitle) private var headlineValueFontSize: CGFloat = 56
+
+    private let chartHeight: CGFloat = 320
+
+    init(
+        title: String,
+        icon: String,
+        iconColor: Color,
+        currentValue: String,
+        unit: String,
+        currentDate: String,
+        chartData: [MetricChartDataPoint],
+        onAdd: @escaping () -> Void,
+        metricEntries: MetricEntriesPayload?,
+        relatedMetrics: [MetricDetailRelatedMetric] = [],
+        goalValue: Double?,
+        selectedTimeRange: Binding<TimeRange>,
+        selectedTimelineDate: Binding<Date?> = .constant(nil)
+    ) {
+        self.title = title
+        self.icon = icon
+        self.iconColor = iconColor
+        self.currentValue = currentValue
+        self.unit = unit
+        self.currentDate = currentDate
+        self.chartData = chartData
+        self.onAdd = onAdd
+        self.metricEntries = metricEntries
+        self.relatedMetrics = relatedMetrics
+        self.goalValue = goalValue
+        _selectedTimeRange = selectedTimeRange
+        _selectedTimelineDate = selectedTimelineDate
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -300,6 +345,7 @@ struct FullMetricChartView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         headlineBlock
                         chartCard
+                        relatedMetricsRow
                         historyBlock
                     }
                     .padding(.horizontal, 16)
@@ -311,6 +357,7 @@ struct FullMetricChartView: View {
                 }
             }
         }
+        .accessibilityIdentifier("metric_detail_screen")
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(false)
@@ -361,71 +408,77 @@ struct FullMetricChartView: View {
     }
 
     private var headlineBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(headlineValueText)
-                    .font(.system(size: 62, weight: .regular, design: .default))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(iconColor)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Circle()
+                            .fill(iconColor.opacity(0.16))
+                    )
 
-                if !unit.isEmpty {
-                    Text(unit)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(Color.metricTextSecondary)
-                }
+                Text("Latest")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(Color.metricTextSecondary)
             }
 
-            Text(headlineDateText)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.65))
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(headlineValueText)
+                        .font(.system(size: headlineValueFontSize, weight: .semibold, design: .default))
+                        .foregroundColor(.white)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.58)
+                        .layoutPriority(2)
+                        .accessibilityIdentifier("metric_detail_headline")
+
+                    if !unit.isEmpty {
+                        Text(unit)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(Color.metricTextSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
+
+                Text(activePoint == nil ? "Updated \(headlineDateText)" : headlineDateText)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.65))
+                    .lineLimit(1)
+            }
 
             if let stats = computeSeriesStats(for: displayedSeries) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top, spacing: 16) {
-                        statsCell(
-                            title: "Avg (\(selectedTimeRange.rawValue))",
-                            value: formatStatValue(stats.average),
-                            alignRight: false
-                        )
+                HStack(spacing: 10) {
+                    statsCell(
+                        title: "Average",
+                        value: formatStatValue(stats.average),
+                        caption: selectedTimeRange.rawValue
+                    )
 
-                        Spacer(minLength: 12)
-
-                        statsCell(
-                            title: changeCaptionText,
-                            value: formatDeltaValueCompact(stats.delta),
-                            valueColor: deltaColor(for: stats.delta),
-                            alignRight: true
-                        )
-                    }
-
-                    if let bounds = minMaxTexts(for: displayedSeries) {
-                        HStack(alignment: .top, spacing: 16) {
-                            statsCell(
-                                title: "Low",
-                                value: bounds.min,
-                                alignRight: false
-                            )
-
-                            Spacer(minLength: 12)
-
-                            statsCell(
-                                title: "High",
-                                value: bounds.max,
-                                alignRight: true
-                            )
-                        }
-                    }
+                    statsCell(
+                        title: "Change",
+                        value: formatDeltaValueCompact(stats.delta),
+                        caption: selectedTimeRange.rawValue,
+                        valueColor: deltaColor(for: stats.delta),
+                        alignRight: true
+                    )
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("metric_detail_headline_block")
     }
 
     @ViewBuilder
     private func statsCell(
         title: String,
         value: String,
+        caption: String,
         valueColor: Color = .white,
-        alignRight: Bool
+        alignRight: Bool = false
     ) -> some View {
         VStack(
             alignment: alignRight ? .trailing : .leading,
@@ -439,24 +492,18 @@ struct FullMetricChartView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(valueColor)
                 .multilineTextAlignment(alignRight ? .trailing : .leading)
-        }
-    }
 
-    private var changeCaptionText: String {
-        switch selectedTimeRange {
-        case .week1:
-            return "Change vs 1 week ago"
-        case .month1:
-            return "Change vs 1 month ago"
-        case .month3:
-            return "Change vs 3 months ago"
-        case .month6:
-            return "Change vs 6 months ago"
-        case .year1:
-            return "Change vs 1 year ago"
-        case .all:
-            return "Change over time"
+            Text(caption)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Color.metricTextTertiary)
         }
+        .frame(maxWidth: .infinity, alignment: alignRight ? .trailing : .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+        )
     }
 
     private func formatDeltaValueCompact(_ delta: Double) -> String {
@@ -540,16 +587,90 @@ struct FullMetricChartView: View {
                     .frame(height: chartHeight)
             }
         }
-        .padding(14)
+        .accessibilityIdentifier("metric_detail_chart")
+    }
+
+    @ViewBuilder
+    private var relatedMetricsRow: some View {
+        if !relatedMetrics.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Related")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.white)
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
+                    ForEach(relatedMetrics) { metric in
+                        relatedMetricTile(metric)
+                    }
+                }
+            }
+            .accessibilityIdentifier("metric_detail_related_metrics")
+        }
+    }
+
+    private func relatedMetricTile(_ metric: MetricDetailRelatedMetric) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: metric.systemImageName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(relatedMetricAccent(for: metric.id))
+
+                Text(metric.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color.metricTextSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+
+            Text(metric.value)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.white)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(metric.caption)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Color.metricTextTertiary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.metricCard)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.065))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.metricCardBorder, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.45), radius: 20, x: 0, y: 10)
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(metric.title), \(metric.value), \(metric.caption)")
+        .accessibilityIdentifier("metric_detail_related_metric_\(metric.id)")
+    }
+
+    private func relatedMetricAccent(for id: String) -> Color {
+        switch id {
+        case "steps":
+            return Color.metricAccentSteps
+        case "weight":
+            return Color.metricAccentWeight
+        case "body_fat":
+            return Color.metricAccentBodyFat
+        case "ffmi":
+            return Color.metricAccentFFMI
+        case "body_score":
+            return Color.metricAccent
+        default:
+            return Color.metricAccent
+        }
     }
 
     private var chartSkeleton: some View {
@@ -566,20 +687,18 @@ struct FullMetricChartView: View {
 
     private var chartHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 12) {
-                Text("Trend")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
-
-                Spacer()
-
-                chartModeToggle
-            }
-
             timeRangeSelector
                 .fixedSize(horizontal: false, vertical: true)
 
-            chartPresenceLegend
+            HStack(alignment: .center, spacing: 12) {
+                chartModeToggle
+
+                Spacer()
+            }
+
+            if shouldShowPresenceLegend {
+                chartPresenceLegend
+            }
         }
     }
 
@@ -721,7 +840,7 @@ struct FullMetricChartView: View {
                     .foregroundStyle(Color.metricGridMajor.opacity(0.6))
             }
 
-            if let focus = activePoint {
+            if let focus = selectedFocusPoint {
                 RuleMark(x: .value("Selected", focus.date))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     .foregroundStyle(Color.white.opacity(0.4))
@@ -788,7 +907,10 @@ struct FullMetricChartView: View {
                                         isScrubbing = true
                                         HapticManager.shared.selection()
                                     }
-                                    activePoint = nearestPoint(to: date)
+                                    if let focus = nearestPoint(to: date) {
+                                        activePoint = focus
+                                        selectedTimelineDate = focus.date
+                                    }
                                 }
                             }
                             .onEnded { _ in
@@ -1109,22 +1231,37 @@ struct FullMetricChartView: View {
         }
     }
 
+    private var shouldShowPresenceLegend: Bool {
+        visiblePresenceLegendItems.contains { item in
+            item.presence != .present
+        }
+    }
+
     private var minSeriesValue: Double? {
         activeSeries.map(\.value).min()
     }
 
     private var headlineValueText: String {
-        if let point = activePoint {
+        if let point = selectedFocusPoint {
             return formatHeadlineValue(point.value)
         }
         return currentValue
     }
 
     private var headlineDateText: String {
-        if let point = activePoint {
+        if let point = selectedFocusPoint {
             return point.date.formatted(.dateTime.month().day().year())
         }
         return currentDate
+    }
+
+    private var selectedFocusPoint: MetricChartDataPoint? {
+        if let activePoint {
+            return activePoint
+        }
+
+        guard let selectedTimelineDate else { return nil }
+        return nearestPoint(to: selectedTimelineDate)
     }
 
     private var chartDataFingerprint: String {
@@ -1306,22 +1443,6 @@ struct FullMetricChartView: View {
             return Color.metricTextPrimary
         }
         return delta > 0 ? Color.metricDeltaPositive : Color.metricDeltaNegative
-    }
-
-    private func minMaxTexts(
-        for series: [MetricChartDataPoint]
-    ) -> (min: String, max: String)? {
-        guard
-            let minValue = series.map(\.value).min(),
-            let maxValue = series.map(\.value).max(),
-            minValue != maxValue
-        else {
-            return nil
-        }
-
-        let minText = formatStatValue(minValue)
-        let maxText = formatStatValue(maxValue)
-        return (min: minText, max: maxText)
     }
 
     @MainActor

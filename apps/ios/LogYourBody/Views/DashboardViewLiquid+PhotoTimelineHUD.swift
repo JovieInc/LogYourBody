@@ -258,14 +258,12 @@ extension DashboardViewLiquid {
     }
 
     func selectClosestMetric(to date: Date) {
-        guard let match = bodyMetrics.enumerated().min(by: { lhs, rhs in
-            abs(lhs.element.date.timeIntervalSince(date)) < abs(rhs.element.date.timeIntervalSince(date))
-        }) else {
+        guard let index = nearestBodyMetricIndex(in: bodyMetrics, to: date) else {
             return
         }
 
-        selectedIndex = match.offset
-        updateAnimatedValues(for: match.offset)
+        selectedIndex = index
+        updateAnimatedValues(for: index)
     }
 
     func formatHUDDate(_ date: Date) -> String {
@@ -326,4 +324,10 @@ extension DashboardViewLiquid {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
+}
+
+func nearestBodyMetricIndex(in metrics: [BodyMetrics], to date: Date) -> Int? {
+    metrics.enumerated().min(by: { lhs, rhs in
+        abs(lhs.element.date.timeIntervalSince(date)) < abs(rhs.element.date.timeIntervalSince(date))
+    })?.offset
 }

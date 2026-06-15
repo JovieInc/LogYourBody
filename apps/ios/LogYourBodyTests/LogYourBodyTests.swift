@@ -557,6 +557,16 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertEqual(first.id, second.id)
     }
 
+    func testMetricChartDataPointIdentityIsStableAcrossRenders() {
+        let date = Date(timeIntervalSince1970: 1_771_000_000)
+        let first = MetricChartDataPoint(date: date, value: 181.2, presence: .present)
+        let second = MetricChartDataPoint(date: date, value: 181.2, presence: .present)
+        let interpolated = MetricChartDataPoint(date: date, value: 181.2, presence: .interpolated)
+
+        XCTAssertEqual(first.id, second.id)
+        XCTAssertNotEqual(first.id, interpolated.id)
+    }
+
     func testShareCardLayoutScalesDownForNarrowStoryPreview() {
         let layout = ShareCardLayout(size: CGSize(width: 260, height: 462), aspect: .story)
 
@@ -695,6 +705,34 @@ final class BodyScoreShareCardTests: XCTestCase {
 }
 
 final class DashboardTimelineProviderPerformanceTests: XCTestCase {
+    func testNearestBodyMetricIndexSelectsClosestTimelineDate() {
+        let calendar = Calendar(identifier: .gregorian)
+        let baseDate = calendar.date(from: DateComponents(year: 2_026, month: 6, day: 1))!
+        let metrics = [
+            makeMetric(id: "old", date: baseDate, weight: 181, bodyFat: 18.5),
+            makeMetric(
+                id: "middle",
+                date: calendar.date(byAdding: .day, value: 7, to: baseDate)!,
+                weight: 180,
+                bodyFat: 18.2
+            ),
+            makeMetric(
+                id: "new",
+                date: calendar.date(byAdding: .day, value: 14, to: baseDate)!,
+                weight: 179,
+                bodyFat: 18.0
+            )
+        ]
+
+        let scrubDate = calendar.date(byAdding: .day, value: 9, to: baseDate)!
+
+        XCTAssertEqual(nearestBodyMetricIndex(in: metrics, to: scrubDate), 1)
+    }
+
+    func testNearestBodyMetricIndexReturnsNilForEmptyTimeline() {
+        XCTAssertNil(nearestBodyMetricIndex(in: [], to: Date()))
+    }
+
     func testTimelineRenderSignatureTracksOnlyRenderInputs() {
         let baseDate = Date(timeIntervalSince1970: 1_800_000_000)
         let metric = makeMetric(
