@@ -21,6 +21,7 @@ struct ProgressTimelineView: View {
     @State private var isDragging: Bool = false
     @State private var dragPosition: Double = 0.5
     @State private var currentDateLabel: String = ""
+    @State private var timelineSetupTask: Task<Void, Never>?
 
     private let timelineHeight: CGFloat = 50
     private let scrubberHandleSize: CGFloat = 44
@@ -58,13 +59,19 @@ struct ProgressTimelineView: View {
             .frame(height: timelineHeight)
         }
         .onAppear {
-            setupTimeline()
+            scheduleTimelineSetup()
         }
         .onChange(of: bodyMetrics) { _, _ in
-            setupTimeline()
+            scheduleTimelineSetup()
         }
         .onChange(of: mode) { _, _ in
-            setupTimeline()
+            scheduleTimelineSetup()
+        }
+        .onChange(of: selectedIndex) { _, _ in
+            scheduleTimelineSetup()
+        }
+        .onDisappear {
+            timelineSetupTask?.cancel()
         }
     }
 
@@ -188,15 +195,32 @@ struct ProgressTimelineView: View {
 
     // MARK: - Logic
 
-    private func setupTimeline() {
-        dataProvider.loadMetrics(bodyMetrics)
+    private func scheduleTimelineSetup() {
+        let metricsSnapshot = bodyMetrics
+        let modeSnapshot = mode
+        let selectedIndexSnapshot = selectedIndex
 
-        guard !bodyMetrics.isEmpty else {
+        timelineSetupTask?.cancel()
+        timelineSetupTask = Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            setupTimeline(
+                metrics: metricsSnapshot,
+                mode: modeSnapshot,
+                selectedIndex: selectedIndexSnapshot
+            )
+        }
+    }
+
+    private func setupTimeline(metrics: [BodyMetrics], mode: TimelineMode, selectedIndex: Int) {
+        dataProvider.loadMetrics(metrics)
+
+        guard !metrics.isEmpty else {
             anchors = []
             return
         }
 
-        let sortedMetrics = bodyMetrics.sorted { $0.date < $1.date }
+        let sortedMetrics = metrics.sorted { $0.date < $1.date }
         guard let firstDate = sortedMetrics.first?.date,
               let lastDate = sortedMetrics.last?.date else {
             return
@@ -209,17 +233,17 @@ struct ProgressTimelineView: View {
         anchors = dataProvider.generateAnchors(mode: mode, zoomLevel: zoomLevel)
 
         // Set initial position
-        updateDragPosition(for: selectedIndex)
+        updateDragPosition(for: selectedIndex, in: metrics, using: anchors)
     }
 
-    private func updateDragPosition(for index: Int) {
-        guard index >= 0, index < bodyMetrics.count else { return }
-        let metric = bodyMetrics[index]
+    private func updateDragPosition(for index: Int, in metrics: [BodyMetrics], using anchors: [TimelineAnchor]) {
+        guard index >= 0, index < metrics.count else { return }
+        let metric = metrics[index]
 
         guard let anchor = anchors.first(where: { $0.bodyMetrics.id == metric.id }) else {
             // If not an anchor, calculate position manually
-            guard let firstDate = bodyMetrics.first?.date,
-                  let lastDate = bodyMetrics.last?.date else {
+            guard let firstDate = metrics.first?.date,
+                  let lastDate = metrics.last?.date else {
                 return
             }
             let midpointDate = dataProvider.dateFromPosition(0.5, from: firstDate, to: lastDate)
