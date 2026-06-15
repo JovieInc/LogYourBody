@@ -6,15 +6,18 @@ The iOS performance audit now emits a repeatable budget artifact instead of only
 
 ## Budgets
 
-| Check                      |             Default budget | Source                                                            |
-| -------------------------- | -------------------------: | ----------------------------------------------------------------- |
-| Performance unit total     |                       2.0s | `xcresulttool get test-results tests` or xcodebuild log fallback  |
-| Slowest performance unit   |                      0.75s | `xcresulttool get test-results tests` or xcodebuild log fallback  |
-| Launch performance UI test | 90.0s hard / 60.0s warning | `LogYourBodyUITests/testLaunchPerformance` result-bundle duration |
+| Check                      |             Default budget | Source                                                             |
+| -------------------------- | -------------------------: | ------------------------------------------------------------------ |
+| Performance unit total     |                       2.0s | `xcresulttool get test-results tests` or xcodebuild log fallback   |
+| Slowest performance unit   |                      0.75s | `xcresulttool get test-results tests` or xcodebuild log fallback   |
+| Launch performance UI test | 90.0s hard / 60.0s warning | `LogYourBodyUITests/testLaunchPerformance` result-bundle duration  |
+| Timeline trace workflow    | 35.0s hard / 28.0s warning | `LogYourBodyUITests/testTimelinePerformanceTraceWorkflow` duration |
 
 The helper also records whether XCTest published granular launch metric statistics. On the current Xcode lane, `xcresulttool get test-results metrics` returns an empty payload for `XCTApplicationLaunchMetric`, so the gate reports a warning and keeps the issue open for a focused Instruments or ETTrace capture before frame/hitch budgets are tightened.
 
 The full local audit runs the selected performance unit tests by default, with simulator parallelism disabled and the UI-test target explicitly skipped for the unit selectors. In hosted GitHub Actions, when `RUN_LAUNCH_PERFORMANCE=false`, the script defaults to summary mode for the post-launch-quality step so CI still publishes the same budget-summary artifact without starting a second Xcode test build inside the 8-minute post-audit step. Agents can force the full unit pass in CI with `RUN_PERFORMANCE_UNIT_TESTS=true`.
+
+`RUN_TIMELINE_TRACE_WORKFLOW=true` runs the focused Avatar/Photo plus Timeline/Stats workflow added for JOV-3217 and enforces its warning/hard duration budgets in the same summary JSON and Markdown outputs. See `docs/audits/jov-3217/performance-trace-budget-2026-06-15.md` for current trace evidence and the simulator `xctrace` limitation.
 
 ## Validation
 

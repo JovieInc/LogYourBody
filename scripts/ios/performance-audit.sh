@@ -10,6 +10,7 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$IOS_DIR/test_results/performance-audit/$STAMP}"
 RUN_SWIFTLINT="${RUN_SWIFTLINT:-true}"
 RUN_LAUNCH_PERFORMANCE="${RUN_LAUNCH_PERFORMANCE:-true}"
+RUN_TIMELINE_TRACE_WORKFLOW="${RUN_TIMELINE_TRACE_WORKFLOW:-false}"
 XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO}"
 TEST_TIMEOUTS_ENABLED="${TEST_TIMEOUTS_ENABLED:-YES}"
 DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="${DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90}"
@@ -76,6 +77,17 @@ else
   echo "Skipping launch-performance XCTest because RUN_LAUNCH_PERFORMANCE=false" | tee "$ARTIFACT_DIR/launch-performance.log"
 fi
 
+if [[ "$RUN_TIMELINE_TRACE_WORKFLOW" == "true" ]]; then
+  xcodebuild \
+    "${COMMON_XCODEBUILD_ARGS[@]}" \
+    -resultBundlePath "$ARTIFACT_DIR/timeline-trace-workflow.xcresult" \
+    -only-testing:LogYourBodyUITests/LogYourBodyUITests/testTimelinePerformanceTraceWorkflow \
+    "${XCODEBUILD_SETTINGS_ARRAY[@]}" \
+    test | tee "$ARTIFACT_DIR/timeline-trace-workflow.log"
+else
+  echo "Skipping timeline trace workflow XCTest because RUN_TIMELINE_TRACE_WORKFLOW=false" | tee "$ARTIFACT_DIR/timeline-trace-workflow.log"
+fi
+
 SUMMARY_ARGS=(
   --artifact-dir "$ARTIFACT_DIR"
   --destination "$DESTINATION"
@@ -90,6 +102,15 @@ if [[ "$RUN_LAUNCH_PERFORMANCE" == "true" ]]; then
   )
 else
   SUMMARY_ARGS+=(--launch-skipped)
+fi
+
+if [[ "$RUN_TIMELINE_TRACE_WORKFLOW" == "true" ]]; then
+  SUMMARY_ARGS+=(
+    --timeline-workflow-xcresult "$ARTIFACT_DIR/timeline-trace-workflow.xcresult"
+    --timeline-workflow-log "$ARTIFACT_DIR/timeline-trace-workflow.log"
+  )
+else
+  SUMMARY_ARGS+=(--timeline-workflow-skipped)
 fi
 
 if [[ "$RUN_PERFORMANCE_UNIT_TESTS" != "true" ]]; then

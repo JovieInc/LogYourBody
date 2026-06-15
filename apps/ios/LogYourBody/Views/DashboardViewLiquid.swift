@@ -102,6 +102,10 @@ struct DashboardViewLiquid: View {
         #endif
     }
 
+    private var usesTimelinePerformanceTraceFixture: Bool {
+        ProcessInfo.processInfo.arguments.contains("-lybUITestTimelinePerformanceTraceFixture")
+    }
+
     enum DashboardTab: Hashable {
         case home
         case photos
@@ -308,7 +312,7 @@ struct DashboardViewLiquid: View {
             Task {
                 await viewModel.loadData(
                     authManager: authManager,
-                    loadOnlyNewest: true,
+                    loadOnlyNewest: !usesTimelinePerformanceTraceFixture,
                     selectedIndex: selectedIndex
                 )
                 scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
@@ -316,7 +320,7 @@ struct DashboardViewLiquid: View {
         }
 
         // Then refresh async (loads all data in background) once per dashboard lifecycle
-        if !hasPerformedInitialRefresh {
+        if !hasPerformedInitialRefresh && !usesTimelinePerformanceTraceFixture {
             hasPerformedInitialRefresh = true
             Task {
                 await viewModel.refreshData(

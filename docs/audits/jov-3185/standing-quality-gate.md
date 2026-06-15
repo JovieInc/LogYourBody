@@ -22,6 +22,7 @@ The gate writes artifacts under `apps/ios/test_results/quality-gate/` and runs:
 - Dashboard timeline provider performance tests.
 - Progress photo image pipeline performance tests.
 - Launch performance smoke test.
+- Optional focused Avatar/Photo plus Timeline/Stats workflow via `RUN_TIMELINE_TRACE_WORKFLOW=true`.
 
 For the lighter CI-equivalent local path, use:
 
@@ -41,4 +42,4 @@ The gate intentionally avoids App Store Connect, TestFlight, Doppler, and produc
 
 This is the first standing gate, not the final visual-regression system. It catches concrete layout/navigation regressions through UI assertions and preserves screenshots for review, but it does not yet perform pixel-diff snapshot comparison or Instruments-level hitch budgets.
 
-Next hardening step: add a real screenshot baseline/diff tool or ETTrace-derived hitch budget once the current simulator fixtures stabilize.
+Next hardening step: add a real screenshot baseline/diff tool and enforce the JOV-3217 frame/hitch budgets once simulator or device `xctrace` can capture a valid app trace in the active Xcode lane.
