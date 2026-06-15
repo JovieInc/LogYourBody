@@ -23,8 +23,8 @@ LogYourBody/
 │   │   └── SignUpView.swift
 │   ├── Dashboard/
 │   │   └── DashboardView.swift
-│   ├── Weight/
-│   │   └── LogWeightView.swift
+│   ├── Entry/
+│   │   └── AddEntrySheet.swift
 │   ├── Photos/
 │   │   └── PhotosView.swift
 │   └── Settings/
@@ -51,6 +51,7 @@ LogYourBody/
 4. **Set folder references** to match physical structure
 
 ## Color Scheme Applied:
+
 - Background: #0A0B0D (Linear dark)
 - Cards: #111113
 - Primary: #5E6AD2 (Purple)
@@ -58,6 +59,7 @@ LogYourBody/
 - Secondary Text: #9CA0A8
 
 ## Typography:
+
 - Using system fonts matching Inter
 - Monospace for numbers
 - Consistent sizing with web app

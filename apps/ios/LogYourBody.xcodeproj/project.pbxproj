@@ -122,6 +122,7 @@
 		AD8F12EA2ED6AA76003C4559 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6004A2FFDAAAA00ABCDEF /* AnalyticsService.swift */; };
 		AD8F12F32ED7C97B003C4559 /* BugReportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8F12F22ED7C97B003C4559 /* BugReportViews.swift */; };
 		AD8F12F52ED7C987003C4559 /* BugReportManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8F12F42ED7C987003C4559 /* BugReportManager.swift */; };
+		AD3150A22F15000100ABCDEF /* LogWeightFormValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3150A12F15000100ABCDEF /* LogWeightFormValidator.swift */; };
 		ADA4B7372ECC3A7A00F4262A /* EntryVisibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */; };
 		ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */; };
 		ADA4B73B2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B73A2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift */; };
@@ -228,7 +229,6 @@
 		ADDC47E72E2D89F3003C97E7 /* HealthKitPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B012E15FA5C002376C6 /* HealthKitPromptView.swift */; };
 		ADDC47E82E2D89F3003C97E7 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B022E15FA5C002376C6 /* LoadingView.swift */; };
 		ADDC47E92E2D89F3003C97E7 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B032E15FA5C002376C6 /* LoginView.swift */; };
-		ADDC47EA2E2D89F3003C97E7 /* LogWeightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B042E15FA5C002376C6 /* LogWeightView.swift */; };
 		ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B052E15FA5C002376C6 /* MainTabView.swift */; };
 		ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B062E15FA5C002376C6 /* PreferencesView.swift */; };
 		AD3147B12F0B000100ABCDEF /* PreferenceGoalEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3147A12F0B000100ABCDEF /* PreferenceGoalEditing.swift */; };
@@ -262,7 +262,6 @@
 		ADDC48842E2D8A6B003C97E7 /* WhatsNewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC487B2E2D8A6B003C97E7 /* WhatsNewView.swift */; };
 		ADDC48852E2D8A6B003C97E7 /* BiometricLockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC486D2E2D8A6B003C97E7 /* BiometricLockView.swift */; };
 		ADDC48862E2D8A6B003C97E7 /* HealthDisclaimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48732E2D8A6B003C97E7 /* HealthDisclaimerView.swift */; };
-		ADDC48872E2D8A6B003C97E7 /* ProgressPhotoCutoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48782E2D8A6B003C97E7 /* ProgressPhotoCutoutView.swift */; };
 		ADDC48892E2D8A6B003C97E7 /* VersionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48792E2D8A6B003C97E7 /* VersionRow.swift */; };
 		ADDC488A2E2D8A6B003C97E7 /* WhatsNewRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC487A2E2D8A6B003C97E7 /* WhatsNewRow.swift */; };
 		ADE146442EBF05E000B64DA0 /* TimelineMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE146432EBF05E000B64DA0 /* TimelineMode.swift */; };
@@ -420,7 +419,6 @@
 		AD723B012E15FA5C002376C6 /* HealthKitPromptView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HealthKitPromptView.swift; sourceTree = "<group>"; };
 		AD723B022E15FA5C002376C6 /* LoadingView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		AD723B032E15FA5C002376C6 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		AD723B042E15FA5C002376C6 /* LogWeightView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogWeightView.swift; sourceTree = "<group>"; };
 		AD723B052E15FA5C002376C6 /* MainTabView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		AD723B062E15FA5C002376C6 /* PreferencesView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		AD3147A12F0B000100ABCDEF /* PreferenceGoalEditing.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferenceGoalEditing.swift; sourceTree = "<group>"; };
@@ -540,6 +538,7 @@
 		AD933DFF2E249EA000801078 /* PhotoLibraryScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryScanner.swift; sourceTree = "<group>"; };
 		AD933E042E24A22D00801078 /* LegalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalView.swift; sourceTree = "<group>"; };
 		AD99F2982E1491FA00F5ECE4 /* AuthManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = AuthManager.swift; path = Services/AuthManager.swift; sourceTree = "<group>"; };
+		AD3150A12F15000100ABCDEF /* LogWeightFormValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogWeightFormValidator.swift; sourceTree = "<group>"; };
 		ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryVisibilityManager.swift; sourceTree = "<group>"; };
 		ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreCache.swift; sourceTree = "<group>"; };
 		ADA4B73A2ECE490A00F4262A /* BodyScoreHealthConfirmationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreHealthConfirmationView.swift; sourceTree = "<group>"; };
@@ -609,7 +608,6 @@
 		ADBAF04B2ECAD88A00A95F98 /* BodyScoreModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreModels.swift; sourceTree = "<group>"; };
 		ADBD692C2E14A7B900921A30 /* DashboardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		ADBD692D2E14A7B900921A30 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		ADBD692E2E14A7B900921A30 /* LogWeightView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogWeightView.swift; sourceTree = "<group>"; };
 		ADBD692F2E14A7B900921A30 /* MainTabView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		ADBD69312E14A7B900921A30 /* SettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		ADBD69322E14A7B900921A30 /* SignUpView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
@@ -627,7 +625,6 @@
 		ADDC48752E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptimizedProgressPhotoView.swift; sourceTree = "<group>"; };
 		ADDC48762E2D8A6B003C97E7 /* OTPInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPInputView.swift; sourceTree = "<group>"; };
 		ADDC48772E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoCarouselView.swift; sourceTree = "<group>"; };
-		ADDC48782E2D8A6B003C97E7 /* ProgressPhotoCutoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoCutoutView.swift; sourceTree = "<group>"; };
 		ADDC48792E2D8A6B003C97E7 /* VersionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionRow.swift; sourceTree = "<group>"; };
 		ADDC487A2E2D8A6B003C97E7 /* WhatsNewRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewRow.swift; sourceTree = "<group>"; };
 		ADDC487B2E2D8A6B003C97E7 /* WhatsNewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewView.swift; sourceTree = "<group>"; };
@@ -946,6 +943,7 @@
 				ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */,
 				ADA4B74C2ED00F1500F4262A /* KeychainManager.swift */,
 				ADA4B74A2ED00E1F00F4262A /* ValidationService.swift */,
+				AD3150A12F15000100ABCDEF /* LogWeightFormValidator.swift */,
 				AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */,
 				AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */,
 				AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */,
@@ -1038,7 +1036,6 @@
 				ADDC48762E2D8A6B003C97E7 /* OTPInputView.swift */,
 				AD3145A12F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift */,
 				ADDC48772E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift */,
-				ADDC48782E2D8A6B003C97E7 /* ProgressPhotoCutoutView.swift */,
 				ADDC48792E2D8A6B003C97E7 /* VersionRow.swift */,
 				ADDC487A2E2D8A6B003C97E7 /* WhatsNewRow.swift */,
 				ADDC487B2E2D8A6B003C97E7 /* WhatsNewView.swift */,
@@ -1059,7 +1056,6 @@
 				AD723B012E15FA5C002376C6 /* HealthKitPromptView.swift */,
 				AD723B022E15FA5C002376C6 /* LoadingView.swift */,
 				AD723B032E15FA5C002376C6 /* LoginView.swift */,
-				AD723B042E15FA5C002376C6 /* LogWeightView.swift */,
 				AD723B052E15FA5C002376C6 /* MainTabView.swift */,
 				AD723B062E15FA5C002376C6 /* PreferencesView.swift */,
 				AD3147A12F0B000100ABCDEF /* PreferenceGoalEditing.swift */,
@@ -1373,7 +1369,6 @@
 				ADBD692D2E14A7B900921A30 /* LoginView.swift */,
 				AD8056FC2E25F5180028C0DD /* CameraView.swift */,
 				AD0054DA2E20C6270029E0FF /* HealthDisclaimerView.swift */,
-				ADBD692E2E14A7B900921A30 /* LogWeightView.swift */,
 				AD0054DC2E20C9DF0029E0FF /* LegalConsentView.swift */,
 				ADF5C2002E1F2BD900E3FB4D /* EmailVerificationView.swift */,
 				ADF5C2012E1F2BD900E3FB4D /* EnhancedOTPInputView.swift */,
@@ -1674,7 +1669,6 @@
 				ADDC48842E2D8A6B003C97E7 /* WhatsNewView.swift in Sources */,
 				ADDC48852E2D8A6B003C97E7 /* BiometricLockView.swift in Sources */,
 				ADDC48862E2D8A6B003C97E7 /* HealthDisclaimerView.swift in Sources */,
-				ADDC48872E2D8A6B003C97E7 /* ProgressPhotoCutoutView.swift in Sources */,
 				ADDC48892E2D8A6B003C97E7 /* VersionRow.swift in Sources */,
 				ADDC488A2E2D8A6B003C97E7 /* WhatsNewRow.swift in Sources */,
 				ADDC47AE2E2D89F3003C97E7 /* WeightEntry.swift in Sources */,
@@ -1731,7 +1725,6 @@
 				ADDC47E92E2D89F3003C97E7 /* LoginView.swift in Sources */,
 				AD050C4B2EC12E590082A313 /* PaywallView.swift in Sources */,
 				ADE146442EBF05E000B64DA0 /* TimelineMode.swift in Sources */,
-				ADDC47EA2E2D89F3003C97E7 /* LogWeightView.swift in Sources */,
 				ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */,
 				AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */,
 					ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */,
@@ -1830,6 +1823,7 @@
 				AD8872BE2EB946BE0041C426 /* OTPField.swift in Sources */,
 				AD8872BF2EB946BE0041C426 /* DashboardContent.swift in Sources */,
 				ADA4B74B2ED00E1F00F4262A /* ValidationService.swift in Sources */,
+				AD3150A22F15000100ABCDEF /* LogWeightFormValidator.swift in Sources */,
 				AD8872C02EB946BE0041C426 /* MetricGauge.swift in Sources */,
 				AD8872C22EB946BE0041C426 /* PasswordStrengthIndicator.swift in Sources */,
 				ADE146482EBF0B4800B64DA0 /* TimelineDataProvider.swift in Sources */,
