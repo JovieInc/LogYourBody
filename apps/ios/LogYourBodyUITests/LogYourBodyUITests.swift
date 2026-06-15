@@ -611,6 +611,7 @@ final class LogYourBodyUITests: XCTestCase {
         let cardFrame = shareCard.frame
         let windowFrame = app.windows.firstMatch.frame
         XCTAssertGreaterThan(cardFrame.width, windowFrame.width * 0.88)
+        XCTAssertGreaterThan(cardFrame.height, cardFrame.width * 1.18)
         attachScreenshot(named: "launch-quality-body-score-share", from: app)
     }
 

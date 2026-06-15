@@ -32,6 +32,8 @@ enum BodyScoreShareAspect: String, CaseIterable, Identifiable {
     case portrait
     case story
 
+    static let defaultExportAspect: BodyScoreShareAspect = .portrait
+
     var id: String { rawValue }
 
     var displayName: String {
@@ -87,6 +89,7 @@ struct BodyScoreShareCardView: View {
         }
         .aspectRatio(aspectRatioValue, contentMode: .fit)
         .clipped()
+        .dynamicTypeSize(.medium)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("body_score_share_card")
     }
@@ -138,12 +141,14 @@ struct BodyScoreShareCardView: View {
                     .font(.system(size: layout.brandFontSize, weight: .semibold, design: .rounded))
                     .foregroundColor(.white)
                     .lineLimit(1)
+                    .allowsTightening(true)
                     .minimumScaleFactor(0.78)
 
                 Text(payload.visualBadgeText)
                     .font(.system(size: layout.badgeFontSize, weight: .medium))
                     .foregroundColor(Color.white.opacity(0.62))
                     .lineLimit(1)
+                    .allowsTightening(true)
                     .minimumScaleFactor(0.72)
             }
 
@@ -159,6 +164,7 @@ struct BodyScoreShareCardView: View {
                     .monospacedDigit()
                     .foregroundColor(.white)
                     .lineLimit(1)
+                    .allowsTightening(true)
                     .minimumScaleFactor(0.58)
 
                 VStack(alignment: .leading, spacing: layout.scoreLabelSpacing) {
@@ -167,6 +173,7 @@ struct BodyScoreShareCardView: View {
                         .foregroundColor(Color.white.opacity(0.66))
                         .textCase(.uppercase)
                         .lineLimit(1)
+                        .allowsTightening(true)
                         .minimumScaleFactor(0.7)
 
                     Text(payload.tagline)
@@ -181,6 +188,7 @@ struct BodyScoreShareCardView: View {
                             .font(.system(size: layout.deltaFontSize, weight: .medium))
                             .foregroundColor(Color.white.opacity(0.66))
                             .lineLimit(1)
+                            .allowsTightening(true)
                             .minimumScaleFactor(0.72)
                     }
                 }
@@ -198,6 +206,7 @@ struct BodyScoreShareCardView: View {
                 .font(.system(size: layout.footerFontSize, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.58))
                 .lineLimit(1)
+                .allowsTightening(true)
                 .minimumScaleFactor(0.74)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -242,6 +251,7 @@ struct BodyScoreShareCardView: View {
                 .font(.system(size: layout.metricTitleFontSize, weight: .bold))
                 .foregroundColor(Color.white.opacity(0.58))
                 .lineLimit(1)
+                .allowsTightening(true)
                 .minimumScaleFactor(0.68)
 
             Text(value)
@@ -249,24 +259,40 @@ struct BodyScoreShareCardView: View {
                 .monospacedDigit()
                 .foregroundColor(.white)
                 .lineLimit(1)
+                .allowsTightening(true)
                 .minimumScaleFactor(0.58)
 
             Text(caption)
                 .font(.system(size: layout.metricCaptionFontSize, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.54))
                 .lineLimit(1)
+                .allowsTightening(true)
                 .minimumScaleFactor(0.68)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-private struct ShareCardLayout {
+struct ShareCardLayout {
     let size: CGSize
     let aspect: BodyScoreShareAspect
 
-    private var scale: CGFloat {
-        min(max(size.width / 390, 0.86), 2.8)
+    var scale: CGFloat {
+        let reference = referenceSize
+        let widthScale = reference.width > 0 ? size.width / reference.width : 1
+        let heightScale = reference.height > 0 ? size.height / reference.height : 1
+        return min(max(min(widthScale, heightScale), 0.58), 2.8)
+    }
+
+    private var referenceSize: CGSize {
+        switch aspect {
+        case .square:
+            return CGSize(width: 390, height: 520)
+        case .portrait:
+            return CGSize(width: 390, height: 620)
+        case .story:
+            return CGSize(width: 390, height: 760)
+        }
     }
 
     var horizontalPadding: CGFloat { 28 * scale }
@@ -354,7 +380,7 @@ struct BodyScoreShareSheet: View {
     let payload: BodyScoreSharePayload
     let onClose: (() -> Void)?
 
-    @State private var selectedAspect: BodyScoreShareAspect = .square
+    @State private var selectedAspect: BodyScoreShareAspect = .defaultExportAspect
     @State private var renderedImage: UIImage?
     @State private var isRendering = false
     @State private var showSystemShareSheet = false
