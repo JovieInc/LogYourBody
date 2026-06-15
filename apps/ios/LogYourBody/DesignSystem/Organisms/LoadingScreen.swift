@@ -77,7 +77,7 @@ struct LoadingScreen: View {
         .onAppear {
             checkCompletion()
         }
-        .onChange(of: clampedProgress) { _ in
+        .onChange(of: clampedProgress) { _, _ in
             checkCompletion()
         }
     }

@@ -66,12 +66,12 @@ extension DashboardViewLiquid {
             }
         }
         .contentShape(Rectangle())
-        .gesture(photoTimelineRootSwipeGesture)
+        .highPriorityGesture(photoTimelineRootSwipeGesture)
         .accessibilityIdentifier("photo_timeline_root_pager")
     }
 
     private var photoTimelineRootSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 28)
+        DragGesture(minimumDistance: 18, coordinateSpace: .local)
             .onEnded { value in
                 let horizontal = value.translation.width
                 let vertical = value.translation.height
