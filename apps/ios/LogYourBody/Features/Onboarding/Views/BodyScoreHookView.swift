@@ -31,6 +31,7 @@ struct BodyScoreHookView: View {
                         .font(.system(size: 18, weight: .semibold))
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
+                .accessibilityIdentifier("body_score_onboarding_start_button")
 
                 if viewModel.entryContext == .preAuth {
                     OnboardingTextButton(title: "I already have an account") {

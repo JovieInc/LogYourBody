@@ -46,7 +46,10 @@ jobs:
             ios:
               - 'apps/ios/**'
               - '.github/actions/setup-ios-build/**'
+              - '.github/workflows/ci.yml'
               - '.github/workflows/ios*.yml'
+              - 'scripts/ios/**'
+              - 'package.json'
 
   js:
     name: JavaScript/TypeScript
@@ -115,11 +118,65 @@ jobs:
           cd apps/ios
           bundle exec fastlane ci_ios
 
+  ios_quality:
+    name: iOS Launch Quality Gate
+    runs-on: macos-15
+    needs: detect-changes
+    if: needs.detect-changes.outputs.ios == 'true'
+    timeout-minutes: 36
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup iOS build environment
+        uses: ./.github/actions/setup-ios-build
+        with:
+          xcode-version: 'latest-stable'
+          working-directory: apps/ios
+          setup-ruby: 'true'
+          create-config-files: 'true'
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/ios/.build
+            ~/Library/Developer/Xcode/DerivedData
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-quality-spm-xcode-latest-stable-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-quality-spm-xcode-latest-stable-
+            ${{ runner.os }}-spm-
+
+      - name: Run launch quality audit
+        timeout-minutes: 26
+        env:
+          DESTINATION: auto
+          ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/launch-quality
+        run: bash scripts/ios/launch-quality-audit.sh
+
+      - name: Run performance budget audit
+        timeout-minutes: 8
+        env:
+          DESTINATION: auto
+          RUN_SWIFTLINT: false
+          RUN_LAUNCH_PERFORMANCE: false
+          ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/performance
+        run: bash scripts/ios/performance-audit.sh
+
+      - name: Upload quality gate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-launch-quality-gate-${{ github.run_id }}
+          path: apps/ios/test_results/quality-gate/ci-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 14
+
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
     if: always()
-    needs: [detect-changes, js, ios]
+    needs: [detect-changes, js, ios, ios_quality]
     steps:
       - name: Check results
         run: |
@@ -128,12 +185,14 @@ jobs:
             echo ""
             echo "- Web changed: ${{ needs.detect-changes.outputs.web }}"
             echo "- iOS changed: ${{ needs.detect-changes.outputs.ios }}"
+            echo "- iOS quality gate: ${{ needs.ios_quality.result }}"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
           # Check if any required jobs failed
           if [[ "${{ needs.js.result }}" == "failure" ]] || \
-             [[ "${{ needs.ios.result }}" == "failure" ]]; then
+             [[ "${{ needs.ios.result }}" == "failure" ]] || \
+             [[ "${{ needs.ios_quality.result }}" == "failure" ]]; then
             echo "❌ One or more CI jobs failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi

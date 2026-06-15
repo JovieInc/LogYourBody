@@ -203,24 +203,22 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPhotoHUDFixtureRoutesToIntendedPostMVPDashboard() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhotoTimelineAnalyticsFixture"
+        ]
         app.launch()
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_pager"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
-
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
 
-        let pager = app.collectionViews["photo_timeline_root_pager"]
-        XCTAssertTrue(pager.waitForExistence(timeout: 5))
-        pager.swipeLeft()
-
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 10))
         let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]
         XCTAssertTrue(presenceSummary.waitForExistence(timeout: 5))
         XCTAssertTrue(presenceSummary.label.contains("Measured"))
         XCTAssertTrue(presenceSummary.label.contains("Interpolated"))
         XCTAssertFalse(app.staticTexts["Timeline states"].exists)
+        attachScreenshot(named: "launch-quality-analytics", from: app)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
 
@@ -232,6 +230,46 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_avatar"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["dashboard_home_timeline_photo_stage"].exists)
+    }
+
+    func testLaunchQualityGateCapturesTimelineHomeSurface() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhaseInsightFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture"
+        ]
+
+        app.launch()
+
+        let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 10))
+
+        let window = app.windows.firstMatch
+        let windowFrame = window.frame
+        XCTAssertGreaterThan(hero.frame.width, windowFrame.width * 0.82)
+        XCTAssertGreaterThanOrEqual(hero.frame.minX, windowFrame.minX - 1)
+        XCTAssertLessThanOrEqual(hero.frame.maxX, windowFrame.maxX + 1)
+
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+        attachScreenshot(named: "launch-quality-home-timeline", from: app)
+    }
+
+    func testLaunchQualityGateCapturesOnboardingFixedCTA() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Get your Body Score in 60 seconds."].waitForExistence(timeout: 10))
+
+        let startButton = app.buttons["Start my 60-sec Body Score"]
+        XCTAssertTrue(startButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(startButton.isHittable)
+
+        let windowFrame = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(startButton.frame.minY, windowFrame.height * 0.72)
+        XCTAssertLessThanOrEqual(startButton.frame.maxY, windowFrame.maxY + 1)
+        attachScreenshot(named: "launch-quality-onboarding-fixed-cta", from: app)
     }
 
     func testPhaseInsightFixtureShowsDeterministicCuttingInsight() throws {
@@ -353,6 +391,13 @@ final class LogYourBodyUITests: XCTestCase {
             app.swipeUp()
             remainingSwipes -= 1
         }
+    }
+
+    private func attachScreenshot(named name: String, from app: XCUIApplication) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     private func openIntegrations(in app: XCUIApplication) throws {

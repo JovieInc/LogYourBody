@@ -93,6 +93,13 @@ struct DashboardViewLiquid: View {
 
     init(layoutMode: LayoutMode = .legacyTabbed) {
         self.layoutMode = layoutMode
+
+        #if DEBUG
+        let opensAnalyticsPage = ProcessInfo.processInfo.arguments.contains("-lybUITestPhotoTimelineAnalyticsFixture")
+        _selectedPhotoTimelineRootPage = State(initialValue: opensAnalyticsPage ? .analytics : .timeline)
+        #else
+        _selectedPhotoTimelineRootPage = State(initialValue: .timeline)
+        #endif
     }
 
     enum DashboardTab: Hashable {
