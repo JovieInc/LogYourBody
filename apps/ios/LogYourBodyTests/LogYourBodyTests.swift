@@ -667,6 +667,78 @@ final class BodyScoreShareCardTests: XCTestCase {
 }
 
 final class DashboardTimelineProviderPerformanceTests: XCTestCase {
+    func testTimelineRenderSignatureTracksOnlyRenderInputs() {
+        let baseDate = Date(timeIntervalSince1970: 1_800_000_000)
+        let metric = makeMetric(
+            id: "metric",
+            date: baseDate,
+            weight: 181,
+            bodyFat: 18.4,
+            photoUrl: "https://example.com/original.jpg"
+        )
+        let sameMetric = makeMetric(
+            id: "metric",
+            date: baseDate,
+            weight: 181,
+            bodyFat: 18.4,
+            photoUrl: "https://example.com/original.jpg"
+        )
+        let changedPhoto = makeMetric(
+            id: "metric",
+            date: baseDate,
+            weight: 181,
+            bodyFat: 18.4,
+            photoUrl: "https://example.com/changed.jpg"
+        )
+        let changedUpdatedAt = makeMetric(
+            id: "metric",
+            date: baseDate,
+            weight: 181,
+            bodyFat: 18.4,
+            photoUrl: "https://example.com/original.jpg",
+            updatedAt: baseDate.addingTimeInterval(1)
+        )
+
+        let signature = TimelineRenderSignature(metrics: [metric], mode: .photo)
+
+        XCTAssertEqual(
+            signature,
+            TimelineRenderSignature(metrics: [sameMetric], mode: .photo)
+        )
+        XCTAssertNotEqual(
+            signature,
+            TimelineRenderSignature(metrics: [metric], mode: .avatar)
+        )
+        XCTAssertNotEqual(
+            signature,
+            TimelineRenderSignature(metrics: [changedPhoto], mode: .photo)
+        )
+        XCTAssertNotEqual(
+            signature,
+            TimelineRenderSignature(metrics: [changedUpdatedAt], mode: .photo)
+        )
+    }
+
+    func testTimelineRenderDataFactorySortsMetricsAndBuildsAnchors() {
+        let baseDate = Date(timeIntervalSince1970: 1_800_000_000)
+        let newest = makeMetric(id: "newest", date: baseDate, weight: 181, bodyFat: nil)
+        let oldest = makeMetric(id: "oldest", date: baseDate.addingTimeInterval(-86_400 * 3), weight: 184, bodyFat: nil)
+        let photo = makeMetric(
+            id: "photo",
+            date: baseDate.addingTimeInterval(-86_400),
+            weight: nil,
+            bodyFat: 18.4,
+            photoUrl: "https://example.com/photo.jpg"
+        )
+
+        let renderData = TimelineRenderData.make(metrics: [newest, photo, oldest], mode: .photo)
+
+        XCTAssertEqual(renderData.metrics.map(\.id), ["oldest", "photo", "newest"])
+        XCTAssertEqual(renderData.provider.bodyMetrics.map(\.id), ["oldest", "photo", "newest"])
+        XCTAssertFalse(renderData.anchors.isEmpty)
+        XCTAssertTrue(renderData.anchors.contains { $0.id == "photo" })
+    }
+
     func testLoadMetricsBuildsSortedTimelineIndexesOnce() {
         let provider = TimelineDataProvider()
         let baseDate = Date(timeIntervalSince1970: 1_800_000_000)
@@ -728,7 +800,8 @@ final class DashboardTimelineProviderPerformanceTests: XCTestCase {
         localDate: String? = nil,
         weight: Double?,
         bodyFat: Double?,
-        photoUrl: String? = nil
+        photoUrl: String? = nil,
+        updatedAt: Date? = nil
     ) -> BodyMetrics {
         BodyMetrics(
             id: id,
@@ -745,7 +818,7 @@ final class DashboardTimelineProviderPerformanceTests: XCTestCase {
             photoUrl: photoUrl,
             dataSource: BodyMetricSource.manual.rawValue,
             createdAt: date,
-            updatedAt: date
+            updatedAt: updatedAt ?? date
         )
     }
 }

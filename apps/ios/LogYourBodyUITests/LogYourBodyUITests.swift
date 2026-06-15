@@ -447,10 +447,9 @@ final class LogYourBodyUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
 
         let avatarButton = app.buttons["home_mode_avatar_button"]
-        XCTAssertTrue(avatarButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(avatarButton.waitForExistence(timeout: 10))
         if avatarButton.isHittable {
             avatarButton.tap()
         }

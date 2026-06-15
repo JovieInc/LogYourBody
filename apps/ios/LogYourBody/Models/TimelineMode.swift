@@ -92,19 +92,81 @@ struct TimelineDataResult {
         } else if daysDiff < 7 {
             return "\(daysDiff) days ago"
         } else if daysDiff < 30 {
-            let formatter = DateFormatter()
-            formatter.dateFormat = short ? "MMM d" : "MMMM d"
-            return formatter.string(from: date)
+            return TimelineDateFormatterCache.string(from: date, style: short ? .shortMonthDay : .longMonthDay)
         } else if daysDiff < 365 {
-            let formatter = DateFormatter()
-            formatter.dateFormat = short ? "MMM d" : "MMMM d, yyyy"
-            return formatter.string(from: date)
+            return TimelineDateFormatterCache.string(from: date, style: short ? .shortMonthDay : .longMonthDayYear)
         } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = short ? "MMM yyyy" : "MMMM yyyy"
-            return formatter.string(from: date)
+            return TimelineDateFormatterCache.string(from: date, style: short ? .shortMonthYear : .longMonthYear)
         }
     }
+}
+
+enum TimelineDateFormatterCache {
+    enum Style {
+        case shortMonthDay
+        case longMonthDay
+        case longMonthDayYear
+        case mediumDate
+        case shortMonthYear
+        case longMonthYear
+    }
+
+    static func string(from date: Date, style: Style) -> String {
+        formatter(for: style).string(from: date)
+    }
+
+    private static func formatter(for style: Style) -> DateFormatter {
+        switch style {
+        case .shortMonthDay:
+            return shortMonthDayFormatter
+        case .longMonthDay:
+            return longMonthDayFormatter
+        case .longMonthDayYear:
+            return longMonthDayYearFormatter
+        case .mediumDate:
+            return mediumDateFormatter
+        case .shortMonthYear:
+            return shortMonthYearFormatter
+        case .longMonthYear:
+            return longMonthYearFormatter
+        }
+    }
+
+    private static let shortMonthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter
+    }()
+
+    private static let longMonthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d"
+        return formatter
+    }()
+
+    private static let longMonthDayYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d, yyyy"
+        return formatter
+    }()
+
+    private static let mediumDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter
+    }()
+
+    private static let shortMonthYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM yyyy"
+        return formatter
+    }()
+
+    private static let longMonthYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter
+    }()
 }
 
 /// Timeline position with metadata for rendering
