@@ -181,8 +181,7 @@ final class LogYourBodyUITests: XCTestCase {
         app.launchArguments = ["-lybUITestPaidMVPFixture"]
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_pager"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Start with a photo"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Weight log"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
@@ -206,19 +205,13 @@ final class LogYourBodyUITests: XCTestCase {
         app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
         app.launch()
 
-        let pager = app.descendants(matching: .any)["photo_timeline_root_pager"]
-        XCTAssertTrue(pager.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists)
 
-        let statsNav = app.descendants(matching: .any)["photo_timeline_root_nav_stats"]
-        if statsNav.waitForExistence(timeout: 5) {
-            statsNav.tap()
-        } else {
-            let statsButton = app.buttons["Stats"]
-            XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
-            statsButton.tap()
-        }
+        let statsButton = app.buttons["Stats"]
+        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+        statsButton.tap()
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 10))
         let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]
