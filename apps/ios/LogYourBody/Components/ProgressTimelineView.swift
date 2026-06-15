@@ -18,14 +18,30 @@ struct ProgressTimelineView: View {
     @State private var isDragging: Bool = false
     @State private var dragPosition: Double = 0.5
     @State private var currentDateLabel: String = ""
+    @State private var renderSignature: TimelineRenderSignature
+    @State private var renderData: TimelineRenderData
 
     private let timelineHeight: CGFloat = 50
     private let scrubberHandleSize: CGFloat = 44
 
+    init(
+        bodyMetrics: [BodyMetrics],
+        selectedIndex: Binding<Int>,
+        mode: Binding<TimelineMode>
+    ) {
+        self.bodyMetrics = bodyMetrics
+        _selectedIndex = selectedIndex
+        _mode = mode
+
+        let initialSignature = TimelineRenderSignature(metrics: bodyMetrics, mode: mode.wrappedValue)
+        _renderSignature = State(initialValue: initialSignature)
+        _renderData = State(initialValue: TimelineRenderData.make(metrics: bodyMetrics, mode: mode.wrappedValue))
+    }
+
     // MARK: - Body
 
     var body: some View {
-        let renderData = makeRenderData(metrics: bodyMetrics, mode: mode)
+        let currentRenderSignature = TimelineRenderSignature(metrics: bodyMetrics, mode: mode)
         let handlePosition = isDragging ? dragPosition : selectedPosition(
             in: renderData,
             selectedIndex: selectedIndex
@@ -67,6 +83,12 @@ struct ProgressTimelineView: View {
             .frame(height: timelineHeight)
         }
         .accessibilityIdentifier("dashboard_timeline_scrubber")
+        .onAppear {
+            refreshRenderDataIfNeeded(for: currentRenderSignature)
+        }
+        .onChange(of: currentRenderSignature) { _, newSignature in
+            refreshRenderDataIfNeeded(for: newSignature)
+        }
     }
 
     // MARK: - Subviews
@@ -194,39 +216,6 @@ struct ProgressTimelineView: View {
 
     // MARK: - Logic
 
-    private func makeRenderData(metrics: [BodyMetrics], mode: TimelineMode) -> TimelineRenderData {
-        let provider = TimelineDataProvider()
-        provider.loadMetrics(metrics)
-        guard !metrics.isEmpty else {
-            return TimelineRenderData(
-                metrics: [],
-                provider: provider,
-                anchors: [],
-                zoomLevel: .month
-            )
-        }
-
-        guard let firstDate = provider.bodyMetrics.first?.date,
-              let lastDate = provider.bodyMetrics.last?.date else {
-            return TimelineRenderData(
-                metrics: [],
-                provider: provider,
-                anchors: [],
-                zoomLevel: .month
-            )
-        }
-
-        let zoomLevel = TimelineZoomLevel.calculate(from: firstDate, to: lastDate)
-        let anchors = provider.generateAnchors(mode: mode, zoomLevel: zoomLevel)
-
-        return TimelineRenderData(
-            metrics: provider.bodyMetrics,
-            provider: provider,
-            anchors: anchors,
-            zoomLevel: zoomLevel
-        )
-    }
-
     private func selectedPosition(in renderData: TimelineRenderData, selectedIndex: Int) -> Double {
         guard selectedIndex >= 0, selectedIndex < bodyMetrics.count else {
             return dragPosition
@@ -284,10 +273,7 @@ struct ProgressTimelineView: View {
             return
         }
 
-        // Format date
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        currentDateLabel = formatter.string(from: nearestDate)
+        currentDateLabel = TimelineDateFormatterCache.string(from: nearestDate, style: .mediumDate)
 
         // Update selected index
         if let metric = provider.getMetric(for: nearestDate),
@@ -305,13 +291,75 @@ struct ProgressTimelineView: View {
         let impact = UIImpactFeedbackGenerator(style: .light)
         impact.impactOccurred()
     }
+
+    private func refreshRenderDataIfNeeded(for signature: TimelineRenderSignature) {
+        guard signature != renderSignature else { return }
+
+        renderSignature = signature
+        renderData = TimelineRenderData.make(metrics: bodyMetrics, mode: mode)
+    }
 }
 
-private struct TimelineRenderData {
+struct TimelineRenderSignature: Equatable {
+    let modeRawValue: String
+    let metricFingerprints: [MetricFingerprint]
+
+    init(metrics: [BodyMetrics], mode: TimelineMode) {
+        modeRawValue = mode.rawValue
+        metricFingerprints = metrics.map(MetricFingerprint.init)
+    }
+
+    struct MetricFingerprint: Equatable {
+        let id: String
+        let date: TimeInterval
+        let localDate: String
+        let photoUrl: String?
+        let weight: Double?
+        let bodyFatPercentage: Double?
+        let updatedAt: TimeInterval
+
+        init(metric: BodyMetrics) {
+            id = metric.id
+            date = metric.date.timeIntervalSinceReferenceDate
+            localDate = metric.localDate
+            photoUrl = metric.photoUrl
+            weight = metric.weight
+            bodyFatPercentage = metric.bodyFatPercentage
+            updatedAt = metric.updatedAt.timeIntervalSinceReferenceDate
+        }
+    }
+}
+
+struct TimelineRenderData {
     let metrics: [BodyMetrics]
     let provider: TimelineDataProvider
     let anchors: [TimelineAnchor]
     let zoomLevel: TimelineZoomLevel
+
+    static func make(metrics: [BodyMetrics], mode: TimelineMode) -> TimelineRenderData {
+        let provider = TimelineDataProvider()
+        provider.loadMetrics(metrics)
+        guard !metrics.isEmpty,
+              let firstDate = provider.bodyMetrics.first?.date,
+              let lastDate = provider.bodyMetrics.last?.date else {
+            return TimelineRenderData(
+                metrics: [],
+                provider: provider,
+                anchors: [],
+                zoomLevel: .month
+            )
+        }
+
+        let zoomLevel = TimelineZoomLevel.calculate(from: firstDate, to: lastDate)
+        let anchors = provider.generateAnchors(mode: mode, zoomLevel: zoomLevel)
+
+        return TimelineRenderData(
+            metrics: provider.bodyMetrics,
+            provider: provider,
+            anchors: anchors,
+            zoomLevel: zoomLevel
+        )
+    }
 }
 
 // MARK: - Preview

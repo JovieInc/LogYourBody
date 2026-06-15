@@ -23,6 +23,7 @@
     "lint:swift": "cd apps/ios && swiftlint lint --strict",
     "ios:launch-quality-audit": "bash scripts/ios/launch-quality-audit.sh",
     "ios:performance-audit": "bash scripts/ios/performance-audit.sh",
+    "ios:ettrace-profile": "bash scripts/ios/ettrace-profile.sh",
     "ios:quality-gate": "bash scripts/ios/quality-gate.sh"
   },
   "devDependencies": {
