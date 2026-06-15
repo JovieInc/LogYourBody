@@ -426,7 +426,7 @@ extension DashboardViewLiquid {
             Text("Steps progress")
         }
         .gaugeStyle(.accessoryLinearCapacity)
-        .tint(Color.metricAccentSteps)
+        .tint(theme.colors.accentOrange)
         .labelsHidden()
         .accessibilityHidden(true)
     }
@@ -446,7 +446,7 @@ extension DashboardViewLiquid {
             Text(String(format: "Target %.1f%%", goal))
         }
         .gaugeStyle(.accessoryLinearCapacity)
-        .tint(Color.metricAccentBodyFat)
+        .tint(theme.colors.accentPink)
         .labelsHidden()
         .accessibilityLabel("Body fat \(String(format: "%.1f%%", current)), target \(String(format: "%.1f%%", goal))")
     }
@@ -469,7 +469,7 @@ extension DashboardViewLiquid {
                     Text(String(format: "Target %.1f %@", goal, unit))
                 }
                 .gaugeStyle(.accessoryLinearCapacity)
-                .tint(Color.metricAccentWeight)
+                .tint(theme.colors.accentViolet)
                 .labelsHidden()
                 .accessibilityLabel(
                     "Weight \(String(format: "%.1f %@", current, unit)), target \(String(format: "%.1f %@", goal, unit))"
@@ -481,11 +481,11 @@ extension DashboardViewLiquid {
                 HStack(spacing: 4) {
                     Image(systemName: "hand.tap.fill")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.40))
+                        .foregroundColor(theme.colors.textQuaternary)
 
                     Text("Tap to set")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.40))
+                        .foregroundColor(theme.colors.textQuaternary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 8, alignment: .leading)
             )
@@ -584,7 +584,7 @@ extension DashboardViewLiquid {
 
     var visualDivider: some View {
         Rectangle()
-            .fill(Color.liquidTextPrimary.opacity(0.15))
+            .fill(theme.colors.border)
             .frame(height: 1)
     }
 }

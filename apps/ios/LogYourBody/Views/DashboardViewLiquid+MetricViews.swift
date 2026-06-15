@@ -86,7 +86,7 @@ extension DashboardViewLiquid {
             FullMetricChartView(
                 title: "Steps",
                 icon: "flame.fill",
-                iconColor: Color.metricAccentSteps,
+                iconColor: theme.colors.accentOrange,
                 currentValue: formatSteps(dailyMetrics?.steps),
                 unit: "steps",
                 currentDate: formatDate(dailyMetrics?.updatedAt ?? Date()),
@@ -105,7 +105,7 @@ extension DashboardViewLiquid {
             FullMetricChartView(
                 title: "Weight",
                 icon: "figure.stand",
-                iconColor: Color.metricAccentWeight,
+                iconColor: theme.colors.accentViolet,
                 currentValue: currentMetric.flatMap { formatWeightValue($0.weight) } ?? "–",
                 unit: weightUnit,
                 currentDate: formatDate(currentMetric?.date ?? Date()),
@@ -124,7 +124,7 @@ extension DashboardViewLiquid {
             FullMetricChartView(
                 title: "Body Fat %",
                 icon: "percent",
-                iconColor: Color.metricAccentBodyFat,
+                iconColor: theme.colors.accentPink,
                 currentValue: currentMetric.flatMap { formatBodyFatValue($0.bodyFatPercentage) } ?? "–",
                 unit: "%",
                 currentDate: formatDate(currentMetric?.date ?? Date()),
@@ -143,7 +143,7 @@ extension DashboardViewLiquid {
             FullMetricChartView(
                 title: "FFMI",
                 icon: "figure.arms.open",
-                iconColor: Color.metricAccentFFMI,
+                iconColor: theme.colors.accentTeal,
                 currentValue: currentMetric.map { formatFFMIValue($0) } ?? "–",
                 unit: "",
                 currentDate: formatDate(currentMetric?.date ?? Date()),
@@ -163,7 +163,7 @@ extension DashboardViewLiquid {
             FullMetricChartView(
                 title: "Body Score",
                 icon: "star.fill",
-                iconColor: Color.metricAccent,
+                iconColor: theme.colors.primary,
                 currentValue: bodyScore.scoreText,
                 unit: "",
                 currentDate: formatDate(currentMetric?.date ?? Date()),
@@ -189,7 +189,7 @@ extension DashboardViewLiquid {
             FullMetricChartView(
                 title: "GLP-1 Dose",
                 icon: "syringe",
-                iconColor: Color.metricAccent,
+                iconColor: theme.colors.primary,
                 currentValue: currentValue,
                 unit: unit,
                 currentDate: currentDate,

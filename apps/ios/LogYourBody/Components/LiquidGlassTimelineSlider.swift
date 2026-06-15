@@ -33,6 +33,10 @@ struct LiquidGlassTimelineSlider: View {
         !photoMetrics.isEmpty
     }
 
+    private var photoAnchorTicks: [TimelineTick] {
+        ticks.filter { $0.isPhotoAnchor }
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             // Photo navigation with glass effect
@@ -100,7 +104,7 @@ struct LiquidGlassTimelineSlider: View {
                     )
 
                     // Photo thumbnails with glass effect
-                    ForEach(ticks.filter({ $0.isPhotoAnchor }), id: \.index) { tick in
+                    ForEach(photoAnchorTicks, id: \.index) { tick in
                         let tickProgress = Double(tick.index) / Double(metrics.count - 1)
                         let xPosition = geometry.size.width * CGFloat(tickProgress)
 

@@ -2,8 +2,7 @@ import SwiftUI
 import UIKit
 import Photos
 
-struct BodyScoreSharePayload: Identifiable {
-    let id = UUID()
+struct BodyScoreSharePayload {
     let score: Int
     let scoreText: String
     let tagline: String
@@ -57,6 +56,25 @@ enum BodyScoreShareAspect: String, CaseIterable, Identifiable {
             return CGSize(width: 1_080, height: 1_920)
         }
     }
+
+    static func preferredExportAspect(for image: UIImage?) -> BodyScoreShareAspect {
+        guard let image,
+              image.size.width > 0,
+              image.size.height > 0 else {
+            return defaultExportAspect
+        }
+
+        let ratio = image.size.width / image.size.height
+        if ratio > 0.86 {
+            return .square
+        }
+
+        if ratio < 0.66 {
+            return .story
+        }
+
+        return .portrait
+    }
 }
 
 struct BodyScoreShareCardView: View {
@@ -105,7 +123,7 @@ struct BodyScoreShareCardView: View {
             if let photoImage = payload.photoImage {
                 Image(uiImage: photoImage)
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
                     .frame(width: layout.size.width, height: layout.size.height, alignment: .center)
                     .clipped()
                     .accessibilityLabel("Progress photo")
@@ -376,10 +394,10 @@ struct ShareCardLayout {
     var textVisualGap: CGFloat { max(10 * scale, size.height * 0.018) }
 
     var estimatedSummaryContentHeight: CGFloat {
-        let scoreLabelStack = scoreLabelFontSize + taglineFontSize * 2.2 + deltaFontSize + scoreLabelSpacing * 3
+        let scoreLabelStack = scoreLabelFontSize + taglineFontSize * 2.6 + deltaFontSize + scoreLabelSpacing * 3
         let scoreRow = max(scoreFontSize * 1.02, scoreLabelStack)
         let metricRow = metricTitleFontSize + metricValueFontSize + metricCaptionFontSize + metricTextSpacing * 2
-        return scoreRow + summarySpacing + metricRow + summarySpacing + footerFontSize
+        return scoreRow + summarySpacing + metricRow * 1.12 + summarySpacing + footerFontSize * 1.2
     }
 
     var summaryTopY: CGFloat {
@@ -398,14 +416,17 @@ struct ShareCardLayout {
     }
 
     var summaryMatteHeight: CGFloat {
+        let minimumHeight = size.height - summaryTopY + bottomPadding
+        let baseHeight: CGFloat
         switch aspect {
         case .square:
-            return size.height * 0.60
+            baseHeight = size.height * 0.60
         case .portrait:
-            return size.height * 0.54
+            baseHeight = size.height * 0.54
         case .story:
-            return size.height * 0.46
+            baseHeight = size.height * 0.46
         }
+        return max(baseHeight, minimumHeight)
     }
 
     var bottomOverlayHeight: CGFloat {
@@ -426,7 +447,7 @@ struct BodyScoreShareSheet: View {
     let payload: BodyScoreSharePayload
     let onClose: (() -> Void)?
 
-    @State private var selectedAspect: BodyScoreShareAspect = .defaultExportAspect
+    @State private var selectedAspect: BodyScoreShareAspect
     @State private var renderedImage: UIImage?
     @State private var isRendering = false
     @State private var showSystemShareSheet = false
@@ -434,6 +455,7 @@ struct BodyScoreShareSheet: View {
     init(payload: BodyScoreSharePayload, onClose: (() -> Void)? = nil) {
         self.payload = payload
         self.onClose = onClose
+        _selectedAspect = State(initialValue: BodyScoreShareAspect.preferredExportAspect(for: payload.photoImage))
     }
 
     var body: some View {

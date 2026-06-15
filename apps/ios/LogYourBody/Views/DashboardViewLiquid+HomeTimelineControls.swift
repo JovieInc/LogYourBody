@@ -31,13 +31,12 @@ extension DashboardViewLiquid {
             }
         }
         .padding(4)
-        .background(
-            Capsule(style: .continuous)
-                .fill(Color.white.opacity(0.08))
-        )
-        .overlay(
-            Capsule(style: .continuous)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        .systemBGlassSurface(
+            cornerRadius: theme.radius.full,
+            tint: theme.colors.text,
+            tintOpacity: 0.025,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.85
         )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home_mode_switch")
@@ -56,10 +55,10 @@ extension DashboardViewLiquid {
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity)
                 .frame(height: 34)
-                .foregroundColor(isSelected ? .black : Color.white.opacity(0.72))
+                .foregroundColor(isSelected ? theme.colors.background : theme.colors.textSecondary)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(isSelected ? Color.white : Color.clear)
+                        .fill(isSelected ? theme.colors.text : Color.clear)
                 )
         }
         .buttonStyle(.plain)

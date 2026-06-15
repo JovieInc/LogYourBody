@@ -20,7 +20,7 @@ extension DashboardViewLiquid {
                 HStack(spacing: 8) {
                     Text(insight.title)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(Color.liquidTextPrimary)
+                        .foregroundColor(theme.colors.text)
 
                     if let delta = insight.weightDeltaPercentPerWeek {
                         Text(formatPhaseInsightDelta(delta))
@@ -38,13 +38,13 @@ extension DashboardViewLiquid {
 
                 Text(insight.message)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color.liquidTextPrimary.opacity(0.68))
+                    .foregroundColor(theme.colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let detail = insight.detail {
                     Text(detail)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.52))
+                        .foregroundColor(theme.colors.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -52,13 +52,12 @@ extension DashboardViewLiquid {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.white.opacity(0.06))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        .systemBGlassSurface(
+            cornerRadius: theme.radius.card,
+            tint: theme.colors.text,
+            tintOpacity: 0.025,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.85
         )
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("photo_timeline_hud_phase_insight")
@@ -88,7 +87,7 @@ extension DashboardViewLiquid {
                     HStack(spacing: 8) {
                         Text(summary.title)
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(Color.liquidTextPrimary)
+                            .foregroundColor(theme.colors.text)
 
                         if let latestDoseText = summary.latestDoseText {
                             Text(latestDoseText)
@@ -106,7 +105,7 @@ extension DashboardViewLiquid {
 
                     Text(summary.message)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.68))
+                        .foregroundColor(theme.colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -114,19 +113,18 @@ extension DashboardViewLiquid {
 
                 Text(summary.actionTitle)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.black)
+                    .foregroundColor(theme.colors.background)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Capsule().fill(Color.white))
+                    .background(Capsule().fill(theme.colors.text))
             }
             .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(Color.white.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            .systemBGlassSurface(
+                cornerRadius: theme.radius.card,
+                tint: theme.colors.text,
+                tintOpacity: 0.025,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.85
             )
         }
         .buttonStyle(.plain)
@@ -188,13 +186,13 @@ extension DashboardViewLiquid {
     func phaseInsightColor(for kind: PhaseInsightKind) -> Color {
         switch kind {
         case .cutting:
-            return Color.metricAccentBodyFat
+            return theme.colors.accentPink
         case .maintaining:
-            return Color.metricAccent
+            return theme.colors.primary
         case .gaining:
-            return Color.metricAccentWeight
+            return theme.colors.accentViolet
         case .insufficientData:
-            return Color.metricTextTertiary
+            return theme.colors.textTertiary
         }
     }
 
@@ -211,11 +209,11 @@ extension DashboardViewLiquid {
     func glp1WeeklyCheckInColor(for status: Glp1WeeklyCheckInStatus) -> Color {
         switch status {
         case .setup:
-            return Color.metricAccent
+            return theme.colors.primary
         case .due:
-            return Color.metricAccentWeight
+            return theme.colors.accentViolet
         case .logged:
-            return Color.metricAccentSteps
+            return theme.colors.accentOrange
         }
     }
 

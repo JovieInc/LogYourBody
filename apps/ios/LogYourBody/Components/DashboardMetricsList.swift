@@ -5,6 +5,8 @@ import UIKit
 struct DashboardMetricsList<CardContent: View>: View {
     typealias MetricIdentifier = DashboardViewLiquid.MetricIdentifier
 
+    @Environment(\.theme) private var theme
+
     @Binding var metricsOrder: [MetricIdentifier]
     @Binding var draggedMetric: MetricIdentifier?
     @Binding var dropTargetMetric: MetricIdentifier?
@@ -30,10 +32,10 @@ struct DashboardMetricsList<CardContent: View>: View {
             ForEach(metricsOrder) { metricId in
                 cardContent(metricId)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
                             .stroke(
                                 (draggedMetric == metricId || dropTargetMetric == metricId) ?
-                                    Color.metricAccent.opacity(draggedMetric == metricId ? 0.9 : 0.6) :
+                                    theme.colors.primary.opacity(draggedMetric == metricId ? 0.9 : 0.6) :
                                     Color.clear,
                                 lineWidth: draggedMetric == metricId ? 2 : (dropTargetMetric == metricId ? 1.5 : 0)
                             )
@@ -41,7 +43,7 @@ struct DashboardMetricsList<CardContent: View>: View {
                     .scaleEffect(draggedMetric == metricId ? 1.03 : 1.0)
                     .opacity(1.0)
                     .shadow(
-                        color: draggedMetric == metricId ? Color.black.opacity(0.45) : Color.clear,
+                        color: draggedMetric == metricId ? theme.colors.background.opacity(0.45) : Color.clear,
                         radius: draggedMetric == metricId ? 18 : 0,
                         x: 0,
                         y: draggedMetric == metricId ? 10 : 0

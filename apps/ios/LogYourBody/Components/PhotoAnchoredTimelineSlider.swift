@@ -446,6 +446,10 @@ struct PhotoAnchoredTimelineSlider: View {
 
             // Timeline slider with enhanced polish
             GeometryReader { geometry in
+                let photoTicks = calculateSmartTicks().filter { $0.hasPhoto }
+                let milestoneNotches = getMilestoneNotches()
+                let visibleMilestoneLabels = getVisibleMilestoneLabels(in: geometry.size.width)
+
                 ZStack(alignment: .leading) {
                     // Background track
                     RoundedRectangle(cornerRadius: 2)
@@ -462,13 +466,13 @@ struct PhotoAnchoredTimelineSlider: View {
                 .frame(height: 20, alignment: .center)
 
                 // Photo thumbnails only (no tick lines)
-                ForEach(calculateSmartTicks().filter { $0.hasPhoto }, id: \.index) { tick in
+                ForEach(photoTicks, id: \.index) { tick in
                     PhotoThumbnailTick(photoUrl: tick.photoUrl, isSelected: tick.index == selectedIndex)
                         .position(x: tick.position * geometry.size.width, y: 10)
                 }
 
                 // Milestone notches with varying heights
-                ForEach(getMilestoneNotches(), id: \.index) { milestone in
+                ForEach(milestoneNotches, id: \.index) { milestone in
                     Rectangle()
                         .fill(Color.white.opacity(milestone.importance == .yearly ? 0.6 : 0.4))
                         .frame(
@@ -479,7 +483,7 @@ struct PhotoAnchoredTimelineSlider: View {
                 }
 
                 // Milestone labels with collision detection
-                ForEach(getVisibleMilestoneLabels(in: geometry.size.width), id: \.index) { milestone in
+                ForEach(visibleMilestoneLabels, id: \.index) { milestone in
                     Text(milestone.displayLabel)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.white.opacity(0.70))
