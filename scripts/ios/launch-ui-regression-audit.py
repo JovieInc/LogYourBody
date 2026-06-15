@@ -168,7 +168,7 @@ def main() -> int:
     for token in [
         ".background(theme.colors.background)",
         "padding: 0,",
-        "horizontalFillScale: 1.08",
+        "horizontalFillScale: 1.0",
         "renderMode: .fillWidth",
     ]:
         require_token(
