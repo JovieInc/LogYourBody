@@ -202,6 +202,7 @@ struct AccountDeletionCleanupService {
     static let accountUserDefaultsKeys: [String] = [
         Constants.hasCompletedOnboardingKey,
         Constants.onboardingCompletedVersionKey,
+        Constants.onboardingCompletedUserIdKey,
         Constants.preferredWeightUnitKey,
         Constants.preferredMeasurementSystemKey,
         Constants.goalWeightKey,

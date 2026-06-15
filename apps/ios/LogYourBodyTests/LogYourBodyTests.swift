@@ -378,6 +378,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
             Constants.authTokenKey,
             Constants.hasCompletedOnboardingKey,
             Constants.onboardingCompletedVersionKey,
+            Constants.onboardingCompletedUserIdKey,
             Constants.defaultHomeModeKey,
             Constants.timelineModeKey,
             "healthKitSyncEnabled",
@@ -414,6 +415,7 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
 
     func testDefaultHomeModeDefaultsToAvatar() {
         XCTAssertEqual(Constants.defaultHomeModeKey, "defaultHomeMode")
+        XCTAssertEqual(Constants.onboardingCompletedUserIdKey, "onboardingCompletedUserId")
         XCTAssertEqual(DefaultHomeMode.default, .avatar)
         XCTAssertEqual(DefaultHomeMode(storedValue: "photo"), .photo)
         XCTAssertEqual(DefaultHomeMode(storedValue: "unexpected"), .avatar)
@@ -2266,6 +2268,42 @@ final class OnboardingFlowViewModelTests: XCTestCase {
 
         XCTAssertTrue(manager.hasCompletedCurrentVersion)
         XCTAssertEqual(defaults.integer(forKey: Constants.onboardingCompletedVersionKey), 2)
+    }
+
+    func testProfileCompletionSyncIgnoresStaleFalseForSameCompletedUser() {
+        let suiteName = "onboarding-profile-stale-false-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let manager = OnboardingStateManager(defaults: defaults, currentVersion: 1)
+
+        manager.markCompleted(userId: "same-user")
+        manager.syncCompletionFlagFromProfile(false, userId: "same-user")
+
+        XCTAssertTrue(manager.hasCompletedCurrentVersion)
+        XCTAssertTrue(manager.hasCompletedCurrentVersion(for: "same-user"))
+        XCTAssertEqual(defaults.string(forKey: Constants.onboardingCompletedUserIdKey), "same-user")
+    }
+
+    func testProfileCompletionSyncClearsInheritedCompletionForDifferentUser() {
+        let suiteName = "onboarding-profile-user-switch-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let manager = OnboardingStateManager(defaults: defaults, currentVersion: 1)
+
+        manager.markCompleted(userId: "previous-user")
+        XCTAssertFalse(manager.hasCompletedCurrentVersion(for: "new-user"))
+
+        manager.syncCompletionFlagFromProfile(false, userId: "new-user")
+
+        XCTAssertFalse(manager.hasCompletedCurrentVersion)
+        XCTAssertFalse(manager.hasCompletedCurrentVersion(for: "previous-user"))
+        XCTAssertNil(defaults.string(forKey: Constants.onboardingCompletedUserIdKey))
     }
 
     func testFirstPhotoBackNavigationAndPaywallBackNavigation() {

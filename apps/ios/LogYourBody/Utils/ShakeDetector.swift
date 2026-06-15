@@ -122,6 +122,8 @@ class DebugResetManager {
         // Also clear specific keys
         let keysToRemove = [
             Constants.hasCompletedOnboardingKey,
+            Constants.onboardingCompletedVersionKey,
+            Constants.onboardingCompletedUserIdKey,
             Constants.preferredMeasurementSystemKey,
             "healthKitSyncEnabled",
             "biometricLockEnabled",

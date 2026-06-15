@@ -158,7 +158,10 @@ class LoadingManager: ObservableObject {
 
                         // Sync onboarding state to UserDefaults via OnboardingStateManager
                         if let onboardingCompleted = profile.onboardingCompleted {
-                            OnboardingStateManager.shared.syncCompletionFlagFromProfile(onboardingCompleted)
+                            OnboardingStateManager.shared.syncCompletionFlagFromProfile(
+                                onboardingCompleted,
+                                userId: userId
+                            )
                             // print("✅ LoadingManager: Synced onboarding status from profile: \(onboardingCompleted)")
                         }
                     }

@@ -18,6 +18,11 @@ enum LaunchSurfacePolicy {
     }
 }
 
+private struct ProfileCompletionSyncKey: Equatable {
+    let userId: String?
+    let completionFlag: Bool
+}
+
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
@@ -28,7 +33,7 @@ struct ContentView: View {
     private let onboardingStateManager = OnboardingStateManager.shared
     @State private var currentUserId: String?
     @State private var hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion
-    @State private var lastProfileCompletionSync: Bool?
+    @State private var lastProfileCompletionSync: ProfileCompletionSyncKey?
     @State private var isLoadingComplete = false
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
@@ -42,11 +47,13 @@ struct ContentView: View {
 
     private func applyProfileCompletionIfNeeded(_ completionFlag: Bool?) {
         guard let completionFlag else { return }
-        guard lastProfileCompletionSync != completionFlag else { return }
+        let userId = currentUserId ?? authManager.currentUser?.id
+        let syncKey = ProfileCompletionSyncKey(userId: userId, completionFlag: completionFlag)
+        guard lastProfileCompletionSync != syncKey else { return }
 
-        lastProfileCompletionSync = completionFlag
-        onboardingStateManager.updateCompletionStatus(completionFlag)
-        hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
+        lastProfileCompletionSync = syncKey
+        onboardingStateManager.syncCompletionFlagFromProfile(completionFlag, userId: userId)
+        hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion(for: userId)
     }
 
     // Check if user profile is complete
@@ -107,8 +114,8 @@ struct ContentView: View {
         }
         .onAppear {
             // Initialize onboarding status
-            hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
             currentUserId = authManager.currentUser?.id
+            hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion(for: currentUserId)
 
             // Fallback: Check profile if UserDefaults doesn't have it
             if !hasCompletedOnboarding {
@@ -127,12 +134,12 @@ struct ContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: OnboardingStateManager.onboardingStateDidChange)) { _ in
-            hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
+            hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion(for: currentUserId)
         }
         .onChange(of: authManager.isAuthenticated) { _, newValue in
             currentUserId = authManager.currentUser?.id
             if newValue {
-                hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion
+                hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion(for: currentUserId)
             } else {
                 lastProfileCompletionSync = nil
                 if hasCompletedOnboarding {

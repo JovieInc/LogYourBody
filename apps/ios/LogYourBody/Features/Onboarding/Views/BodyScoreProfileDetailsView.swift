@@ -367,7 +367,7 @@ struct BodyScoreProfileDetailsView: View {
         let trimmedLast = trimmedLastName
         let fullName = "\(trimmedFirst) \(trimmedLast)".trimmingCharacters(in: .whitespacesAndNewlines)
         let completesOnboardingNow = !viewModel.includesFirstPhotoStep ||
-            OnboardingStateManager.shared.hasCompletedCurrentVersion
+            OnboardingStateManager.shared.hasCompletedCurrentVersion(for: authManager.currentUser?.id)
 
         Task {
             do {
