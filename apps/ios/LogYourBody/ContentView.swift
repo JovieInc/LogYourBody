@@ -101,6 +101,7 @@ struct ContentView: View {
             loadingOverlay
         }
         .preferredColorScheme(.dark)
+        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         // Toast presenter removed - handle notifications at view level
         .fullScreenCover(isPresented: $showLegalConsent) {
             LegalConsentView(
