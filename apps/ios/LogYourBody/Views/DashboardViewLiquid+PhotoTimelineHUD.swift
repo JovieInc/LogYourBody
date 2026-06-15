@@ -100,14 +100,14 @@ extension DashboardViewLiquid {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(
                         selectedPhotoTimelineRootPage == page
-                            ? Color.white
-                            : Color.white.opacity(0.58)
+                            ? theme.colors.text
+                            : theme.colors.textSecondary
                     )
 
                 Capsule()
                     .fill(
                         selectedPhotoTimelineRootPage == page
-                            ? Color.white
+                            ? theme.colors.text
                             : Color.clear
                     )
                     .frame(width: 24, height: 2)
@@ -173,9 +173,12 @@ extension DashboardViewLiquid {
             )
         }
         .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.06))
+        .systemBGlassSurface(
+            cornerRadius: theme.radius.card,
+            tint: theme.colors.text,
+            tintOpacity: 0.025,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.85
         )
         .accessibilityIdentifier("photo_timeline_hud_timeline")
     }
@@ -274,16 +277,16 @@ extension DashboardViewLiquid {
             VStack(alignment: .leading, spacing: 16) {
                 Image(systemName: "camera.metering.center.weighted")
                     .font(.system(size: 34, weight: .semibold))
-                    .foregroundColor(Color.white.opacity(0.78))
+                    .foregroundColor(theme.colors.textSecondary)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Start with a photo")
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.colors.text)
 
                     Text("Add a progress photo or weight entry to build your body-composition timeline.")
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.68))
+                        .foregroundColor(theme.colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -294,21 +297,20 @@ extension DashboardViewLiquid {
                         .font(.system(size: 15, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Capsule().fill(Color.white))
-                        .foregroundColor(.black)
+                        .background(Capsule().fill(theme.colors.text))
+                        .foregroundColor(theme.colors.background)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("photo_timeline_hud_empty_add_photo_button")
             }
             .padding(24)
             .frame(maxWidth: .infinity, minHeight: 420, alignment: .bottomLeading)
-            .background(
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(Color.white.opacity(0.07))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 28)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+            .systemBGlassSurface(
+                cornerRadius: theme.radius.card,
+                tint: theme.colors.text,
+                tintOpacity: 0.03,
+                borderColor: theme.colors.border,
+                borderOpacity: 0.9
             )
             .padding(.horizontal, 20)
 

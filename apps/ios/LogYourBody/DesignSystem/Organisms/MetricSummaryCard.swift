@@ -104,10 +104,10 @@ public struct MetricSummaryCard: View {
         self.isButtonContext = isButtonContext
     }
 
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.theme) private var theme
 
     @ScaledMetric(relativeTo: .largeTitle) private var valueFontSize: CGFloat = 44
     @ScaledMetric(relativeTo: .title3) private var unitFontSize: CGFloat = 18
@@ -116,42 +116,34 @@ public struct MetricSummaryCard: View {
 
     private let horizontalPadding: CGFloat = 16
     private let verticalPadding: CGFloat = 11
-    private let cardCornerRadius: CGFloat = 20
 
     private var isAccessibilityCategory: Bool {
         dynamicTypeSize >= .accessibility1
     }
 
     public var body: some View {
-        let shape = RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
 
-        return ZStack {
-            // Solid background layer
-            shape
-                .fill(cardBackgroundColor)
+        return VStack(alignment: .leading, spacing: 0) {
+            header
+                .padding(.horizontal, horizontalPadding)
+                .padding(.top, verticalPadding + 2)
 
-            // Optional material overlay for subtle softness (reduced for flatter look)
-            if !reduceTransparency {
-                shape
-                    .fill(.ultraThinMaterial.opacity(0.35))
-            }
-
-            // Border and soft shadow (Apple Health-style, low contrast)
-            shape
-                .strokeBorder(borderColor, lineWidth: 1)
-                .shadow(color: shadowColor, radius: 6, x: 0, y: 4)
-
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                    .padding(.horizontal, horizontalPadding)
-                    .padding(.top, verticalPadding + 2)
-
-                stateView
-                    .padding(.horizontal, horizontalPadding)
-                    .padding(.top, verticalPadding)
-                    .padding(.bottom, verticalPadding)
-            }
+            stateView
+                .padding(.horizontal, horizontalPadding)
+                .padding(.top, verticalPadding)
+                .padding(.bottom, verticalPadding)
         }
+        .systemBGlassSurface(
+            cornerRadius: theme.radius.card,
+            tint: theme.colors.text,
+            tintOpacity: reduceTransparency ? 0 : 0.025,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.85,
+            shadowOpacity: 0.18,
+            shadowRadius: 6,
+            shadowY: 4
+        )
         .contentShape(shape)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
@@ -256,9 +248,7 @@ public struct MetricSummaryCard: View {
             if let footnote = content.footnote, !footnote.isEmpty {
                 Text(footnote)
                     .font(.system(.footnote, design: .rounded))
-                    .foregroundStyle(
-                        colorScheme == .dark ? Color.metricTextSecondary : secondaryTextColor
-                    )
+                    .foregroundStyle(secondaryTextColor)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
                     .fixedSize(horizontal: false, vertical: true)
@@ -306,14 +296,14 @@ public struct MetricSummaryCard: View {
                 if let caption = trend.caption, !caption.isEmpty {
                     Text("· \(caption)")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.metricTextSecondary)
+                        .foregroundStyle(secondaryTextColor)
                 }
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(trendBackground(for: trend.direction))
-        .cornerRadius(cardCornerRadius)
+        .cornerRadius(theme.radius.full)
         .foregroundStyle(trendForeground(for: trend.direction))
     }
 
@@ -322,7 +312,7 @@ public struct MetricSummaryCard: View {
     }
 
     private func chart(for content: Content) -> some View {
-        let lineColor = Color.metricChartLine
+        let lineColor = accentColor
         let isSteps = isStepsContent(content)
         let minPoint = content.dataPoints.min(by: { $0.value < $1.value })
         let maxPoint = content.dataPoints.max(by: { $0.value < $1.value })
@@ -417,7 +407,7 @@ public struct MetricSummaryCard: View {
             HStack(spacing: 12) {
                 Image(systemName: iconName)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(isError ? Color.red : accentColor)
+                    .foregroundStyle(isError ? theme.colors.error : accentColor)
 
                 Text(message)
                     .font(.system(.body, design: .rounded))
@@ -435,7 +425,7 @@ public struct MetricSummaryCard: View {
                         .cornerRadius(14)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(isError ? Color.red : accentColor)
+                .foregroundStyle(isError ? theme.colors.error : accentColor)
                 .accessibilityHint(isError ? "Retry" : "Add data")
             }
         }
@@ -468,29 +458,16 @@ public struct MetricSummaryCard: View {
         }
     }
 
-    private var cardBackgroundColor: Color {
-        colorScheme == .dark ? Color.metricCard : Color.linearCard
-    }
-
-    private var borderColor: Color {
-        // Increased opacity for better card definition
-        colorScheme == .dark ? Color.metricCardBorder.opacity(0.6) : Color.black.opacity(0.10)
-    }
-
-    private var shadowColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.3) : Color.black.opacity(0.12)
-    }
-
     private var primaryTextColor: Color {
-        colorScheme == .dark ? Color.metricTextPrimary : Color.appText
+        theme.colors.text
     }
 
     private var secondaryTextColor: Color {
-        colorScheme == .dark ? Color.metricTextSecondary : Color.appTextSecondary
+        theme.colors.textSecondary
     }
 
     private var placeholderColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
+        theme.colors.text.opacity(0.12)
     }
 
     private func trendIcon(for direction: Trend.Direction) -> String {
@@ -504,9 +481,9 @@ public struct MetricSummaryCard: View {
     private func trendBackground(for direction: Trend.Direction) -> Color {
         switch direction {
         case .up:
-            return Color.metricDeltaPositive.opacity(0.15)
+            return theme.colors.success.opacity(0.15)
         case .down:
-            return Color.metricDeltaNegative.opacity(0.15)
+            return theme.colors.error.opacity(0.15)
         case .flat:
             return secondaryTextColor.opacity(0.15)
         }
@@ -515,9 +492,9 @@ public struct MetricSummaryCard: View {
     private func trendForeground(for direction: Trend.Direction) -> Color {
         switch direction {
         case .up:
-            return Color.metricDeltaPositive
+            return theme.colors.success
         case .down:
-            return Color.metricDeltaNegative
+            return theme.colors.error
         case .flat:
             return secondaryTextColor
         }
@@ -525,9 +502,9 @@ public struct MetricSummaryCard: View {
 
     private func actionBackground(isError: Bool) -> some ShapeStyle {
         if reduceTransparency {
-            return AnyShapeStyle((isError ? Color.red : accentColor).opacity(0.12))
+            return AnyShapeStyle((isError ? theme.colors.error : accentColor).opacity(0.12))
         }
-        return AnyShapeStyle((isError ? Color.red : accentColor).opacity(0.08))
+        return AnyShapeStyle((isError ? theme.colors.error : accentColor).opacity(0.08))
     }
 
     private var accessibilityLabel: String {
@@ -640,5 +617,5 @@ struct MetricCardButtonStyle: ButtonStyle {
         }
         .padding(24)
     }
-    .background(Color.appBackground)
+    .background(DefaultTheme().colors.background)
 }

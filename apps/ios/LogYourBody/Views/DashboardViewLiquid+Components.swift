@@ -38,6 +38,8 @@ struct DashboardEmptyStateLiquid: View {
 }
 
 struct DashboardHomeTimelineHero: View {
+    @Environment(\.theme) private var theme
+
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
     @Binding var selectedIndex: Int
@@ -102,7 +104,7 @@ struct DashboardHomeTimelineHero: View {
             }
             .aspectRatio(4.0 / 5.0, contentMode: .fit)
             .frame(maxWidth: .infinity)
-            .background(shouldShowPhoto ? Color.black : Color.clear)
+            .background(theme.colors.background)
             .clipped()
             .overlay(alignment: .top) {
                 timelineDateBar
@@ -121,9 +123,9 @@ struct DashboardHomeTimelineHero: View {
     private var timelineGradient: some View {
         LinearGradient(
             colors: [
-                Color.black.opacity(0.62),
-                Color.black.opacity(0.05),
-                Color.black.opacity(0.86)
+                theme.colors.background.opacity(0.62),
+                theme.colors.background.opacity(0.05),
+                theme.colors.background.opacity(0.86)
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -134,10 +136,10 @@ struct DashboardHomeTimelineHero: View {
         HStack(spacing: 10) {
             Text(dateText)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(theme.colors.text)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 7)
-                .background(Capsule().fill(Color.black.opacity(0.42)))
+                .background(Capsule().fill(theme.colors.background.opacity(0.42)))
                 .allowsHitTesting(false)
 
             Spacer(minLength: 0)
@@ -148,9 +150,9 @@ struct DashboardHomeTimelineHero: View {
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.colors.text)
                         .frame(width: 32, height: 32)
-                        .background(Circle().fill(Color.black.opacity(0.42)))
+                        .background(Circle().fill(theme.colors.background.opacity(0.42)))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Share Body Score")
@@ -160,10 +162,10 @@ struct DashboardHomeTimelineHero: View {
             Text(timelinePositionText)
                 .font(.system(size: 12, weight: .semibold))
                 .monospacedDigit()
-                .foregroundColor(Color.white.opacity(0.72))
+                .foregroundColor(theme.colors.textSecondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Capsule().fill(Color.black.opacity(0.34)))
+                .background(Capsule().fill(theme.colors.background.opacity(0.34)))
                 .allowsHitTesting(false)
         }
     }
@@ -177,7 +179,7 @@ struct DashboardHomeTimelineHero: View {
                     title: "Weight",
                     value: weightValue,
                     caption: weightCaption,
-                    color: Color.metricAccentWeight,
+                    color: theme.colors.accentViolet,
                     action: onTapWeight
                 )
 
@@ -187,7 +189,7 @@ struct DashboardHomeTimelineHero: View {
                     title: "Body Fat",
                     value: bodyFatValue,
                     caption: bodyFatCaption,
-                    color: Color.metricAccentBodyFat,
+                    color: theme.colors.accentPink,
                     action: onTapBodyFat
                 )
 
@@ -197,7 +199,7 @@ struct DashboardHomeTimelineHero: View {
                     title: "FFMI",
                     value: ffmiValue,
                     caption: ffmiCaption,
-                    color: Color.metricAccentFFMI,
+                    color: theme.colors.accentTeal,
                     action: onTapFFMI
                 )
             }
@@ -221,26 +223,26 @@ struct DashboardHomeTimelineHero: View {
             Text(bodyScoreText)
                 .font(.system(size: 50, weight: .bold, design: .rounded))
                 .monospacedDigit()
-                .foregroundColor(.white)
+                .foregroundColor(theme.colors.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Body Score")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(Color.white.opacity(0.66))
+                    .foregroundColor(theme.colors.textSecondary)
                     .textCase(.uppercase)
 
                 Text(bodyScoreTagline)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color.white.opacity(0.86))
+                    .foregroundColor(theme.colors.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
 
                 if let bodyScoreDeltaText {
                     Text(bodyScoreDeltaText)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.62))
+                        .foregroundColor(theme.colors.textSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                 }
@@ -255,13 +257,15 @@ struct DashboardHomeTimelineHero: View {
 
     private var metricDivider: some View {
         Rectangle()
-            .fill(Color.white.opacity(0.16))
+            .fill(theme.colors.border)
             .frame(width: 1, height: 44)
             .padding(.horizontal, 10)
     }
 }
 
 private struct DashboardHomeTimelineMetricButton: View {
+    @Environment(\.theme) private var theme
+
     let title: String
     let value: String
     let caption: String
@@ -278,19 +282,19 @@ private struct DashboardHomeTimelineMetricButton: View {
 
                 Text(title)
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(Color.white.opacity(0.62))
+                    .foregroundColor(theme.colors.textSecondary)
                     .lineLimit(1)
 
                 Text(value)
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.colors.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.68)
 
                 Text(caption)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.58))
+                    .foregroundColor(theme.colors.textTertiary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
@@ -322,9 +326,9 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
                 bodyFatPercentage: bodyFatPercentage,
                 gender: gender,
                 height: geometry.size.height,
-                padding: 18,
-                verticalPadding: 10,
-                horizontalFillScale: 1,
+                padding: 0,
+                verticalPadding: 0,
+                horizontalFillScale: 1.08,
                 alignment: .bottom,
                 renderMode: .fillWidth
             )
@@ -339,6 +343,8 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
 // MARK: - Home / Photos / Metrics Tabs
 
 struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, QuickActions: View>: View {
+    @Environment(\.theme) private var theme
+
     let header: (CGFloat) -> Header
     let syncBanner: () -> SyncBanner
     let metricContent: () -> MetricContent
@@ -411,17 +417,17 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
                 }
             )
             .background(
-                Color.black.opacity(0.9)
+                theme.colors.background.opacity(0.9)
                     .ignoresSafeArea(edges: .top)
                     .overlay(
                         Rectangle()
-                            .fill(.ultraThinMaterial)
+                            .fill(theme.materials.glassUltraThin)
                             .opacity(0.2 * scrollProgress)
                             .ignoresSafeArea(edges: .top)
                     )
             )
             .shadow(
-                color: Color.black.opacity(0.18 * scrollProgress),
+                color: theme.colors.background.opacity(0.18 * scrollProgress),
                 radius: 18,
                 x: 0,
                 y: 10
@@ -511,6 +517,8 @@ struct DashboardMetricsTab<Header: View, SyncBanner: View, TitleBlock: View, Met
 // MARK: - Steps Card
 
 struct DashboardStepsCard<ProgressView: View>: View {
+    @Environment(\.theme) private var theme
+
     let formattedSteps: String
     let formattedGoal: String
     let subtext: String
@@ -519,7 +527,7 @@ struct DashboardStepsCard<ProgressView: View>: View {
 
     var body: some View {
         LiquidGlassCard(
-            cornerRadius: 24,
+            cornerRadius: theme.radius.card,
             blurRadius: 20,
             padding: 14,
             showShadow: false,
@@ -545,16 +553,16 @@ struct DashboardStepsCard<ProgressView: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Steps")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color.white.opacity(0.7))
+                .foregroundColor(theme.colors.textSecondary)
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(formattedSteps)
                     .font(.system(size: 26, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.colors.text)
 
                 Text("/" + formattedGoal)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.65))
+                    .foregroundColor(theme.colors.textSecondary)
 
                 Spacer()
             }
@@ -564,7 +572,7 @@ struct DashboardStepsCard<ProgressView: View>: View {
 
             Text(subtext)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.65))
+                .foregroundColor(theme.colors.textSecondary)
         }
     }
 }

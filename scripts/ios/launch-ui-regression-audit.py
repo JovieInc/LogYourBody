@@ -104,8 +104,12 @@ def write_outputs(artifact_dir: Path, violations: list[AuditViolation]) -> None:
                 "- Dashboard ScrollViews do not use large fake bottom spacers that create dead over-scroll.",
                 "- The removed bottom stats-card hook stays out of app source.",
                 "- Body Score share cards expose layout anchors for UI assertions.",
+                "- Body Score share cards preserve actual photo aspect defaults instead of forcing one crop.",
                 "- Body Score sharing resolves the actual progress photo before presenting the sheet.",
+                "- The dashboard avatar visual fills a full-width black stage with transparent assets.",
+                "- Dashboard/HUD launch surfaces stay on System B theme colors and real glass material.",
                 "- Timeline/Stats swipe navigation changes page on release, not during drag updates.",
+                "- Paid users default directly into the timeline HUD without a Statsig or legacy fallback gate.",
             ]
         )
 
@@ -148,6 +152,8 @@ def main() -> int:
         "body_score_share_summary",
         "body_score_share_metrics",
         "body_score_share_footer",
+        "preferredExportAspect(for: payload.photoImage)",
+        ".scaledToFit()",
     ]:
         require_token(
             root=root,
@@ -157,6 +163,85 @@ def main() -> int:
             detail=f"Missing share-card layout anchor `{token}`.",
             violations=violations,
         )
+
+    dashboard_components = app_dir / "Views/DashboardViewLiquid+Components.swift"
+    for token in [
+        ".background(theme.colors.background)",
+        "padding: 0,",
+        "horizontalFillScale: 1.08",
+        "renderMode: .fillWidth",
+    ]:
+        require_token(
+            root=root,
+            path=dashboard_components,
+            token=token,
+            check="avatar.full_width_transparent_stage",
+            detail=f"Missing avatar full-width hero-stage contract `{token}`.",
+            violations=violations,
+        )
+
+    system_b_surface_files = [
+        app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift",
+        app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift",
+        app_dir / "Views/DashboardViewLiquid+PhotoTimelineAnalytics.swift",
+        app_dir / "Views/DashboardViewLiquid+HomeTimelineControls.swift",
+        app_dir / "DesignSystem/Organisms/MetricSummaryCard.swift",
+    ]
+    for path in system_b_surface_files:
+        require_token(
+            root=root,
+            path=path,
+            token=".systemBGlassSurface(",
+            check="dashboard.system_b_glass_surface",
+            detail="Dashboard/HUD cards must use the theme-backed System B glass surface.",
+            violations=violations,
+        )
+
+    system_b_dashboard_files = [
+        app_dir / "Components/DashboardMetricsList.swift",
+        app_dir / "DesignSystem/Organisms/MetricSummaryCard.swift",
+        app_dir / "Views/DashboardMetricsSection.swift",
+        app_dir / "Views/DashboardViewLiquid.swift",
+        app_dir / "Views/DashboardViewLiquid+Components.swift",
+        app_dir / "Views/DashboardViewLiquid+Glp1MetricCard.swift",
+        app_dir / "Views/DashboardViewLiquid+HeroAndActions.swift",
+        app_dir / "Views/DashboardViewLiquid+HomeTimelineControls.swift",
+        app_dir / "Views/DashboardViewLiquid+MetricViews.swift",
+        app_dir / "Views/DashboardViewLiquid+PhotoTimelineAnalytics.swift",
+        app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift",
+        app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift",
+    ]
+    add_pattern_violations(
+        root=root,
+        paths=system_b_dashboard_files,
+        pattern=re.compile(
+            r"Color\.(?:metric|liquid|app|white|black)\b|"
+            r"Material\.ultraThinMaterial|"
+            r"Color\.metricCard|Color\.metricCardBorder|cardCornerRadius"
+        ),
+        check="dashboard.system_b_theme_tokens",
+        detail="Dashboard launch surfaces should use theme colors/materials instead of legacy color namespaces or fake glass.",
+        violations=violations,
+    )
+
+    main_tab_view = app_dir / "Views/MainTabView.swift"
+    require_token(
+        root=root,
+        path=main_tab_view,
+        token="static func surface() -> PaidAppSurface {\n        .photoTimelineHUD",
+        check="routing.timeline_hud_default",
+        detail="Paid app default surface must route straight to the timeline HUD for v1.",
+        violations=violations,
+    )
+
+    add_pattern_violations(
+        root=root,
+        paths=[main_tab_view],
+        pattern=re.compile(r"AnalyticsService\.shared\.isFeatureEnabled|Statsig\.checkGate"),
+        check="routing.no_feature_gate_default_surface",
+        detail="The v1 paid-app default surface must not depend on a feature gate or legacy fallback.",
+        violations=violations,
+    )
 
     require_token(
         root=root,

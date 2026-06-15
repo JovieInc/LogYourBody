@@ -23,7 +23,7 @@ extension DashboardViewLiquid {
             } label: {
                 MetricSummaryCard(
                     icon: "syringe",
-                    accentColor: Color.metricAccent,
+                    accentColor: theme.colors.primary,
                     state: .data(
                         MetricSummaryCard.Content(
                             title: "GLP-1 Dose",

@@ -12,7 +12,7 @@ extension DashboardViewLiquid {
 
     var photoTimelineAnalyticsPage: some View {
         ZStack {
-            Color.metricCanvas.ignoresSafeArea()
+            theme.colors.background.ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
@@ -35,11 +35,11 @@ extension DashboardViewLiquid {
         VStack(alignment: .leading, spacing: 6) {
             Text("Body trends")
                 .font(.system(size: 28, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(theme.colors.text)
 
             Text("Open a metric for chart and history.")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color.metricTextSecondary)
+                .foregroundColor(theme.colors.textSecondary)
         }
     }
 
@@ -48,31 +48,30 @@ extension DashboardViewLiquid {
             HStack {
                 Text("Timeline data")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.colors.text)
 
                 Spacer()
 
                 Text("\(timelinePresenceValueCount) values")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color.metricTextTertiary)
+                    .foregroundColor(theme.colors.textTertiary)
             }
 
             Text(photoTimelinePresenceLegendText)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color.metricTextSecondary)
+                .foregroundColor(theme.colors.textSecondary)
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("photo_timeline_stats_presence_legend")
         }
         .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.white.opacity(0.06))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        .systemBGlassSurface(
+            cornerRadius: theme.radius.card,
+            tint: theme.colors.text,
+            tintOpacity: 0.025,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.85
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Timeline data. \(photoTimelinePresenceLegendText). \(timelinePresenceValueCount) values.")

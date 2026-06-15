@@ -21,6 +21,7 @@ struct DashboardViewLiquid: View {
 
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
+    @Environment(\.theme) var theme
     @StateObject var viewModel = DashboardViewModel()
     @StateObject var globalTimelineStore = GlobalTimelineStore()
 
@@ -242,7 +243,7 @@ struct DashboardViewLiquid: View {
             .navigationDestination(isPresented: $isStatsDestinationActive) {
                 photoTimelineStatsDestination
             }
-            .toolbarBackground(Material.ultraThinMaterial, for: ToolbarPlacement.tabBar)
+            .toolbarBackground(theme.materials.glassUltraThin, for: ToolbarPlacement.tabBar)
             .toolbarBackground(Visibility.visible, for: ToolbarPlacement.tabBar)
             .onScreenshot {
                 guard selectedTab == .home else { return }
@@ -465,10 +466,10 @@ struct DashboardViewLiquid: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your Metrics")
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(Color.liquidTextPrimary)
+                        .foregroundColor(theme.colors.text)
                     Text("Reorder and tap any card to drill in.")
                         .font(.system(size: 13, weight: .regular))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.6))
+                        .foregroundColor(theme.colors.textSecondary)
                 }
                 .padding(.horizontal, 20)
             },
@@ -513,7 +514,7 @@ struct DashboardViewLiquid: View {
 
     private var dashboardBackground: some View {
         LinearGradient(
-            colors: [.black, .black.opacity(0.85)],
+            colors: [theme.colors.background, theme.colors.backgroundSecondary],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -553,7 +554,7 @@ struct DashboardViewLiquid: View {
                         Text("Metrics")
                     }
             }
-            .tint(Color.appPrimary)
+            .tint(theme.colors.primary)
             .accessibilityIdentifier("legacy_full_dashboard_beta")
         }
     }

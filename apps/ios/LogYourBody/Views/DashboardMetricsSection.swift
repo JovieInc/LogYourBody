@@ -5,6 +5,8 @@ import SwiftUI
 struct DashboardMetricsSection: View {
     typealias MetricIdentifier = DashboardViewLiquid.MetricIdentifier
 
+    @Environment(\.theme) private var theme
+
     @Binding var metricsOrder: [MetricIdentifier]
     @Binding var draggedMetric: MetricIdentifier?
     let onReorder: () -> Void
@@ -89,7 +91,7 @@ struct DashboardMetricsSection: View {
 
             MetricSummaryCard(
                 icon: "flame.fill",
-                accentColor: Color.metricAccentSteps,
+                accentColor: theme.colors.accentOrange,
                 state: .data(MetricSummaryCard.Content(
                     title: "Steps",
                     value: formatSteps(latestSteps.value),
@@ -121,7 +123,7 @@ struct DashboardMetricsSection: View {
             } label: {
                 MetricSummaryCard(
                     icon: "figure.stand",
-                    accentColor: Color.metricAccentWeight,
+                    accentColor: theme.colors.accentViolet,
                     state: .data(MetricSummaryCard.Content(
                         title: "Weight",
                         value: formatTrendWeightHeadline(currentMetric, weightUsesTrend),
@@ -154,7 +156,7 @@ struct DashboardMetricsSection: View {
             } label: {
                 MetricSummaryCard(
                     icon: "percent",
-                    accentColor: Color.metricAccentBodyFat,
+                    accentColor: theme.colors.accentPink,
                     state: .data(MetricSummaryCard.Content(
                         title: "Body Fat %",
                         value: formatBodyFatValue(currentMetric.bodyFatPercentage),
@@ -187,7 +189,7 @@ struct DashboardMetricsSection: View {
             } label: {
                 MetricSummaryCard(
                     icon: "figure.arms.open",
-                    accentColor: Color.metricAccentFFMI,
+                    accentColor: theme.colors.accentTeal,
                     state: .data(MetricSummaryCard.Content(
                         title: "FFMI",
                         value: formatFFMIValue(currentMetric),

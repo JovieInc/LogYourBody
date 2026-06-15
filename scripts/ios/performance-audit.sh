@@ -9,6 +9,7 @@ DESTINATION="${DESTINATION:-platform=iOS Simulator,name=LYB Golden iPhone 16}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$IOS_DIR/test_results/performance-audit/$STAMP}"
 RUN_SWIFTLINT="${RUN_SWIFTLINT:-true}"
+RUN_SWIFTUI_PERFORMANCE_SMELL_AUDIT="${RUN_SWIFTUI_PERFORMANCE_SMELL_AUDIT:-true}"
 RUN_LAUNCH_PERFORMANCE="${RUN_LAUNCH_PERFORMANCE:-true}"
 RUN_TIMELINE_TRACE_WORKFLOW="${RUN_TIMELINE_TRACE_WORKFLOW:-false}"
 XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO}"
@@ -51,6 +52,15 @@ cd "$IOS_DIR"
 
 if [[ "$RUN_SWIFTLINT" == "true" ]]; then
   swiftlint lint --strict | tee "$ARTIFACT_DIR/swiftlint.log"
+fi
+
+if [[ "$RUN_SWIFTUI_PERFORMANCE_SMELL_AUDIT" == "true" ]]; then
+  python3 "$ROOT_DIR/scripts/ios/swiftui-performance-smell-audit.py" \
+    --root "$ROOT_DIR" \
+    --artifact-dir "$ARTIFACT_DIR" |
+    tee "$ARTIFACT_DIR/swiftui-performance-smell-audit.log"
+else
+  echo "Skipping static SwiftUI performance smell audit" | tee "$ARTIFACT_DIR/swiftui-performance-smell-audit.log"
 fi
 
 if [[ "$RUN_PERFORMANCE_UNIT_TESTS" == "true" ]]; then

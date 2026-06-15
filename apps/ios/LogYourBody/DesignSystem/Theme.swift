@@ -366,6 +366,8 @@ struct SurfaceStyleModifier: ViewModifier {
 private struct SystemBGlassSurfaceModifier: ViewModifier {
     @Environment(\.theme)
     private var theme
+    @Environment(\.accessibilityReduceTransparency)
+    private var reduceTransparency
 
     let cornerRadius: CGFloat?
     let tint: Color
@@ -383,12 +385,18 @@ private struct SystemBGlassSurfaceModifier: ViewModifier {
 
         content
             .background(
-                shape
-                    .fill(theme.materials.glassUltraThin)
-                    .overlay(
+                Group {
+                    if reduceTransparency {
+                        shape.fill(theme.colors.surface)
+                    } else {
                         shape
-                            .fill(tint.opacity(tintOpacity))
-                    )
+                            .fill(theme.materials.glassUltraThin)
+                            .overlay(
+                                shape
+                                    .fill(tint.opacity(tintOpacity))
+                            )
+                    }
+                }
             )
             .overlay(
                 shape
@@ -398,7 +406,7 @@ private struct SystemBGlassSurfaceModifier: ViewModifier {
                     )
             )
             .shadow(
-                color: Color.black.opacity(shadowOpacity),
+                color: theme.colors.background.opacity(shadowOpacity),
                 radius: shadowRadius,
                 x: 0,
                 y: shadowY

@@ -548,6 +548,28 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
 final class BodyScoreShareCardTests: XCTestCase {
     func testShareSheetDefaultsToPortraitExportAspect() {
         XCTAssertEqual(BodyScoreShareAspect.defaultExportAspect, .portrait)
+        XCTAssertEqual(BodyScoreShareAspect.preferredExportAspect(for: nil), .portrait)
+    }
+
+    func testPhotoShareAspectTracksNativeImageShape() {
+        XCTAssertEqual(
+            BodyScoreShareAspect.preferredExportAspect(
+                for: makeShareTestImage(size: CGSize(width: 480, height: 640))
+            ),
+            .portrait
+        )
+        XCTAssertEqual(
+            BodyScoreShareAspect.preferredExportAspect(
+                for: makeShareTestImage(size: CGSize(width: 360, height: 760))
+            ),
+            .story
+        )
+        XCTAssertEqual(
+            BodyScoreShareAspect.preferredExportAspect(
+                for: makeShareTestImage(size: CGSize(width: 640, height: 640))
+            ),
+            .square
+        )
     }
 
     func testMetricSummaryDataPointIdentityIsStableAcrossRenders() {
@@ -586,7 +608,8 @@ final class BodyScoreShareCardTests: XCTestCase {
         let previewSizes: [(BodyScoreShareAspect, CGSize)] = [
             (.square, CGSize(width: 320, height: 320)),
             (.portrait, CGSize(width: 320, height: 400)),
-            (.story, CGSize(width: 260, height: 462))
+            (.story, CGSize(width: 260, height: 462)),
+            (.story, CGSize(width: 1_080, height: 1_920))
         ]
 
         for (aspect, size) in previewSizes {
@@ -597,6 +620,11 @@ final class BodyScoreShareCardTests: XCTestCase {
                 avatarBottom + layout.textVisualGap,
                 layout.summaryTopY + 0.5,
                 "Avatar visual overlaps text budget for \(aspect.rawValue)"
+            )
+            XCTAssertGreaterThanOrEqual(
+                layout.summaryMatteHeight,
+                layout.size.height - layout.summaryTopY,
+                "Summary matte must cover the full text area for \(aspect.rawValue)"
             )
         }
     }
@@ -705,8 +733,7 @@ final class BodyScoreShareCardTests: XCTestCase {
         )
     }
 
-    private func makeShareTestImage() -> UIImage {
-        let size = CGSize(width: 480, height: 640)
+    private func makeShareTestImage(size: CGSize = CGSize(width: 480, height: 640)) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { context in
             // swiftlint:disable:next object_literal
@@ -715,10 +742,24 @@ final class BodyScoreShareCardTests: XCTestCase {
 
             // swiftlint:disable:next object_literal
             UIColor(red: 0.12, green: 0.55, blue: 1.0, alpha: 1).setFill()
-            context.fill(CGRect(x: 110, y: 80, width: 260, height: 460))
+            context.fill(
+                CGRect(
+                    x: size.width * 0.23,
+                    y: size.height * 0.12,
+                    width: size.width * 0.54,
+                    height: size.height * 0.72
+                )
+            )
 
             UIColor.white.withAlphaComponent(0.82).setFill()
-            context.fill(CGRect(x: 170, y: 120, width: 140, height: 320))
+            context.fill(
+                CGRect(
+                    x: size.width * 0.35,
+                    y: size.height * 0.19,
+                    width: size.width * 0.30,
+                    height: size.height * 0.50
+                )
+            )
         }
     }
 }
