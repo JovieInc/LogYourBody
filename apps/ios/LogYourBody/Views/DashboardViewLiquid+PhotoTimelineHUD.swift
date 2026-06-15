@@ -58,7 +58,7 @@ extension DashboardViewLiquid {
             ZStack {
                 switch selectedPhotoTimelineRootPage {
                 case .timeline:
-                    Group {
+                    ZStack {
                         if bodyMetrics.isEmpty {
                             photoTimelineHUDEmptyState
                         } else {
@@ -67,7 +67,9 @@ extension DashboardViewLiquid {
                     }
                     .accessibilityIdentifier("photo_timeline_root_page_timeline")
                 case .analytics:
-                    photoTimelineAnalyticsPage
+                    ZStack {
+                        photoTimelineAnalyticsPage
+                    }
                         .accessibilityIdentifier("photo_timeline_root_page_analytics")
                 }
             }
@@ -76,7 +78,6 @@ extension DashboardViewLiquid {
             .highPriorityGesture(photoTimelineRootSwipeGesture)
             .simultaneousGesture(photoTimelineRootSwipeGesture)
         }
-        .accessibilityIdentifier("photo_timeline_root_pager")
     }
 
     private var photoTimelineRootNavigation: some View {

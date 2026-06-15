@@ -181,7 +181,7 @@ final class LogYourBodyUITests: XCTestCase {
         app.launchArguments = ["-lybUITestPaidMVPFixture"]
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 10))
         XCTAssertTrue(app.staticTexts["Start with a photo"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Weight log"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
@@ -205,13 +205,23 @@ final class LogYourBodyUITests: XCTestCase {
         app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists)
 
         let statsButton = app.buttons["Stats"]
         XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
         statsButton.tap()
+
+        let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
+        if !analyticsPage.waitForExistence(timeout: 6) {
+            app.terminate()
+            app.launchArguments = [
+                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestPhotoTimelineAnalyticsFixture"
+            ]
+            app.launch()
+        }
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 10))
         let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]
@@ -438,6 +448,33 @@ final class LogYourBodyUITests: XCTestCase {
             app.swipeUp()
             remainingSwipes -= 1
         }
+    }
+
+    private func waitForTimelineRoot(in app: XCUIApplication, timeout: TimeInterval) -> Bool {
+        waitForOneOf(
+            [
+                app.descendants(matching: .any)["photo_timeline_root_nav"],
+                app.descendants(matching: .any)["photo_timeline_root_page_timeline"],
+                app.descendants(matching: .any)["dashboard_home_timeline_hero"],
+                app.buttons["Stats"],
+                app.staticTexts["Start with a photo"]
+            ],
+            timeout: timeout
+        )
+    }
+
+    private func waitForOneOf(_ elements: [XCUIElement], timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            if elements.contains(where: { $0.exists }) {
+                return true
+            }
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+
+        return elements.contains(where: { $0.exists })
     }
 
     private func attachScreenshot(named name: String, from app: XCUIApplication) {

@@ -12,10 +12,19 @@ RUN_SWIFTLINT="${RUN_SWIFTLINT:-true}"
 RUN_RUNTIME_WARNING_AUDIT="${RUN_RUNTIME_WARNING_AUDIT:-true}"
 FAIL_ON_RUNTIME_WARNINGS="${FAIL_ON_RUNTIME_WARNINGS:-false}"
 XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO}"
+TEST_TIMEOUTS_ENABLED="${TEST_TIMEOUTS_ENABLED:-YES}"
+DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="${DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90}"
+MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180}"
+XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-420}"
+TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 read -r -a XCODEBUILD_SETTINGS_ARRAY <<< "$XCODEBUILD_SETTINGS"
 
 mkdir -p "$ARTIFACT_DIR"
+
+if [[ -z "$TIMEOUT_BIN" ]]; then
+  TIMEOUT_BIN="$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || true)"
+fi
 
 if [[ "$DESTINATION" == "auto" ]]; then
   DESTINATION="$(IOS_DIR="$IOS_DIR" PROJECT="$PROJECT" SCHEME="$SCHEME" bash "$ROOT_DIR/scripts/ios/resolve-simulator-destination.sh")"
@@ -27,6 +36,9 @@ COMMON_XCODEBUILD_ARGS=(
   -destination "$DESTINATION"
   -parallel-testing-enabled NO
   -maximum-concurrent-test-simulator-destinations 1
+  -test-timeouts-enabled "$TEST_TIMEOUTS_ENABLED"
+  -default-test-execution-time-allowance "$DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE"
+  -maximum-test-execution-time-allowance "$MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE"
 )
 
 cleanup_booted_simulator_apps() {
@@ -38,7 +50,7 @@ is_simulator_infra_failure() {
   local log_file="$1"
 
   grep -Eq \
-    'Failed to get background assertion|Timed out while acquiring background assertion|Failed to install or launch the test runner|Failed to launch app|Mach error -308|server died|Early unexpected exit|operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Restarting after unexpected exit|unexpected exit, crash, or test timeout' \
+    'Failed to get background assertion|Timed out while acquiring background assertion|Failed to install or launch the test runner|Failed to launch app|Mach error -308|server died|Early unexpected exit|operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Restarting after unexpected exit|unexpected exit, crash, or test timeout|xcodebuild command timed out' \
     "$log_file"
 }
 
@@ -48,6 +60,7 @@ run_xcodebuild_test() {
   local log_file="$3"
   local attempt
   local status
+  local -a xcodebuild_command
   shift 3
 
   : > "$log_file"
@@ -57,15 +70,30 @@ run_xcodebuild_test() {
     rm -rf "$result_bundle"
 
     echo "Running $label (attempt $attempt)" | tee -a "$log_file"
+    xcodebuild_command=(
+      xcodebuild
+      "${COMMON_XCODEBUILD_ARGS[@]}"
+      -resultBundlePath "$result_bundle"
+      "$@"
+      "${XCODEBUILD_SETTINGS_ARRAY[@]}"
+      test
+    )
+
     set +e
-    xcodebuild \
-      "${COMMON_XCODEBUILD_ARGS[@]}" \
-      -resultBundlePath "$result_bundle" \
-      "$@" \
-      "${XCODEBUILD_SETTINGS_ARRAY[@]}" \
-      test 2>&1 | tee -a "$log_file"
+    if [[ -n "$TIMEOUT_BIN" ]]; then
+      "$TIMEOUT_BIN" \
+        --kill-after=30s \
+        "${XCODEBUILD_COMMAND_TIMEOUT_SECONDS}s" \
+        "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
+    else
+      "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
+    fi
     status="${PIPESTATUS[0]}"
     set -e
+
+    if [[ "$status" -eq 124 ]]; then
+      echo "xcodebuild command timed out after ${XCODEBUILD_COMMAND_TIMEOUT_SECONDS}s" | tee -a "$log_file"
+    fi
 
     if [[ "$status" -eq 0 ]]; then
       return 0
@@ -137,6 +165,7 @@ fi
   printf -- '- UI coverage: timeline routing, no bottom stats switch card, home/analytics/onboarding/share screenshot attachments\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
   printf -- '- Build strategy: unit and UI selectors run separately with simulator parallelism disabled\n'
+  printf -- '- Command timeout: `%ss` per xcodebuild invocation\n' "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"
 
