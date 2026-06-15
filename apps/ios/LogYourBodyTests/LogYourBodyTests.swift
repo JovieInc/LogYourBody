@@ -550,12 +550,26 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertEqual(BodyScoreShareAspect.defaultExportAspect, .portrait)
     }
 
+    func testMetricSummaryDataPointIdentityIsStableAcrossRenders() {
+        let first = MetricSummaryCard.DataPoint(index: 4, value: 181.2)
+        let second = MetricSummaryCard.DataPoint(index: 4, value: 179.8)
+
+        XCTAssertEqual(first.id, second.id)
+    }
+
     func testShareCardLayoutScalesDownForNarrowStoryPreview() {
         let layout = ShareCardLayout(size: CGSize(width: 260, height: 462), aspect: .story)
 
         XCTAssertLessThan(layout.scale, 0.7)
         XCTAssertLessThan(layout.scoreFontSize, 42)
         XCTAssertLessThan(layout.metricValueFontSize, 14)
+    }
+
+    func testShareCardLayoutReservesBottomMatteForStoryPreviewText() {
+        let layout = ShareCardLayout(size: CGSize(width: 260, height: 462), aspect: .story)
+
+        XCTAssertGreaterThan(layout.summaryMatteHeight, layout.size.height * 0.44)
+        XCTAssertLessThan(layout.visualTopOffset + layout.visualHeight, layout.size.height * 0.72)
     }
 
     func testSharePayloadUsesSameNearestAvatarBucketAsHomeHero() {

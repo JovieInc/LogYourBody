@@ -57,6 +57,7 @@ struct DashboardMetricsSection: View {
                 metricCardView(for: metric)
             }
         )
+        .accessibilityIdentifier("photo_timeline_stats_metric_stack")
     }
 
     @ViewBuilder
@@ -106,6 +107,7 @@ struct DashboardMetricsSection: View {
             )
         }
         .buttonStyle(MetricCardButtonStyle())
+        .accessibilityIdentifier("photo_timeline_stats_metric_card_steps")
     }
 
     @ViewBuilder
@@ -137,6 +139,7 @@ struct DashboardMetricsSection: View {
                 )
             }
             .buttonStyle(MetricCardButtonStyle())
+            .accessibilityIdentifier("photo_timeline_stats_metric_card_weight")
         }
     }
 
@@ -169,6 +172,7 @@ struct DashboardMetricsSection: View {
                 )
             }
             .buttonStyle(MetricCardButtonStyle())
+            .accessibilityIdentifier("photo_timeline_stats_metric_card_body_fat")
         }
     }
 
@@ -201,6 +205,7 @@ struct DashboardMetricsSection: View {
                 )
             }
             .buttonStyle(MetricCardButtonStyle())
+            .accessibilityIdentifier("photo_timeline_stats_metric_card_ffmi")
         }
     }
 }

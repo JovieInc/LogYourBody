@@ -75,7 +75,6 @@ extension DashboardViewLiquid {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
-            .highPriorityGesture(photoTimelineRootSwipeGesture)
             .simultaneousGesture(photoTimelineRootSwipeGesture)
         }
     }
