@@ -307,7 +307,7 @@ struct BodyScoreShareSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 24) {
                 Picker("Format", selection: $selectedAspect) {
                     ForEach(BodyScoreShareAspect.allCases) { aspect in

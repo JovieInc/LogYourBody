@@ -608,7 +608,7 @@ struct PhotoGridItem: View {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         BulkPhotoImportView()
             .environmentObject(AuthManager.shared)
     }

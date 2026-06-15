@@ -17,7 +17,6 @@ struct LoginView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isRetrying = false
-    @State private var navigateToSignUp = false
     @State private var showsAppleSignIn = AuthSurfacePolicy.defaultShowsAppleSignIn
 
     var body: some View {
@@ -92,14 +91,6 @@ struct LoginView: View {
                     )
                 }
                 .padding(.top, 20)
-
-                NavigationLink(
-                    destination: SignUpView(),
-                    isActive: $navigateToSignUp
-                ) {
-                    EmptyView()
-                }
-                .hidden()
 
                 Spacer(minLength: 40)
             }
@@ -270,7 +261,7 @@ struct LoginView: View {
 
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         LoginView()
             .environmentObject(AuthManager.shared)
     }

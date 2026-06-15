@@ -265,7 +265,7 @@ enum PasswordError: LocalizedError {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         ChangePasswordView()
             .preferredColorScheme(.dark)
     }

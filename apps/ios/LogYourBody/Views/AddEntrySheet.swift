@@ -66,7 +66,7 @@ struct AddEntrySheet: View {
     @AppStorage(Constants.hasPromptedDeletePhotosKey) private var hasPromptedDeletePhotos = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Tab selector
                 Picker("Entry Type", selection: $selectedTab) {
@@ -988,7 +988,7 @@ private struct Glp1AddMedicationView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 List {
                     Section {

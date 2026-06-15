@@ -174,7 +174,7 @@ struct DisclaimerSection: View {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         HealthDisclaimerView()
     }
     .preferredColorScheme(.dark)

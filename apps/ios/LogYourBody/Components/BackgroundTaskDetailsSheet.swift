@@ -13,7 +13,7 @@ struct BackgroundTaskDetailsSheet: View {
     @State private var showCancelAllConfirmation = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 Color.appBackground.ignoresSafeArea()
 

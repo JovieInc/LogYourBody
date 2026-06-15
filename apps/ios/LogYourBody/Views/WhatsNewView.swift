@@ -41,7 +41,7 @@ struct WhatsNewView: View {
     private let changelogManager = ChangelogManager.shared
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 ForEach(changelogManager.entries, id: \.version) { entry in
                     Section {

@@ -116,7 +116,7 @@ struct SyncDetailsView: View {
     @Environment(\.dismiss)
     private var dismiss
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section("Sync Status") {
                     HStack {

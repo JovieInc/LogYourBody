@@ -34,17 +34,17 @@ struct SignUpView: View {
         .navigationBarHidden(true)
         .standardErrorAlert(isPresented: $showError, message: errorMessage)
         .sheet(isPresented: $showTermsSheet) {
-            NavigationView {
+            NavigationStack {
                 LegalDocumentView(documentType: .terms)
             }
         }
         .sheet(isPresented: $showPrivacySheet) {
-            NavigationView {
+            NavigationStack {
                 LegalDocumentView(documentType: .privacy)
             }
         }
         .sheet(isPresented: $showHealthDisclaimerSheet) {
-            NavigationView {
+            NavigationStack {
                 LegalDocumentView(documentType: .healthDisclosure)
             }
         }
@@ -291,7 +291,7 @@ struct SignUpView: View {
 // MARK: - Preview
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         SignUpView()
             .environmentObject(AuthManager.shared)
     }

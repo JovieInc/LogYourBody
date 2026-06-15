@@ -472,7 +472,7 @@ struct ProfileHeightPickerSheet: View {
     @Environment(\.dismiss)
     var dismiss
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 unitSelector
                 heightDisplay
@@ -605,7 +605,7 @@ struct DatePickerSheet: View {
     @Environment(\.dismiss)
     var dismiss
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack {
                 DatePicker(
                     "",
@@ -638,7 +638,7 @@ struct DatePickerSheet: View {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         ProfileSettingsViewV2()
             .environmentObject({
                 let authManager = AuthManager()

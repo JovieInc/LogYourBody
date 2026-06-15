@@ -12,7 +12,7 @@ enum PhaseType: String, CaseIterable {
 
 struct DietPhaseHistoryView: View {
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 Color.appBackground
                     .ignoresSafeArea()
