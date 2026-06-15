@@ -72,10 +72,11 @@ extension DashboardViewLiquid {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .highPriorityGesture(photoTimelineRootSwipeGesture)
+            .simultaneousGesture(photoTimelineRootSwipeGesture)
         }
-        .contentShape(Rectangle())
-        .highPriorityGesture(photoTimelineRootSwipeGesture)
-        .simultaneousGesture(photoTimelineRootSwipeGesture)
+        .accessibilityIdentifier("photo_timeline_root_pager")
     }
 
     private var photoTimelineRootNavigation: some View {
