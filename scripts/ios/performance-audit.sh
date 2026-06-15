@@ -14,6 +14,10 @@ XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNIN
 
 read -r -a XCODEBUILD_SETTINGS_ARRAY <<< "$XCODEBUILD_SETTINGS"
 
+if [[ "$ARTIFACT_DIR" != /* ]]; then
+  ARTIFACT_DIR="$ROOT_DIR/$ARTIFACT_DIR"
+fi
+
 mkdir -p "$ARTIFACT_DIR"
 
 if [[ "$DESTINATION" == "auto" ]]; then
@@ -49,13 +53,22 @@ else
   echo "Skipping launch-performance XCTest because RUN_LAUNCH_PERFORMANCE=false" | tee "$ARTIFACT_DIR/launch-performance.log"
 fi
 
-cat > "$ARTIFACT_DIR/summary.md" <<SUMMARY
-# iOS Performance Audit
+SUMMARY_ARGS=(
+  --artifact-dir "$ARTIFACT_DIR"
+  --destination "$DESTINATION"
+  --unit-xcresult "$ARTIFACT_DIR/performance-unit-tests.xcresult"
+  --unit-log "$ARTIFACT_DIR/performance-unit-tests.log"
+)
 
-- Destination: \`$DESTINATION\`
-- Unit coverage: dashboard timeline indexes, progress-photo image pipeline
-- Launch smoke: \`LogYourBodyUITests/testLaunchPerformance\` enabled=\`$RUN_LAUNCH_PERFORMANCE\`
-- Logs: \`$ARTIFACT_DIR\`
-SUMMARY
+if [[ "$RUN_LAUNCH_PERFORMANCE" == "true" ]]; then
+  SUMMARY_ARGS+=(
+    --launch-xcresult "$ARTIFACT_DIR/launch-performance.xcresult"
+    --launch-log "$ARTIFACT_DIR/launch-performance.log"
+  )
+else
+  SUMMARY_ARGS+=(--launch-skipped)
+fi
+
+python3 "$ROOT_DIR/scripts/ios/performance-budget-summary.py" "${SUMMARY_ARGS[@]}"
 
 echo "Performance audit logs written to $ARTIFACT_DIR"
