@@ -100,7 +100,18 @@ extension DashboardViewLiquid {
             onTapFFMI: {
                 selectedMetricType = .ffmi
                 isMetricDetailActive = true
-            }
+            },
+            onShareBodyScore: makeBodyScoreShareAction(metric: metric, score: bodyScore.score)
         )
+    }
+
+    func makeBodyScoreShareAction(metric: BodyMetrics? = nil, score: Int? = nil) -> (() -> Void)? {
+        if let score, score <= 0 { return nil }
+
+        return {
+            if let payload = makeBodyScoreSharePayload(metric: metric) {
+                bodyScoreSharePayload = payload
+            }
+        }
     }
 }

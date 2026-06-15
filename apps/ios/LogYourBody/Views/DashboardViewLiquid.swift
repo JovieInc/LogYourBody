@@ -84,7 +84,6 @@ struct DashboardViewLiquid: View {
     @State var progressPhotoAttachTarget: BodyMetrics?
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
-    @State var isBodyScoreSharePresented = false
     @State var bodyScoreSharePayload: BodyScoreSharePayload?
     @State private var hasPerformedInitialRefresh = false
     @State var featureGateRefreshToken = UUID()
@@ -143,6 +142,7 @@ struct DashboardViewLiquid: View {
         let base = ZStack {
             dashboardBackground
             dashboardContent
+            bodyScoreShareOverlay
         }
 
         let withLifecycle = base
@@ -239,17 +239,13 @@ struct DashboardViewLiquid: View {
             )
             .toolbarBackground(Material.ultraThinMaterial, for: ToolbarPlacement.tabBar)
             .toolbarBackground(Visibility.visible, for: ToolbarPlacement.tabBar)
-            .sheet(isPresented: $isBodyScoreSharePresented) {
-                if let payload = bodyScoreSharePayload {
-                    BodyScoreShareSheet(payload: payload)
-                }
-            }
             .onScreenshot {
                 guard selectedTab == .home else { return }
                 guard !isMetricDetailActive else { return }
                 guard let payload = makeBodyScoreSharePayload() else { return }
-                bodyScoreSharePayload = payload
-                isBodyScoreSharePresented = true
+                DispatchQueue.main.async {
+                    bodyScoreSharePayload = payload
+                }
             }
             .onChange(of: showAddEntrySheet) { _, isPresented in
                 guard !isPresented else { return }
@@ -258,6 +254,18 @@ struct DashboardViewLiquid: View {
             }
 
         return withSheetsAndNavigation
+    }
+
+    @ViewBuilder
+    private var bodyScoreShareOverlay: some View {
+        if let payload = bodyScoreSharePayload {
+            BodyScoreShareSheet(payload: payload) {
+                bodyScoreSharePayload = nil
+            }
+            .ignoresSafeArea()
+            .zIndex(20)
+            .transition(.opacity)
+        }
     }
 
     private var homeTab: some View {

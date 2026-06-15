@@ -2,7 +2,8 @@ import SwiftUI
 import UIKit
 import Photos
 
-struct BodyScoreSharePayload {
+struct BodyScoreSharePayload: Identifiable {
+    let id = UUID()
     let score: Int
     let scoreText: String
     let tagline: String
@@ -293,11 +294,17 @@ struct BodyScoreShareSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let payload: BodyScoreSharePayload
+    let onClose: (() -> Void)?
 
     @State private var selectedAspect: BodyScoreShareAspect = .square
     @State private var renderedImage: UIImage?
     @State private var isRendering = false
     @State private var showSystemShareSheet = false
+
+    init(payload: BodyScoreSharePayload, onClose: (() -> Void)? = nil) {
+        self.payload = payload
+        self.onClose = onClose
+    }
 
     var body: some View {
         NavigationView {
@@ -315,11 +322,9 @@ struct BodyScoreShareSheet: View {
 
                     BodyScoreShareCardView(payload: payload, aspect: selectedAspect)
                         .frame(width: size.width, height: size.height)
-                        .cornerRadius(24)
-                        .shadow(color: Color.black.opacity(0.4), radius: 24, x: 0, y: 12)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 }
-                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity)
 
                 HStack(spacing: 12) {
                     GlassPillButton(icon: "square.and.arrow.down", title: "Save") {
@@ -350,11 +355,14 @@ struct BodyScoreShareSheet: View {
             }
             .navigationTitle("Share Body Score")
             .navigationBarTitleDisplayMode(.inline)
-            .accessibilityIdentifier("body_score_share_sheet")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        dismiss()
+                        if let onClose {
+                            onClose()
+                        } else {
+                            dismiss()
+                        }
                     }
                 }
             }

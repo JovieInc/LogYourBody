@@ -504,34 +504,45 @@ extension DashboardViewLiquid {
     // MARK: - Quick Actions
 
     var quickActions: some View {
-        HStack(spacing: 12) {
+        let bodyScore = bodyScoreText()
+        let shareAction = makeBodyScoreShareAction(score: bodyScore.score)
+
+        return HStack(spacing: 12) {
             GlassPillButton(icon: "plus.circle.fill", title: "Log") {
                 showAddEntrySheet = true
             }
 
-            GlassPillButton(icon: "square.and.arrow.up.fill", title: "Share Score") {
-                if let payload = makeBodyScoreSharePayload() {
-                    bodyScoreSharePayload = payload
-                    isBodyScoreSharePresented = true
+            if let shareAction {
+                GlassPillButton(icon: "square.and.arrow.up.fill", title: "Share Score") {
+                    shareAction()
                 }
+                .accessibilityIdentifier("body_score_quick_share_button")
             }
-            .accessibilityIdentifier("body_score_share_button")
 
             Spacer()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    func makeBodyScoreSharePayload() -> BodyScoreSharePayload? {
-        let bodyScore = bodyScoreText()
+    func makeBodyScoreSharePayload(metric: BodyMetrics? = nil) -> BodyScoreSharePayload? {
+        let selectedMetric = metric ?? currentMetric
+        let calculatedResult = selectedMetric.flatMap { bodyScoreResult(for: $0) }
+        let cachedResult = latestBodyScoreResult()
+
+        let bodyScore: (score: Int, scoreText: String, tagline: String)
+        if let result = calculatedResult ?? cachedResult {
+            bodyScore = (result.score, "\(result.score)", result.statusTagline)
+        } else {
+            bodyScore = bodyScoreText()
+        }
 
         // Avoid prompting to share when the score is effectively missing
         guard bodyScore.score > 0 else {
             return nil
         }
 
-        let ffmiValue = heroFFMIValue()
-        let ffmiCaption = heroFFMICaption()
+        let ffmiValue = calculatedResult.map { String(format: "%.1f", $0.ffmi) } ?? heroFFMIValue()
+        let ffmiCaption = calculatedResult?.ffmiStatus ?? heroFFMICaption()
         let bodyFatValue = heroBodyFatValue()
         let bodyFatCaption = heroBodyFatCaption()
         let weightValue = heroWeightValue()
@@ -549,7 +560,7 @@ extension DashboardViewLiquid {
             weightValue: weightValue,
             weightCaption: weightCaption,
             deltaText: deltaText,
-            bodyFatPercentage: currentMetric?.bodyFatPercentage,
+            bodyFatPercentage: selectedMetric?.bodyFatPercentage ?? currentMetric?.bodyFatPercentage,
             gender: authManager.currentUser?.profile?.gender
         )
     }

@@ -445,11 +445,14 @@ extension DashboardViewLiquid {
             return dailyMetricsLookupCache
         }
 
-        rebuildDailyMetricsLookupCache()
-        return dailyMetricsLookupCache
+        return makeDailyMetricsLookup()
     }
 
     func rebuildDailyMetricsLookupCache() {
+        dailyMetricsLookupCache = makeDailyMetricsLookup()
+    }
+
+    private func makeDailyMetricsLookup() -> [Date: DailyMetrics] {
         var lookup = [Date: DailyMetrics](minimumCapacity: recentDailyMetrics.count)
         let calendar = Calendar.current
 
@@ -464,7 +467,7 @@ extension DashboardViewLiquid {
             }
         }
 
-        dailyMetricsLookupCache = lookup
+        return lookup
     }
 
     func generateWeightChartData() -> [MetricDataPoint] {

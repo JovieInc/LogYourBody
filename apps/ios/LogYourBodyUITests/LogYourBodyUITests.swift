@@ -255,6 +255,34 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "launch-quality-home-timeline", from: app)
     }
 
+    func testLaunchQualityGateCapturesBodyScoreShareSheet() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhaseInsightFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
+
+        let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
+        XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(shareButton.isHittable)
+        shareButton.tap()
+
+        let shareCard = app.descendants(matching: .any)["body_score_share_card"]
+        XCTAssertTrue(shareCard.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_avatar_visual"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_save_button"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_system_button"].exists)
+
+        let cardFrame = shareCard.frame
+        let windowFrame = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(cardFrame.width, windowFrame.width * 0.88)
+        attachScreenshot(named: "launch-quality-body-score-share", from: app)
+    }
+
     func testLaunchQualityGateCapturesOnboardingFixedCTA() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture"]
@@ -270,6 +298,24 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertGreaterThan(startButton.frame.minY, windowFrame.height * 0.72)
         XCTAssertLessThanOrEqual(startButton.frame.maxY, windowFrame.maxY + 1)
         attachScreenshot(named: "launch-quality-onboarding-fixed-cta", from: app)
+    }
+
+    func testLaunchQualityGateCapturesOnboardingFirstPhotoCTA() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestBodyScoreFirstPhotoFixture"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Start your visual timeline."].waitForExistence(timeout: 10))
+
+        let addPhotoButton = app.buttons["Add first photo"]
+        let skipButton = app.buttons["Skip for now"]
+        XCTAssertTrue(addPhotoButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(skipButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(addPhotoButton.isHittable)
+        XCTAssertTrue(skipButton.isHittable)
+        XCTAssertFalse(app.buttons["Continue"].exists)
+
+        attachScreenshot(named: "launch-quality-onboarding-first-photo", from: app)
     }
 
     func testPhaseInsightFixtureShowsDeterministicCuttingInsight() throws {

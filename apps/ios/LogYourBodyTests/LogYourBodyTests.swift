@@ -562,6 +562,26 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertEqual(image.size.height, size.height, accuracy: 0.5)
     }
 
+    func testShareCardRendersEveryLaunchExportAspect() throws {
+        for aspect in BodyScoreShareAspect.allCases {
+            let size = aspect.pixelSize
+            let renderer = ImageRenderer(
+                content: BodyScoreShareCardView(
+                    payload: makePayload(bodyFatPercentage: 18.6, gender: "male"),
+                    aspect: aspect
+                )
+                .frame(width: size.width, height: size.height)
+                .environment(\.colorScheme, .dark)
+            )
+            renderer.scale = 1.0
+
+            let image = try XCTUnwrap(renderer.uiImage, "Missing rendered image for \(aspect.rawValue)")
+
+            XCTAssertEqual(image.size.width, size.width, accuracy: 0.5)
+            XCTAssertEqual(image.size.height, size.height, accuracy: 0.5)
+        }
+    }
+
     private func makePayload(
         bodyFatPercentage: Double?,
         gender: String?
@@ -2025,24 +2045,84 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertFalse(OnboardingStateManager.shared.hasCompletedCurrentVersion)
     }
 
-    func testProfileDetailsCompletesOnboardingWhenFirstPhotoDisabled() {
+    func testProfileDetailsCompletesOnboardingWhenFirstPhotoDisabled() async {
         let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: false)
         viewModel.currentStep = .profileDetails
 
-        viewModel.goToNextStep()
+        await viewModel.finishOnboardingAndShowPaywall()
 
         XCTAssertEqual(viewModel.currentStep, .paywall)
         XCTAssertTrue(OnboardingStateManager.shared.hasCompletedCurrentVersion)
     }
 
-    func testFirstPhotoStepCanCompleteToPaywall() {
+    func testFirstPhotoStepCanCompleteToPaywall() async {
         let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: true)
         viewModel.currentStep = .firstPhoto
 
-        viewModel.goToNextStep()
+        await viewModel.completeFirstPhotoStep()
 
         XCTAssertEqual(viewModel.currentStep, .paywall)
         XCTAssertTrue(OnboardingStateManager.shared.hasCompletedCurrentVersion)
+    }
+
+    func testFirstPhotoCompletionMarksLocalUserComplete() async {
+        let userId = "onboarding-first-photo-complete-\(UUID().uuidString)"
+        let previousUser = AuthManager.shared.currentUser
+        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+
+        defer {
+            AuthManager.shared.currentUser = previousUser
+            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            OnboardingProgressStore.shared.clearProgress(for: userId)
+        }
+
+        AuthManager.shared.currentUser = User(
+            id: userId,
+            email: "first-photo-complete@example.com",
+            name: "First Photo",
+            profile: UserProfile(
+                id: userId,
+                email: "first-photo-complete@example.com",
+                username: nil,
+                fullName: "First Photo",
+                dateOfBirth: nil,
+                height: nil,
+                heightUnit: nil,
+                gender: nil,
+                activityLevel: nil,
+                goalWeight: nil,
+                goalWeightUnit: nil,
+                onboardingCompleted: false
+            ),
+            onboardingCompleted: false
+        )
+        AuthManager.shared.isAuthenticated = true
+
+        let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: true)
+        viewModel.currentStep = .firstPhoto
+
+        await viewModel.completeFirstPhotoStep()
+
+        XCTAssertEqual(viewModel.currentStep, .paywall)
+        XCTAssertTrue(OnboardingStateManager.shared.hasCompletedCurrentVersion)
+        XCTAssertTrue(AuthManager.shared.currentUser?.onboardingCompleted == true)
+        XCTAssertEqual(AuthManager.shared.currentUser?.profile?.onboardingCompleted, true)
+        XCTAssertNil(OnboardingProgressStore.shared.snapshotForTesting(for: userId))
+    }
+
+    func testProfileCompletionSyncPersistsCurrentOnboardingVersion() {
+        let suiteName = "onboarding-profile-sync-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let manager = OnboardingStateManager(defaults: defaults, currentVersion: 2)
+
+        manager.syncCompletionFlagFromProfile(true)
+
+        XCTAssertTrue(manager.hasCompletedCurrentVersion)
+        XCTAssertEqual(defaults.integer(forKey: Constants.onboardingCompletedVersionKey), 2)
     }
 
     func testFirstPhotoBackNavigationAndPaywallBackNavigation() {

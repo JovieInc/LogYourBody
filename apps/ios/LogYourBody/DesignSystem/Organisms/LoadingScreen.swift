@@ -14,6 +14,9 @@ struct LoadingScreen: View {
 
     var backgroundColor = Color("LaunchScreenBackground")
     var showPercentage: Bool = true
+    private var clampedProgress: Double {
+        min(max(progress, 0), 1)
+    }
 
     var body: some View {
         ZStack {
@@ -42,12 +45,14 @@ struct LoadingScreen: View {
                         style: .footnote,
                         color: .white.opacity(0.7)
                     )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .multilineTextAlignment(.center)
                     .frame(minHeight: 20)
-                    .animation(.easeInOut(duration: 0.3), value: loadingStatus)
 
                     // Progress bar
                     DSProgressBar(
-                        progress: progress,
+                        progress: clampedProgress,
                         height: 8,
                         backgroundColor: .white.opacity(0.2),
                         foregroundColor: .white,
@@ -58,7 +63,7 @@ struct LoadingScreen: View {
                     // Percentage
                     if showPercentage {
                         DSText(
-                            "\(Int(progress * 100))%",
+                            "\(Int(clampedProgress * 100))%",
                             style: .caption,
                             weight: .medium,
                             color: .white.opacity(0.5)
@@ -77,7 +82,7 @@ struct LoadingScreen: View {
     }
 
     private func checkCompletion() {
-        if progress >= 1.0 {
+        if clampedProgress >= 1.0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 onComplete()
             }

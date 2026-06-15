@@ -45,7 +45,14 @@ final class OnboardingStateManager {
     }
 
     func syncCompletionFlagFromProfile(_ isCompleted: Bool) {
-        defaults.set(isCompleted, forKey: Constants.hasCompletedOnboardingKey)
+        if isCompleted {
+            defaults.set(true, forKey: Constants.hasCompletedOnboardingKey)
+            defaults.set(currentOnboardingVersion, forKey: Constants.onboardingCompletedVersionKey)
+        } else {
+            defaults.set(false, forKey: Constants.hasCompletedOnboardingKey)
+            defaults.removeObject(forKey: Constants.onboardingCompletedVersionKey)
+        }
+        notifyChange()
     }
 
     func resetForNextVersion(newVersion: Int) {

@@ -195,7 +195,8 @@ struct LogYourBodyApp: App {
         let usesPaywallPlansFixture = arguments.contains("-lybUITestPaywallPlansFixture")
         let usesFullDashboardFixture = arguments.contains("-lybUITestFullDashboardFixture")
         let usesPhotoTimelineHUDFixture = arguments.contains("-lybUITestPhotoTimelineHUDFixture")
-        let usesBodyScoreOnboardingFixture = arguments.contains("-lybUITestBodyScoreOnboardingFixture")
+        let usesBodyScoreOnboardingFixture = arguments.contains("-lybUITestBodyScoreOnboardingFixture") ||
+            arguments.contains("-lybUITestBodyScoreFirstPhotoFixture")
         let usesDailyReminderPromptFixture = arguments.contains("-lybUITestDailyReminderPromptFixture")
 
         guard usesPaidFixture || usesWeightLoggerFixture || usesPaywallFixture || usesPaywallPlansFixture ||

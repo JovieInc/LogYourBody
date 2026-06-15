@@ -47,6 +47,8 @@ xcodebuild \
   -only-testing:LogYourBodyUITests/LogYourBodyUITests/testPhotoHUDFixtureRoutesToIntendedPostMVPDashboard \
   -only-testing:LogYourBodyUITests/LogYourBodyUITests/testLaunchQualityGateCapturesTimelineHomeSurface \
   -only-testing:LogYourBodyUITests/LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA \
+  -only-testing:LogYourBodyUITests/LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA \
+  -only-testing:LogYourBodyUITests/LogYourBodyUITests/testLaunchQualityGateCapturesBodyScoreShareSheet \
   "${XCODEBUILD_SETTINGS_ARRAY[@]}" \
   test | tee "$ARTIFACT_DIR/launch-quality-ui-tests.log"
 
@@ -55,7 +57,7 @@ cat > "$ARTIFACT_DIR/summary.md" <<SUMMARY
 
 - Destination: \`$DESTINATION\`
 - Unit coverage: photo timeline HUD policy, Body Score share card layout
-- UI coverage: timeline routing, no bottom stats switch card, home/analytics/onboarding screenshot attachments
+- UI coverage: timeline routing, no bottom stats switch card, home/analytics/onboarding/share screenshot attachments
 - Build strategy: unit and UI selectors run separately with simulator parallelism disabled
 - Logs and result bundles: \`$ARTIFACT_DIR\`
 SUMMARY
