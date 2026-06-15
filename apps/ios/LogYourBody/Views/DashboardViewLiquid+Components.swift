@@ -174,36 +174,47 @@ struct DashboardHomeTimelineHero: View {
         VStack(alignment: .leading, spacing: 14) {
             bodyScoreSummary
 
-            HStack(alignment: .top, spacing: 0) {
-                DashboardHomeTimelineMetricButton(
-                    title: "Weight",
-                    value: weightValue,
-                    caption: weightCaption,
-                    color: theme.colors.accentViolet,
-                    action: onTapWeight
-                )
+            GeometryReader { geometry in
+                let dividerTrackWidth = 42.0
+                let columnWidth = max(0, (geometry.size.width - dividerTrackWidth) / 3.0)
 
-                metricDivider
+                HStack(alignment: .top, spacing: 0) {
+                    DashboardHomeTimelineMetricButton(
+                        title: "Weight",
+                        value: weightValue,
+                        caption: weightCaption,
+                        color: theme.colors.accentViolet,
+                        action: onTapWeight
+                    )
+                    .frame(width: columnWidth, alignment: .leading)
 
-                DashboardHomeTimelineMetricButton(
-                    title: "Body Fat",
-                    value: bodyFatValue,
-                    caption: bodyFatCaption,
-                    color: theme.colors.accentPink,
-                    action: onTapBodyFat
-                )
+                    metricDivider
 
-                metricDivider
+                    DashboardHomeTimelineMetricButton(
+                        title: "Body Fat",
+                        value: bodyFatValue,
+                        caption: bodyFatCaption,
+                        color: theme.colors.accentPink,
+                        action: onTapBodyFat
+                    )
+                    .frame(width: columnWidth, alignment: .leading)
 
-                DashboardHomeTimelineMetricButton(
-                    title: "FFMI",
-                    value: ffmiValue,
-                    caption: ffmiCaption,
-                    color: theme.colors.accentTeal,
-                    action: onTapFFMI
-                )
+                    metricDivider
+
+                    DashboardHomeTimelineMetricButton(
+                        title: "FFMI",
+                        value: ffmiValue,
+                        caption: ffmiCaption,
+                        color: theme.colors.accentTeal,
+                        action: onTapFFMI
+                    )
+                    .frame(width: columnWidth, alignment: .leading)
+                }
+                .frame(width: geometry.size.width, alignment: .leading)
             }
+            .frame(height: 68)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -251,6 +262,7 @@ struct DashboardHomeTimelineHero: View {
             Spacer(minLength: 0)
         }
         .contentShape(Rectangle())
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Body Score \(bodyScoreText), \(bodyScoreTagline)")
     }
@@ -302,6 +314,7 @@ private struct DashboardHomeTimelineMetricButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title), \(value), \(caption)")
     }
@@ -322,21 +335,30 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
 
     var body: some View {
         GeometryReader { geometry in
-            AvatarBodyRenderer(
-                bodyFatPercentage: bodyFatPercentage,
-                gender: gender,
-                height: geometry.size.height,
-                padding: 0,
-                verticalPadding: 0,
-                horizontalFillScale: 1.08,
-                alignment: .bottom,
-                renderMode: .fillWidth
-            )
+            ZStack(alignment: .bottom) {
+                AvatarBodyRenderer(
+                    bodyFatPercentage: bodyFatPercentage,
+                    gender: gender,
+                    height: geometry.size.height,
+                    padding: 0,
+                    verticalPadding: 0,
+                    horizontalFillScale: 1.0,
+                    alignment: .bottom,
+                    renderMode: .fillWidth
+                )
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
+                .accessibilityHidden(true)
+
+                Color.clear
+                    .contentShape(Rectangle())
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(accessibilityText)
+                    .accessibilityIdentifier("dashboard_home_timeline_avatar")
+                    .allowsHitTesting(false)
+            }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
-        .accessibilityIdentifier("dashboard_home_timeline_avatar")
+        .clipped()
     }
 }
 

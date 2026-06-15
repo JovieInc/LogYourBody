@@ -6,6 +6,8 @@ extension DashboardViewLiquid {
     var photoTimelineHUD: some View {
         GeometryReader { geometry in
             let viewportWidth = max(1, geometry.size.width)
+            let heroHorizontalInset: CGFloat = 10
+            let heroWidth = max(1, viewportWidth - heroHorizontalInset * 2)
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
@@ -21,7 +23,8 @@ extension DashboardViewLiquid {
 
                     if let metric = currentMetric {
                         homeTimelineHero(metric: metric)
-                            .frame(width: viewportWidth, alignment: .top)
+                            .frame(width: heroWidth, alignment: .top)
+                            .clipped()
                     }
 
                     hudTimelineSection
