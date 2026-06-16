@@ -102,6 +102,7 @@ def write_outputs(artifact_dir: Path, violations: list[AuditViolation]) -> None:
                 "## Covered Contracts",
                 "",
                 "- Dashboard ScrollViews do not use large fake bottom spacers that create dead over-scroll.",
+                "- Onboarding fixed-CTA screens use size-based vertical scroll bounce to avoid empty over-scroll.",
                 "- The removed bottom stats-card hook stays out of app source.",
                 "- Body Score share cards expose layout anchors for UI assertions.",
                 "- Body Score share cards preserve actual photo aspect defaults instead of forcing one crop.",
@@ -133,6 +134,15 @@ def main() -> int:
         pattern=re.compile(r"Spacer\s*\(\s*minLength:\s*(?:1[2-9]\d|[2-9]\d{2,})"),
         check="overscroll.no_large_fake_bottom_spacers",
         detail="Use real bottom padding or safe-area insets instead of fake ScrollView content.",
+        violations=violations,
+    )
+
+    require_token(
+        root=root,
+        path=app_dir / "Features/Onboarding/Components/OnboardingMolecules.swift",
+        token=".scrollBounceBehavior(.basedOnSize, axes: .vertical)",
+        check="onboarding.fixed_cta_size_based_bounce",
+        detail="Onboarding fixed-CTA ScrollViews must disable empty vertical over-scroll when content fits.",
         violations=violations,
     )
 
