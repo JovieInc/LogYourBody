@@ -1826,9 +1826,13 @@ class CoreDataManager: ObservableObject {
     func saveGlp1DoseLogs(
         _ logs: [Glp1DoseLog],
         userId: String,
-        markAsSynced: Bool = true
+        markAsSynced: Bool = true,
+        completion: ((Result<Void, Error>) -> Void)? = nil
     ) {
-        guard !logs.isEmpty else { return }
+        guard !logs.isEmpty else {
+            completion?(.success(()))
+            return
+        }
 
         let context = viewContext
 
@@ -1848,6 +1852,10 @@ class CoreDataManager: ObservableObject {
                     cached.createdAt = log.createdAt
                 }
 
+                if markAsSynced, cached.isMarkedDeleted {
+                    continue
+                }
+
                 cached.userId = userId
                 cached.takenAt = log.takenAt
                 cached.medicationId = log.medicationId
@@ -1860,6 +1868,7 @@ class CoreDataManager: ObservableObject {
                 cached.supplierName = log.supplierName
                 cached.notes = log.notes
                 cached.updatedAt = log.updatedAt
+                cached.isMarkedDeleted = false
                 cached.isSynced = markAsSynced
                 cached.syncStatus = markAsSynced ? "synced" : "pending"
             }
@@ -1868,6 +1877,7 @@ class CoreDataManager: ObservableObject {
                 if context.hasChanges {
                     try context.save()
                 }
+                completion?(.success(()))
             } catch {
                 #if DEBUG
                 let appError = AppError.coreData(operation: "saveGlp1DoseLogs", underlying: error)
@@ -1879,6 +1889,19 @@ class CoreDataManager: ObservableObject {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 #endif
+                completion?(.failure(error))
+            }
+        }
+    }
+
+    func saveGlp1DoseLogsAndWait(
+        _ logs: [Glp1DoseLog],
+        userId: String,
+        markAsSynced: Bool = true
+    ) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            saveGlp1DoseLogs(logs, userId: userId, markAsSynced: markAsSynced) { result in
+                continuation.resume(with: result)
             }
         }
     }
@@ -1888,7 +1911,10 @@ class CoreDataManager: ObservableObject {
 
         return await context.perform {
             let request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
-            request.predicate = NSPredicate(format: "userId == %@", userId)
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "userId == %@", userId),
+                NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false))
+            ])
             request.sortDescriptors = [NSSortDescriptor(key: "takenAt", ascending: true)]
 
             do {
@@ -1906,6 +1932,48 @@ class CoreDataManager: ObservableObject {
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 #endif
                 return []
+            }
+        }
+    }
+
+    func markGlp1DoseLogDeleted(id: String, userId: String) async -> Bool {
+        let context = viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "id == %@", id),
+                NSPredicate(format: "userId == %@", userId)
+            ])
+            request.fetchLimit = 1
+
+            guard let cached = try? context.fetch(request).first else {
+                return false
+            }
+
+            let now = Date()
+            cached.isMarkedDeleted = true
+            cached.updatedAt = now
+            cached.isSynced = false
+            cached.syncStatus = "pending"
+
+            do {
+                if context.hasChanges {
+                    try context.save()
+                }
+                return true
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "markGlp1DoseLogDeleted", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "markGlp1DoseLogDeleted",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return false
             }
         }
     }

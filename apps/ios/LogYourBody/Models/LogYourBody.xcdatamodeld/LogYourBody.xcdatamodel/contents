@@ -74,6 +74,7 @@
         <attribute name="notes" optional="YES" attributeType="String"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isMarkedDeleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="isSynced" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
         <attribute name="syncStatus" attributeType="String" defaultValueString="synced"/>
     </entity>

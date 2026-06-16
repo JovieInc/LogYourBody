@@ -426,6 +426,11 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Zepbound"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["glp1DoseHistorySection"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.switches["Rest day"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["GLP-1 dose notes"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Delete dose"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Save GLP-1"].exists)
     }
 

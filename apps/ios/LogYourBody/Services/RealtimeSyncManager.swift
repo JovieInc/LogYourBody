@@ -376,6 +376,8 @@ class RealtimeSyncManager: ObservableObject {
         let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults(for: userId)
         let deletedBodyMetrics = unsynced.bodyMetrics.filter(\.isMarkedDeleted)
         let bodyMetricsToUpsert = unsynced.bodyMetrics.filter { !$0.isMarkedDeleted }
+        let deletedGlp1DoseLogs = unsyncedGlp1.filter(\.isMarkedDeleted)
+        let glp1DoseLogsToUpsert = unsyncedGlp1.filter { !$0.isMarkedDeleted }
 
         // Batch sync for efficiency
         if !deletedBodyMetrics.isEmpty {
@@ -394,8 +396,12 @@ class RealtimeSyncManager: ObservableObject {
             try await syncProfilesBatch(unsynced.profiles, token: token)
         }
 
-        if !unsyncedGlp1.isEmpty {
-            try await syncGlp1DoseLogsBatch(unsyncedGlp1, token: token)
+        if !deletedGlp1DoseLogs.isEmpty {
+            try await syncDeletedGlp1DoseLogsBatch(deletedGlp1DoseLogs, token: token)
+        }
+
+        if !glp1DoseLogsToUpsert.isEmpty {
+            try await syncGlp1DoseLogsBatch(glp1DoseLogsToUpsert, token: token)
         }
 
         if !unsyncedMedications.isEmpty {
@@ -419,6 +425,23 @@ class RealtimeSyncManager: ObservableObject {
 
             metric.syncStatus = "synced"
             metric.isSynced = true
+        }
+
+        coreDataManager.save()
+    }
+
+    nonisolated private func syncDeletedGlp1DoseLogsBatch(_ logs: [CachedGlp1DoseLog], token: String) async throws {
+        for log in logs {
+            guard let id = log.id else { continue }
+
+            try await supabaseManager.deleteData(
+                table: "glp1_dose_logs",
+                id: id,
+                token: token
+            )
+
+            log.syncStatus = "synced"
+            log.isSynced = true
         }
 
         coreDataManager.save()
