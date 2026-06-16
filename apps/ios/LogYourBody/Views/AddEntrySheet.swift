@@ -57,7 +57,13 @@ struct AddEntrySheet: View {
     @State private var glp1IsLoadingMedications = false
     @State private var isPresentingGlp1AddMedication = false
     @State private var glp1UseCustomDose = false
+    @State private var glp1IsRestDay = false
     @State private var glp1UserId: String?
+    @State private var glp1DoseLogs: [Glp1DoseLog] = []
+    @State private var glp1DoseNotes: String = ""
+    @State private var editingGlp1DoseLogId: String?
+    @State private var editingGlp1DoseCreatedAt: Date?
+    @State private var pendingDeleteGlp1DoseLog: Glp1DoseLog?
 
     @State private var showError = false
     @State private var errorMessage = ""
@@ -181,7 +187,7 @@ struct AddEntrySheet: View {
 
     private var glp1EntryView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Log GLP-1 dose")
+            Text(editingGlp1DoseLogId == nil ? "Log GLP-1 dose" : "Edit GLP-1 dose")
                 .font(.appHeadline)
                 .padding(.top)
 
@@ -266,11 +272,38 @@ struct AddEntrySheet: View {
                         let unit = glp1UnitForSelectedMedication ?? glp1DoseUnit
 
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Dose")
+                            HStack {
+                                Text(editingGlp1DoseLogId == nil ? "Dose" : "Editing dose")
+                                    .font(.appBodySmall)
+                                    .foregroundColor(.appTextSecondary)
+
+                                Spacer()
+
+                                if editingGlp1DoseLogId != nil {
+                                    Button("Cancel") {
+                                        resetGlp1DoseEditing()
+                                    }
+                                    .font(.appBodySmall)
+                                    .foregroundColor(.appTextSecondary)
+                                }
+                            }
+
+                            Toggle("Rest day", isOn: $glp1IsRestDay)
                                 .font(.appBodySmall)
                                 .foregroundColor(.appTextSecondary)
+                                .onChange(of: glp1IsRestDay) { _, isRestDay in
+                                    if !isRestDay {
+                                        updateGlp1DoseFromSelection()
+                                    } else {
+                                        glp1Error = nil
+                                    }
+                                }
 
-                            if !options.isEmpty {
+                            if glp1IsRestDay {
+                                Text("Record this date as a planned no-dose day.")
+                                    .font(.appBodySmall)
+                                    .foregroundColor(.appTextTertiary)
+                            } else if !options.isEmpty {
                                 Picker("Dose", selection: $selectedGlp1DoseIndex) {
                                     ForEach(options.indices, id: \.self) { index in
                                         Text(String(format: "%.2f", options[index]))
@@ -293,16 +326,18 @@ struct AddEntrySheet: View {
                                 }
                             }
 
-                            Toggle("Custom dose", isOn: $glp1UseCustomDose)
-                                .font(.appBodySmall)
-                                .foregroundColor(.appTextSecondary)
-                                .onChange(of: glp1UseCustomDose) { _, isCustom in
-                                    if !isCustom {
-                                        updateGlp1DoseFromSelection()
+                            if !glp1IsRestDay {
+                                Toggle("Custom dose", isOn: $glp1UseCustomDose)
+                                    .font(.appBodySmall)
+                                    .foregroundColor(.appTextSecondary)
+                                    .onChange(of: glp1UseCustomDose) { _, isCustom in
+                                        if !isCustom {
+                                            updateGlp1DoseFromSelection()
+                                        }
                                     }
-                                }
+                            }
 
-                            if glp1UseCustomDose {
+                            if glp1UseCustomDose && !glp1IsRestDay {
                                 HStack(spacing: 12) {
                                     TextField("0.0", text: $glp1Dose)
                                         .keyboardType(.decimalPad)
@@ -331,6 +366,17 @@ struct AddEntrySheet: View {
                                     .font(.appBodySmall)
                                     .foregroundColor(.appTextTertiary)
                             }
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Notes")
+                                    .font(.appBodySmall)
+                                    .foregroundColor(.appTextSecondary)
+
+                                TextField("Optional context", text: $glp1DoseNotes)
+                                    .font(.appBody)
+                                    .modernTextFieldStyle()
+                                    .accessibilityLabel("GLP-1 dose notes")
+                            }
                         }
                         .onAppear {
                             if glp1Dose.isEmpty {
@@ -341,6 +387,8 @@ struct AddEntrySheet: View {
                     }
                 }
             }
+
+            glp1DoseHistorySection
 
             Spacer()
         }
@@ -354,6 +402,115 @@ struct AddEntrySheet: View {
                 }
             }
         }
+        .confirmationDialog(
+            "Delete dose?",
+            isPresented: glp1DeleteConfirmationBinding,
+            titleVisibility: .visible
+        ) {
+            if let log = pendingDeleteGlp1DoseLog {
+                Button("Delete dose", role: .destructive) {
+                    deleteGlp1Dose(log)
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if let log = pendingDeleteGlp1DoseLog {
+                Text("This removes \(Glp1DoseHistoryFormatter.doseText(log)) from your dose history.")
+            }
+        }
+    }
+
+    private var glp1DoseHistorySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Recent doses")
+                    .font(.appBodySmall)
+                    .foregroundColor(.appTextSecondary)
+
+                Spacer()
+
+                if glp1DoseLogs.count > recentGlp1DoseLogs.count {
+                    Text("\(glp1DoseLogs.count) total")
+                        .font(.appBodySmall)
+                        .foregroundColor(.appTextTertiary)
+                }
+            }
+
+            if recentGlp1DoseLogs.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("No doses logged yet")
+                        .font(.appBody)
+                        .foregroundColor(.appText)
+
+                    Text("Save a dose here and it will appear in your history.")
+                        .font(.appBodySmall)
+                        .foregroundColor(.appTextSecondary)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.appCard)
+                .cornerRadius(Constants.cornerRadius)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(recentGlp1DoseLogs) { log in
+                        glp1DoseHistoryRow(log)
+
+                        if log.id != recentGlp1DoseLogs.last?.id {
+                            Divider()
+                                .background(Color.appBorder)
+                        }
+                    }
+                }
+                .background(Color.appCard)
+                .cornerRadius(Constants.cornerRadius)
+            }
+        }
+        .accessibilityIdentifier("glp1DoseHistorySection")
+    }
+
+    private func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(log.brand ?? "GLP-1")
+                    .font(.appBody)
+                    .foregroundColor(.appText)
+                    .lineLimit(1)
+
+                Text("\(Glp1DoseHistoryFormatter.doseText(log)) • \(Glp1DoseHistoryFormatter.dateText(log.takenAt))")
+                    .font(.appBodySmall)
+                    .foregroundColor(.appTextSecondary)
+                    .lineLimit(1)
+
+                if let notes = log.notes, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(notes)
+                        .font(.appBodySmall)
+                        .foregroundColor(.appTextTertiary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            Button("Edit") {
+                editGlp1Dose(log)
+            }
+            .font(.appBodySmall)
+            .foregroundColor(.appPrimary)
+            .buttonStyle(.borderless)
+            .accessibilityIdentifier("glp1DoseHistoryEditButton")
+
+            Button(role: .destructive) {
+                pendingDeleteGlp1DoseLog = log
+            } label: {
+                Image(systemName: "trash")
+                    .font(.appBodySmall)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Delete dose")
+            .accessibilityIdentifier("glp1DoseHistoryDeleteButton")
+        }
+        .padding(14)
     }
 
     // MARK: - Weight Entry View
@@ -554,7 +711,11 @@ struct AddEntrySheet: View {
         case 2:
             return !selectedPhotos.isEmpty
         case 3:
-            return glp1SelectedMedication != nil && !glp1Dose.isEmpty && Double(glp1Dose) != nil && glp1Error == nil
+            guard glp1SelectedMedication != nil else { return false }
+            if glp1IsRestDay {
+                return true
+            }
+            return !glp1Dose.isEmpty && Double(glp1Dose) != nil && glp1Error == nil
         default:
             return false
         }
@@ -569,7 +730,7 @@ struct AddEntrySheet: View {
         case 2:
             return selectedPhotos.count > 1 ? "Upload \(selectedPhotos.count) Photos" : "Upload Photo"
         case 3:
-            return "Save GLP-1"
+            return editingGlp1DoseLogId == nil ? "Save GLP-1" : "Save Changes"
         default:
             return "Save"
         }
@@ -664,14 +825,21 @@ struct AddEntrySheet: View {
                 return
             }
 
-            guard let dose = Double(glp1Dose) else {
-                glp1Error = "Please enter a valid number"
-                return
-            }
+            let dose: Double?
+            if glp1IsRestDay {
+                dose = nil
+            } else {
+                guard let resolvedDose = Double(glp1Dose) else {
+                    glp1Error = "Please enter a valid number"
+                    return
+                }
 
-            if dose <= 0 {
-                glp1Error = "Dose must be greater than zero"
-                return
+                if resolvedDose <= 0 {
+                    glp1Error = "Dose must be greater than zero"
+                    return
+                }
+
+                dose = resolvedDose
             }
 
             glp1Error = nil
@@ -680,24 +848,25 @@ struct AddEntrySheet: View {
             let calendar = Calendar.current
             let takenDate = calendar.startOfDay(for: selectedDate)
             let log = Glp1DoseLog(
-                id: UUID().uuidString,
+                id: editingGlp1DoseLogId ?? UUID().uuidString,
                 userId: userId,
                 takenAt: takenDate,
                 medicationId: medication.id,
                 doseAmount: dose,
-                doseUnit: medication.doseUnit ?? glp1DoseUnit,
+                doseUnit: glp1IsRestDay ? nil : medication.doseUnit ?? glp1DoseUnit,
                 drugClass: medication.drugClass,
                 brand: medication.brand ?? medication.displayName,
                 isCompounded: medication.isCompounded,
                 supplierType: nil,
                 supplierName: nil,
-                notes: nil,
-                createdAt: now,
+                notes: glp1DoseLogNotesForSave(isRestDay: glp1IsRestDay),
+                createdAt: editingGlp1DoseCreatedAt ?? now,
                 updatedAt: now
             )
 
             Task {
                 CoreDataManager.shared.saveGlp1DoseLogs([log], userId: userId, markAsSynced: false)
+                await loadGlp1DoseLogs(userId: userId)
                 RealtimeSyncManager.shared.updatePendingSyncCount()
                 RealtimeSyncManager.shared.syncIfNeeded()
                 dismiss()
@@ -897,10 +1066,44 @@ struct AddEntrySheet: View {
         return config.unit
     }
 
+    private var recentGlp1DoseLogs: [Glp1DoseLog] {
+        Array(glp1DoseLogs.sorted(by: { $0.takenAt > $1.takenAt }).prefix(5))
+    }
+
+    private var normalizedGlp1DoseNotes: String? {
+        let trimmed = glp1DoseNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func glp1DoseLogNotesForSave(isRestDay: Bool) -> String? {
+        guard isRestDay else {
+            return normalizedGlp1DoseNotes
+        }
+
+        guard let notes = normalizedGlp1DoseNotes else {
+            return "Rest day"
+        }
+
+        return notes.localizedCaseInsensitiveContains("rest day") ? notes : "Rest day: \(notes)"
+    }
+
+    private var glp1DeleteConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { pendingDeleteGlp1DoseLog != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingDeleteGlp1DoseLog = nil
+                }
+            }
+        )
+    }
+
     @MainActor
     private func loadGlp1Medications(userId: String) async {
         glp1IsLoadingMedications = true
         let cached = await CoreDataManager.shared.fetchGlp1Medications(for: userId)
+        await loadGlp1DoseLogs(userId: userId)
+
         if !cached.isEmpty {
             glp1Medications = cached.sorted { $0.startedAt < $1.startedAt }
 
@@ -923,6 +1126,10 @@ struct AddEntrySheet: View {
             glp1Medications = medications.sorted(by: { $0.startedAt < $1.startedAt })
             CoreDataManager.shared.saveGlp1Medications(medications, userId: userId)
 
+            let doseLogs = try await SupabaseManager.shared.fetchGlp1DoseLogs(userId: userId)
+            CoreDataManager.shared.saveGlp1DoseLogs(doseLogs, userId: userId)
+            glp1DoseLogs = doseLogs.sorted(by: { $0.takenAt < $1.takenAt })
+
             if selectedGlp1MedicationId == nil,
                let active = glp1Medications.last(where: { $0.endedAt == nil }) ?? glp1Medications.last {
                 selectedGlp1MedicationId = active.id
@@ -932,6 +1139,11 @@ struct AddEntrySheet: View {
         }
 
         glp1IsLoadingMedications = false
+    }
+
+    @MainActor
+    private func loadGlp1DoseLogs(userId: String) async {
+        glp1DoseLogs = await CoreDataManager.shared.fetchGlp1DoseLogs(for: userId)
     }
 
     private func loadGlp1MedicationsIfNeeded() {
@@ -948,6 +1160,7 @@ struct AddEntrySheet: View {
         glp1DoseUnit = config.unit
         selectedGlp1DoseIndex = 0
         glp1UseCustomDose = false
+        glp1IsRestDay = false
 
         if let first = config.doses.first {
             glp1Dose = String(first)
@@ -961,6 +1174,73 @@ struct AddEntrySheet: View {
     private func selectGlp1Medication(_ medication: Glp1Medication) {
         selectedGlp1MedicationId = medication.id
         applyDefaultDoseConfig(for: medication)
+    }
+
+    private func editGlp1Dose(_ log: Glp1DoseLog) {
+        editingGlp1DoseLogId = log.id
+        editingGlp1DoseCreatedAt = log.createdAt
+        selectedDate = log.takenAt
+        glp1DoseNotes = log.notes ?? ""
+        glp1IsRestDay = Glp1DoseHistoryFormatter.isRestDay(log)
+
+        if let medicationId = log.medicationId,
+           glp1Medications.contains(where: { $0.id == medicationId }) {
+            selectedGlp1MedicationId = medicationId
+        } else if let brand = log.brand,
+                  let medication = glp1Medications.first(where: { $0.displayName == brand || $0.brand == brand }) {
+            selectedGlp1MedicationId = medication.id
+        }
+
+        glp1DoseUnit = log.doseUnit ?? glp1UnitForSelectedMedication ?? glp1DoseUnit
+
+        guard let amount = log.doseAmount else {
+            glp1Dose = ""
+            glp1UseCustomDose = true
+            glp1Error = nil
+            return
+        }
+
+        if let matchingIndex = glp1DoseOptions.firstIndex(where: { abs($0 - amount) < 0.0001 }) {
+            selectedGlp1DoseIndex = matchingIndex
+            glp1UseCustomDose = false
+            glp1Dose = String(glp1DoseOptions[matchingIndex])
+        } else {
+            glp1UseCustomDose = true
+            glp1Dose = Glp1DoseHistoryFormatter.numberText(amount)
+        }
+
+        validateGlp1Dose(glp1Dose)
+    }
+
+    private func deleteGlp1Dose(_ log: Glp1DoseLog) {
+        Task {
+            let deleted = await CoreDataManager.shared.markGlp1DoseLogDeleted(id: log.id, userId: log.userId)
+            guard deleted else { return }
+
+            if editingGlp1DoseLogId == log.id {
+                resetGlp1DoseEditing()
+            }
+
+            pendingDeleteGlp1DoseLog = nil
+            await loadGlp1DoseLogs(userId: log.userId)
+            RealtimeSyncManager.shared.updatePendingSyncCount()
+            RealtimeSyncManager.shared.syncIfNeeded()
+            HapticManager.shared.successAction()
+        }
+    }
+
+    private func resetGlp1DoseEditing() {
+        editingGlp1DoseLogId = nil
+        editingGlp1DoseCreatedAt = nil
+        glp1DoseNotes = ""
+        glp1IsRestDay = false
+
+        if let medication = glp1SelectedMedication {
+            applyDefaultDoseConfig(for: medication)
+        } else {
+            glp1Dose = ""
+            glp1Error = nil
+        }
     }
 
     private func updateGlp1DoseFromSelection() {
@@ -985,6 +1265,10 @@ private struct Glp1AddMedicationView: View {
     @State private var searchText: String = ""
     @State private var selectedPreset: Glp1MedicationPreset?
     @State private var activeFilters: Set<Glp1Filter> = []
+    @State private var customCompoundName: String = ""
+    @State private var customDoseUnit: String = "mg/week"
+    @State private var customSchedule: Glp1CustomSchedule = .weekly
+    @State private var customScheduleDays: String = ""
 
     private var presets: [Glp1MedicationPreset] {
         Glp1MedicationCatalog.allPresets
@@ -1094,8 +1378,68 @@ private struct Glp1AddMedicationView: View {
                             }
                         }
                     }
+
+                    Section(header: Text("Custom compound")
+                        .font(.appCaption)
+                        .foregroundColor(.appTextSecondary)
+                        .textCase(nil)
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(
+                                "For informational reference only. Log what you are already taking; " +
+                                    "this does not provide dosing guidance."
+                            )
+                                .font(.appCaption)
+                                .foregroundColor(.appTextSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            TextField("Compound name", text: $customCompoundName)
+                                .font(.appBody)
+                                .modernTextFieldStyle()
+                                .accessibilityLabel("Custom compound name")
+
+                            Picker("Schedule", selection: $customSchedule) {
+                                ForEach(Glp1CustomSchedule.allCases) { schedule in
+                                    Text(schedule.label).tag(schedule)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+
+                            if customSchedule == .custom {
+                                TextField("Custom days, e.g. Mon/Wed/Fri", text: $customScheduleDays)
+                                    .font(.appBody)
+                                    .modernTextFieldStyle()
+                                    .accessibilityLabel("Custom compound schedule days")
+                            }
+
+                            TextField("Dose unit", text: $customDoseUnit)
+                                .font(.appBody)
+                                .modernTextFieldStyle()
+                                .accessibilityLabel("Custom compound dose unit")
+
+                            Button {
+                                createCustomMedication()
+                            } label: {
+                                Text("Use custom compound")
+                                    .font(.appBodySmall)
+                                    .fontWeight(.semibold)
+                                    .frame(height: 40)
+                                    .frame(maxWidth: .infinity)
+                                    .background(customCompoundCanSave ? Color.appPrimary : Color.appBorder)
+                                    .foregroundColor(customCompoundCanSave ? .black : .white)
+                                    .cornerRadius(Constants.cornerRadius)
+                            }
+                            .disabled(!customCompoundCanSave || isSaving)
+                        }
+                        .padding(.vertical, 6)
+                    }
                 }
                 .listStyle(.insetGrouped)
+                .onChange(of: searchText) { _, newValue in
+                    if customCompoundName.isEmpty {
+                        customCompoundName = newValue
+                    }
+                }
 
                 VStack(spacing: 8) {
                     if errorMessage != nil {
@@ -1184,6 +1528,24 @@ private struct Glp1AddMedicationView: View {
         presets.filter { preset in
             matchesSearch(preset) && matchesFilters(preset)
         }
+    }
+
+    private var customCompoundCanSave: Bool {
+        !trimmedCustomCompoundName.isEmpty
+            && !trimmedCustomDoseUnit.isEmpty
+            && (customSchedule != .custom || !trimmedCustomScheduleDays.isEmpty)
+    }
+
+    private var trimmedCustomCompoundName: String {
+        customCompoundName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedCustomDoseUnit: String {
+        customDoseUnit.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedCustomScheduleDays: String {
+        customScheduleDays.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var groupedPresets: [Glp1Group] {
@@ -1374,6 +1736,41 @@ private struct Glp1AddMedicationView: View {
         }
     }
 
+    private enum Glp1CustomSchedule: String, CaseIterable, Identifiable {
+        case weekly
+        case daily
+        case everyOtherDay
+        case custom
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .weekly:
+                return "Weekly"
+            case .daily:
+                return "Daily"
+            case .everyOtherDay:
+                return "Every other"
+            case .custom:
+                return "Custom"
+            }
+        }
+
+        func frequencyText(customDays: String) -> String {
+            switch self {
+            case .weekly:
+                return "once weekly"
+            case .daily:
+                return "once daily"
+            case .everyOtherDay:
+                return "every other day"
+            case .custom:
+                return "custom: \(customDays)"
+            }
+        }
+    }
+
     private struct Glp1Group {
         let title: String
         let items: [Glp1MedicationPreset]
@@ -1400,6 +1797,47 @@ private struct Glp1AddMedicationView: View {
             startedAt: now,
             endedAt: nil,
             notes: nil,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        Task {
+            CoreDataManager.shared.endActiveGlp1Medications(for: userId, endedAt: now)
+            CoreDataManager.shared.saveGlp1Medications([medication], userId: userId, markAsSynced: false)
+
+            await MainActor.run {
+                onCreated(medication)
+                isSaving = false
+                dismiss()
+            }
+
+            RealtimeSyncManager.shared.updatePendingSyncCount()
+            RealtimeSyncManager.shared.syncIfNeeded()
+        }
+    }
+
+    private func createCustomMedication() {
+        guard customCompoundCanSave, !isSaving else { return }
+        errorMessage = nil
+        isSaving = true
+
+        let now = Date()
+        let name = trimmedCustomCompoundName
+        let medication = Glp1Medication(
+            id: UUID().uuidString,
+            userId: userId,
+            displayName: name,
+            genericName: name,
+            drugClass: "GLP-1 receptor agonist",
+            brand: name,
+            route: "subcutaneous",
+            frequency: customSchedule.frequencyText(customDays: trimmedCustomScheduleDays),
+            doseUnit: trimmedCustomDoseUnit,
+            isCompounded: true,
+            hkIdentifier: nil,
+            startedAt: now,
+            endedAt: nil,
+            notes: "For informational reference only",
             createdAt: now,
             updatedAt: now
         )

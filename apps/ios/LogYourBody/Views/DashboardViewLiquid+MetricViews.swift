@@ -195,7 +195,7 @@ extension DashboardViewLiquid {
                 currentDate: currentDate,
                 chartData: cachedChartData(for: .glp1, generator: generateFullScreenGlp1ChartData),
                 onAdd: {
-                    showAddEntrySheet = true
+                    presentAddEntrySheet(initialTab: 3, includesGlp1Entry: true)
                 },
                 metricEntries: nil,
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .glp1),
