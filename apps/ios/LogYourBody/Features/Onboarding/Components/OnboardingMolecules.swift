@@ -329,6 +329,7 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
                     .padding(.bottom, showsCTA ? 24 : 40)
             }
             .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize, axes: .vertical)
             .accessibilityIdentifier("onboarding_scaffold_scroll")
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {

@@ -2431,6 +2431,24 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: Constants.onboardingCompletedUserIdKey), "same-user")
     }
 
+    func testCompletionUpdateIgnoresUnauthenticatedFalseForCompletedUser() {
+        let suiteName = "onboarding-auth-refresh-false-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let manager = OnboardingStateManager(defaults: defaults, currentVersion: 1)
+
+        manager.markCompleted(userId: "same-user")
+        manager.updateCompletionStatus(false)
+
+        XCTAssertTrue(manager.hasCompletedCurrentVersion)
+        XCTAssertTrue(manager.hasCompletedCurrentVersion(for: "same-user"))
+        XCTAssertEqual(defaults.string(forKey: Constants.onboardingCompletedUserIdKey), "same-user")
+        XCTAssertEqual(defaults.integer(forKey: Constants.onboardingCompletedVersionKey), 1)
+    }
+
     func testProfileCompletionSyncClearsInheritedCompletionForDifferentUser() {
         let suiteName = "onboarding-profile-user-switch-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

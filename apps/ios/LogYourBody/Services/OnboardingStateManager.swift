@@ -102,11 +102,11 @@ final class OnboardingStateManager {
 
     private func shouldPreserveLocalCompletionForStaleFalse(userId: String?) -> Bool {
         guard hasCompletedCurrentVersion else { return false }
-        guard let userId, !userId.isEmpty else { return false }
         guard let completedUserId = defaults.string(forKey: Constants.onboardingCompletedUserIdKey),
               !completedUserId.isEmpty else {
             return false
         }
+        guard let userId, !userId.isEmpty else { return true }
 
         return completedUserId == userId
     }
