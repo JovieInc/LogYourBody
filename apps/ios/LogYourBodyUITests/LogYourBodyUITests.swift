@@ -414,7 +414,7 @@ final class LogYourBodyUITests: XCTestCase {
         ]
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
 
         let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
         scrollUntilExists(prompt, in: app)

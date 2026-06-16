@@ -91,6 +91,17 @@ struct ContentView: View {
         )
     }
 
+    private func completeLaunchOverlayIfReady() {
+        guard !isLoadingComplete,
+              loadingManager.progress >= 1.0 else {
+            return
+        }
+
+        withAnimation(.easeInOut(duration: 0.25)) {
+            isLoadingComplete = true
+        }
+    }
+
     var body: some View {
         ZStack {
             Color.appBackground
@@ -126,13 +137,14 @@ struct ContentView: View {
             // Start loading process
             Task {
                 await loadingManager.startLoading()
-                // Check if loading is already complete
-                if !loadingManager.isLoading && loadingManager.progress >= 1.0 {
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        isLoadingComplete = true
-                    }
-                }
+                completeLaunchOverlayIfReady()
             }
+        }
+        .onChange(of: loadingManager.isLoading) { _, _ in
+            completeLaunchOverlayIfReady()
+        }
+        .onChange(of: loadingManager.progress) { _, _ in
+            completeLaunchOverlayIfReady()
         }
         .onReceive(NotificationCenter.default.publisher(for: OnboardingStateManager.onboardingStateDidChange)) { _ in
             hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion(for: currentUserId)
@@ -239,14 +251,12 @@ struct ContentView: View {
 
     private var loadingOverlay: some View {
         Group {
-            if !isLoadingComplete {
+            if !isLoadingComplete && loadingManager.progress < 1.0 {
                 LoadingView(
                     progress: $loadingManager.progress,
                     loadingStatus: $loadingManager.loadingStatus,
                     onComplete: {
-                        withAnimation(.easeInOut(duration: 0.4)) {
-                            isLoadingComplete = true
-                        }
+                        completeLaunchOverlayIfReady()
                     }
                 )
                 .transition(.opacity)
