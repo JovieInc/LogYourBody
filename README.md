@@ -164,11 +164,13 @@ The iOS app can be distributed via TestFlight or the App Store.
 
 ## Contributing
 
-We welcome contributions! Please see our contributing guidelines for more details.
+This is an internal Jovie Technology Inc. project. Contributions are limited to authorized team members and collaborators.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is proprietary and confidential. All rights reserved by Jovie Technology Inc.
+
+See [LICENSE](LICENSE) for full terms. Unauthorized copying, distribution, or use of this software is strictly prohibited. This repository is public solely to support continuous integration; it is **not** open source.
 
 ## Support
 
