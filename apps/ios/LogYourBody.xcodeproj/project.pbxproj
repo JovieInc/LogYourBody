@@ -61,6 +61,8 @@
 		AD72435C2E15FA5E002376C6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AD723B102E15FA5C002376C6 /* LaunchScreen.storyboard */; };
 		AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30A62E1490810072AA5B /* LogYourBodyTests.swift */; };
 		FE04A4A400000000000000B4 /* SyncIntervalAndChunkingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */; };
+		FE02A2A200000000000000B2 /* DashboardMetricFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE02A2A200000000000000F2 /* DashboardMetricFormattingTests.swift */; };
+		FE01A1A100000000000000B1 /* TimelineDataProviderScrubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE01A1A100000000000000F1 /* TimelineDataProviderScrubTests.swift */; };
 		AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */; };
 		AD7D30B32E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */; };
 		AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872322EB405C00041C426 /* BackgroundTaskType.swift */; };
@@ -451,6 +453,8 @@
 		AD7D30A22E1490810072AA5B /* LogYourBodyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LogYourBodyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AD7D30A62E1490810072AA5B /* LogYourBodyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyTests.swift; sourceTree = "<group>"; };
 		FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncIntervalAndChunkingTests.swift; sourceTree = "<group>"; };
+		FE02A2A200000000000000F2 /* DashboardMetricFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricFormattingTests.swift; sourceTree = "<group>"; };
+		FE01A1A100000000000000F1 /* TimelineDataProviderScrubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineDataProviderScrubTests.swift; sourceTree = "<group>"; };
 		AD7D30AC2E1490810072AA5B /* LogYourBodyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LogYourBodyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITests.swift; sourceTree = "<group>"; };
 		AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITestsLaunchTests.swift; sourceTree = "<group>"; };
@@ -1162,6 +1166,8 @@
 			children = (
 				AD7D30A62E1490810072AA5B /* LogYourBodyTests.swift */,
 				FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */,
+				FE02A2A200000000000000F2 /* DashboardMetricFormattingTests.swift */,
+				FE01A1A100000000000000F1 /* TimelineDataProviderScrubTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1600,6 +1606,8 @@
 			files = (
 				AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */,
 				FE04A4A400000000000000B4 /* SyncIntervalAndChunkingTests.swift in Sources */,
+				FE02A2A200000000000000B2 /* DashboardMetricFormattingTests.swift in Sources */,
+				FE01A1A100000000000000B1 /* TimelineDataProviderScrubTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -300,33 +300,35 @@ struct ProgressTimelineView: View {
     }
 }
 
+/// Compact fingerprint of the inputs that affect timeline rendering.
+///
+/// `ProgressTimelineView.body` rebuilds this on every evaluation purely to detect when the
+/// expensive `TimelineRenderData` needs regenerating, so it has to be cheap. It previously
+/// allocated an `[MetricFingerprint]` array (each element retaining several `String`s) and
+/// compared it field-by-field — during a drag that is an O(n) heap allocation plus ARC
+/// churn *per frame*, and an O(n) `Equatable` walk on every `onChange` comparison. Folding
+/// the same tracked fields into a single hash makes construction allocation-free and
+/// equality O(1), while preserving exactly which fields trigger a refresh.
 struct TimelineRenderSignature: Equatable {
     let modeRawValue: String
-    let metricFingerprints: [MetricFingerprint]
+    let metricCount: Int
+    let fingerprint: Int
 
     init(metrics: [BodyMetrics], mode: TimelineMode) {
         modeRawValue = mode.rawValue
-        metricFingerprints = metrics.map(MetricFingerprint.init)
-    }
+        metricCount = metrics.count
 
-    struct MetricFingerprint: Equatable {
-        let id: String
-        let date: TimeInterval
-        let localDate: String
-        let photoUrl: String?
-        let weight: Double?
-        let bodyFatPercentage: Double?
-        let updatedAt: TimeInterval
-
-        init(metric: BodyMetrics) {
-            id = metric.id
-            date = metric.date.timeIntervalSinceReferenceDate
-            localDate = metric.localDate
-            photoUrl = metric.photoUrl
-            weight = metric.weight
-            bodyFatPercentage = metric.bodyFatPercentage
-            updatedAt = metric.updatedAt.timeIntervalSinceReferenceDate
+        var hasher = Hasher()
+        for metric in metrics {
+            hasher.combine(metric.id)
+            hasher.combine(metric.date.timeIntervalSinceReferenceDate)
+            hasher.combine(metric.localDate)
+            hasher.combine(metric.photoUrl)
+            hasher.combine(metric.weight)
+            hasher.combine(metric.bodyFatPercentage)
+            hasher.combine(metric.updatedAt.timeIntervalSinceReferenceDate)
         }
+        fingerprint = hasher.finalize()
     }
 }
 
