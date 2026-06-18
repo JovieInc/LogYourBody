@@ -196,23 +196,10 @@ class RealtimeSyncManager: ObservableObject {
     // MARK: - Battery Optimization
     private func adjustSyncIntervalForBattery() {
         UIDevice.current.isBatteryMonitoringEnabled = true
-        let batteryLevel = UIDevice.current.batteryLevel
-        let batteryState = UIDevice.current.batteryState
-
-        switch (batteryState, batteryLevel) {
-        case (.charging, _), (.full, _):
-            // Aggressive sync when charging
-            syncInterval = 60 // 1 minute
-        case (_, let level) where level > 0.5:
-            // Normal sync above 50% battery
-            syncInterval = 300 // 5 minutes
-        case (_, let level) where level > 0.2:
-            // Conservative sync below 50% battery
-            syncInterval = 900 // 15 minutes
-        default:
-            // Minimal sync below 20% battery
-            syncInterval = 1_800 // 30 minutes
-        }
+        syncInterval = BatterySyncIntervalPolicy.interval(
+            state: UIDevice.current.batteryState,
+            level: UIDevice.current.batteryLevel
+        )
 
         // Restart timer with new interval
         startAutoSync()
