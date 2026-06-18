@@ -50,6 +50,22 @@ LogYourBody/
 
 ---
 
+## Brain-First Knowledge (gbrain)
+
+`gbrain` is the shared knowledge brain holding prior decisions, bug post-mortems, conventions, and architecture notes for this repo. **Query it before exploring the codebase or making an architectural decision.**
+
+```bash
+gbrain search "clerk proxy auth"          # keyword (tsvector)
+gbrain query "what is the timeline scrubber convention?"   # hybrid
+```
+
+- **Setup (one-time per machine):** `pnpm setup:gbrain` (or `bash scripts/setup-gbrain.sh`). It resolves the brain's Supabase URL from `GBRAIN_DATABASE_URL` or Doppler (`jovie-web/dev`) and writes `~/.gbrain/config.json`. The connection string is a secret and is never committed.
+- **Code-aware search (optional):** run `/sync-gbrain --full` in Claude Code to index this repo, enabling `gbrain code-def` / `code-refs` / `code-callers`. It pins the worktree with `.gbrain-source` (gitignored).
+- **Graceful degradation:** if gbrain is unreachable, fall back to normal repo exploration — never block on it.
+- **Writes are automatic** via the memory→gbrain sync hook; you do not push manually.
+
+---
+
 ## Branching Model
 
 ### Production / Trunk Branch
