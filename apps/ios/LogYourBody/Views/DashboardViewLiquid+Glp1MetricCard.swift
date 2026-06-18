@@ -5,18 +5,7 @@ import SwiftUI
 extension DashboardViewLiquid {
     @ViewBuilder
     var glp1MetricCard: some View {
-        let sortedLogs = glp1DoseLogs.sorted { $0.takenAt < $1.takenAt }
-
-        if let latestLog = sortedLogs.last,
-           let latestDose = latestLog.doseAmount {
-            let unit = latestLog.doseUnit ?? "mg"
-            let dataPoints: [MetricSummaryCard.DataPoint] = Array(sortedLogs.suffix(7))
-                .enumerated()
-                .compactMap { index, log in
-                    guard let value = log.doseAmount else { return nil }
-                    return MetricSummaryCard.DataPoint(index: index, value: value)
-                }
-
+        if let cardData = Glp1DoseCardData.make(from: glp1DoseLogs) {
             Button {
                 selectedMetricType = .glp1
                 isMetricDetailActive = true
@@ -27,12 +16,12 @@ extension DashboardViewLiquid {
                     state: .data(
                         MetricSummaryCard.Content(
                             title: "GLP-1 Dose",
-                            value: String(format: "%.1f", latestDose),
-                            unit: unit,
-                            timestamp: formatCardDateOnly(latestLog.takenAt),
-                            dataPoints: dataPoints,
+                            value: String(format: "%.1f", cardData.latestDose),
+                            unit: cardData.unit,
+                            timestamp: formatCardDateOnly(cardData.latestTakenAt),
+                            dataPoints: cardData.dataPoints,
                             chartAccessibilityLabel: "GLP-1 dose history",
-                            chartAccessibilityValue: "Latest dose \(String(format: "%.1f", latestDose)) \(unit)",
+                            chartAccessibilityValue: "Latest dose \(String(format: "%.1f", cardData.latestDose)) \(cardData.unit)",
                             trend: nil,
                             footnote: nil
                         )

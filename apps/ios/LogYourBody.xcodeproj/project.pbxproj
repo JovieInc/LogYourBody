@@ -60,6 +60,7 @@
 		AD7243592E15FA5E002376C6 /* Config.xcconfig.example in Resources */ = {isa = PBXBuildFile; fileRef = AD723B0D2E15FA5C002376C6 /* Config.xcconfig.example */; };
 		AD72435C2E15FA5E002376C6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AD723B102E15FA5C002376C6 /* LaunchScreen.storyboard */; };
 		AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30A62E1490810072AA5B /* LogYourBodyTests.swift */; };
+		FE06A6A600000000000000B6 /* Glp1CardAndCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE06A6A600000000000000F6 /* Glp1CardAndCatalogTests.swift */; };
 		AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */; };
 		AD7D30B32E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */; };
 		AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872322EB405C00041C426 /* BackgroundTaskType.swift */; };
@@ -266,6 +267,7 @@
 		ADDC488A2E2D8A6B003C97E7 /* WhatsNewRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC487A2E2D8A6B003C97E7 /* WhatsNewRow.swift */; };
 		ADE146442EBF05E000B64DA0 /* TimelineMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE146432EBF05E000B64DA0 /* TimelineMode.swift */; };
 		ADE146462EBF090D00B64DA0 /* ProgressTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE146452EBF090D00B64DA0 /* ProgressTimelineView.swift */; };
+		FE05A5A500000000000000B5 /* Glp1DoseCardData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE05A5A500000000000000F5 /* Glp1DoseCardData.swift */; };
 		ADE146482EBF0B4800B64DA0 /* TimelineDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE146472EBF0B4800B64DA0 /* TimelineDataProvider.swift */; };
 		ADE1464E2EBF0BDF00B64DA0 /* TimelineZoomLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE1464B2EBF0BDF00B64DA0 /* TimelineZoomLevel.swift */; };
 		ADE1464F2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE1464A2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift */; };
@@ -448,6 +450,7 @@
 		AD7D309C2E1490810072AA5B /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		AD7D30A22E1490810072AA5B /* LogYourBodyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LogYourBodyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AD7D30A62E1490810072AA5B /* LogYourBodyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyTests.swift; sourceTree = "<group>"; };
+		FE06A6A600000000000000F6 /* Glp1CardAndCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Glp1CardAndCatalogTests.swift; sourceTree = "<group>"; };
 		AD7D30AC2E1490810072AA5B /* LogYourBodyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LogYourBodyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITests.swift; sourceTree = "<group>"; };
 		AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITestsLaunchTests.swift; sourceTree = "<group>"; };
@@ -630,6 +633,7 @@
 		ADDC487B2E2D8A6B003C97E7 /* WhatsNewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewView.swift; sourceTree = "<group>"; };
 		ADE146432EBF05E000B64DA0 /* TimelineMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineMode.swift; sourceTree = "<group>"; };
 		ADE146452EBF090D00B64DA0 /* ProgressTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProgressTimelineView.swift; path = Components/ProgressTimelineView.swift; sourceTree = "<group>"; };
+		FE05A5A500000000000000F5 /* Glp1DoseCardData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Glp1DoseCardData.swift; path = Components/Glp1DoseCardData.swift; sourceTree = "<group>"; };
 		ADE146472EBF0B4800B64DA0 /* TimelineDataProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineDataProvider.swift; sourceTree = "<group>"; };
 		ADE1464A2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelinePhotoSampler.swift; sourceTree = "<group>"; };
 		ADE1464B2EBF0BDF00B64DA0 /* TimelineZoomLevel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineZoomLevel.swift; sourceTree = "<group>"; };
@@ -784,6 +788,7 @@
 				C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */,
 				ADA923012E22EF4600B82C49 /* Common */,
 				ADE146452EBF090D00B64DA0 /* ProgressTimelineView.swift */,
+				FE05A5A500000000000000F5 /* Glp1DoseCardData.swift */,
 			);
 			name = Components;
 			sourceTree = "<group>";
@@ -1156,6 +1161,7 @@
 			isa = PBXGroup;
 			children = (
 				AD7D30A62E1490810072AA5B /* LogYourBodyTests.swift */,
+				FE06A6A600000000000000F6 /* Glp1CardAndCatalogTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1593,6 +1599,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */,
+				FE06A6A600000000000000B6 /* Glp1CardAndCatalogTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1613,6 +1620,7 @@
 				ADDC479E2E2D89F3003C97E7 /* CommonComponents.swift in Sources */,
 				ADDC47A12E2D89F3003C97E7 /* ProcessingImagePlaceholder.swift in Sources */,
 				ADE146462EBF090D00B64DA0 /* ProgressTimelineView.swift in Sources */,
+				FE05A5A500000000000000B5 /* Glp1DoseCardData.swift in Sources */,
 				ADDC47A32E2D89F3003C97E7 /* SettingsComponents.swift in Sources */,
 				ADDC47A72E2D89F3003C97E7 /* Changelog.swift in Sources */,
 				ADDC47A82E2D89F3003C97E7 /* BodyMetrics.swift in Sources */,
