@@ -1497,7 +1497,7 @@ class CoreDataManager: ObservableObject {
             let userId = data["id"] as? String ?? ""
 
             let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
-            request.predicate = NSPredicate(format: "userId == %@", userId)
+            request.predicate = NSPredicate(format: "id == %@", userId)
             request.fetchLimit = 1
 
             do {

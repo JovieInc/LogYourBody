@@ -18,6 +18,27 @@ enum LaunchSurfacePolicy {
     }
 }
 
+enum ProfileCompletionPolicy {
+    static func isComplete(user: User?) -> Bool {
+        guard let user else { return false }
+        return isComplete(profile: user.profile, fallbackName: user.name)
+    }
+
+    static func isComplete(profile: UserProfile?, fallbackName: String?) -> Bool {
+        guard let profile else { return false }
+
+        let profileName = profile.fullName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackDisplayName = fallbackName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = profileName?.isEmpty == false ? profileName : fallbackDisplayName
+        let hasName = !(displayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        let hasDOB = profile.dateOfBirth != nil
+        let hasHeight = (profile.height ?? 0) > 0
+        let hasGender = !(profile.gender?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+
+        return hasName && hasDOB && hasHeight && hasGender
+    }
+}
+
 private struct ProfileCompletionSyncKey: Equatable {
     let userId: String?
     let completionFlag: Bool
@@ -58,19 +79,7 @@ struct ContentView: View {
 
     // Check if user profile is complete
     private var isProfileComplete: Bool {
-        // Safely check if profile exists and is complete
-        guard let user = authManager.currentUser,
-              let profile = user.profile else {
-            return false
-        }
-
-        let displayName = profile.fullName ?? user.name
-        let hasName = !(displayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-        let hasDOB = profile.dateOfBirth != nil
-        let hasHeight = (profile.height ?? 0) > 0
-        let hasGender = !(profile.gender?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-
-        return hasName && hasDOB && hasHeight && hasGender
+        ProfileCompletionPolicy.isComplete(user: authManager.currentUser)
     }
 
     private var shouldShowOnboarding: Bool {
