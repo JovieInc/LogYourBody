@@ -38,6 +38,57 @@ final class LaunchSurfacePolicyTests: XCTestCase {
             )
         )
     }
+
+    func testProfileCompletionPolicyRequiresRealNameHeightGenderAndDateOfBirth() {
+        let dateOfBirth = Date(timeIntervalSince1970: 631_152_000)
+        let completeProfile = UserProfile(
+            id: "profile-complete",
+            email: "complete@example.com",
+            username: nil,
+            fullName: "Complete User",
+            dateOfBirth: dateOfBirth,
+            height: 180,
+            heightUnit: "cm",
+            gender: "male",
+            activityLevel: nil,
+            goalWeight: nil,
+            goalWeightUnit: nil,
+            onboardingCompleted: true
+        )
+        let blankNameProfile = UserProfile(
+            id: "profile-blank-name",
+            email: "blank@example.com",
+            username: nil,
+            fullName: "   ",
+            dateOfBirth: dateOfBirth,
+            height: 180,
+            heightUnit: "cm",
+            gender: "male",
+            activityLevel: nil,
+            goalWeight: nil,
+            goalWeightUnit: nil,
+            onboardingCompleted: true
+        )
+        let zeroHeightProfile = UserProfile(
+            id: "profile-zero-height",
+            email: "height@example.com",
+            username: nil,
+            fullName: "Height User",
+            dateOfBirth: dateOfBirth,
+            height: 0,
+            heightUnit: "cm",
+            gender: "male",
+            activityLevel: nil,
+            goalWeight: nil,
+            goalWeightUnit: nil,
+            onboardingCompleted: true
+        )
+
+        XCTAssertTrue(ProfileCompletionPolicy.isComplete(profile: completeProfile, fallbackName: nil))
+        XCTAssertFalse(ProfileCompletionPolicy.isComplete(profile: blankNameProfile, fallbackName: nil))
+        XCTAssertFalse(ProfileCompletionPolicy.isComplete(profile: zeroHeightProfile, fallbackName: nil))
+        XCTAssertTrue(ProfileCompletionPolicy.isComplete(profile: blankNameProfile, fallbackName: "Fallback User"))
+    }
 }
 
 final class BodyCompositionMathGoldenTests: XCTestCase {
@@ -3514,6 +3565,17 @@ final class SyncIntegrationTests: XCTestCase {
         }
     }
 
+    private func cachedProfiles(id: String) async -> [CachedProfile] {
+        let context = CoreDataManager.shared.viewContext
+
+        return await context.perform {
+            let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+
+            return (try? context.fetch(request)) ?? []
+        }
+    }
+
     private func makeBodySpecSummary(
         resultId: String,
         startTime: Date,
@@ -3888,6 +3950,46 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertEqual(log.notes, "daily-metrics-mapped")
         XCTAssertEqual(log.createdAt.timeIntervalSince(createdAt), 0, accuracy: 0.001)
         XCTAssertEqual(log.updatedAt.timeIntervalSince(updatedAt), 0, accuracy: 0.001)
+    }
+
+    func testUpdateOrCreateProfile_IsIdempotentForSameId() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_profile_\(UUID().uuidString)"
+        let firstPayload: [String: Any] = [
+            "id": userId,
+            "full_name": "First Name",
+            "username": "first_name",
+            "height": 178.0,
+            "height_unit": "cm",
+            "gender": "male",
+            "activity_level": "active",
+            "date_of_birth": "1990-01-01T00:00:00Z"
+        ]
+        let secondPayload: [String: Any] = [
+            "id": userId,
+            "full_name": "Updated Name",
+            "username": "updated_name",
+            "height": 181.0,
+            "height_unit": "cm",
+            "gender": "male",
+            "activity_level": "active",
+            "date_of_birth": "1990-01-01T00:00:00Z"
+        ]
+
+        coreData.updateOrCreateProfile(from: firstPayload)
+        coreData.updateOrCreateProfile(from: secondPayload)
+
+        let profiles = await cachedProfiles(id: userId)
+        XCTAssertEqual(profiles.count, 1)
+
+        let profile = try XCTUnwrap(profiles.first)
+        XCTAssertEqual(profile.id, userId)
+        XCTAssertEqual(profile.fullName, "Updated Name")
+        XCTAssertEqual(profile.username, "updated_name")
+        XCTAssertEqual(profile.height, 181.0, accuracy: 0.001)
+        XCTAssertEqual(profile.syncStatus, "synced")
+        XCTAssertTrue(profile.isSynced)
     }
 
     func testUpdateOrCreateBodyMetric_IsIdempotentForSameId() async throws {

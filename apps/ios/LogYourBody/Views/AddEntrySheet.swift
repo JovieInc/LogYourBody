@@ -45,7 +45,7 @@ struct AddEntrySheet: View {
     @State private var isProcessingPhotos = false
     @State private var photoProgress: Double = 0
     @State private var processedCount = 0
-    @State private var photoIdentifiers: [String] = []  // Store PHAsset identifiers for deletion
+    @State private var photoIdentifiers: [String] = []  // Store successfully uploaded PHAsset identifiers for deletion
 
     // GLP-1 entry
     @State private var glp1Dose: String = ""
@@ -67,6 +67,7 @@ struct AddEntrySheet: View {
 
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var isSavingEntry = false
     @State private var showDeletePhotosPrompt = false
     @AppStorage(Constants.deletePhotosAfterImportKey) private var deletePhotosAfterImport = false
     @AppStorage(Constants.hasPromptedDeletePhotosKey) private var hasPromptedDeletePhotos = false
@@ -124,7 +125,7 @@ struct AddEntrySheet: View {
                 // Save button
                 Button(action: saveEntry) {
                     HStack {
-                        if isProcessingPhotos {
+                        if isProcessingPhotos || isSavingEntry {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                 .scaleEffect(0.8)
@@ -140,7 +141,7 @@ struct AddEntrySheet: View {
                     .foregroundColor(canSave ? .black : .white)
                     .cornerRadius(Constants.cornerRadius)
                 }
-                .disabled(!canSave || isProcessingPhotos)
+                .disabled(!canSave || isProcessingPhotos || isSavingEntry)
                 .padding()
             }
             .navigationTitle("Add Entry")
@@ -739,6 +740,7 @@ struct AddEntrySheet: View {
     // MARK: - Actions
     private func saveEntry() {
         guard let userId = authManager.currentUser?.id else { return }
+        guard !isSavingEntry, !isProcessingPhotos else { return }
 
         switch selectedTab {
         case 0:
@@ -762,8 +764,11 @@ struct AddEntrySheet: View {
             let weightInKg = resolvedWeightUnit == "lbs" ? validatedWeight.lbsToKg : validatedWeight
 
             weightError = nil
+            isSavingEntry = true
 
             Task {
+                defer { isSavingEntry = false }
+
                 _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
                     for: selectedDate,
                     weight: weightInKg,
@@ -772,19 +777,17 @@ struct AddEntrySheet: View {
                 RealtimeSyncManager.shared.syncIfNeeded()
 
                 BodyScoreRecalculationService.shared.scheduleRecalculation()
+
+                trackEntrySaved(
+                    type: "weight",
+                    properties: [
+                        "unit": resolvedWeightUnit
+                    ]
+                )
+                HapticManager.shared.successAction()
+
+                dismiss()
             }
-
-            AnalyticsService.shared.track(
-                event: "entry_saved",
-                properties: [
-                    "type": "weight",
-                    "unit": resolvedWeightUnit
-                ]
-            )
-            trackLogEntrySaved(type: "weight")
-            HapticManager.shared.successAction()
-
-            dismiss()
         } catch let error as ValidationError {
             handleValidationError(error, for: .weight)
         } catch {
@@ -796,8 +799,11 @@ struct AddEntrySheet: View {
         do {
             let validatedBodyFat = try ValidationService.shared.validateBodyFat(bodyFat)
             bodyFatError = nil
+            isSavingEntry = true
 
             Task {
+                defer { isSavingEntry = false }
+
                 _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
                     for: selectedDate,
                     bodyFatPercentage: validatedBodyFat,
@@ -806,11 +812,11 @@ struct AddEntrySheet: View {
                 RealtimeSyncManager.shared.syncIfNeeded()
 
                 BodyScoreRecalculationService.shared.scheduleRecalculation()
-            }
 
-            trackLogEntrySaved(type: "body_fat")
-            HapticManager.shared.successAction()
-            dismiss()
+                trackEntrySaved(type: "body_fat")
+                HapticManager.shared.successAction()
+                dismiss()
+            }
         } catch let error as ValidationError {
             handleValidationError(error, for: .bodyFat)
         } catch {
@@ -843,6 +849,7 @@ struct AddEntrySheet: View {
             }
 
             glp1Error = nil
+            isSavingEntry = true
 
             let now = Date()
             let calendar = Calendar.current
@@ -865,21 +872,22 @@ struct AddEntrySheet: View {
             )
 
             Task {
+                defer { isSavingEntry = false }
+
                 CoreDataManager.shared.saveGlp1DoseLogs([log], userId: userId, markAsSynced: false)
                 await loadGlp1DoseLogs(userId: userId)
                 RealtimeSyncManager.shared.updatePendingSyncCount()
                 RealtimeSyncManager.shared.syncIfNeeded()
+
+                trackEntrySaved(
+                    type: "glp1",
+                    properties: [
+                        "medication_id": medication.id,
+                        "dose_unit": medication.doseUnit ?? glp1DoseUnit
+                    ]
+                )
                 dismiss()
             }
-
-            AnalyticsService.shared.track(
-                event: "entry_saved",
-                properties: [
-                    "type": "glp1",
-                    "medication_id": medication.id,
-                    "dose_unit": medication.doseUnit ?? glp1DoseUnit
-                ]
-            )
         }
     }
 
@@ -888,13 +896,18 @@ struct AddEntrySheet: View {
         photoProgress = 0
         processedCount = 0
         photoIdentifiers.removeAll()
+        var successfulUploadCount = 0
+        var successfulPhotoIdentifiers: [String] = []
 
         for (index, item) in selectedPhotos.enumerated() {
             do {
-                // Extract PHAsset identifier if available
-                if let identifier = item.itemIdentifier {
-                    photoIdentifiers.append(identifier)
+                defer {
+                    processedCount = index + 1
+                    photoProgress = Double(processedCount) / Double(selectedPhotos.count)
                 }
+
+                // Extract PHAsset identifier if available
+                let itemIdentifier = item.itemIdentifier
 
                 // Load the photo data
                 guard let data = try await item.loadTransferable(type: Data.self),
@@ -917,8 +930,10 @@ struct AddEntrySheet: View {
                     image: image
                 )
 
-                processedCount = index + 1
-                photoProgress = Double(processedCount) / Double(selectedPhotos.count)
+                successfulUploadCount += 1
+                if let itemIdentifier {
+                    successfulPhotoIdentifiers.append(itemIdentifier)
+                }
             } catch {
                 let context = ErrorContext(
                     feature: "photos",
@@ -930,6 +945,15 @@ struct AddEntrySheet: View {
             }
         }
 
+        if successfulUploadCount == 0 {
+            isProcessingPhotos = false
+            errorMessage = "Photo upload failed. Please try again."
+            showError = true
+            return
+        }
+
+        photoIdentifiers = successfulPhotoIdentifiers
+
         // Delete photos from camera roll if enabled
         if deletePhotosAfterImport && !photoIdentifiers.isEmpty {
             await deletePhotosFromLibrary()
@@ -939,23 +963,22 @@ struct AddEntrySheet: View {
         RealtimeSyncManager.shared.syncIfNeeded()
         dismiss()
 
-        AnalyticsService.shared.track(
-            event: "entry_saved",
+        trackEntrySaved(
+            type: "photos",
             properties: [
-                "type": "photos",
-                "count": String(selectedPhotos.count)
+                "count": String(successfulUploadCount)
             ]
         )
-        trackLogEntrySaved(type: "photos")
         HapticManager.shared.successAction()
     }
 
-    private func trackLogEntrySaved(type: String) {
+    private func trackEntrySaved(type: String, properties: [String: String] = [:]) {
+        var eventProperties = properties
+        eventProperties["type"] = type
+
         AnalyticsService.shared.track(
-            event: "log_entry_saved",
-            properties: [
-                "type": type
-            ]
+            event: "entry_saved",
+            properties: eventProperties
         )
     }
 

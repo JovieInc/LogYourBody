@@ -82,6 +82,11 @@ extension BackgroundPhotoUploadService {
                             createdAt: date,
                             updatedAt: date
                         )
+                        try await CoreDataManager.shared.saveBodyMetricsAndWait(
+                            metrics,
+                            userId: userId,
+                            markAsSynced: false
+                        )
                     }
 
                     // Upload photo with metrics

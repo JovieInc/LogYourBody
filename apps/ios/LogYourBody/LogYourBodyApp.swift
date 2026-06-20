@@ -416,25 +416,7 @@ struct LogYourBodyApp: App {
             break
 
         case "log":
-            // Check if user is authenticated and has completed onboarding
-            guard authManager.isAuthenticated else {
-                // User needs to sign in first
-                return
-            }
-
-            // Check if body-composition onboarding/profile requirements apply before logging.
-            let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Constants.hasCompletedOnboardingKey)
-            let isProfileComplete = checkProfileComplete()
-            let requiresOnboarding = LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
-                hasCompletedOnboarding: hasCompletedOnboarding
-            )
-            let requiresProfile = LaunchSurfacePolicy.requiresCompleteProfile(
-                isProfileComplete: isProfileComplete
-            )
-
-            if requiresOnboarding || requiresProfile {
-                // User needs to complete onboarding first
-                // Don't open the add entry sheet
+            guard canOpenEntrySheetFromDeepLink else {
                 return
             }
 
@@ -462,11 +444,21 @@ struct LogYourBodyApp: App {
         }
     }
 
-    private func checkProfileComplete() -> Bool {
-        guard let profile = authManager.currentUser?.profile else { return false }
-        return profile.fullName != nil &&
-            profile.dateOfBirth != nil &&
-            profile.height != nil &&
-            profile.gender != nil
+    private var canOpenEntrySheetFromDeepLink: Bool {
+        guard authManager.isAuthenticated,
+              let user = authManager.currentUser else {
+            return false
+        }
+
+        let hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion(for: user.id)
+        let isProfileComplete = ProfileCompletionPolicy.isComplete(user: user)
+
+        return !LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+            hasCompletedOnboarding: hasCompletedOnboarding
+        ) &&
+            !LaunchSurfacePolicy.requiresCompleteProfile(
+                isProfileComplete: isProfileComplete
+            ) &&
+            revenueCatManager.isSubscribed
     }
 }
