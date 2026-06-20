@@ -1173,6 +1173,8 @@ struct AddEntrySheet: View {
         guard includesGlp1Entry, selectedTab == 3 else { return }
         guard let userId = authManager.currentUser?.id else { return }
 
+        glp1UserId = userId
+
         Task {
             await loadGlp1Medications(userId: userId)
         }

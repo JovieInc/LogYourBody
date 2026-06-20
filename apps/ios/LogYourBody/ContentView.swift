@@ -18,6 +18,27 @@ enum LaunchSurfacePolicy {
     }
 }
 
+enum EntryDeepLinkPolicy {
+    static func canOpenEntrySheet(
+        isAuthenticated: Bool,
+        user: User?,
+        hasCompletedOnboarding: Bool,
+        isSubscribed: Bool
+    ) -> Bool {
+        guard isAuthenticated else { return false }
+
+        let isProfileComplete = ProfileCompletionPolicy.isComplete(user: user)
+
+        return !LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
+            hasCompletedOnboarding: hasCompletedOnboarding
+        ) &&
+            !LaunchSurfacePolicy.requiresCompleteProfile(
+                isProfileComplete: isProfileComplete
+            ) &&
+            isSubscribed
+    }
+}
+
 enum ProfileCompletionPolicy {
     static func isComplete(user: User?) -> Bool {
         guard let user else { return false }

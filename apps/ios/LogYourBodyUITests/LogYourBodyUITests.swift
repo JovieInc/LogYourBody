@@ -434,6 +434,38 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Save GLP-1"].exists)
     }
 
+    func testGlp1WeeklyCheckInFixtureOpensMedicationSelectorWhenEmpty() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture",
+            "-lybUITestGlp1EmptyMedicationFixture"
+        ]
+        app.launch()
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+
+        let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
+        scrollUntilExists(prompt, in: app)
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+
+        scrollUntilHittable(prompt, in: app)
+        XCTAssertTrue(prompt.isHittable)
+        prompt.tap()
+
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
+
+        let addMedication = app.buttons["Add medication"]
+        XCTAssertTrue(addMedication.waitForExistence(timeout: 5))
+        scrollUntilHittable(addMedication, in: app)
+        XCTAssertTrue(addMedication.isHittable)
+        addMedication.tap()
+
+        XCTAssertTrue(app.staticTexts["Select GLP-1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Save medication"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Cancel"].exists)
+    }
+
     func testBulkPhotoImportLockedByDefaultInIntegrations() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]

@@ -357,25 +357,12 @@ class RevenueCatManager: NSObject, ObservableObject {
         // print("💰 Logging out user")
 
         guard isConfigured else {
-            customerInfo = nil
-            isSubscribed = false
-            cachedIsSubscribed = false
-            currentOffering = nil
-            currentEntitlementSnapshot = nil
-            resetSubscriptionAnalyticsCache()
+            clearLocalSubscriptionState()
             return
         }
 
         do {
             try await purchasesClient.logOut()
-            await MainActor.run {
-                self.customerInfo = nil
-                self.isSubscribed = false
-                self.cachedIsSubscribed = false
-                self.currentOffering = nil
-                self.currentEntitlementSnapshot = nil
-                self.resetSubscriptionAnalyticsCache()
-            }
         } catch {
             let appError = AppError.billing(operation: "logoutUser", underlying: error)
             let context = ErrorContext(
@@ -386,6 +373,8 @@ class RevenueCatManager: NSObject, ObservableObject {
             )
             ErrorReporter.shared.capture(appError, context: context)
         }
+
+        clearLocalSubscriptionState()
     }
 
     // MARK: - Subscription Status
@@ -414,12 +403,8 @@ class RevenueCatManager: NSObject, ObservableObject {
                 userId: nil
             )
             ErrorReporter.shared.capture(appError, context: context)
-
-            await MainActor.run {
-                self.isSubscribed = false
-                self.cachedIsSubscribed = false
-                self.currentEntitlementSnapshot = nil
-            }
+            // Do not revoke cached access on transient RevenueCat/App Store/network failures.
+            // A later successful refresh with an inactive entitlement still invalidates access.
         }
     }
 
@@ -881,6 +866,15 @@ class RevenueCatManager: NSObject, ObservableObject {
         cachedSubscriptionAnalyticsPhase = RevenueCatSubscriptionAnalyticsPhase.none.rawValue
         cachedSubscriptionAnalyticsAppUserId = ""
         cachedTrialExpirationTimestamp = 0
+    }
+
+    private func clearLocalSubscriptionState() {
+        customerInfo = nil
+        isSubscribed = false
+        cachedIsSubscribed = false
+        currentOffering = nil
+        currentEntitlementSnapshot = nil
+        resetSubscriptionAnalyticsCache()
     }
 
     private func subscriptionAnalyticsPhase(
