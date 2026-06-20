@@ -39,6 +39,81 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         )
     }
 
+    func testEntryDeepLinkPolicyRequiresFullLaunchGateChain() {
+        let user = makeLaunchPolicyUser(id: "eligible-user")
+
+        XCTAssertFalse(
+            EntryDeepLinkPolicy.canOpenEntrySheet(
+                isAuthenticated: false,
+                user: user,
+                hasCompletedOnboarding: true,
+                isSubscribed: true
+            )
+        )
+        XCTAssertFalse(
+            EntryDeepLinkPolicy.canOpenEntrySheet(
+                isAuthenticated: true,
+                user: nil,
+                hasCompletedOnboarding: true,
+                isSubscribed: true
+            )
+        )
+        XCTAssertFalse(
+            EntryDeepLinkPolicy.canOpenEntrySheet(
+                isAuthenticated: true,
+                user: user,
+                hasCompletedOnboarding: false,
+                isSubscribed: true
+            )
+        )
+        XCTAssertFalse(
+            EntryDeepLinkPolicy.canOpenEntrySheet(
+                isAuthenticated: true,
+                user: makeLaunchPolicyUser(id: "incomplete-user", height: 0),
+                hasCompletedOnboarding: true,
+                isSubscribed: true
+            )
+        )
+        XCTAssertFalse(
+            EntryDeepLinkPolicy.canOpenEntrySheet(
+                isAuthenticated: true,
+                user: user,
+                hasCompletedOnboarding: true,
+                isSubscribed: false
+            )
+        )
+        XCTAssertTrue(
+            EntryDeepLinkPolicy.canOpenEntrySheet(
+                isAuthenticated: true,
+                user: user,
+                hasCompletedOnboarding: true,
+                isSubscribed: true
+            )
+        )
+    }
+
+    @MainActor
+    func testEntryDeepLinkPolicyBlocksAccountSwitchWithPreviousOnboardingCompletion() {
+        let suiteName = "entry-deeplink-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = OnboardingStateManager(defaults: defaults, currentVersion: 1)
+        manager.markCompleted(userId: "previous-user")
+
+        let newUser = makeLaunchPolicyUser(id: "new-user")
+
+        XCTAssertFalse(manager.hasCompletedCurrentVersion(for: newUser.id))
+        XCTAssertFalse(
+            EntryDeepLinkPolicy.canOpenEntrySheet(
+                isAuthenticated: true,
+                user: newUser,
+                hasCompletedOnboarding: manager.hasCompletedCurrentVersion(for: newUser.id),
+                isSubscribed: true
+            )
+        )
+    }
+
     func testProfileCompletionPolicyRequiresRealNameHeightGenderAndDateOfBirth() {
         let dateOfBirth = Date(timeIntervalSince1970: 631_152_000)
         let completeProfile = UserProfile(
@@ -88,6 +163,34 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertFalse(ProfileCompletionPolicy.isComplete(profile: blankNameProfile, fallbackName: nil))
         XCTAssertFalse(ProfileCompletionPolicy.isComplete(profile: zeroHeightProfile, fallbackName: nil))
         XCTAssertTrue(ProfileCompletionPolicy.isComplete(profile: blankNameProfile, fallbackName: "Fallback User"))
+    }
+
+    private func makeLaunchPolicyUser(
+        id: String,
+        name: String = "Launch User",
+        height: Double = 180
+    ) -> User {
+        User(
+            id: id,
+            email: "\(id)@example.com",
+            name: name,
+            avatarUrl: nil,
+            profile: UserProfile(
+                id: "profile-\(id)",
+                email: "\(id)@example.com",
+                username: nil,
+                fullName: name,
+                dateOfBirth: Date(timeIntervalSince1970: 631_152_000),
+                height: height,
+                heightUnit: "cm",
+                gender: "male",
+                activityLevel: nil,
+                goalWeight: nil,
+                goalWeightUnit: nil,
+                onboardingCompleted: true
+            ),
+            onboardingCompleted: true
+        )
     }
 }
 
@@ -3298,7 +3401,7 @@ final class RevenueCatPurchaseRestoreFlowTests: XCTestCase {
         XCTAssertEqual(fixture.manager.errorMessage, "No active subscriptions found")
     }
 
-    func testRefreshFailureInvalidatesStaleSubscribedCache() async {
+    func testRefreshFailurePreservesCachedSubscribedAccess() async {
         let fixture = makeFixture(cachedSubscribed: true)
         defer { fixture.cleanup() }
 
@@ -3307,8 +3410,50 @@ final class RevenueCatPurchaseRestoreFlowTests: XCTestCase {
 
         await fixture.manager.refreshCustomerInfo()
 
+        XCTAssertTrue(fixture.manager.isSubscribed)
+        XCTAssertTrue(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+    }
+
+    func testRefreshInactiveCustomerInvalidatesStaleSubscribedCache() async {
+        let fixture = makeFixture(cachedSubscribed: true)
+        defer { fixture.cleanup() }
+
+        XCTAssertTrue(fixture.manager.isSubscribed)
+        fixture.client.customerInfoResult = .success(Self.customer(isActive: false))
+
+        await fixture.manager.refreshCustomerInfo()
+
         XCTAssertFalse(fixture.manager.isSubscribed)
         XCTAssertFalse(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+    }
+
+    func testLogoutUserFailureStillClearsLocalSubscriptionState() async {
+        let fixture = makeFixture(cachedSubscribed: true)
+        defer { fixture.cleanup() }
+
+        fixture.client.customerInfoResult = .success(Self.customer(isActive: true))
+        await fixture.manager.refreshCustomerInfo()
+        fixture.client.logOutResult = .failure(MockRevenueCatPurchasesClient.MockError.logOutFailed)
+
+        await fixture.manager.logoutUser()
+
+        XCTAssertFalse(fixture.manager.isSubscribed)
+        XCTAssertFalse(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+        XCTAssertNil(fixture.manager.customerInfo)
+    }
+
+    func testLogoutUserSuccessClearsLocalSubscriptionState() async {
+        let fixture = makeFixture(cachedSubscribed: true)
+        defer { fixture.cleanup() }
+
+        fixture.client.customerInfoResult = .success(Self.customer(isActive: true))
+        await fixture.manager.refreshCustomerInfo()
+
+        await fixture.manager.logoutUser()
+
+        XCTAssertFalse(fixture.manager.isSubscribed)
+        XCTAssertFalse(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+        XCTAssertNil(fixture.manager.customerInfo)
     }
 
     func testEntitlementIdentifierMatchesRevenueCatDashboardContract() {
@@ -3391,6 +3536,7 @@ private final class MockRevenueCatPurchasesClient: RevenueCatPurchasesProtocol {
     enum MockError: Error {
         case notImplemented
         case customerInfoFailed
+        case logOutFailed
     }
 
     var customerInfoResult: Result<RevenueCatCustomerSnapshot, Error> = .success(
@@ -3402,6 +3548,7 @@ private final class MockRevenueCatPurchasesClient: RevenueCatPurchasesProtocol {
     var restoreResult: Result<RevenueCatCustomerSnapshot, Error> = .success(
         RevenueCatCustomerSnapshot(originalAppUserId: "unit-test-user", entitlement: nil)
     )
+    var logOutResult: Result<Void, Error> = .success(())
     var onPurchase: (() -> Void)?
     var onRestore: (() -> Void)?
 
@@ -3420,7 +3567,9 @@ private final class MockRevenueCatPurchasesClient: RevenueCatPurchasesProtocol {
         RevenueCatCustomerSnapshot(originalAppUserId: userId, entitlement: nil)
     }
 
-    func logOut() async throws {}
+    func logOut() async throws {
+        try logOutResult.get()
+    }
 
     func customerInfo(entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
         try customerInfoResult.get()

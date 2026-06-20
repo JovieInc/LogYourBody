@@ -302,7 +302,8 @@ struct LogYourBodyApp: App {
             await seedFullDashboardUITestFixtureData(userId: userId)
         }
 
-        if arguments.contains("-lybUITestGlp1WeeklyCheckInFixture") {
+        if arguments.contains("-lybUITestGlp1WeeklyCheckInFixture") &&
+            !arguments.contains("-lybUITestGlp1EmptyMedicationFixture") {
             await seedGlp1WeeklyCheckInUITestFixtureData(userId: userId)
         }
 
@@ -445,20 +446,13 @@ struct LogYourBodyApp: App {
     }
 
     private var canOpenEntrySheetFromDeepLink: Bool {
-        guard authManager.isAuthenticated,
-              let user = authManager.currentUser else {
-            return false
-        }
+        let user = authManager.currentUser
 
-        let hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion(for: user.id)
-        let isProfileComplete = ProfileCompletionPolicy.isComplete(user: user)
-
-        return !LaunchSurfacePolicy.requiresBodyCompositionOnboarding(
-            hasCompletedOnboarding: hasCompletedOnboarding
-        ) &&
-            !LaunchSurfacePolicy.requiresCompleteProfile(
-                isProfileComplete: isProfileComplete
-            ) &&
-            revenueCatManager.isSubscribed
+        return EntryDeepLinkPolicy.canOpenEntrySheet(
+            isAuthenticated: authManager.isAuthenticated,
+            user: user,
+            hasCompletedOnboarding: OnboardingStateManager.shared.hasCompletedCurrentVersion(for: user?.id),
+            isSubscribed: revenueCatManager.isSubscribed
+        )
     }
 }
