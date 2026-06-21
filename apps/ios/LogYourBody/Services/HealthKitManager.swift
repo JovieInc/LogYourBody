@@ -6,6 +6,7 @@ import Foundation
 import HealthKit
 
 enum HealthKitDefaultsKey: String {
+    case authorizationConfirmed = "hasConfirmedHealthKitAuthorization"
     case lastObserverSyncDate = "lastHealthKitObserverSyncDate"
     case fullSyncCompleted = "hasPerformedFullHealthKitSync"
 
@@ -14,6 +15,21 @@ enum HealthKitDefaultsKey: String {
             return rawValue
         }
         return "\(rawValue)_\(userId)"
+    }
+}
+
+struct HealthKitAuthorizationPolicy {
+    static func isAuthorized(
+        writeStatus: HKAuthorizationStatus,
+        hasConfirmedReadAccess: Bool
+    ) -> Bool {
+        writeStatus == .sharingAuthorized || hasConfirmedReadAccess
+    }
+}
+
+struct HealthKitFullSyncCompletionPolicy {
+    static func shouldMarkCompleted(importSucceeded: Bool) -> Bool {
+        importSucceeded
     }
 }
 
@@ -112,6 +128,14 @@ class HealthKitManager: ObservableObject {
         return HKHealthStore.isHealthDataAvailable()
     }
 
+    private func hasConfirmedAuthorization() -> Bool {
+        userDefaults.bool(forKey: HealthKitDefaultsKey.authorizationConfirmed.rawValue)
+    }
+
+    private func markAuthorizationConfirmed() {
+        userDefaults.set(true, forKey: HealthKitDefaultsKey.authorizationConfirmed.rawValue)
+    }
+
     // MARK: - Bootstrap & Authorization
 
     // Check authorization status
@@ -121,29 +145,11 @@ class HealthKitManager: ObservableObject {
             return
         }
 
-        // Check if we have any permissions for weight data
-        // Note: We can't check read permissions directly, but we can check write permissions
         let writeStatus = healthStore.authorizationStatus(for: weightType)
-
-        // If we have write permission, we're authorized
-        // If not, we check if we can read by trying to query
-        if writeStatus == .sharingAuthorized {
-            isAuthorized = true
-        } else {
-            // Try to read to check if we have read permission
-            Task {
-                do {
-                    _ = try await fetchLatestWeight()
-                    await MainActor.run {
-                        self.isAuthorized = true
-                    }
-                } catch {
-                    await MainActor.run {
-                        self.isAuthorized = false
-                    }
-                }
-            }
-        }
+        isAuthorized = HealthKitAuthorizationPolicy.isAuthorized(
+            writeStatus: writeStatus,
+            hasConfirmedReadAccess: hasConfirmedAuthorization()
+        )
     }
 
     // Fetch latest height from HealthKit
@@ -289,13 +295,20 @@ class HealthKitManager: ObservableObject {
         do {
             try await healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead)
 
-            // Check if we got permission
             let status = healthStore.authorizationStatus(for: weightType)
+            let confirmedReadAccess = status == .sharingAuthorized ? true : await probeReadableHealthKitData()
+            let authorized = HealthKitAuthorizationPolicy.isAuthorized(
+                writeStatus: status,
+                hasConfirmedReadAccess: confirmedReadAccess
+            )
+            if authorized {
+                markAuthorizationConfirmed()
+            }
             await MainActor.run {
-                self.isAuthorized = (status == .sharingAuthorized)
+                self.isAuthorized = authorized
             }
 
-            return isAuthorized
+            return authorized
         } catch {
             await captureHealthKitError(
                 error,
@@ -304,6 +317,35 @@ class HealthKitManager: ObservableObject {
             )
             // print("HealthKit authorization failed: \(error)")
             return false
+        }
+    }
+
+    private func probeReadableHealthKitData() async -> Bool {
+        if await hasReadableQuantitySample(weightType) {
+            return true
+        }
+        if await hasReadableQuantitySample(bodyFatType) {
+            return true
+        }
+        if await hasReadableQuantitySample(heightType) {
+            return true
+        }
+        return false
+    }
+
+    private func hasReadableQuantitySample(_ sampleType: HKQuantityType) async -> Bool {
+        await withCheckedContinuation { continuation in
+            let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+            let query = HKSampleQuery(
+                sampleType: sampleType,
+                predicate: nil,
+                limit: 1,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                continuation.resume(returning: error == nil && !(samples?.isEmpty ?? true))
+            }
+
+            healthStore.execute(query)
         }
     }
 
@@ -606,6 +648,7 @@ class HealthKitManager: ObservableObject {
         let userId = await MainActor.run { AuthManager.shared.currentUser?.id }
         let lastObserverKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: userId)
         let fullSyncKey = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: userId)
+        userDefaults.removeObject(forKey: HealthKitDefaultsKey.authorizationConfirmed.rawValue)
         userDefaults.removeObject(forKey: lastObserverKey)
         userDefaults.removeObject(forKey: fullSyncKey)
 
@@ -835,6 +878,7 @@ class HealthKitManager: ObservableObject {
 
     private func triggerFullHealthKitSyncIfNeeded(imported: Int) async {
         let currentUserId = await MainActor.run { AuthManager.shared.currentUser?.id }
+        guard currentUserId != nil else { return }
         let fullSyncKey = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: currentUserId)
         let hasPerformedFullSync = userDefaults.bool(forKey: fullSyncKey)
 
@@ -850,10 +894,10 @@ class HealthKitManager: ObservableObject {
             // print("📊 Current cached entries: \(totalCachedEntries)")
             Task.detached(priority: .background) { [weak self] in
                 guard let self else { return }
-                await self.syncAllHistoricalHealthKitData()
-                let userId = await MainActor.run { AuthManager.shared.currentUser?.id }
-                let key = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: userId)
-                self.userDefaults.set(true, forKey: key)
+                let importSucceeded = await self.syncAllHistoricalHealthKitData()
+                if HealthKitFullSyncCompletionPolicy.shouldMarkCompleted(importSucceeded: importSucceeded) {
+                    self.userDefaults.set(true, forKey: fullSyncKey)
+                }
             }
         } else if totalCachedEntries < 50 && imported > 0 {
             // Also trigger if we have very few entries despite having done a sync before
@@ -912,7 +956,8 @@ class HealthKitManager: ObservableObject {
     }
 
     // Sync ALL historical HealthKit data efficiently
-    func syncAllHistoricalHealthKitData() async {
+    @discardableResult
+    func syncAllHistoricalHealthKitData() async -> Bool {
         await MainActor.run {
             isImporting = true
             importProgress = 0.0
@@ -964,6 +1009,7 @@ class HealthKitManager: ObservableObject {
                     "skipped": String(totalSkipped)
                 ]
             )
+            return true
         } catch {
             await captureHealthKitError(
                 error,
@@ -984,6 +1030,7 @@ class HealthKitManager: ObservableObject {
                 importStatus = "Import failed: \(error.localizedDescription)"
                 isImporting = false
             }
+            return false
         }
     }
 
@@ -1056,7 +1103,7 @@ class HealthKitManager: ObservableObject {
     }
 
     func forceFullHealthKitSync() async {
-        await syncAllHistoricalHealthKitData()
+        _ = await syncAllHistoricalHealthKitData()
     }
 
     // Get the earliest weight entry date from HealthKit
