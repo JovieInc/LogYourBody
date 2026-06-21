@@ -637,16 +637,18 @@ class RealtimeSyncManager: ObservableObject {
                 NSNull()
             }
 
-            let profileData: [String: Any] = [
+            var profileData: [String: Any] = [
                 "id": profile.id,
                 "full_name": profile.fullName as Any,
                 "username": profile.username as Any,
-                "height": profile.height,
                 "height_unit": profile.heightUnit as Any,
                 "gender": profile.gender as Any,
                 "date_of_birth": formattedBirthDate,
                 "activity_level": profile.activityLevel as Any
             ]
+            if let height = profile.height {
+                profileData["height"] = height
+            }
 
             try await supabaseManager.updateProfile(profileData, token: token)
             await coreDataManager.markAsSynced(entityName: "CachedProfile", ids: [profile.id])

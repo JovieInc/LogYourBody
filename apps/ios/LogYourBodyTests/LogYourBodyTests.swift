@@ -4095,6 +4095,7 @@ final class AuthLegacyStorageMigrationTests: XCTestCase {
 final class StubSupabaseManager: SupabaseManager {
     private(set) var bodyMetricsBatches: [[[String: Any]]] = []
     private(set) var dailyMetricsBatches: [[[String: Any]]] = []
+    private(set) var profilePayloads: [[String: Any]] = []
     private(set) var dexaPayloads: [[String: Any]] = []
     private(set) var glp1DoseLogPayloads: [[String: Any]] = []
     private(set) var glp1MedicationPayloads: [[String: Any]] = []
@@ -4115,6 +4116,10 @@ final class StubSupabaseManager: SupabaseManager {
             guard let id = metric["id"] as? String else { return [:] }
             return ["id": id]
         }
+    }
+
+    override func updateProfile(_ profile: [String: Any], token: String) async throws {
+        profilePayloads.append(profile)
     }
 
     override func upsertData(table: String, data: Data, token: String) async throws -> [[String: Any]] {
@@ -4630,6 +4635,56 @@ final class SyncIntegrationTests: XCTestCase {
         XCTAssertEqual(profile.height, 181.0, accuracy: 0.001)
         XCTAssertEqual(profile.syncStatus, "synced")
         XCTAssertTrue(profile.isSynced)
+    }
+
+    func testSyncLocalChanges_OmitsMissingProfileHeight() async throws {
+        let coreData = CoreDataManager.shared
+
+        let userId = "sync_test_user_profile_no_height_\(UUID().uuidString)"
+        let profile = UserProfile(
+            id: userId,
+            email: "profile-no-height@example.com",
+            username: "profile_no_height",
+            fullName: "Profile No Height",
+            dateOfBirth: nil,
+            height: nil,
+            heightUnit: "cm",
+            gender: "male",
+            activityLevel: "active",
+            goalWeight: nil,
+            goalWeightUnit: nil,
+            onboardingCompleted: true
+        )
+
+        coreData.saveProfile(
+            profile,
+            userId: userId,
+            email: "profile-no-height@example.com",
+            markSynced: false
+        )
+
+        let snapshot = try await coreData.fetchPendingLocalSyncSnapshot(for: userId)
+        let pendingProfile = try XCTUnwrap(snapshot.profiles.first { $0.id == userId })
+        XCTAssertNil(pendingProfile.height)
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        let payload = try XCTUnwrap(stubSupabase.profilePayloads.first)
+        XCTAssertEqual(payload["id"] as? String, userId)
+        XCTAssertNil(payload["height"])
+        XCTAssertEqual(payload["height_unit"] as? String, "cm")
+
+        let profiles = await cachedProfiles(id: userId)
+        let cachedProfile = try XCTUnwrap(profiles.first)
+        XCTAssertTrue(cachedProfile.isSynced)
+        XCTAssertEqual(cachedProfile.syncStatus, "synced")
     }
 
     func testUpdateOrCreateBodyMetric_IsIdempotentForSameId() async throws {

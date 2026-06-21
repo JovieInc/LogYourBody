@@ -111,7 +111,7 @@ struct PendingProfileSyncItem {
     let id: String
     let fullName: String?
     let username: String?
-    let height: Double
+    let height: Double?
     let heightUnit: String?
     let gender: String?
     let dateOfBirth: Date?
@@ -2774,7 +2774,7 @@ extension CachedProfile {
             id: id ?? "",
             fullName: fullName,
             username: username,
-            height: height,
+            height: height > 0 ? height : nil,
             heightUnit: heightUnit,
             gender: gender,
             dateOfBirth: dateOfBirth,
