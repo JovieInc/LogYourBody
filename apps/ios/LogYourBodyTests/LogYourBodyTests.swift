@@ -92,6 +92,72 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         )
     }
 
+    func testEntryDeepLinkParserSupportsCustomSchemeTabs() throws {
+        XCTAssertEqual(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "logyourbody://log/weight"))),
+            .entry(tab: 0)
+        )
+        XCTAssertEqual(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "logyourbody://log/bodyfat"))),
+            .entry(tab: 1)
+        )
+        XCTAssertEqual(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "logyourbody://log/photo"))),
+            .entry(tab: 2)
+        )
+    }
+
+    func testEntryDeepLinkParserSupportsUniversalLinks() throws {
+        XCTAssertEqual(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "https://logyourbody.com/log/weight"))),
+            .entry(tab: 0)
+        )
+        XCTAssertEqual(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "https://www.logyourbody.com/log/bodyfat"))),
+            .entry(tab: 1)
+        )
+        XCTAssertEqual(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "https://www.logyourbody.com/log/photo"))),
+            .entry(tab: 2)
+        )
+    }
+
+    func testEntryDeepLinkParserDefaultsGenericLogLinksToWeightTab() throws {
+        XCTAssertEqual(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "logyourbody://log"))),
+            .entry(tab: 0)
+        )
+        XCTAssertEqual(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "https://www.logyourbody.com/log"))),
+            .entry(tab: 0)
+        )
+        XCTAssertEqual(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "https://www.logyourbody.com/log/unknown"))),
+            .entry(tab: 0)
+        )
+    }
+
+    func testEntryDeepLinkParserIgnoresUnsupportedUrlsAndKeepsOAuthCallbacksSeparate() throws {
+        var insecureUniversalLink = URLComponents()
+        insecureUniversalLink.scheme = "http"
+        insecureUniversalLink.host = "logyourbody.com"
+        insecureUniversalLink.path = "/log/weight"
+
+        XCTAssertNil(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "https://example.com/log/weight")))
+        )
+        XCTAssertNil(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(insecureUniversalLink.url))
+        )
+        XCTAssertNil(
+            LogYourBodyDeepLink.destination(for: try XCTUnwrap(URL(string: "logyourbody://settings")))
+        )
+
+        let oauthURL = try XCTUnwrap(URL(string: "logyourbody://oauth-callback"))
+        XCTAssertTrue(LogYourBodyDeepLink.isOAuthCallback(oauthURL))
+        XCTAssertNil(LogYourBodyDeepLink.destination(for: oauthURL))
+    }
+
     @MainActor
     func testEntryDeepLinkPolicyBlocksAccountSwitchWithPreviousOnboardingCompletion() {
         let suiteName = "entry-deeplink-\(UUID().uuidString)"

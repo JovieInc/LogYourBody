@@ -6,6 +6,60 @@ import SwiftUI
 import Clerk
 import AppIntents
 
+enum LogYourBodyDeepLink {
+    enum Destination: Equatable {
+        case entry(tab: Int)
+    }
+
+    private static let universalLinkHosts: Set<String> = [
+        "logyourbody.com",
+        "www.logyourbody.com"
+    ]
+
+    static func destination(for url: URL) -> Destination? {
+        if isCustomScheme(url) {
+            guard url.host?.lowercased() == "log" else { return nil }
+            return entryDestination(from: Array(url.pathComponents.dropFirst()))
+        }
+
+        if isUniversalLink(url) {
+            let pathComponents = Array(url.pathComponents.dropFirst())
+            guard pathComponents.first?.lowercased() == "log" else { return nil }
+            return entryDestination(from: Array(pathComponents.dropFirst()))
+        }
+
+        return nil
+    }
+
+    static func isOAuthCallback(_ url: URL) -> Bool {
+        guard isCustomScheme(url) else { return false }
+        let host = url.host?.lowercased()
+        return host == "oauth" || host == "oauth-callback"
+    }
+
+    private static func isCustomScheme(_ url: URL) -> Bool {
+        url.scheme == "logyourbody"
+    }
+
+    private static func isUniversalLink(_ url: URL) -> Bool {
+        guard url.scheme == "https", let host = url.host?.lowercased() else {
+            return false
+        }
+        return universalLinkHosts.contains(host)
+    }
+
+    private static func entryDestination(from pathComponents: [String]) -> Destination {
+        switch pathComponents.first?.lowercased() {
+        case "bodyfat":
+            return .entry(tab: 1)
+        case "photo":
+            return .entry(tab: 2)
+        default:
+            return .entry(tab: 0)
+        }
+    }
+}
+
 @main
 struct LogYourBodyApp: App {
     @StateObject private var authManager = AuthManager.shared
@@ -408,40 +462,23 @@ struct LogYourBodyApp: App {
     // MARK: - Deep Link Handling
 
     private func handleDeepLink(_ url: URL) {
-        guard url.scheme == "logyourbody" else { return }
+        if LogYourBodyDeepLink.isOAuthCallback(url) {
+            // Clerk SDK handles the OAuth callback automatically.
+            return
+        }
 
-        switch url.host {
-        case "oauth", "oauth-callback":
-            // Handle OAuth callbacks (e.g., from Apple Sign In)
-            // Clerk SDK handles the OAuth callback automatically
-            break
+        guard
+            let destination = LogYourBodyDeepLink.destination(for: url),
+            canOpenEntrySheetFromDeepLink
+        else {
+            return
+        }
 
-        case "log":
-            guard canOpenEntrySheetFromDeepLink else {
-                return
-            }
-
-            // Handle specific log types
-            if let path = url.pathComponents.dropFirst().first {
-                switch path {
-                case "weight":
-                    selectedEntryTab = 0
-                    UserDefaults.standard.set(0, forKey: "pendingEntryTab")
-                case "bodyfat":
-                    selectedEntryTab = 1
-                    UserDefaults.standard.set(1, forKey: "pendingEntryTab")
-                case "photo":
-                    selectedEntryTab = 2
-                    UserDefaults.standard.set(2, forKey: "pendingEntryTab")
-                default:
-                    break
-                }
-            }
+        switch destination {
+        case .entry(let tab):
+            selectedEntryTab = tab
+            UserDefaults.standard.set(tab, forKey: "pendingEntryTab")
             showAddEntrySheet = true
-
-        default:
-            // Unhandled URL host
-            break
         }
     }
 
