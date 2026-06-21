@@ -20,6 +20,28 @@ struct PhotoUploadBatchPolicy {
     static func canChangeSelection(isProcessing: Bool) -> Bool {
         !isProcessing
     }
+
+    static func canStartUpload(selectedCount: Int, isSaving: Bool, isProcessing: Bool) -> Bool {
+        selectedCount > 0 && !isSaving && !isProcessing
+    }
+
+    static func canDismiss(isSaving: Bool, isProcessing: Bool) -> Bool {
+        !isSaving && !isProcessing
+    }
+
+    static func shouldDismissAfterUpload(successfulCount: Int, totalCount: Int) -> Bool {
+        totalCount > 0 && successfulCount == totalCount
+    }
+
+    static func uploadFailureMessage(successfulCount: Int, totalCount: Int) -> String {
+        guard successfulCount > 0 else {
+            return "Photo upload failed. Please try again."
+        }
+
+        let failedCount = max(totalCount - successfulCount, 0)
+        let noun = failedCount == 1 ? "photo" : "photos"
+        return "Uploaded \(successfulCount) of \(totalCount) photos. \(failedCount) \(noun) failed. Try again."
+    }
 }
 
 struct AddEntrySheet: View {
@@ -167,10 +189,22 @@ struct AddEntrySheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
+                        guard PhotoUploadBatchPolicy.canDismiss(
+                            isSaving: isSavingEntry,
+                            isProcessing: isProcessingPhotos
+                        ) else { return }
                         dismiss()
                     }
+                    .disabled(!PhotoUploadBatchPolicy.canDismiss(
+                        isSaving: isSavingEntry,
+                        isProcessing: isProcessingPhotos
+                    ))
                 }
             }
+            .interactiveDismissDisabled(!PhotoUploadBatchPolicy.canDismiss(
+                isSaving: isSavingEntry,
+                isProcessing: isProcessingPhotos
+            ))
             .standardErrorAlert(isPresented: $showError, message: errorMessage)
             .alert("Delete Photos After Import?", isPresented: $showDeletePhotosPrompt) {
                 Button("Keep Photos", role: .cancel) {
@@ -773,6 +807,18 @@ struct AddEntrySheet: View {
             saveBodyFat(userId: userId)
         case 2:
             let photosToSave = selectedPhotos
+            guard PhotoUploadBatchPolicy.canStartUpload(
+                selectedCount: photosToSave.count,
+                isSaving: isSavingEntry,
+                isProcessing: isProcessingPhotos
+            ) else { return }
+
+            isProcessingPhotos = true
+            photoProgress = 0
+            processedCount = 0
+            processingPhotoCount = photosToSave.count
+            photoIdentifiers.removeAll()
+
             Task {
                 await savePhotos(userId: userId, selectedPhotos: photosToSave)
             }
@@ -926,6 +972,7 @@ struct AddEntrySheet: View {
         photoIdentifiers.removeAll()
         var successfulUploadCount = 0
         var successfulPhotoIdentifiers: [String] = []
+        var failedPhotos: [PhotosPickerItem] = []
 
         defer {
             isProcessingPhotos = false
@@ -948,6 +995,7 @@ struct AddEntrySheet: View {
                 // Load the photo data
                 guard let data = try await item.loadTransferable(type: Data.self),
                       let image = UIImage(data: data) else {
+                    failedPhotos.append(item)
                     continue
                 }
 
@@ -978,23 +1026,32 @@ struct AddEntrySheet: View {
                     userId: userId
                 )
                 ErrorReporter.shared.captureNonFatal(error, context: context)
+                failedPhotos.append(item)
             }
-        }
-
-        if successfulUploadCount == 0 {
-            errorMessage = "Photo upload failed. Please try again."
-            showError = true
-            return
         }
 
         photoIdentifiers = successfulPhotoIdentifiers
 
-        // Delete photos from camera roll if enabled
+        // Delete successfully imported originals even if a later item failed.
         if deletePhotosAfterImport && !photoIdentifiers.isEmpty {
             await deletePhotosFromLibrary()
         }
 
         RealtimeSyncManager.shared.syncIfNeeded()
+
+        if !PhotoUploadBatchPolicy.shouldDismissAfterUpload(
+            successfulCount: successfulUploadCount,
+            totalCount: photosToUpload.count
+        ) {
+            selectedPhotos = failedPhotos
+            errorMessage = PhotoUploadBatchPolicy.uploadFailureMessage(
+                successfulCount: successfulUploadCount,
+                totalCount: photosToUpload.count
+            )
+            showError = true
+            return
+        }
+
         dismiss()
 
         trackEntrySaved(

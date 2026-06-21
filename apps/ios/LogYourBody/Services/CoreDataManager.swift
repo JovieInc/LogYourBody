@@ -1023,6 +1023,44 @@ class CoreDataManager: ObservableObject {
         }
     }
 
+    @discardableResult
+    func updateBodyMetricPhoto(
+        id: String,
+        userId: String,
+        storagePath: String,
+        processedUrl: String
+    ) async throws -> Bool {
+        let context = viewContext
+
+        return try await context.perform {
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "id == %@", id),
+                NSPredicate(format: "userId == %@", userId),
+                NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false))
+            ])
+            fetchRequest.fetchLimit = 1
+
+            guard let cachedMetric = try context.fetch(fetchRequest).first else {
+                return false
+            }
+
+            let now = Date()
+            cachedMetric.photoUrl = processedUrl
+            cachedMetric.originalPhotoUrl = storagePath
+            cachedMetric.updatedAt = now
+            cachedMetric.lastModified = now
+            cachedMetric.isSynced = false
+            cachedMetric.syncStatus = "pending"
+
+            if context.hasChanges {
+                try context.save()
+            }
+
+            return true
+        }
+    }
+
     func markBodyMetricDeleted(id: String) async -> Bool {
         let context = viewContext
 

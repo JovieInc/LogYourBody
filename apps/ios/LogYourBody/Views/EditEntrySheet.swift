@@ -49,12 +49,18 @@ struct EditEntrySheet: View {
                             displayedComponents: .date
                         )
                         .datePickerStyle(.graphical)
+                        .onChange(of: selectedDate) { _, _ in
+                            errorMessage = nil
+                        }
                     }
 
                     Section(header: Text(primaryFieldLabel)) {
                         TextField("0.0", text: $primaryValue)
                             .keyboardType(.decimalPad)
                             .disabled(isSaving)
+                            .onChange(of: primaryValue) { _, _ in
+                                errorMessage = nil
+                            }
 
                         if metricType == .weight {
                             HStack {
@@ -109,7 +115,11 @@ struct EditEntrySheet: View {
                             Text("Save")
                         }
                     }
-                    .disabled(!canSave || isSaving)
+                    .disabled(!EditEntrySavePolicy.canAttemptSave(
+                        isSaving: isSaving,
+                        validationMessage: validationMessage,
+                        value: primaryValue
+                    ))
                 }
             }
         }
@@ -157,8 +167,11 @@ struct EditEntrySheet: View {
     }
 
     private var canSave: Bool {
-        guard !primaryValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        return validationMessage == nil
+        EditEntrySavePolicy.canAttemptSave(
+            isSaving: isSaving,
+            validationMessage: validationMessage,
+            value: primaryValue
+        )
     }
 
     private var showsHealthBanner: Bool {
@@ -191,8 +204,9 @@ struct EditEntrySheet: View {
     }
 
     private func saveChanges() async {
-        guard errorMessage == nil else { return }
+        guard canSave else { return }
 
+        errorMessage = nil
         isSaving = true
         defer { isSaving = false }
 
@@ -257,5 +271,13 @@ struct EditEntrySheet: View {
         } catch {
             return error.localizedDescription
         }
+    }
+}
+
+enum EditEntrySavePolicy {
+    static func canAttemptSave(isSaving: Bool, validationMessage: String?, value: String) -> Bool {
+        !isSaving
+            && validationMessage == nil
+            && !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }

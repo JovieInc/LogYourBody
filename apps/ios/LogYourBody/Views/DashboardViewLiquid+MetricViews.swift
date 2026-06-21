@@ -91,9 +91,7 @@ extension DashboardViewLiquid {
                 unit: "steps",
                 currentDate: formatDate(dailyMetrics?.updatedAt ?? Date()),
                 chartData: cachedChartData(for: .steps, generator: generateFullScreenStepsChartData),
-                onAdd: {
-                    showAddEntrySheet = true
-                },
+                onAdd: nil,
                 metricEntries: cachedMetricEntries(for: .steps),
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .steps),
                 goalValue: Double(stepGoal),
@@ -111,7 +109,7 @@ extension DashboardViewLiquid {
                 currentDate: formatDate(currentMetric?.date ?? Date()),
                 chartData: cachedChartData(for: .weight, generator: generateFullScreenWeightChartData),
                 onAdd: {
-                    showAddEntrySheet = true
+                    presentAddEntrySheet(initialTab: 0)
                 },
                 metricEntries: cachedMetricEntries(for: .weight),
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .weight),
@@ -130,7 +128,7 @@ extension DashboardViewLiquid {
                 currentDate: formatDate(currentMetric?.date ?? Date()),
                 chartData: cachedChartData(for: .bodyFat, generator: generateFullScreenBodyFatChartData),
                 onAdd: {
-                    showAddEntrySheet = true
+                    presentAddEntrySheet(initialTab: 1)
                 },
                 metricEntries: cachedMetricEntries(for: .bodyFat),
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .bodyFat),
@@ -148,9 +146,7 @@ extension DashboardViewLiquid {
                 unit: "",
                 currentDate: formatDate(currentMetric?.date ?? Date()),
                 chartData: cachedChartData(for: .ffmi, generator: generateFullScreenFFMIChartData),
-                onAdd: {
-                    showAddEntrySheet = true
-                },
+                onAdd: nil,
                 metricEntries: cachedMetricEntries(for: .ffmi),
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .ffmi),
                 goalValue: ffmiGoal,
@@ -168,9 +164,7 @@ extension DashboardViewLiquid {
                 unit: "",
                 currentDate: formatDate(currentMetric?.date ?? Date()),
                 chartData: cachedChartData(for: .bodyScore, generator: generateFullScreenBodyScoreChartData),
-                onAdd: {
-                    showAddEntrySheet = true
-                },
+                onAdd: nil,
                 metricEntries: cachedMetricEntries(for: .bodyScore),
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .bodyScore),
                 goalValue: nil,
