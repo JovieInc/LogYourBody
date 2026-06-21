@@ -248,22 +248,25 @@ class SupabaseManager: ObservableObject {
         }
     }
 
-    func upsertData(table: String, data: Data, token: String) async throws {
+    @discardableResult
+    func upsertData(table: String, data: Data, token: String) async throws -> [[String: Any]] {
         let url = URL(string: "\(supabaseURL)/rest/v1/\(table)")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        request.setValue("return=representation,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
         request.httpBody = data
 
-        let (_, response) = try await self.session.data(for: request)
+        let (responseData, response) = try await self.session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             throw SupabaseError.requestFailed
         }
+
+        return try JSONSerialization.jsonObject(with: responseData) as? [[String: Any]] ?? []
     }
 
     func deleteData(table: String, id: String, token: String) async throws {

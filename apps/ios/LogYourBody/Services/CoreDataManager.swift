@@ -23,6 +23,158 @@ struct CachedUserProfileSnapshot {
     }
 }
 
+struct PendingLocalSyncSnapshot {
+    let bodyMetrics: [PendingBodyMetricSyncItem]
+    let dailyMetrics: [PendingDailyMetricSyncItem]
+    let profiles: [PendingProfileSyncItem]
+    let glp1DoseLogs: [PendingGlp1DoseLogSyncItem]
+    let glp1Medications: [PendingGlp1MedicationSyncItem]
+    let dexaResults: [PendingDexaResultSyncItem]
+
+    static let empty = PendingLocalSyncSnapshot(
+        bodyMetrics: [],
+        dailyMetrics: [],
+        profiles: [],
+        glp1DoseLogs: [],
+        glp1Medications: [],
+        dexaResults: []
+    )
+
+    var counts: PendingLocalSyncCounts {
+        PendingLocalSyncCounts(
+            bodyMetrics: bodyMetrics.count,
+            dailyMetrics: dailyMetrics.count,
+            profiles: profiles.count,
+            glp1DoseLogs: glp1DoseLogs.count,
+            glp1Medications: glp1Medications.count,
+            dexaResults: dexaResults.count
+        )
+    }
+}
+
+struct PendingLocalSyncCounts {
+    let bodyMetrics: Int
+    let dailyMetrics: Int
+    let profiles: Int
+    let glp1DoseLogs: Int
+    let glp1Medications: Int
+    let dexaResults: Int
+
+    static let empty = PendingLocalSyncCounts(
+        bodyMetrics: 0,
+        dailyMetrics: 0,
+        profiles: 0,
+        glp1DoseLogs: 0,
+        glp1Medications: 0,
+        dexaResults: 0
+    )
+
+    var total: Int {
+        bodyMetrics + dailyMetrics + profiles + glp1DoseLogs + glp1Medications + dexaResults
+    }
+}
+
+struct PendingBodyMetricSyncItem {
+    let id: String
+    let userId: String
+    let date: Date
+    let localDate: String?
+    let weight: Double
+    let weightUnit: String?
+    let waistCircumference: Double
+    let hipCircumference: Double
+    let waistUnit: String?
+    let bodyFatPercentage: Double
+    let bodyFatMethod: String?
+    let muscleMass: Double
+    let boneMass: Double
+    let photoUrl: String?
+    let notes: String?
+    let dataSource: String?
+    let sourceMetadataJSON: String?
+    let createdAt: Date
+    let updatedAt: Date
+    let isMarkedDeleted: Bool
+}
+
+struct PendingDailyMetricSyncItem {
+    let id: String
+    let userId: String
+    let date: Date
+    let steps: Int32
+    let notes: String?
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+struct PendingProfileSyncItem {
+    let id: String
+    let fullName: String?
+    let username: String?
+    let height: Double
+    let heightUnit: String?
+    let gender: String?
+    let dateOfBirth: Date?
+    let activityLevel: String?
+}
+
+struct PendingGlp1DoseLogSyncItem {
+    let id: String
+    let userId: String
+    let takenAt: Date
+    let medicationId: String?
+    let doseAmount: Double
+    let doseUnit: String?
+    let drugClass: String?
+    let brand: String?
+    let isCompounded: Bool
+    let supplierType: String?
+    let supplierName: String?
+    let notes: String?
+    let createdAt: Date
+    let updatedAt: Date
+    let isMarkedDeleted: Bool
+}
+
+struct PendingGlp1MedicationSyncItem {
+    let id: String
+    let userId: String
+    let displayName: String?
+    let genericName: String?
+    let drugClass: String?
+    let brand: String?
+    let route: String?
+    let frequency: String?
+    let doseUnit: String?
+    let isCompounded: Bool
+    let hkIdentifier: String?
+    let startedAt: Date
+    let endedAt: Date?
+    let notes: String?
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+struct PendingDexaResultSyncItem {
+    let id: String
+    let userId: String
+    let bodyMetricsId: String?
+    let externalSource: String?
+    let externalResultId: String?
+    let externalUpdateTime: Date?
+    let scannerModel: String?
+    let locationId: String?
+    let locationName: String?
+    let acquireTime: Date?
+    let analyzeTime: Date?
+    let vatMassKg: Double
+    let vatVolumeCm3: Double
+    let resultPdfUrl: String?
+    let resultPdfName: String?
+    let createdAt: Date
+    let updatedAt: Date
+}
+
 class CoreDataManager: ObservableObject {
     static let shared = CoreDataManager()
 
@@ -1140,6 +1292,144 @@ class CoreDataManager: ObservableObject {
         }
     }
 
+    func fetchPendingLocalSyncSnapshot(for userId: String? = nil) async throws -> PendingLocalSyncSnapshot {
+        let context = viewContext
+
+        return try await context.perform {
+            do {
+                let bodyMetricsFetch: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+                var bodyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    bodyPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                bodyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: bodyPredicates)
+
+                let dailyMetricsFetch: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+                var dailyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    dailyPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                dailyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: dailyPredicates)
+
+                let profilesFetch: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
+                var profilePredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    profilePredicates.append(NSPredicate(format: "id == %@", userId))
+                }
+                profilesFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: profilePredicates)
+
+                let glp1DoseLogsFetch: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+                var glp1DoseLogPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    glp1DoseLogPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                glp1DoseLogsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: glp1DoseLogPredicates)
+
+                let glp1MedicationsFetch: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+                var glp1MedicationPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    glp1MedicationPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                glp1MedicationsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: glp1MedicationPredicates)
+
+                let dexaResultsFetch: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
+                var dexaPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    dexaPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                dexaResultsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: dexaPredicates)
+
+                return PendingLocalSyncSnapshot(
+                    bodyMetrics: try context.fetch(bodyMetricsFetch).map { $0.pendingSyncItem() },
+                    dailyMetrics: try context.fetch(dailyMetricsFetch).map { $0.pendingSyncItem() },
+                    profiles: try context.fetch(profilesFetch).map { $0.pendingSyncItem() },
+                    glp1DoseLogs: try context.fetch(glp1DoseLogsFetch).map { $0.pendingSyncItem() },
+                    glp1Medications: try context.fetch(glp1MedicationsFetch).map { $0.pendingSyncItem() },
+                    dexaResults: try context.fetch(dexaResultsFetch).map { $0.pendingSyncItem() }
+                )
+            } catch {
+                let appError = AppError.coreData(operation: "fetchPendingLocalSyncSnapshot", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchPendingLocalSyncSnapshot",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                throw error
+            }
+        }
+    }
+
+    func fetchPendingLocalSyncCounts(for userId: String? = nil) async throws -> PendingLocalSyncCounts {
+        let context = viewContext
+
+        return try await context.perform {
+            do {
+                let bodyMetricsFetch: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+                var bodyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    bodyPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                bodyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: bodyPredicates)
+
+                let dailyMetricsFetch: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+                var dailyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    dailyPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                dailyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: dailyPredicates)
+
+                let profilesFetch: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
+                var profilePredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    profilePredicates.append(NSPredicate(format: "id == %@", userId))
+                }
+                profilesFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: profilePredicates)
+
+                let glp1DoseLogsFetch: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+                var glp1DoseLogPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    glp1DoseLogPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                glp1DoseLogsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: glp1DoseLogPredicates)
+
+                let glp1MedicationsFetch: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+                var glp1MedicationPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    glp1MedicationPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                glp1MedicationsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: glp1MedicationPredicates)
+
+                let dexaResultsFetch: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
+                var dexaPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    dexaPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                dexaResultsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: dexaPredicates)
+
+                return PendingLocalSyncCounts(
+                    bodyMetrics: try context.count(for: bodyMetricsFetch),
+                    dailyMetrics: try context.count(for: dailyMetricsFetch),
+                    profiles: try context.count(for: profilesFetch),
+                    glp1DoseLogs: try context.count(for: glp1DoseLogsFetch),
+                    glp1Medications: try context.count(for: glp1MedicationsFetch),
+                    dexaResults: try context.count(for: dexaResultsFetch)
+                )
+            } catch {
+                let appError = AppError.coreData(operation: "fetchPendingLocalSyncCounts", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchPendingLocalSyncCounts",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                throw error
+            }
+        }
+    }
+
     @available(*, unavailable, message: "Use async fetchUnsyncedEntries() instead")
     func fetchUnsyncedEntriesSync() -> (
         bodyMetrics: [CachedBodyMetrics],
@@ -1183,6 +1473,81 @@ class CoreDataManager: ObservableObject {
             }
 
             self.save()
+        }
+    }
+
+    func markAsSynced(entityName: String, ids: Set<String>) async {
+        guard !ids.isEmpty else { return }
+
+        let context = viewContext
+        await context.perform {
+            do {
+                switch entityName {
+                case "CachedBodyMetrics":
+                    let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+                    request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
+                    try context.fetch(request).forEach {
+                        $0.isSynced = true
+                        $0.syncStatus = "synced"
+                    }
+
+                case "CachedDailyMetrics":
+                    let request: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+                    request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
+                    try context.fetch(request).forEach {
+                        $0.isSynced = true
+                        $0.syncStatus = "synced"
+                    }
+
+                case "CachedProfile":
+                    let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
+                    request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
+                    try context.fetch(request).forEach {
+                        $0.isSynced = true
+                        $0.syncStatus = "synced"
+                    }
+
+                case "CachedGlp1DoseLog":
+                    let request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+                    request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
+                    try context.fetch(request).forEach {
+                        $0.isSynced = true
+                        $0.syncStatus = "synced"
+                    }
+
+                case "CachedGlp1Medication":
+                    let request: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+                    request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
+                    try context.fetch(request).forEach {
+                        $0.isSynced = true
+                        $0.syncStatus = "synced"
+                    }
+
+                case "CachedDexaResult":
+                    let request: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
+                    request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
+                    try context.fetch(request).forEach {
+                        $0.isSynced = true
+                        $0.syncStatus = "synced"
+                    }
+
+                default:
+                    return
+                }
+
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                let appError = AppError.coreData(operation: "markAsSynced", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "markAsSynced",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+            }
         }
     }
 
@@ -2153,6 +2518,27 @@ class CoreDataManager: ObservableObject {
 }
 
 extension CachedGlp1Medication {
+    func pendingSyncItem() -> PendingGlp1MedicationSyncItem {
+        PendingGlp1MedicationSyncItem(
+            id: id ?? UUID().uuidString,
+            userId: userId ?? "",
+            displayName: displayName,
+            genericName: genericName,
+            drugClass: drugClass,
+            brand: brand,
+            route: route,
+            frequency: frequency,
+            doseUnit: doseUnit,
+            isCompounded: isCompounded,
+            hkIdentifier: hkIdentifier,
+            startedAt: startedAt ?? Date(),
+            endedAt: endedAt,
+            notes: notes,
+            createdAt: createdAt ?? Date(),
+            updatedAt: updatedAt ?? Date()
+        )
+    }
+
     func toGlp1Medication() -> Glp1Medication? {
         guard let id = id,
               let userId = userId,
@@ -2185,6 +2571,28 @@ extension CachedGlp1Medication {
 }
 
 extension CachedDexaResult {
+    func pendingSyncItem() -> PendingDexaResultSyncItem {
+        PendingDexaResultSyncItem(
+            id: id ?? UUID().uuidString,
+            userId: userId ?? "",
+            bodyMetricsId: bodyMetricsId,
+            externalSource: externalSource,
+            externalResultId: externalResultId,
+            externalUpdateTime: externalUpdateTime,
+            scannerModel: scannerModel,
+            locationId: locationId,
+            locationName: locationName,
+            acquireTime: acquireTime,
+            analyzeTime: analyzeTime,
+            vatMassKg: vatMassKg,
+            vatVolumeCm3: vatVolumeCm3,
+            resultPdfUrl: resultPdfUrl,
+            resultPdfName: resultPdfName,
+            createdAt: createdAt ?? Date(),
+            updatedAt: updatedAt ?? Date()
+        )
+    }
+
     func toDexaResult() -> DexaResult? {
         guard let id = id,
               let userId = userId,
@@ -2234,6 +2642,32 @@ extension CachedDexaResult {
 // MARK: - Model Extensions for Conversion
 
 extension CachedBodyMetrics {
+    func pendingSyncItem() -> PendingBodyMetricSyncItem {
+        let date = date ?? Date()
+        return PendingBodyMetricSyncItem(
+            id: id ?? UUID().uuidString,
+            userId: userId ?? "",
+            date: date,
+            localDate: localDate,
+            weight: weight,
+            weightUnit: weightUnit,
+            waistCircumference: waistCircumference,
+            hipCircumference: hipCircumference,
+            waistUnit: waistUnit,
+            bodyFatPercentage: bodyFatPercentage,
+            bodyFatMethod: bodyFatMethod,
+            muscleMass: muscleMass,
+            boneMass: boneMass,
+            photoUrl: photoUrl,
+            notes: notes,
+            dataSource: dataSource,
+            sourceMetadataJSON: sourceMetadataJSON,
+            createdAt: createdAt ?? date,
+            updatedAt: updatedAt ?? createdAt ?? date,
+            isMarkedDeleted: isMarkedDeleted
+        )
+    }
+
     func toBodyMetrics() -> BodyMetrics? {
         // Skip entries with missing required fields
         guard let id = id,
@@ -2270,6 +2704,19 @@ extension CachedBodyMetrics {
 }
 
 extension CachedDailyMetrics {
+    func pendingSyncItem() -> PendingDailyMetricSyncItem {
+        let date = date ?? Date()
+        return PendingDailyMetricSyncItem(
+            id: id ?? UUID().uuidString,
+            userId: userId ?? "",
+            date: date,
+            steps: steps,
+            notes: notes,
+            createdAt: createdAt ?? date,
+            updatedAt: updatedAt ?? createdAt ?? date
+        )
+    }
+
     func toDailyMetrics() -> DailyMetrics {
         DailyMetrics(
             id: id ?? UUID().uuidString,
@@ -2284,6 +2731,19 @@ extension CachedDailyMetrics {
 }
 
 extension CachedProfile {
+    func pendingSyncItem() -> PendingProfileSyncItem {
+        PendingProfileSyncItem(
+            id: id ?? "",
+            fullName: fullName,
+            username: username,
+            height: height,
+            heightUnit: heightUnit,
+            gender: gender,
+            dateOfBirth: dateOfBirth,
+            activityLevel: activityLevel
+        )
+    }
+
     func toUserProfile() -> UserProfile {
         let storedHeight = height
         let unit = heightUnit?.lowercased()
@@ -2323,6 +2783,26 @@ extension CachedProfile {
 }
 
 extension CachedGlp1DoseLog {
+    func pendingSyncItem() -> PendingGlp1DoseLogSyncItem {
+        PendingGlp1DoseLogSyncItem(
+            id: id ?? UUID().uuidString,
+            userId: userId ?? "",
+            takenAt: takenAt ?? Date(),
+            medicationId: medicationId,
+            doseAmount: doseAmount,
+            doseUnit: doseUnit,
+            drugClass: drugClass,
+            brand: brand,
+            isCompounded: isCompounded,
+            supplierType: supplierType,
+            supplierName: supplierName,
+            notes: notes,
+            createdAt: createdAt ?? takenAt ?? Date(),
+            updatedAt: updatedAt ?? createdAt ?? takenAt ?? Date(),
+            isMarkedDeleted: isMarkedDeleted
+        )
+    }
+
     func toGlp1DoseLog() -> Glp1DoseLog? {
         guard let id = id,
               let userId = userId,

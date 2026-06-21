@@ -357,16 +357,12 @@ class RealtimeSyncManager: ObservableObject {
     }
 
     nonisolated func syncLocalChanges(for userId: String?, token: String) async throws {
-        let unsynced = await coreDataManager.fetchUnsyncedEntries(for: userId)
-        let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs(for: userId)
-        let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications(for: userId)
-        let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults(for: userId)
+        let unsynced = try await coreDataManager.fetchPendingLocalSyncSnapshot(for: userId)
         let deletedBodyMetrics = unsynced.bodyMetrics.filter(\.isMarkedDeleted)
         let bodyMetricsToUpsert = unsynced.bodyMetrics.filter { !$0.isMarkedDeleted }
-        let deletedGlp1DoseLogs = unsyncedGlp1.filter(\.isMarkedDeleted)
-        let glp1DoseLogsToUpsert = unsyncedGlp1.filter { !$0.isMarkedDeleted }
+        let deletedGlp1DoseLogs = unsynced.glp1DoseLogs.filter(\.isMarkedDeleted)
+        let glp1DoseLogsToUpsert = unsynced.glp1DoseLogs.filter { !$0.isMarkedDeleted }
 
-        // Batch sync for efficiency
         if !deletedBodyMetrics.isEmpty {
             try await syncDeletedBodyMetricsBatch(deletedBodyMetrics, token: token)
         }
@@ -391,65 +387,64 @@ class RealtimeSyncManager: ObservableObject {
             try await syncGlp1DoseLogsBatch(glp1DoseLogsToUpsert, token: token)
         }
 
-        if !unsyncedMedications.isEmpty {
-            try await syncGlp1MedicationsBatch(unsyncedMedications, token: token)
+        if !unsynced.glp1Medications.isEmpty {
+            try await syncGlp1MedicationsBatch(unsynced.glp1Medications, token: token)
         }
 
-        if !unsyncedDexa.isEmpty {
-            try await syncDexaResultsBatch(unsyncedDexa, token: token)
+        if !unsynced.dexaResults.isEmpty {
+            try await syncDexaResultsBatch(unsynced.dexaResults, token: token)
         }
     }
 
-    nonisolated private func syncDeletedBodyMetricsBatch(_ metrics: [CachedBodyMetrics], token: String) async throws {
-        for metric in metrics {
-            guard let id = metric.id else { continue }
+    nonisolated private func syncDeletedBodyMetricsBatch(
+        _ metrics: [PendingBodyMetricSyncItem],
+        token: String
+    ) async throws {
+        var syncedIds = Set<String>()
 
-            try await supabaseManager.deleteData(
-                table: "body_metrics",
-                id: id,
-                token: token
-            )
-
-            metric.syncStatus = "synced"
-            metric.isSynced = true
+        do {
+            for metric in metrics {
+                try await supabaseManager.deleteData(table: "body_metrics", id: metric.id, token: token)
+                syncedIds.insert(metric.id)
+            }
+        } catch {
+            await coreDataManager.markAsSynced(entityName: "CachedBodyMetrics", ids: syncedIds)
+            throw error
         }
 
-        coreDataManager.save()
+        await coreDataManager.markAsSynced(entityName: "CachedBodyMetrics", ids: syncedIds)
     }
 
-    nonisolated private func syncDeletedGlp1DoseLogsBatch(_ logs: [CachedGlp1DoseLog], token: String) async throws {
-        for log in logs {
-            guard let id = log.id else { continue }
+    nonisolated private func syncDeletedGlp1DoseLogsBatch(
+        _ logs: [PendingGlp1DoseLogSyncItem],
+        token: String
+    ) async throws {
+        var syncedIds = Set<String>()
 
-            try await supabaseManager.deleteData(
-                table: "glp1_dose_logs",
-                id: id,
-                token: token
-            )
-
-            log.syncStatus = "synced"
-            log.isSynced = true
+        do {
+            for log in logs {
+                try await supabaseManager.deleteData(table: "glp1_dose_logs", id: log.id, token: token)
+                syncedIds.insert(log.id)
+            }
+        } catch {
+            await coreDataManager.markAsSynced(entityName: "CachedGlp1DoseLog", ids: syncedIds)
+            throw error
         }
 
-        coreDataManager.save()
+        await coreDataManager.markAsSynced(entityName: "CachedGlp1DoseLog", ids: syncedIds)
     }
 
-    nonisolated private func syncBodyMetricsBatch(_ metrics: [CachedBodyMetrics], token: String) async throws {
-        let batchSize = 50 // Sync in batches to avoid timeouts
+    nonisolated private func syncBodyMetricsBatch(_ metrics: [PendingBodyMetricSyncItem], token: String) async throws {
+        let batchSize = 50
         let formatter = ISO8601DateFormatter()
 
         for batch in metrics.chunked(into: batchSize) {
-            let metricsData = batch.compactMap { metric -> [String: Any]? in
-                let id = metric.id ?? UUID().uuidString
-                let date = metric.date ?? Date()
-                let createdAt = metric.createdAt ?? date
-                let updatedAt = metric.updatedAt ?? createdAt
-
-                return [
-                    "id": id,
-                    "user_id": metric.userId ?? "",
-                    "date": formatter.string(from: date),
-                    "local_date": BodyMetricLocalDate.normalized(metric.localDate, fallback: date),
+            let metricsData = batch.map { metric -> [String: Any] in
+                [
+                    "id": metric.id,
+                    "user_id": metric.userId,
+                    "date": formatter.string(from: metric.date),
+                    "local_date": BodyMetricLocalDate.normalized(metric.localDate, fallback: metric.date),
                     "weight": metric.weight,
                     "weight_unit": metric.weightUnit ?? "kg",
                     "waist_circumference": metric.waistCircumference as Any,
@@ -463,76 +458,46 @@ class RealtimeSyncManager: ObservableObject {
                     "notes": metric.notes as Any,
                     "data_source": BodyMetricSource.normalizedRawValue(metric.dataSource),
                     "source_metadata": BodyMetricSourceMetadata(jsonString: metric.sourceMetadataJSON)?.jsonObject ?? [:],
-                    "created_at": formatter.string(from: createdAt),
-                    "updated_at": formatter.string(from: updatedAt)
+                    "created_at": formatter.string(from: metric.createdAt),
+                    "updated_at": formatter.string(from: metric.updatedAt)
                 ]
             }
 
             let response = try await supabaseManager.upsertBodyMetricsBatch(metricsData, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
-
-            for metric in batch {
-                if let id = metric.id, syncedIds.contains(id) {
-                    metric.syncStatus = "synced"
-                    metric.isSynced = true
-                }
-            }
-
-            coreDataManager.save()
+            await coreDataManager.markAsSynced(entityName: "CachedBodyMetrics", ids: syncedIds)
         }
     }
 
-    nonisolated private func syncDexaResultsBatch(_ results: [CachedDexaResult], token: String) async throws {
+    nonisolated private func syncDexaResultsBatch(_ results: [PendingDexaResultSyncItem], token: String) async throws {
         guard !results.isEmpty else { return }
 
         let batchSize = 50
         let formatter = ISO8601DateFormatter()
 
         for batch in results.chunked(into: batchSize) {
-            let payload: [[String: Any]] = batch.compactMap { result in
-                let id = result.id ?? UUID().uuidString
-                let userId = result.userId ?? ""
-                let createdAt = result.createdAt ?? Date()
-                let updatedAt = result.updatedAt ?? createdAt
-
-                let externalUpdateTimeValue: Any
-                if let externalUpdateTime = result.externalUpdateTime {
-                    externalUpdateTimeValue = formatter.string(from: externalUpdateTime)
+            let payload: [[String: Any]] = batch.map { result in
+                let externalUpdateTimeValue: Any = if let externalUpdateTime = result.externalUpdateTime {
+                    formatter.string(from: externalUpdateTime)
                 } else {
-                    externalUpdateTimeValue = NSNull()
+                    NSNull()
                 }
-
-                let acquireTimeValue: Any
-                if let acquireTime = result.acquireTime {
-                    acquireTimeValue = formatter.string(from: acquireTime)
+                let acquireTimeValue: Any = if let acquireTime = result.acquireTime {
+                    formatter.string(from: acquireTime)
                 } else {
-                    acquireTimeValue = NSNull()
+                    NSNull()
                 }
-
-                let analyzeTimeValue: Any
-                if let analyzeTime = result.analyzeTime {
-                    analyzeTimeValue = formatter.string(from: analyzeTime)
+                let analyzeTimeValue: Any = if let analyzeTime = result.analyzeTime {
+                    formatter.string(from: analyzeTime)
                 } else {
-                    analyzeTimeValue = NSNull()
+                    NSNull()
                 }
-
-                let vatMassValue: Any
-                if result.vatMassKg > 0 {
-                    vatMassValue = result.vatMassKg
-                } else {
-                    vatMassValue = NSNull()
-                }
-
-                let vatVolumeValue: Any
-                if result.vatVolumeCm3 > 0 {
-                    vatVolumeValue = result.vatVolumeCm3
-                } else {
-                    vatVolumeValue = NSNull()
-                }
+                let vatMassValue: Any = result.vatMassKg > 0 ? result.vatMassKg : NSNull()
+                let vatVolumeValue: Any = result.vatVolumeCm3 > 0 ? result.vatVolumeCm3 : NSNull()
 
                 return [
-                    "id": id,
-                    "user_id": userId,
+                    "id": result.id,
+                    "user_id": result.userId,
                     "body_metrics_id": result.bodyMetricsId as Any,
                     "external_source": result.externalSource as Any,
                     "external_result_id": result.externalResultId as Any,
@@ -546,55 +511,44 @@ class RealtimeSyncManager: ObservableObject {
                     "vat_volume_cm3": vatVolumeValue,
                     "result_pdf_url": result.resultPdfUrl as Any,
                     "result_pdf_name": result.resultPdfName as Any,
-                    "created_at": formatter.string(from: createdAt),
-                    "updated_at": formatter.string(from: updatedAt)
+                    "created_at": formatter.string(from: result.createdAt),
+                    "updated_at": formatter.string(from: result.updatedAt)
                 ]
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload)
-            try await supabaseManager.upsertData(table: "dexa_results", data: data, token: token)
-
-            for result in batch {
-                result.isSynced = true
-                result.syncStatus = "synced"
-            }
-
-            coreDataManager.save()
+            let response = try await supabaseManager.upsertData(table: "dexa_results", data: data, token: token)
+            let syncedIds = Set(response.compactMap { $0["id"] as? String })
+            await coreDataManager.markAsSynced(entityName: "CachedDexaResult", ids: syncedIds)
         }
     }
 
-    nonisolated private func syncGlp1MedicationsBatch(_ medications: [CachedGlp1Medication], token: String) async throws {
+    nonisolated private func syncGlp1MedicationsBatch(
+        _ medications: [PendingGlp1MedicationSyncItem],
+        token: String
+    ) async throws {
         guard !medications.isEmpty else { return }
 
         let formatter = ISO8601DateFormatter()
         let batchSize = 50
 
-        let userIds = Set(medications.compactMap { $0.userId })
-
-        for userId in userIds {
+        for userId in Set(medications.map(\.userId)) {
             let userMeds = medications.filter { $0.userId == userId }
             let endDate = userMeds.compactMap { $0.endedAt }.max() ?? Date()
             try await supabaseManager.endActiveGlp1Medications(userId: userId, endedAt: endDate)
         }
 
         for batch in medications.chunked(into: batchSize) {
-            let payload: [[String: Any]] = batch.compactMap { medication in
-                let id = medication.id ?? UUID().uuidString
-                let userId = medication.userId ?? ""
-                let startedAt = medication.startedAt ?? Date()
-                let createdAt = medication.createdAt ?? startedAt
-                let updatedAt = medication.updatedAt ?? createdAt
-
-                let endedAtValue: Any
-                if let endedAt = medication.endedAt {
-                    endedAtValue = formatter.string(from: endedAt)
+            let payload: [[String: Any]] = batch.map { medication in
+                let endedAtValue: Any = if let endedAt = medication.endedAt {
+                    formatter.string(from: endedAt)
                 } else {
-                    endedAtValue = NSNull()
+                    NSNull()
                 }
 
                 return [
-                    "id": id,
-                    "user_id": userId,
+                    "id": medication.id,
+                    "user_id": medication.userId,
                     "display_name": medication.displayName as Any,
                     "generic_name": medication.genericName as Any,
                     "drug_class": medication.drugClass as Any,
@@ -604,42 +558,31 @@ class RealtimeSyncManager: ObservableObject {
                     "dose_unit": medication.doseUnit as Any,
                     "is_compounded": medication.isCompounded,
                     "hk_identifier": medication.hkIdentifier as Any,
-                    "started_at": formatter.string(from: startedAt),
+                    "started_at": formatter.string(from: medication.startedAt),
                     "ended_at": endedAtValue,
                     "notes": medication.notes as Any,
-                    "created_at": formatter.string(from: createdAt),
-                    "updated_at": formatter.string(from: updatedAt)
+                    "created_at": formatter.string(from: medication.createdAt),
+                    "updated_at": formatter.string(from: medication.updatedAt)
                 ]
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload)
-            try await supabaseManager.upsertData(table: "glp1_medications", data: data, token: token)
-
-            for medication in batch {
-                medication.isSynced = true
-                medication.syncStatus = "synced"
-            }
-
-            coreDataManager.save()
+            let response = try await supabaseManager.upsertData(table: "glp1_medications", data: data, token: token)
+            let syncedIds = Set(response.compactMap { $0["id"] as? String })
+            await coreDataManager.markAsSynced(entityName: "CachedGlp1Medication", ids: syncedIds)
         }
     }
 
-    nonisolated private func syncGlp1DoseLogsBatch(_ logs: [CachedGlp1DoseLog], token: String) async throws {
+    nonisolated private func syncGlp1DoseLogsBatch(_ logs: [PendingGlp1DoseLogSyncItem], token: String) async throws {
         let batchSize = 50
         let formatter = ISO8601DateFormatter()
 
         for batch in logs.chunked(into: batchSize) {
-            let payload: [[String: Any]] = batch.compactMap { log in
-                let id = log.id ?? UUID().uuidString
-                let userId = log.userId ?? ""
-                let takenAt = log.takenAt ?? Date()
-                let createdAt = log.createdAt ?? takenAt
-                let updatedAt = log.updatedAt ?? createdAt
-
-                return [
-                    "id": id,
-                    "user_id": userId,
-                    "taken_at": formatter.string(from: takenAt),
+            let payload: [[String: Any]] = batch.map { log in
+                [
+                    "id": log.id,
+                    "user_id": log.userId,
+                    "taken_at": formatter.string(from: log.takenAt),
                     "medication_id": log.medicationId as Any,
                     "dose_amount": log.doseAmount,
                     "dose_unit": log.doseUnit as Any,
@@ -649,75 +592,55 @@ class RealtimeSyncManager: ObservableObject {
                     "supplier_type": log.supplierType as Any,
                     "supplier_name": log.supplierName as Any,
                     "notes": log.notes as Any,
-                    "created_at": formatter.string(from: createdAt),
-                    "updated_at": formatter.string(from: updatedAt)
+                    "created_at": formatter.string(from: log.createdAt),
+                    "updated_at": formatter.string(from: log.updatedAt)
                 ]
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload)
-            try await supabaseManager.upsertData(table: "glp1_dose_logs", data: data, token: token)
-
-            for log in batch {
-                log.isSynced = true
-                log.syncStatus = "synced"
-            }
-
-            coreDataManager.save()
+            let response = try await supabaseManager.upsertData(table: "glp1_dose_logs", data: data, token: token)
+            let syncedIds = Set(response.compactMap { $0["id"] as? String })
+            await coreDataManager.markAsSynced(entityName: "CachedGlp1DoseLog", ids: syncedIds)
         }
     }
 
-    nonisolated private func syncDailyMetricsBatch(_ metrics: [CachedDailyMetrics], token: String) async throws {
-        // Similar batch implementation for daily metrics
+    nonisolated private func syncDailyMetricsBatch(_ metrics: [PendingDailyMetricSyncItem], token: String) async throws {
         let batchSize = 50
         let formatter = ISO8601DateFormatter()
 
         for batch in metrics.chunked(into: batchSize) {
-            let metricsData = batch.compactMap { metric -> [String: Any]? in
-                let id = metric.id ?? UUID().uuidString
-                let date = metric.date ?? Date()
-                let createdAt = metric.createdAt ?? date
-                let updatedAt = metric.updatedAt ?? createdAt
-
-                return [
-                    "id": id,
-                    "user_id": metric.userId ?? "",
-                    "date": formatter.string(from: date),
-                    "steps": metric.steps,
+            let metricsData = batch.map { metric -> [String: Any] in
+                [
+                    "id": metric.id,
+                    "user_id": metric.userId,
+                    "date": formatter.string(from: metric.date),
+                    "steps": Int(metric.steps),
                     "notes": metric.notes as Any,
-                    "created_at": formatter.string(from: createdAt),
-                    "updated_at": formatter.string(from: updatedAt)
+                    "created_at": formatter.string(from: metric.createdAt),
+                    "updated_at": formatter.string(from: metric.updatedAt)
                 ]
             }
 
             let response = try await supabaseManager.upsertDailyMetricsBatch(metricsData, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
-
-            for metric in batch {
-                if let id = metric.id, syncedIds.contains(id) {
-                    metric.syncStatus = "synced"
-                    metric.isSynced = true
-                }
-            }
-
-            coreDataManager.save()
+            await coreDataManager.markAsSynced(entityName: "CachedDailyMetrics", ids: syncedIds)
         }
     }
 
-    nonisolated private func syncProfilesBatch(_ profiles: [CachedProfile], token: String) async throws {
-        // Profile sync (usually just one per user)
+    nonisolated private func syncProfilesBatch(_ profiles: [PendingProfileSyncItem], token: String) async throws {
+        let formatter = ISO8601DateFormatter()
+
         for profile in profiles {
-            let formattedBirthDate: Any
-            if let dateOfBirth = profile.dateOfBirth {
-                formattedBirthDate = ISO8601DateFormatter().string(from: dateOfBirth)
+            let formattedBirthDate: Any = if let dateOfBirth = profile.dateOfBirth {
+                formatter.string(from: dateOfBirth)
             } else {
-                formattedBirthDate = NSNull()
+                NSNull()
             }
 
             let profileData: [String: Any] = [
-                "id": profile.id ?? "",
+                "id": profile.id,
                 "full_name": profile.fullName as Any,
                 "username": profile.username as Any,
-                // "avatar_url": profile.avatarUrl as Any, // Field doesn't exist
                 "height": profile.height,
                 "height_unit": profile.heightUnit as Any,
                 "gender": profile.gender as Any,
@@ -726,10 +649,7 @@ class RealtimeSyncManager: ObservableObject {
             ]
 
             try await supabaseManager.updateProfile(profileData, token: token)
-
-            profile.syncStatus = "synced"
-            // profile.lastSyncedAt = Date() // Field doesn't exist
-            coreDataManager.save()
+            await coreDataManager.markAsSynced(entityName: "CachedProfile", ids: [profile.id])
         }
     }
 
@@ -868,25 +788,27 @@ class RealtimeSyncManager: ObservableObject {
                 return
             }
 
-            let unsynced = await self.coreDataManager.fetchUnsyncedEntries(for: userId)
-            let unsyncedGlp1 = await self.coreDataManager.fetchUnsyncedGlp1DoseLogs(for: userId)
-            let unsyncedMedications = await self.coreDataManager.fetchUnsyncedGlp1Medications(for: userId)
-            let unsyncedDexa = await self.coreDataManager.fetchUnsyncedDexaResults(for: userId)
             let operationsCount = await MainActor.run {
                 self.pendingOperations.filter { $0.userId == userId }.count
             }
+
+            let unsynced: PendingLocalSyncCounts
+            do {
+                unsynced = try await self.coreDataManager.fetchPendingLocalSyncCounts(for: userId)
+            } catch {
+                await MainActor.run {
+                    self.pendingSyncCount = max(self.pendingSyncCount, operationsCount + 1)
+                }
+                return
+            }
+
             await MainActor.run {
-                self.unsyncedBodyCount = unsynced.bodyMetrics.count
-                self.unsyncedDailyCount = unsynced.dailyMetrics.count
-                self.unsyncedProfileCount = unsynced.profiles.count
-                self.unsyncedGlp1Count = unsyncedGlp1.count
-                self.unsyncedDexaCount = unsyncedDexa.count
-                self.pendingSyncCount = unsynced.bodyMetrics.count +
-                    unsynced.dailyMetrics.count +
-                    unsynced.profiles.count +
-                    unsyncedGlp1.count +
-                    unsyncedMedications.count +
-                    unsyncedDexa.count +
+                self.unsyncedBodyCount = unsynced.bodyMetrics
+                self.unsyncedDailyCount = unsynced.dailyMetrics
+                self.unsyncedProfileCount = unsynced.profiles
+                self.unsyncedGlp1Count = unsynced.glp1DoseLogs
+                self.unsyncedDexaCount = unsynced.dexaResults
+                self.pendingSyncCount = unsynced.total +
                     operationsCount
             }
         }
@@ -897,17 +819,13 @@ class RealtimeSyncManager: ObservableObject {
             return false
         }
 
-        let unsynced = await coreDataManager.fetchUnsyncedEntries(for: userId)
-        let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs(for: userId)
-        let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications(for: userId)
-        let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults(for: userId)
-        return !unsynced.bodyMetrics.isEmpty ||
-            !unsynced.dailyMetrics.isEmpty ||
-            !unsynced.profiles.isEmpty ||
-            !unsyncedGlp1.isEmpty ||
-            !unsyncedMedications.isEmpty ||
-            !unsyncedDexa.isEmpty ||
-            pendingOperations.contains { $0.userId == userId }
+        do {
+            let unsynced = try await coreDataManager.fetchPendingLocalSyncCounts(for: userId)
+            return unsynced.total > 0 ||
+                pendingOperations.contains { $0.userId == userId }
+        } catch {
+            return true
+        }
     }
     private func shouldPullLatestData() -> Bool {
         guard let lastSync = lastSyncDate else { return true }
