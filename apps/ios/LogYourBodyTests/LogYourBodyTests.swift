@@ -3866,6 +3866,9 @@ final class StubSupabaseManager: SupabaseManager {
     private(set) var bodyMetricsBatches: [[[String: Any]]] = []
     private(set) var dailyMetricsBatches: [[[String: Any]]] = []
     private(set) var dexaPayloads: [[String: Any]] = []
+    private(set) var glp1DoseLogPayloads: [[String: Any]] = []
+    private(set) var glp1MedicationPayloads: [[String: Any]] = []
+    private(set) var endedActiveMedicationRequests: [(userId: String, endedAt: Date)] = []
     private(set) var deletedRecords: [(table: String, id: String)] = []
 
     override func upsertBodyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> [[String: Any]] {
@@ -3884,18 +3887,33 @@ final class StubSupabaseManager: SupabaseManager {
         }
     }
 
-    override func upsertData(table: String, data: Data, token: String) async throws {
-        guard table == "dexa_results" else {
-            return
-        }
-
+    override func upsertData(table: String, data: Data, token: String) async throws -> [[String: Any]] {
         let jsonObject = try JSONSerialization.jsonObject(with: data)
         let array = jsonObject as? [[String: Any]] ?? []
-        dexaPayloads.append(contentsOf: array)
+
+        switch table {
+        case "dexa_results":
+            dexaPayloads.append(contentsOf: array)
+        case "glp1_dose_logs":
+            glp1DoseLogPayloads.append(contentsOf: array)
+        case "glp1_medications":
+            glp1MedicationPayloads.append(contentsOf: array)
+        default:
+            return []
+        }
+
+        return array.compactMap { payload in
+            guard let id = payload["id"] as? String else { return nil }
+            return ["id": id]
+        }
     }
 
     override func deleteData(table: String, id: String, token: String) async throws {
         deletedRecords.append((table: table, id: id))
+    }
+
+    override func endActiveGlp1Medications(userId: String, endedAt: Date) async throws {
+        endedActiveMedicationRequests.append((userId: userId, endedAt: endedAt))
     }
 }
 
@@ -4892,7 +4910,9 @@ final class SyncIntegrationTests: XCTestCase {
             supabaseManager: stubSupabase
         )
 
-        try await manager.syncLocalChanges(token: "test-token")
+        try await Task.detached {
+            try await manager.syncLocalChanges(token: "test-token")
+        }.value
 
         // Verify Supabase payload
         XCTAssertEqual(stubSupabase.bodyMetricsBatches.count, 1)
@@ -5159,6 +5179,112 @@ final class SyncIntegrationTests: XCTestCase {
         let unsynced = await coreData.fetchUnsyncedEntries()
         let unsyncedForUser = unsynced.dailyMetrics.filter { $0.userId == userId }
         XCTAssertTrue(unsyncedForUser.isEmpty)
+    }
+
+    func testSyncLocalChanges_UsesSupabaseAndMarksGlp1DoseLogSynced() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_glp1_log_\(UUID().uuidString)"
+        let medicationId = UUID().uuidString
+        let now = Date(timeIntervalSince1970: 1_780_100_000)
+        let log = Glp1DoseLog(
+            id: id,
+            userId: userId,
+            takenAt: now,
+            medicationId: medicationId,
+            doseAmount: 2.5,
+            doseUnit: "mg",
+            drugClass: "semaglutide",
+            brand: "Ozempic",
+            isCompounded: false,
+            supplierType: "pharmacy",
+            supplierName: "Test Pharmacy",
+            notes: "weekly dose",
+            createdAt: now.addingTimeInterval(-60),
+            updatedAt: now
+        )
+
+        try await coreData.saveGlp1DoseLogsAndWait([log], userId: userId, markAsSynced: false)
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        XCTAssertEqual(stubSupabase.glp1DoseLogPayloads.count, 1)
+        let payload = try XCTUnwrap(stubSupabase.glp1DoseLogPayloads.first)
+        XCTAssertEqual(payload["id"] as? String, id)
+        XCTAssertEqual(payload["user_id"] as? String, userId)
+        XCTAssertEqual(payload["medication_id"] as? String, medicationId)
+        XCTAssertEqual(payload["dose_amount"] as? Double, 2.5)
+        XCTAssertEqual(payload["dose_unit"] as? String, "mg")
+        XCTAssertEqual(payload["brand"] as? String, "Ozempic")
+
+        let remaining = await coreData.fetchUnsyncedGlp1DoseLogs(for: userId)
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
+    func testSyncLocalChanges_UsesSupabaseAndMarksGlp1MedicationSynced() async throws {
+        let coreData = CoreDataManager.shared
+
+        let id = UUID().uuidString
+        let userId = "sync_test_user_glp1_med_\(UUID().uuidString)"
+        let now = Date(timeIntervalSince1970: 1_780_200_000)
+        let endedAt = now.addingTimeInterval(3_600)
+
+        let context = coreData.viewContext
+        await context.perform {
+            let medication = CachedGlp1Medication(context: context)
+            medication.id = id
+            medication.userId = userId
+            medication.displayName = "Semaglutide"
+            medication.genericName = "semaglutide"
+            medication.drugClass = "glp1"
+            medication.brand = "Ozempic"
+            medication.route = "injection"
+            medication.frequency = "weekly"
+            medication.doseUnit = "mg"
+            medication.isCompounded = false
+            medication.hkIdentifier = "hk-med-\(UUID().uuidString)"
+            medication.startedAt = now
+            medication.endedAt = endedAt
+            medication.notes = "medication note"
+            medication.createdAt = now.addingTimeInterval(-120)
+            medication.updatedAt = endedAt
+            medication.isSynced = false
+            medication.syncStatus = "pending"
+
+            if context.hasChanges {
+                try? context.save()
+            }
+        }
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await manager.syncLocalChanges(token: "test-token")
+
+        XCTAssertEqual(stubSupabase.endedActiveMedicationRequests.count, 1)
+        XCTAssertEqual(stubSupabase.endedActiveMedicationRequests.first?.userId, userId)
+        XCTAssertEqual(stubSupabase.glp1MedicationPayloads.count, 1)
+        let payload = try XCTUnwrap(stubSupabase.glp1MedicationPayloads.first)
+        XCTAssertEqual(payload["id"] as? String, id)
+        XCTAssertEqual(payload["user_id"] as? String, userId)
+        XCTAssertEqual(payload["display_name"] as? String, "Semaglutide")
+        XCTAssertEqual(payload["brand"] as? String, "Ozempic")
+        XCTAssertEqual(payload["ended_at"] as? String, ISO8601DateFormatter().string(from: endedAt))
+
+        let remaining = await coreData.fetchUnsyncedGlp1Medications(for: userId)
+        XCTAssertTrue(remaining.isEmpty)
     }
 
     func testSyncLocalChanges_UsesSupabaseAndMarksDexaResultsSynced() async throws {
