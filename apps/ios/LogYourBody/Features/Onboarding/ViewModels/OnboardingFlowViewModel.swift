@@ -194,6 +194,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     private let calculator: BodyScoreCalculating
     private let profileUpdateHandler: @MainActor ([String: Any]) async throws -> Void
     private var hasMarkedOnboardingComplete = false
+    private var isOnboardingCompletionInFlight = false
     private let progressStore = OnboardingProgressStore.shared
     private var isRestoringProgress = false
 
@@ -914,21 +915,25 @@ final class OnboardingFlowViewModel: ObservableObject {
     func completeOnboardingIfNeeded() async -> Bool {
         guard entryContext == .authenticated else { return true }
         guard !hasMarkedOnboardingComplete else { return true }
-        hasMarkedOnboardingComplete = true
+        guard !isOnboardingCompletionInFlight else { return false }
+        isOnboardingCompletionInFlight = true
         isCompletingOnboarding = true
-        defer { isCompletingOnboarding = false }
+        defer {
+            isOnboardingCompletionInFlight = false
+            isCompletingOnboarding = false
+        }
 
         let updates = buildOnboardingProfileUpdates()
         do {
             try await profileUpdateHandler(updates)
         } catch {
-            hasMarkedOnboardingComplete = false
             let message = "We couldn't save your setup. Check your connection and try again."
             errorMessage = message
             firstPhotoErrorMessage = message
             return false
         }
 
+        hasMarkedOnboardingComplete = true
         applyCompletedOnboardingLocally(with: updates)
         OnboardingStateManager.shared.markCompleted(userId: AuthManager.shared.currentUser?.id)
         UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)

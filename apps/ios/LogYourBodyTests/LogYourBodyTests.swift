@@ -3140,6 +3140,48 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertTrue(OnboardingStateManager.shared.hasCompletedCurrentVersion)
     }
 
+    func testFirstPhotoStepDoesNotAdvanceDuringConcurrentCompletionSave() async {
+        var releaseSave: CheckedContinuation<Void, Never>?
+        var updateAttempts = 0
+        let viewModel = OnboardingFlowViewModel(
+            includesFirstPhotoStep: true,
+            profileUpdateHandler: { _ in
+                updateAttempts += 1
+                await withCheckedContinuation { continuation in
+                    releaseSave = continuation
+                }
+                throw SupabaseError.requestFailed
+            }
+        )
+        viewModel.currentStep = .firstPhoto
+
+        let firstCompletion = Task {
+            await viewModel.completeFirstPhotoStep()
+        }
+        while releaseSave == nil {
+            await Task.yield()
+        }
+
+        await viewModel.completeFirstPhotoStep()
+
+        XCTAssertEqual(updateAttempts, 1)
+        XCTAssertEqual(viewModel.currentStep, .firstPhoto)
+        XCTAssertTrue(viewModel.isCompletingOnboarding)
+        XCTAssertFalse(OnboardingStateManager.shared.hasCompletedCurrentVersion)
+
+        releaseSave?.resume()
+        await firstCompletion.value
+
+        XCTAssertEqual(updateAttempts, 1)
+        XCTAssertEqual(viewModel.currentStep, .firstPhoto)
+        XCTAssertFalse(viewModel.isCompletingOnboarding)
+        XCTAssertFalse(OnboardingStateManager.shared.hasCompletedCurrentVersion)
+        XCTAssertEqual(
+            viewModel.firstPhotoErrorMessage,
+            "We couldn't save your setup. Check your connection and try again."
+        )
+    }
+
     func testFirstPhotoCompletionMarksLocalUserComplete() async {
         let userId = "onboarding-first-photo-complete-\(UUID().uuidString)"
         let previousUser = AuthManager.shared.currentUser
