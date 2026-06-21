@@ -980,6 +980,8 @@ struct AddEntrySheet: View {
         }
 
         for (index, item) in photosToUpload.enumerated() {
+            var placeholderMetricId: String?
+
             do {
                 defer {
                     processedCount = index + 1
@@ -1003,10 +1005,12 @@ struct AddEntrySheet: View {
                 let photoDate = PhotoMetadataService.shared.extractDate(from: data) ?? selectedDate
 
                 // Create or get metrics for this date
-                let metrics = await PhotoMetadataService.shared.createOrUpdateMetrics(
+                let metricsResult = try await PhotoMetadataService.shared.createOrUpdateMetricsForPhotoUpload(
                     for: photoDate,
                     userId: userId
                 )
+                let metrics = metricsResult.metrics
+                placeholderMetricId = metrics.id
 
                 // Upload the photo
                 _ = try await PhotoUploadManager.shared.uploadProgressPhoto(
@@ -1026,6 +1030,12 @@ struct AddEntrySheet: View {
                     userId: userId
                 )
                 ErrorReporter.shared.captureNonFatal(error, context: context)
+                if let placeholderMetricId {
+                    _ = await CoreDataManager.shared.deleteEmptyPhotoPlaceholder(
+                        id: placeholderMetricId,
+                        userId: userId
+                    )
+                }
                 failedPhotos.append(item)
             }
         }

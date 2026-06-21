@@ -539,8 +539,12 @@ struct ProgressPhotoAttachSheet: View {
         attachStatus = .processing
 
         Task {
+            var placeholderMetricId: String?
+
             do {
-                let metrics = await targetMetrics(userId: userId)
+                let metricsResult = try await targetMetrics(userId: userId)
+                let metrics = metricsResult.metrics
+                placeholderMetricId = metrics.id
 
                 #if DEBUG
                 if usesProgressPhotoAttachFixture {
@@ -571,6 +575,12 @@ struct ProgressPhotoAttachSheet: View {
             } catch {
                 await MainActor.run {
                     attachStatus = .failed(error.localizedDescription)
+                }
+                if let placeholderMetricId {
+                    _ = await CoreDataManager.shared.deleteEmptyPhotoPlaceholder(
+                        id: placeholderMetricId,
+                        userId: userId
+                    )
                 }
             }
         }
@@ -638,12 +648,15 @@ struct ProgressPhotoAttachSheet: View {
     }
     #endif
 
-    private func targetMetrics(userId: String) async -> BodyMetrics {
+    private func targetMetrics(userId: String) async throws -> PhotoMetricsUpdateResult {
         if let targetMetric {
-            return targetMetric
+            return try await PhotoMetadataService.shared.prepareExistingMetricsForPhotoUpload(
+                id: targetMetric.id,
+                userId: userId
+            )
         }
 
-        return await PhotoMetadataService.shared.createOrUpdateMetrics(
+        return try await PhotoMetadataService.shared.createOrUpdateMetricsForPhotoUpload(
             for: selectedImageDate ?? fallbackDate,
             userId: userId
         )

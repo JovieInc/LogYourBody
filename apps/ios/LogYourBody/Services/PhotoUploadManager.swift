@@ -138,6 +138,11 @@ class PhotoUploadManager: ObservableObject {
             // print("📸 PhotoUploadManager: Uploading to Supabase Storage with fileName: \(fileName)")
             _ = try await uploadToSupabase(imageData: imageData, fileName: fileName)
             let storagePath = fileName
+            await coreDataManager.markPhotoUploadStorageCommitted(
+                id: metrics.id,
+                userId: userId,
+                storagePath: storagePath
+            )
             // print("✅ PhotoUploadManager: Upload complete, storage path: \(storagePath)")
 
             updateUploadStatus(.uploading, progress: 0.5)
@@ -309,6 +314,11 @@ class PhotoUploadManager: ObservableObject {
             let fileName = "\(userId)/\(metrics.id)_\(Date().timeIntervalSince1970).jpg"
             _ = try await uploadToSupabase(imageData: finalImageData, fileName: fileName)
             let storagePath = fileName
+            await coreDataManager.markPhotoUploadStorageCommitted(
+                id: metrics.id,
+                userId: userId,
+                storagePath: storagePath
+            )
 
             updateUploadStatus(.uploading, progress: 0.5)
 
