@@ -5,6 +5,23 @@
 import SwiftUI
 import PhotosUI
 
+struct PhotoUploadBatchPolicy {
+    static func progress(completedCount: Int, totalCount: Int) -> Double {
+        guard totalCount > 0 else { return 0 }
+        return Double(completedCount) / Double(totalCount)
+    }
+
+    static func progressText(processedCount: Int, totalCount: Int) -> String {
+        guard totalCount > 0 else { return "Processing photos" }
+        let currentIndex = min(processedCount + 1, totalCount)
+        return "Processing \(currentIndex) of \(totalCount)"
+    }
+
+    static func canChangeSelection(isProcessing: Bool) -> Bool {
+        !isProcessing
+    }
+}
+
 struct AddEntrySheet: View {
     @Environment(\.dismiss)
     var dismiss
@@ -45,6 +62,7 @@ struct AddEntrySheet: View {
     @State private var isProcessingPhotos = false
     @State private var photoProgress: Double = 0
     @State private var processedCount = 0
+    @State private var processingPhotoCount = 0
     @State private var photoIdentifiers: [String] = []  // Store successfully uploaded PHAsset identifiers for deletion
 
     // GLP-1 entry
@@ -681,6 +699,7 @@ struct AddEntrySheet: View {
                             selectedPhotos = []
                         }
                         .foregroundColor(.appPrimary)
+                        .disabled(!PhotoUploadBatchPolicy.canChangeSelection(isProcessing: isProcessingPhotos))
                     }
 
                     if isProcessingPhotos {
@@ -688,7 +707,12 @@ struct AddEntrySheet: View {
                             ProgressView(value: photoProgress)
                                 .tint(.appPrimary)
 
-                            Text("Processing \(processedCount + 1) of \(selectedPhotos.count)")
+                            Text(
+                                PhotoUploadBatchPolicy.progressText(
+                                    processedCount: processedCount,
+                                    totalCount: processingPhotoCount
+                                )
+                            )
                                 .font(.appCaption)
                                 .foregroundColor(.appTextSecondary)
                         }
@@ -748,8 +772,9 @@ struct AddEntrySheet: View {
         case 1:
             saveBodyFat(userId: userId)
         case 2:
+            let photosToSave = selectedPhotos
             Task {
-                await savePhotos(userId: userId)
+                await savePhotos(userId: userId, selectedPhotos: photosToSave)
             }
         case 3:
             saveGlp1Dose(userId: userId)
@@ -891,19 +916,30 @@ struct AddEntrySheet: View {
         }
     }
 
-    private func savePhotos(userId: String) async {
+    private func savePhotos(userId: String, selectedPhotos photosToUpload: [PhotosPickerItem]) async {
+        guard !photosToUpload.isEmpty else { return }
+
         isProcessingPhotos = true
         photoProgress = 0
         processedCount = 0
+        processingPhotoCount = photosToUpload.count
         photoIdentifiers.removeAll()
         var successfulUploadCount = 0
         var successfulPhotoIdentifiers: [String] = []
 
-        for (index, item) in selectedPhotos.enumerated() {
+        defer {
+            isProcessingPhotos = false
+            processingPhotoCount = 0
+        }
+
+        for (index, item) in photosToUpload.enumerated() {
             do {
                 defer {
                     processedCount = index + 1
-                    photoProgress = Double(processedCount) / Double(selectedPhotos.count)
+                    photoProgress = PhotoUploadBatchPolicy.progress(
+                        completedCount: processedCount,
+                        totalCount: photosToUpload.count
+                    )
                 }
 
                 // Extract PHAsset identifier if available
@@ -946,7 +982,6 @@ struct AddEntrySheet: View {
         }
 
         if successfulUploadCount == 0 {
-            isProcessingPhotos = false
             errorMessage = "Photo upload failed. Please try again."
             showError = true
             return
@@ -959,7 +994,6 @@ struct AddEntrySheet: View {
             await deletePhotosFromLibrary()
         }
 
-        isProcessingPhotos = false
         RealtimeSyncManager.shared.syncIfNeeded()
         dismiss()
 

@@ -68,6 +68,13 @@ struct ProgressPhotoAttachPolicy {
             return false
         }
     }
+
+    static func isBusy(status: ProgressPhotoAttachStatus) -> Bool {
+        if case .processing = status {
+            return true
+        }
+        return false
+    }
 }
 
 struct ProgressPhotoAttachSheet: View {
@@ -84,16 +91,14 @@ struct ProgressPhotoAttachSheet: View {
     @State private var selectedImageDate: Date?
     @State private var attachStatus: ProgressPhotoAttachStatus = .empty
     @State private var isCameraPresented = false
+    @State private var photoSelectionLoadID = UUID()
 
     private var targetDate: Date {
         targetMetric?.date ?? selectedImageDate ?? fallbackDate
     }
 
     private var isBusy: Bool {
-        if case .processing = attachStatus {
-            return true
-        }
-        return uploadManager.isUploading
+        ProgressPhotoAttachPolicy.isBusy(status: attachStatus)
     }
 
     private var isSuccess: Bool {
@@ -437,6 +442,9 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private func loadSelectedPhoto(_ item: PhotosPickerItem?) {
+        let loadID = UUID()
+        photoSelectionLoadID = loadID
+
         guard let item else {
             selectedImage = nil
             selectedImageDate = nil
@@ -458,12 +466,14 @@ struct ProgressPhotoAttachSheet: View {
 
                 let photoDate = PhotoMetadataService.shared.extractDate(from: data)
                 await MainActor.run {
+                    guard photoSelectionLoadID == loadID else { return }
                     selectedImage = image
                     selectedImageDate = photoDate
                     attachStatus = .ready
                 }
             } catch {
                 await MainActor.run {
+                    guard photoSelectionLoadID == loadID else { return }
                     attachStatus = .failed("Could not read that photo. Choose another image.")
                 }
             }
@@ -504,6 +514,7 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private func handleCameraImage(_ image: UIImage) {
+        photoSelectionLoadID = UUID()
         selectedImage = image
         selectedImageDate = nil
         attachStatus = .ready
@@ -567,6 +578,7 @@ struct ProgressPhotoAttachSheet: View {
 
     #if DEBUG
     private func selectFixturePhoto() {
+        photoSelectionLoadID = UUID()
         selectedImage = makeFixtureProgressPhoto()
         selectedImageDate = targetDate
         attachStatus = .ready

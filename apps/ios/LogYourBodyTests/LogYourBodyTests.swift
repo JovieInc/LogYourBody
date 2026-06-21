@@ -2141,6 +2141,33 @@ final class ProgressPhotoAttachPolicyTests: XCTestCase {
             )
         )
     }
+
+    func testProgressPhotoAttachBusyStateOnlyComesFromLocalProcessingStatus() {
+        XCTAssertTrue(ProgressPhotoAttachPolicy.isBusy(status: .processing))
+        XCTAssertFalse(ProgressPhotoAttachPolicy.isBusy(status: .empty))
+        XCTAssertFalse(ProgressPhotoAttachPolicy.isBusy(status: .ready))
+        XCTAssertFalse(ProgressPhotoAttachPolicy.isBusy(status: .success))
+        XCTAssertFalse(ProgressPhotoAttachPolicy.isBusy(status: .failed("Upload failed")))
+    }
+}
+
+final class PhotoUploadBatchPolicyTests: XCTestCase {
+    func testPhotoUploadBatchProgressHandlesEmptyAndCompletedCounts() {
+        XCTAssertEqual(PhotoUploadBatchPolicy.progress(completedCount: 0, totalCount: 0), 0)
+        XCTAssertEqual(PhotoUploadBatchPolicy.progress(completedCount: 1, totalCount: 4), 0.25)
+        XCTAssertEqual(PhotoUploadBatchPolicy.progress(completedCount: 4, totalCount: 4), 1.0)
+    }
+
+    func testPhotoUploadBatchProgressTextCapsCurrentIndexAtTotal() {
+        XCTAssertEqual(PhotoUploadBatchPolicy.progressText(processedCount: 0, totalCount: 0), "Processing photos")
+        XCTAssertEqual(PhotoUploadBatchPolicy.progressText(processedCount: 0, totalCount: 3), "Processing 1 of 3")
+        XCTAssertEqual(PhotoUploadBatchPolicy.progressText(processedCount: 3, totalCount: 3), "Processing 3 of 3")
+    }
+
+    func testPhotoUploadBatchSelectionCannotChangeWhileProcessing() {
+        XCTAssertTrue(PhotoUploadBatchPolicy.canChangeSelection(isProcessing: false))
+        XCTAssertFalse(PhotoUploadBatchPolicy.canChangeSelection(isProcessing: true))
+    }
 }
 
 final class PhotoMetadataServiceTests: XCTestCase {
