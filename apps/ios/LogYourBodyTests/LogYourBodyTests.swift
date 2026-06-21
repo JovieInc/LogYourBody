@@ -5,6 +5,7 @@
 import XCTest
 import AVFoundation
 import CoreData
+import HealthKit
 import RevenueCat
 import SwiftUI
 import UIKit
@@ -602,6 +603,9 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
             Constants.defaultHomeModeKey,
             Constants.timelineModeKey,
             "healthKitSyncEnabled",
+            HealthKitDefaultsKey.authorizationConfirmed.rawValue,
+            HealthKitDefaultsKey.lastObserverSyncDate.rawValue,
+            HealthKitDefaultsKey.fullSyncCompleted.rawValue,
             "HasSyncedHistoricalSteps",
             "lastSupabaseSyncDate",
             "lastHealthKitWeightSyncDate",
@@ -2148,6 +2152,55 @@ final class ProgressPhotoAttachPolicyTests: XCTestCase {
         XCTAssertFalse(ProgressPhotoAttachPolicy.isBusy(status: .ready))
         XCTAssertFalse(ProgressPhotoAttachPolicy.isBusy(status: .success))
         XCTAssertFalse(ProgressPhotoAttachPolicy.isBusy(status: .failed("Upload failed")))
+    }
+}
+
+final class HealthKitAuthorizationPolicyTests: XCTestCase {
+    func testConfirmedReadAccessKeepsReadOnlyHealthKitAccessUsableWhenSharingIsDenied() {
+        XCTAssertTrue(
+            HealthKitAuthorizationPolicy.isAuthorized(
+                writeStatus: .sharingDenied,
+                hasConfirmedReadAccess: true
+            )
+        )
+    }
+
+    func testDeniedSharingWithoutConfirmedReadAccessIsNotAuthorized() {
+        XCTAssertFalse(
+            HealthKitAuthorizationPolicy.isAuthorized(
+                writeStatus: .sharingDenied,
+                hasConfirmedReadAccess: false
+            )
+        )
+    }
+
+    func testShareAuthorizationIsEnoughWithoutStoredPromptState() {
+        XCTAssertTrue(
+            HealthKitAuthorizationPolicy.isAuthorized(
+                writeStatus: .sharingAuthorized,
+                hasConfirmedReadAccess: false
+            )
+        )
+    }
+
+    func testUndeterminedStatusWithoutCompletedRequestIsNotAuthorized() {
+        XCTAssertFalse(
+            HealthKitAuthorizationPolicy.isAuthorized(
+                writeStatus: .notDetermined,
+                hasConfirmedReadAccess: false
+            )
+        )
+    }
+}
+
+final class HealthKitFullSyncCompletionPolicyTests: XCTestCase {
+    func testFullSyncCompletionIsOnlyMarkedAfterSuccessfulImport() {
+        XCTAssertTrue(
+            HealthKitFullSyncCompletionPolicy.shouldMarkCompleted(importSucceeded: true)
+        )
+        XCTAssertFalse(
+            HealthKitFullSyncCompletionPolicy.shouldMarkCompleted(importSucceeded: false)
+        )
     }
 }
 
