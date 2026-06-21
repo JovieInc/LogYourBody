@@ -60,6 +60,68 @@ enum LogYourBodyDeepLink {
     }
 }
 
+enum EntryDeepLinkRoutingPolicy {
+    struct PendingDestination: Equatable {
+        let destination: LogYourBodyDeepLink.Destination
+        let userId: String?
+        let receivedAt: Date
+    }
+
+    enum Action: Equatable {
+        case open(LogYourBodyDeepLink.Destination)
+        case store(LogYourBodyDeepLink.Destination)
+        case keepPending
+        case ignore
+    }
+
+    static let pendingLinkTTL: TimeInterval = 120
+
+    static func canStoreForLater(isClerkLoaded: Bool, isAuthenticated: Bool) -> Bool {
+        !isClerkLoaded || isAuthenticated
+    }
+
+    static func action(
+        for destination: LogYourBodyDeepLink.Destination?,
+        canOpenNow: Bool,
+        canStoreForLater: Bool
+    ) -> Action {
+        guard let destination else { return .ignore }
+
+        if canOpenNow {
+            return .open(destination)
+        }
+
+        return canStoreForLater ? .store(destination) : .ignore
+    }
+
+    static func actionForStoredDestination(
+        _ pendingDestination: PendingDestination?,
+        currentUserId: String?,
+        canOpenNow: Bool,
+        canStoreForLater: Bool,
+        now: Date,
+        ttl: TimeInterval = pendingLinkTTL
+    ) -> Action {
+        guard let pendingDestination else { return .ignore }
+
+        if now.timeIntervalSince(pendingDestination.receivedAt) > ttl {
+            return .ignore
+        }
+
+        if let pendingUserId = pendingDestination.userId,
+           let currentUserId,
+           pendingUserId != currentUserId {
+            return .ignore
+        }
+
+        if canOpenNow {
+            return .open(pendingDestination.destination)
+        }
+
+        return canStoreForLater ? .keepPending : .ignore
+    }
+}
+
 @main
 struct LogYourBodyApp: App {
     @StateObject private var authManager = AuthManager.shared
@@ -70,6 +132,7 @@ struct LogYourBodyApp: App {
     @State private var clerk = Clerk.shared
     @State private var showAddEntrySheet = false
     @State private var selectedEntryTab = 0
+    @State private var pendingEntryDeepLinkDestination: EntryDeepLinkRoutingPolicy.PendingDestination?
 
     let persistenceController = CoreDataManager.shared
 
@@ -110,6 +173,25 @@ struct LogYourBodyApp: App {
                 }
                 .task {
                     await performStartupSequence()
+                    resolvePendingEntryDeepLinkIfPossible()
+                }
+                .onChange(of: authManager.isClerkLoaded) { _, _ in
+                    resolvePendingEntryDeepLinkIfPossible()
+                }
+                .onChange(of: authManager.isAuthenticated) { _, _ in
+                    resolvePendingEntryDeepLinkIfPossible()
+                }
+                .onChange(of: authManager.currentUser?.id) { _, _ in
+                    resolvePendingEntryDeepLinkIfPossible()
+                }
+                .onChange(of: authManager.currentUser?.profile?.onboardingCompleted) { _, _ in
+                    resolvePendingEntryDeepLinkIfPossible()
+                }
+                .onChange(of: revenueCatManager.isSubscribed) { _, _ in
+                    resolvePendingEntryDeepLinkIfPossible()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: OnboardingStateManager.onboardingStateDidChange)) { _ in
+                    resolvePendingEntryDeepLinkIfPossible()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                     // App entering background - ensure sync is complete
@@ -461,25 +543,73 @@ struct LogYourBodyApp: App {
 
     // MARK: - Deep Link Handling
 
+    @MainActor
     private func handleDeepLink(_ url: URL) {
         if LogYourBodyDeepLink.isOAuthCallback(url) {
             // Clerk SDK handles the OAuth callback automatically.
             return
         }
 
-        guard
-            let destination = LogYourBodyDeepLink.destination(for: url),
-            canOpenEntrySheetFromDeepLink
-        else {
+        guard let destination = LogYourBodyDeepLink.destination(for: url) else {
             return
         }
 
+        let action = EntryDeepLinkRoutingPolicy.action(
+            for: destination,
+            canOpenNow: canOpenEntrySheetFromDeepLink,
+            canStoreForLater: canStoreEntryDeepLinkForLater
+        )
+
+        applyEntryDeepLinkAction(action)
+    }
+
+    @MainActor
+    private func resolvePendingEntryDeepLinkIfPossible() {
+        let action = EntryDeepLinkRoutingPolicy.actionForStoredDestination(
+            pendingEntryDeepLinkDestination,
+            currentUserId: authManager.currentUser?.id,
+            canOpenNow: canOpenEntrySheetFromDeepLink,
+            canStoreForLater: canStoreEntryDeepLinkForLater,
+            now: Date()
+        )
+
+        applyEntryDeepLinkAction(action)
+    }
+
+    @MainActor
+    private func applyEntryDeepLinkAction(_ action: EntryDeepLinkRoutingPolicy.Action) {
+        switch action {
+        case .open(let destination):
+            pendingEntryDeepLinkDestination = nil
+            openEntryDeepLink(destination)
+        case .store(let destination):
+            pendingEntryDeepLinkDestination = EntryDeepLinkRoutingPolicy.PendingDestination(
+                destination: destination,
+                userId: authManager.currentUser?.id,
+                receivedAt: Date()
+            )
+        case .keepPending:
+            break
+        case .ignore:
+            pendingEntryDeepLinkDestination = nil
+        }
+    }
+
+    @MainActor
+    private func openEntryDeepLink(_ destination: LogYourBodyDeepLink.Destination) {
         switch destination {
         case .entry(let tab):
             selectedEntryTab = tab
             UserDefaults.standard.set(tab, forKey: "pendingEntryTab")
             showAddEntrySheet = true
         }
+    }
+
+    private var canStoreEntryDeepLinkForLater: Bool {
+        EntryDeepLinkRoutingPolicy.canStoreForLater(
+            isClerkLoaded: authManager.isClerkLoaded,
+            isAuthenticated: authManager.isAuthenticated
+        )
     }
 
     private var canOpenEntrySheetFromDeepLink: Bool {
