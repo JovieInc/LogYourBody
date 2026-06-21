@@ -56,4 +56,14 @@ struct UserProfile: Codable {
         case firstName = "first_name"
         case lastName = "last_name"
     }
+
+    var hasAppOwnedProfileData: Bool {
+        if dateOfBirth != nil { return true }
+        if let height, height > 0 { return true }
+        if let gender, !gender.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if let activityLevel, !activityLevel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if let goalWeight, goalWeight > 0 { return true }
+        if onboardingCompleted != nil { return true }
+        return false
+    }
 }
