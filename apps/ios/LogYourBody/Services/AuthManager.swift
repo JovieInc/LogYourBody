@@ -1299,22 +1299,31 @@ extension AuthManager {
         _ = try await signUp.prepareVerification(strategy: .emailCode)
     }
 
-    func updateProfile(_ updates: [String: Any]) async {
-        guard let userId = currentUser?.id else { return }
+    func updateProfileDurably(_ updates: [String: Any]) async throws {
+        guard let currentUser else { throw SupabaseError.notAuthenticated }
 
         var payload = updates
-        payload["id"] = userId
+        payload["id"] = currentUser.id
+        if payload["email"] == nil {
+            payload["email"] = currentUser.email
+        }
 
-        guard let token = await getSupabaseToken() else { return }
+        guard let token = await getSupabaseToken() else {
+            throw SupabaseError.tokenGenerationFailed
+        }
 
+        try await SupabaseManager.shared.updateProfile(payload, token: token)
+    }
+
+    func updateProfile(_ updates: [String: Any]) async {
         do {
-            try await SupabaseManager.shared.updateProfile(payload, token: token)
+            try await updateProfileDurably(updates)
         } catch {
             let context = ErrorContext(
                 feature: "profile",
                 operation: "updateProfile",
                 screen: nil,
-                userId: userId
+                userId: currentUser?.id
             )
             ErrorReporter.shared.captureNonFatal(error, context: context)
         }

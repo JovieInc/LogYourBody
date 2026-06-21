@@ -324,6 +324,35 @@ final class AuthProfileBootstrapPolicyTests: XCTestCase {
     }
 }
 
+final class SupabaseProfilePayloadTests: XCTestCase {
+    func testProfilePayloadNormalizesLaunchGateColumns() throws {
+        let birthDate = Date(timeIntervalSince1970: 631_152_000)
+        let payload: [String: Any] = [
+            "id": "profile-user",
+            "email": "profile@example.com",
+            "fullName": "Profile User",
+            "dateOfBirth": birthDate,
+            "heightUnit": "cm",
+            "onboardingCompleted": true,
+            "avatarUrl": Optional<String>.none as Any,
+            "activity_level": "active"
+        ]
+
+        let sanitized = try SupabaseManager.sanitizedProfilePayload(payload)
+
+        XCTAssertEqual(sanitized["id"] as? String, "profile-user")
+        XCTAssertEqual(sanitized["full_name"] as? String, "Profile User")
+        XCTAssertEqual(sanitized["date_of_birth"] as? String, ISO8601DateFormatter().string(from: birthDate))
+        XCTAssertEqual(sanitized["height_unit"] as? String, "cm")
+        XCTAssertEqual(sanitized["onboarding_completed"] as? Bool, true)
+        XCTAssertEqual(sanitized["activity_level"] as? String, "active")
+        XCTAssertNil(sanitized["avatar_url"])
+        XCTAssertNil(sanitized["fullName"])
+        XCTAssertNil(sanitized["dateOfBirth"])
+        XCTAssertNil(sanitized["onboardingCompleted"])
+    }
+}
+
 final class BodyCompositionMathGoldenTests: XCTestCase {
     private let calendar = Calendar.current
 
@@ -3062,8 +3091,17 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertFalse(OnboardingStateManager.shared.hasCompletedCurrentVersion)
     }
 
+    func testProfileCompletionGateSkipsFirstPhotoOnSubmit() {
+        let viewModel = ProfileCompletionGatePolicy.makeViewModel()
+
+        XCTAssertFalse(viewModel.includesFirstPhotoStep)
+    }
+
     func testProfileDetailsCompletesOnboardingWhenFirstPhotoDisabled() async {
-        let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: false)
+        let viewModel = OnboardingFlowViewModel(
+            includesFirstPhotoStep: false,
+            profileUpdateHandler: { _ in }
+        )
         viewModel.currentStep = .profileDetails
 
         await viewModel.finishOnboardingAndShowPaywall()
@@ -3072,8 +3110,28 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertTrue(OnboardingStateManager.shared.hasCompletedCurrentVersion)
     }
 
+    func testProfileDetailsDoesNotCompleteWhenDurableProfileWriteFails() async {
+        let viewModel = OnboardingFlowViewModel(
+            includesFirstPhotoStep: false,
+            profileUpdateHandler: { _ in throw SupabaseError.requestFailed }
+        )
+        viewModel.currentStep = .profileDetails
+
+        await viewModel.finishOnboardingAndShowPaywall()
+
+        XCTAssertEqual(viewModel.currentStep, .profileDetails)
+        XCTAssertFalse(OnboardingStateManager.shared.hasCompletedCurrentVersion)
+        XCTAssertEqual(
+            viewModel.errorMessage,
+            "We couldn't save your setup. Check your connection and try again."
+        )
+    }
+
     func testFirstPhotoStepCanCompleteToPaywall() async {
-        let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: true)
+        let viewModel = OnboardingFlowViewModel(
+            includesFirstPhotoStep: true,
+            profileUpdateHandler: { _ in }
+        )
         viewModel.currentStep = .firstPhoto
 
         await viewModel.completeFirstPhotoStep()
@@ -3115,7 +3173,10 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         )
         AuthManager.shared.isAuthenticated = true
 
-        let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: true)
+        let viewModel = OnboardingFlowViewModel(
+            includesFirstPhotoStep: true,
+            profileUpdateHandler: { _ in }
+        )
         viewModel.currentStep = .firstPhoto
 
         await viewModel.completeFirstPhotoStep()

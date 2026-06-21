@@ -192,6 +192,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     let includesFirstPhotoStep: Bool
     private let healthKitManager: HealthKitManager
     private let calculator: BodyScoreCalculating
+    private let profileUpdateHandler: @MainActor ([String: Any]) async throws -> Void
     private var hasMarkedOnboardingComplete = false
     private let progressStore = OnboardingProgressStore.shared
     private var isRestoringProgress = false
@@ -214,13 +215,17 @@ final class OnboardingFlowViewModel: ObservableObject {
         entryContext: EntryContext = .authenticated,
         healthKitManager: HealthKitManager = .shared,
         calculator: BodyScoreCalculating = BodyScoreCalculator(),
-        includesFirstPhotoStep: Bool? = nil
+        includesFirstPhotoStep: Bool? = nil,
+        profileUpdateHandler: @escaping @MainActor ([String: Any]) async throws -> Void = {
+            try await AuthManager.shared.updateProfileDurably($0)
+        }
     ) {
         self.entryContext = entryContext
         self.healthKitManager = healthKitManager
         self.calculator = calculator
         self.includesFirstPhotoStep = includesFirstPhotoStep
             ?? (entryContext == .authenticated && PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD())
+        self.profileUpdateHandler = profileUpdateHandler
 
         isRestoringProgress = true
         configureMeasurementPreference()
@@ -905,15 +910,25 @@ final class OnboardingFlowViewModel: ObservableObject {
         persistProgress()
     }
 
-    func completeOnboardingIfNeeded() async {
-        guard entryContext == .authenticated else { return }
-        guard !hasMarkedOnboardingComplete else { return }
+    @discardableResult
+    func completeOnboardingIfNeeded() async -> Bool {
+        guard entryContext == .authenticated else { return true }
+        guard !hasMarkedOnboardingComplete else { return true }
         hasMarkedOnboardingComplete = true
         isCompletingOnboarding = true
         defer { isCompletingOnboarding = false }
 
         let updates = buildOnboardingProfileUpdates()
-        await AuthManager.shared.updateProfile(updates)
+        do {
+            try await profileUpdateHandler(updates)
+        } catch {
+            hasMarkedOnboardingComplete = false
+            let message = "We couldn't save your setup. Check your connection and try again."
+            errorMessage = message
+            firstPhotoErrorMessage = message
+            return false
+        }
+
         applyCompletedOnboardingLocally(with: updates)
         OnboardingStateManager.shared.markCompleted(userId: AuthManager.shared.currentUser?.id)
         UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)
@@ -923,6 +938,8 @@ final class OnboardingFlowViewModel: ObservableObject {
         if didRequestHealthSync, UserDefaults.standard.bool(forKey: "healthKitSyncEnabled") {
             scheduleDeferredHealthSync()
         }
+
+        return true
     }
 
     func completeFirstPhotoStep() async {
@@ -934,7 +951,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     }
 
     private func finishOnboardingAndShowPaywall(from previousStep: Step) async {
-        await completeOnboardingIfNeeded()
+        guard await completeOnboardingIfNeeded() else { return }
         currentStep = .paywall
         trackStepTransition(from: previousStep, to: currentStep)
     }
