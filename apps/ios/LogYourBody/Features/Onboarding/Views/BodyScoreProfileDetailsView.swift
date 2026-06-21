@@ -389,7 +389,7 @@ struct BodyScoreProfileDetailsView: View {
                     updates["heightUnit"] = heightUnitStorageValue
                 }
 
-                await authManager.updateProfile(updates)
+                try await authManager.updateProfileDurably(updates)
 
                 await MainActor.run {
                     isSaving = false

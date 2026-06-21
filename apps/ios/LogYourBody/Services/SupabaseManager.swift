@@ -185,7 +185,7 @@ class SupabaseManager: ObservableObject {
     }
 
     func fetchProfile(userId: String, token: String) async throws -> [String: Any]? {
-        let url = URL(string: "\(supabaseURL)/rest/v1/user_profiles?id=eq.\(userId)")!
+        let url = URL(string: "\(supabaseURL)/rest/v1/profiles?id=eq.\(userId)&select=*")!
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -206,23 +206,18 @@ class SupabaseManager: ObservableObject {
     func updateProfile(_ profile: [String: Any], token: String) async throws {
         guard let userId = profile["id"] as? String else { throw SupabaseError.invalidData }
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/user_profiles?id=eq.\(userId)")!
+        let sanitizedProfile = try Self.sanitizedProfilePayload(profile)
+        guard sanitizedProfile["id"] as? String == userId else {
+            throw SupabaseError.invalidData
+        }
+
+        let url = URL(string: "\(supabaseURL)/rest/v1/profiles?id=eq.\(userId)&select=id")!
         var request = URLRequest(url: url)
         request.httpMethod = "PATCH"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let isoFormatter = ISO8601DateFormatter()
-        let sanitizedProfile: [String: Any] = profile.reduce(into: [:]) { result, element in
-            let (key, value) = element
-
-            if let dateValue = value as? Date {
-                result[key] = isoFormatter.string(from: dateValue)
-            } else {
-                result[key] = value
-            }
-        }
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
 
         guard JSONSerialization.isValidJSONObject(sanitizedProfile) else {
             ErrorTrackingService.shared.addBreadcrumb(
@@ -240,11 +235,106 @@ class SupabaseManager: ObservableObject {
         let jsonData = try JSONSerialization.data(withJSONObject: sanitizedProfile)
         request.httpBody = jsonData
 
-        let (_, response) = try await self.session.data(for: request)
+        let (responseData, response) = try await self.session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             throw SupabaseError.requestFailed
+        }
+
+        let rows = if responseData.isEmpty {
+            [[String: Any]]()
+        } else {
+            try JSONSerialization.jsonObject(with: responseData) as? [[String: Any]] ?? []
+        }
+        if rows.isEmpty {
+            try await upsertProfilePayload(sanitizedProfile, token: token)
+        }
+    }
+
+    private func upsertProfilePayload(_ profile: [String: Any], token: String) async throws {
+        guard profile["id"] is String else { throw SupabaseError.invalidData }
+
+        let url = URL(string: "\(supabaseURL)/rest/v1/profiles")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("return=representation,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+
+        guard JSONSerialization.isValidJSONObject(profile) else {
+            throw SupabaseError.invalidData
+        }
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: profile)
+
+        let (responseData, response) = try await self.session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw SupabaseError.requestFailed
+        }
+
+        let rows = if responseData.isEmpty {
+            [[String: Any]]()
+        } else {
+            try JSONSerialization.jsonObject(with: responseData) as? [[String: Any]] ?? []
+        }
+        guard !rows.isEmpty else { throw SupabaseError.requestFailed }
+    }
+
+    nonisolated static func sanitizedProfilePayload(_ profile: [String: Any]) throws -> [String: Any] {
+        let isoFormatter = ISO8601DateFormatter()
+        let sanitizedProfile = profile.reduce(into: [String: Any]()) { result, element in
+            let (key, value) = element
+            guard let unwrappedValue = unwrapOptional(value) else { return }
+
+            let columnName = profileColumnName(for: key)
+            if let dateValue = unwrappedValue as? Date {
+                result[columnName] = isoFormatter.string(from: dateValue)
+            } else {
+                result[columnName] = unwrappedValue
+            }
+        }
+
+        guard JSONSerialization.isValidJSONObject(sanitizedProfile) else {
+            throw SupabaseError.invalidData
+        }
+
+        return sanitizedProfile
+    }
+
+    nonisolated private static func unwrapOptional(_ value: Any) -> Any? {
+        let mirror = Mirror(reflecting: value)
+        guard mirror.displayStyle == .optional else { return value }
+        return mirror.children.first?.value
+    }
+
+    nonisolated private static func profileColumnName(for key: String) -> String {
+        switch key {
+        case "fullName":
+            return "full_name"
+        case "dateOfBirth":
+            return "date_of_birth"
+        case "heightUnit":
+            return "height_unit"
+        case "activityLevel":
+            return "activity_level"
+        case "goalWeight":
+            return "goal_weight"
+        case "goalWeightUnit":
+            return "goal_weight_unit"
+        case "onboardingCompleted":
+            return "onboarding_completed"
+        case "avatarUrl":
+            return "avatar_url"
+        case "firstName":
+            return "first_name"
+        case "lastName":
+            return "last_name"
+        default:
+            return key
         }
     }
 
