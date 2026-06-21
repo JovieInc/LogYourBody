@@ -159,6 +159,137 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertNil(LogYourBodyDeepLink.destination(for: oauthURL))
     }
 
+    func testEntryDeepLinkRoutingStoresDuringStartupAndReplaysWhenEligible() {
+        let destination = LogYourBodyDeepLink.Destination.entry(tab: 2)
+        let receivedAt = Date()
+        let pending = EntryDeepLinkRoutingPolicy.PendingDestination(
+            destination: destination,
+            userId: nil,
+            receivedAt: receivedAt
+        )
+
+        XCTAssertEqual(
+            EntryDeepLinkRoutingPolicy.action(
+                for: destination,
+                canOpenNow: false,
+                canStoreForLater: true
+            ),
+            .store(destination)
+        )
+        XCTAssertEqual(
+            EntryDeepLinkRoutingPolicy.actionForStoredDestination(
+                pending,
+                currentUserId: "restored-user",
+                canOpenNow: true,
+                canStoreForLater: true,
+                now: receivedAt.addingTimeInterval(1)
+            ),
+            .open(destination)
+        )
+    }
+
+    func testEntryDeepLinkRoutingDropsKnownSignedOutUsers() {
+        let destination = LogYourBodyDeepLink.Destination.entry(tab: 0)
+        let receivedAt = Date()
+        let pending = EntryDeepLinkRoutingPolicy.PendingDestination(
+            destination: destination,
+            userId: nil,
+            receivedAt: receivedAt
+        )
+
+        XCTAssertFalse(
+            EntryDeepLinkRoutingPolicy.canStoreForLater(
+                isClerkLoaded: true,
+                isAuthenticated: false
+            )
+        )
+        XCTAssertEqual(
+            EntryDeepLinkRoutingPolicy.action(
+                for: destination,
+                canOpenNow: false,
+                canStoreForLater: false
+            ),
+            .ignore
+        )
+        XCTAssertEqual(
+            EntryDeepLinkRoutingPolicy.actionForStoredDestination(
+                pending,
+                currentUserId: nil,
+                canOpenNow: false,
+                canStoreForLater: false,
+                now: receivedAt.addingTimeInterval(1)
+            ),
+            .ignore
+        )
+    }
+
+    func testEntryDeepLinkRoutingKeepsAuthenticatedDeferredLinksUntilDownstreamGatesOpen() {
+        let destination = LogYourBodyDeepLink.Destination.entry(tab: 1)
+        let receivedAt = Date()
+        let pending = EntryDeepLinkRoutingPolicy.PendingDestination(
+            destination: destination,
+            userId: "user-a",
+            receivedAt: receivedAt
+        )
+
+        XCTAssertTrue(
+            EntryDeepLinkRoutingPolicy.canStoreForLater(
+                isClerkLoaded: true,
+                isAuthenticated: true
+            )
+        )
+        XCTAssertEqual(
+            EntryDeepLinkRoutingPolicy.actionForStoredDestination(
+                pending,
+                currentUserId: "user-a",
+                canOpenNow: false,
+                canStoreForLater: true,
+                now: receivedAt.addingTimeInterval(1)
+            ),
+            .keepPending
+        )
+    }
+
+    func testEntryDeepLinkRoutingExpiresStalePendingLinks() {
+        let receivedAt = Date()
+        let pending = EntryDeepLinkRoutingPolicy.PendingDestination(
+            destination: .entry(tab: 2),
+            userId: "user-a",
+            receivedAt: receivedAt
+        )
+
+        XCTAssertEqual(
+            EntryDeepLinkRoutingPolicy.actionForStoredDestination(
+                pending,
+                currentUserId: "user-a",
+                canOpenNow: true,
+                canStoreForLater: true,
+                now: receivedAt.addingTimeInterval(EntryDeepLinkRoutingPolicy.pendingLinkTTL + 1)
+            ),
+            .ignore
+        )
+    }
+
+    func testEntryDeepLinkRoutingClearsPendingLinksAcrossAccountSwitch() {
+        let receivedAt = Date()
+        let pending = EntryDeepLinkRoutingPolicy.PendingDestination(
+            destination: .entry(tab: 1),
+            userId: "user-a",
+            receivedAt: receivedAt
+        )
+
+        XCTAssertEqual(
+            EntryDeepLinkRoutingPolicy.actionForStoredDestination(
+                pending,
+                currentUserId: "user-b",
+                canOpenNow: true,
+                canStoreForLater: true,
+                now: receivedAt.addingTimeInterval(1)
+            ),
+            .ignore
+        )
+    }
+
     @MainActor
     func testEntryDeepLinkPolicyBlocksAccountSwitchWithPreviousOnboardingCompletion() {
         let suiteName = "entry-deeplink-\(UUID().uuidString)"
