@@ -281,7 +281,7 @@ struct FullMetricChartView: View {
     let unit: String
     let currentDate: String
     let chartData: [MetricChartDataPoint]
-    let onAdd: () -> Void
+    let onAdd: (() -> Void)?
     let metricEntries: MetricEntriesPayload?
     let relatedMetrics: [MetricDetailRelatedMetric]
 
@@ -314,7 +314,7 @@ struct FullMetricChartView: View {
         unit: String,
         currentDate: String,
         chartData: [MetricChartDataPoint],
-        onAdd: @escaping () -> Void,
+        onAdd: (() -> Void)?,
         metricEntries: MetricEntriesPayload?,
         relatedMetrics: [MetricDetailRelatedMetric] = [],
         goalValue: Double?,
@@ -362,16 +362,18 @@ struct FullMetricChartView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(false)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    HapticManager.shared.selection()
-                    onAdd()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color.metricAccent)
+            if let onAdd {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        HapticManager.shared.selection()
+                        onAdd()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color.metricAccent)
+                    }
+                    .accessibilityLabel("Add Entry")
                 }
-                .accessibilityLabel("Add Entry")
             }
         }
         .toolbar(.visible, for: .navigationBar)
@@ -960,20 +962,23 @@ struct FullMetricChartView: View {
 
                 Spacer()
 
-                Button {
-                    HapticManager.shared.selection()
-                    onAdd()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color.metricAccent)
-                        .frame(width: 32, height: 32)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.white.opacity(0.08))
-                        )
+                if let onAdd {
+                    Button {
+                        HapticManager.shared.selection()
+                        onAdd()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color.metricAccent)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add Entry")
                 }
-                .buttonStyle(.plain)
             }
 
             if let payload = metricEntries,

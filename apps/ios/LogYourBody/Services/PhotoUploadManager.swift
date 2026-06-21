@@ -446,14 +446,19 @@ class PhotoUploadManager: ObservableObject {
 
     private func updateMetricsWithPhoto(metricsId: String, storagePath: String, processedUrl: String) async throws {
         // Update local CoreData
-        guard let userId = authManager.currentUser?.id else { return }
-        if let cachedMetrics = await coreDataManager.fetchBodyMetrics(for: userId)
-            .first(where: { $0.id == metricsId }) {
-            cachedMetrics.photoUrl = processedUrl
-            cachedMetrics.originalPhotoUrl = storagePath
-            cachedMetrics.lastModified = Date()
-            cachedMetrics.isSynced = false
-            coreDataManager.save()
+        guard let userId = authManager.currentUser?.id else {
+            throw PhotoError.notAuthenticated
+        }
+
+        let didUpdate = try await coreDataManager.updateBodyMetricPhoto(
+            id: metricsId,
+            userId: userId,
+            storagePath: storagePath,
+            processedUrl: processedUrl
+        )
+
+        guard didUpdate else {
+            throw PhotoError.processingFailed("Could not save photo locally")
         }
 
         // Trigger sync to update remote
