@@ -12,6 +12,17 @@ import Foundation
 import CoreData
 import HealthKit
 
+struct CachedUserProfileSnapshot {
+    let profile: UserProfile
+    let isSynced: Bool
+    let syncStatus: String?
+    let lastModified: Date?
+
+    var hasPendingLocalChanges: Bool {
+        !isSynced || syncStatus == "pending" || syncStatus == "failed"
+    }
+}
+
 class CoreDataManager: ObservableObject {
     static let shared = CoreDataManager()
 
@@ -902,7 +913,7 @@ class CoreDataManager: ObservableObject {
     }
 
     // MARK: - Daily Metrics Operations
-    func saveProfile(_ profile: UserProfile, userId: String, email: String) {
+    func saveProfile(_ profile: UserProfile, userId: String, email: String, markSynced: Bool = false) {
         let context = viewContext
 
         context.perform {
@@ -933,8 +944,8 @@ class CoreDataManager: ObservableObject {
                 cached.goalWeightUnit = profile.goalWeightUnit
                 cached.updatedAt = Date()
                 cached.lastModified = Date()
-                cached.isSynced = false
-                cached.syncStatus = "pending"
+                cached.isSynced = markSynced
+                cached.syncStatus = markSynced ? "synced" : "pending"
                 cached.isMarkedDeleted = false
 
                 self.save()
@@ -948,6 +959,45 @@ class CoreDataManager: ObservableObject {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Failed to save profile: \(error)")
+            }
+        }
+    }
+
+    func fetchUserProfile(for userId: String) async -> UserProfile? {
+        await fetchUserProfileSnapshot(for: userId)?.profile
+    }
+
+    func fetchUserProfileSnapshot(for userId: String) async -> CachedUserProfileSnapshot? {
+        let context = viewContext
+
+        return await context.perform {
+            let fetchRequest: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@ AND isMarkedDeleted == %@", userId, NSNumber(value: false))
+            fetchRequest.fetchLimit = 1
+
+            do {
+                guard let cached = try context.fetch(fetchRequest).first else {
+                    return nil
+                }
+
+                return CachedUserProfileSnapshot(
+                    profile: cached.toUserProfile(),
+                    isSynced: cached.isSynced,
+                    syncStatus: cached.syncStatus,
+                    lastModified: cached.lastModified
+                )
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "fetchUserProfileSnapshot", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "fetchUserProfileSnapshot",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return nil
             }
         }
     }

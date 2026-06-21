@@ -69,6 +69,12 @@ enum EmailVerificationFlow: Equatable {
     case signIn
 }
 
+enum AuthProfileBootstrapPolicy {
+    static func shouldPersistProjectedProfile(_ profile: UserProfile) -> Bool {
+        profile.hasAppOwnedProfileData
+    }
+}
+
 // MARK: - AsyncGate Helper
 
 actor AsyncGate {
@@ -697,25 +703,6 @@ class AuthManager: NSObject, ObservableObject {
         self.lastExitReason = .none
 
         ErrorTrackingService.shared.updateUserId(localUser.id)
-        CoreDataManager.shared.saveProfile(
-            localUser.profile ?? UserProfile(
-                id: localUser.id,
-                email: localUser.email,
-                username: nil,
-                fullName: localUser.name,
-                dateOfBirth: nil,
-                height: nil,
-                heightUnit: "cm",
-                gender: nil,
-                activityLevel: nil,
-                goalWeight: nil,
-                goalWeightUnit: "kg",
-                onboardingCompleted: nil
-            ),
-            userId: localUser.id,
-            email: localUser.email
-        )
-
         var traits: [String: String] = [
             "email": email,
             "name": localUser.displayName,
@@ -1342,11 +1329,38 @@ extension AuthManager {
         }
 
         bootstrappedProfileSessionIds.insert(sessionId)
-        CoreDataManager.shared.saveProfile(profile, userId: user.id, email: user.email)
+
+        if let cachedProfile = await CoreDataManager.shared.fetchUserProfileSnapshot(for: user.id),
+           cachedProfile.hasPendingLocalChanges {
+            applyAuthenticatedProfile(cachedProfile.profile, fallbackEmail: user.email)
+            return
+        }
 
         do {
+            if let remoteProfile = try await SupabaseManager.shared.fetchProfile(userId: user.id) {
+                applyAuthenticatedProfile(remoteProfile, fallbackEmail: user.email)
+                CoreDataManager.shared.saveProfile(
+                    remoteProfile,
+                    userId: user.id,
+                    email: remoteProfile.email ?? user.email,
+                    markSynced: true
+                )
+                return
+            }
+
+            guard AuthProfileBootstrapPolicy.shouldPersistProjectedProfile(profile) else {
+                bootstrappedProfileSessionIds.remove(sessionId)
+                return
+            }
+
             try await SupabaseManager.shared.upsertProfile(profile)
+            CoreDataManager.shared.saveProfile(profile, userId: user.id, email: user.email, markSynced: true)
         } catch {
+            if let cachedProfile = await CoreDataManager.shared.fetchUserProfile(for: user.id) {
+                applyAuthenticatedProfile(cachedProfile, fallbackEmail: user.email)
+                return
+            }
+
             bootstrappedProfileSessionIds.remove(sessionId)
             let context = ErrorContext(
                 feature: "auth",
@@ -1356,6 +1370,26 @@ extension AuthManager {
             )
             ErrorReporter.shared.captureNonFatal(error, context: context)
         }
+    }
+
+    private func applyAuthenticatedProfile(_ profile: UserProfile, fallbackEmail: String) {
+        guard var user = currentUser else { return }
+
+        user.profile = profile
+
+        if let fullName = profile.fullName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !fullName.isEmpty {
+            user.name = fullName
+        } else if user.name == nil {
+            user.name = fallbackEmail.components(separatedBy: "@").first ?? "User"
+        }
+
+        if let onboardingCompleted = profile.onboardingCompleted {
+            user.onboardingCompleted = onboardingCompleted
+            OnboardingStateManager.shared.syncCompletionFlagFromProfile(onboardingCompleted, userId: user.id)
+        }
+
+        currentUser = user
     }
 
     // MARK: - Account Deletion Helpers
