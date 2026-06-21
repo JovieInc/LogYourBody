@@ -7,6 +7,11 @@ import Photos
 import ImageIO
 import CoreData
 
+struct PhotoMetricsUpdateResult {
+    let metrics: BodyMetrics
+    let createdNewEntry: Bool
+}
+
 class PhotoMetadataService {
     static let shared = PhotoMetadataService()
 
@@ -103,6 +108,27 @@ class PhotoMetadataService {
         dataSource: String? = nil,
         preserveExistingMeasurements: Bool = false
     ) async -> BodyMetrics {
+        await createOrUpdateMetricsWithResult(
+            for: date,
+            photoUrl: photoUrl,
+            weight: weight,
+            bodyFatPercentage: bodyFatPercentage,
+            userId: userId,
+            dataSource: dataSource,
+            preserveExistingMeasurements: preserveExistingMeasurements
+        ).metrics
+    }
+
+    /// Create or update body metrics and report whether this call created a new local row.
+    func createOrUpdateMetricsWithResult(
+        for date: Date,
+        photoUrl: String? = nil,
+        weight: Double? = nil,
+        bodyFatPercentage: Double? = nil,
+        userId: String,
+        dataSource: String? = nil,
+        preserveExistingMeasurements: Bool = false
+    ) async -> PhotoMetricsUpdateResult {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
         let localDate = BodyMetricLocalDate.key(for: date)
@@ -141,7 +167,7 @@ class PhotoMetadataService {
             )
 
             CoreDataManager.shared.saveBodyMetrics(updated, userId: userId)
-            return updated
+            return PhotoMetricsUpdateResult(metrics: updated, createdNewEntry: false)
         } else {
             // Create new metrics
             let new = BodyMetrics(
@@ -168,8 +194,30 @@ class PhotoMetadataService {
             )
 
             CoreDataManager.shared.saveBodyMetrics(new, userId: userId)
-            return new
+            return PhotoMetricsUpdateResult(metrics: new, createdNewEntry: true)
         }
+    }
+
+    /// Create or reuse the metrics row for an upload and mark empty placeholders in flight atomically.
+    func createOrUpdateMetricsForPhotoUpload(
+        for date: Date,
+        userId: String
+    ) async throws -> PhotoMetricsUpdateResult {
+        try await CoreDataManager.shared.createOrUpdatePhotoUploadMetricsPlaceholder(
+            for: date,
+            userId: userId
+        )
+    }
+
+    func prepareExistingMetricsForPhotoUpload(
+        id: String,
+        userId: String
+    ) async throws -> PhotoMetricsUpdateResult {
+        let metrics = try await CoreDataManager.shared.prepareExistingPhotoUploadMetrics(
+            id: id,
+            userId: userId
+        )
+        return PhotoMetricsUpdateResult(metrics: metrics, createdNewEntry: false)
     }
 
     /// Estimate weight based on nearby entries

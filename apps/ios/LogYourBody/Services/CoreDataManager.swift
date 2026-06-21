@@ -89,9 +89,11 @@ struct PendingBodyMetricSyncItem {
     let muscleMass: Double
     let boneMass: Double
     let photoUrl: String?
+    let originalPhotoUrl: String?
     let notes: String?
     let dataSource: String?
     let sourceMetadataJSON: String?
+    let syncStatus: String?
     let createdAt: Date
     let updatedAt: Date
     let isMarkedDeleted: Bool
@@ -177,6 +179,8 @@ struct PendingDexaResultSyncItem {
 
 class CoreDataManager: ObservableObject {
     static let shared = CoreDataManager()
+    static let photoUploadInFlightSyncStatus = "photo_upload_in_flight"
+    static let photoUploadStorageCommittedSyncStatus = "photo_upload_storage_committed"
 
     private let saveQueue = DispatchQueue(label: "com.logyourbody.coredata.save", qos: .utility)
     private var isSaving = false
@@ -750,6 +754,126 @@ class CoreDataManager: ObservableObject {
         }
     }
 
+    func createOrUpdatePhotoUploadMetricsPlaceholder(
+        for date: Date,
+        userId: String
+    ) async throws -> PhotoMetricsUpdateResult {
+        let context = viewContext
+        let startOfDay = Calendar.current.startOfDay(for: date)
+        let localDate = BodyMetricLocalDate.key(for: date)
+        let normalizedLocalDate = BodyMetricLocalDate.normalized(localDate, fallback: date)
+
+        return try await context.perform {
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            fetchRequest.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
+                NSCompoundPredicate(andPredicateWithSubpredicates: [
+                    NSPredicate(format: "userId == %@", userId),
+                    NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false)),
+                    NSPredicate(format: "localDate == %@", normalizedLocalDate)
+                ]),
+                Self.legacyBodyMetricDatePredicate(userId: userId, localDate: normalizedLocalDate)
+            ])
+            fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+            fetchRequest.fetchLimit = 1
+
+            let cached: CachedBodyMetrics
+            let createdNewEntry: Bool
+            let now = Date()
+
+            if let existing = try context.fetch(fetchRequest).first {
+                cached = existing
+                createdNewEntry = false
+            } else {
+                cached = CachedBodyMetrics(context: context)
+                cached.id = UUID().uuidString
+                cached.userId = userId
+                cached.date = startOfDay
+                cached.localDate = normalizedLocalDate
+                cached.weight = 0
+                cached.weightUnit = "kg"
+                cached.waistCircumference = 0
+                cached.hipCircumference = 0
+                cached.bodyFatPercentage = 0
+                cached.muscleMass = 0
+                cached.boneMass = 0
+                cached.dataSource = BodyMetricSource.photo.rawValue
+                cached.createdAt = now
+                cached.updatedAt = now
+                cached.lastModified = now
+                cached.isMarkedDeleted = false
+                cached.isSynced = false
+                createdNewEntry = true
+            }
+
+            if Self.isUploadPlaceholderCandidate(cached, userId: userId),
+               !Self.isPhotoUploadStorageCommittedSyncStatus(cached.syncStatus) {
+                cached.syncStatus = Self.photoUploadInFlightSyncStatus
+                cached.updatedAt = now
+                cached.lastModified = now
+                cached.isSynced = false
+            }
+
+            if context.hasChanges {
+                try context.save()
+            }
+
+            guard let metrics = cached.toBodyMetrics() else {
+                throw NSError(
+                    domain: "CoreDataManager",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Could not create photo upload metrics placeholder"]
+                )
+            }
+
+            return PhotoMetricsUpdateResult(metrics: metrics, createdNewEntry: createdNewEntry)
+        }
+    }
+
+    func prepareExistingPhotoUploadMetrics(id: String, userId: String) async throws -> BodyMetrics {
+        let context = viewContext
+
+        return try await context.perform {
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "id == %@", id),
+                NSPredicate(format: "userId == %@", userId),
+                NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false))
+            ])
+            fetchRequest.fetchLimit = 1
+
+            guard let cached = try context.fetch(fetchRequest).first else {
+                throw NSError(
+                    domain: "CoreDataManager",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Could not find selected photo upload metrics"]
+                )
+            }
+
+            if Self.isUploadPlaceholderCandidate(cached, userId: userId),
+               !Self.isPhotoUploadStorageCommittedSyncStatus(cached.syncStatus) {
+                let now = Date()
+                cached.syncStatus = Self.photoUploadInFlightSyncStatus
+                cached.updatedAt = now
+                cached.lastModified = now
+                cached.isSynced = false
+
+                if context.hasChanges {
+                    try context.save()
+                }
+            }
+
+            guard let metrics = cached.toBodyMetrics() else {
+                throw NSError(
+                    domain: "CoreDataManager",
+                    code: 3,
+                    userInfo: [NSLocalizedDescriptionKey: "Could not prepare selected photo upload metrics"]
+                )
+            }
+
+            return metrics
+        }
+    }
+
     // MARK: - Async Fetch Methods (Recommended for UI)
 
     /// Async version - does NOT block the main thread
@@ -801,7 +925,7 @@ class CoreDataManager: ObservableObject {
                     NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false)),
                     NSPredicate(format: "localDate == %@", normalizedLocalDate)
                 ]),
-                self.legacyBodyMetricDatePredicate(userId: userId, localDate: normalizedLocalDate)
+                Self.legacyBodyMetricDatePredicate(userId: userId, localDate: normalizedLocalDate)
             ])
             fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
 
@@ -816,7 +940,7 @@ class CoreDataManager: ObservableObject {
         }
     }
 
-    private func legacyBodyMetricDatePredicate(userId: String, localDate: String) -> NSPredicate {
+    private static func legacyBodyMetricDatePredicate(userId: String, localDate: String) -> NSPredicate {
         guard let startOfDay = BodyMetricLocalDate.startOfDay(for: localDate),
               let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay) else {
             return NSPredicate(value: false)
@@ -1061,6 +1185,91 @@ class CoreDataManager: ObservableObject {
         }
     }
 
+    @discardableResult
+    func markPhotoPlaceholderUploadInFlight(id: String, userId: String) async -> Bool {
+        let context = viewContext
+
+        return await context.perform {
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@ AND userId == %@", id, userId)
+            fetchRequest.fetchLimit = 1
+
+            do {
+                guard let cachedMetric = try context.fetch(fetchRequest).first,
+                      Self.isUploadPlaceholderCandidate(cachedMetric, userId: userId) else {
+                    return false
+                }
+
+                let now = Date()
+                cachedMetric.syncStatus = Self.photoUploadInFlightSyncStatus
+                cachedMetric.updatedAt = now
+                cachedMetric.lastModified = now
+                cachedMetric.isSynced = false
+
+                if context.hasChanges {
+                    try context.save()
+                }
+
+                return true
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "markPhotoPlaceholderUploadInFlight", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "markPhotoPlaceholderUploadInFlight",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return false
+            }
+        }
+    }
+
+    @discardableResult
+    func markPhotoUploadStorageCommitted(id: String, userId: String, storagePath: String) async -> Bool {
+        let context = viewContext
+
+        return await context.perform {
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@ AND userId == %@", id, userId)
+            fetchRequest.fetchLimit = 1
+
+            do {
+                guard let cachedMetric = try context.fetch(fetchRequest).first,
+                      Self.isUploadPlaceholderCandidate(cachedMetric, userId: userId) else {
+                    return false
+                }
+
+                let now = Date()
+                cachedMetric.originalPhotoUrl = storagePath
+                cachedMetric.syncStatus = Self.photoUploadStorageCommittedSyncStatus
+                cachedMetric.updatedAt = now
+                cachedMetric.lastModified = now
+                cachedMetric.isSynced = false
+
+                if context.hasChanges {
+                    try context.save()
+                }
+
+                return true
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "markPhotoUploadStorageCommitted", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "markPhotoUploadStorageCommitted",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return false
+            }
+        }
+    }
+
     func markBodyMetricDeleted(id: String) async -> Bool {
         let context = viewContext
 
@@ -1100,6 +1309,80 @@ class CoreDataManager: ObservableObject {
                 return false
             }
         }
+    }
+
+    func deleteEmptyPhotoPlaceholder(id: String, userId: String) async -> Bool {
+        let context = viewContext
+
+        return await context.perform {
+            let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@ AND userId == %@", id, userId)
+            fetchRequest.fetchLimit = 1
+
+            do {
+                guard let cachedMetric = try context.fetch(fetchRequest).first,
+                      Self.isDeletableEmptyPhotoPlaceholder(cachedMetric, userId: userId) else {
+                    return false
+                }
+
+                context.delete(cachedMetric)
+
+                if context.hasChanges {
+                    try context.save()
+                }
+
+                return true
+            } catch {
+                #if DEBUG
+                let appError = AppError.coreData(operation: "deleteEmptyPhotoPlaceholder", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "deleteEmptyPhotoPlaceholder",
+                    screen: nil,
+                    userId: userId
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+                #endif
+                return false
+            }
+        }
+    }
+
+    private static func isDeletableEmptyPhotoPlaceholder(_ metric: CachedBodyMetrics, userId: String) -> Bool {
+        isUploadPlaceholderCandidate(metric, userId: userId) &&
+            !isPhotoUploadStorageCommittedSyncStatus(metric.syncStatus) &&
+            Self.isBlank(metric.notes) &&
+            Self.isBlank(metric.sourceMetadataJSON)
+    }
+
+    private static func isUploadPlaceholderCandidate(_ metric: CachedBodyMetrics, userId: String) -> Bool {
+        metric.userId == userId &&
+            !metric.isSynced &&
+            !metric.isMarkedDeleted &&
+            BodyMetricSource.normalizedRawValue(metric.dataSource) == BodyMetricSource.photo.rawValue &&
+            metric.weight <= 0 &&
+            metric.bodyFatPercentage <= 0 &&
+            metric.muscleMass <= 0 &&
+            metric.boneMass <= 0 &&
+            metric.waistCircumference <= 0 &&
+            metric.hipCircumference <= 0 &&
+            Self.isBlank(metric.photoUrl)
+    }
+
+    static func isPhotoUploadPlaceholderSyncStatus(_ value: String?) -> Bool {
+        isPhotoUploadInFlightSyncStatus(value) || isPhotoUploadStorageCommittedSyncStatus(value)
+    }
+
+    private static func isPhotoUploadInFlightSyncStatus(_ value: String?) -> Bool {
+        value == photoUploadInFlightSyncStatus
+    }
+
+    private static func isPhotoUploadStorageCommittedSyncStatus(_ value: String?) -> Bool {
+        value == photoUploadStorageCommittedSyncStatus
+    }
+
+    private static func isBlank(_ value: String?) -> Bool {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
     }
 
     // MARK: - Daily Metrics Operations
@@ -2697,9 +2980,11 @@ extension CachedBodyMetrics {
             muscleMass: muscleMass,
             boneMass: boneMass,
             photoUrl: photoUrl,
+            originalPhotoUrl: originalPhotoUrl,
             notes: notes,
             dataSource: dataSource,
             sourceMetadataJSON: sourceMetadataJSON,
+            syncStatus: syncStatus,
             createdAt: createdAt ?? date,
             updatedAt: updatedAt ?? createdAt ?? date,
             isMarkedDeleted: isMarkedDeleted

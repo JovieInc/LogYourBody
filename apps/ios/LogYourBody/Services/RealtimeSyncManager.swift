@@ -357,9 +357,16 @@ class RealtimeSyncManager: ObservableObject {
     }
 
     nonisolated func syncLocalChanges(for userId: String?, token: String) async throws {
-        let unsynced = try await coreDataManager.fetchPendingLocalSyncSnapshot(for: userId)
+        var unsynced = try await coreDataManager.fetchPendingLocalSyncSnapshot(for: userId)
+        if unsynced.bodyMetrics.contains(where: \.isStaleEmptyPhotoPlaceholder) {
+            await discardEmptyPhotoPlaceholders(unsynced.bodyMetrics)
+            unsynced = try await coreDataManager.fetchPendingLocalSyncSnapshot(for: userId)
+        }
+
         let deletedBodyMetrics = unsynced.bodyMetrics.filter(\.isMarkedDeleted)
-        let bodyMetricsToUpsert = unsynced.bodyMetrics.filter { !$0.isMarkedDeleted }
+        let bodyMetricsToUpsert = unsynced.bodyMetrics.filter {
+            !$0.isMarkedDeleted && !$0.shouldSkipBodyMetricUpsert
+        }
         let deletedGlp1DoseLogs = unsynced.glp1DoseLogs.filter(\.isMarkedDeleted)
         let glp1DoseLogsToUpsert = unsynced.glp1DoseLogs.filter { !$0.isMarkedDeleted }
 
@@ -393,6 +400,15 @@ class RealtimeSyncManager: ObservableObject {
 
         if !unsynced.dexaResults.isEmpty {
             try await syncDexaResultsBatch(unsynced.dexaResults, token: token)
+        }
+    }
+
+    nonisolated private func discardEmptyPhotoPlaceholders(_ metrics: [PendingBodyMetricSyncItem]) async {
+        for metric in metrics where metric.isStaleEmptyPhotoPlaceholder {
+            _ = await coreDataManager.deleteEmptyPhotoPlaceholder(
+                id: metric.id,
+                userId: metric.userId
+            )
         }
     }
 
@@ -913,6 +929,37 @@ class RealtimeSyncManager: ObservableObject {
         if syncStatus == .error("") {
             syncStatus = .idle
         }
+    }
+}
+
+private extension PendingBodyMetricSyncItem {
+    var shouldSkipBodyMetricUpsert: Bool {
+        isEmptyPhotoPlaceholder ||
+            (
+                CoreDataManager.isPhotoUploadPlaceholderSyncStatus(syncStatus) &&
+                    Self.isBlank(photoUrl)
+            )
+    }
+
+    var isStaleEmptyPhotoPlaceholder: Bool {
+        isEmptyPhotoPlaceholder && !CoreDataManager.isPhotoUploadPlaceholderSyncStatus(syncStatus)
+    }
+
+    var isEmptyPhotoPlaceholder: Bool {
+        BodyMetricSource.normalizedRawValue(dataSource) == BodyMetricSource.photo.rawValue &&
+            weight <= 0 &&
+            waistCircumference <= 0 &&
+            hipCircumference <= 0 &&
+            bodyFatPercentage <= 0 &&
+            muscleMass <= 0 &&
+            boneMass <= 0 &&
+            Self.isBlank(photoUrl) &&
+            Self.isBlank(notes) &&
+            Self.isBlank(sourceMetadataJSON)
+    }
+
+    static func isBlank(_ value: String?) -> Bool {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
     }
 }
 
