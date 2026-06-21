@@ -409,6 +409,8 @@ struct ProfileSettingsViewV2: View {
                     try await authManager.consolidateNameUpdate(editableName)
                 }
 
+                let onboardingCompleted = currentUser.profile?.onboardingCompleted ?? currentUser.onboardingCompleted
+
                 // Create updated profile
                 let updatedProfile = UserProfile(
                     id: currentUser.id,
@@ -422,7 +424,7 @@ struct ProfileSettingsViewV2: View {
                     activityLevel: currentUser.profile?.activityLevel,
                     goalWeight: currentUser.profile?.goalWeight,
                     goalWeightUnit: currentUser.profile?.goalWeightUnit,
-                    onboardingCompleted: currentUser.profile?.onboardingCompleted
+                    onboardingCompleted: onboardingCompleted
                 )
 
                 // Save to Core Data
@@ -435,19 +437,21 @@ struct ProfileSettingsViewV2: View {
                     "height": Double(editableHeightCm),
                     "heightUnit": useMetricHeight ? "cm" : "in",
                     "gender": editableGender.description,
-                    "onboardingCompleted": true
+                    "onboardingCompleted": onboardingCompleted
                 ]
 
                 await authManager.updateProfile(updates)
 
                 await MainActor.run {
-                    isSaving = false
-                    withAnimation {
-                        showingSaveSuccess = true
+                    let didApplyProfile = authManager.applySavedProfileToCurrentUser(updatedProfile)
+                    if !didApplyProfile {
+                        hasChanges = true
+                    } else {
+                        withAnimation {
+                            showingSaveSuccess = true
+                        }
                     }
-
-                    // Force UI refresh
-                    NotificationCenter.default.post(name: .profileUpdated, object: nil)
+                    isSaving = false
                 }
 
                 let elapsed = Date().timeIntervalSince(start)

@@ -3514,6 +3514,88 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertEqual(manager.currentUser?.email, "user_apple_123@apple.local.logyourbody")
     }
 
+    func testApplySavedProfileUpdatesPublishedCurrentUser() {
+        let manager = AuthManager()
+        manager.currentUser = LocalUser(
+            id: "profile-user",
+            email: "profile@example.com",
+            name: "Old Name",
+            avatarUrl: nil,
+            profile: UserProfile(
+                id: "profile-user",
+                email: "profile@example.com",
+                username: nil,
+                fullName: "Old Name",
+                dateOfBirth: nil,
+                height: nil,
+                heightUnit: "cm",
+                gender: nil,
+                activityLevel: nil,
+                goalWeight: nil,
+                goalWeightUnit: nil,
+                onboardingCompleted: false
+            ),
+            onboardingCompleted: false
+        )
+
+        let savedProfile = UserProfile(
+            id: "profile-user",
+            email: "profile@example.com",
+            username: nil,
+            fullName: "Updated Name",
+            dateOfBirth: Date(timeIntervalSince1970: 631_152_000),
+            height: 180,
+            heightUnit: "cm",
+            gender: "male",
+            activityLevel: nil,
+            goalWeight: nil,
+            goalWeightUnit: nil,
+            onboardingCompleted: true
+        )
+
+        let didApply = manager.applySavedProfileToCurrentUser(savedProfile)
+
+        XCTAssertTrue(didApply)
+        XCTAssertEqual(manager.currentUser?.name, "Updated Name")
+        XCTAssertEqual(manager.currentUser?.profile?.height, 180)
+        XCTAssertEqual(manager.currentUser?.profile?.gender, "male")
+        XCTAssertEqual(manager.currentUser?.onboardingCompleted, true)
+    }
+
+    func testApplySavedProfileRejectsDifferentUserProfile() {
+        let manager = AuthManager()
+        manager.currentUser = LocalUser(
+            id: "current-user",
+            email: "current@example.com",
+            name: "Current User",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: false
+        )
+
+        let didApply = manager.applySavedProfileToCurrentUser(
+            UserProfile(
+                id: "other-user",
+                email: "other@example.com",
+                username: nil,
+                fullName: "Other User",
+                dateOfBirth: nil,
+                height: 180,
+                heightUnit: "cm",
+                gender: "male",
+                activityLevel: nil,
+                goalWeight: nil,
+                goalWeightUnit: nil,
+                onboardingCompleted: true
+            )
+        )
+
+        XCTAssertFalse(didApply)
+        XCTAssertEqual(manager.currentUser?.id, "current-user")
+        XCTAssertNil(manager.currentUser?.profile)
+        XCTAssertFalse(manager.currentUser?.onboardingCompleted ?? true)
+    }
+
     func testSyntheticAuthEmailSanitizesClerkUserId() {
         XCTAssertEqual(
             AuthManager.syntheticAuthEmail(userId: " user:abc/123 "),

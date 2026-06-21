@@ -1401,6 +1401,18 @@ extension AuthManager {
         currentUser = user
     }
 
+    @discardableResult
+    func applySavedProfileToCurrentUser(_ profile: UserProfile) -> Bool {
+        guard currentUser?.id == profile.id else { return false }
+
+        applyAuthenticatedProfile(
+            profile,
+            fallbackEmail: profile.email ?? currentUser?.email ?? ""
+        )
+        NotificationCenter.default.post(name: .profileUpdated, object: nil)
+        return true
+    }
+
     // MARK: - Account Deletion Helpers
 
     /// Best-effort call to backend delete-account pipeline.
