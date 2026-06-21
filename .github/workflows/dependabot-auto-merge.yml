@@ -1,93 +1,12 @@
+# Thin caller — keep in sync via ~/.hermes/scripts/sync-ship-github-workflows.py
 name: Dependabot Auto-Merge
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+    types: [opened, reopened, synchronize, ready_for_review]
 
-permissions:
-  contents: read  # Default to read-only
+permissions: {}
 
 jobs:
-  # First check if tests pass
-  check-tests:
-    runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
-    outputs:
-      tests-passed: ${{ steps.check.outputs.passed }}
-      update-type: ${{ steps.metadata.outputs.update-type }}
-    steps:
-      - name: Fetch metadata
-        id: metadata
-        uses: dependabot/fetch-metadata@v2
-        with:
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Determine test status
-        id: check
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]] && echo "passed=true" >> $GITHUB_OUTPUT || echo "passed=false" >> $GITHUB_OUTPUT
-          else
-            sleep 30
-            PR_SHA="${{ github.event.pull_request.head.sha }}"
-            # Check for CI workflow run or PR checks
-            CHECKS=$(gh api repos/${{ github.repository }}/commits/${PR_SHA}/check-runs --jq '.check_runs[] | select(.name == "JavaScript/TypeScript" or .name == "iOS" or .name == "CI Summary") | .conclusion')
-            
-            # If any required check passed, consider tests as passed
-            if echo "$CHECKS" | grep -q "success"; then
-              STATUS="success"
-            else
-              STATUS="failure"
-            fi
-            [[ "$STATUS" == "success" ]] && echo "passed=true" >> $GITHUB_OUTPUT || echo "passed=false" >> $GITHUB_OUTPUT
-          fi
-
-  # Auto-merge only after tests pass
-  auto-merge:
-    needs: check-tests
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    if: |
-      github.actor == 'dependabot[bot]' && 
-      needs.check-tests.outputs.tests-passed == 'true' &&
-      (needs.check-tests.outputs.update-type == 'version-update:semver-patch' || 
-       needs.check-tests.outputs.update-type == 'version-update:semver-minor')
-    
-    steps:
-    - name: Enable auto-merge for Dependabot PR
-      run: |
-        gh pr merge --auto --squash "$PR_URL"
-        echo "✅ Enabled auto-merge for Dependabot PR (tests passed)"
-      env:
-        PR_URL: ${{ github.event.pull_request.html_url || github.event.workflow_run.pull_requests[0].html_url }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Comment on updates that need manual review
-  comment-manual-review:
-    needs: check-tests
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    if: |
-      github.actor == 'dependabot[bot]' && 
-      (needs.check-tests.outputs.update-type == 'version-update:semver-major' ||
-       needs.check-tests.outputs.tests-passed == 'false')
-    
-    steps:
-    - name: Comment on PR
-      env:
-        PR_URL: ${{ github.event.pull_request.html_url || github.event.workflow_run.pull_requests[0].html_url }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        if [[ "${{ needs.check-tests.outputs.tests-passed }}" == "false" ]]; then
-          COMMENT="❌ Tests are failing. This PR requires manual review and cannot be auto-merged."
-        else
-          COMMENT="⚠️ This is a major version update and requires manual review before merging."
-        fi
-        
-        gh pr comment "$PR_URL" --body "$COMMENT"
+  call:
+    uses: JovieInc/ci/.github/workflows/dependabot-auto-merge.yml@main
