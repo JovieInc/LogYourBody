@@ -2204,6 +2204,40 @@ final class PhotoMetadataServiceTests: XCTestCase {
         XCTAssertEqual(created.dataSource, BodyMetricSource.manual.rawValue)
         XCTAssertNil(created.photoUrl)
     }
+
+    func testCreateOrUpdateMetricsDefaultsNewManualMeasurementsToManualSource() async {
+        let userId = "manual_entry_default_source_\(UUID().uuidString)"
+        let date = Date(timeIntervalSince1970: 1_765_100_000)
+
+        let weightEntry = await PhotoMetadataService.shared.createOrUpdateMetrics(
+            for: date,
+            weight: 82.4,
+            userId: userId
+        )
+
+        let bodyFatEntry = await PhotoMetadataService.shared.createOrUpdateMetrics(
+            for: date.addingTimeInterval(86_400),
+            bodyFatPercentage: 17.1,
+            userId: userId
+        )
+
+        XCTAssertEqual(weightEntry.dataSource, BodyMetricSource.manual.rawValue)
+        XCTAssertEqual(bodyFatEntry.dataSource, BodyMetricSource.manual.rawValue)
+    }
+
+    func testCreateOrUpdateMetricsKeepsPhotoDefaultForPhotoOnlyPlaceholder() async {
+        let userId = "photo_entry_default_source_\(UUID().uuidString)"
+        let date = Date(timeIntervalSince1970: 1_765_200_000)
+
+        let photoEntry = await PhotoMetadataService.shared.createOrUpdateMetrics(
+            for: date,
+            userId: userId
+        )
+
+        XCTAssertEqual(photoEntry.dataSource, BodyMetricSource.photo.rawValue)
+        XCTAssertNil(photoEntry.weight)
+        XCTAssertNil(photoEntry.bodyFatPercentage)
+    }
 }
 
 final class BulkProgressPhotoImportPolicyTests: XCTestCase {

@@ -157,7 +157,12 @@ class PhotoMetadataService {
                 boneMass: nil,
                 notes: nil,
                 photoUrl: photoUrl,
-                dataSource: dataSource ?? BodyMetricSource.photo.rawValue,
+                dataSource: resolvedDataSource(
+                    explicitDataSource: dataSource,
+                    photoUrl: photoUrl,
+                    weight: weight,
+                    bodyFatPercentage: bodyFatPercentage
+                ),
                 createdAt: Date(),
                 updatedAt: Date()
             )
@@ -191,6 +196,27 @@ class PhotoMetadataService {
         }
 
         return nil
+    }
+
+    private func resolvedDataSource(
+        explicitDataSource: String?,
+        photoUrl: String?,
+        weight: Double?,
+        bodyFatPercentage: Double?
+    ) -> String {
+        if let explicitDataSource {
+            return BodyMetricSource.normalizedRawValue(explicitDataSource)
+        }
+
+        if weight != nil || bodyFatPercentage != nil {
+            return BodyMetricSource.manual.rawValue
+        }
+
+        if photoUrl != nil {
+            return BodyMetricSource.photo.rawValue
+        }
+
+        return BodyMetricSource.photo.rawValue
     }
 
     /// Estimate body fat percentage based on nearby entries (with caching for performance)
