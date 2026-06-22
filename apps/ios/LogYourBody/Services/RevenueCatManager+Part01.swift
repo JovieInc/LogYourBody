@@ -544,6 +544,7 @@ func cachePaywallOfferingDisplay(_ display: CachedPaywallOfferingDisplay) {
         }
     }
 
+#if DEBUG
 func applyCachedPaywallOfferingUITestFixture() {
         shouldForceOfferingsUnavailableForUITests = true
         currentOffering = nil
@@ -628,6 +629,7 @@ func applyPaywallPlansUITestFixture() {
 func fixtureDecimal(_ value: String) -> Decimal {
         Decimal(string: value) ?? 0
     }
+#endif
 
 // MARK: - Private Helper Methods
 
