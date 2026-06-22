@@ -27,6 +27,8 @@ jobs:
 
       - name: Determine test status
         id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
             [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]] && echo "passed=true" >> $GITHUB_OUTPUT || echo "passed=false" >> $GITHUB_OUTPUT
