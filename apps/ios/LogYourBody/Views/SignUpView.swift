@@ -5,7 +5,6 @@
 // Refactored using Atomic Design principles
 //
 import SwiftUI
-import AuthenticationServices
 
 struct SignUpView: View {
     @Environment(\.theme)
@@ -49,7 +48,7 @@ struct SignUpView: View {
             }
         }
         .onAppear {
-            AnalyticsService.shared.track(event: "signup_view")
+            AppServicePorts.analyticsTracker.track(event: "signup_view")
             refreshAppleSignInVisibility()
         }
         .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
@@ -68,9 +67,9 @@ struct SignUpView: View {
             VStack(spacing: 0) {
                 navigationBar
 
-                // Show Clerk initialization status banner
-                if shouldShowClerkStatusBanner {
-                    clerkStatusBanner
+                // Show authentication service status banner
+                if shouldShowAuthProviderStatusBanner {
+                    authProviderStatusBanner
                         .padding(.horizontal, 24)
                         .padding(.top, 12)
                 }
@@ -80,7 +79,7 @@ struct SignUpView: View {
                     title: "Create Account",
                     subtitle: "Start tracking your fitness progress"
                 )
-                .padding(.top, shouldShowClerkStatusBanner ? 12 : 20)
+                .padding(.top, shouldShowAuthProviderStatusBanner ? 12 : 20)
                 .padding(.bottom, 40)
 
                 // Organism: Sign Up Form
@@ -129,8 +128,8 @@ struct SignUpView: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    private var shouldShowClerkStatusBanner: Bool {
-        !authManager.isClerkLoaded || authManager.clerkInitError != nil
+    private var shouldShowAuthProviderStatusBanner: Bool {
+        !authManager.isAuthProviderReady || authManager.authProviderInitError != nil
     }
 
     private func refreshAppleSignInVisibility() {
@@ -160,10 +159,10 @@ struct SignUpView: View {
         .padding(.top, 8)
     }
 
-    // Clerk status banner (same as LoginView)
-    private var clerkStatusBanner: some View {
+    // Authentication service status banner (same as LoginView)
+    private var authProviderStatusBanner: some View {
         VStack(spacing: 12) {
-            if let error = authManager.clerkInitError {
+            if let error = authManager.authProviderInitError {
                 // Error state
                 VStack(spacing: 8) {
                     HStack {
@@ -180,7 +179,7 @@ struct SignUpView: View {
                         .foregroundColor(theme.colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Button(action: retryClerkInit) {
+                    Button(action: retryAuthProviderInit) {
                         HStack {
                             if isRetrying {
                                 ProgressView()
@@ -234,17 +233,17 @@ struct SignUpView: View {
         }
     }
 
-    private func retryClerkInit() {
+    private func retryAuthProviderInit() {
         isRetrying = true
         Task {
-            await authManager.retryClerkInitialization()
+            await authManager.retryAuthProviderInitialization()
             isRetrying = false
         }
     }
 
     private func signUp() {
-        // Check if Clerk is ready
-        guard authManager.isClerkLoaded else {
+        // Check if authentication service is ready
+        guard authManager.isAuthProviderReady else {
             errorMessage = authManager.authServiceNotReadyMessage
             showError = true
             return
@@ -255,7 +254,7 @@ struct SignUpView: View {
 
         isLoading = true
 
-        AnalyticsService.shared.track(
+        AppServicePorts.analyticsTracker.track(
             event: "signup_attempt",
             properties: [
                 "method": "email_otp"
@@ -277,7 +276,7 @@ struct SignUpView: View {
                     showError = true
                 }
 
-                AnalyticsService.shared.track(
+                AppServicePorts.analyticsTracker.track(
                     event: "signup_failed",
                     properties: [
                         "method": "email_otp"

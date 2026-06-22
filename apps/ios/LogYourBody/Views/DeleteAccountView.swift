@@ -3,7 +3,6 @@
 // LogYourBody
 //
 import SwiftUI
-import Clerk
 
 struct DeleteAccountView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -163,7 +162,7 @@ struct DeleteAccountView: View {
             do {
                 try await AccountDeletionCleanupService.live(
                     authManager: authManager,
-                    deleteClerkAccount: deleteClerkAccount
+                    deleteAuthAccount: authManager.deleteCurrentAccount
                 ).performDeletion()
             } catch {
                 await MainActor.run {
@@ -174,24 +173,14 @@ struct DeleteAccountView: View {
             }
         }
     }
-
-    private func deleteClerkAccount() async throws {
-        // Use Clerk SDK to delete the user account
-        guard let user = Clerk.shared.user else {
-            throw NSError(domain: "DeleteAccount", code: 1, userInfo: [NSLocalizedDescriptionKey: "No user found"])
-        }
-
-        // Delete the user through Clerk
-        try await user.delete()
-    }
 }
 
 struct AccountDeletionCleanupService {
     struct Dependencies {
-        var logoutRevenueCat: () async -> Void
+        var logoutSubscriptionProvider: () async -> Void
         var resetHealthKitAnchors: () async -> Void
         var notifyBackendOfAccountDeletion: () async -> Void
-        var deleteClerkAccount: () async throws -> Void
+        var deleteAuthAccount: () async throws -> Void
         var deleteCoreData: () async throws -> Void
         var clearKeychain: () -> Void
         var deleteSpotlightMetrics: () -> Void
@@ -239,13 +228,13 @@ struct AccountDeletionCleanupService {
 
     static func live(
         authManager: AuthManager,
-        deleteClerkAccount: @escaping () async throws -> Void
+        deleteAuthAccount: @escaping () async throws -> Void
     ) -> AccountDeletionCleanupService {
         AccountDeletionCleanupService(
             dependencies: Dependencies(
-                logoutRevenueCat: {
-                    // Dissociates RevenueCat from the deleted account; subscriptions expire normally.
-                    await RevenueCatManager.shared.logoutUser()
+                logoutSubscriptionProvider: {
+                    // Dissociates subscription state from the deleted account; subscriptions expire normally.
+                    await SubscriptionManager.shared.logoutUser()
                 },
                 resetHealthKitAnchors: {
                     await HealthSyncCoordinator.shared.resetForCurrentUser()
@@ -253,7 +242,7 @@ struct AccountDeletionCleanupService {
                 notifyBackendOfAccountDeletion: {
                     await authManager.notifyBackendOfAccountDeletion()
                 },
-                deleteClerkAccount: deleteClerkAccount,
+                deleteAuthAccount: deleteAuthAccount,
                 deleteCoreData: {
                     try await CoreDataManager.shared.deleteAllDataAndWait()
                 },
@@ -274,10 +263,10 @@ struct AccountDeletionCleanupService {
     }
 
     func performDeletion() async throws {
-        await dependencies.logoutRevenueCat()
+        await dependencies.logoutSubscriptionProvider()
         await dependencies.resetHealthKitAnchors()
         await dependencies.notifyBackendOfAccountDeletion()
-        try await dependencies.deleteClerkAccount()
+        try await dependencies.deleteAuthAccount()
 
         var localCleanupError: Error?
         do {

@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import Photos
 
 struct BodyScoreSharePayload {
     let score: Int
@@ -596,29 +595,6 @@ struct BodyScoreShareSheet: View {
         }
         guard let image = renderedImage else { return }
 
-        let status = PHPhotoLibrary.authorizationStatus()
-
-        switch status {
-        case .authorized:
-            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-        case .notDetermined:
-            let newStatus = await withCheckedContinuation { continuation in
-                PHPhotoLibrary.requestAuthorization { authStatus in
-                    continuation.resume(returning: authStatus)
-                }
-            }
-
-            if newStatus == .authorized {
-                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-            } else if #available(iOS 14, *), newStatus == .limited {
-                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-            }
-        case .limited:
-            if #available(iOS 14, *) {
-                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-            }
-        default:
-            return
-        }
+        _ = await LivePhotoLibraryAdapter.shared.saveImage(image)
     }
 }

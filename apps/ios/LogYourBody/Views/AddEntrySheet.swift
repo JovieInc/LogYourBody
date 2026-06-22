@@ -3,7 +3,6 @@
 // LogYourBody
 //
 import SwiftUI
-import PhotosUI
 
 struct PhotoUploadBatchPolicy {
     static func progress(completedCount: Int, totalCount: Int) -> Double {
@@ -80,12 +79,12 @@ struct AddEntrySheet: View {
     @State private var bodyFatError: String?
 
     // Photo entry
-    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var selectedPhotos: [AppPhotoAsset] = []
     @State private var isProcessingPhotos = false
     @State private var photoProgress: Double = 0
     @State private var processedCount = 0
     @State private var processingPhotoCount = 0
-    @State private var photoIdentifiers: [String] = []  // Store successfully uploaded PHAsset identifiers for deletion
+    @State private var photoIdentifiers: [String] = []  // Store successfully uploaded photo identifiers for deletion
 
     // GLP-1 entry
     @State private var glp1Dose: String = ""
@@ -228,7 +227,7 @@ struct AddEntrySheet: View {
                 }
 
                 loadGlp1MedicationsIfNeeded()
-                AnalyticsService.shared.track(event: "add_entry_view")
+                AppServicePorts.analyticsTracker.track(event: "add_entry_view")
             }
             .onChange(of: selectedTab) { _, _ in
                 loadGlp1MedicationsIfNeeded()
@@ -701,11 +700,14 @@ struct AddEntrySheet: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
 
-                    PhotosPicker(
-                        selection: $selectedPhotos,
-                        maxSelectionCount: 10,
-                        matching: .images
-                    ) {
+                    AppPhotosPicker(maxSelectionCount: 10) { assets in
+                        await MainActor.run {
+                            selectedPhotos = assets
+                            if !assets.isEmpty && !hasPromptedDeletePhotos {
+                                showDeletePhotosPrompt = true
+                            }
+                        }
+                    } label: {
                         Label("Choose Photos", systemImage: "photo.fill")
                             .frame(height: 48)
                             .frame(maxWidth: .infinity)
@@ -714,11 +716,6 @@ struct AddEntrySheet: View {
                             .cornerRadius(Constants.cornerRadius)
                     }
                     .padding(.horizontal)
-                    .onChange(of: selectedPhotos) { _, newPhotos in
-                        if !newPhotos.isEmpty && !hasPromptedDeletePhotos {
-                            showDeletePhotosPrompt = true
-                        }
-                    }
                 }
                 .padding(.top, 40)
             } else {
@@ -962,7 +959,7 @@ struct AddEntrySheet: View {
         }
     }
 
-    private func savePhotos(userId: String, selectedPhotos photosToUpload: [PhotosPickerItem]) async {
+    private func savePhotos(userId: String, selectedPhotos photosToUpload: [AppPhotoAsset]) async {
         guard !photosToUpload.isEmpty else { return }
 
         isProcessingPhotos = true
@@ -972,7 +969,7 @@ struct AddEntrySheet: View {
         photoIdentifiers.removeAll()
         var successfulUploadCount = 0
         var successfulPhotoIdentifiers: [String] = []
-        var failedPhotos: [PhotosPickerItem] = []
+        var failedPhotos: [AppPhotoAsset] = []
 
         defer {
             isProcessingPhotos = false
@@ -991,15 +988,9 @@ struct AddEntrySheet: View {
                     )
                 }
 
-                // Extract PHAsset identifier if available
-                let itemIdentifier = item.itemIdentifier
-
-                // Load the photo data
-                guard let data = try await item.loadTransferable(type: Data.self),
-                      let image = UIImage(data: data) else {
-                    failedPhotos.append(item)
-                    continue
-                }
+                let itemIdentifier = item.localIdentifier
+                let data = item.data
+                let image = item.image
 
                 // Extract date from metadata
                 let photoDate = PhotoMetadataService.shared.extractDate(from: data) ?? selectedDate
@@ -1077,7 +1068,7 @@ struct AddEntrySheet: View {
         var eventProperties = properties
         eventProperties["type"] = type
 
-        AnalyticsService.shared.track(
+        AppServicePorts.analyticsTracker.track(
             event: "entry_saved",
             properties: eventProperties
         )
@@ -1086,14 +1077,8 @@ struct AddEntrySheet: View {
     private func deletePhotosFromLibrary() async {
         guard !photoIdentifiers.isEmpty else { return }
 
-        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: photoIdentifiers, options: nil)
-
-        guard fetchResult.firstObject != nil else { return }
-
         do {
-            try await PHPhotoLibrary.shared().performChanges {
-                PHAssetChangeRequest.deleteAssets(fetchResult)
-            }
+            try await LivePhotoLibraryAdapter.shared.deleteAssets(localIdentifiers: photoIdentifiers)
         } catch {
             let context = ErrorContext(
                 feature: "photos",
@@ -1246,11 +1231,11 @@ struct AddEntrySheet: View {
         #endif
 
         do {
-            let medications = try await SupabaseManager.shared.fetchGlp1Medications(userId: userId)
+            let medications = try await AppServicePorts.glp1RemoteDataProvider.fetchGlp1Medications(userId: userId)
             glp1Medications = medications.sorted(by: { $0.startedAt < $1.startedAt })
             CoreDataManager.shared.saveGlp1Medications(medications, userId: userId)
 
-            let doseLogs = try await SupabaseManager.shared.fetchGlp1DoseLogs(userId: userId)
+            let doseLogs = try await AppServicePorts.glp1RemoteDataProvider.fetchGlp1DoseLogs(userId: userId)
             CoreDataManager.shared.saveGlp1DoseLogs(doseLogs, userId: userId)
             glp1DoseLogs = doseLogs.sorted(by: { $0.takenAt < $1.takenAt })
 

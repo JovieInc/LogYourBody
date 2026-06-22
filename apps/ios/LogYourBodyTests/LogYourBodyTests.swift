@@ -656,7 +656,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
         var events: [String] = []
         let service = AccountDeletionCleanupService(
             dependencies: .init(
-                logoutRevenueCat: {
+                logoutSubscriptionProvider: {
                     events.append("revenuecat")
                 },
                 resetHealthKitAnchors: {
@@ -665,7 +665,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
                 notifyBackendOfAccountDeletion: {
                     events.append("backend")
                 },
-                deleteClerkAccount: {
+                deleteAuthAccount: {
                     events.append("clerk")
                 },
                 deleteCoreData: {
@@ -709,7 +709,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
         var events: [String] = []
         let service = AccountDeletionCleanupService(
             dependencies: .init(
-                logoutRevenueCat: {
+                logoutSubscriptionProvider: {
                     events.append("revenuecat")
                 },
                 resetHealthKitAnchors: {
@@ -718,7 +718,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
                 notifyBackendOfAccountDeletion: {
                     events.append("backend")
                 },
-                deleteClerkAccount: {
+                deleteAuthAccount: {
                     events.append("clerk")
                 },
                 deleteCoreData: {
@@ -768,7 +768,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
         var events: [String] = []
         let service = AccountDeletionCleanupService(
             dependencies: .init(
-                logoutRevenueCat: {
+                logoutSubscriptionProvider: {
                     events.append("revenuecat")
                 },
                 resetHealthKitAnchors: {
@@ -777,7 +777,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
                 notifyBackendOfAccountDeletion: {
                     events.append("backend")
                 },
-                deleteClerkAccount: {
+                deleteAuthAccount: {
                     events.append("clerk")
                     throw TestError.clerkDeletionFailed
                 },

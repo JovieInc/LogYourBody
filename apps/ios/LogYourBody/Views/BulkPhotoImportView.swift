@@ -3,7 +3,6 @@
 // LogYourBody
 //
 import SwiftUI
-import Photos
 
 struct BulkPhotoImportView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -479,7 +478,7 @@ struct BulkPhotoImportView: View {
 
         scanner.checkAuthorizationStatus()
 
-        if scanner.authorizationStatus == .authorized || scanner.authorizationStatus == .limited {
+        if scanner.authorizationStatus == .authorized {
             Task {
                 await scanner.scanPhotoLibrary()
             }

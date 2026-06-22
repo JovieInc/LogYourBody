@@ -3,7 +3,6 @@
 // LogYourBody
 //
 import SwiftUI
-import Clerk
 import AppIntents
 
 enum LogYourBodyDeepLink {
@@ -125,11 +124,10 @@ enum EntryDeepLinkRoutingPolicy {
 @main
 struct LogYourBodyApp: App {
     @StateObject private var authManager = AuthManager.shared
-    @StateObject private var revenueCatManager = RevenueCatManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var healthKitManager = HealthKitManager.shared
     @StateObject private var realtimeSyncManager = RealtimeSyncManager.shared
     @StateObject private var bugReportManager = BugReportManager.shared
-    @State private var clerk = Clerk.shared
     @State private var showAddEntrySheet = false
     @State private var selectedEntryTab = 0
     @State private var pendingEntryDeepLinkDestination: EntryDeepLinkRoutingPolicy.PendingDestination?
@@ -146,9 +144,8 @@ struct LogYourBodyApp: App {
                 .environment(\.managedObjectContext, persistenceController.viewContext)
                 .environmentObject(authManager)
                 .environmentObject(realtimeSyncManager)
-                .environmentObject(revenueCatManager)
+                .environmentObject(subscriptionManager)
                 .environmentObject(bugReportManager)
-                .environment(clerk)
                 .sheet(isPresented: $bugReportManager.isPromptPresented) {
                     BugReportPromptSheet()
                         .environmentObject(bugReportManager)
@@ -187,7 +184,7 @@ struct LogYourBodyApp: App {
                 .onChange(of: authManager.currentUser?.profile?.onboardingCompleted) { _, _ in
                     resolvePendingEntryDeepLinkIfPossible()
                 }
-                .onChange(of: revenueCatManager.isSubscribed) { _, _ in
+                .onChange(of: subscriptionManager.isSubscribed) { _, _ in
                     resolvePendingEntryDeepLinkIfPossible()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: OnboardingStateManager.onboardingStateDidChange)) { _ in
@@ -230,15 +227,15 @@ struct LogYourBodyApp: App {
 
         scheduleDeferredMaintenance()
 
-        ErrorTrackingService.shared.start()
+        AppServicePorts.errorTracker.start()
 
-        AnalyticsService.shared.start()
-        AnalyticsService.shared.track(event: "app_open")
+        AppServicePorts.analyticsTracker.start()
+        AppServicePorts.analyticsTracker.track(event: "app_open")
 
         let clerkInitializationTask = authManager.ensureClerkInitializationTask(priority: .userInitiated)
 
         Task { @MainActor in
-            await configureRevenueCat(waitingFor: clerkInitializationTask)
+            await configureSubscriptions(waitingFor: clerkInitializationTask)
         }
 
         Task { @MainActor in
@@ -249,18 +246,18 @@ struct LogYourBodyApp: App {
     }
 
     @MainActor
-    private func configureRevenueCat(waitingFor clerkTask: Task<Void, Never>) async {
+    private func configureSubscriptions(waitingFor clerkTask: Task<Void, Never>) async {
         let apiKey = Constants.revenueCatAPIKey
         guard !apiKey.isEmpty else { return }
 
-        revenueCatManager.configure(apiKey: apiKey)
+        subscriptionManager.configure(apiKey: apiKey)
 
         await clerkTask.value
 
         if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
-            await revenueCatManager.identifyUser(userId: userId)
+            await subscriptionManager.identifyUser(userId: userId)
         } else {
-            await revenueCatManager.refreshCustomerInfo()
+            await subscriptionManager.refreshCustomerInfo()
         }
     }
 
@@ -295,11 +292,11 @@ struct LogYourBodyApp: App {
         }
 
         authManager.applySignedOutUITestFixture()
-        revenueCatManager.isSubscribed = false
-        revenueCatManager.customerInfo = nil
-        revenueCatManager.currentOffering = nil
-        revenueCatManager.errorMessage = nil
-        revenueCatManager.isPurchasing = false
+        subscriptionManager.isSubscribed = false
+        subscriptionManager.customerInfo = nil
+        subscriptionManager.currentOffering = nil
+        subscriptionManager.errorMessage = nil
+        subscriptionManager.isPurchasing = false
 
         return true
     }
@@ -312,11 +309,11 @@ struct LogYourBodyApp: App {
         }
 
         authManager.applyEmailVerificationUITestFixture()
-        revenueCatManager.isSubscribed = false
-        revenueCatManager.customerInfo = nil
-        revenueCatManager.currentOffering = nil
-        revenueCatManager.errorMessage = nil
-        revenueCatManager.isPurchasing = false
+        subscriptionManager.isSubscribed = false
+        subscriptionManager.customerInfo = nil
+        subscriptionManager.currentOffering = nil
+        subscriptionManager.errorMessage = nil
+        subscriptionManager.isPurchasing = false
 
         return true
     }
@@ -409,15 +406,15 @@ struct LogYourBodyApp: App {
         )
         authManager.isAuthenticated = true
         authManager.isClerkLoaded = true
-        revenueCatManager.isSubscribed = isSubscribed
-        revenueCatManager.customerInfo = nil
-        revenueCatManager.currentOffering = nil
-        revenueCatManager.errorMessage = nil
-        revenueCatManager.isPurchasing = false
+        subscriptionManager.isSubscribed = isSubscribed
+        subscriptionManager.customerInfo = nil
+        subscriptionManager.currentOffering = nil
+        subscriptionManager.errorMessage = nil
+        subscriptionManager.isPurchasing = false
         if usesPaywallFixture {
-            revenueCatManager.applyCachedPaywallOfferingUITestFixture()
+            subscriptionManager.applyCachedPaywallOfferingUITestFixture()
         } else if usesPaywallPlansFixture {
-            revenueCatManager.applyPaywallPlansUITestFixture()
+            subscriptionManager.applyPaywallPlansUITestFixture()
         }
         UserDefaults.standard.set(isSubscribed, forKey: "revenuecat_isSubscribed")
         if isSubscribed && !usesDailyReminderPromptFixture {
@@ -619,7 +616,7 @@ struct LogYourBodyApp: App {
             isAuthenticated: authManager.isAuthenticated,
             user: user,
             hasCompletedOnboarding: OnboardingStateManager.shared.hasCompletedCurrentVersion(for: user?.id),
-            isSubscribed: revenueCatManager.isSubscribed
+            isSubscribed: subscriptionManager.isSubscribed
         )
     }
 }

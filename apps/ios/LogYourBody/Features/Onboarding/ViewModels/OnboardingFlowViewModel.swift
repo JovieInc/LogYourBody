@@ -276,7 +276,7 @@ final class OnboardingFlowViewModel: ObservableObject {
             advanceFromEmailCapture()
         case .account:
             if entryContext == .preAuth {
-                AnalyticsService.shared.track(
+                AppServicePorts.analyticsTracker.track(
                     event: "onboarding_pre_auth_completed"
                 )
 
@@ -437,7 +437,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     private func trackStepTransition(from: Step, to: Step) {
         guard from != to else { return }
 
-        AnalyticsService.shared.track(
+        AppServicePorts.analyticsTracker.track(
             event: "onboarding_step_advanced",
             properties: [
                 "from_step": from.rawValue,
@@ -487,12 +487,12 @@ final class OnboardingFlowViewModel: ObservableObject {
     // MARK: - HealthKit
 
     func attemptHealthImport() async {
-        AnalyticsService.shared.track(
+        AppServicePorts.analyticsTracker.track(
             event: "onboarding_health_import_attempt"
         )
 
         guard healthKitManager.isHealthKitAvailable else {
-            AnalyticsService.shared.track(
+            AppServicePorts.analyticsTracker.track(
                 event: "onboarding_health_import_unavailable"
             )
             currentStep = .manualWeight
@@ -502,13 +502,13 @@ final class OnboardingFlowViewModel: ObservableObject {
         let granted = await healthKitManager.requestAuthorization()
         if granted {
             didRequestHealthSync = true
-            AnalyticsService.shared.track(
+            AppServicePorts.analyticsTracker.track(
                 event: "onboarding_health_import_authorized"
             )
             currentStep = .healthConfirmation
             await fetchHealthMetrics()
         } else {
-            AnalyticsService.shared.track(
+            AppServicePorts.analyticsTracker.track(
                 event: "onboarding_health_import_denied"
             )
             currentStep = .manualWeight
@@ -564,7 +564,7 @@ final class OnboardingFlowViewModel: ObservableObject {
             return
         }
 
-        AnalyticsService.shared.track(
+        AppServicePorts.analyticsTracker.track(
             event: "onboarding_body_score_calculation_attempt",
             properties: [
                 "entry_context": entryContext.analyticsContext
@@ -579,7 +579,7 @@ final class OnboardingFlowViewModel: ObservableObject {
             let result = try calculator.calculateScore(context: context)
             BodyScoreCache.shared.store(result, for: AuthManager.shared.currentUser?.id)
 
-            AnalyticsService.shared.track(
+            AppServicePorts.analyticsTracker.track(
                 event: "onboarding_body_score_calculation_succeeded",
                 properties: [
                     "entry_context": entryContext.analyticsContext
@@ -593,7 +593,7 @@ final class OnboardingFlowViewModel: ObservableObject {
                 self.errorMessage = nil
             }
         } catch {
-            AnalyticsService.shared.track(
+            AppServicePorts.analyticsTracker.track(
                 event: "onboarding_body_score_calculation_failed",
                 properties: [
                     "entry_context": entryContext.analyticsContext
@@ -751,7 +751,7 @@ final class OnboardingFlowViewModel: ObservableObject {
 
     func persistEmailCapture() {
         emailAddress = trimmedEmailAddress
-        AnalyticsService.shared.track(
+        AppServicePorts.analyticsTracker.track(
             event: "onboarding_email_captured",
             properties: [
                 "entry_context": entryContext.analyticsContext
@@ -788,7 +788,7 @@ final class OnboardingFlowViewModel: ObservableObject {
                 name: ""
             )
 
-            AnalyticsService.shared.track(
+            AppServicePorts.analyticsTracker.track(
                 event: "onboarding_account_created",
                 properties: [
                     "entry_context": entryContext.analyticsContext,
@@ -806,7 +806,7 @@ final class OnboardingFlowViewModel: ObservableObject {
                 self.goToNextStep()
             }
         } catch {
-            AnalyticsService.shared.track(
+            AppServicePorts.analyticsTracker.track(
                 event: "onboarding_account_creation_failed",
                 properties: [
                     "entry_context": entryContext.analyticsContext

@@ -74,7 +74,7 @@ struct PhotoScanCriteria {
 class PhotoLibraryScanner: ObservableObject {
     static let shared = PhotoLibraryScanner()
 
-    @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
+    @Published var authorizationStatus: AppAuthorizationState = .notDetermined
     @Published var isScanning = false
     @Published var scanProgress: Double = 0
     @Published var scannedPhotos: [ScannedPhoto] = []
@@ -90,13 +90,15 @@ class PhotoLibraryScanner: ObservableObject {
     // MARK: - Authorization
 
     func checkAuthorizationStatus() {
-        authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        authorizationStatus = Self.appAuthorizationState(
+            from: PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        )
     }
 
     func requestAuthorization() async -> Bool {
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         await MainActor.run {
-            self.authorizationStatus = status
+            self.authorizationStatus = Self.appAuthorizationState(from: status)
         }
         return status == .authorized || status == .limited
     }
@@ -104,7 +106,7 @@ class PhotoLibraryScanner: ObservableObject {
     // MARK: - Scanning
 
     func scanPhotoLibrary(with criteria: PhotoScanCriteria = .default) async {
-        guard authorizationStatus == .authorized || authorizationStatus == .limited else {
+        guard authorizationStatus == .authorized else {
             // print("❌ Photo library access not authorized")
             return
         }
@@ -154,6 +156,21 @@ class PhotoLibraryScanner: ObservableObject {
         scanTask = nil
         isScanning = false
         scanProgress = 0
+    }
+
+    private static func appAuthorizationState(from status: PHAuthorizationStatus) -> AppAuthorizationState {
+        switch status {
+        case .authorized, .limited:
+            return .authorized
+        case .notDetermined:
+            return .notDetermined
+        case .denied:
+            return .denied
+        case .restricted:
+            return .restricted
+        @unknown default:
+            return .unknown
+        }
     }
 
     // MARK: - Private Methods

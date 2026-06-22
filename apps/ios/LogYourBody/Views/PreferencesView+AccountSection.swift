@@ -26,8 +26,8 @@ extension PreferencesView {
     }
 
     var changeProfilePhotoRow: some View {
-        Button {
-            showingPhotoPicker = true
+        AppPhotosPicker(maxSelectionCount: 1) { assets in
+            await handlePhotoSelection(assets.first)
         } label: {
             SettingsRow(
                 icon: "camera.fill",

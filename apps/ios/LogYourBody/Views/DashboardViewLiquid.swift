@@ -201,7 +201,7 @@ struct DashboardViewLiquid: View {
             }
             .onChange(of: selectedTab) { _, newTab in
                 if newTab == .photos {
-                    AnalyticsService.shared.track(event: "photos_tab_opened")
+                    AppServicePorts.analyticsTracker.track(event: "photos_tab_opened")
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .bodyScoreUpdated)) { _ in

@@ -4,14 +4,12 @@
 //
 import SwiftUI
 import Foundation
-import LocalAuthentication
-import PhotosUI
 
 struct PreferencesView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.openURL) var openURL
     @Environment(\.theme) var theme
-    @StateObject var revenueCatManager = RevenueCatManager.shared
+    @StateObject var subscriptionManager = SubscriptionManager.shared
     @StateObject var notificationManager = NotificationManager.shared
     @AppStorage(Constants.preferredMeasurementSystemKey) var measurementSystem = PreferencesView.defaultMeasurementSystem
     @AppStorage("biometricLockEnabled") var biometricLockEnabled = false
@@ -22,14 +20,12 @@ struct PreferencesView: View {
     @AppStorage(Constants.goalBodyFatPercentageKey) var customBodyFatGoal: Double?
     @AppStorage(Constants.goalFFMIKey) var customFFMIGoal: Double?
 
-    @State var biometricType: LABiometryType = .none
+    @State var biometricType: AppBiometryType = .none
     @ObservedObject var healthKitManager = HealthKitManager.shared
     @State var showingRestoreAlert = false
     @State var restoreAlertMessage = ""
     @State var activeGoalEditor: PreferenceGoalKind?
     @State var isShowingProfileSettings = false
-    @State var showingPhotoPicker = false
-    @State var selectedPhotoItem: PhotosPickerItem?
     @State var isUploadingPhoto = false
     @State var avatarUploadProgress = 0.0
     @State var profileImageURL: String?
@@ -42,8 +38,6 @@ struct PreferencesView: View {
     @State var cachedIsFemale = false
     @State var cachedDefaultBodyFatGoal = Constants.BodyComposition.BodyFat.maleIdealValue
     @State var cachedDefaultFFMIGoal = Constants.BodyComposition.FFMI.maleIdealValue
-
-    let context = LAContext()
 
     static var defaultMeasurementSystem: String {
         MeasurementSystem.imperial.rawValue
@@ -105,19 +99,6 @@ struct PreferencesView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .photosPicker(
-            isPresented: $showingPhotoPicker,
-            selection: $selectedPhotoItem,
-            matching: .images,
-            photoLibrary: .shared()
-        )
-        .onChange(of: selectedPhotoItem) { _, newItem in
-            if let newItem {
-                Task {
-                    await handlePhotoSelection(newItem)
-                }
-            }
-        }
         .sheet(isPresented: $isShowingProfileSettings) {
             NavigationStack {
                 ProfileSettingsViewV2()
@@ -138,12 +119,7 @@ struct PreferencesView: View {
     }
 
     func checkBiometricAvailability() {
-        var error: NSError?
-        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            biometricType = context.biometryType
-        } else {
-            biometricType = .none
-        }
+        biometricType = LocalBiometricAuthenticationAdapter.shared.availableBiometryType()
     }
 }
 

@@ -5,12 +5,11 @@
 // Premium subscription paywall with glassmorphic design
 //
 import SwiftUI
-import RevenueCat
 
 struct PaywallView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject var authManager: AuthManager
-    @EnvironmentObject var revenueCatManager: RevenueCatManager
+    @EnvironmentObject var subscriptionManager: SubscriptionManager
     @State private var isLoading = true
     @State private var showRestoreSuccess = false
     @State private var showRestoreError = false
@@ -41,7 +40,7 @@ struct PaywallView: View {
                             .tint(.appPrimary)
                     } else {
                         plansUnavailableState(
-                            cachedPackage: revenueCatManager.cachedPaywallOfferingDisplay?.preferredPackage
+                            cachedPackage: subscriptionManager.cachedPaywallOfferingDisplay?.preferredPackage
                         )
                     }
 
@@ -62,16 +61,16 @@ struct PaywallView: View {
             .accessibilityIdentifier("paywall_screen")
 
             // Loading overlay
-            if revenueCatManager.isPurchasing {
+            if subscriptionManager.isPurchasing {
                 LoadingOverlay(message: "Processing purchase...")
             }
         }
         .alert("Purchase Error", isPresented: $showPurchaseError) {
             Button("OK", role: .cancel) {
-                revenueCatManager.errorMessage = nil
+                subscriptionManager.errorMessage = nil
             }
         } message: {
-            Text(revenueCatManager.errorMessage ?? "An error occurred")
+            Text(subscriptionManager.errorMessage ?? "An error occurred")
         }
         .alert("Restore Successful", isPresented: $showRestoreSuccess) {
             Button("OK", role: .cancel) {}
@@ -80,10 +79,10 @@ struct PaywallView: View {
         }
         .alert("No Subscription Found", isPresented: $showRestoreError) {
             Button("OK", role: .cancel) {
-                revenueCatManager.errorMessage = nil
+                subscriptionManager.errorMessage = nil
             }
         } message: {
-            Text(revenueCatManager.errorMessage ?? "No active subscription found")
+            Text(subscriptionManager.errorMessage ?? "No active subscription found")
         }
         .confirmationDialog(
             "Log out of LogYourBody?",
@@ -92,7 +91,7 @@ struct PaywallView: View {
         ) {
             Button("Log Out", role: .destructive) {
                 Task {
-                    AnalyticsService.shared.track(event: "paywall_logout")
+                    AppServicePorts.analyticsTracker.track(event: "paywall_logout")
                     await authManager.logout()
                 }
             }
@@ -102,7 +101,7 @@ struct PaywallView: View {
         }
         .onAppear {
             // Use cached offerings if available, otherwise fetch
-            if revenueCatManager.currentOffering != nil {
+            if !subscriptionManager.paywallPackages.isEmpty {
                 isLoading = false
                 // print("💰 Using cached offerings")
             } else {
@@ -111,7 +110,7 @@ struct PaywallView: View {
                 }
             }
 
-            AnalyticsService.shared.track(event: "paywall_view")
+            AppServicePorts.analyticsTracker.track(event: "paywall_view")
         }
         .sheet(isPresented: $showTermsSheet) {
             NavigationStack {
@@ -127,30 +126,18 @@ struct PaywallView: View {
 
     // MARK: - Computed Properties
 
-    private var availablePrimaryPackages: [Package] {
-        guard let offering = revenueCatManager.currentOffering else {
-            return []
-        }
-
-        let monthly = offering.package(identifier: "$rc_monthly")
-        let annual = offering.package(identifier: "$rc_annual")
-        let primaryPackages = [monthly, annual].compactMap { $0 }
-
-        if !primaryPackages.isEmpty {
-            return primaryPackages
-        }
-
-        return Array(offering.availablePackages.prefix(1))
+    private var availablePrimaryPackages: [PaywallPackageDisplay] {
+        subscriptionManager.paywallPackages
     }
 
-    private var selectedPackage: Package? {
+    private var selectedPackage: PaywallPackageDisplay? {
         let packages = availablePrimaryPackages
 
-        if let selected = packages.first(where: { $0.identifier == selectedPackageIdentifier }) {
+        if let selected = packages.first(where: { $0.packageIdentifier == selectedPackageIdentifier }) {
             return selected
         }
 
-        if let annual = packages.first(where: { $0.identifier == "$rc_annual" }) {
+        if let annual = packages.first(where: { $0.packageIdentifier == "$rc_annual" }) {
             return annual
         }
 
@@ -201,39 +188,39 @@ struct PaywallView: View {
         .padding(.horizontal, 8)
     }
 
-    private func pricingOptionsSection(packages: [Package]) -> some View {
+    private func pricingOptionsSection(packages: [PaywallPackageDisplay]) -> some View {
         VStack(spacing: 12) {
             if packages.count > 1 {
                 HStack(spacing: 10) {
-                    ForEach(packages, id: \.identifier) { package in
+                    ForEach(packages) { package in
                         pricingOptionCard(
                             package: package,
-                            isSelected: package.identifier == selectedPackage?.identifier
+                            isSelected: package.packageIdentifier == selectedPackage?.packageIdentifier
                         )
                     }
                 }
             } else if let package = packages.first {
                 pricingOptionCard(
                     package: package,
-                    isSelected: package.identifier == selectedPackage?.identifier
+                    isSelected: package.packageIdentifier == selectedPackage?.packageIdentifier
                 )
             }
         }
     }
 
-    private func pricingOptionCard(package: Package, isSelected: Bool) -> some View {
+    private func pricingOptionCard(package: PaywallPackageDisplay, isSelected: Bool) -> some View {
         Button {
-            selectedPackageIdentifier = package.identifier
+            selectedPackageIdentifier = package.packageIdentifier
             HapticManager.shared.impact(style: .light)
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(planTitle(for: package))
+                        Text(package.planTitle)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.appText)
 
-                        if let trialText = revenueCatManager.getTrialDurationText(package: package) {
+                        if let trialText = package.trialText {
                             Text(trialText.uppercased())
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.appPrimary)
@@ -249,25 +236,25 @@ struct PaywallView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text(revenueCatManager.formatPrice(package: package))
+                        Text(package.localizedPrice)
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundColor(.appText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
 
-                        Text(billingPeriodShortSuffix(for: package))
+                        Text(package.billingPeriodSuffix)
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.appTextSecondary)
                     }
 
-                    Text(packageSummaryText(for: package))
+                    Text(package.summaryText)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.appTextSecondary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                if let savingsText = savingsBadgeText(for: package) {
+                if let savingsText = package.savingsBadgeText {
                     Text(savingsText)
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.black)
@@ -306,9 +293,9 @@ struct PaywallView: View {
             .shadow(color: isSelected ? Color.appPrimary.opacity(0.18) : .clear, radius: 14, x: 0, y: 8)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(planTitle(for: package)) plan")
+        .accessibilityLabel("\(package.planTitle) plan")
         .accessibilityHint(isSelected ? "Selected" : "Double tap to select this plan")
-        .accessibilityIdentifier("paywall_plan_\(planIdentifierSuffix(for: package))")
+        .accessibilityIdentifier("paywall_plan_\(package.accessibilityIdentifierSuffix)")
     }
 
     private func selectionIndicator(isSelected: Bool) -> some View {
@@ -317,36 +304,36 @@ struct PaywallView: View {
             .foregroundColor(isSelected ? .appPrimary : .appTextSecondary.opacity(0.65))
     }
 
-    private func purchaseButton(package: Package) -> some View {
+    private func purchaseButton(package: PaywallPackageDisplay) -> some View {
         Button {
             Task {
-                AnalyticsService.shared.track(
+                AppServicePorts.analyticsTracker.track(
                     event: "purchase_start",
                     properties: [
-                        "package_id": package.identifier
+                        "package_id": package.packageIdentifier
                     ]
                 )
 
-                let success = await revenueCatManager.purchase(package: package)
-                if !success && revenueCatManager.errorMessage != nil {
+                let success = await subscriptionManager.purchase(packageIdentifier: package.packageIdentifier)
+                if !success && subscriptionManager.errorMessage != nil {
                     showPurchaseError = true
                 }
 
-                AnalyticsService.shared.track(
+                AppServicePorts.analyticsTracker.track(
                     event: success ? "purchase_success" : "purchase_failed",
                     properties: [
-                        "package_id": package.identifier
+                        "package_id": package.packageIdentifier
                     ]
                 )
             }
         } label: {
             HStack(spacing: 12) {
-                if !revenueCatManager.isPurchasing {
+                if !subscriptionManager.isPurchasing {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 20, weight: .semibold))
                 }
 
-                Text(revenueCatManager.isPurchasing ? "Processing..." : purchaseButtonTitle(for: package))
+                Text(subscriptionManager.isPurchasing ? "Processing..." : package.purchaseButtonTitle)
                     .font(.system(size: 18, weight: .semibold))
             }
             .foregroundColor(.black)
@@ -355,21 +342,21 @@ struct PaywallView: View {
             .background(Color.appPrimary)
             .cornerRadius(16)
         }
-        .disabled(revenueCatManager.isPurchasing)
+        .disabled(subscriptionManager.isPurchasing)
         .accessibilityIdentifier("paywall_purchase_button")
     }
 
     private var restorePurchasesButton: some View {
         Button {
             Task {
-                let success = await revenueCatManager.restorePurchases()
+                let success = await subscriptionManager.restorePurchases()
                 if success {
                     showRestoreSuccess = true
-                } else if revenueCatManager.errorMessage != nil {
+                } else if subscriptionManager.errorMessage != nil {
                     showRestoreError = true
                 }
 
-                AnalyticsService.shared.track(
+                AppServicePorts.analyticsTracker.track(
                     event: success ? "restore_success" : "restore_failed"
                 )
             }
@@ -378,7 +365,7 @@ struct PaywallView: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white.opacity(0.7))
         }
-        .disabled(revenueCatManager.isPurchasing)
+        .disabled(subscriptionManager.isPurchasing)
         .accessibilityIdentifier("paywall_restore_purchases_button")
     }
 
@@ -391,7 +378,7 @@ struct PaywallView: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.red.opacity(0.85))
         }
-        .disabled(revenueCatManager.isPurchasing)
+        .disabled(subscriptionManager.isPurchasing)
         .accessibilityLabel("Log out")
         .accessibilityHint("Signs you out so you can use another account.")
         .accessibilityIdentifier("paywall_logout_button")
@@ -520,108 +507,6 @@ struct PaywallView: View {
         .accessibilityIdentifier("paywall_cached_pricing_card")
     }
 
-    private func billingPeriodShortSuffix(for package: Package) -> String {
-        let period = billingPeriodLabel(for: package)
-        switch period {
-        case "year":
-            return "/yr"
-        case "month":
-            return "/mo"
-        case "week":
-            return "/wk"
-        default:
-            return ""
-        }
-    }
-
-    private func packageSummaryText(for package: Package) -> String {
-        let period = billingPeriodLabel(for: package)
-        switch period {
-        case "year":
-            if let monthlyEquivalent = annualMonthlyEquivalentText(for: package) {
-                return "\(monthlyEquivalent)/mo, billed yearly"
-            }
-            return "Billed yearly"
-        case "month":
-            return "Billed monthly"
-        case "week":
-            return "Billed weekly"
-        default:
-            return "Billed by the App Store"
-        }
-    }
-
-    private func purchaseButtonTitle(for package: Package) -> String {
-        revenueCatManager.getTrialDurationText(package: package) == nil ? "Subscribe" : "Start trial"
-    }
-
-    private func billingPeriodLabel(for package: Package) -> String {
-        let identifier = "\(package.identifier) \(package.storeProduct.productIdentifier)".lowercased()
-
-        if identifier.contains("annual") || identifier.contains("year") {
-            return "year"
-        }
-
-        if identifier.contains("month") {
-            return "month"
-        }
-
-        if identifier.contains("week") {
-            return "week"
-        }
-
-        return ""
-    }
-
-    private func planTitle(for package: Package) -> String {
-        switch billingPeriodLabel(for: package) {
-        case "year":
-            return "Annual"
-        case "month":
-            return "Monthly"
-        case "week":
-            return "Weekly"
-        default:
-            return "Plan"
-        }
-    }
-
-    private func planIdentifierSuffix(for package: Package) -> String {
-        switch billingPeriodLabel(for: package) {
-        case "year":
-            return "annual"
-        case "month":
-            return "monthly"
-        case "week":
-            return "weekly"
-        default:
-            return "fallback"
-        }
-    }
-
-    private func savingsBadgeText(for package: Package) -> String? {
-        guard package.identifier == "$rc_annual",
-              let monthly = availablePrimaryPackages.first(where: { $0.identifier == "$rc_monthly" }),
-              let savingsPercent = PaywallSavingsPolicy.savingsPercent(
-                monthlyPrice: monthly.storeProduct.price,
-                annualPrice: package.storeProduct.price
-              ) else {
-            return nil
-        }
-
-        return "Save \(savingsPercent)%"
-    }
-
-    private func annualMonthlyEquivalentText(for package: Package) -> String? {
-        guard package.identifier == "$rc_annual",
-              let monthlyEquivalent = PaywallSavingsPolicy.monthlyEquivalent(annualPrice: package.storeProduct.price),
-              let formatter = package.storeProduct.priceFormatter else {
-            return nil
-        }
-
-        return formatter.string(from: monthlyEquivalent)
-    }
-
     private func contactSupportAboutUnavailablePlans() {
         let subject = "Subscription plans unavailable"
             .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Subscription%20plans%20unavailable"
@@ -636,10 +521,10 @@ struct PaywallView: View {
 
     private func loadOfferings() async {
         isLoading = true
-        await revenueCatManager.fetchOfferings()
+        await subscriptionManager.fetchOfferings()
         isLoading = false
 
-        if revenueCatManager.currentOffering == nil {
+        if subscriptionManager.paywallPackages.isEmpty {
             // print("⚠️ No offerings available")
         }
     }
@@ -675,54 +560,10 @@ private struct PaywallFeatureRow: View {
     }
 }
 
-enum PaywallSavingsPolicy {
-    static func monthlyEquivalent(annualPrice: Decimal) -> NSDecimalNumber? {
-        let annual = NSDecimalNumber(decimal: annualPrice)
-        guard annual.compare(NSDecimalNumber.zero) == .orderedDescending else {
-            return nil
-        }
-
-        return annual.dividing(by: NSDecimalNumber(value: 12))
-    }
-
-    static func savingsPercent(monthlyPrice: Decimal, annualPrice: Decimal) -> Int? {
-        let monthly = NSDecimalNumber(decimal: monthlyPrice)
-        let annual = NSDecimalNumber(decimal: annualPrice)
-
-        guard monthly.compare(NSDecimalNumber.zero) == .orderedDescending,
-              annual.compare(NSDecimalNumber.zero) == .orderedDescending else {
-            return nil
-        }
-
-        let fullYearAtMonthlyPrice = monthly.multiplying(by: NSDecimalNumber(value: 12))
-        guard fullYearAtMonthlyPrice.compare(annual) == .orderedDescending else {
-            return nil
-        }
-
-        let rawPercent = fullYearAtMonthlyPrice
-            .subtracting(annual)
-            .dividing(by: fullYearAtMonthlyPrice)
-            .multiplying(by: NSDecimalNumber(value: 100))
-
-        let roundedPercent = rawPercent.rounding(
-            accordingToBehavior: NSDecimalNumberHandler(
-                roundingMode: .plain,
-                scale: 0,
-                raiseOnExactness: false,
-                raiseOnOverflow: false,
-                raiseOnUnderflow: false,
-                raiseOnDivideByZero: false
-            )
-        )
-
-        return max(roundedPercent.intValue, 0)
-    }
-}
-
 // MARK: - Preview
 
 #Preview {
     PaywallView()
         .environmentObject(AuthManager())
-        .environmentObject(RevenueCatManager.shared)
+        .environmentObject(SubscriptionManager.shared)
 }

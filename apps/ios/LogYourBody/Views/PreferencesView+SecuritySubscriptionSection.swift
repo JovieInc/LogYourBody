@@ -56,7 +56,7 @@ extension PreferencesView {
             icon: "crown.fill",
             title: subscriptionStatusText,
             subtitle: subscriptionPlanDisplay,
-            tintColor: revenueCatManager.isSubscribed ? nil : theme.colors.warning
+            tintColor: subscriptionManager.isSubscribed ? nil : theme.colors.warning
         )
         .accessibilityIdentifier("settings_subscription_status_row")
     }
@@ -87,8 +87,8 @@ extension PreferencesView {
     }
 
     var subscriptionStatusText: String {
-        if revenueCatManager.isSubscribed {
-            if revenueCatManager.isInTrialPeriod {
+        if subscriptionManager.isSubscribed {
+            if subscriptionManager.isInTrialPeriod {
                 return "Active (Free Trial)"
             } else {
                 return "Active"
@@ -99,8 +99,8 @@ extension PreferencesView {
     }
 
     var subscriptionPlanDisplay: String? {
-        guard revenueCatManager.isSubscribed else { return nil }
-        let productId = revenueCatManager.customerInfo?.entitlements.active.values.first?.productIdentifier ?? ""
+        guard subscriptionManager.isSubscribed else { return nil }
+        let productId = subscriptionManager.currentSubscriptionProductIdentifier ?? ""
         let lowercased = productId.lowercased()
 
         if lowercased.contains("annual") {
@@ -112,7 +112,7 @@ extension PreferencesView {
     }
 
     var subscriptionRenewalText: String? {
-        guard let date = revenueCatManager.subscriptionExpirationDate else { return nil }
+        guard let date = subscriptionManager.subscriptionExpirationDate else { return nil }
         return formatDate(date)
     }
 }

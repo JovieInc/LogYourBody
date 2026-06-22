@@ -43,6 +43,7 @@
 		AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */; };
 		AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134002F01313400D134A1 /* NotificationManager.swift */; };
 		AD3134032F01313400D134A1 /* DailyWeighInReminderPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */; };
+		ADAD00022F10000000ABCDEF /* ExternalServicePorts.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAD00012F10000000ABCDEF /* ExternalServicePorts.swift */; };
 		AD0B7BF52EC552FA008B29E7 /* LogYourBody.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */; };
 		AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */; };
 		AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */; };
@@ -365,6 +366,7 @@
 		AD050C442EBFFEF60082A313 /* MetricChartView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricChartView.swift; path = Components/MetricChartView.swift; sourceTree = "<group>"; };
 		AD050C482EC12E390082A313 /* RevenueCatManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueCatManager.swift; sourceTree = "<group>"; };
 		AD050C4A2EC12E590082A313 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		ADAD00012F10000000ABCDEF /* ExternalServicePorts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalServicePorts.swift; sourceTree = "<group>"; };
 		AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = LogYourBody.storekit; sourceTree = "<group>"; };
 		AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricChartDataHelper.swift; sourceTree = "<group>"; };
 		AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PeriodSelector.swift; path = Components/PeriodSelector.swift; sourceTree = "<group>"; };
@@ -961,6 +963,7 @@
 				AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */,
 				AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */,
 				AD3134002F01313400D134A1 /* NotificationManager.swift */,
+				ADAD00012F10000000ABCDEF /* ExternalServicePorts.swift */,
 				ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */,
 				ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */,
 				AD050C482EC12E390082A313 /* RevenueCatManager.swift */,
@@ -1650,6 +1653,7 @@
 				AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
+				ADAD00022F10000000ABCDEF /* ExternalServicePorts.swift in Sources */,
 				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,
 				AD3145C12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift in Sources */,
 				AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */,

@@ -5,7 +5,6 @@
 // Refactored using Atomic Design principles
 //
 import SwiftUI
-import LocalAuthentication
 
 struct BiometricLockView: View {
     @Binding var isUnlocked: Bool
@@ -14,23 +13,10 @@ struct BiometricLockView: View {
     @State private var authenticationTimer: Timer?
     @State private var haloRotation: Double = 0
     @State private var haloPulse = false
+    private let biometricAuthenticator: BiometricAuthenticating = LocalBiometricAuthenticationAdapter.shared
 
     private var biometricType: BiometricAuthView.BiometricType {
-        let context = LAContext()
-        var error: NSError?
-
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            return .faceID // Default to Face ID for unknown state
-        }
-
-        switch context.biometryType {
-        case .faceID:
-            return .faceID
-        case .touchID:
-            return .touchID
-        default:
-            return .faceID
-        }
+        biometricAuthenticator.availableBiometryType().authViewType
     }
 
     private var biometricScanningText: String {
@@ -133,6 +119,7 @@ struct BiometricLockView: View {
         }
         .onDisappear {
             authenticationTimer?.invalidate()
+            biometricAuthenticator.cancelCurrentAuthentication()
         }
     }
 
@@ -242,50 +229,30 @@ struct BiometricLockView: View {
     }
 
     private func authenticate() {
-        let context = LAContext()
-        var error: NSError?
-
-        // Configure context for no fallback button
-        context.localizedFallbackTitle = ""
-
-        // Cancel any existing timer
         authenticationTimer?.invalidate()
+        isAuthenticating = true
 
-        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            isAuthenticating = true
+        Task {
+            let result = await biometricAuthenticator.authenticate(
+                reason: "Unlock LogYourBody",
+                cancelTitle: nil,
+                fallbackTitle: "",
+                timeout: 5
+            )
 
-            // Set a timeout to prevent indefinite blocking
-            authenticationTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
-                DispatchQueue.main.async {
-                    if self.isAuthenticating {
-                        // Timeout reached, cancel authentication
-                        context.invalidate()
-                        self.isAuthenticating = false
-                        self.hasAttemptedOnce = true
+            await MainActor.run {
+                authenticationTimer?.invalidate()
+                isAuthenticating = false
+
+                switch result {
+                case .success, .unavailable:
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        isUnlocked = true
                     }
+                case .failure:
+                    hasAttemptedOnce = true
                 }
             }
-
-            let reason = "Unlock LogYourBody"
-
-            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, _ in
-                DispatchQueue.main.async {
-                    self.authenticationTimer?.invalidate()
-                    self.isAuthenticating = false
-
-                    if success {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            self.isUnlocked = true
-                        }
-                    } else {
-                        // Show the retry UI
-                        self.hasAttemptedOnce = true
-                    }
-                }
-            }
-        } else {
-            // No biometric available, just unlock
-            isUnlocked = true
         }
     }
 }

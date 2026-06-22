@@ -4,7 +4,7 @@ import SwiftUI
 struct BodyScoreOnboardingFlowView: View {
     @StateObject private var viewModel: OnboardingFlowViewModel
     @EnvironmentObject private var authManager: AuthManager
-    @EnvironmentObject private var revenueCatManager: RevenueCatManager
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @State private var hasTrackedOnboardingStart = false
 
     @MainActor
@@ -53,14 +53,14 @@ struct BodyScoreOnboardingFlowView: View {
             case .paywall:
                 PaywallView()
                     .environmentObject(authManager)
-                    .environmentObject(revenueCatManager)
+                    .environmentObject(subscriptionManager)
             }
         }
         .environmentObject(authManager)
         .onAppear {
             guard !hasTrackedOnboardingStart else { return }
             hasTrackedOnboardingStart = true
-            AnalyticsService.shared.track(
+            AppServicePorts.analyticsTracker.track(
                 event: "onboarding_started",
                 properties: [
                     "entry_context": viewModel.entryContext.analyticsContext
@@ -108,5 +108,5 @@ private struct BodyScoreDefaultHomeModeView: View {
 #Preview {
     BodyScoreOnboardingFlowView()
         .environmentObject(AuthManager.shared)
-        .environmentObject(RevenueCatManager.shared)
+        .environmentObject(SubscriptionManager.shared)
 }

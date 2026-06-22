@@ -223,7 +223,7 @@ extension DashboardViewLiquid {
             #endif
 
             // Always attempt a remote refresh when possible
-            let logs = try await SupabaseManager.shared.fetchGlp1DoseLogs(userId: userId, limit: 200)
+            let logs = try await AppServicePorts.glp1RemoteDataProvider.fetchGlp1DoseLogs(userId: userId, limit: 200)
             glp1DoseLogs = logs.sorted { $0.takenAt < $1.takenAt }
             CoreDataManager.shared.saveGlp1DoseLogs(logs, userId: userId)
         } catch {
@@ -255,7 +255,7 @@ extension DashboardViewLiquid {
         #endif
 
         do {
-            let medications = try await SupabaseManager.shared.fetchGlp1Medications(userId: userId)
+            let medications = try await AppServicePorts.glp1RemoteDataProvider.fetchGlp1Medications(userId: userId)
             glp1Medications = medications.sorted { $0.startedAt < $1.startedAt }
             CoreDataManager.shared.saveGlp1Medications(medications, userId: userId)
         } catch {

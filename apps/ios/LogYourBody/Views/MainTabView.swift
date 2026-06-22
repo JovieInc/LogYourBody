@@ -619,7 +619,7 @@ private struct PaidWeightLoggerMVPView: View {
             try await CoreDataManager.shared.saveBodyMetricsAndWait(metrics, userId: userId, markAsSynced: false)
             realtimeSyncManager.updatePendingSyncCount()
             realtimeSyncManager.syncIfNeeded()
-            AnalyticsService.shared.track(event: "mvp_weight_logged")
+            AppServicePorts.analyticsTracker.track(event: "mvp_weight_logged")
 
             isWeightFieldFocused = false
             weightText = ""

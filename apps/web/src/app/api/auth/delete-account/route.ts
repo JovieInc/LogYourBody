@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { auth, clerkClient } from '@clerk/nextjs/server';
-import { createClerkSupabaseClient } from '@/lib/supabase/clerk-client';
+import { deleteServerAuthUser, getServerAuthSession } from '@/lib/ports/server-auth-runtime';
+import { createAuthenticatedDataClient } from '@/lib/ports/server-data-client';
 
 type DeleteTarget = {
   table: string;
@@ -41,7 +41,7 @@ function cleanupFailureResponse() {
 
 export async function DELETE() {
   try {
-    const { userId, getToken } = await auth();
+    const { userId, getToken } = await getServerAuthSession();
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -53,7 +53,7 @@ export async function DELETE() {
       return NextResponse.json({ error: 'Missing authentication token' }, { status: 401 });
     }
 
-    const supabase = await createClerkSupabaseClient(() => Promise.resolve(token));
+    const supabase = await createAuthenticatedDataClient(() => Promise.resolve(token));
 
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -101,8 +101,7 @@ export async function DELETE() {
       }
     }
 
-    const client = await clerkClient();
-    await client.users.deleteUser(userId);
+    await deleteServerAuthUser(userId);
 
     return NextResponse.json({ message: 'Account deleted successfully' }, { status: 200 });
   } catch (error) {

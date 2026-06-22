@@ -5,7 +5,6 @@
 // Refactored using Atomic Design principles
 //
 import SwiftUI
-import AuthenticationServices
 
 struct LoginView: View {
     @Environment(\.theme)
@@ -27,7 +26,7 @@ struct LoginView: View {
         .navigationBarHidden(true)
         .standardErrorAlert(isPresented: $showError, message: errorMessage)
         .onAppear {
-            AnalyticsService.shared.track(event: "login_view")
+            AppServicePorts.analyticsTracker.track(event: "login_view")
             refreshAppleSignInVisibility()
         }
         .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
@@ -44,9 +43,9 @@ struct LoginView: View {
     private var scrollContent: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Show Clerk initialization status banner
-                if shouldShowClerkStatusBanner {
-                    clerkStatusBanner
+                // Show authentication service status banner
+                if shouldShowAuthProviderStatusBanner {
+                    authProviderStatusBanner
                         .padding(.top, 20)
                         .padding(.horizontal, 24)
                 }
@@ -62,7 +61,7 @@ struct LoginView: View {
                     title: "LogYourBody",
                     subtitle: "Log your body in under 10 seconds."
                 )
-                .padding(.top, shouldShowClerkStatusBanner ? 20 : 80)
+                .padding(.top, shouldShowAuthProviderStatusBanner ? 20 : 80)
                 .padding(.bottom, 24)
 
                 // Organism: Login Form
@@ -98,8 +97,8 @@ struct LoginView: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    private var shouldShowClerkStatusBanner: Bool {
-        !authManager.isClerkLoaded || authManager.clerkInitError != nil
+    private var shouldShowAuthProviderStatusBanner: Bool {
+        !authManager.isAuthProviderReady || authManager.authProviderInitError != nil
     }
 
     private func refreshAppleSignInVisibility() {
@@ -133,10 +132,10 @@ struct LoginView: View {
         )
     }
 
-    // Clerk status banner
-    private var clerkStatusBanner: some View {
+    // Authentication service status banner
+    private var authProviderStatusBanner: some View {
         VStack(spacing: 12) {
-            if let error = authManager.clerkInitError {
+            if let error = authManager.authProviderInitError {
                 // Error state
                 VStack(spacing: 8) {
                     HStack {
@@ -153,7 +152,7 @@ struct LoginView: View {
                         .foregroundColor(theme.colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Button(action: retryClerkInit) {
+                    Button(action: retryAuthProviderInit) {
                         HStack {
                             if isRetrying {
                                 ProgressView()
@@ -207,17 +206,17 @@ struct LoginView: View {
         }
     }
 
-    private func retryClerkInit() {
+    private func retryAuthProviderInit() {
         isRetrying = true
         Task {
-            await authManager.retryClerkInitialization()
+            await authManager.retryAuthProviderInitialization()
             isRetrying = false
         }
     }
 
     private func login() {
-        // Check if Clerk is ready
-        guard authManager.isClerkLoaded else {
+        // Check if authentication service is ready
+        guard authManager.isAuthProviderReady else {
             errorMessage = authManager.authServiceNotReadyMessage
             showError = true
             return
@@ -228,7 +227,7 @@ struct LoginView: View {
 
         isLoading = true
 
-        AnalyticsService.shared.track(
+        AppServicePorts.analyticsTracker.track(
             event: "login_attempt",
             properties: [
                 "method": "email_otp"
@@ -248,7 +247,7 @@ struct LoginView: View {
                 showError = true
                 isLoading = false
 
-                AnalyticsService.shared.track(
+                AppServicePorts.analyticsTracker.track(
                     event: "login_failed",
                     properties: [
                         "method": "email_otp"

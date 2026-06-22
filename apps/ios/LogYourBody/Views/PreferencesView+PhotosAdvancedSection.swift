@@ -25,11 +25,11 @@ extension PreferencesView {
                 Button {
                     HapticManager.shared.selection()
                     Task {
-                        let success = await revenueCatManager.restorePurchases()
+                        let success = await subscriptionManager.restorePurchases()
                         await MainActor.run {
                             restoreAlertMessage = success
                                 ? "Your subscription has been restored"
-                                : (revenueCatManager.errorMessage ?? "No active subscription found")
+                                : (subscriptionManager.errorMessage ?? "No active subscription found")
                             showingRestoreAlert = true
                         }
                     }
