@@ -15,6 +15,10 @@ jobs:
   check-tests:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]'
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
     outputs:
       tests-passed: ${{ steps.check.outputs.passed }}
       update-type: ${{ steps.metadata.outputs.update-type }}
@@ -27,6 +31,8 @@ jobs:
 
       - name: Determine test status
         id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
             [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]] && echo "passed=true" >> $GITHUB_OUTPUT || echo "passed=false" >> $GITHUB_OUTPUT
