@@ -12,6 +12,10 @@ Run locally:
 pnpm ios:quality-gate
 ```
 
+The gate bootstraps missing ignored iOS config with
+`scripts/ios/bootstrap-local-config.sh` before building, using secret-free
+development values for simulator fixture proof.
+
 The gate writes artifacts under `apps/ios/test_results/quality-gate/` and runs:
 
 - Strict SwiftLint once.

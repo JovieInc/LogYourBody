@@ -8,6 +8,8 @@ ARTIFACT_ROOT="${ARTIFACT_ROOT:-$IOS_DIR/test_results/quality-gate/$STAMP}"
 
 mkdir -p "$ARTIFACT_ROOT"
 
+bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
+
 if [[ "${DESTINATION:-}" == "auto" ]]; then
   DESTINATION="$(IOS_DIR="$IOS_DIR" bash "$ROOT_DIR/scripts/ios/resolve-simulator-destination.sh")"
   export DESTINATION

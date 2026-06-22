@@ -28,6 +28,8 @@ fi
 
 mkdir -p "$ARTIFACT_DIR"
 
+bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
+
 if [[ -z "$TIMEOUT_BIN" ]]; then
   TIMEOUT_BIN="$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || true)"
 fi

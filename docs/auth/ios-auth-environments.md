@@ -13,6 +13,17 @@ LogYourBody iOS uses Clerk for identity and Supabase for data/storage. Real conf
 
 ## Development Setup
 
+For local compile and UI fixture proof with secret-free values, run from the
+repository root:
+
+```bash
+pnpm ios:bootstrap-local-config
+```
+
+This creates missing ignored config files and preserves existing real local
+config. It is enough for simulator compile and deterministic fixture proof, but
+it is not production provider evidence.
+
 1. Copy `Config-Development.xcconfig.template` to `Config-Development.xcconfig`.
 1. Fill only dev/test provider values:
    - Clerk test/dev publishable key.
