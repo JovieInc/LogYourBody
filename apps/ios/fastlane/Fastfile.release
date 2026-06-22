@@ -1,0 +1,480 @@
+  desc "Build and upload Alpha to TestFlight (dev branch - rapid)"
+  lane :alpha do |options|
+    # Setup API key
+    setup_app_store_connect_api
+
+    # Use sigh to create/fetch App Store provisioning profile
+    # This avoids Match + OpenSSL curve issues
+    profile = sigh(
+      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
+      team_id: ENV["APPLE_TEAM_ID"]
+    )
+
+    # Use manual signing with the sigh profile
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      team_id: ENV["APPLE_TEAM_ID"],
+      bundle_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
+      profile_name: lane_context[SharedValues::SIGH_NAME],
+      code_sign_identity: "Apple Distribution",
+      path: "./LogYourBody.xcodeproj"
+    )
+
+    # Use the shared build lane
+    build_result = build(
+      configuration: "Release",
+      export_method: "app-store",
+      build_number: options[:build_number],
+      output_directory: "./build",
+      clean_artifacts: true,
+      export_options: {
+        method: "app-store",
+        provisioningProfiles: {
+          (ENV["APP_IDENTIFIER"] || "com.logyourbody.app") => lane_context[SharedValues::SIGH_NAME]
+        }
+      }
+    )
+    
+    # Read release notes if provided
+    release_notes = "Alpha Build"
+    if options[:release_notes_file] && File.exist?(options[:release_notes_file])
+      release_notes = File.read(options[:release_notes_file])
+    end
+    
+    # Upload to TestFlight
+    # Get groups from options or default to Internal Testers
+    test_groups = options[:groups] ? options[:groups].split(",") : ["Internal Testers"]
+    
+    upload_to_testflight(
+      **testflight_upload_options.call(
+        ipa: build_result[:output_path],
+        groups: test_groups,
+        changelog: release_notes,
+        distribute_external: false
+      )
+    )
+
+    archive_path = lane_context[SharedValues::XCODEBUILD_ARCHIVE]
+    dsym_dir = archive_path ? File.join(archive_path, "dSYMs") : "./build"
+    sentry_upload_symbols(dsym_dir: dsym_dir)
+
+    # Clean up
+    clean_build_artifacts
+    notify_success(context: 'alpha')
+  end
+
+  desc "Build and upload to TestFlight (preview branch - beta)"
+  lane :beta do
+    # Ensure we have a clean state
+    clean_build_artifacts
+    
+    # Setup App Store Connect API authentication
+    setup_app_store_connect_api
+    
+    # Increment build number
+    build_number = Time.now.strftime("%Y%m%d%H%M%S")
+    increment_build_number(
+      build_number: build_number,
+      xcodeproj: project
+    )
+    
+    # Build the app
+    build_result = build(
+      configuration: "Release",
+      export_method: "app-store",
+      build_number: build_number,
+      output_directory: "./build",
+      clean_artifacts: true
+    )
+    
+    # Upload to TestFlight
+    upload_to_testflight(
+      **testflight_upload_options.call(
+        ipa: build_result[:output_path],
+        groups: ["Beta Testers"],
+        distribute_external: true # Beta includes external testers
+      )
+    )
+
+    archive_path = lane_context[SharedValues::XCODEBUILD_ARCHIVE]
+    dsym_dir = archive_path ? File.join(archive_path, "dSYMs") : "./build"
+    sentry_upload_symbols(dsym_dir: dsym_dir)
+
+    # Clean up
+    clean_build_artifacts
+    notify_success(context: 'beta')
+  end
+
+  desc "Build for CI"
+  lane :ci_build do
+    # This lane is specifically for CI environments
+    # Use absolute path from iOS directory
+    ios_dir = File.expand_path("..", Dir.pwd)
+    proj_path = File.join(ios_dir, "LogYourBody.xcodeproj")
+    
+    build_app(
+      project: proj_path,
+      scheme: scheme,
+      configuration: "Debug",
+      skip_archive: true,
+      skip_codesigning: true,
+      derived_data_path: "build",
+      destination: "platform=iOS Simulator,name=iPhone 16"
+    )
+  end
+
+  desc "Build for release (archive only)"
+  lane :build_release do
+    bundle_identifier = ENV["APP_IDENTIFIER"] || "com.logyourbody.app"
+    release_profile = ENV["PROVISIONING_PROFILE_SPECIFIER"].to_s
+    release_profile = "match AppStore com.logyourbody.app 1780400349" if release_profile.empty?
+
+    if ENV["MATCH_GIT_URL"] && ENV["MATCH_PASSWORD"]
+      setup_provisioning(type: "appstore", readonly: true)
+    end
+
+    build_app(
+      project: project,
+      scheme: scheme,
+      configuration: "Release",
+      export_method: "app-store",
+      export_team_id: ENV["APPLE_TEAM_ID"],
+      export_options: {
+        teamID: ENV["APPLE_TEAM_ID"],
+        provisioningProfiles: {
+          bundle_identifier => release_profile
+        },
+        compileBitcode: false,
+        uploadBitcode: false,
+        uploadSymbols: true,
+        signingStyle: "manual"
+      },
+      output_directory: "build",
+      output_name: "LogYourBody",
+      # Speed optimizations
+      skip_package_dependencies_resolution: true,
+      disable_package_automatic_updates: true,
+      cloned_source_packages_path: "SourcePackages",
+      skip_profile_detection: true,
+      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM='#{ENV["APPLE_TEAM_ID"]}' CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='#{release_profile}' PROVISIONING_PROFILE=''"
+    )
+  end
+
+  desc "Upload existing IPA to TestFlight"
+  lane :upload_testflight do |options|
+    # Setup App Store Connect API authentication
+    setup_app_store_connect_api
+    
+    # Upload IPA
+    upload_to_testflight(
+      **testflight_upload_options.call(
+        ipa: options[:ipa_path],
+        groups: options[:groups] ? options[:groups].split(",") : ["Beta Testers"],
+        changelog: options[:changelog_file] ? File.read(options[:changelog_file]) : "New build",
+        distribute_external: true
+      )
+    )
+  end
+
+  desc "Submit existing IPA to App Store"
+  lane :submit_app_store do |options|
+    setup_app_store_connect_api
+
+    bool_option = lambda do |value, default|
+      return default if value.nil?
+      return value if value == true || value == false
+
+      normalized = value.to_s.strip.downcase
+      return true if %w[true 1 yes y on].include?(normalized)
+      return false if %w[false 0 no n off].include?(normalized)
+
+      UI.user_error!("Invalid boolean option: #{value.inspect}")
+    end
+
+    submit_for_review = bool_option.call(options[:submit_for_review], false)
+    automatic_release = bool_option.call(options[:automatic_release], false)
+    phased_release = bool_option.call(options[:phased_release], false)
+
+    if automatic_release && !submit_for_review
+      UI.user_error!("automatic_release requires submit_for_review")
+    end
+
+    env_or_default = lambda do |key, default|
+      value = ENV[key].to_s.strip
+      value.empty? ? default : value
+    end
+
+    app_review_information = {
+      first_name: env_or_default.call("APP_REVIEW_FIRST_NAME", "LogYourBody"),
+      last_name: env_or_default.call("APP_REVIEW_LAST_NAME", "Team"),
+      email_address: env_or_default.call("APP_REVIEW_EMAIL_ADDRESS", "support@logyourbody.com"),
+      phone_number: ENV["APP_REVIEW_PHONE_NUMBER"],
+      notes: env_or_default.call("APP_REVIEW_NOTES", "Review access: choose Create Account, enter an email address that can receive a one-time code, accept Terms, Privacy Policy, and Health Disclaimer, then enter the email code. On LogYourBody Pro, tap Start trial; subscriptions use Apple's sandbox review environment and include a 3-day trial. After purchase or trial activation, the paid surface opens to the photo-first body-composition HUD. Add one progress photo, review the timeline and Stats view, optionally connect or skip HealthKit, then open Settings to test Restore Purchases, Manage Subscription, Export Data, and Delete Account. Apple Sign-In is hidden unless enabled for an internal cohort. If email codes, photos, HealthKit prompts, or subscription products do not load, contact support@logyourbody.com.")
+    }.compact
+
+    begin
+      upload_to_app_store(
+        ipa: options[:ipa_path],
+        force: true,
+        metadata_path: "fastlane/metadata",
+        screenshots_path: "fastlane/screenshots",
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: submit_for_review,
+        automatic_release: automatic_release,
+        phased_release: phased_release,
+        app_review_information: app_review_information,
+        run_precheck_before_submit: false,
+        app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
+        team_id: ENV["APPLE_TEAM_ID"]
+      )
+    rescue => e
+      if submit_for_review && e.message.include?("A review submission is already in progress")
+        UI.success("App Store review submission is already in progress; treating as submitted.")
+      else
+        raise
+      end
+    end
+  end
+
+  desc "Deploy to App Store (build + upload)"
+  lane :release do
+    # Ensure we have a clean state
+    clean_build_artifacts
+    
+    setup_app_store_connect_api
+    
+    # Build the app
+    build_app(
+      project: project,
+      scheme: scheme,
+      configuration: "Release",
+      export_method: "app-store"
+    )
+    
+    # Upload to App Store Connect
+    upload_to_app_store(
+      force: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: false,
+      automatic_release: false,
+      run_precheck_before_submit: false,
+      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
+      team_id: ENV["APPLE_TEAM_ID"]
+    )
+    
+    # Clean up
+    clean_build_artifacts
+    notify_success(context: 'release')
+  end
+
+  desc "Setup provisioning with match (readonly mode for CI)"
+  lane :setup_provisioning do |options|
+    # Get the match type from options or environment
+    match_type = options[:type] || ENV["MATCH_TYPE"] || "appstore"
+    readonly = options[:readonly] != false # Default to readonly for CI
+    force = options[:force] || false
+    
+    # For initial setup or if explicitly set, disable readonly
+    if ENV["MATCH_FORCE_ENTERPRISE"] == "true" || ENV["MATCH_READONLY"] == "false"
+      readonly = false
+      UI.important("Match running in read-write mode - will create certificates if needed")
+    end
+    
+    # Force regeneration if requested
+    if force
+      readonly = false
+      UI.important("Force regeneration requested - will create new certificates")
+    end
+    
+    # Setup App Store Connect API authentication first
+    setup_app_store_connect_api
+    
+    # If using match with git repository
+    if ENV["MATCH_GIT_URL"]
+      begin
+        # Build match parameters
+        match_params = {
+          type: match_type,
+          app_identifier: [ENV["APP_IDENTIFIER"] || "com.logyourbody.app"],
+          readonly: readonly,
+          git_url: ENV["MATCH_GIT_URL"],
+          git_branch: ENV["MATCH_GIT_BRANCH"].to_s.empty? ? "main" : ENV["MATCH_GIT_BRANCH"],
+          git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
+          team_id: ENV["APPLE_TEAM_ID"],
+          generate_apple_certs: false, # Never generate certs due to OpenSSL issues and cert limits
+          skip_provisioning_profiles: false,
+          platform: "ios",
+          verbose: true,
+          force: force,
+          force_for_new_devices: !readonly && match_type == "development"
+        }
+        
+        # Add API key if available
+        # Handle OpenSSL curve compatibility issues by passing API key directly
+        if ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_API_ISSUER_ID"]
+          if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+            match_params[:api_key_path] = ENV["APP_STORE_CONNECT_API_KEY_PATH"]
+            UI.message("Using App Store Connect API key from file: #{ENV["APP_STORE_CONNECT_API_KEY_PATH"]}")
+          elsif ENV["APP_STORE_CONNECT_API_KEY"]
+            # Pass API key directly to Match to bypass OpenSSL curve issues
+            match_params[:api_key] = {
+              key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+              issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+              key: ENV["APP_STORE_CONNECT_API_KEY"],
+              is_key_content_base64: false,
+              duration: 1200,
+              in_house: false
+            }
+            UI.message("Using App Store Connect API key from environment (content)")
+          end
+        elsif lane_context[SharedValues::APP_STORE_CONNECT_API_KEY]
+          # API key is already configured via setup_app_store_connect_api
+          UI.message("Using App Store Connect API key from lane context")
+        else
+          UI.important("⚠️  No App Store Connect API key found - Match may fall back to Apple ID authentication")
+        end
+        
+        # Use match instead of sync_code_signing
+        match(match_params)
+      rescue => e
+        if e.message.include?("No code signing identity found") && readonly
+          UI.error("No certificates found in Match repository. Run locally with MATCH_READONLY=false to create them.")
+          UI.error("Instructions:")
+          UI.error("1. Clone this repository locally")
+          UI.error("2. cd apps/ios")
+          UI.error("3. export MATCH_GIT_URL='https://github.com/JovieInc/certificates.git'")
+          UI.error("4. export MATCH_READONLY=false")
+          UI.error("5. bundle exec fastlane setup_provisioning type:appstore")
+          raise e
+        else
+          raise e
+        end
+      end
+    else
+      # Fallback to manual provisioning profile if match is not configured
+      UI.important("Match git repository not configured, using manual provisioning profile")
+      
+      # Install profile from base64 encoded secret
+      if ENV["IOS_PROVISIONING_PROFILE_BASE64"]
+        require 'tempfile'
+        require 'base64'
+        
+        # Create temp file for the profile
+        profile_file = Tempfile.new(['provision', '.mobileprovision'])
+        profile_file.write(Base64.decode64(ENV["IOS_PROVISIONING_PROFILE_BASE64"]))
+        profile_file.close
+        
+        # Install the profile
+        install_provisioning_profile(path: profile_file.path)
+        
+        # Validate it
+        validate_profile(profile_path: profile_file.path)
+        
+        # Clean up
+        profile_file.unlink
+      else
+        UI.user_error!("No provisioning profile available. Set up match or provide IOS_PROVISIONING_PROFILE_BASE64")
+      end
+    end
+  end
+  
+  desc "Create development certificates and profiles"
+  lane :setup_certificates do
+    setup_provisioning(type: "development", readonly: false)
+  end
+
+  desc "Create distribution certificates and profiles"
+  lane :setup_distribution do
+    setup_provisioning(type: "appstore", readonly: false)
+  end
+  
+  desc "Nuke all certificates from Apple Developer Portal"
+  lane :nuke_all_certs do
+    # Setup API key authentication
+    setup_app_store_connect_api
+    
+    UI.important("🔥 Nuking all certificates from Apple Developer Portal...")
+    
+    # Set up match parameters that work with our authentication
+    match_params = {
+      git_url: ENV["MATCH_GIT_URL"],
+      git_branch: ENV["MATCH_GIT_BRANCH"].to_s.empty? ? "main" : ENV["MATCH_GIT_BRANCH"],
+      git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
+      team_id: ENV["APPLE_TEAM_ID"],
+      skip_confirmation: true
+    }
+    
+    # Pass API key directly to avoid OpenSSL issues
+    if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+      match_params[:api_key_path] = ENV["APP_STORE_CONNECT_API_KEY_PATH"]
+      UI.message("Using App Store Connect API key from file for nuke operation")
+    elsif ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_API_KEY"]
+      match_params[:api_key] = {
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+        key: ENV["APP_STORE_CONNECT_API_KEY"],
+        is_key_content_base64: false,
+        duration: 1200,
+        in_house: false
+      }
+      UI.message("Using App Store Connect API key from environment for nuke operation")
+    end
+    
+    # Nuke app store certificates
+    begin
+      match_nuke(
+        **match_params,
+        type: "appstore"
+      )
+      UI.success("✅ App Store certificates nuked")
+    rescue => e
+      UI.message("App Store nuke failed (may not exist): #{e.message}")
+    end
+    
+    # Nuke development certificates
+    begin
+      match_nuke(
+        **match_params,
+        type: "development"
+      )
+      UI.success("✅ Development certificates nuked")
+    rescue => e
+      UI.message("Development nuke failed (may not exist): #{e.message}")
+    end
+    
+    UI.success("🔥 All certificates nuked!")
+  end
+
+  desc "Force regenerate all provisioning profiles with Match"
+  lane :regenerate_profiles do
+    # Force regenerate profiles with proper capabilities
+    UI.important("Regenerating provisioning profiles with all capabilities...")
+    
+    # Setup API key authentication
+    setup_app_store_connect_api
+    
+    # Note: Capabilities must be enabled in Apple Developer Portal
+    # before running this lane. This can be done manually or with:
+    # bundle exec fastlane produce enable_services:app_group,associated_domains,health_kit,sign_in_with_apple
+    UI.message("Note: Ensure App ID has all required capabilities enabled in Apple Developer Portal")
+    
+    # Regenerate both types
+    ["appstore", "development"].each do |type|
+      UI.message("Regenerating #{type} certificates and profiles...")
+      setup_provisioning(
+        type: type,
+        force: true,
+        readonly: false
+      )
+    end
+    
+    UI.success("Provisioning profiles regenerated!")
+    UI.message("The new profiles should include all capabilities enabled for the App ID:")
+    UI.message("- Sign in with Apple")
+    UI.message("- HealthKit")
+    UI.message("- Associated Domains")
+    UI.message("- App Groups")
+  end
+
