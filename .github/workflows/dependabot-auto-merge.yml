@@ -15,6 +15,9 @@ jobs:
   check-tests:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]'
+    permissions:
+      checks: read
+      contents: read
     outputs:
       tests-passed: ${{ steps.check.outputs.passed }}
       update-type: ${{ steps.metadata.outputs.update-type }}
@@ -27,6 +30,8 @@ jobs:
 
       - name: Determine test status
         id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
             [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]] && echo "passed=true" >> $GITHUB_OUTPUT || echo "passed=false" >> $GITHUB_OUTPUT
@@ -65,7 +70,7 @@ jobs:
         echo "✅ Enabled auto-merge for Dependabot PR (tests passed)"
       env:
         PR_URL: ${{ github.event.pull_request.html_url || github.event.workflow_run.pull_requests[0].html_url }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Comment on updates that need manual review
   comment-manual-review:
@@ -82,7 +87,7 @@ jobs:
     - name: Comment on PR
       env:
         PR_URL: ${{ github.event.pull_request.html_url || github.event.workflow_run.pull_requests[0].html_url }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         if [[ "${{ needs.check-tests.outputs.tests-passed }}" == "false" ]]; then
           COMMENT="❌ Tests are failing. This PR requires manual review and cannot be auto-merged."
