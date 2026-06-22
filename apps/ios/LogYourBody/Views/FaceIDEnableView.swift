@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import LocalAuthentication
 
 struct FaceIDEnableView: View {
     @Environment(\.dismiss) private var dismiss
@@ -15,7 +14,7 @@ struct FaceIDEnableView: View {
 
     @State private var isAuthenticating = false
     @State private var showError = false
-    @State private var currentContext: LAContext?
+    private let biometricAuthenticator: BiometricAuthenticating = LocalBiometricAuthenticationAdapter.shared
 
     var body: some View {
         NavigationStack {
@@ -39,8 +38,7 @@ struct FaceIDEnableView: View {
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(isAuthenticating)
         .onDisappear {
-            currentContext?.invalidate()
-            currentContext = nil
+            biometricAuthenticator.cancelCurrentAuthentication()
         }
     }
 
@@ -129,32 +127,20 @@ struct FaceIDEnableView: View {
         }
         isAuthenticating = true
 
-        let context = LAContext()
-        context.localizedCancelTitle = "Not Now"
-        context.localizedFallbackTitle = ""
-        currentContext?.invalidate()
-        currentContext = context
-
-        var authError: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &authError) else {
-            finish(with: false)
-            return
-        }
-
-        context.evaluatePolicy(
-            .deviceOwnerAuthenticationWithBiometrics,
-            localizedReason: "Enable Face ID for LogYourBody"
-        ) { success, _ in
-            Task { @MainActor in
-                finish(with: success)
-            }
+        Task {
+            let result = await biometricAuthenticator.authenticate(
+                reason: "Enable Face ID for LogYourBody",
+                cancelTitle: "Not Now",
+                fallbackTitle: "",
+                timeout: nil
+            )
+            await finish(with: result == .success)
         }
     }
 
     @MainActor
     private func finish(with success: Bool) {
         isAuthenticating = false
-        currentContext = nil
         if success {
             showError = false
             HapticManager.shared.notification(type: .success)

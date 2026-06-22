@@ -1,6 +1,3 @@
-import AVFoundation
-import Photos
-import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -57,14 +54,12 @@ struct ProgressPhotoAttachPolicy {
         }
     }
 
-    static func canUseCamera(isAvailable: Bool, authorizationStatus: AVAuthorizationStatus) -> Bool {
+    static func canUseCamera(isAvailable: Bool, authorizationStatus: AppAuthorizationState) -> Bool {
         guard isAvailable else { return false }
         switch authorizationStatus {
         case .authorized, .notDetermined:
             return true
-        case .denied, .restricted:
-            return false
-        @unknown default:
+        case .denied, .restricted, .unknown:
             return false
         }
     }
@@ -81,12 +76,13 @@ struct ProgressPhotoAttachSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authManager: AuthManager
     @ObservedObject private var uploadManager = PhotoUploadManager.shared
+    private let photoLibrary: PhotoLibraryManaging = LivePhotoLibraryAdapter.shared
+    private let cameraAuthorizer: CameraAuthorizing = LiveCameraAuthorizationAdapter.shared
 
     let targetMetric: BodyMetrics?
     let fallbackDate: Date
     let onComplete: () async -> Void
 
-    @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
     @State private var selectedImageDate: Date?
     @State private var attachStatus: ProgressPhotoAttachStatus = .empty
@@ -160,9 +156,6 @@ struct ProgressPhotoAttachSheet: View {
             }
             .onAppear {
                 updateInitialPermissionState()
-            }
-            .onChange(of: selectedPhotoItem) { _, item in
-                loadSelectedPhoto(item)
             }
         }
         .accessibilityIdentifier("progress_photo_attach_sheet")
@@ -315,10 +308,11 @@ struct ProgressPhotoAttachSheet: View {
 
     private var actionPane: some View {
         VStack(spacing: 10) {
-            PhotosPicker(
-                selection: $selectedPhotoItem,
-                matching: .images
-            ) {
+            AppPhotosPicker(maxSelectionCount: 1) { assets in
+                await MainActor.run {
+                    loadSelectedPhoto(assets.first)
+                }
+            } label: {
                 actionRow(
                     title: "Choose from Library",
                     subtitle: "Select one existing progress photo",
@@ -339,10 +333,10 @@ struct ProgressPhotoAttachSheet: View {
                 )
             }
             .buttonStyle(.plain)
-            .disabled(isBusy || !UIImagePickerController.isSourceTypeAvailable(.camera))
+            .disabled(isBusy || !cameraAuthorizer.isCameraAvailable)
             .accessibilityIdentifier("progress_photo_attach_camera_button")
 
-            if !UIImagePickerController.isSourceTypeAvailable(.camera) {
+            if !cameraAuthorizer.isCameraAvailable {
                 Text("Camera capture is unavailable in Simulator. Choose from Library for simulator validation.")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(Color.metricTextTertiary)
@@ -369,7 +363,7 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private var cameraSubtitle: String {
-        UIImagePickerController.isSourceTypeAvailable(.camera)
+        cameraAuthorizer.isCameraAvailable
             ? "Use the device camera"
             : "Unavailable in Simulator"
     }
@@ -435,17 +429,17 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private func updateInitialPermissionState() {
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        let status = photoLibrary.authorizationStatus()
         if status == .denied || status == .restricted {
             attachStatus = .permissionDenied
         }
     }
 
-    private func loadSelectedPhoto(_ item: PhotosPickerItem?) {
+    private func loadSelectedPhoto(_ asset: AppPhotoAsset?) {
         let loadID = UUID()
         photoSelectionLoadID = loadID
 
-        guard let item else {
+        guard let asset else {
             selectedImage = nil
             selectedImageDate = nil
             attachStatus = .empty
@@ -453,46 +447,25 @@ struct ProgressPhotoAttachSheet: View {
         }
 
         attachStatus = .processing
-
-        Task {
-            do {
-                guard let data = try await item.loadTransferable(type: Data.self),
-                      let image = UIImage(data: data) else {
-                    await MainActor.run {
-                        attachStatus = .failed("Choose a different image file.")
-                    }
-                    return
-                }
-
-                let photoDate = PhotoMetadataService.shared.extractDate(from: data)
-                await MainActor.run {
-                    guard photoSelectionLoadID == loadID else { return }
-                    selectedImage = image
-                    selectedImageDate = photoDate
-                    attachStatus = .ready
-                }
-            } catch {
-                await MainActor.run {
-                    guard photoSelectionLoadID == loadID else { return }
-                    attachStatus = .failed("Could not read that photo. Choose another image.")
-                }
-            }
-        }
+        guard photoSelectionLoadID == loadID else { return }
+        selectedImage = asset.image
+        selectedImageDate = PhotoMetadataService.shared.extractDate(from: asset.data)
+        attachStatus = .ready
     }
 
     private func startCameraCapture() {
-        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+        guard cameraAuthorizer.isCameraAvailable else {
             attachStatus = .failed("Camera is not available in Simulator. Choose from Library instead.")
             return
         }
 
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        switch cameraAuthorizer.authorizationStatus() {
         case .authorized:
             isCameraPresented = true
         case .notDetermined:
             attachStatus = .processing
             Task {
-                let granted = await requestCameraAccess()
+                let granted = await cameraAuthorizer.requestAccess()
                 await MainActor.run {
                     attachStatus = granted ? .empty : .permissionDenied
                     isCameraPresented = granted
@@ -500,16 +473,8 @@ struct ProgressPhotoAttachSheet: View {
             }
         case .denied, .restricted:
             attachStatus = .permissionDenied
-        @unknown default:
+        case .unknown:
             attachStatus = .permissionDenied
-        }
-    }
-
-    private func requestCameraAccess() async -> Bool {
-        await withCheckedContinuation { continuation in
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                continuation.resume(returning: granted)
-            }
         }
     }
 

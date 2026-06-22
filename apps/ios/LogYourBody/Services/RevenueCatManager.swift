@@ -33,6 +33,65 @@ struct CachedPaywallOfferingDisplay: Codable, Equatable {
     }
 }
 
+struct PaywallPackageDisplay: Identifiable, Equatable {
+    let id: String
+    let packageIdentifier: String
+    let productIdentifier: String
+    let planTitle: String
+    let localizedPrice: String
+    let billingPeriod: String
+    let billingPeriodSuffix: String
+    let summaryText: String
+    let trialText: String?
+    let savingsBadgeText: String?
+    let purchaseButtonTitle: String
+    let accessibilityIdentifierSuffix: String
+}
+
+enum PaywallSavingsPolicy {
+    static func monthlyEquivalent(annualPrice: Decimal) -> NSDecimalNumber? {
+        let annual = NSDecimalNumber(decimal: annualPrice)
+        guard annual.compare(NSDecimalNumber.zero) == .orderedDescending else {
+            return nil
+        }
+
+        return annual.dividing(by: NSDecimalNumber(value: 12))
+    }
+
+    static func savingsPercent(monthlyPrice: Decimal, annualPrice: Decimal) -> Int? {
+        let monthly = NSDecimalNumber(decimal: monthlyPrice)
+        let annual = NSDecimalNumber(decimal: annualPrice)
+
+        guard monthly.compare(NSDecimalNumber.zero) == .orderedDescending,
+              annual.compare(NSDecimalNumber.zero) == .orderedDescending else {
+            return nil
+        }
+
+        let fullYearAtMonthlyPrice = monthly.multiplying(by: NSDecimalNumber(value: 12))
+        guard fullYearAtMonthlyPrice.compare(annual) == .orderedDescending else {
+            return nil
+        }
+
+        let rawPercent = fullYearAtMonthlyPrice
+            .subtracting(annual)
+            .dividing(by: fullYearAtMonthlyPrice)
+            .multiplying(by: NSDecimalNumber(value: 100))
+
+        let roundedPercent = rawPercent.rounding(
+            accordingToBehavior: NSDecimalNumberHandler(
+                roundingMode: .plain,
+                scale: 0,
+                raiseOnExactness: false,
+                raiseOnOverflow: false,
+                raiseOnUnderflow: false,
+                raiseOnDivideByZero: false
+            )
+        )
+
+        return max(roundedPercent.intValue, 0)
+    }
+}
+
 enum RevenueCatSubscriptionAnalyticsPhase: String {
     case none
     case trial
@@ -423,6 +482,35 @@ class RevenueCatManager: NSObject, ObservableObject {
         return currentEntitlementSnapshot?.periodType == .trial
     }
 
+    var currentSubscriptionProductIdentifier: String? {
+        currentEntitlementSnapshot?.productIdentifier
+    }
+
+    var paywallPackages: [PaywallPackageDisplay] {
+        let packages = primaryPaywallPackages
+        let monthlyPackage = packages.first { billingPeriodLabel(for: $0) == "month" }
+
+        return packages.map { package in
+            makePaywallPackageDisplay(package: package, monthlyPackage: monthlyPackage)
+        }
+    }
+
+    private var primaryPaywallPackages: [Package] {
+        guard let offering = currentOffering else {
+            return []
+        }
+
+        let monthly = offering.package(identifier: "$rc_monthly")
+        let annual = offering.package(identifier: "$rc_annual")
+        let primaryPackages = [monthly, annual].compactMap { $0 }
+
+        if !primaryPackages.isEmpty {
+            return primaryPackages
+        }
+
+        return Array(offering.availablePackages.prefix(1))
+    }
+
     // MARK: - Offerings & Purchases
 
     /// Fetch available offerings from RevenueCat
@@ -489,6 +577,18 @@ class RevenueCatManager: NSObject, ObservableObject {
                 self.errorMessage = "Failed to load subscription options"
             }
         }
+    }
+
+    func purchase(packageIdentifier: String) async -> Bool {
+        guard let package = currentOffering?.package(identifier: packageIdentifier)
+            ?? currentOffering?.availablePackages.first(where: { $0.identifier == packageIdentifier }) else {
+            await MainActor.run {
+                self.errorMessage = "Subscription option unavailable. Please try again."
+            }
+            return false
+        }
+
+        return await purchase(package: package)
     }
 
     /// Purchase a package
@@ -641,6 +741,106 @@ class RevenueCatManager: NSObject, ObservableObject {
         }
 
         return nil
+    }
+
+    private func makePaywallPackageDisplay(
+        package: Package,
+        monthlyPackage: Package?
+    ) -> PaywallPackageDisplay {
+        let billingPeriod = billingPeriodLabel(for: package)
+        let trialText = getTrialDurationText(package: package)
+        let savingsText: String?
+
+        if package.identifier == "$rc_annual",
+           let monthlyPackage,
+           let savingsPercent = PaywallSavingsPolicy.savingsPercent(
+            monthlyPrice: monthlyPackage.storeProduct.price,
+            annualPrice: package.storeProduct.price
+           ) {
+            savingsText = "Save \(savingsPercent)%"
+        } else {
+            savingsText = nil
+        }
+
+        return PaywallPackageDisplay(
+            id: package.identifier,
+            packageIdentifier: package.identifier,
+            productIdentifier: package.storeProduct.productIdentifier,
+            planTitle: planTitle(for: package),
+            localizedPrice: formatPrice(package: package),
+            billingPeriod: billingPeriod,
+            billingPeriodSuffix: billingPeriodShortSuffix(for: package),
+            summaryText: packageSummaryText(for: package),
+            trialText: trialText,
+            savingsBadgeText: savingsText,
+            purchaseButtonTitle: trialText == nil ? "Subscribe" : "Start trial",
+            accessibilityIdentifierSuffix: planIdentifierSuffix(for: package)
+        )
+    }
+
+    private func billingPeriodShortSuffix(for package: Package) -> String {
+        switch billingPeriodLabel(for: package) {
+        case "year":
+            return "/yr"
+        case "month":
+            return "/mo"
+        case "week":
+            return "/wk"
+        default:
+            return ""
+        }
+    }
+
+    private func packageSummaryText(for package: Package) -> String {
+        switch billingPeriodLabel(for: package) {
+        case "year":
+            if let monthlyEquivalent = annualMonthlyEquivalentText(for: package) {
+                return "\(monthlyEquivalent)/mo, billed yearly"
+            }
+            return "Billed yearly"
+        case "month":
+            return "Billed monthly"
+        case "week":
+            return "Billed weekly"
+        default:
+            return "Billed by the App Store"
+        }
+    }
+
+    private func planTitle(for package: Package) -> String {
+        switch billingPeriodLabel(for: package) {
+        case "year":
+            return "Annual"
+        case "month":
+            return "Monthly"
+        case "week":
+            return "Weekly"
+        default:
+            return "Plan"
+        }
+    }
+
+    private func planIdentifierSuffix(for package: Package) -> String {
+        switch billingPeriodLabel(for: package) {
+        case "year":
+            return "annual"
+        case "month":
+            return "monthly"
+        case "week":
+            return "weekly"
+        default:
+            return "fallback"
+        }
+    }
+
+    private func annualMonthlyEquivalentText(for package: Package) -> String? {
+        guard package.identifier == "$rc_annual",
+              let monthlyEquivalent = PaywallSavingsPolicy.monthlyEquivalent(annualPrice: package.storeProduct.price),
+              let formatter = package.storeProduct.priceFormatter else {
+            return nil
+        }
+
+        return formatter.string(from: monthlyEquivalent)
     }
 
     func cachePaywallOfferingDisplay(_ display: CachedPaywallOfferingDisplay) {
@@ -969,6 +1169,8 @@ class RevenueCatManager: NSObject, ObservableObject {
         }
     }
 }
+
+typealias SubscriptionManager = RevenueCatManager
 
 // MARK: - PurchasesDelegate
 

@@ -75,6 +75,57 @@ enum AuthProfileBootstrapPolicy {
     }
 }
 
+enum PasswordUpdateError: LocalizedError {
+    case notAuthenticated
+    case incorrectCurrentPassword
+    case notStrongEnough
+    case failed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .notAuthenticated:
+            return "You must be logged in to change your password"
+        case .incorrectCurrentPassword:
+            return "Current password is incorrect"
+        case .notStrongEnough:
+            return "Please choose a stronger password"
+        case .failed(let message):
+            return message
+        }
+    }
+}
+
+protocol AuthAccountManaging {
+    func updatePassword(currentPassword: String, newPassword: String) async throws
+    func deleteCurrentAccount() async throws
+}
+
+private struct ClerkAuthAccountAdapter: AuthAccountManaging {
+    func updatePassword(currentPassword: String, newPassword: String) async throws {
+        guard let user = await Clerk.shared.user else {
+            throw PasswordUpdateError.notAuthenticated
+        }
+
+        try await user.updatePassword(.init(
+            newPassword: newPassword,
+            currentPassword: currentPassword,
+            signOutOfOtherSessions: true
+        ))
+    }
+
+    func deleteCurrentAccount() async throws {
+        guard let user = await Clerk.shared.user else {
+            throw NSError(
+                domain: "DeleteAccount",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "No user found"]
+            )
+        }
+
+        try await user.delete()
+    }
+}
+
 // MARK: - AsyncGate Helper
 
 actor AsyncGate {
@@ -141,6 +192,7 @@ class AuthManager: NSObject, ObservableObject {
     @Published var emailVerificationFlow: EmailVerificationFlow?
     private let clerk = Clerk.shared
     private let supabase = SupabaseClient.shared  // Keep for data operations
+    private let accountAdapter: AuthAccountManaging
     private let userDefaults = UserDefaults.standard
     private let userKey = Constants.currentUserKey
     private var cancellables = Set<AnyCancellable>()
@@ -149,7 +201,8 @@ class AuthManager: NSObject, ObservableObject {
     private var clerkInitializationTask: Task<Void, Never>?
     private var bootstrappedProfileSessionIds = Set<String>()
 
-    override init() {
+    init(accountAdapter: AuthAccountManaging = ClerkAuthAccountAdapter()) {
+        self.accountAdapter = accountAdapter
         super.init()
         // print("🔐 AuthManager initialized")
 
@@ -557,6 +610,32 @@ class AuthManager: NSObject, ObservableObject {
         )
 
         return [info]
+    }
+
+    func changePassword(currentPassword: String, newPassword: String) async throws {
+        do {
+            try await accountAdapter.updatePassword(
+                currentPassword: currentPassword,
+                newPassword: newPassword
+            )
+        } catch let error as PasswordUpdateError {
+            throw error
+        } catch let clerkError as ClerkAPIError {
+            switch clerkError.code {
+            case "form_password_incorrect":
+                throw PasswordUpdateError.incorrectCurrentPassword
+            case "form_password_not_strong_enough":
+                throw PasswordUpdateError.notStrongEnough
+            default:
+                throw PasswordUpdateError.failed(clerkError.message ?? "Failed to update password")
+            }
+        } catch {
+            throw PasswordUpdateError.failed(error.localizedDescription)
+        }
+    }
+
+    func deleteCurrentAccount() async throws {
+        try await accountAdapter.deleteCurrentAccount()
     }
 
     @discardableResult
@@ -1526,6 +1605,20 @@ extension AuthManager {
         } catch {
             // print("❌ Failed to save legal consent: \(error)")
         }
+    }
+}
+
+extension AuthManager {
+    var isAuthProviderReady: Bool {
+        isClerkLoaded
+    }
+
+    var authProviderInitError: String? {
+        clerkInitError
+    }
+
+    func retryAuthProviderInitialization() async {
+        await retryClerkInitialization()
     }
 }
 

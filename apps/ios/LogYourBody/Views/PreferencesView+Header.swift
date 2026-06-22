@@ -116,7 +116,7 @@ extension PreferencesView {
     var statusBadge: some View {
         HStack(spacing: theme.spacing.xs) {
             Circle()
-                .fill(revenueCatManager.isSubscribed ? theme.colors.success : theme.colors.warning)
+                .fill(subscriptionManager.isSubscribed ? theme.colors.success : theme.colors.warning)
                 .frame(width: 8, height: 8)
 
             Text(subscriptionStatusText)

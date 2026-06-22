@@ -260,7 +260,7 @@ struct BodySpecIntegrationView: View {
         }
 
         do {
-            let scans = try await SupabaseManager.shared.fetchDexaResults(userId: userId, limit: 10)
+            let scans = try await AppServicePorts.dexaResultRemoteDataProvider.fetchDexaResults(userId: userId, limit: 10)
             recentScans = scans
             CoreDataManager.shared.saveDexaResults(scans, userId: userId)
         } catch {

@@ -9,28 +9,26 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useUser, useAuth as useClerkAuth, useSignIn } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { processImageFile, validateImageFile } from '@/lib/clerk-avatar-upload';
 import { analytics } from '@/lib/analytics';
-
-type ClerkUserResource = ReturnType<typeof useUser>['user'];
-type ClerkGetToken = ReturnType<typeof useClerkAuth>['getToken'];
+import {
+  AppAuthSession,
+  AppAuthUser,
+  AuthProviderName,
+  useAuthRuntime,
+} from '@/lib/ports/auth-runtime';
 
 type AuthExitReason = 'none' | 'userInitiated' | 'sessionExpired';
 
-interface AuthSession {
-  getToken: ClerkGetToken;
-}
-
 interface AuthContextType {
-  user: ClerkUserResource | null;
-  session: AuthSession | null;
+  user: AppAuthUser | null;
+  session: AppAuthSession | null;
   loading: boolean;
   signIn: (email?: string) => Promise<{ error: Error | null }>;
   signUp: (email?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  signInWithProvider: (provider: 'google' | 'apple') => Promise<{ error: Error | null }>;
+  signInWithProvider: (provider: AuthProviderName) => Promise<{ error: Error | null }>;
   uploadProfileImage: (file: File) => Promise<{ imageUrl?: string; error: Error | null }>;
   deleteProfileImage: () => Promise<{ error: Error | null }>;
   exitReason: AuthExitReason;
@@ -40,9 +38,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
-  const { user, isLoaded } = useUser();
-  const { signOut: clerkSignOut, getToken } = useClerkAuth();
-  const { signIn: clerkSignIn } = useSignIn();
+  const authRuntime = useAuthRuntime();
+  const { user, isLoaded, getToken } = authRuntime;
   const router = useRouter();
 
   const [exitReason, setExitReason] = useState<AuthExitReason>('none');
@@ -132,32 +129,20 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     setExitReason('userInitiated');
-    await clerkSignOut();
+    await authRuntime.signOut();
     router.push('/');
-  }, [clerkSignOut, router]);
+  }, [authRuntime, router]);
 
   const signInWithProvider = useCallback(
-    async (provider: 'google' | 'apple') => {
+    async (provider: AuthProviderName) => {
       try {
-        if (!clerkSignIn) throw new Error('Sign in not available');
-
-        const providerMap: Record<'google' | 'apple', 'oauth_google' | 'oauth_apple'> = {
-          google: 'oauth_google',
-          apple: 'oauth_apple',
-        };
-
-        await clerkSignIn.authenticateWithRedirect({
-          strategy: providerMap[provider],
-          redirectUrl: '/auth/callback',
-          redirectUrlComplete: '/dashboard',
-        });
-
+        await authRuntime.signInWithProvider(provider);
         return { error: null };
       } catch (error) {
         return { error: error as Error };
       }
     },
-    [clerkSignIn],
+    [authRuntime],
   );
 
   const uploadProfileImage = useCallback(
@@ -216,7 +201,7 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const value = useMemo(() => {
-    const currentSession: AuthSession | null = isLoaded ? { getToken } : null;
+    const currentSession: AppAuthSession | null = isLoaded ? { getToken } : null;
     return {
       user,
       session: currentSession,

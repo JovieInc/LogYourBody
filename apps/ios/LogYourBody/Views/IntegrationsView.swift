@@ -312,7 +312,7 @@ extension IntegrationsView {
         }
 
         do {
-            let results = try await SupabaseManager.shared.fetchDexaResults(userId: userId, limit: 1)
+            let results = try await AppServicePorts.dexaResultRemoteDataProvider.fetchDexaResults(userId: userId, limit: 1)
 
             if let latest = results.first {
                 let date = latest.acquireTime ?? latest.updatedAt

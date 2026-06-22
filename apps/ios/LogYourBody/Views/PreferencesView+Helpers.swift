@@ -2,7 +2,6 @@
 // PreferencesView+Helpers.swift
 // LogYourBody
 //
-import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -118,15 +117,14 @@ extension PreferencesView {
         return "\(feet)' \(inches)\""
     }
 
-    func handlePhotoSelection(_ item: PhotosPickerItem) async {
+    func handlePhotoSelection(_ asset: AppPhotoAsset?) async {
         await MainActor.run {
             isUploadingPhoto = true
             avatarUploadProgress = 0.15
         }
 
         do {
-            if let data = try await item.loadTransferable(type: Data.self),
-               let image = UIImage(data: data) {
+            if let image = asset?.image {
                 await MainActor.run {
                     avatarUploadProgress = 0.4
                 }
@@ -154,10 +152,6 @@ extension PreferencesView {
                 avatarUploadProgress = 0.0
                 isUploadingPhoto = false
             }
-        }
-
-        await MainActor.run {
-            selectedPhotoItem = nil
         }
     }
 

@@ -103,7 +103,7 @@ struct BugReportFormView: View {
             bottomBar
         }
         .onAppear {
-            AnalyticsService.shared.track(
+            AppServicePorts.analyticsTracker.track(
                 event: "bug_report_form_opened",
                 properties: [
                     "has_screenshot": bugReportManager.screenshotData != nil ? "true" : "false"

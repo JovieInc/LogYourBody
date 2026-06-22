@@ -4,9 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { ClerkProvider } from '@clerk/nextjs';
 import { ClerkAuthProvider } from '@/contexts/ClerkAuthContext';
 import { PWAProvider } from '@/components/PWAProvider';
+import { AuthRuntimeProvider } from '@/lib/ports/auth-ui';
 
 const clerkFreeMarketingPrefixes = [
   '/',
@@ -58,11 +58,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
         {shouldLoadClerk ? (
-          <ClerkProvider>
+          <AuthRuntimeProvider>
             <ClerkAuthProvider>
               <PWAProvider>{children}</PWAProvider>
             </ClerkAuthProvider>
-          </ClerkProvider>
+          </AuthRuntimeProvider>
         ) : (
           <PWAProvider>{children}</PWAProvider>
         )}

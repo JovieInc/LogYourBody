@@ -1,29 +1,29 @@
-'use client'
+'use client';
 
-import { useUser } from '@clerk/nextjs'
-import { useClerkSupabaseClient } from '@/lib/supabase/clerk-client'
-import { useState, useEffect, useCallback } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { PostgrestError } from '@supabase/supabase-js'
-import type { BodyMetrics } from '@/types/body-metrics'
+import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useClerkSupabaseClient } from '@/lib/supabase/clerk-client';
+import { useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { BodyMetrics } from '@/types/body-metrics';
 
-type ProfileRow = Record<string, unknown> & { id?: string; email?: string | null }
-type WeightLog = BodyMetrics
+type ProfileRow = Record<string, unknown> & { id?: string; email?: string | null };
+type WeightLog = BodyMetrics;
+type DataError = { code?: string; message: string };
 
 export default function TestClerkSupabasePage() {
-  const { user, isLoaded } = useUser()
-  const supabase = useClerkSupabaseClient()
-  const [profile, setProfile] = useState<ProfileRow | null>(null)
-  const [weights, setWeights] = useState<WeightLog[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const { user, loading: authLoading } = useAuth();
+  const supabase = useClerkSupabaseClient();
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [weights, setWeights] = useState<WeightLog[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
-    if (!user) return
+    if (!user) return;
 
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
     try {
       // Test fetching profile
@@ -31,13 +31,13 @@ export default function TestClerkSupabasePage() {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single()
+        .single();
 
-      if (profileError && (profileError as PostgrestError).code !== 'PGRST116') {
-        console.error('Profile error:', profileError)
-        setError(`Profile error: ${profileError.message}`)
+      if (profileError && (profileError as DataError).code !== 'PGRST116') {
+        console.error('Profile error:', profileError);
+        setError(`Profile error: ${profileError.message}`);
       } else {
-        setProfile(profileData as ProfileRow | null)
+        setProfile(profileData as ProfileRow | null);
       }
 
       // Test fetching latest body metrics with weight entries
@@ -46,33 +46,37 @@ export default function TestClerkSupabasePage() {
         .select('*')
         .eq('user_id', user.id)
         .order('date', { ascending: false })
-        .limit(5)
+        .limit(5);
 
       if (weightsError) {
-        console.error('Weights error:', weightsError)
-        setError(prev => prev ? `${prev}\nWeights error: ${weightsError.message}` : `Weights error: ${weightsError.message}`)
+        console.error('Weights error:', weightsError);
+        setError((prev) =>
+          prev
+            ? `${prev}\nWeights error: ${weightsError.message}`
+            : `Weights error: ${weightsError.message}`,
+        );
       } else {
-        setWeights((weightsData as WeightLog[] | null) || [])
+        setWeights((weightsData as WeightLog[] | null) || []);
       }
     } catch (err: unknown) {
-      console.error('Unexpected error:', err)
-      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
+      console.error('Unexpected error:', err);
+      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [supabase, user])
+  }, [supabase, user]);
 
   useEffect(() => {
-    if (isLoaded && user) {
-      fetchData()
+    if (!authLoading && user) {
+      fetchData();
     }
-  }, [fetchData, isLoaded, user])
+  }, [fetchData, authLoading, user]);
 
   const createTestProfile = async () => {
-    if (!user) return
+    if (!user) return;
 
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
     try {
       const { data, error } = await supabase
@@ -82,29 +86,29 @@ export default function TestClerkSupabasePage() {
           email: user.emailAddresses[0]?.emailAddress,
           name: user.fullName || user.firstName || 'Test User',
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .select()
-        .single()
+        .single();
 
       if (error) {
-        setError(`Failed to create profile: ${error.message}`)
+        setError(`Failed to create profile: ${error.message}`);
       } else {
-        setProfile(data)
-        await fetchData()
+        setProfile(data);
+        await fetchData();
       }
     } catch (err: unknown) {
-      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
+      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const addTestWeight = async () => {
-    if (!user) return
+    if (!user) return;
 
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
     try {
       const { error } = await supabase
@@ -114,34 +118,34 @@ export default function TestClerkSupabasePage() {
           date: new Date().toISOString(),
           weight: 70 + Math.random() * 10,
           weight_unit: 'kg',
-          notes: 'Test weight entry'
+          notes: 'Test weight entry',
         })
         .select()
-        .single()
+        .single();
 
       if (error) {
-        setError(`Failed to add weight: ${error.message}`)
+        setError(`Failed to add weight: ${error.message}`);
       } else {
-        await fetchData()
+        await fetchData();
       }
     } catch (err: unknown) {
-      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
+      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  if (!isLoaded) {
-    return <div className="p-8">Loading...</div>
+  if (authLoading) {
+    return <div className="p-8">Loading...</div>;
   }
 
   if (!user) {
-    return <div className="p-8">Please sign in to test Clerk-Supabase integration</div>
+    return <div className="p-8">Please sign in to test Clerk-Supabase integration</div>;
   }
 
   return (
     <div className="container mx-auto p-8">
-      <h1 className="text-2xl font-bold mb-6">Clerk-Supabase Integration Test</h1>
+      <h1 className="mb-6 text-2xl font-bold">Clerk-Supabase Integration Test</h1>
 
       <div className="grid gap-6">
         <Card>
@@ -149,12 +153,16 @@ export default function TestClerkSupabasePage() {
             <CardTitle>Clerk User Info</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="text-sm overflow-auto bg-gray-100 p-4 rounded">
-              {JSON.stringify({
-                id: user.id,
-                email: user.emailAddresses[0]?.emailAddress,
-                name: user.fullName || user.firstName
-              }, null, 2)}
+            <pre className="overflow-auto rounded bg-gray-100 p-4 text-sm">
+              {JSON.stringify(
+                {
+                  id: user.id,
+                  email: user.emailAddresses[0]?.emailAddress,
+                  name: user.fullName || user.firstName,
+                },
+                null,
+                2,
+              )}
             </pre>
           </CardContent>
         </Card>
@@ -165,7 +173,7 @@ export default function TestClerkSupabasePage() {
           </CardHeader>
           <CardContent>
             {profile ? (
-              <pre className="text-sm overflow-auto bg-gray-100 p-4 rounded">
+              <pre className="overflow-auto rounded bg-gray-100 p-4 text-sm">
                 {JSON.stringify(profile, null, 2)}
               </pre>
             ) : (
@@ -188,7 +196,7 @@ export default function TestClerkSupabasePage() {
               Add Test Weight
             </Button>
             {weights.length > 0 ? (
-              <pre className="text-sm overflow-auto bg-gray-100 p-4 rounded">
+              <pre className="overflow-auto rounded bg-gray-100 p-4 text-sm">
                 {JSON.stringify(weights, null, 2)}
               </pre>
             ) : (
@@ -203,11 +211,11 @@ export default function TestClerkSupabasePage() {
               <CardTitle className="text-red-600">Error</CardTitle>
             </CardHeader>
             <CardContent>
-              <pre className="text-sm text-red-600 whitespace-pre-wrap">{error}</pre>
+              <pre className="whitespace-pre-wrap text-sm text-red-600">{error}</pre>
             </CardContent>
           </Card>
         )}
       </div>
     </div>
-  )
+  );
 }

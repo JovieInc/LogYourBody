@@ -3,9 +3,9 @@
 // LogYourBody
 //
 import SwiftUI
-import Clerk
 
 struct ChangePasswordView: View {
+    @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss)
     var dismiss
     @Environment(\.theme)
@@ -203,36 +203,15 @@ struct ChangePasswordView: View {
 
         Task { @MainActor in
             do {
-                guard let user = Clerk.shared.user else {
-                    throw PasswordError.notAuthenticated
-                }
-
-                // Update password using Clerk
-                try await user.updatePassword(.init(
-                    newPassword: newPassword,
+                try await authManager.changePassword(
                     currentPassword: currentPassword,
-                    signOutOfOtherSessions: true
-                ))
-
+                    newPassword: newPassword
+                )
                 isLoading = false
                 showSuccess = true
             } catch {
                 isLoading = false
-
-                // Handle specific Clerk errors
-                if let clerkError = error as? ClerkAPIError {
-                    switch clerkError.code {
-                    case "form_password_incorrect":
-                        errorMessage = "Current password is incorrect"
-                    case "form_password_not_strong_enough":
-                        errorMessage = "Please choose a stronger password"
-                    default:
-                        errorMessage = clerkError.message ?? "Failed to update password"
-                    }
-                } else {
-                    errorMessage = error.localizedDescription
-                }
-
+                errorMessage = error.localizedDescription
                 showError = true
             }
         }
@@ -259,20 +238,10 @@ struct PasswordRequirement: View {
     }
 }
 
-enum PasswordError: LocalizedError {
-    case notAuthenticated
-
-    var errorDescription: String? {
-        switch self {
-        case .notAuthenticated:
-            return "You must be logged in to change your password"
-        }
-    }
-}
-
 #Preview {
     NavigationStack {
         ChangePasswordView()
+            .environmentObject(AuthManager.shared)
             .preferredColorScheme(.dark)
     }
 }

@@ -68,7 +68,7 @@ private struct ProfileCompletionSyncKey: Equatable {
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
-    @EnvironmentObject var revenueCatManager: RevenueCatManager
+    @EnvironmentObject var subscriptionManager: SubscriptionManager
     @EnvironmentObject var bugReportManager: BugReportManager
     @StateObject private var loadingManager: LoadingManager
     @StateObject private var notificationManager = NotificationManager.shared
@@ -117,7 +117,7 @@ struct ContentView: View {
 
     private var shouldShowDailyReminderPrompt: Bool {
         notificationManager.shouldShowPostPaywallPrompt(
-            isSubscribed: revenueCatManager.isSubscribed
+            isSubscribed: subscriptionManager.isSubscribed
         )
     }
 
@@ -239,20 +239,20 @@ struct ContentView: View {
             if shouldShowOnboarding {
                 BodyScoreOnboardingFlowView()
                     .onAppear {
-                        AnalyticsService.shared.track(event: "onboarding_view")
+                        AppServicePorts.analyticsTracker.track(event: "onboarding_view")
                     }
             } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
-            } else if !revenueCatManager.isSubscribed {
+            } else if !subscriptionManager.isSubscribed {
                 PaywallView()
                     .environmentObject(authManager)
-                    .environmentObject(revenueCatManager)
+                    .environmentObject(subscriptionManager)
             } else if shouldShowDailyReminderPrompt {
                 DailyWeighInReminderPromptView(notificationManager: notificationManager)
             } else {
                 MainTabView()
                     .onAppear {
-                        AnalyticsService.shared.track(event: "dashboard_view")
+                        AppServicePorts.analyticsTracker.track(event: "dashboard_view")
                     }
             }
         }

@@ -75,7 +75,7 @@ struct EmailVerificationView: View {
         .accessibilityIdentifier("email_verification_screen")
         .navigationBarHidden(true)
         .onAppear {
-            AnalyticsService.shared.track(event: "email_verification_view")
+            AppServicePorts.analyticsTracker.track(event: "email_verification_view")
         }
     }
 
@@ -92,11 +92,11 @@ struct EmailVerificationView: View {
                 case .signIn?:
                     try await authManager.verifySignInEmail(code: verificationCode)
                     successMessage = "Signed in successfully!"
-                    AnalyticsService.shared.track(event: "login_email_code_verified")
+                    AppServicePorts.analyticsTracker.track(event: "login_email_code_verified")
                 case .signUp?, nil:
                     try await authManager.verifyEmail(code: verificationCode)
                     successMessage = "Email verified successfully!"
-                    AnalyticsService.shared.track(event: "email_verified")
+                    AppServicePorts.analyticsTracker.track(event: "email_verified")
                 }
             } catch {
                 errorMessage = "Invalid verification code. Please try again."
@@ -110,7 +110,7 @@ struct EmailVerificationView: View {
                     event = "email_verification_failed"
                 }
 
-                AnalyticsService.shared.track(event: event)
+                AppServicePorts.analyticsTracker.track(event: event)
             }
         }
     }
@@ -125,15 +125,15 @@ struct EmailVerificationView: View {
                 case .signIn?:
                     try await authManager.resendSignInEmailCode()
                     successMessage = "A new sign-in code has been sent to your email."
-                    AnalyticsService.shared.track(event: "login_email_code_resent")
+                    AppServicePorts.analyticsTracker.track(event: "login_email_code_resent")
                 case .signUp?, nil:
                     try await authManager.resendVerificationEmail()
                     successMessage = "A new verification code has been sent to your email."
-                    AnalyticsService.shared.track(event: "email_verification_resent")
+                    AppServicePorts.analyticsTracker.track(event: "email_verification_resent")
                 }
             } catch {
                 errorMessage = "Failed to resend code. Please try again."
-                AnalyticsService.shared.track(event: "email_verification_resend_failed")
+                AppServicePorts.analyticsTracker.track(event: "email_verification_resend_failed")
             }
         }
     }

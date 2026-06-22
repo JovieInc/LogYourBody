@@ -26,5 +26,5 @@ struct PreAuthBodyScoreOnboardingContainer: View {
 #Preview {
     PreAuthBodyScoreOnboardingContainer(onCompleted: {})
         .environmentObject(AuthManager.shared)
-        .environmentObject(RevenueCatManager.shared)
+        .environmentObject(SubscriptionManager.shared)
 }

@@ -3,7 +3,6 @@
 // LogYourBody
 //
 import SwiftUI
-import Clerk
 
 struct SecuritySessionsView: View {
     @EnvironmentObject var authManager: AuthManager
