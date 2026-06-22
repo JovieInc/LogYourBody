@@ -1,22 +1,13 @@
 #!/bin/bash
 
-echo "🔧 Setting up Xcode configuration..."
+set -euo pipefail
 
-# Check if Config.xcconfig exists
-if [ ! -f "LogYourBody/Config.xcconfig" ]; then
-    echo "❌ Config.xcconfig not found!"
-    echo ""
-    echo "Creating Config.xcconfig from example..."
-    cp LogYourBody/Config.xcconfig.example LogYourBody/Config.xcconfig
-    echo ""
-    echo "⚠️  Please edit LogYourBody/Config.xcconfig with your Supabase credentials:"
-    echo "   - SUPABASE_URL"
-    echo "   - SUPABASE_ANON_KEY"
-    echo ""
-    echo "You can find these in your Supabase project settings."
-else
-    echo "✅ Config.xcconfig found!"
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+echo "🔧 Setting up Xcode configuration..."
+echo ""
+bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
 
 echo ""
 echo "📝 Next steps:"

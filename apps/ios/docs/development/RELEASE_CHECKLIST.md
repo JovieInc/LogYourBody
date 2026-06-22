@@ -2,6 +2,9 @@
 
 Use this checklist before sending a LogYourBody iOS build to TestFlight or App Store review.
 
+Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
+`apps/ios/docs/development/RELEASE_EVIDENCE_PATH.md`.
+
 ## Configuration
 
 - Clerk production publishable key is configured in `Config.xcconfig`.
@@ -92,6 +95,7 @@ From the repository root:
 
 ```bash
 pnpm install
+pnpm ios:bootstrap-local-config
 pnpm lint
 pnpm typecheck
 pnpm test:ci
@@ -103,11 +107,11 @@ From `apps/ios/`:
 swiftlint lint --strict
 xcodebuild -project LogYourBody.xcodeproj \
   -scheme LogYourBody \
-  -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -destination 'platform=iOS Simulator,name=LYB Golden iPhone 16' \
   build-for-testing
 xcodebuild -project LogYourBody.xcodeproj \
   -scheme LogYourBody \
-  -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -destination 'platform=iOS Simulator,name=LYB Golden iPhone 16' \
   test
 ```
 
