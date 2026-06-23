@@ -217,8 +217,8 @@ struct EnhancedOTPInputView: View {
         }
 
         // Handle single digit
-        if newValue.count == 1 && newValue.last!.isNumber {
-            digits[index] = String(newValue.last!)
+        if let digit = newValue.last, newValue.count == 1, digit.isNumber {
+            digits[index] = String(digit)
             animateDigit(at: index, scale: 1.1)
 
             // Move to next field with delay to prevent UI freeze

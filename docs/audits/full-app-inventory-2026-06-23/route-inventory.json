@@ -1,0 +1,267 @@
+{
+  "generatedAt": "2026-06-23",
+  "sourceRoot": "apps/web/src/app",
+  "counts": {
+    "pages": 38,
+    "apiRouteHandlers": 12
+  },
+  "productionDebugGate": {
+    "source": "apps/web/src/middleware.ts",
+    "behavior": "No mounted debug/test app routes are present on this branch; middleware returns 404 for matching debug/test route patterns before auth handling.",
+    "coveredBy": "apps/web/src/__tests__/middleware-production-gate.test.ts"
+  },
+  "pages": [
+    {
+      "route": "/about",
+      "file": "apps/web/src/app/about/page.tsx",
+      "group": "marketing"
+    },
+    {
+      "route": "/auth/callback",
+      "file": "apps/web/src/app/auth/callback/page.tsx",
+      "group": "auth"
+    },
+    {
+      "route": "/blog/[slug]",
+      "file": "apps/web/src/app/blog/[slug]/page.tsx",
+      "group": "marketing"
+    },
+    {
+      "route": "/blog",
+      "file": "apps/web/src/app/blog/page.tsx",
+      "group": "marketing"
+    },
+    {
+      "route": "/blog/tag/[tag]",
+      "file": "apps/web/src/app/blog/tag/[tag]/page.tsx",
+      "group": "marketing"
+    },
+    {
+      "route": "/brand",
+      "file": "apps/web/src/app/brand/page.tsx",
+      "group": "marketing"
+    },
+    {
+      "route": "/careers",
+      "file": "apps/web/src/app/careers/page.tsx",
+      "group": "marketing"
+    },
+    {
+      "route": "/changelog",
+      "file": "apps/web/src/app/changelog/page.tsx",
+      "group": "marketing"
+    },
+    {
+      "route": "/dashboard",
+      "file": "apps/web/src/app/dashboard/page.tsx",
+      "group": "web-product"
+    },
+    {
+      "route": "/delete-account",
+      "file": "apps/web/src/app/delete-account/page.tsx",
+      "group": "support-account"
+    },
+    {
+      "route": "/download/android",
+      "file": "apps/web/src/app/download/android/page.tsx",
+      "group": "download"
+    },
+    {
+      "route": "/download/ios",
+      "file": "apps/web/src/app/download/ios/page.tsx",
+      "group": "download"
+    },
+    {
+      "route": "/download",
+      "file": "apps/web/src/app/download/page.tsx",
+      "group": "download"
+    },
+    {
+      "route": "/forgot-password",
+      "file": "apps/web/src/app/forgot-password/page.tsx",
+      "group": "auth"
+    },
+    {
+      "route": "/health-disclosure",
+      "file": "apps/web/src/app/health-disclosure/page.tsx",
+      "group": "legal"
+    },
+    {
+      "route": "/import",
+      "file": "apps/web/src/app/import/page.tsx",
+      "group": "web-product"
+    },
+    {
+      "route": "/landing",
+      "file": "apps/web/src/app/landing/page.tsx",
+      "group": "marketing"
+    },
+    {
+      "route": "/log",
+      "file": "apps/web/src/app/log/page.tsx",
+      "group": "web-product"
+    },
+    {
+      "route": "/login-minimal",
+      "file": "apps/web/src/app/login-minimal/page.tsx",
+      "group": "auth"
+    },
+    {
+      "route": "/mobile",
+      "file": "apps/web/src/app/mobile/page.tsx",
+      "group": "download"
+    },
+    {
+      "route": "/onboarding",
+      "file": "apps/web/src/app/onboarding/page.tsx",
+      "group": "web-product"
+    },
+    {
+      "route": "/",
+      "file": "apps/web/src/app/page.tsx",
+      "group": "marketing"
+    },
+    {
+      "route": "/photos",
+      "file": "apps/web/src/app/photos/page.tsx",
+      "group": "web-product"
+    },
+    {
+      "route": "/privacy",
+      "file": "apps/web/src/app/privacy/page.tsx",
+      "group": "legal"
+    },
+    {
+      "route": "/security",
+      "file": "apps/web/src/app/security/page.tsx",
+      "group": "legal"
+    },
+    {
+      "route": "/settings/account",
+      "file": "apps/web/src/app/settings/account/page.tsx",
+      "group": "support-account"
+    },
+    {
+      "route": "/settings/data-export",
+      "file": "apps/web/src/app/settings/data-export/page.tsx",
+      "group": "support-account"
+    },
+    {
+      "route": "/settings/notifications",
+      "file": "apps/web/src/app/settings/notifications/page.tsx",
+      "group": "support-account"
+    },
+    {
+      "route": "/settings",
+      "file": "apps/web/src/app/settings/page.tsx",
+      "group": "support-account"
+    },
+    {
+      "route": "/settings/preferences",
+      "file": "apps/web/src/app/settings/preferences/page.tsx",
+      "group": "support-account"
+    },
+    {
+      "route": "/settings/profile",
+      "file": "apps/web/src/app/settings/profile/page.tsx",
+      "group": "support-account"
+    },
+    {
+      "route": "/settings/subscription",
+      "file": "apps/web/src/app/settings/subscription/page.tsx",
+      "group": "support-account"
+    },
+    {
+      "route": "/signin",
+      "file": "apps/web/src/app/signin/page.tsx",
+      "group": "auth"
+    },
+    {
+      "route": "/signup",
+      "file": "apps/web/src/app/signup/page.tsx",
+      "group": "auth"
+    },
+    {
+      "route": "/simple-login",
+      "file": "apps/web/src/app/simple-login/page.tsx",
+      "group": "auth"
+    },
+    {
+      "route": "/steps",
+      "file": "apps/web/src/app/steps/page.tsx",
+      "group": "web-product"
+    },
+    {
+      "route": "/support",
+      "file": "apps/web/src/app/support/page.tsx",
+      "group": "support-account"
+    },
+    {
+      "route": "/terms",
+      "file": "apps/web/src/app/terms/page.tsx",
+      "group": "legal"
+    }
+  ],
+  "apiRouteHandlers": [
+    {
+      "route": "/api/app-store-redirect",
+      "file": "apps/web/src/app/api/app-store-redirect/route.ts",
+      "group": "download"
+    },
+    {
+      "route": "/api/auth/delete-account",
+      "file": "apps/web/src/app/api/auth/delete-account/route.ts",
+      "group": "support-account"
+    },
+    {
+      "route": "/api/auth/login",
+      "file": "apps/web/src/app/api/auth/login/route.ts",
+      "group": "auth"
+    },
+    {
+      "route": "/api/auth/signup",
+      "file": "apps/web/src/app/api/auth/signup/route.ts",
+      "group": "auth"
+    },
+    {
+      "route": "/api/auth/verify",
+      "file": "apps/web/src/app/api/auth/verify/route.ts",
+      "group": "auth"
+    },
+    {
+      "route": "/api/parse-pdf-alt",
+      "file": "apps/web/src/app/api/parse-pdf-alt/route.ts",
+      "group": "import"
+    },
+    {
+      "route": "/api/parse-pdf-v2",
+      "file": "apps/web/src/app/api/parse-pdf-v2/route.ts",
+      "group": "import"
+    },
+    {
+      "route": "/api/parse-pdf",
+      "file": "apps/web/src/app/api/parse-pdf/route.ts",
+      "group": "import"
+    },
+    {
+      "route": "/api/webhooks/clerk",
+      "file": "apps/web/src/app/api/webhooks/clerk/route.ts",
+      "group": "webhook"
+    },
+    {
+      "route": "/api/weights",
+      "file": "apps/web/src/app/api/weights/route.ts",
+      "group": "web-product"
+    },
+    {
+      "route": "/login/clear-cookies",
+      "file": "apps/web/src/app/login/clear-cookies/route.ts",
+      "group": "api"
+    },
+    {
+      "route": "/login",
+      "file": "apps/web/src/app/login/route.ts",
+      "group": "api"
+    }
+  ]
+}

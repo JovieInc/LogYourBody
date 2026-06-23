@@ -440,7 +440,7 @@ extension AuthManager {
             return
         }
 
-        guard let url = URL(string: "\(Constants.supabaseURL)/functions/v1/delete-user-assets") else {
+        guard let url = try? SupabaseURLBuilder.functionURL("delete-user-assets") else {
             return
         }
 
@@ -477,7 +477,10 @@ extension AuthManager {
 
         do {
             // Query the profiles table for legal consent status
-            let url = URL(string: "\(Constants.supabaseURL)/rest/v1/profiles?id=eq.\(userId)&select=legal_accepted_at")!
+            let url = try SupabaseURLBuilder.restURL(
+                table: "profiles",
+                query: "id=eq.\(userId)&select=legal_accepted_at"
+            )
             var request = URLRequest(url: url)
             request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -513,7 +516,7 @@ extension AuthManager {
                 "privacy_accepted": true
             ]
 
-            let url = URL(string: "\(Constants.supabaseURL)/rest/v1/profiles")!
+            let url = try SupabaseURLBuilder.restURL(table: "profiles")
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")

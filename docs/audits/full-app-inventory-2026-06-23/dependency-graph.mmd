@@ -1,0 +1,70 @@
+flowchart LR
+  subgraph Native["iOS dependencies"]
+    SwiftUI["SwiftUI"]
+    CoreData["Core Data"]
+    HealthKit["HealthKit"]
+    Photos["Photos / PhotosUI"]
+    ClerkIOS["Clerk iOS 0.59.0"]
+    RevenueCat["RevenueCat 5.47.0"]
+    Statsig["Statsig 1.55.1"]
+    Sentry["Sentry 8.57.3"]
+    Factory["Factory 2.5.3"]
+    Get["Get 2.2.1"]
+    SimpleKeychain["SimpleKeychain 1.3.0"]
+  end
+
+  subgraph Web["Web dependencies"]
+    Next["Next.js 15.5.19"]
+    React["React 19.1.0"]
+    ClerkWeb["@clerk/nextjs"]
+    SupabaseWeb["@supabase/ssr and supabase-js"]
+    ReactQuery["@tanstack/react-query"]
+    Radix["Radix UI"]
+    Tailwind["Tailwind CSS 4"]
+    OpenAI["OpenAI"]
+    PDF["pdf-lib / pdf-parse / pdfjs-dist"]
+    Playwright["Playwright"]
+    Jest["Jest"]
+  end
+
+  subgraph Shared["Workspace packages"]
+    Tokens["@logyourbody/design-tokens"]
+    SharedLib["@logyourbody/shared-lib"]
+    SharedUI["@logyourbody/shared-ui"]
+  end
+
+  subgraph Platform["External platforms"]
+    Supabase["Supabase Postgres/RLS/Storage/Functions"]
+    Clerk["Clerk"]
+    AppStore["App Store Connect"]
+    TestFlight["TestFlight"]
+    Vercel["Vercel"]
+    SentryCloud["Sentry"]
+    StatsigCloud["Statsig"]
+  end
+
+  SwiftUI --> CoreData
+  SwiftUI --> HealthKit
+  SwiftUI --> Photos
+  ClerkIOS --> Clerk
+  RevenueCat --> AppStore
+  RevenueCat --> TestFlight
+  Statsig --> StatsigCloud
+  Sentry --> SentryCloud
+  CoreData --> Supabase
+  Get --> Supabase
+  SimpleKeychain --> ClerkIOS
+
+  Next --> React
+  Next --> Vercel
+  ClerkWeb --> Clerk
+  SupabaseWeb --> Supabase
+  ReactQuery --> SupabaseWeb
+  OpenAI --> PDF
+  Playwright --> Vercel
+  Jest --> Next
+
+  Tokens --> SwiftUI
+  Tokens --> Tailwind
+  SharedLib --> Supabase
+  SharedUI --> React

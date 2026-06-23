@@ -97,8 +97,8 @@ struct OTPInputView: View {
         }
 
         // Handle single digit
-        if newValue.count == 1 && newValue.last!.isNumber {
-            digits[index] = String(newValue.last!)
+        if let digit = newValue.last, newValue.count == 1, digit.isNumber {
+            digits[index] = String(digit)
 
             // Move to next field
             if index < numberOfDigits - 1 {

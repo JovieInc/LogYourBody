@@ -22,7 +22,11 @@ extension SupabaseManager {
     }
 
 func fetchLatestBodyMetricTimestamp(userId: String, token: String) async throws -> Date? {
-        let url = URL(string: "\(supabaseURL)/rest/v1/body_metrics?user_id=eq.\(userId)&order=updated_at.desc&limit=1")!
+        let url = try SupabaseURLBuilder.restURL(
+            table: "body_metrics",
+            query: "user_id=eq.\(userId)&order=updated_at.desc&limit=1",
+            baseURL: supabaseURL
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -50,7 +54,11 @@ func fetchBodyMetrics(userId: String, since: Date, token: String) async throws -
         let dateFormatter = ISO8601DateFormatter()
         let sinceString = dateFormatter.string(from: since)
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/body_metrics?user_id=eq.\(userId)&updated_at=gte.\(sinceString)&order=created_at.desc")!
+        let url = try SupabaseURLBuilder.restURL(
+            table: "body_metrics",
+            query: "user_id=eq.\(userId)&updated_at=gte.\(sinceString)&order=created_at.desc",
+            baseURL: supabaseURL
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -72,7 +80,11 @@ func fetchDailyMetrics(userId: String, since: Date, token: String) async throws 
         let dateFormatter = ISO8601DateFormatter()
         let sinceString = dateFormatter.string(from: since)
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/daily_metrics?user_id=eq.\(userId)&updated_at=gte.\(sinceString)&order=date.desc")!
+        let url = try SupabaseURLBuilder.restURL(
+            table: "daily_metrics",
+            query: "user_id=eq.\(userId)&updated_at=gte.\(sinceString)&order=date.desc",
+            baseURL: supabaseURL
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -91,7 +103,11 @@ func fetchDailyMetrics(userId: String, since: Date, token: String) async throws 
     }
 
 func fetchProfile(userId: String, token: String) async throws -> [String: Any]? {
-        let url = URL(string: "\(supabaseURL)/rest/v1/profiles?id=eq.\(userId)&select=*")!
+        let url = try SupabaseURLBuilder.restURL(
+            table: "profiles",
+            query: "id=eq.\(userId)&select=*",
+            baseURL: supabaseURL
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -112,7 +128,7 @@ func fetchProfile(userId: String, token: String) async throws -> [String: Any]? 
 func upsertProfilePayload(_ profile: [String: Any], token: String) async throws {
         guard profile["id"] is String else { throw SupabaseError.invalidData }
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/profiles")!
+        let url = try SupabaseURLBuilder.restURL(table: "profiles", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -167,7 +183,11 @@ nonisolated static func sanitizedProfilePayload(_ profile: [String: Any]) throws
     func fetchProfile(userId: String) async throws -> UserProfile? {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/profiles?id=eq.\(userId)&select=*")!
+        let url = try SupabaseURLBuilder.restURL(
+            table: "profiles",
+            query: "id=eq.\(userId)&select=*",
+            baseURL: supabaseURL
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -217,7 +237,7 @@ nonisolated static func sanitizedProfilePayload(_ profile: [String: Any]) throws
 func upsertProfile(_ profile: UserProfile) async throws {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/profiles")!
+        let url = try SupabaseURLBuilder.restURL(table: "profiles", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -249,7 +269,11 @@ func upsertProfile(_ profile: UserProfile) async throws {
     func fetchGlp1Medications(userId: String) async throws -> [Glp1Medication] {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/glp1_medications?user_id=eq.\(userId)&order=started_at.asc")!
+        let url = try SupabaseURLBuilder.restURL(
+            table: "glp1_medications",
+            query: "user_id=eq.\(userId)&order=started_at.asc",
+            baseURL: supabaseURL
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -297,7 +321,7 @@ func upsertProfile(_ profile: UserProfile) async throws {
 func saveGlp1Medication(_ medication: Glp1Medication) async throws {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/glp1_medications")!
+        let url = try SupabaseURLBuilder.restURL(table: "glp1_medications", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -346,7 +370,11 @@ func saveGlp1Medication(_ medication: Glp1Medication) async throws {
 func fetchDexaResults(userId: String, limit: Int = 50) async throws -> [DexaResult] {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/dexa_results?user_id=eq.\(userId)&order=acquire_time.desc&limit=\(limit)")!
+        let url = try SupabaseURLBuilder.restURL(
+            table: "dexa_results",
+            query: "user_id=eq.\(userId)&order=acquire_time.desc&limit=\(limit)",
+            baseURL: supabaseURL
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -377,7 +405,7 @@ func fetchDexaResults(userId: String, limit: Int = 50) async throws -> [DexaResu
     func upsertDexaResult(_ result: DexaResult) async throws {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/dexa_results")!
+        let url = try SupabaseURLBuilder.restURL(table: "dexa_results", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -409,7 +437,11 @@ func fetchDexaResults(userId: String, limit: Int = 50) async throws -> [DexaResu
     func fetchBodyMetrics(userId: String, limit: Int = 30) async throws -> [BodyMetrics] {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/body_metrics?user_id=eq.\(userId)&order=date.desc&limit=\(limit)")!
+        let url = try SupabaseURLBuilder.restURL(
+            table: "body_metrics",
+            query: "user_id=eq.\(userId)&order=date.desc&limit=\(limit)",
+            baseURL: supabaseURL
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -438,7 +470,7 @@ func fetchDexaResults(userId: String, limit: Int = 50) async throws -> [DexaResu
 func saveBodyMetrics(_ metrics: BodyMetrics) async throws {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/body_metrics")!
+        let url = try SupabaseURLBuilder.restURL(table: "body_metrics", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -473,7 +505,11 @@ func saveBodyMetrics(_ metrics: BodyMetrics) async throws {
         let dateFormatter = ISO8601DateFormatter()
         let fromDateString = dateFormatter.string(from: date)
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/daily_metrics?user_id=eq.\(userId)&date=gte.\(fromDateString)&order=date.desc")!
+        let url = try SupabaseURLBuilder.restURL(
+            table: "daily_metrics",
+            query: "user_id=eq.\(userId)&date=gte.\(fromDateString)&order=date.desc",
+            baseURL: supabaseURL
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -502,7 +538,7 @@ func saveBodyMetrics(_ metrics: BodyMetrics) async throws {
 func saveDailyMetrics(_ metrics: DailyMetrics) async throws {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/daily_metrics")!
+        let url = try SupabaseURLBuilder.restURL(table: "daily_metrics", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -534,7 +570,11 @@ func saveDailyMetrics(_ metrics: DailyMetrics) async throws {
     func fetchGlp1DoseLogs(userId: String, limit: Int = 100) async throws -> [Glp1DoseLog] {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/glp1_dose_logs?user_id=eq.\(userId)&order=taken_at.desc&limit=\(limit)")!
+        let url = try SupabaseURLBuilder.restURL(
+            table: "glp1_dose_logs",
+            query: "user_id=eq.\(userId)&order=taken_at.desc&limit=\(limit)",
+            baseURL: supabaseURL
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -563,7 +603,7 @@ func saveDailyMetrics(_ metrics: DailyMetrics) async throws {
 func saveGlp1DoseLog(_ log: Glp1DoseLog) async throws {
         let jwt = try await getSupabaseJWT()
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/glp1_dose_logs")!
+        let url = try SupabaseURLBuilder.restURL(table: "glp1_dose_logs", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")

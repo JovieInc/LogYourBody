@@ -1,0 +1,88 @@
+flowchart TD
+  User["User / App Reviewer"]
+
+  subgraph IOS["Native iOS app"]
+    App["LogYourBodyApp"]
+    Content["ContentView launch gate"]
+    Auth["AuthManager / Clerk"]
+    Onboarding["BodyScore onboarding"]
+    Paywall["PaywallView / RevenueCat"]
+    HUD["MainTabView -> photo timeline HUD"]
+    Entry["AddEntry / body metrics"]
+    Photos["Progress photo attach/import"]
+    Health["HealthKit import"]
+    Settings["Settings / export / delete"]
+    CoreData["Core Data cache"]
+    Sync["RealtimeSyncManager"]
+    Ports["ExternalServicePorts"]
+    Sentry["Sentry error tracking"]
+    Statsig["Statsig analytics / gates"]
+  end
+
+  subgraph Web["Next.js web app"]
+    Marketing["Marketing/download pages"]
+    Legal["Legal/support/security pages"]
+    WebAuth["Clerk auth routes"]
+    WebProduct["Dashboard/log/photos/import/settings"]
+    APIs["API routes"]
+    Middleware["Production debug/test route gate"]
+    IndexedDB["IndexedDB sync cache"]
+  end
+
+  subgraph Data["Data and backend"]
+    Supabase["Supabase Postgres / RLS / Storage"]
+    Functions["Supabase edge functions"]
+    MigrationsRoot["supabase/migrations"]
+    MigrationsWeb["apps/web/supabase/migrations"]
+  end
+
+  subgraph Release["CI and release"]
+    CI["GitHub CI"]
+    IOSQuality["iOS Launch Quality Gate"]
+    Deploy["Deploy"]
+    ReleaseLoop["iOS Release Loop"]
+    TestFlight["TestFlight"]
+    AppStore["App Store Connect"]
+    Vercel["Vercel production"]
+  end
+
+  User --> IOS
+  User --> Web
+
+  App --> Content
+  Content --> Auth
+  Content --> Onboarding
+  Content --> Paywall
+  Content --> HUD
+  HUD --> Entry
+  HUD --> Photos
+  HUD --> Health
+  HUD --> Settings
+  Entry --> CoreData
+  Photos --> CoreData
+  Health --> CoreData
+  CoreData --> Sync
+  Sync --> Supabase
+  Auth --> Supabase
+  Paywall --> TestFlight
+  Ports --> Sentry
+  Ports --> Statsig
+
+  Marketing --> Vercel
+  Legal --> Vercel
+  WebAuth --> APIs
+  WebProduct --> IndexedDB
+  IndexedDB --> APIs
+  APIs --> Supabase
+  APIs --> Functions
+  Middleware --> Web
+
+  MigrationsRoot --> Supabase
+  MigrationsWeb -. drift risk .-> Supabase
+
+  CI --> IOSQuality
+  CI --> Deploy
+  Deploy --> Vercel
+  ReleaseLoop --> TestFlight
+  ReleaseLoop --> AppStore
+  ReleaseLoop --> Paywall

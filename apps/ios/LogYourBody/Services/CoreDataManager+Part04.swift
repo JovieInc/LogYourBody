@@ -259,7 +259,7 @@ func updateOrCreateProfile(from data: [String: Any]) {
 
 @available(*, unavailable, message: "Use async fetchAllBodyMetrics(for:) instead")
     func fetchAllBodyMetricsSync(for userId: String) -> [BodyMetrics] {
-        fatalError("fetchAllBodyMetricsSync has been removed. Use the async counterpart instead.")
+        []
     }
 
 /// Async version - does NOT block the main thread
@@ -313,7 +313,7 @@ func updateOrCreateProfile(from data: [String: Any]) {
 
 @available(*, unavailable, message: "Use async fetchAllDailyLogs(for:) instead")
     func fetchAllDailyLogsSync(for userId: String) -> [DailyLog] {
-        fatalError("fetchAllDailyLogsSync has been removed. Use the async counterpart instead.")
+        []
     }
 
 // MARK: - Debug Methods

@@ -82,6 +82,27 @@ RUN_LAUNCH_PERFORMANCE=false DESTINATION=auto pnpm ios:quality-gate
 
 Record the artifact directory under `apps/ios/test_results/`.
 
+## 3a. Performance And Privacy Proof Boundaries
+
+The local quality gate proves build, launch-surface policy, static SwiftUI
+performance smells, and selected performance unit tests. It does not by itself
+prove frame-time, hitch, HealthKit permission, or real in-app purchase behavior.
+
+Before claiming runtime performance budgets, capture one of:
+
+- `RUN_TIMELINE_TRACE_WORKFLOW=true RUN_LAUNCH_PERFORMANCE=true DESTINATION=auto pnpm ios:performance-audit` with a passing `summary.json` and usable metric payloads, or
+- a physical-device Instruments/ETTrace artifact that records launch, photo HUD
+  first render, timeline scrub, Avatar/Photo switching, and Stats round-trip.
+
+If simulator `xctrace` or XCTest metrics are unavailable, record the limitation
+as trace infrastructure evidence only. Do not convert it into a passed
+frame/hitch claim.
+
+Before claiming HealthKit readiness, capture allow, deny, and skip behavior with
+the current `Info.plist` usage strings and the resulting app state after each
+branch. The app must remain usable when HealthKit authorization is denied or
+unavailable.
+
 ## 4. PR Evidence
 
 The PR must include:
@@ -90,6 +111,11 @@ The PR must include:
 - GitHub PR checks from `.github/workflows/ci.yml`: `js`, `iOS`, and `iOS Launch Quality Gate` when iOS files changed.
 - The uploaded quality artifact named `ios-launch-quality-gate-<run_id>`.
 - Any known simulator limitation called out as local-only, not TestFlight proof.
+- Observability state: whether production `SENTRY_DSN` and
+  `STATSIG_CLIENT_SDK_KEY` are configured. If either is unset, do not claim
+  release crash/analytics monitoring beyond local logging.
+- HealthKit allow/deny/skip proof, or an explicit statement that HealthKit proof
+  remains pending for App Review.
 
 ## 5. Main And Release Evidence
 

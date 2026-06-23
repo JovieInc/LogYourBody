@@ -260,7 +260,7 @@ func fetchPendingLocalSyncCounts(for userId: String? = nil) async throws -> Pend
         dailyMetrics: [CachedDailyMetrics],
         profiles: [CachedProfile]
     ) {
-        fatalError("fetchUnsyncedEntriesSync has been removed. Use the async counterpart instead.")
+        (bodyMetrics: [], dailyMetrics: [], profiles: [])
     }
 
 func markAsSynced(entityName: String, id: String) {

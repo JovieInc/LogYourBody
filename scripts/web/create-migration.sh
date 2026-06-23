@@ -8,7 +8,7 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 MIGRATIONS_DIR="$REPO_ROOT/supabase/migrations"
 
-if [ -z "$1" ]; then
+if [ "$#" -lt 1 ] || [ -z "$1" ]; then
   echo "Usage: $0 \"descriptive name\""
   echo "Example: $0 \"add user preferences\""
   exit 1
@@ -23,6 +23,7 @@ TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 # Create filename
 FILENAME="${TIMESTAMP}_${DESCRIPTION}.sql"
 FILEPATH="${MIGRATIONS_DIR}/${FILENAME}"
+RELATIVE_FILEPATH="${FILEPATH#$REPO_ROOT/}"
 
 mkdir -p "$MIGRATIONS_DIR"
 
@@ -54,7 +55,7 @@ cat > "$FILEPATH" << EOF
 
 EOF
 
-echo "✅ Created migration file: ${FILEPATH#$REPO_ROOT/}"
+echo "✅ Created migration file: $RELATIVE_FILEPATH"
 echo ""
 echo "Next steps:"
 echo "1. Edit the migration file to add your SQL"

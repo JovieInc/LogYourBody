@@ -41,7 +41,7 @@ class SupabaseClient {
             urlString += "?" + queryItems.joined(separator: "&")
         }
 
-        let url = URL(string: urlString)!
+        let url = try SupabaseURLBuilder.url(from: urlString)
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -65,7 +65,7 @@ class SupabaseClient {
         data: T,
         accessToken: String
     ) async throws {
-        let url = URL(string: "\(supabaseURL)/rest/v1/\(table)")!
+        let url = try SupabaseURLBuilder.restURL(table: table, baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -94,7 +94,7 @@ class SupabaseClient {
         filter: String,
         accessToken: String
     ) async throws {
-        let url = URL(string: "\(supabaseURL)/rest/v1/\(table)?\(filter)")!
+        let url = try SupabaseURLBuilder.restURL(table: table, query: filter, baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "PATCH"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -129,6 +129,7 @@ enum SupabaseError: LocalizedError, Equatable {
     case httpError(Int)
     case requestFailed
     case invalidData
+    case invalidConfiguration
 
     var errorDescription: String? {
         switch self {
@@ -148,7 +149,37 @@ enum SupabaseError: LocalizedError, Equatable {
             return "Request failed"
         case .invalidData:
             return "Invalid data"
+        case .invalidConfiguration:
+            return "Invalid server configuration"
         }
+    }
+}
+
+enum SupabaseURLBuilder {
+    static func restURL(table: String, query: String? = nil, baseURL: String = Constants.supabaseURL) throws -> URL {
+        let suffix = query.map { "/rest/v1/\(table)?\($0)" } ?? "/rest/v1/\(table)"
+        return try url(from: baseURL + suffix)
+    }
+
+    static func storageURL(bucket: String, path: String, baseURL: String = Constants.supabaseURL) throws -> URL {
+        try url(from: baseURL + "/storage/v1/object/\(bucket)/\(path)")
+    }
+
+    static func functionURL(_ functionName: String, baseURL: String = Constants.supabaseURL) throws -> URL {
+        try url(from: baseURL + "/functions/v1/\(functionName)")
+    }
+
+    static func url(from absoluteString: String) throws -> URL {
+        guard
+            let url = URL(string: absoluteString),
+            let scheme = url.scheme?.lowercased(),
+            ["http", "https"].contains(scheme),
+            url.host?.isEmpty == false
+        else {
+            throw SupabaseError.invalidConfiguration
+        }
+
+        return url
     }
 }
 

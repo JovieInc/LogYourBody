@@ -1,0 +1,162 @@
+{
+  "generatedAt": "2026-06-23",
+  "sourceRoot": "apps/ios/LogYourBody",
+  "counts": {
+    "appSwiftFiles": 290,
+    "unitTestSwiftFiles": 73,
+    "uiTestSwiftFiles": 2
+  },
+  "launchPath": [
+    {
+      "name": "LogYourBodyApp",
+      "file": "apps/ios/LogYourBody/LogYourBodyApp.swift",
+      "responsibility": "App entrypoint, environment objects, startup tasks, deep links, bug-report sheets, foreground/background sync hooks"
+    },
+    {
+      "name": "ContentView",
+      "file": "apps/ios/LogYourBody/ContentView.swift",
+      "responsibility": "Authenticated/signed-out routing across email verification, onboarding, profile completion, paywall, reminder prompt, and paid app"
+    },
+    {
+      "name": "MainTabView",
+      "file": "apps/ios/LogYourBody/Views/MainTabView.swift",
+      "responsibility": "Paid-app surface policy; current default is photoTimelineHUD"
+    },
+    {
+      "name": "DashboardViewLiquid",
+      "file": "apps/ios/LogYourBody/Views/DashboardViewLiquid.swift",
+      "responsibility": "Photo-first HUD, legacy dashboard mode, timeline/stat surfaces, and dashboard composition"
+    }
+  ],
+  "screenGroups": [
+    {
+      "group": "auth",
+      "files": [
+        "apps/ios/LogYourBody/Views/LoginView.swift",
+        "apps/ios/LogYourBody/Views/SignUpView.swift",
+        "apps/ios/LogYourBody/Views/EmailVerificationView.swift",
+        "apps/ios/LogYourBody/Views/AppleSignInButton.swift",
+        "apps/ios/LogYourBody/Views/OTPInputView.swift",
+        "apps/ios/LogYourBody/Views/EnhancedOTPInputView.swift",
+        "apps/ios/LogYourBody/Views/FaceIDEnableView.swift",
+        "apps/ios/LogYourBody/Views/BiometricLockView.swift"
+      ]
+    },
+    {
+      "group": "onboarding",
+      "files": [
+        "apps/ios/LogYourBody/Features/Onboarding/Views/PreAuthBodyScoreOnboardingContainer.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreOnboardingFlowView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreHookView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreBasicsView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreHeightView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreManualWeightView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreBodyFatChoiceView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreBodyFatNumericView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreBodyFatVisualView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreHealthConnectView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreHealthConfirmationView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreRevealView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreFirstProgressPhotoView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreEmailCaptureView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreAccountCreationView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreProfileDetailsView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreLoadingView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/ProfileCompletionGateView.swift"
+      ]
+    },
+    {
+      "group": "paid-hud-and-dashboard",
+      "files": [
+        "apps/ios/LogYourBody/Views/MainTabView.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+Components.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+CoreAccessors.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+FullScreenMetricData.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+Glp1MetricCard.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+HeaderAndSync.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+HeroAndActions.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+HomeTimelineControls.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+MetricViews.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+MetricsHelpers.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+PhotoTimelineAnalytics.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+PhotoTimelineHUD.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+PhotoTimelineInsights.swift",
+        "apps/ios/LogYourBody/Views/DashboardMetricsSection.swift",
+        "apps/ios/LogYourBody/Components/FullMetricChartView.swift",
+        "apps/ios/LogYourBody/Components/MetricChartView.swift",
+        "apps/ios/LogYourBody/Components/ProgressTimelineView.swift"
+      ]
+    },
+    {
+      "group": "entry-and-photos",
+      "files": [
+        "apps/ios/LogYourBody/Views/AddEntrySheet.swift",
+        "apps/ios/LogYourBody/Views/AddEntrySheet+Part01.swift",
+        "apps/ios/LogYourBody/Views/AddEntrySheet+Part02.swift",
+        "apps/ios/LogYourBody/Views/AddEntrySheet+Part03.swift",
+        "apps/ios/LogYourBody/Views/EditEntrySheet.swift",
+        "apps/ios/LogYourBody/Views/ProgressPhotoAttachSheet.swift",
+        "apps/ios/LogYourBody/Views/ProgressPhotoCarouselView.swift",
+        "apps/ios/LogYourBody/Views/OptimizedProgressPhotoView.swift",
+        "apps/ios/LogYourBody/Views/CameraView.swift",
+        "apps/ios/LogYourBody/Views/BulkPhotoImportView.swift",
+        "apps/ios/LogYourBody/ProcessingImagePlaceholder.swift"
+      ]
+    },
+    {
+      "group": "settings-account-legal",
+      "files": [
+        "apps/ios/LogYourBody/Views/PreferencesView.swift",
+        "apps/ios/LogYourBody/Views/PreferencesView+AccountSection.swift",
+        "apps/ios/LogYourBody/Views/PreferencesView+Header.swift",
+        "apps/ios/LogYourBody/Views/PreferencesView+Helpers.swift",
+        "apps/ios/LogYourBody/Views/PreferencesView+PhotosAdvancedSection.swift",
+        "apps/ios/LogYourBody/Views/PreferencesView+RemindersSection.swift",
+        "apps/ios/LogYourBody/Views/PreferencesView+SecuritySubscriptionSection.swift",
+        "apps/ios/LogYourBody/Views/PreferencesView+TrackingGoalsSection.swift",
+        "apps/ios/LogYourBody/Views/ProfileSettingsViewV2.swift",
+        "apps/ios/LogYourBody/Views/PreferenceGoalEditing.swift",
+        "apps/ios/LogYourBody/Views/PreferenceGoalRows.swift",
+        "apps/ios/LogYourBody/Views/ExportDataView.swift",
+        "apps/ios/LogYourBody/Views/DeleteAccountView.swift",
+        "apps/ios/LogYourBody/Views/LegalView.swift",
+        "apps/ios/LogYourBody/Views/LegalConsentView.swift",
+        "apps/ios/LogYourBody/Views/LegalDocumentView.swift",
+        "apps/ios/LogYourBody/Views/HealthDisclaimerView.swift",
+        "apps/ios/LogYourBody/Views/SecuritySessionsView.swift",
+        "apps/ios/LogYourBody/Views/ChangePasswordView.swift"
+      ]
+    },
+    {
+      "group": "integrations-and-support",
+      "files": [
+        "apps/ios/LogYourBody/Views/PaywallView.swift",
+        "apps/ios/LogYourBody/Views/HealthKitPromptView.swift",
+        "apps/ios/LogYourBody/Views/IntegrationsView.swift",
+        "apps/ios/LogYourBody/Views/BodySpecIntegrationView.swift",
+        "apps/ios/LogYourBody/Views/DailyWeighInReminderPromptView.swift",
+        "apps/ios/LogYourBody/Views/SyncStatusView.swift",
+        "apps/ios/LogYourBody/Views/BugReportViews.swift",
+        "apps/ios/LogYourBody/Views/WhatsNewView.swift",
+        "apps/ios/LogYourBody/Views/WhatsNewRow.swift",
+        "apps/ios/LogYourBody/Views/VersionRow.swift",
+        "apps/ios/LogYourBody/Views/LoadingView.swift"
+      ]
+    }
+  ],
+  "designSystemSurfaces": [
+    "apps/ios/LogYourBody/DesignSystem/Atoms",
+    "apps/ios/LogYourBody/DesignSystem/Molecules",
+    "apps/ios/LogYourBody/DesignSystem/Organisms",
+    "apps/ios/LogYourBody/DesignSystem/Components",
+    "apps/ios/LogYourBody/Components",
+    "apps/ios/LogYourBody/Common"
+  ],
+  "releaseCriticalDocuments": [
+    "apps/ios/docs/development/RELEASE_CHECKLIST.md",
+    "apps/ios/docs/development/RELEASE_EVIDENCE_PATH.md",
+    "docs/audits/jov-2864/app-store-release-closeout.md",
+    "docs/revenuecat-agentmail-provisioning.md"
+  ]
+}

@@ -1,6 +1,8 @@
 /**
  * @jest-environment node
  */
+import { readdirSync, statSync } from 'node:fs';
+import { join, sep } from 'node:path';
 import { NextRequest } from 'next/server';
 
 const mockProtect = jest.fn();
@@ -27,6 +29,57 @@ jest.mock('@clerk/nextjs/server', () => ({
   }),
 }));
 
+function collectAppRouteFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const fullPath = join(dir, entry);
+    const stat = statSync(fullPath);
+
+    if (stat.isDirectory()) {
+      if (entry === '__tests__') {
+        return [];
+      }
+
+      return collectAppRouteFiles(fullPath);
+    }
+
+    return /(?:^|\/)(?:page|route)\.(?:t|j)sx?$/.test(fullPath) ? [fullPath] : [];
+  });
+}
+
+function toRoutePath(filePath: string) {
+  const appDir = join(process.cwd(), 'src', 'app');
+  const relativePath = filePath
+    .slice(appDir.length + 1)
+    .split(sep)
+    .join('/');
+  const routePath = relativePath
+    .replace(/(?:^|\/)(?:page|route)\.(?:t|j)sx?$/, '')
+    .replace(/(^|\/)\([^/]+\)/g, '$1')
+    .replace(/\/+/g, '/')
+    .replace(/\/$/, '');
+
+  return routePath ? `/${routePath}` : '/';
+}
+
+function routeNameRequiresProductionDebugGate(pathname: string) {
+  return [
+    /^\/(?:api\/)?debug(?:\/.*)?$/,
+    /^\/(?:api\/)?debug-[^/]+(?:\/.*)?$/,
+    /^\/(?:api\/)?test(?:\/.*)?$/,
+    /^\/(?:api\/)?test-[^/]+(?:\/.*)?$/,
+    /^\/basic-test(?:\/.*)?$/,
+    /^\/compare-avatars(?:\/.*)?$/,
+    /^\/diag(?:\/.*)?$/,
+    /^\/login-test(?:\/.*)?$/,
+    /^\/pwa-test(?:\/.*)?$/,
+  ].some((pattern) => pattern.test(pathname));
+}
+
+const discoveredProductionDebugRoutes = collectAppRouteFiles(join(process.cwd(), 'src', 'app'))
+  .map(toRoutePath)
+  .filter(routeNameRequiresProductionDebugGate)
+  .sort();
+
 describe('middleware production debug/test gate', () => {
   const originalVercelEnv = process.env.VERCEL_ENV;
 
@@ -42,10 +95,15 @@ describe('middleware production debug/test gate', () => {
     mockProtectedMiddleware.mockReset();
   });
 
+  it('keeps debug/test routes out of the mounted production route inventory', () => {
+    expect(discoveredProductionDebugRoutes).toEqual([]);
+  });
+
   it.each([
     '/debug-auth',
     '/debug-login',
     '/debug',
+    '/api/debug',
     '/api/debug/auth',
     '/api/debug-pdf',
     '/api/test-openai',

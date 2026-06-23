@@ -54,22 +54,24 @@ struct SecondaryMetricsRow: View {
                 MetricSummaryCard(
                     icon: "figure.arms.open",
                     accentColor: Color.metricAccentFFMI,
-                    state: ffmi != nil ? .data(MetricSummaryCard.Content(
-                        title: "FFMI",
-                        value: String(format: "%.1f", ffmi!),
-                        unit: "",
-                        timestamp: nil,
-                        dataPoints: [],
-                        chartAccessibilityLabel: nil,
-                        chartAccessibilityValue: nil,
-                        trend: ffmiTrend.map { trend in
-                            MetricSummaryCard.Trend(
-                                direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
-                                valueText: String(format: "%.1f", abs(trend))
-                            )
-                        },
-                        footnote: nil
-                    )) : .empty(message: "No data", action: nil),
+                    state: ffmi.map { ffmi in
+                        .data(MetricSummaryCard.Content(
+                            title: "FFMI",
+                            value: String(format: "%.1f", ffmi),
+                            unit: "",
+                            timestamp: nil,
+                            dataPoints: [],
+                            chartAccessibilityLabel: nil,
+                            chartAccessibilityValue: nil,
+                            trend: ffmiTrend.map { trend in
+                                MetricSummaryCard.Trend(
+                                    direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
+                                    valueText: String(format: "%.1f", abs(trend))
+                                )
+                            },
+                            footnote: nil
+                        ))
+                    } ?? .empty(message: "No data", action: nil),
                     isButtonContext: true
                 )
                 .scaleEffect(displayMode == .ffmiChart ? 1.05 : 1.0)
@@ -84,22 +86,24 @@ struct SecondaryMetricsRow: View {
             MetricSummaryCard(
                 icon: "figure.arms.open",
                 accentColor: Color.metricAccentWaist,
-                state: leanMass != nil ? .data(MetricSummaryCard.Content(
-                    title: "Lean \(weightUnit)",
-                    value: "\(Int(leanMass!))",
-                    unit: "",
-                    timestamp: nil,
-                    dataPoints: [],
-                    chartAccessibilityLabel: nil,
-                    chartAccessibilityValue: nil,
-                    trend: leanMassTrend.map { trend in
-                        MetricSummaryCard.Trend(
-                            direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
-                            valueText: String(format: "%.1f", abs(trend))
-                        )
-                    },
-                    footnote: nil
-                )) : .empty(message: "No data", action: nil)
+                state: leanMass.map { leanMass in
+                    .data(MetricSummaryCard.Content(
+                        title: "Lean \(weightUnit)",
+                        value: "\(Int(leanMass))",
+                        unit: "",
+                        timestamp: nil,
+                        dataPoints: [],
+                        chartAccessibilityLabel: nil,
+                        chartAccessibilityValue: nil,
+                        trend: leanMassTrend.map { trend in
+                            MetricSummaryCard.Trend(
+                                direction: trend < 0 ? .down : (trend > 0 ? .up : .flat),
+                                valueText: String(format: "%.1f", abs(trend))
+                            )
+                        },
+                        footnote: nil
+                    ))
+                } ?? .empty(message: "No data", action: nil)
             )
         }
         .padding(.horizontal, 20)

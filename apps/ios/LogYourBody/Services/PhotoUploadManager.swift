@@ -381,7 +381,9 @@ class PhotoUploadManager: ObservableObject {
 
         // print("📸 PhotoUploadManager: Got JWT token for storage upload")
 
-        let url = URL(string: "\(Constants.supabaseURL)/storage/v1/object/photos/\(fileName)")!
+        guard let url = try? SupabaseURLBuilder.storageURL(bucket: "photos", path: fileName) else {
+            throw PhotoError.uploadFailed("Invalid upload URL")
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -417,7 +419,9 @@ class PhotoUploadManager: ObservableObject {
     private func processImageWithCloudinary(storagePath: String, metricsId: String) async throws -> String {
         let token = try await authenticatedJWT()
 
-        let url = URL(string: "\(Constants.supabaseURL)/functions/v1/process-progress-photo")!
+        guard let url = try? SupabaseURLBuilder.functionURL("process-progress-photo") else {
+            throw PhotoError.processingFailed("Invalid processing URL")
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
