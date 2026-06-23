@@ -102,6 +102,9 @@ dependencies:
   '@radix-ui/react-visually-hidden':
     specifier: ^1.2.4
     version: 1.2.4(@types/react-dom@19.2.3)(@types/react@19.2.17)(react-dom@19.2.7)(react@19.2.7)
+  '@statsig/js-client':
+    specifier: ^3.33.2
+    version: 3.33.2
   '@supabase/ssr':
     specifier: ^0.12.0
     version: 0.12.0(@supabase/supabase-js@2.108.2)
@@ -218,7 +221,7 @@ dependencies:
     version: 16.1.1(react@19.2.7)
   recharts:
     specifier: ^3.8.1
-    version: 3.8.1(@types/react@19.2.17)(react-dom@19.2.7)(react-is@19.2.0)(react@19.2.7)(redux@5.0.1)
+    version: 3.8.1(@types/react@19.2.17)(react-dom@19.2.7)(react-is@19.2.7)(react@19.2.7)(redux@5.0.1)
   server-only:
     specifier: ^0.0.1
     version: 0.0.1
@@ -3755,6 +3758,16 @@ packages:
 
   /@standard-schema/utils@0.3.0:
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
+    dev: false
+
+  /@statsig/client-core@3.33.2:
+    resolution: {integrity: sha512-TKZ546NfK2oShe1sHhgn+TaCoAWZ/bs0soK+gAjB/y5UAqWVhCcORAd/8eRUyor8Lz2VfL3V4Ze/zr1CCM2/5g==}
+    dev: false
+
+  /@statsig/js-client@3.33.2:
+    resolution: {integrity: sha512-FgAnaN0d8X/OEZS/HEGI2D3CdbZzsbw3BHlSGvaqUcnwu45aXejFFUCCw96/NTH4lEvSMj1S1RBsrnQ2pVErgQ==}
+    dependencies:
+      '@statsig/client-core': 3.33.2
     dev: false
 
   /@supabase/auth-js@2.108.2:
@@ -8863,13 +8876,8 @@ packages:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
     dev: true
 
-  /react-is@19.2.0:
-    resolution: {integrity: sha512-x3Ax3kNSMIIkyVYhWPyO09bu0uttcAIoecO/um/rKGQ4EltYWVYtyiGkS/3xMynrbVQdS69Jhlv8FXUEZehlzA==}
-    dev: false
-
   /react-is@19.2.7:
     resolution: {integrity: sha512-kZFnouyVv7eP/Phmrlo9FK+zcAdriZJvzxXHF1Sl1P377WSGe2G/JxVolhTrB/jeV47lKImhNUsijjHAAbcl/A==}
-    dev: true
 
   /react-markdown@10.1.0(@types/react@19.2.17)(react@19.2.7):
     resolution: {integrity: sha512-qKxVopLT/TyA6BX3Ue5NwabOsAzm0Q7kAPwq6L+wWDwisYs7R8vZ0nRXqq6rkueboxpkjvLGU9fWifiX/ZZFxQ==}
@@ -9012,7 +9020,7 @@ packages:
     resolution: {integrity: sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ==}
     engines: {node: '>=0.10.0'}
 
-  /recharts@3.8.1(@types/react@19.2.17)(react-dom@19.2.7)(react-is@19.2.0)(react@19.2.7)(redux@5.0.1):
+  /recharts@3.8.1(@types/react@19.2.17)(react-dom@19.2.7)(react-is@19.2.7)(react@19.2.7)(redux@5.0.1):
     resolution: {integrity: sha512-mwzmO1s9sFL0TduUpwndxCUNoXsBw3u3E/0+A+cLcrSfQitSG62L32N69GhqUrrT5qKcAE3pCGVINC6pqkBBQg==}
     engines: {node: '>=18'}
     peerDependencies:
@@ -9028,7 +9036,7 @@ packages:
       immer: 10.2.0
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
-      react-is: 19.2.0
+      react-is: 19.2.7
       react-redux: 9.2.0(@types/react@19.2.17)(react@19.2.7)(redux@5.0.1)
       reselect: 5.1.1
       tiny-invariant: 1.3.3
