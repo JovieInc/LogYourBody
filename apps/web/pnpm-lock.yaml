@@ -102,6 +102,9 @@ dependencies:
   '@radix-ui/react-visually-hidden':
     specifier: ^1.2.4
     version: 1.2.4(@types/react-dom@19.2.3)(@types/react@19.2.17)(react-dom@19.2.0)(react@19.2.0)
+  '@statsig/js-client':
+    specifier: ^3.33.2
+    version: 3.33.2
   '@supabase/ssr':
     specifier: ^0.7.0
     version: 0.7.0(@supabase/supabase-js@2.84.0)
@@ -3424,6 +3427,16 @@ packages:
 
   /@standard-schema/utils@0.3.0:
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
+    dev: false
+
+  /@statsig/client-core@3.33.2:
+    resolution: {integrity: sha512-TKZ546NfK2oShe1sHhgn+TaCoAWZ/bs0soK+gAjB/y5UAqWVhCcORAd/8eRUyor8Lz2VfL3V4Ze/zr1CCM2/5g==}
+    dev: false
+
+  /@statsig/js-client@3.33.2:
+    resolution: {integrity: sha512-FgAnaN0d8X/OEZS/HEGI2D3CdbZzsbw3BHlSGvaqUcnwu45aXejFFUCCw96/NTH4lEvSMj1S1RBsrnQ2pVErgQ==}
+    dependencies:
+      '@statsig/client-core': 3.33.2
     dev: false
 
   /@supabase/auth-js@2.84.0:
