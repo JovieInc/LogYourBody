@@ -3,6 +3,7 @@
 Date: 2026-06-07
 Issue: JOV-2864
 Branch: `codex/jov-2864-release-evidence`
+Last refreshed: 2026-06-23 after PR `#443`
 
 ## Decision
 
@@ -15,31 +16,32 @@ Do not call the MVP publicly launched yet. The latest automated proof is TestFli
 
 ## Exact Build State
 
-- Current audited `main` commit: `0c484fca0c188a16b3863d021e28af32798f2566`.
+- Current audited `main` commit: `450d568efd0f0a1a96dcb7adbca283bcfe06d571`.
 - Xcode release build settings:
   - `MARKETING_VERSION = 1.2.0`
   - `CURRENT_PROJECT_VERSION = 20251126162826`
   - `PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app`
   - `DEVELOPMENT_TEAM = G24T327LXT`
   - `CODE_SIGN_STYLE = Manual`
-- Latest TestFlight release tag: `ios-v1.2.0-testflight.20260607021614`.
-- Latest TestFlight release URL: https://github.com/JovieInc/LogYourBody/releases/tag/ios-v1.2.0-testflight.20260607021614
-- Release body records build `20260607021614`, deployment `testflight`, commit `0c484fca0c188a16b3863d021e28af32798f2566`, and TestFlight availability for all testers.
+- Latest TestFlight release tag: `ios-v1.2.0-testflight.20260623082957`.
+- Latest TestFlight release URL: https://github.com/JovieInc/LogYourBody/releases/tag/ios-v1.2.0-testflight.20260623082957
+- Current release evidence records PR `#443`, deployment `testflight`, commit `450d568efd0f0a1a96dcb7adbca283bcfe06d571`, and a successful TestFlight production deployment job. It does not prove public App Store availability or real purchase/restore.
 
 ## Main CI And Release Workflow Evidence
 
-Latest `main` evidence after the MVP smoke-coverage merge:
+Latest `main` evidence after PR `#443`:
 
-- CI run `27080055563`: success
-  - URL: https://github.com/JovieInc/LogYourBody/actions/runs/27080055563
-- Deploy run `27080055564`: success
-  - URL: https://github.com/JovieInc/LogYourBody/actions/runs/27080055564
-- iOS Release Loop run `27080055554`: success
-  - URL: https://github.com/JovieInc/LogYourBody/actions/runs/27080055554
-  - Completed `Validate Release`, `Check Existing Build`, `Build Release`, `Deploy to TestFlight / Deploy to TestFlight (production)`, and `Create Release`.
-  - `Deploy to App Store` was skipped because the push-triggered lane defaults to TestFlight.
+- CI run `28012399897`: success
+  - URL: https://github.com/JovieInc/LogYourBody/actions/runs/28012399897
+- Deploy run `28012400613`: success
+  - URL: https://github.com/JovieInc/LogYourBody/actions/runs/28012400613
+- iOS Release Loop run `28012401595`: success
+  - URL: https://github.com/JovieInc/LogYourBody/actions/runs/28012401595
+  - `Deploy to TestFlight / Deploy to TestFlight (production)` succeeded.
+  - GitHub prerelease `ios-v1.2.0-testflight.20260623082957` was published at `2026-06-23T08:43:31Z`.
+  - `Deploy to App Store` was skipped by workflow policy.
 
-Recent launch-lane `main` release-loop runs are also green:
+Older launch-lane `main` release-loop runs remain historical context:
 
 - `21e0264db3934582b6ea33e9b7f90ed94a6d0630`: iOS Release Loop `27078567239`, success.
 - `8a4375c1772b698bf43e9c4fb0c7a1ee2113f998`: iOS Release Loop `27077320662`, success.
@@ -95,7 +97,7 @@ Known web-only gap: `apps/web/src/app/settings/account/page.tsx` still simulates
 Confirmed evidence:
 
 - The iOS release workflow verifies the current RevenueCat iOS offering before archiving.
-- Latest successful release loop `27080055554` completed `Verify RevenueCat iOS offering`.
+- Latest successful release loop `28012401595` completed the TestFlight production release path.
 - `docs/revenuecat-agentmail-provisioning.md` records the configured RevenueCat project, bundle ID `com.logyourbody.app`, `Premium` entitlement, current offering `default`, and monthly/annual product identifiers:
   - `com.logyourbody.app.pro1.monthly.3daytrial`
   - `com.logyourbody.app.pro1.annual.3daytrial`
@@ -133,6 +135,12 @@ Follow-up public App Store URL check on 2026-06-23 after PR `#442` and
 release-loop run `28008976044`:
 
 - https://apps.apple.com/us/app/logyourbody/id6755209876 -> HTTP 404 at `2026-06-23T07:46:41Z`
+
+Latest public App Store URL check on 2026-06-23 after PR `#443` merged at
+`450d568efd0f0a1a96dcb7adbca283bcfe06d571` and iOS Release Loop run
+`28012401595`:
+
+- https://apps.apple.com/us/app/logyourbody/id6755209876 -> HTTP 404 at Tue, 23 Jun 2026 08:43:58 GMT
 
 This means the app is not publicly available from the App Store listing at audit time. That is not by itself a submission blocker for a prelaunch app, but it is a launch blocker for any claim that the app is live.
 
