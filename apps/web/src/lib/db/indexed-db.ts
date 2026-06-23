@@ -42,6 +42,69 @@ interface CachedProfile extends UserProfile {
 class IndexedDBManager {
   private db: IDBPDatabase | null = null;
 
+  private normalizeDate(value: Date | string): Date {
+    if (value instanceof Date) {
+      return value;
+    }
+
+    const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) {
+      const [, year, month, day] = dateOnly;
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+
+    return new Date(value);
+  }
+
+  private normalizeDailyMetricsDates(metrics: DailyMetrics): DailyMetrics {
+    return {
+      ...metrics,
+      created_at: this.normalizeDate(metrics.created_at),
+      date: this.normalizeDate(metrics.date),
+      last_modified: metrics.last_modified
+        ? this.normalizeDate(metrics.last_modified)
+        : metrics.last_modified,
+      updated_at: this.normalizeDate(metrics.updated_at),
+    };
+  }
+
+  private dailyMetricsNeedsDateRepair(metrics: DailyMetrics): boolean {
+    return (
+      !(metrics.created_at instanceof Date) ||
+      !(metrics.date instanceof Date) ||
+      !(metrics.updated_at instanceof Date) ||
+      (metrics.last_modified !== undefined && !(metrics.last_modified instanceof Date))
+    );
+  }
+
+  private findDailyMetricsForDay(
+    entries: DailyMetrics[],
+    startOfDay: Date,
+    endOfDay: Date,
+  ): DailyMetrics | null {
+    return (
+      entries.find((entry) => {
+        const entryDate = this.normalizeDate(entry.date);
+        return !entry.is_deleted && entryDate >= startOfDay && entryDate <= endOfDay;
+      }) ?? null
+    );
+  }
+
+  private async repairDailyMetricsDateKeys(metrics: DailyMetrics): Promise<DailyMetrics> {
+    const normalized = this.normalizeDailyMetricsDates(metrics);
+    if (!this.dailyMetricsNeedsDateRepair(metrics)) {
+      return normalized;
+    }
+
+    const db = await this.initDB();
+    const tx = db.transaction('dailyMetrics', 'readwrite');
+    const store = tx.objectStore('dailyMetrics');
+    await store.put(normalized);
+    await tx.done;
+
+    return normalized;
+  }
+
   async initDB() {
     if (this.db) return this.db;
 
@@ -111,7 +174,7 @@ class IndexedDBManager {
 
     // Filter by date range if provided
     if (from || to) {
-      metrics = metrics.filter(m => {
+      metrics = metrics.filter((m) => {
         const date = new Date(m.date);
         if (from && date < from) return false;
         if (to && date > to) return false;
@@ -120,7 +183,7 @@ class IndexedDBManager {
     }
 
     // Filter out deleted items
-    return metrics.filter(m => !m.is_deleted);
+    return metrics.filter((m) => !m.is_deleted);
   }
 
   // Daily Metrics Operations
@@ -131,6 +194,7 @@ class IndexedDBManager {
 
     const cached: DailyMetrics = {
       ...metrics,
+      ...this.normalizeDailyMetricsDates(metrics),
       sync_status: metrics.sync_status ?? 'pending',
       is_deleted: false,
       last_modified: new Date(),
@@ -151,13 +215,22 @@ class IndexedDBManager {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Search for entries matching user and date
-    const allEntries = await index.getAll(userId);
-    const result = allEntries.find(entry => {
-      const entryDate = new Date(entry.date);
-      return entryDate >= startOfDay && entryDate <= endOfDay;
-    });
-    return result && !result.is_deleted ? result : null;
+    const dayRange = IDBKeyRange.bound([userId, startOfDay], [userId, endOfDay]);
+    const allEntries = await index.getAll(dayRange);
+    const result = this.findDailyMetricsForDay(allEntries, startOfDay, endOfDay);
+    await tx.done;
+    if (result) {
+      return this.repairDailyMetricsDateKeys(result);
+    }
+
+    const fallbackTx = db.transaction('dailyMetrics', 'readonly');
+    const fallbackStore = fallbackTx.objectStore('dailyMetrics');
+    const userIndex = fallbackStore.index('user_id');
+    const userEntries = await userIndex.getAll(userId);
+    const legacyResult = this.findDailyMetricsForDay(userEntries, startOfDay, endOfDay);
+    await fallbackTx.done;
+
+    return legacyResult ? this.repairDailyMetricsDateKeys(legacyResult) : null;
   }
 
   // Profile Operations
@@ -181,7 +254,7 @@ class IndexedDBManager {
     const db = await this.initDB();
     const tx = db.transaction('profiles', 'readonly');
     const store = tx.objectStore('profiles');
-    
+
     const result = await store.get(userId);
     return result && !result.is_deleted ? result : null;
   }
@@ -189,7 +262,7 @@ class IndexedDBManager {
   // Sync Operations
   async getUnsyncedItems() {
     const db = await this.initDB();
-    
+
     const bodyMetricsTx = db.transaction('bodyMetrics', 'readonly');
     const bodyMetricsStore = bodyMetricsTx.objectStore('bodyMetrics');
     const bodyMetricsIndex = bodyMetricsStore.index('sync_status');
@@ -206,9 +279,9 @@ class IndexedDBManager {
     const profiles = await profilesIndex.getAll('pending');
 
     return {
-      bodyMetrics: bodyMetrics.filter(m => !m.is_deleted),
-      dailyMetrics: dailyMetrics.filter(m => !m.is_deleted),
-      profiles: profiles.filter(p => !p.is_deleted),
+      bodyMetrics: bodyMetrics.filter((m) => !m.is_deleted),
+      dailyMetrics: dailyMetrics.filter((m) => !m.is_deleted),
+      profiles: profiles.filter((p) => !p.is_deleted),
     };
   }
 
@@ -216,24 +289,29 @@ class IndexedDBManager {
     const db = await this.initDB();
     const tx = db.transaction(storeName, 'readwrite');
     const store = tx.objectStore(storeName);
-    
+
     const item = await store.get(id);
     if (item) {
       item.sync_status = 'synced';
       await store.put(item);
     }
-    
+
     await tx.done;
   }
 
-  async updateSyncStatus(entityName: string, entityId: string, status: string, error?: string): Promise<void> {
+  async updateSyncStatus(
+    entityName: string,
+    entityId: string,
+    status: string,
+    error?: string,
+  ): Promise<void> {
     const db = await this.initDB();
     const tx = db.transaction('syncMetadata', 'readwrite');
     const store = tx.objectStore('syncMetadata');
     const index = store.index('entity');
-    
+
     let metadata = await index.get([entityName, entityId]);
-    
+
     if (!metadata) {
       metadata = {
         id: `${entityName}_${entityId}`,
@@ -242,9 +320,9 @@ class IndexedDBManager {
         sync_retry_count: 0,
       };
     }
-    
+
     metadata.last_sync_attempt = new Date();
-    
+
     if (status === 'synced') {
       metadata.last_sync_success = new Date();
       metadata.sync_retry_count = 0;
@@ -253,7 +331,7 @@ class IndexedDBManager {
       metadata.sync_retry_count += 1;
       metadata.last_sync_error = error;
     }
-    
+
     await store.put(metadata);
     await tx.done;
   }
@@ -261,36 +339,39 @@ class IndexedDBManager {
   // Cleanup Operations
   async cleanupDeletedItems(olderThan: Date): Promise<void> {
     const db = await this.initDB();
-    
+
     // Cleanup body metrics
     const bodyMetricsTx = db.transaction('bodyMetrics', 'readwrite');
     const bodyMetricsStore = bodyMetricsTx.objectStore('bodyMetrics');
     const bodyMetrics = await bodyMetricsStore.getAll();
-    
+
     for (const item of bodyMetrics) {
       if (item.is_deleted && item.last_modified && item.last_modified < olderThan) {
         await bodyMetricsStore.delete(item.id);
       }
     }
-    
+
     await bodyMetricsTx.done;
-    
+
     // Similar cleanup for other stores...
   }
 
   // Clear all data (useful for logout)
   async clearAllData(): Promise<void> {
     const db = await this.initDB();
-    
-    const tx = db.transaction(['bodyMetrics', 'dailyMetrics', 'profiles', 'syncMetadata'], 'readwrite');
-    
+
+    const tx = db.transaction(
+      ['bodyMetrics', 'dailyMetrics', 'profiles', 'syncMetadata'],
+      'readwrite',
+    );
+
     await Promise.all([
       tx.objectStore('bodyMetrics').clear(),
       tx.objectStore('dailyMetrics').clear(),
       tx.objectStore('profiles').clear(),
       tx.objectStore('syncMetadata').clear(),
     ]);
-    
+
     await tx.done;
   }
 }

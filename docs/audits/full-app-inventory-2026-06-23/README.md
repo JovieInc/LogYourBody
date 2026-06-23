@@ -18,15 +18,15 @@ Current source-derived inventory:
 | iOS UI-test Swift files   |     2 | `apps/ios/LogYourBodyUITests`             |
 | Web pages                 |    38 | `apps/web/src/app/**/page.tsx`            |
 | Web API route handlers    |    12 | `apps/web/src/app/**/route.ts`            |
-| Web Jest suites           |    36 | `pnpm --filter logyourbody test:coverage` |
-| Web Jest tests            |   308 | All passed in the implementation pass     |
+| Web Jest suites           |    37 | `pnpm --filter logyourbody test:coverage` |
+| Web Jest tests            |   312 | All passed in the implementation pass     |
 
 Current validation evidence:
 
 - `pnpm install --frozen-lockfile` passed with Node engine warnings because local Node is `v22.22.1` while the repo expects Node `20.x`.
 - `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` passed.
-- `pnpm --filter logyourbody test:coverage` passed: 36 suites, 308 tests.
-- Web coverage improved but remains low: 501/6525 lines (7.68%), 520/6977 statements (7.45%), 96/1361 functions (7.05%), 248/4051 branches (6.12%).
+- `pnpm --filter logyourbody test:coverage` passed: 37 suites, 313 tests.
+- Web coverage improved but remains low: 556/6554 lines (8.48%), 577/7006 statements (8.23%), 105/1366 functions (7.68%), 268/4067 branches (6.58%).
 - `pnpm check:supabase-migrations` passed and now fails on unsafe legacy-only migration drift or same-filename content mismatches.
 - `pnpm check:vendor-boundaries` passed and now fails direct vendor SDK imports outside approved service, port, or adapter boundaries.
 - `xcodebuild -list -project apps/ios/LogYourBody.xcodeproj` resolved the iOS packages and listed `LogYourBody`, `LogYourBodyTests`, and `LogYourBodyUITests`.
@@ -156,7 +156,7 @@ Current evidence:
 
 | Area              | Current evidence                                                                              | Gap                                                              |
 | ----------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Web Jest          | 36 suites, 308 tests passed                                                                   | Aggregate line coverage is 7.68%                                 |
+| Web Jest          | 37 suites, 313 tests passed                                                                   | Aggregate line coverage is 8.48%                                 |
 | Web routes        | Dashboard/log/import/auth/settings and readiness pages covered in parts                       | Many pages, components, sync modules, and API routes are 0%      |
 | iOS unit tests    | 73 test files covering auth, sync, HealthKit, dashboard, paywall, photos, metrics, onboarding | Need current full local/CI run after bootstrap                   |
 | iOS UI tests      | Launch/paywall/HUD paths exist                                                                | Runtime simulator health must be separated from product failures |
