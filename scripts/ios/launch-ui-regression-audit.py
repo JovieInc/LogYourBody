@@ -235,9 +235,10 @@ def main() -> int:
     )
 
     main_tab_view = app_dir / "Views/MainTabView.swift"
+    main_tab_view_policies = app_dir / "Views/MainTabViewPolicies.swift"
     require_token(
         root=root,
-        path=main_tab_view,
+        path=main_tab_view_policies,
         token="static func surface() -> PaidAppSurface {\n        .photoTimelineHUD",
         check="routing.timeline_hud_default",
         detail="Paid app default surface must route straight to the timeline HUD for v1.",
@@ -246,7 +247,7 @@ def main() -> int:
 
     add_pattern_violations(
         root=root,
-        paths=[main_tab_view],
+        paths=[main_tab_view, main_tab_view_policies],
         pattern=re.compile(r"AnalyticsService\.shared\.isFeatureEnabled|Statsig\.checkGate"),
         check="routing.no_feature_gate_default_surface",
         detail="The v1 paid-app default surface must not depend on a feature gate or legacy fallback.",
