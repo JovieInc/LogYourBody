@@ -64,14 +64,27 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
                 return;
             }
 
-            const user: { userID?: string; custom?: Record<string, string | number | boolean | null | undefined> } = {};
+            const user: { userID?: string; custom?: Record<string, string | number | boolean> } = {};
 
             if (userId && userId.trim().length > 0) {
                 user.userID = userId;
             }
 
             if (traits && Object.keys(traits).length > 0) {
-                user.custom = traits;
+                // Filter out null and undefined values as Statsig doesn't accept them
+                const filteredTraits = Object.entries(traits).reduce(
+                    (acc, [key, value]) => {
+                        if (value !== null && value !== undefined) {
+                            acc[key] = value;
+                        }
+                        return acc;
+                    },
+                    {} as Record<string, string | number | boolean>,
+                );
+
+                if (Object.keys(filteredTraits).length > 0) {
+                    user.custom = filteredTraits;
+                }
             }
 
             void c.updateUserAsync(user).catch(() => {
@@ -90,9 +103,20 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
                 return;
             }
 
+            // Filter and convert properties to match Statsig's expected type
+            const metadata = Object.entries(properties).reduce(
+                (acc, [key, value]) => {
+                    if (value !== null && value !== undefined) {
+                        acc[key] = String(value);
+                    }
+                    return acc;
+                },
+                {} as Record<string, string>,
+            );
+
             c.logEvent({
                 eventName: String(event),
-                metadata: properties,
+                metadata,
             });
         },
 
