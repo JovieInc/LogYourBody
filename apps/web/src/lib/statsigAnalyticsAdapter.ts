@@ -1,6 +1,6 @@
 'use client';
 
-import { StatsigClient } from '@statsig/js-client';
+import { StatsigClient, type StatsigEvent, type StatsigUser } from '@statsig/js-client';
 
 export interface StatsigAnalyticsConfig {
     clientKey: string;
@@ -8,6 +8,37 @@ export interface StatsigAnalyticsConfig {
 }
 
 export type AnalyticsProperties = Record<string, string | number | boolean | null | undefined>;
+
+type StatsigCustomTraits = NonNullable<StatsigUser['custom']>;
+type StatsigEventMetadata = NonNullable<StatsigEvent['metadata']>;
+
+export function toStatsigCustomTraits(
+    traits: Record<string, string | number | boolean | null | undefined>,
+): StatsigCustomTraits {
+    const custom: StatsigCustomTraits = {};
+
+    for (const [key, value] of Object.entries(traits)) {
+        if (value !== null && value !== undefined) {
+            custom[key] = value;
+        }
+    }
+
+    return custom;
+}
+
+export function toStatsigEventMetadata(properties: AnalyticsProperties): StatsigEventMetadata {
+    const metadata: StatsigEventMetadata = {};
+
+    for (const [key, value] of Object.entries(properties)) {
+        if (value === null || value === undefined) {
+            continue;
+        }
+
+        metadata[key] = typeof value === 'string' ? value : String(value);
+    }
+
+    return metadata;
+}
 
 let client: StatsigClient | null = null;
 let initialized = false;
@@ -64,14 +95,14 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
                 return;
             }
 
-            const user: { userID?: string; custom?: Record<string, string | number | boolean | null | undefined> } = {};
+            const user: StatsigUser = {};
 
             if (userId && userId.trim().length > 0) {
                 user.userID = userId;
             }
 
             if (traits && Object.keys(traits).length > 0) {
-                user.custom = traits;
+                user.custom = toStatsigCustomTraits(traits);
             }
 
             void c.updateUserAsync(user).catch(() => {
@@ -92,7 +123,7 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
 
             c.logEvent({
                 eventName: String(event),
-                metadata: properties,
+                metadata: toStatsigEventMetadata(properties),
             });
         },
 
