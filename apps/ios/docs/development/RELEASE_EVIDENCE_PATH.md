@@ -133,7 +133,7 @@ After merge to `main`, use GitHub as the source of truth:
 
 1. Confirm post-merge `main` checks and relevant deployments are green.
 2. Run `.github/workflows/ios-release-loop.yml` from `main` for TestFlight or App Store release intent.
-3. Capture the release-loop run ID, commit SHA, version/build, TestFlight deployment job result, and generated GitHub release tag.
+3. Capture the release-loop run ID, commit SHA, version/build, TestFlight deployment job result, generated GitHub release tag, and redacted observability status from `LogYourBody/release-observability.md` or the GitHub step summary.
 4. Keep `paywall_testflight_verified=false` for App Store submission until a real TestFlight build has completed purchase and restore proof.
 5. For App Store review, rerun the release loop with `release_type=app_store`, `submit_for_review=true`, `automatic_release=true`, and `phased_release=true` only after the TestFlight purchase/restore evidence exists.
 
@@ -143,12 +143,13 @@ Final release evidence must name the exact workflow run, release tag, TestFlight
 
 As of 2026-06-23, the latest completed `main` release evidence is:
 
-- PR `#440` merged at `eeb2ebf860047faffba0bf82d1323c475d0c545e`.
-- Post-merge CI run `28002701753` succeeded.
-- Web deploy run `28002701756` succeeded.
-- iOS release-loop run `28002701832` succeeded.
-- TestFlight production deployment succeeded in run `28002701832`.
-- GitHub prerelease `ios-v1.2.0-testflight.20260623045503` was created.
+- PR `#441` merged at `f3032407f7d2138abbe58a1e16b631602d02c429`.
+- Post-merge CI run `28005571661` succeeded.
+- Web deploy run `28005571660` succeeded.
+- iOS release-loop run `28005571776` succeeded.
+- TestFlight production deployment succeeded in run `28005571776`.
+- GitHub prerelease `ios-v1.2.0-testflight.20260623061323` was created.
+- App Store approved-release monitor run `28006708745` succeeded, but the public App Store URL returned HTTP `404`; this is not public listing proof.
 - App Store direct deploy was skipped by workflow policy.
 
 This evidence proves build, signing, TestFlight upload, release-tag creation,

@@ -150,4 +150,24 @@ SUPABASE_URL = $(xcconfig_url "$SUPABASE_URL")
 SUPABASE_ANON_KEY = $SUPABASE_ANON_KEY
 EOF
 
+{
+  echo "## iOS Release Observability"
+  echo ""
+  if [ -n "$SENTRY_DSN" ]; then
+    echo "- Sentry configured: true"
+  else
+    echo "- Sentry configured: false"
+  fi
+  if [ -n "$STATSIG_CLIENT_SDK_KEY" ]; then
+    echo "- Statsig configured: true"
+  else
+    echo "- Statsig configured: false"
+  fi
+  echo "- Values redacted: true"
+} | tee "$CONFIG_DIR/release-observability.md" >/dev/null
+
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  cat "$CONFIG_DIR/release-observability.md" >> "$GITHUB_STEP_SUMMARY"
+fi
+
 echo "Wrote production iOS release config files."

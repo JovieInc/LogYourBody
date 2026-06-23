@@ -108,6 +108,7 @@ apps/ios/**/*.xcresult
 apps/ios/LogYourBody/Config.xcconfig
 apps/ios/LogYourBody/Config-Development.xcconfig
 apps/ios/LogYourBody/Config-Production.xcconfig
+apps/ios/LogYourBody/release-observability.md
 apps/ios/Supabase.xcconfig
 !apps/ios/LogYourBody/Config-Template.xcconfig
 !apps/ios/LogYourBody/*.xcconfig.example
