@@ -29,6 +29,7 @@
     "ios:performance-audit": "bash scripts/ios/performance-audit.sh",
     "ios:ettrace-profile": "bash scripts/ios/ettrace-profile.sh",
     "ios:quality-gate": "bash scripts/ios/quality-gate.sh",
+    "check:vendor-boundaries": "node scripts/check-vendor-boundaries.js",
     "check:supabase-migrations": "node scripts/check-supabase-migration-drift.js"
   },
   "devDependencies": {

@@ -343,7 +343,9 @@ def main() -> int:
                 label="Performance unit total",
                 observed_seconds=unit_total if unit_cases else None,
                 budget_seconds=unit_total_budget,
-                status="failed" if unit_cases and unit_total > unit_total_budget else ("passed" if unit_cases else "warning"),
+                status="failed"
+                if not unit_cases or unit_total > unit_total_budget
+                else "passed",
                 detail=(
                     f"{len(unit_cases)} test cases reported {unit_total:.3f}s total XCTest runtime."
                     if unit_cases
@@ -360,8 +362,8 @@ def main() -> int:
                 budget_seconds=unit_case_budget,
                 status=(
                     "failed"
-                    if unit_slowest and unit_slowest.duration_seconds > unit_case_budget
-                    else ("passed" if unit_slowest else "warning")
+                    if not unit_slowest or unit_slowest.duration_seconds > unit_case_budget
+                    else "passed"
                 ),
                 detail=(
                     f"{unit_slowest.identifier} reported {unit_slowest.duration_seconds:.3f}s."
@@ -384,7 +386,7 @@ def main() -> int:
         )
     else:
         launch_duration = launch_case.duration_seconds if launch_case else None
-        launch_status = "warning"
+        launch_status = "failed"
         if launch_duration is not None:
             if launch_duration > float(budgets["launchMaxTestSeconds"]):
                 launch_status = "failed"
@@ -442,7 +444,7 @@ def main() -> int:
         timeline_workflow_duration = (
             timeline_workflow_case.duration_seconds if timeline_workflow_case else None
         )
-        timeline_workflow_status = "warning"
+        timeline_workflow_status = "failed"
         if timeline_workflow_duration is not None:
             if timeline_workflow_duration > float(budgets["timelineWorkflowMaxSeconds"]):
                 timeline_workflow_status = "failed"

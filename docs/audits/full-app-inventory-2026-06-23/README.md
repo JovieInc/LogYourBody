@@ -18,19 +18,20 @@ Current source-derived inventory:
 | iOS UI-test Swift files   |     2 | `apps/ios/LogYourBodyUITests`             |
 | Web pages                 |    38 | `apps/web/src/app/**/page.tsx`            |
 | Web API route handlers    |    12 | `apps/web/src/app/**/route.ts`            |
-| Web Jest suites           |    34 | `pnpm --filter logyourbody test:coverage` |
-| Web Jest tests            |   300 | All passed in the implementation pass     |
+| Web Jest suites           |    36 | `pnpm --filter logyourbody test:coverage` |
+| Web Jest tests            |   308 | All passed in the implementation pass     |
 
 Current validation evidence:
 
 - `pnpm install --frozen-lockfile` passed with Node engine warnings because local Node is `v22.22.1` while the repo expects Node `20.x`.
 - `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` passed.
-- `pnpm --filter logyourbody test:coverage` passed: 34 suites, 300 tests.
-- Web coverage improved but remains low: 463/6525 lines (7.10%), 481/6977 statements (6.89%), 93/1361 functions (6.83%), 230/4051 branches (5.68%).
+- `pnpm --filter logyourbody test:coverage` passed: 36 suites, 308 tests.
+- Web coverage improved but remains low: 501/6525 lines (7.68%), 520/6977 statements (7.45%), 96/1361 functions (7.05%), 248/4051 branches (6.12%).
 - `pnpm check:supabase-migrations` passed and now fails on unsafe legacy-only migration drift or same-filename content mismatches.
+- `pnpm check:vendor-boundaries` passed and now fails direct vendor SDK imports outside approved service, port, or adapter boundaries.
 - `xcodebuild -list -project apps/ios/LogYourBody.xcodeproj` resolved the iOS packages and listed `LogYourBody`, `LogYourBodyTests`, and `LogYourBodyUITests`.
 - Focused `SupabaseURLBuilderTests` passed.
-- `RUN_LAUNCH_PERFORMANCE=false DESTINATION=auto pnpm ios:quality-gate` passed and wrote artifacts under `apps/ios/test_results/quality-gate/20260622-211712`.
+- `ARTIFACT_ROOT=/tmp/lyb-quality-gate-nonempty-proof RUN_LAUNCH_PERFORMANCE=false DESTINATION=auto pnpm ios:quality-gate` passed; the launch-quality unit shard executed 19 tests, the critical-surfaces UI shard executed 1 test, and the performance unit shard executed 1 test.
 
 Appendices:
 
@@ -147,6 +148,7 @@ Current evidence:
 
 - Static SwiftUI performance smell audit passed: no raw image decoding in launch-critical render paths, no inline `ForEach` sort/filter/map in covered launch-critical timeline controls, and no per-render UUID identities in covered rows.
 - Launch UI regression audit passed and confirms paid users default to the timeline HUD without Statsig or legacy fallback.
+- Launch-quality XCTest shards now fail if a non-skipped result bundle contains zero test cases, preventing target-membership or selector drift from being counted as proof.
 - Existing performance docs set target budgets once reliable device traces work: cold launch to usable timeline hero <= 2.5s, warm launch <= 1.2s, timeline scrub p95 <= 16.7ms, p99 <= 33.3ms, and zero hitches over 250ms during key interactions.
 - Runtime trace proof remains incomplete; simulator `xctrace` has known reliability limitations in prior evidence. Device or reliable simulator trace is still required before claiming frame/hitch budgets.
 
@@ -154,11 +156,11 @@ Current evidence:
 
 | Area              | Current evidence                                                                              | Gap                                                              |
 | ----------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Web Jest          | 34 suites, 300 tests passed                                                                   | Aggregate line coverage is 7.10%                                 |
+| Web Jest          | 36 suites, 308 tests passed                                                                   | Aggregate line coverage is 7.68%                                 |
 | Web routes        | Dashboard/log/import/auth/settings and readiness pages covered in parts                       | Many pages, components, sync modules, and API routes are 0%      |
 | iOS unit tests    | 73 test files covering auth, sync, HealthKit, dashboard, paywall, photos, metrics, onboarding | Need current full local/CI run after bootstrap                   |
 | iOS UI tests      | Launch/paywall/HUD paths exist                                                                | Runtime simulator health must be separated from product failures |
-| Static iOS audits | Launch UI and SwiftUI perf smell audits pass                                                  | Static checks do not prove frame times or App Store purchase     |
+| Static iOS audits | Launch UI and SwiftUI perf smell audits pass; quality gate rejects empty XCTest shards        | Static checks do not prove frame times or App Store purchase     |
 | Release tests     | Release workflow verifies RevenueCat offering                                                 | Real TestFlight purchase/restore proof remains human/external    |
 
 ## Code Health Report
@@ -234,9 +236,15 @@ pnpm lint
 pnpm typecheck
 pnpm test:ci
 pnpm --filter logyourbody test:coverage
+pnpm check:supabase-migrations
+pnpm check:vendor-boundaries
+pnpm --filter @logyourbody/shared-lib test
+pnpm --filter logyourbody test --config jest.config.node.js src/app/api/app-store-redirect/__tests__/route.node.test.ts src/app/api/weights/__tests__/route.node.test.ts --runInBand
 pnpm ios:bootstrap-local-config
 xcodebuild -list -project apps/ios/LogYourBody.xcodeproj
 RUN_LAUNCH_PERFORMANCE=false DESTINATION=auto pnpm ios:quality-gate
+ARTIFACT_ROOT=/tmp/lyb-quality-gate-nonempty-proof RUN_LAUNCH_PERFORMANCE=false DESTINATION=auto pnpm ios:quality-gate
+RUN_SWIFTLINT=false RUN_LAUNCH_PERFORMANCE=false RUN_TIMELINE_TRACE_WORKFLOW=false DESTINATION=auto ARTIFACT_DIR=/tmp/lyb-aud-004-013-fixed-performance pnpm ios:performance-audit
 ```
 
 Optional focused iOS release evidence follows `apps/ios/docs/development/RELEASE_EVIDENCE_PATH.md`.
@@ -246,4 +254,4 @@ Optional focused iOS release evidence follows `apps/ios/docs/development/RELEASE
 - This audit prioritizes the paid native iOS App Store path.
 - Web is inventoried fully, but expansion work remains below native MVP unless it affects support, legal, billing, or account management.
 - Node 22 local warnings are documented; CI Node 20 remains authoritative.
-- Implementation refactors require a separate approval after this dossier lands.
+- Product refactors require a separate approval after this dossier lands.

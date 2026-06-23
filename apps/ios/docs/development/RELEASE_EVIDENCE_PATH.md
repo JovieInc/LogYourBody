@@ -94,6 +94,16 @@ Before claiming runtime performance budgets, capture one of:
 - a physical-device Instruments/ETTrace artifact that records launch, photo HUD
   first render, timeline scrub, Avatar/Photo switching, and Stats round-trip.
 
+`summary.json` is valid performance proof only when every non-skipped section
+reports at least one matching test case. Empty `unitCases`, `launchCases`, or
+`timelineWorkflowCases` for a non-skipped section are infrastructure failures,
+not passed performance evidence.
+
+Launch-quality XCTest result bundles are valid proof only when each non-skipped
+shard reports at least one matching test case. Empty launch-quality unit or UI
+bundles are selector or target-membership failures, even when `xcodebuild`
+exits successfully.
+
 If simulator `xctrace` or XCTest metrics are unavailable, record the limitation
 as trace infrastructure evidence only. Do not convert it into a passed
 frame/hitch claim.
@@ -128,3 +138,20 @@ After merge to `main`, use GitHub as the source of truth:
 5. For App Store review, rerun the release loop with `release_type=app_store`, `submit_for_review=true`, `automatic_release=true`, and `phased_release=true` only after the TestFlight purchase/restore evidence exists.
 
 Final release evidence must name the exact workflow run, release tag, TestFlight/App Store state, and any external blocker such as App Store Connect agreement, sandbox tester, or account-owner approval.
+
+## Latest Completed Release Evidence
+
+As of 2026-06-23, the latest completed `main` release evidence is:
+
+- PR `#440` merged at `eeb2ebf860047faffba0bf82d1323c475d0c545e`.
+- Post-merge CI run `28002701753` succeeded.
+- Web deploy run `28002701756` succeeded.
+- iOS release-loop run `28002701832` succeeded.
+- TestFlight production deployment succeeded in run `28002701832`.
+- GitHub prerelease `ios-v1.2.0-testflight.20260623045503` was created.
+- App Store direct deploy was skipped by workflow policy.
+
+This evidence proves build, signing, TestFlight upload, release-tag creation,
+RevenueCat offering validation, and App Store subscription product validation.
+It does not prove real TestFlight purchase/restore, HealthKit allow/deny/skip,
+or runtime frame/hitch budgets.
