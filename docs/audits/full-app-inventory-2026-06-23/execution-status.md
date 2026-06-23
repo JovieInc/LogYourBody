@@ -19,6 +19,7 @@ to the register without changing the register schema.
 | `AUD-012` | Advanced web import APIs are now protected by Clerk middleware                  | `middleware-production-gate.test.ts` verifies `/api/parse-pdf`, `/api/parse-pdf-alt`, and `/api/parse-pdf-v2` invoke Clerk auth before route handlers                                                   |
 | `AUD-013` | Timeline and photo/cache unit performance proof no longer passes empty          | `pnpm ios:performance-audit` now targets Xcode-membered timeline, dashboard timeline provider, progress-photo pipeline, and image-cache tests; launch-quality shards also fail empty XCTest bundles     |
 | `AUD-014` | Web sync conflict and queue coverage added; queued mutation failure is retained | `ConflictResolver` tests cover merge behavior; `sync-manager.test.ts` covers upload/error/offline cleanup; `realtime-sync-manager.test.ts` verifies failed queued writes stay queued and surface errors |
+| `AUD-015` | Release observability config is redacted and trace sampling is validated        | `write_release_config.sh` records Sentry/Statsig configured booleans, rejects invalid `SENTRY_TRACES_SAMPLE_RATE`, and marks whether provider smoke proof is required                                   |
 | `AUD-016` | Web deletion readiness is tested honestly                                       | API tests verify cleanup order and fail-closed behavior; page tests verify web page is iOS deletion plus support fallback                                                                               |
 | `AUD-017` | HealthKit App Review source guard added                                         | `healthkit-app-review-proof-guard.test.ts` checks production usage strings, entitlements, Xcode wiring, and release-doc requirements for allow/deny/skip proof                                          |
 | `AUD-018` | Inventory dossier exists and now has execution status plus a refresh checklist  | This file, the machine-readable appendices, and the lightweight refresh checklist below                                                                                                                 |
@@ -27,23 +28,23 @@ to the register without changing the register schema.
 
 | Evidence                | Current state                                                                                                                                                             |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Merged PR               | `#443` merged to `main` at `450d568efd0f0a1a96dcb7adbca283bcfe06d571` on `2026-06-23T08:18:12Z`                                                                           |
-| Post-merge CI           | GitHub run `28012399897` completed successfully                                                                                                                           |
-| Web deploy              | GitHub Deploy run `28012400613` completed successfully                                                                                                                    |
-| iOS release loop        | GitHub run `28012401595` completed successfully                                                                                                                           |
-| TestFlight upload       | `Deploy to TestFlight / Deploy to TestFlight (production)` completed successfully in run `28012401595`                                                                    |
-| GitHub release artifact | Prerelease `ios-v1.2.0-testflight.20260623082957` published at `2026-06-23T08:43:31Z`                                                                                     |
+| Merged PR               | `#445` merged to `main` at `941142ebe699f8e88fb65f48aabbf62a16c62f75` on `2026-06-23T10:12:33Z`                                                                           |
+| Post-merge CI           | GitHub run `28018851364` completed successfully                                                                                                                           |
+| Web deploy              | GitHub Deploy run `28018851421` completed successfully                                                                                                                    |
+| iOS release loop        | GitHub run `28018851764` completed successfully                                                                                                                           |
+| TestFlight upload       | `Deploy to TestFlight / Deploy to TestFlight (production)` completed successfully in run `28018851764`                                                                    |
+| GitHub release artifact | Prerelease `ios-v1.2.0-testflight.20260623102440` published at `2026-06-23T10:39:26Z`                                                                                     |
 | App Store direct deploy | `Deploy to App Store` was skipped by workflow policy; App Store submission still requires real TestFlight purchase/restore evidence first                                 |
-| App Store listing       | Public URL `https://apps.apple.com/us/app/logyourbody/id6755209876` returned HTTP `404` at Tue, 23 Jun 2026 08:43:58 GMT; this does not prove public listing availability |
+| App Store listing       | Public URL `https://apps.apple.com/us/app/logyourbody/id6755209876` returned HTTP `404` at Tue, 23 Jun 2026 10:39:46 GMT; this does not prove public listing availability |
 
 ## Guardrailed But Still Externally Blocked
 
-| Issue     | Current state                                                                                                                                                                           | Required next proof                                                                    |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `AUD-001` | TestFlight upload now has workflow proof, but release docs still enforce `paywall_testflight_verified=false` until real purchase/restore proof exists                                   | Account-owner TestFlight purchase and restore evidence plus App Store submission state |
-| `AUD-004` | Local launch-quality and performance-unit gates now require non-empty XCTest evidence; post-merge CI run `28012399897` is the latest landed CI proof; frame/hitch claims remain blocked | Reliable simulator metrics or physical-device Instruments/ETTrace artifact             |
-| `AUD-015` | Release config now emits redacted Sentry/Statsig configured booleans; provider smoke proof remains external                                                                             | Production release summary plus smoke event/crash proof if enabled                     |
-| `AUD-017` | Source-level HealthKit readiness is guarded; interactive permission proof remains App Review-sensitive                                                                                  | Current allow, deny, and skip evidence with production usage strings                   |
+| Issue     | Current state                                                                                                                                                                                  | Required next proof                                                                    |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `AUD-001` | TestFlight upload now has workflow proof, but release docs still enforce `paywall_testflight_verified=false` until real purchase/restore proof exists                                          | Account-owner TestFlight purchase and restore evidence plus App Store submission state |
+| `AUD-004` | Local launch-quality and performance-unit gates now require non-empty XCTest evidence; post-merge CI run `28018851364` is the latest landed CI proof; frame/hitch claims remain blocked        | Reliable simulator metrics or physical-device Instruments/ETTrace artifact             |
+| `AUD-015` | Release config now emits redacted Sentry/Statsig configured booleans, validates trace sample rate, and records whether provider smoke proof is required; provider smoke proof remains external | Production release summary plus smoke event/crash proof if enabled                     |
+| `AUD-017` | Source-level HealthKit readiness is guarded; interactive permission proof remains App Review-sensitive                                                                                         | Current allow, deny, and skip evidence with production usage strings                   |
 
 ## Lightweight Inventory Refresh Checklist
 
@@ -83,6 +84,7 @@ or launch-surface changes:
 - `pnpm check:supabase-migrations`
 - `pnpm check:vendor-boundaries`
 - `pnpm --filter @logyourbody/shared-lib test`
+- `pnpm --filter @logyourbody/shared-lib test -- release-observability-guard.test.ts`
 - `pnpm --filter logyourbody test -- src/lib/sync/__tests__/sync-manager.test.ts src/lib/sync/__tests__/realtime-sync-manager.test.ts --runInBand`
 - `pnpm --filter logyourbody test -- middleware-production-gate.test.ts`
 - `pnpm --filter logyourbody test src/lib/db/__tests__/indexed-db.test.ts --runInBand`
