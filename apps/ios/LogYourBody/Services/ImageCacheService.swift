@@ -9,6 +9,16 @@
 import SwiftUI
 import UIKit
 
+protocol ProgressPhotoImageLoading {
+    func loadImage(urlString: String) async throws -> UIImage
+}
+
+struct ProgressPhotoImagePipelineLoader: ProgressPhotoImageLoading {
+    func loadImage(urlString: String) async throws -> UIImage {
+        try await ProgressPhotoImagePipeline.loadImage(urlString: urlString)
+    }
+}
+
 @MainActor
 class ImageCacheService: ObservableObject {
     static let shared = ImageCacheService()
@@ -17,6 +27,8 @@ class ImageCacheService: ObservableObject {
 
     private let cache = NSCache<NSString, UIImage>()
     private var loadingTasks: [String: Task<UIImage?, Never>] = [:]
+    private let imageLoader: ProgressPhotoImageLoading
+    private let notificationCenter: NotificationCenter
 
     // MARK: - Configuration
 
@@ -24,13 +36,19 @@ class ImageCacheService: ObservableObject {
 
     // MARK: - Initialization
 
-    private init() {
+    init(
+        imageLoader: ProgressPhotoImageLoading = ProgressPhotoImagePipelineLoader(),
+        notificationCenter: NotificationCenter = .default
+    ) {
+        self.imageLoader = imageLoader
+        self.notificationCenter = notificationCenter
+
         // Configure cache limits
         cache.totalCostLimit = maxCacheSizeMB * 1_024 * 1_024
         cache.countLimit = 100
 
         // Handle memory pressure
-        NotificationCenter.default.addObserver(
+        notificationCenter.addObserver(
             self,
             selector: #selector(handleMemoryWarning),
             name: UIApplication.didReceiveMemoryWarningNotification,
@@ -39,7 +57,7 @@ class ImageCacheService: ObservableObject {
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(self)
+        notificationCenter.removeObserver(self)
     }
 
     // MARK: - Memory Management
@@ -111,7 +129,7 @@ class ImageCacheService: ObservableObject {
     // MARK: - Private Helpers
 
     private func fetchAndCacheImage(from urlString: String, cacheKey: NSString) async -> UIImage? {
-        guard let optimizedImage = try? await ProgressPhotoImagePipeline.loadImage(urlString: urlString) else {
+        guard let optimizedImage = try? await imageLoader.loadImage(urlString: urlString) else {
             return nil
         }
 

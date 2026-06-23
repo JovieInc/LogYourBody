@@ -6,6 +6,8 @@ This dossier began as a read-only application inventory and execution plan. The
 follow-up implementation branch now includes targeted crash-risk, data-drift,
 release-evidence, and web-readiness fixes. It still avoids schema changes,
 public API changes, and broad product refactors.
+The only production type seam added in this branch is an internal image-loading
+injection point used to make photo cache behavior target-membered and testable.
 
 The paid native iOS app remains the default launch surface. Web is treated as marketing, legal, support, account, billing, and operational support unless usage proves a full web product is needed.
 
@@ -14,24 +16,27 @@ Current source-derived inventory:
 | Surface                   | Count | Notes                                     |
 | ------------------------- | ----: | ----------------------------------------- |
 | iOS app Swift files       |   290 | `apps/ios/LogYourBody`                    |
-| iOS unit-test Swift files |    73 | `apps/ios/LogYourBodyTests`               |
+| iOS unit-test Swift files |    74 | `apps/ios/LogYourBodyTests`               |
 | iOS UI-test Swift files   |     2 | `apps/ios/LogYourBodyUITests`             |
 | Web pages                 |    38 | `apps/web/src/app/**/page.tsx`            |
 | Web API route handlers    |    12 | `apps/web/src/app/**/route.ts`            |
 | Web Jest suites           |    37 | `pnpm --filter logyourbody test:coverage` |
-| Web Jest tests            |   312 | All passed in the implementation pass     |
+| Web Jest tests            |   317 | All passed in the implementation pass     |
 
 Current validation evidence:
 
 - `pnpm install --frozen-lockfile` passed with Node engine warnings because local Node is `v22.22.1` while the repo expects Node `20.x`.
 - `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` passed.
-- `pnpm --filter logyourbody test:coverage` passed: 37 suites, 313 tests.
-- Web coverage improved but remains low: 556/6554 lines (8.48%), 577/7006 statements (8.23%), 105/1366 functions (7.68%), 268/4067 branches (6.58%).
+- `pnpm --filter logyourbody test:coverage` passed: 37 suites, 317 tests.
+- Web coverage improved but remains low: 557/6554 lines (8.49%), 578/7006 statements (8.25%), 105/1366 functions (7.68%), 272/4067 branches (6.68%).
 - `pnpm check:supabase-migrations` passed and now fails on unsafe legacy-only migration drift or same-filename content mismatches.
 - `pnpm check:vendor-boundaries` passed and now fails direct vendor SDK imports outside approved service, port, or adapter boundaries.
+- Middleware production-gate tests now verify the web PDF import APIs invoke Clerk auth before their handlers.
 - `xcodebuild -list -project apps/ios/LogYourBody.xcodeproj` resolved the iOS packages and listed `LogYourBody`, `LogYourBodyTests`, and `LogYourBodyUITests`.
 - Focused `SupabaseURLBuilderTests` passed.
 - `ARTIFACT_ROOT=/tmp/lyb-quality-gate-nonempty-proof RUN_LAUNCH_PERFORMANCE=false DESTINATION=auto pnpm ios:quality-gate` passed; the launch-quality unit shard executed 19 tests, the critical-surfaces UI shard executed 1 test, and the performance unit shard executed 1 test.
+- Focused Xcode proof passed for target-membered sync chunking, dashboard timeline provider, progress-photo image pipeline, and image cache tests.
+- Bounded `pnpm ios:performance-audit` passed with artifact root `/tmp/lyb-aud-013-photo-cache`: 13 performance-unit test cases, 0.534s total XCTest runtime, slowest unit 0.448s.
 
 Appendices:
 
@@ -62,14 +67,14 @@ Appendices:
 
 ### Web Product And Support Surface
 
-| Feature area           | Routes                                                                                             | User value                           | Readiness                                    |
-| ---------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------- |
-| Marketing/download     | `/`, `/landing`, `/mobile`, `/download/*`, `/about`, `/brand`                                      | App Store handoff and positioning    | Supportive of iOS launch                     |
-| Legal/support/security | `/privacy`, `/terms`, `/support`, `/security`, `/health-disclosure`, `/delete-account`             | Review and customer support surfaces | App Store relevant                           |
-| Account/auth           | `/signin`, `/signup`, `/login`, `/auth/callback`, auth API routes                                  | Web account support                  | Must not contradict iOS-first posture        |
-| Product web app        | `/dashboard`, `/log`, `/photos`, `/import`, `/steps`, `/settings/*`, `/onboarding`                 | Early web tracking surface           | Deprioritized unless support/billing/account |
-| API support            | `/api/weights`, `/api/auth/*`, `/api/webhooks/clerk`, `/api/parse-pdf*`, `/api/app-store-redirect` | Data and operational endpoints       | Needs coverage and production hygiene        |
-| Debug/test routes      | None currently mounted; middleware still blocks `/debug*`, `/test*`, `/diag`, and related patterns | Internal diagnostics                 | Keep source-derived inventory guard          |
+| Feature area           | Routes                                                                                             | User value                           | Readiness                                                          |
+| ---------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| Marketing/download     | `/`, `/landing`, `/mobile`, `/download/*`, `/about`, `/brand`                                      | App Store handoff and positioning    | Supportive of iOS launch                                           |
+| Legal/support/security | `/privacy`, `/terms`, `/support`, `/security`, `/health-disclosure`, `/delete-account`             | Review and customer support surfaces | App Store relevant                                                 |
+| Account/auth           | `/signin`, `/signup`, `/login`, `/auth/callback`, auth API routes                                  | Web account support                  | Must not contradict iOS-first posture                              |
+| Product web app        | `/dashboard`, `/log`, `/photos`, `/import`, `/steps`, `/settings/*`, `/onboarding`                 | Early web tracking surface           | Deprioritized unless support/billing/account                       |
+| API support            | `/api/weights`, `/api/auth/*`, `/api/webhooks/clerk`, `/api/parse-pdf*`, `/api/app-store-redirect` | Data and operational endpoints       | PDF import APIs are Clerk-protected; broader coverage still needed |
+| Debug/test routes      | None currently mounted; middleware still blocks `/debug*`, `/test*`, `/diag`, and related patterns | Internal diagnostics                 | Keep source-derived inventory guard                                |
 
 ## User Story Map
 
@@ -149,6 +154,7 @@ Current evidence:
 - Static SwiftUI performance smell audit passed: no raw image decoding in launch-critical render paths, no inline `ForEach` sort/filter/map in covered launch-critical timeline controls, and no per-render UUID identities in covered rows.
 - Launch UI regression audit passed and confirms paid users default to the timeline HUD without Statsig or legacy fallback.
 - Launch-quality XCTest shards now fail if a non-skipped result bundle contains zero test cases, preventing target-membership or selector drift from being counted as proof.
+- Photo/timeline performance-unit proof now includes target-membered dashboard timeline provider tests, progress-photo image pipeline tests, and image-cache de-dupe/cache/memory-warning tests.
 - Existing performance docs set target budgets once reliable device traces work: cold launch to usable timeline hero <= 2.5s, warm launch <= 1.2s, timeline scrub p95 <= 16.7ms, p99 <= 33.3ms, and zero hitches over 250ms during key interactions.
 - Runtime trace proof remains incomplete; simulator `xctrace` has known reliability limitations in prior evidence. Device or reliable simulator trace is still required before claiming frame/hitch budgets.
 
@@ -156,9 +162,9 @@ Current evidence:
 
 | Area              | Current evidence                                                                              | Gap                                                              |
 | ----------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Web Jest          | 37 suites, 313 tests passed                                                                   | Aggregate line coverage is 8.48%                                 |
+| Web Jest          | 37 suites, 317 tests passed                                                                   | Aggregate line coverage is 8.49%                                 |
 | Web routes        | Dashboard/log/import/auth/settings and readiness pages covered in parts                       | Many pages, components, sync modules, and API routes are 0%      |
-| iOS unit tests    | 73 test files covering auth, sync, HealthKit, dashboard, paywall, photos, metrics, onboarding | Need current full local/CI run after bootstrap                   |
+| iOS unit tests    | 74 test files covering auth, sync, HealthKit, dashboard, paywall, photos, metrics, onboarding | Need current full local/CI run after bootstrap                   |
 | iOS UI tests      | Launch/paywall/HUD paths exist                                                                | Runtime simulator health must be separated from product failures |
 | Static iOS audits | Launch UI and SwiftUI perf smell audits pass; quality gate rejects empty XCTest shards        | Static checks do not prove frame times or App Store purchase     |
 | Release tests     | Release workflow verifies RevenueCat offering                                                 | Real TestFlight purchase/restore proof remains human/external    |
@@ -169,7 +175,7 @@ Highest-priority health findings are ranked in [issue-register.csv](issue-regist
 
 - App Store readiness is proof-gated, not code-gated: the workflow blocks App Store submission until real TestFlight paywall purchase/restore proof exists.
 - Local iOS validation is easy to misclassify as broken source until ignored config files are bootstrapped.
-- Crash-risk tokens exist in launch-adjacent services and views: forced URL construction, removed-sync `fatalError` sentinels, and force unwraps in OTP/chart/metric UI paths.
+- Previously identified launch-adjacent crash tokens were closed or materially reduced: targeted forced URL construction, removed-sync `fatalError` sentinels, and OTP/chart/metric force unwraps now have focused evidence in [execution-status.md](execution-status.md).
 - Maintainability risk is concentrated in large files and singleton-heavy service flows: auth, sync, Core Data, RevenueCat, HealthKit, timeline, add-entry, import, export, and profile settings.
 - Supabase schema ownership has been consolidated to the root migration tree; the new drift guard should stay in the release path.
 - Web debug/test routes are no longer mounted on this branch; middleware still blocks known debug/test patterns before auth if they are reintroduced.
@@ -179,16 +185,16 @@ Highest-priority health findings are ranked in [issue-register.csv](issue-regist
 
 Scoring uses 0-5 impact for each dimension. The launch priority sort weights paid native iOS, App Store readiness, data-loss/crash risk, and user-visible performance above web expansion.
 
-Top issues:
+Remaining top issues:
 
 1. `AUD-001`: Real TestFlight purchase/restore and App Store Connect proof are still external launch gates.
-2. `AUD-002`: Local iOS proof depends on ignored config bootstrapping.
-3. `AUD-003`: Forced URL unwraps in network/photo/export managers need a crash-focused pass.
-4. `AUD-004`: Runtime performance budgets are not yet proven by reliable trace evidence.
-5. `AUD-005`: Supabase migration ownership is now root-only, with drift prevention still release-relevant.
-6. `AUD-006`: Large singleton service files carry sync/auth/billing maintainability risk.
-7. `AUD-007`: Web coverage is very low.
-8. `AUD-008`: Debug/test web route inventory is currently empty; keep the guard to prevent regression.
+2. `AUD-004`: Runtime frame/hitch budgets are not yet proven by reliable trace evidence.
+3. `AUD-006`: Large singleton service files carry sync/auth/billing maintainability risk.
+4. `AUD-007`: Web coverage is still too low for broad product confidence.
+5. `AUD-012`: iOS advanced surfaces remain product-scope decisions after the web import API auth guard.
+6. `AUD-013`: Photo/cache and timeline unit proof is target-membered, but runtime trace proof remains.
+7. `AUD-015`: Provider smoke evidence for release observability remains external.
+8. `AUD-017`: HealthKit interactive allow/deny/skip proof remains App Review-sensitive.
 
 See [issue-register.csv](issue-register.csv) for the full ranked list.
 
@@ -244,7 +250,7 @@ pnpm ios:bootstrap-local-config
 xcodebuild -list -project apps/ios/LogYourBody.xcodeproj
 RUN_LAUNCH_PERFORMANCE=false DESTINATION=auto pnpm ios:quality-gate
 ARTIFACT_ROOT=/tmp/lyb-quality-gate-nonempty-proof RUN_LAUNCH_PERFORMANCE=false DESTINATION=auto pnpm ios:quality-gate
-RUN_SWIFTLINT=false RUN_LAUNCH_PERFORMANCE=false RUN_TIMELINE_TRACE_WORKFLOW=false DESTINATION=auto ARTIFACT_DIR=/tmp/lyb-aud-004-013-fixed-performance pnpm ios:performance-audit
+RUN_SWIFTLINT=false RUN_LAUNCH_PERFORMANCE=false RUN_TIMELINE_TRACE_WORKFLOW=false DESTINATION=auto ARTIFACT_DIR=/tmp/lyb-aud-013-photo-cache pnpm ios:performance-audit
 ```
 
 Optional focused iOS release evidence follows `apps/ios/docs/development/RELEASE_EVIDENCE_PATH.md`.

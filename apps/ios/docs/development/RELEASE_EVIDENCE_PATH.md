@@ -143,13 +143,13 @@ Final release evidence must name the exact workflow run, release tag, TestFlight
 
 As of 2026-06-23, the latest completed `main` release evidence is:
 
-- PR `#441` merged at `f3032407f7d2138abbe58a1e16b631602d02c429`.
-- Post-merge CI run `28005571661` succeeded.
-- Web deploy run `28005571660` succeeded.
-- iOS release-loop run `28005571776` succeeded.
-- TestFlight production deployment succeeded in run `28005571776`.
-- GitHub prerelease `ios-v1.2.0-testflight.20260623061323` was created.
-- App Store approved-release monitor run `28006708745` succeeded, but the public App Store URL returned HTTP `404`; this is not public listing proof.
+- PR `#442` merged at `8db68ee058f2227e97fe62d51a09869e78243ac6`.
+- Post-merge CI run `28008975918` succeeded.
+- Web deploy run `28008975912` succeeded.
+- iOS release-loop run `28008976044` succeeded.
+- TestFlight production deployment succeeded in run `28008976044`.
+- GitHub prerelease `ios-v1.2.0-testflight.20260623072428` was created at `2026-06-23T07:38:39Z`.
+- App Store approved-release monitor run `28006708745` succeeded, but the public App Store URL returned HTTP `404` again on `2026-06-23T07:46:41Z`; this is not public listing proof.
 - App Store direct deploy was skipped by workflow policy.
 
 This evidence proves build, signing, TestFlight upload, release-tag creation,
