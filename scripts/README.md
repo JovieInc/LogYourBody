@@ -8,7 +8,8 @@ This directory contains essential CI/CD and configuration scripts for the LogYou
 scripts/
 ├── web/                    # Web app essential scripts
 │   ├── pre-push-check.sh   # Git pre-push checks
-│   └── create-migration.sh # Database migration creator
+│   └── create-migration.sh # Root Supabase migration creator
+├── supabase/               # Supabase schema checks
 ├── add-clerk-env-secrets.sh    # Add Clerk secrets to GitHub environments
 ├── add-clerk-secrets.sh        # Add Clerk secrets to repository
 ├── check-env-secrets.sh        # Check environment secrets configuration
@@ -43,5 +44,8 @@ All other scripts (avatar generators, test scripts, etc.) are ignored by git but
 cd apps/web && pnpm run check
 
 # Create a database migration
-cd apps/web && pnpm run db:migrate
+pnpm db:migrate "add user preferences"
+
+# Verify migration ownership and optional schema drift
+pnpm db:schema:check
 ```

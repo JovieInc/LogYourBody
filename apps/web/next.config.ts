@@ -1,10 +1,11 @@
-import type { NextConfig } from "next";
-import { version } from "./package.json";
+import type { NextConfig } from 'next';
+import bundleAnalyzer from '@next/bundle-analyzer';
+import { version } from './package.json';
 
 // Bundle analyzer configuration
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
+const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
-})
+});
 
 const nextConfig: NextConfig = {
   // Enable static export for Capacitor when needed
@@ -41,25 +42,20 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '2mb',
     },
   },
-  
+
   // Server external packages
   serverExternalPackages: ['pdf-parse'],
-  
-  // Skip ESLint during builds - we'll run it separately
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  
+
   // Don't skip TypeScript checks
   typescript: {
     ignoreBuildErrors: false,
   },
-  
+
   // Environment variables
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
   },
-  
+
   // Headers for apple-app-site-association
   async headers() {
     return [
@@ -83,7 +79,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  
+
   // Webpack configuration (only used when not using Turbopack)
   webpack: (config, { isServer }) => {
     if (!isServer) {

@@ -1,3 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+overrides:
+  js-yaml: 4.1.1
+  prismjs: 1.30.0

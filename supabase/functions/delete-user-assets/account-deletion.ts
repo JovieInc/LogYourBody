@@ -25,8 +25,7 @@ type AccountDeletionLogger = {
 
 export const accountDeletionTargets: readonly AccountDeletionTarget[] = [
     // Export rows are temporary, but they can contain a full health-data snapshot.
-    // This table is older and may use Supabase UUID auth ids, so it is best effort.
-    { table: "data_exports", column: "user_id", required: false },
+    { table: "data_exports", column: "user_id", required: true },
     { table: "progress_photos", column: "user_id", required: true },
     { table: "dexa_results", column: "user_id", required: true },
     { table: "glp1_dose_logs", column: "user_id", required: true },
