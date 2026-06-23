@@ -64,14 +64,19 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
                 return;
             }
 
-            const user: { userID?: string; custom?: Record<string, string | number | boolean | null | undefined> } = {};
+            const user: { userID?: string; custom?: Record<string, string | number | boolean | undefined> } = {};
 
             if (userId && userId.trim().length > 0) {
                 user.userID = userId;
             }
 
             if (traits && Object.keys(traits).length > 0) {
-                user.custom = traits;
+                const custom = Object.fromEntries(
+                    Object.entries(traits).filter((e): e is [string, string | number | boolean | undefined] => e[1] !== null),
+                );
+                if (Object.keys(custom).length > 0) {
+                    user.custom = custom;
+                }
             }
 
             void c.updateUserAsync(user).catch(() => {
@@ -90,9 +95,14 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
                 return;
             }
 
+            const metadata: Record<string, string> = Object.fromEntries(
+                Object.entries(properties)
+                    .filter(([, v]) => v != null)
+                    .map(([k, v]) => [k, String(v)]),
+            );
             c.logEvent({
                 eventName: String(event),
-                metadata: properties,
+                metadata,
             });
         },
 
