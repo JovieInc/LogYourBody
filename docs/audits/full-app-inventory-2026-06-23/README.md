@@ -20,18 +20,19 @@ Current source-derived inventory:
 | iOS UI-test Swift files   |     2 | `apps/ios/LogYourBodyUITests`             |
 | Web pages                 |    38 | `apps/web/src/app/**/page.tsx`            |
 | Web API route handlers    |    12 | `apps/web/src/app/**/route.ts`            |
-| Web Jest suites           |    37 | `pnpm --filter logyourbody test:coverage` |
-| Web Jest tests            |   317 | All passed in the implementation pass     |
+| Web Jest suites           |    39 | `pnpm --filter logyourbody test:coverage` |
+| Web Jest tests            |   323 | All passed in the implementation pass     |
 
 Current validation evidence:
 
 - `pnpm install --frozen-lockfile` passed with Node engine warnings because local Node is `v22.22.1` while the repo expects Node `20.x`.
 - `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` passed.
-- `pnpm --filter logyourbody test:coverage` passed: 37 suites, 317 tests.
-- Web coverage improved but remains low: 557/6554 lines (8.49%), 578/7006 statements (8.25%), 105/1366 functions (7.68%), 272/4067 branches (6.68%).
+- `pnpm --filter logyourbody test:coverage` passed: 39 suites, 323 tests.
+- Web coverage improved but remains low: 726/6561 lines (11.06%), 755/7014 statements (10.76%), 142/1367 functions (10.38%), 320/4075 branches (7.85%).
 - `pnpm check:supabase-migrations` passed and now fails on unsafe legacy-only migration drift or same-filename content mismatches.
 - `pnpm check:vendor-boundaries` passed and now fails direct vendor SDK imports outside approved service, port, or adapter boundaries.
 - Middleware production-gate tests now verify the web PDF import APIs invoke Clerk auth before their handlers.
+- Web sync tests now cover `syncManager` upload/error/offline cleanup behavior and `realtimeSyncManager` queued mutation success and failure retention.
 - `xcodebuild -list -project apps/ios/LogYourBody.xcodeproj` resolved the iOS packages and listed `LogYourBody`, `LogYourBodyTests`, and `LogYourBodyUITests`.
 - Focused `SupabaseURLBuilderTests` passed.
 - `ARTIFACT_ROOT=/tmp/lyb-quality-gate-nonempty-proof RUN_LAUNCH_PERFORMANCE=false DESTINATION=auto pnpm ios:quality-gate` passed; the launch-quality unit shard executed 19 tests, the critical-surfaces UI shard executed 1 test, and the performance unit shard executed 1 test.
@@ -162,7 +163,7 @@ Current evidence:
 
 | Area              | Current evidence                                                                              | Gap                                                              |
 | ----------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Web Jest          | 37 suites, 317 tests passed                                                                   | Aggregate line coverage is 8.49%                                 |
+| Web Jest          | 39 suites, 323 tests passed                                                                   | Aggregate line coverage is 11.06%                                |
 | Web routes        | Dashboard/log/import/auth/settings and readiness pages covered in parts                       | Many pages, components, sync modules, and API routes are 0%      |
 | iOS unit tests    | 74 test files covering auth, sync, HealthKit, dashboard, paywall, photos, metrics, onboarding | Need current full local/CI run after bootstrap                   |
 | iOS UI tests      | Launch/paywall/HUD paths exist                                                                | Runtime simulator health must be separated from product failures |

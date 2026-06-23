@@ -21,6 +21,10 @@ type SyncTable = 'body_metrics' | 'user_profiles' | 'daily_metrics';
 
 type SyncableRecord = BodyMetrics | UserProfile | DailyMetrics | Record<string, unknown>;
 
+type SupabaseMutationResult = {
+  error?: { message?: string } | Error | null;
+};
+
 interface QueuedChange {
   id: string;
   table: SyncTable;
@@ -104,7 +108,8 @@ export class RealtimeSyncManager {
       }
 
       // Create new channel for user-specific data
-      this.realtimeChannel = this.supabase.channel(`sync:${this.userId}`)
+      this.realtimeChannel = this.supabase
+        .channel(`sync:${this.userId}`)
         .on(
           'postgres_changes',
           {
@@ -113,7 +118,7 @@ export class RealtimeSyncManager {
             table: 'body_metrics',
             filter: `user_id=eq.${this.userId}`,
           },
-          (payload) => this.handleRealtimeChange('body_metrics', payload)
+          (payload) => this.handleRealtimeChange('body_metrics', payload),
         )
         .on(
           'postgres_changes',
@@ -123,7 +128,7 @@ export class RealtimeSyncManager {
             table: 'user_profiles',
             filter: `id=eq.${this.userId}`,
           },
-          (payload) => this.handleRealtimeChange('user_profiles', payload)
+          (payload) => this.handleRealtimeChange('user_profiles', payload),
         )
         .on(
           'postgres_changes',
@@ -133,7 +138,7 @@ export class RealtimeSyncManager {
             table: 'daily_metrics',
             filter: `user_id=eq.${this.userId}`,
           },
-          (payload) => this.handleRealtimeChange('daily_metrics', payload)
+          (payload) => this.handleRealtimeChange('daily_metrics', payload),
         )
         .subscribe((status) => {
           this.updateState({ realtimeConnected: status === 'SUBSCRIBED' });
@@ -149,7 +154,7 @@ export class RealtimeSyncManager {
 
   private async handleRealtimeChange(
     table: SyncTable,
-    payload: RealtimePostgresChangesPayload<Record<string, unknown>>
+    payload: RealtimePostgresChangesPayload<Record<string, unknown>>,
   ) {
     // Skip if this change originated from our own sync
     // TODO: Add sync_id tracking to prevent echo
@@ -178,7 +183,10 @@ export class RealtimeSyncManager {
 
     switch (table) {
       case 'body_metrics':
-        await indexedDB.saveBodyMetrics({ ...(data as BodyMetrics), sync_status: 'synced' }, this.userId!);
+        await indexedDB.saveBodyMetrics(
+          { ...(data as BodyMetrics), sync_status: 'synced' },
+          this.userId!,
+        );
         break;
       case 'user_profiles':
         await indexedDB.saveProfile({ ...(data as UserProfile), sync_status: 'synced' });
@@ -191,14 +199,19 @@ export class RealtimeSyncManager {
     this.notifyListeners();
   }
 
-  private async handleRealtimeUpdate(table: SyncTable, newData: SyncableRecord, _oldData: SyncableRecord | null) {
+  private async handleRealtimeUpdate(
+    table: SyncTable,
+    newData: SyncableRecord,
+    _oldData: SyncableRecord | null,
+  ) {
     if (!newData) return;
 
     // Check for conflicts with local unsynced changes
     const id = (newData as { id?: string | number }).id;
     const localData = id != null ? await this.getLocalRecord(table, String(id)) : null;
 
-    const localSyncStatus = localData && (localData as { sync_status?: 'pending' | 'synced' | 'error' }).sync_status;
+    const localSyncStatus =
+      localData && (localData as { sync_status?: 'pending' | 'synced' | 'error' }).sync_status;
 
     if (localData && localSyncStatus === 'pending') {
       // We have a conflict - resolve it based on table type
@@ -241,7 +254,7 @@ export class RealtimeSyncManager {
       case 'body_metrics':
         // Mark as deleted for soft delete
         const metrics = await indexedDB.getBodyMetrics(this.userId!, undefined, undefined);
-        const toDelete = metrics.find(m => m.id === data.id);
+        const toDelete = metrics.find((m) => m.id === data.id);
         if (toDelete) {
           await indexedDB.saveBodyMetrics({ ...toDelete, is_deleted: true }, this.userId!);
         }
@@ -255,11 +268,14 @@ export class RealtimeSyncManager {
     this.notifyListeners();
   }
 
-  private async getLocalRecord(table: SyncTable, id: string): Promise<BodyMetrics | UserProfile | DailyMetrics | null> {
+  private async getLocalRecord(
+    table: SyncTable,
+    id: string,
+  ): Promise<BodyMetrics | UserProfile | DailyMetrics | null> {
     switch (table) {
       case 'body_metrics':
         const metrics = await indexedDB.getBodyMetrics(this.userId!, undefined, undefined);
-        return metrics.find(m => m.id === id) ?? null;
+        return metrics.find((m) => m.id === id) ?? null;
       case 'user_profiles':
         return await indexedDB.getProfile(this.userId!);
       case 'daily_metrics':
@@ -317,23 +333,27 @@ export class RealtimeSyncManager {
         console.error(`Failed to process queued change:`, error);
 
         change.retryCount++;
+        const errorMessage =
+          error instanceof Error ? error.message : `Failed to sync ${change.table}`;
         if (change.retryCount >= this.maxRetries) {
           // Move to failed queue or notify user
           processedIds.push(change.id);
           this.updateState({
-            error: `Failed to sync ${change.table} after ${this.maxRetries} attempts`
+            error: `Failed to sync ${change.table} after ${this.maxRetries} attempts`,
           });
         } else {
+          this.updateState({ error: errorMessage });
+
           // Exponential backoff for retry
-          await new Promise(resolve =>
-            setTimeout(resolve, this.retryDelay * Math.pow(2, change.retryCount))
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.retryDelay * Math.pow(2, change.retryCount)),
           );
         }
       }
     }
 
     // Remove processed items
-    this.syncQueue = this.syncQueue.filter(item => !processedIds.includes(item.id));
+    this.syncQueue = this.syncQueue.filter((item) => !processedIds.includes(item.id));
     await this.saveQueueToStorage();
 
     this.processingQueue = false;
@@ -342,7 +362,7 @@ export class RealtimeSyncManager {
     this.updateState({
       isSyncing: false,
       syncStatus: this.syncQueue.length === 0 ? 'success' : 'error',
-      lastSyncDate: new Date()
+      lastSyncDate: new Date(),
     });
   }
 
@@ -352,17 +372,31 @@ export class RealtimeSyncManager {
     // Add sync ID to prevent echo
     const syncData = { ...data, sync_id: this.getSyncId() };
 
+    let result: SupabaseMutationResult;
+
     switch (operation) {
       case 'INSERT':
-        await this.supabase.from(table).insert(syncData);
+        result = await this.supabase.from(table).insert(syncData);
         break;
       case 'UPDATE':
-        await this.supabase.from(table).update(syncData).eq('id', data.id);
+        result = await this.supabase.from(table).update(syncData).eq('id', data.id);
         break;
       case 'DELETE':
-        await this.supabase.from(table).delete().eq('id', data.id);
+        result = await this.supabase.from(table).delete().eq('id', data.id);
         break;
     }
+
+    this.throwIfMutationFailed(result);
+  }
+
+  private throwIfMutationFailed(result: SupabaseMutationResult) {
+    if (!result.error) return;
+
+    if (result.error instanceof Error) {
+      throw result.error;
+    }
+
+    throw new Error(result.error.message ?? 'Queued sync mutation failed');
   }
 
   // Sync methods
@@ -399,13 +433,13 @@ export class RealtimeSyncManager {
       this.updateState({
         syncStatus: 'success',
         lastSyncDate: new Date(),
-        error: undefined
+        error: undefined,
       });
     } catch (error) {
       console.error('Sync failed:', error);
       this.updateState({
         syncStatus: 'error',
-        error: error instanceof Error ? error.message : 'Sync failed'
+        error: error instanceof Error ? error.message : 'Sync failed',
       });
     } finally {
       this.updateState({ isSyncing: false });
@@ -463,11 +497,7 @@ export class RealtimeSyncManager {
 
     // Get latest data from server
     const [profileResult, metricsResult, dailyResult] = await Promise.all([
-      this.supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', this.userId)
-        .single(),
+      this.supabase.from('user_profiles').select('*').eq('id', this.userId).single(),
       this.supabase
         .from('body_metrics')
         .select('*')
@@ -538,7 +568,7 @@ export class RealtimeSyncManager {
   }
 
   private notifyListeners() {
-    this.listeners.forEach(listener => listener(this.state));
+    this.listeners.forEach((listener) => listener(this.state));
   }
 
   subscribe(listener: (state: SyncState) => void) {
@@ -575,11 +605,14 @@ export class RealtimeSyncManager {
   // Periodic sync for reliability
   private startPeriodicSync() {
     // Sync every 5 minutes as a fallback
-    this.syncInterval = setInterval(() => {
-      if (this.state.isOnline) {
-        this.syncAll();
-      }
-    }, 5 * 60 * 1000);
+    this.syncInterval = setInterval(
+      () => {
+        if (this.state.isOnline) {
+          this.syncAll();
+        }
+      },
+      5 * 60 * 1000,
+    );
   }
 
   // Cleanup
