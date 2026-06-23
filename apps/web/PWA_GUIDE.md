@@ -5,6 +5,7 @@ LogYourBody is configured as a Progressive Web App, providing an app-like experi
 ## Current PWA Features
 
 ### ✅ Implemented
+
 - **Service Worker**: Handles offline caching and updates
 - **Web App Manifest**: Configures app appearance and behavior
 - **Install Prompt**: Shows after 30 seconds on compatible devices
@@ -39,12 +40,13 @@ LogYourBody is configured as a Progressive Web App, providing an app-like experi
 ## Testing PWA Features
 
 ### Development Testing
-1. Visit http://localhost:3000/pwa-test
-2. Check service worker status
-3. Test install prompt
-4. Test notifications
+
+1. Start the app with `pnpm dev`
+2. Visit http://localhost:3000
+3. Use Chrome DevTools to inspect service worker status, the install prompt, and notifications
 
 ### Chrome DevTools Testing
+
 1. Open Chrome DevTools (F12)
 2. Go to **Application** tab
 3. Check:
@@ -53,6 +55,7 @@ LogYourBody is configured as a Progressive Web App, providing an app-like experi
    - **Storage**: View cached files
 
 ### Lighthouse PWA Audit
+
 1. Open Chrome DevTools
 2. Go to **Lighthouse** tab
 3. Select "Progressive Web App" category
@@ -61,11 +64,13 @@ LogYourBody is configured as a Progressive Web App, providing an app-like experi
 ## Installation Testing
 
 ### Desktop Chrome
+
 1. Look for install icon in address bar
 2. Or wait 30 seconds for install toast
 3. Click install and app opens in standalone window
 
 ### Mobile Devices
+
 - **Android**: Chrome shows "Add to Home Screen" banner
 - **iOS**: Safari > Share > Add to Home Screen
 
@@ -79,12 +84,14 @@ LogYourBody is configured as a Progressive Web App, providing an app-like experi
 ## Deployment Checklist
 
 ### Vercel Deployment
+
 - [x] HTTPS enabled automatically
 - [x] Service worker at root path
 - [x] Manifest linked in HTML head
 - [x] Icons accessible at root
 
 ### Production Requirements
+
 - HTTPS (handled by Vercel)
 - Valid SSL certificate
 - Service worker scope at root
@@ -93,17 +100,20 @@ LogYourBody is configured as a Progressive Web App, providing an app-like experi
 ## Common Issues
 
 ### Service Worker Not Registering
+
 - Check console for errors
 - Ensure HTTPS in production
 - Clear browser cache and retry
 
 ### Install Prompt Not Showing
+
 - Must be on HTTPS
 - User hasn't already installed
 - Browser supports PWA installation
 - Wait 30 seconds after page load
 
 ### Updates Not Working
+
 - Service worker caches may be stale
 - Hard refresh: Ctrl+Shift+R
 - Clear site data in DevTools
@@ -111,54 +121,61 @@ LogYourBody is configured as a Progressive Web App, providing an app-like experi
 ## Future Enhancements
 
 ### Push Notifications
+
 Structure is ready in service worker:
+
 ```javascript
 self.addEventListener('push', (event) => {
   // Implementation ready
-})
+});
 ```
 
 ### Background Sync
+
 Could add for offline weight logging:
+
 ```javascript
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-weights') {
     // Sync offline data
   }
-})
+});
 ```
 
 ### Enhanced Caching
+
 Current: Basic cache-first strategy
 Future: Network-first for API calls
 
 ## Monitoring
 
 ### Analytics Events
+
 PWA events are tracked:
+
 - Install prompt shown
 - App installed
 - Update available
 
 ### Performance Metrics
+
 - Service worker registration time
 - Cache hit rate
 - Offline page views
 
 ## Browser Support
 
-| Feature | Chrome | Safari | Firefox | Edge |
-|---------|--------|--------|---------|------|
-| Service Worker | ✅ | ✅ | ✅ | ✅ |
-| Install | ✅ | ⚠️ | ❌ | ✅ |
-| Push | ✅ | ⚠️ | ✅ | ✅ |
-| Offline | ✅ | ✅ | ✅ | ✅ |
+| Feature        | Chrome | Safari | Firefox | Edge |
+| -------------- | ------ | ------ | ------- | ---- |
+| Service Worker | ✅     | ✅     | ✅      | ✅   |
+| Install        | ✅     | ⚠️     | ❌      | ✅   |
+| Push           | ✅     | ⚠️     | ✅      | ✅   |
+| Offline        | ✅     | ✅     | ✅      | ✅   |
 
 ⚠️ = Partial support
 ❌ = Not supported
 
 ## Resources
 
-- [PWA Test Page](/pwa-test) - Test all PWA features
 - [web.dev PWA Guide](https://web.dev/progressive-web-apps/)
 - [Chrome PWA Docs](https://developer.chrome.com/docs/workbox/)

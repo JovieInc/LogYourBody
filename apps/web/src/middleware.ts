@@ -54,11 +54,8 @@ export function isProductionDebugRoute(pathname: string) {
   return productionDebugRoutePatterns.some((pattern) => pattern.test(normalizedPathname));
 }
 
-export function shouldBlockProductionDebugRoute(
-  pathname: string,
-  env: NodeJS.ProcessEnv = process.env,
-) {
-  return env['VERCEL_ENV'] === 'production' && isProductionDebugRoute(pathname);
+export function shouldBlockDebugRoute(pathname: string) {
+  return isProductionDebugRoute(pathname);
 }
 
 const protectedRouteMiddleware = clerkMiddleware(async (auth) => {
@@ -70,7 +67,7 @@ export function shouldUseClerkMiddleware(req: NextRequest) {
 }
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
-  if (shouldBlockProductionDebugRoute(req.nextUrl.pathname)) {
+  if (shouldBlockDebugRoute(req.nextUrl.pathname)) {
     return new NextResponse(null, {
       status: 404,
       headers: {

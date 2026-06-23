@@ -65,10 +65,10 @@ describe('middleware production debug/test gate', () => {
     '/pwa-test',
   ])('blocks %s in production before auth handling', async (pathname) => {
     process.env.VERCEL_ENV = 'production';
-    const { default: middleware, shouldBlockProductionDebugRoute } = await import('../middleware');
+    const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
     const request = new NextRequest(`https://logyourbody.com${pathname}`);
 
-    expect(shouldBlockProductionDebugRoute(pathname)).toBe(true);
+    expect(shouldBlockDebugRoute(pathname)).toBe(true);
 
     const response = await middleware(request, {} as never);
 
@@ -78,26 +78,27 @@ describe('middleware production debug/test gate', () => {
     expect(mockProtect).not.toHaveBeenCalled();
   });
 
-  it('leaves debug routes available outside production deployments', async () => {
+  it('blocks debug routes outside production deployments too', async () => {
     process.env.VERCEL_ENV = 'preview';
-    const { default: middleware, shouldBlockProductionDebugRoute } = await import('../middleware');
+    const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
     const request = new NextRequest('https://preview.logyourbody.com/api/test-openai');
 
-    expect(shouldBlockProductionDebugRoute('/api/test-openai')).toBe(false);
+    expect(shouldBlockDebugRoute('/api/test-openai')).toBe(true);
 
     const response = await middleware(request, {} as never);
 
-    expect(response?.status).toBe(200);
+    expect(response?.status).toBe(404);
+    expect(response?.headers.get('Cache-Control')).toBe('no-store');
     expect(mockProtectedMiddleware).not.toHaveBeenCalled();
     expect(mockProtect).not.toHaveBeenCalled();
   });
 
   it('keeps normal protected routes behind Clerk auth in production', async () => {
     process.env.VERCEL_ENV = 'production';
-    const { default: middleware, shouldBlockProductionDebugRoute } = await import('../middleware');
+    const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
     const request = new NextRequest('https://logyourbody.com/dashboard');
 
-    expect(shouldBlockProductionDebugRoute('/dashboard')).toBe(false);
+    expect(shouldBlockDebugRoute('/dashboard')).toBe(false);
 
     const response = await middleware(request, {} as never);
 
@@ -108,10 +109,10 @@ describe('middleware production debug/test gate', () => {
 
   it('keeps normal public routes reachable in production', async () => {
     process.env.VERCEL_ENV = 'production';
-    const { default: middleware, shouldBlockProductionDebugRoute } = await import('../middleware');
+    const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
     const request = new NextRequest('https://logyourbody.com/about');
 
-    expect(shouldBlockProductionDebugRoute('/about')).toBe(false);
+    expect(shouldBlockDebugRoute('/about')).toBe(false);
 
     const response = await middleware(request, {} as never);
 
@@ -124,12 +125,10 @@ describe('middleware production debug/test gate', () => {
     'keeps marketing route %s outside Clerk protection in production',
     async (pathname) => {
       process.env.VERCEL_ENV = 'production';
-      const { default: middleware, shouldBlockProductionDebugRoute } = await import(
-        '../middleware'
-      );
+      const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
       const request = new NextRequest(`https://logyourbody.com${pathname}`);
 
-      expect(shouldBlockProductionDebugRoute(pathname)).toBe(false);
+      expect(shouldBlockDebugRoute(pathname)).toBe(false);
 
       const response = await middleware(request, {} as never);
 

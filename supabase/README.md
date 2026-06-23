@@ -37,23 +37,29 @@ supabase/
 
 - Both iOS and web apps share the same database schema
 - The storage bucket is named `photos` (not `progress-photos`)
-- All migrations should be added to the `migrations/` directory here
+- `supabase/migrations/` is the only canonical migration tree. App-local migration directories must not be reintroduced.
 - Edge functions from individual apps are copied during deployment
 
 ## Migration Naming Convention
 
-Use the format: `YYYYMMDD_HHMMSS_description.sql`
+Use the format: `YYYYMMDDHHMMSS_description.sql`
 
-Example: `20250706_120000_add_photo_fields.sql`
+Example: `20250706120000_add_photo_fields.sql`
+
+Create migrations from the repository root:
+
+```bash
+pnpm db:migrate "add photo fields"
+```
 
 ## Storage Configuration
 
 The `photos` bucket is configured with:
 
-- Public access (for processed images)
+- Private access
 - 50MB file size limit
 - Allowed types: JPEG, PNG, HEIC, HEIF, WebP
-- RLS policies ensure users can only access their own photos
+- Storage RLS policies ensure users can only access their own photos. Clients should use stored object paths plus signed URLs, not public object URLs.
 
 ## Unified Weight Model
 

@@ -60,22 +60,22 @@ describe('deleteUserDatabaseRows', () => {
     ]);
   });
 
-  it('allows optional export cleanup to fail without blocking core deletion', async () => {
+  it('treats export cleanup failures as required health-data cleanup failures', async () => {
     const mock = createMockSupabase({
-      data_exports: { message: 'invalid input syntax for type uuid' },
+      data_exports: { message: 'permission denied for table data_exports' },
     });
 
-    const results = await deleteUserDatabaseRows(mock.client, 'user_123', {
-      error: () => undefined,
-    });
+    await expect(
+      deleteUserDatabaseRows(mock.client, 'user_123', { error: () => undefined }),
+    ).rejects.toBeInstanceOf(UserDataDeletionError);
 
-    expect(results.find((result) => result.table === 'data_exports')).toMatchObject({
-      required: false,
-      success: false,
-    });
-    expect(results.find((result) => result.table === 'profiles')).toMatchObject({
+    expect(mock.calls).toContain('data_exports.user_id=user_123');
+  });
+
+  it('keeps export cleanup in the required set', () => {
+    expect(accountDeletionTargets[0]).toMatchObject({
+      table: 'data_exports',
       required: true,
-      success: true,
     });
   });
 

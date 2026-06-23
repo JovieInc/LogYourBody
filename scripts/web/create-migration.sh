@@ -3,6 +3,11 @@
 # Script to create a new Supabase migration file
 # Usage: ./scripts/create-migration.sh "descriptive name"
 
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+MIGRATIONS_DIR="$REPO_ROOT/supabase/migrations"
+
 if [ -z "$1" ]; then
   echo "Usage: $0 \"descriptive name\""
   echo "Example: $0 \"add user preferences\""
@@ -17,7 +22,9 @@ TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 
 # Create filename
 FILENAME="${TIMESTAMP}_${DESCRIPTION}.sql"
-FILEPATH="supabase/migrations/${FILENAME}"
+FILEPATH="${MIGRATIONS_DIR}/${FILENAME}"
+
+mkdir -p "$MIGRATIONS_DIR"
 
 # Get author name from git config
 AUTHOR=$(git config user.name || echo "Unknown")
@@ -47,7 +54,7 @@ cat > "$FILEPATH" << EOF
 
 EOF
 
-echo "✅ Created migration file: $FILEPATH"
+echo "✅ Created migration file: ${FILEPATH#$REPO_ROOT/}"
 echo ""
 echo "Next steps:"
 echo "1. Edit the migration file to add your SQL"
