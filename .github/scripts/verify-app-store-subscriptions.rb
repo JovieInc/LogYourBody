@@ -2,9 +2,9 @@
 # frozen_string_literal: true
 
 require "json"
-require "jwt"
 require "net/http"
 require "openssl"
+require "timeout"
 require "uri"
 
 API_BASE = "https://api.appstoreconnect.apple.com"
@@ -14,6 +14,18 @@ DEFAULT_REQUIRED_PRODUCTS = %w[
   com.logyourbody.app.pro1.monthly.3daytrial
 ].freeze
 DEFAULT_ALLOWED_STATES = %w[READY_TO_SUBMIT APPROVED].freeze
+DEFAULT_MAX_REQUEST_ATTEMPTS = 4
+DEFAULT_RETRY_BASE_SECONDS = 2.0
+RETRYABLE_STATUSES = ([429] + (500..599).to_a).freeze
+TRANSIENT_NETWORK_ERRORS = [
+  EOFError,
+  IOError,
+  SystemCallError,
+  Timeout::Error,
+  Net::OpenTimeout,
+  Net::ReadTimeout,
+  OpenSSL::SSL::SSLError
+].freeze
 
 def fail_with(message)
   warn "::error::#{message}"
@@ -22,6 +34,30 @@ end
 
 def warn_with(message)
   warn "::warning::#{message}"
+end
+
+def max_request_attempts
+  attempts = ENV.fetch("APP_STORE_CONNECT_MAX_REQUEST_ATTEMPTS", DEFAULT_MAX_REQUEST_ATTEMPTS.to_s).to_i
+  fail_with("APP_STORE_CONNECT_MAX_REQUEST_ATTEMPTS must be greater than 0") unless attempts.positive?
+
+  attempts
+end
+
+def retry_base_seconds
+  seconds = Float(ENV.fetch("APP_STORE_CONNECT_RETRY_BASE_SECONDS", DEFAULT_RETRY_BASE_SECONDS.to_s))
+  fail_with("APP_STORE_CONNECT_RETRY_BASE_SECONDS must be 0 or greater") if seconds.negative?
+
+  seconds
+rescue ArgumentError
+  fail_with("APP_STORE_CONNECT_RETRY_BASE_SECONDS must be numeric")
+end
+
+def retry_delay_seconds(attempt)
+  retry_base_seconds * (2**(attempt - 1))
+end
+
+def retryable_status?(status)
+  RETRYABLE_STATUSES.include?(status)
 end
 
 def api_key
@@ -36,6 +72,8 @@ rescue JSON::ParserError => e
 end
 
 def bearer_token
+  require "jwt"
+
   key = api_key
   private_key = OpenSSL::PKey::EC.new(key.fetch("key"))
   payload = {
@@ -58,17 +96,44 @@ end
 def request(method, path, token)
   uri = URI("#{API_BASE}#{path}")
   request_class = { get: Net::HTTP::Get }.fetch(method)
-  req = request_class.new(uri)
-  req["Authorization"] = "Bearer #{token}"
-  req["Content-Type"] = "application/json"
+  attempts = max_request_attempts
+  attempt = 0
 
-  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
-    http.request(req)
+  while attempt < attempts
+    attempt += 1
+
+    begin
+      req = request_class.new(uri)
+      req["Authorization"] = "Bearer #{token}"
+      req["Content-Type"] = "application/json"
+
+      response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
+        http.request(req)
+      end
+      status = response.code.to_i
+      parsed = response.body.empty? ? {} : JSON.parse(response.body)
+
+      if retryable_status?(status) && attempt < attempts
+        delay = retry_delay_seconds(attempt)
+        warn_with("App Store Connect #{method.upcase} #{path} returned #{status}; retrying in #{delay}s (attempt #{attempt + 1}/#{attempts}).")
+        sleep(delay) if delay.positive?
+        next
+      end
+
+      return [status, parsed]
+    rescue *TRANSIENT_NETWORK_ERRORS => e
+      if attempt < attempts
+        delay = retry_delay_seconds(attempt)
+        warn_with("App Store Connect #{method.upcase} #{path} failed with #{e.class}; retrying in #{delay}s (attempt #{attempt + 1}/#{attempts}).")
+        sleep(delay) if delay.positive?
+        next
+      end
+
+      fail_with("App Store Connect #{method.upcase} #{path} failed after #{attempt} attempts: #{e.class}: #{e.message}")
+    rescue JSON::ParserError => e
+      fail_with("App Store Connect returned invalid JSON for #{path}: #{e.message}")
+    end
   end
-
-  [response.code.to_i, response.body.empty? ? {} : JSON.parse(response.body)]
-rescue JSON::ParserError => e
-  fail_with("App Store Connect returned invalid JSON for #{path}: #{e.message}")
 end
 
 def expect(method, path, token, expected: [200])
@@ -141,33 +206,37 @@ def subscription_product_records(token, app_id)
   end
 end
 
-token = bearer_token
-id = app_id(token)
-required = required_products
-allowed = allowed_states
-records = subscription_product_records(token, id)
+def run
+  token = bearer_token
+  id = app_id(token)
+  required = required_products
+  allowed = allowed_states
+  records = subscription_product_records(token, id)
 
-by_product_id = records.to_h do |record|
-  attributes = record.fetch("attributes", {})
-  [attributes["productId"].to_s, attributes]
+  by_product_id = records.to_h do |record|
+    attributes = record.fetch("attributes", {})
+    [attributes["productId"].to_s, attributes]
+  end
+
+  missing = required.reject { |product_id| by_product_id.key?(product_id) }
+  unless missing.empty?
+    available = by_product_id.keys.reject(&:empty?).sort
+    fail_with("App Store Connect is missing required subscription products for app #{id}: #{missing.join(", ")}. Available products: #{available.join(", ")}")
+  end
+
+  invalid = required.filter_map do |product_id|
+    attributes = by_product_id.fetch(product_id)
+    state = attributes["state"].to_s
+    next if allowed.include?(state)
+
+    "#{product_id}=#{state.empty? ? "UNKNOWN" : state}"
+  end
+
+  unless invalid.empty?
+    fail_with("App Store Connect subscription products are not in allowed states #{allowed.join(", ")}: #{invalid.join(", ")}")
+  end
+
+  puts "Verified App Store subscription products for app #{id}: #{required.map { |product_id| "#{product_id}=#{by_product_id.fetch(product_id)["state"]}" }.join(", ")}."
 end
 
-missing = required.reject { |product_id| by_product_id.key?(product_id) }
-unless missing.empty?
-  available = by_product_id.keys.reject(&:empty?).sort
-  fail_with("App Store Connect is missing required subscription products for app #{id}: #{missing.join(", ")}. Available products: #{available.join(", ")}")
-end
-
-invalid = required.filter_map do |product_id|
-  attributes = by_product_id.fetch(product_id)
-  state = attributes["state"].to_s
-  next if allowed.include?(state)
-
-  "#{product_id}=#{state.empty? ? "UNKNOWN" : state}"
-end
-
-unless invalid.empty?
-  fail_with("App Store Connect subscription products are not in allowed states #{allowed.join(", ")}: #{invalid.join(", ")}")
-end
-
-puts "Verified App Store subscription products for app #{id}: #{required.map { |product_id| "#{product_id}=#{by_product_id.fetch(product_id)["state"]}" }.join(", ")}."
+run if __FILE__ == $PROGRAM_NAME
