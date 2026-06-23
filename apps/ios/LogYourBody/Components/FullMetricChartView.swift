@@ -133,12 +133,16 @@ struct ChartSeriesPreprocessor {
     }
 
     func largestTriangleThreeBuckets(points: [MetricChartDataPoint], threshold: Int) -> [MetricChartDataPoint] {
-        guard threshold < points.count else { return points }
+        guard threshold < points.count,
+              let firstPoint = points.first,
+              let lastPoint = points.last else {
+            return points
+        }
 
         let dataCount = points.count
         let bucketSize = Double(dataCount - 2) / Double(threshold - 2)
 
-        var sampled: [MetricChartDataPoint] = [points[0]]
+        var sampled: [MetricChartDataPoint] = [firstPoint]
         var aIndex = 0
 
         for bucket in 0..<(threshold - 2) {
@@ -180,7 +184,7 @@ struct ChartSeriesPreprocessor {
             aIndex = selectedIndex
         }
 
-        sampled.append(points.last!)
+        sampled.append(lastPoint)
         return sampled
     }
 

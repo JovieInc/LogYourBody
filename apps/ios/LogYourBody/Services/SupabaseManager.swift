@@ -29,7 +29,7 @@ class SupabaseManager: ObservableObject {
     // MARK: - Batch Operations
 
     func upsertBodyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> [[String: Any]] {
-        let url = URL(string: "\(supabaseURL)/rest/v1/body_metrics")!
+        let url = try SupabaseURLBuilder.restURL(table: "body_metrics", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -66,7 +66,7 @@ class SupabaseManager: ObservableObject {
     }
 
     func upsertDailyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> [[String: Any]] {
-        let url = URL(string: "\(supabaseURL)/rest/v1/daily_metrics")!
+        let url = try SupabaseURLBuilder.restURL(table: "daily_metrics", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -107,7 +107,7 @@ class SupabaseManager: ObservableObject {
             throw SupabaseError.invalidData
         }
 
-        let url = URL(string: "\(supabaseURL)/rest/v1/profiles?id=eq.\(userId)&select=id")!
+        let url = try SupabaseURLBuilder.restURL(table: "profiles", query: "id=eq.\(userId)&select=id", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "PATCH"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -184,7 +184,7 @@ class SupabaseManager: ObservableObject {
 
     @discardableResult
     func upsertData(table: String, data: Data, token: String) async throws -> [[String: Any]] {
-        let url = URL(string: "\(supabaseURL)/rest/v1/\(table)")!
+        let url = try SupabaseURLBuilder.restURL(table: table, baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -204,7 +204,7 @@ class SupabaseManager: ObservableObject {
     }
 
     func deleteData(table: String, id: String, token: String) async throws {
-        let url = URL(string: "\(supabaseURL)/rest/v1/\(table)?id=eq.\(id)")!
+        let url = try SupabaseURLBuilder.restURL(table: table, query: "id=eq.\(id)", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -223,7 +223,7 @@ class SupabaseManager: ObservableObject {
         let jwt = try await getSupabaseJWT()
 
         // Only affects GLP-1 medications; future non-GLP-1 medication tables are untouched.
-        let url = URL(string: "\(supabaseURL)/rest/v1/glp1_medications?user_id=eq.\(userId)&ended_at=is.null")!
+        let url = try SupabaseURLBuilder.restURL(table: "glp1_medications", query: "user_id=eq.\(userId)&ended_at=is.null", baseURL: supabaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "PATCH"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")

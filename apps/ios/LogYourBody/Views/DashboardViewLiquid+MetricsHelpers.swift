@@ -12,33 +12,43 @@ extension DashboardViewLiquid {
 
         withAnimation(.easeOut(duration: 0.18)) {
             // Weight
-            if let weightResult = metric.weight != nil ?
-                InterpolatedMetric(
-                    value: metric.weight!,
+            let weightResult: InterpolatedMetric?
+            if let weight = metric.weight {
+                weightResult = InterpolatedMetric(
+                    value: weight,
                     isInterpolated: false,
                     isLastKnown: false,
                     confidenceLevel: nil
-                ) :
-                MetricsInterpolationService.shared.estimateWeight(
+                )
+            } else {
+                weightResult = MetricsInterpolationService.shared.estimateWeight(
                     for: metric.date,
                     metrics: viewModel.bodyMetrics
-                ) {
+                )
+            }
+
+            if let weightResult {
                 let system = currentMeasurementSystem
                 animatedWeight = convertWeight(weightResult.value, to: system) ?? weightResult.value
             }
 
             // Body Fat
-            if let bodyFatResult = metric.bodyFatPercentage != nil ?
-                InterpolatedMetric(
-                    value: metric.bodyFatPercentage!,
+            let bodyFatResult: InterpolatedMetric?
+            if let bodyFatPercentage = metric.bodyFatPercentage {
+                bodyFatResult = InterpolatedMetric(
+                    value: bodyFatPercentage,
                     isInterpolated: false,
                     isLastKnown: false,
                     confidenceLevel: nil
-                ) :
-                MetricsInterpolationService.shared.estimateBodyFat(
+                )
+            } else {
+                bodyFatResult = MetricsInterpolationService.shared.estimateBodyFat(
                     for: metric.date,
                     metrics: viewModel.bodyMetrics
-                ) {
+                )
+            }
+
+            if let bodyFatResult {
                 animatedBodyFat = bodyFatResult.value
             }
 

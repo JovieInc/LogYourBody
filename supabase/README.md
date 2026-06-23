@@ -36,9 +36,12 @@ supabase/
 ## Important Notes
 
 - Both iOS and web apps share the same database schema
+- `supabase/migrations` is the authoritative migration root for every product surface
+- `apps/web/supabase/migrations` is a deprecated legacy copy and must not receive new migrations
 - The storage bucket is named `photos` (not `progress-photos`)
 - `supabase/migrations/` is the only canonical migration tree. App-local migration directories must not be reintroduced.
 - Edge functions from individual apps are copied during deployment
+- Run `pnpm check:supabase-migrations` before migration work to detect unsafe drift between the legacy web copy and this root
 
 ## Migration Naming Convention
 
@@ -51,6 +54,9 @@ Create migrations from the repository root:
 ```bash
 pnpm db:migrate "add photo fields"
 ```
+
+The root script writes to `supabase/migrations` regardless of the current working
+directory. Do not create app-local migration directories.
 
 ## Storage Configuration
 

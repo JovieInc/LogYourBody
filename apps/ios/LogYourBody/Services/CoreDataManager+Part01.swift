@@ -117,7 +117,7 @@ func saveDailyMetricsAndWait(_ metrics: DailyMetrics, userId: String) async thro
         for userId: String,
         date: Date
     ) -> CachedDailyMetrics? {
-        fatalError("fetchDailyMetricsSync has been removed. Use the async counterpart instead.")
+        nil
     }
 
 @available(*, unavailable, message: "Use async fetchDailyMetrics(for:from:to:) instead")
@@ -126,7 +126,7 @@ func saveDailyMetricsAndWait(_ metrics: DailyMetrics, userId: String) async thro
         from startDate: Date? = nil,
         to endDate: Date? = nil
     ) -> [CachedDailyMetrics] {
-        fatalError("fetchDailyMetricsSync has been removed. Use the async counterpart instead.")
+        []
     }
 
 // MARK: - Daily Metrics Fetch Helpers

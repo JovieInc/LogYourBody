@@ -214,7 +214,7 @@ func saveHKSamples(_ samples: [HKRawSample]) async {
 
 @available(*, unavailable, message: "Use async fetchBodyMetrics(for:from:to:) instead")
     func fetchBodyMetricsSync(for userId: String, from startDate: Date? = nil, to endDate: Date? = nil) -> [CachedBodyMetrics] {
-        fatalError("fetchBodyMetricsSync has been removed. Use the async counterpart instead.")
+        []
     }
 
 // MARK: - Body Metrics Update/Delete Helpers
@@ -626,6 +626,6 @@ func fetchUserProfileSnapshot(for userId: String) async -> CachedUserProfileSnap
 
 @available(*, unavailable, message: "Use async fetchProfile(for:) instead")
     func fetchProfileSync(for userId: String) -> CachedProfile? {
-        fatalError("fetchProfileSync has been removed. Use the async counterpart instead.")
+        nil
     }
 }

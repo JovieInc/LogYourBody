@@ -439,7 +439,9 @@ struct ExportDataView: View {
             }
 
             // Call edge function
-            let url = URL(string: "\(Constants.supabaseURL)/functions/v1/export-user-data")!
+            guard let url = try? SupabaseURLBuilder.functionURL("export-user-data") else {
+                throw ExportError.exportFailed("Invalid server configuration")
+            }
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

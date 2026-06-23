@@ -35,6 +35,9 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
   real production client SDK key when Statsig analytics or experiments are
   needed. V1 launch surfaces must not depend on feature gates.
 - Optional GitHub `Production` secret `SENTRY_DSN` is a real value if present.
+- Release evidence explicitly records whether production Sentry and Statsig are
+  configured. If either optional secret is absent, the release notes must say
+  that crash or analytics monitoring proof is not available for that service.
 - `ios_apple_sign_in_enabled` stays off for production users until Apple Sign-In
   has physical-device proof.
 - Current JOV-2865 evidence keeps Apple Sign-In safely hidden; production
@@ -132,5 +135,9 @@ xcodebuild -project LogYourBody.xcodeproj \
 - Include HealthKit/photo/analytics proof: `healthkit` and `photo` provenance,
   photo upload/sync path, denied-permission fallback, Stats source-state quality,
   and any Statsig/Sentry release events used as launch evidence.
+- Include performance proof boundaries: local static/unit performance artifacts
+  are acceptable for PR confidence, but frame and hitch budgets require a
+  reliable simulator metrics payload or a physical-device Instruments/ETTrace
+  artifact before they are reported as passed.
 - Include Supabase sync test results.
 - Include validation command output and known risks.

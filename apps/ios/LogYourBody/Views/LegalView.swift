@@ -99,13 +99,23 @@ extension LegalView {
         SettingsSection(header: "Legal Contact") {
             VStack(spacing: 0) {
                 // Email Link
-                Link(destination: URL(string: "mailto:legal@logyourbody.com")!) {
+                if let legalEmailURL = URL(string: "mailto:legal@logyourbody.com") {
+                    Link(destination: legalEmailURL) {
+                        SettingsRow(
+                            icon: "envelope",
+                            title: "Legal Inquiries",
+                            value: "legal@logyourbody.com",
+                            showChevron: true,
+                            isExternal: true
+                        )
+                    }
+                } else {
                     SettingsRow(
                         icon: "envelope",
                         title: "Legal Inquiries",
                         value: "legal@logyourbody.com",
-                        showChevron: true,
-                        isExternal: true
+                        showChevron: false,
+                        isExternal: false
                     )
                 }
             }

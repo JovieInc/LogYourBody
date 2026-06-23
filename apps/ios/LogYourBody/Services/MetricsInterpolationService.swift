@@ -408,6 +408,7 @@ class MetricsInterpolationService {
     func estimateWeight(for date: Date, metrics: [BodyMetrics]) -> InterpolatedMetric? {
         let sortedMetrics = metrics.filter { $0.weight != nil }.sorted { $0.date < $1.date }
         guard !sortedMetrics.isEmpty else { return nil }
+        guard let lastMetric = sortedMetrics.last else { return nil }
 
         // Check if date is before first entry
         if date < sortedMetrics[0].date {
@@ -415,8 +416,8 @@ class MetricsInterpolationService {
         }
 
         // Check if date is after last entry - return last known value
-        if date > sortedMetrics.last!.date {
-            guard let lastWeight = sortedMetrics.last?.weight else { return nil }
+        if date > lastMetric.date {
+            guard let lastWeight = lastMetric.weight else { return nil }
             return InterpolatedMetric(
                 value: round(lastWeight * 10) / 10,
                 isInterpolated: false,
@@ -473,6 +474,7 @@ class MetricsInterpolationService {
     func estimateBodyFat(for date: Date, metrics: [BodyMetrics]) -> InterpolatedMetric? {
         let sortedMetrics = metrics.filter { $0.bodyFatPercentage != nil }.sorted { $0.date < $1.date }
         guard !sortedMetrics.isEmpty else { return nil }
+        guard let lastMetric = sortedMetrics.last else { return nil }
 
         // Check if date is before first entry
         if date < sortedMetrics[0].date {
@@ -480,8 +482,8 @@ class MetricsInterpolationService {
         }
 
         // Check if date is after last entry - return last known value
-        if date > sortedMetrics.last!.date {
-            guard let lastBF = sortedMetrics.last?.bodyFatPercentage else { return nil }
+        if date > lastMetric.date {
+            guard let lastBF = lastMetric.bodyFatPercentage else { return nil }
             return InterpolatedMetric(
                 value: round(lastBF * 10) / 10,
                 isInterpolated: false,
