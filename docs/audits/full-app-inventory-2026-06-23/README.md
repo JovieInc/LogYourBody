@@ -188,7 +188,7 @@ Scoring uses 0-5 impact for each dimension. The launch priority sort weights pai
 
 Remaining top issues:
 
-1. `AUD-001`: Real TestFlight purchase/restore and App Store Connect proof are still external launch gates.
+1. `AUD-001`: Real TestFlight purchase/restore and App Store Connect proof are still external launch gates; subscription-product verification now retries transient provider failures, but the latest release loop reproduced Apple `UNEXPECTED_ERROR` 500 twice before archive/export.
 2. `AUD-004`: Runtime frame/hitch budgets are not yet proven by reliable trace evidence.
 3. `AUD-006`: Large singleton service files carry sync/auth/billing maintainability risk.
 4. `AUD-007`: Web coverage is still too low for broad product confidence.
