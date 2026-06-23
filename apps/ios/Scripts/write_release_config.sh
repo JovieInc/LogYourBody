@@ -48,6 +48,15 @@ require_https_url() {
   fi
 }
 
+require_probability() {
+  local name="$1"
+  local value="$2"
+
+  if ! ruby -e 'value = Float(ARGV.fetch(0)); exit(value >= 0.0 && value <= 1.0 ? 0 : 1)' "$value"; then
+    fail "$name must be a number between 0 and 1 for iOS production releases."
+  fi
+}
+
 host_for_url() {
   ruby -ruri -e 'uri = URI(ARGV.fetch(0)); abort unless uri.host && !uri.host.empty?; print uri.host' "$1"
 }
@@ -103,6 +112,8 @@ fi
 if [ "$SENTRY_ENVIRONMENT" != "production" ]; then
   fail "SENTRY_ENVIRONMENT must be production for iOS production releases."
 fi
+
+require_probability "SENTRY_TRACES_SAMPLE_RATE" "$SENTRY_TRACES_SAMPLE_RATE"
 
 SUPABASE_EXPECTED_HOST="${SUPABASE_EXPECTED_HOST:-$(host_for_url "$SUPABASE_URL")}"
 API_EXPECTED_HOST="${API_EXPECTED_HOST:-$(host_for_url "$API_BASE_URL")}"
@@ -162,6 +173,12 @@ EOF
     echo "- Statsig configured: true"
   else
     echo "- Statsig configured: false"
+  fi
+  echo "- Sentry traces sample rate valid: true"
+  if [ -n "$SENTRY_DSN" ] || [ -n "$STATSIG_CLIENT_SDK_KEY" ]; then
+    echo "- Provider smoke proof required: true"
+  else
+    echo "- Provider smoke proof required: false"
   fi
   echo "- Values redacted: true"
 } | tee "$CONFIG_DIR/release-observability.md" >/dev/null
