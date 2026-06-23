@@ -1,6 +1,6 @@
 'use client';
 
-import { StatsigClient } from '@statsig/js-client';
+import { StatsigClient, type StatsigUser } from '@statsig/js-client';
 
 export interface StatsigAnalyticsConfig {
     clientKey: string;
@@ -8,6 +8,38 @@ export interface StatsigAnalyticsConfig {
 }
 
 export type AnalyticsProperties = Record<string, string | number | boolean | null | undefined>;
+
+function sanitizeTraits(
+    traits: Record<string, string | number | boolean | null | undefined>,
+): StatsigUser['custom'] {
+    const custom: NonNullable<StatsigUser['custom']> = {};
+
+    for (const [key, value] of Object.entries(traits)) {
+        if (value === null || value === undefined) {
+            continue;
+        }
+
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            custom[key] = value;
+        }
+    }
+
+    return Object.keys(custom).length > 0 ? custom : undefined;
+}
+
+function sanitizeMetadata(properties: AnalyticsProperties): Record<string, string> | undefined {
+    const metadata: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(properties)) {
+        if (value === null || value === undefined) {
+            continue;
+        }
+
+        metadata[key] = String(value);
+    }
+
+    return Object.keys(metadata).length > 0 ? metadata : undefined;
+}
 
 let client: StatsigClient | null = null;
 let initialized = false;
@@ -64,14 +96,14 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
                 return;
             }
 
-            const user: { userID?: string; custom?: Record<string, string | number | boolean | null | undefined> } = {};
+            const user: StatsigUser = {};
 
             if (userId && userId.trim().length > 0) {
                 user.userID = userId;
             }
 
             if (traits && Object.keys(traits).length > 0) {
-                user.custom = traits;
+                user.custom = sanitizeTraits(traits);
             }
 
             void c.updateUserAsync(user).catch(() => {
@@ -85,14 +117,16 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
                 return;
             }
 
-            if (!properties || Object.keys(properties).length === 0) {
+            const metadata = properties ? sanitizeMetadata(properties) : undefined;
+
+            if (!metadata) {
                 c.logEvent(String(event));
                 return;
             }
 
             c.logEvent({
                 eventName: String(event),
-                metadata: properties,
+                metadata,
             });
         },
 
