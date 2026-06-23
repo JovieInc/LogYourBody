@@ -146,6 +146,44 @@ run_xcodebuild_test() {
   done
 }
 
+assert_xcresult_has_test_cases() {
+  local label="$1"
+  local result_bundle="$2"
+  local case_count
+
+  if [[ ! -d "$result_bundle" ]]; then
+    echo "Missing xcresult bundle for $label: $result_bundle" >&2
+    exit 66
+  fi
+
+  case_count="$(
+    xcrun xcresulttool get test-results tests \
+      --path "$result_bundle" \
+      --format json |
+      python3 -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+
+def count_cases(node):
+    count = 1 if node.get("nodeType") == "Test Case" else 0
+    for child in node.get("children", []):
+        count += count_cases(child)
+    return count
+
+print(sum(count_cases(root) for root in payload.get("testNodes", [])))
+'
+  )"
+
+  if [[ "$case_count" == "0" ]]; then
+    echo "$label executed 0 XCTest cases; check -only-testing selectors and Xcode target membership." >&2
+    exit 65
+  fi
+
+  echo "$label executed $case_count XCTest case(s)."
+}
+
 build_for_testing_once() {
   local log_file="$ARTIFACT_DIR/launch-quality-build-for-testing.log"
   local status
@@ -194,6 +232,7 @@ run_ui_test_group() {
     "$result_bundle" \
     "$log_file" \
     "${only_testing_args[@]}"
+  assert_xcresult_has_test_cases "$label" "$result_bundle"
 }
 
 cd "$IOS_DIR"
@@ -219,6 +258,9 @@ run_xcodebuild_test \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
   -only-testing:LogYourBodyTests/PhotoTimelineHUDPolicyTests \
   -only-testing:LogYourBodyTests/BodyScoreShareCardTests
+assert_xcresult_has_test_cases \
+  "launch-quality-unit-tests" \
+  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult"
 
 UI_RESULT_BUNDLES=()
 run_ui_test_group \

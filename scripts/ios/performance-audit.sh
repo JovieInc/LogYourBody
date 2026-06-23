@@ -68,8 +68,7 @@ if [[ "$RUN_PERFORMANCE_UNIT_TESTS" == "true" ]]; then
     "${COMMON_XCODEBUILD_ARGS[@]}" \
     -resultBundlePath "$ARTIFACT_DIR/performance-unit-tests.xcresult" \
     -skip-testing:LogYourBodyUITests \
-    -only-testing:LogYourBodyTests/DashboardTimelineProviderPerformanceTests \
-    -only-testing:LogYourBodyTests/ProgressPhotoImagePipelineTests \
+    -only-testing:LogYourBodyTests/TimelineDataProviderScrubTests/testRenderSignatureConstructionPerformance \
     "${XCODEBUILD_SETTINGS_ARRAY[@]}" \
     test | tee "$ARTIFACT_DIR/performance-unit-tests.log"
 else
