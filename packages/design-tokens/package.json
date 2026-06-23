@@ -23,8 +23,8 @@
     "style-dictionary": "^4.2.0"
   },
   "devDependencies": {
-    "chroma-js": "^3.1.1",
-    "nodemon": "^3.1.7"
+    "chroma-js": "^3.2.0",
+    "nodemon": "^3.1.14"
   },
   "keywords": [
     "design-tokens",
