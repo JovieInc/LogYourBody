@@ -231,17 +231,20 @@
     {
       "route": "/api/parse-pdf-alt",
       "file": "apps/web/src/app/api/parse-pdf-alt/route.ts",
-      "group": "import"
+      "group": "import",
+      "auth": "clerk-protected"
     },
     {
       "route": "/api/parse-pdf-v2",
       "file": "apps/web/src/app/api/parse-pdf-v2/route.ts",
-      "group": "import"
+      "group": "import",
+      "auth": "clerk-protected"
     },
     {
       "route": "/api/parse-pdf",
       "file": "apps/web/src/app/api/parse-pdf/route.ts",
-      "group": "import"
+      "group": "import",
+      "auth": "clerk-protected"
     },
     {
       "route": "/api/webhooks/clerk",

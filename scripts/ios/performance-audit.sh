@@ -48,6 +48,18 @@ COMMON_XCODEBUILD_ARGS=(
   -maximum-test-execution-time-allowance "$MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE"
 )
 
+PERFORMANCE_UNIT_TEST_SELECTORS=(
+  "LogYourBodyTests/TimelineDataProviderScrubTests/testRenderSignatureConstructionPerformance"
+  "LogYourBodyTests/DashboardTimelineProviderPerformanceTests"
+  "LogYourBodyTests/ProgressPhotoImagePipelineTests"
+  "LogYourBodyTests/ImageCacheServiceTests"
+)
+
+PERFORMANCE_UNIT_TEST_ARGS=()
+for selector in "${PERFORMANCE_UNIT_TEST_SELECTORS[@]}"; do
+  PERFORMANCE_UNIT_TEST_ARGS+=("-only-testing:$selector")
+done
+
 cd "$IOS_DIR"
 
 if [[ "$RUN_SWIFTLINT" == "true" ]]; then
@@ -68,7 +80,7 @@ if [[ "$RUN_PERFORMANCE_UNIT_TESTS" == "true" ]]; then
     "${COMMON_XCODEBUILD_ARGS[@]}" \
     -resultBundlePath "$ARTIFACT_DIR/performance-unit-tests.xcresult" \
     -skip-testing:LogYourBodyUITests \
-    -only-testing:LogYourBodyTests/TimelineDataProviderScrubTests/testRenderSignatureConstructionPerformance \
+    "${PERFORMANCE_UNIT_TEST_ARGS[@]}" \
     "${XCODEBUILD_SETTINGS_ARRAY[@]}" \
     test | tee "$ARTIFACT_DIR/performance-unit-tests.log"
 else

@@ -63,6 +63,12 @@ final class SyncIntervalAndChunkingTests: XCTestCase {
         XCTAssertEqual([1, 2, 3].chunked(into: 10), [[1, 2, 3]])
     }
 
+    func testChunkNonPositiveSizePreservesElementsWithoutTrapping() {
+        XCTAssertEqual([1, 2, 3].chunked(into: 0), [[1, 2, 3]])
+        XCTAssertEqual([1, 2, 3].chunked(into: -5), [[1, 2, 3]])
+        XCTAssertEqual([Int]().chunked(into: 0), [])
+    }
+
     func testChunkSizeOneSplitsEveryElement() {
         XCTAssertEqual([1, 2, 3].chunked(into: 1), [[1], [2], [3]])
     }

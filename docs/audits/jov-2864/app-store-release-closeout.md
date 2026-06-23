@@ -129,6 +129,11 @@ Public App Store URL checked on 2026-06-07:
 
 - https://apps.apple.com/us/app/logyourbody/id6739360530 -> HTTP 404
 
+Follow-up public App Store URL check on 2026-06-23 after PR `#442` and
+release-loop run `28008976044`:
+
+- https://apps.apple.com/us/app/logyourbody/id6755209876 -> HTTP 404 at `2026-06-23T07:46:41Z`
+
 This means the app is not publicly available from the App Store listing at audit time. That is not by itself a submission blocker for a prelaunch app, but it is a launch blocker for any claim that the app is live.
 
 Local Codex does not have direct App Store Connect UI access or sandbox Apple ID credentials in this run. App Store Connect submission/approval state must be proven by the `release_type=app_store` workflow run and/or account-owner screenshot/export after submission.

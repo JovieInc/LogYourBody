@@ -165,6 +165,37 @@ describe('middleware production debug/test gate', () => {
     expect(mockProtect).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['/api/parse-pdf', '/api/parse-pdf-alt', '/api/parse-pdf-v2'])(
+    'keeps advanced import API route %s behind Clerk auth in production',
+    async (pathname) => {
+      process.env.VERCEL_ENV = 'production';
+      const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
+      const request = new NextRequest(`https://logyourbody.com${pathname}`);
+
+      expect(shouldBlockDebugRoute(pathname)).toBe(false);
+
+      const response = await middleware(request, {} as never);
+
+      expect(response).toBeUndefined();
+      expect(mockProtectedMiddleware).toHaveBeenCalledTimes(1);
+      expect(mockProtect).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('does not broaden parse-PDF API protection to similarly named routes', async () => {
+    process.env.VERCEL_ENV = 'production';
+    const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
+    const request = new NextRequest('https://logyourbody.com/api/parse-pdfish');
+
+    expect(shouldBlockDebugRoute('/api/parse-pdfish')).toBe(false);
+
+    const response = await middleware(request, {} as never);
+
+    expect(response?.status).toBe(200);
+    expect(mockProtectedMiddleware).not.toHaveBeenCalled();
+    expect(mockProtect).not.toHaveBeenCalled();
+  });
+
   it('keeps normal public routes reachable in production', async () => {
     process.env.VERCEL_ENV = 'production';
     const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
