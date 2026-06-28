@@ -49,17 +49,58 @@ class PhotoUploadManager: ObservableObject {
                 return "Please log in to upload photos"
             case .imageConversionFailed:
                 return "Failed to process the image"
-            case .uploadFailed:
-                return "Photo upload failed. Please try again."
-            case .processingFailed:
-                return "Photo processing failed. Please try again."
+            case .uploadFailed(let message):
+                return message
+            case .processingFailed(let message):
+                return message
             case .networkError:
-                return "Network connection error"
+                return "Network connection error. Check your connection and try again."
             }
         }
     }
 
     private init() {}
+
+    private func mapUploadEndpointError(_ error: Error, action: String) -> PhotoError {
+        if error is SupabaseError {
+            return .uploadFailed("\(action) is temporarily unavailable. Please try again.")
+        }
+
+        if let networkError = mapNetworkError(error) {
+            return networkError
+        }
+
+        return .uploadFailed("\(action) failed. Please try again.")
+    }
+
+    private func mapNetworkError(_ error: Error) -> PhotoError? {
+        if let urlError = error as? URLError {
+            return networkPhotoError(for: urlError.code)
+        }
+
+        let nsError = error as NSError
+        if let urlError = nsError.userInfo[NSUnderlyingErrorKey] as? URLError {
+            return networkPhotoError(for: urlError.code)
+        }
+
+        return nil
+    }
+
+    private func networkPhotoError(for code: URLError.Code) -> PhotoError? {
+        switch code {
+        case .cannotFindHost,
+             .dnsLookupFailed,
+             .notConnectedToInternet,
+             .networkConnectionLost,
+             .timedOut,
+             .cannotConnectToHost,
+             .internationalRoamingOff,
+             .dataNotAllowed:
+            return .networkError
+        default:
+            return nil
+        }
+    }
 
     private func authenticatedJWT() async throws -> String {
         guard let session = authManager.clerkSession else {
@@ -381,9 +422,13 @@ class PhotoUploadManager: ObservableObject {
 
         // print("📸 PhotoUploadManager: Got JWT token for storage upload")
 
-        guard let url = try? SupabaseURLBuilder.storageURL(bucket: "photos", path: fileName) else {
-            throw PhotoError.uploadFailed("Invalid upload URL")
+        let url: URL
+        do {
+            url = try SupabaseURLBuilder.storageURL(bucket: "photos", path: fileName)
+        } catch {
+            throw mapUploadEndpointError(error, action: "Photo upload")
         }
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -397,11 +442,17 @@ class PhotoUploadManager: ObservableObject {
         configuration.timeoutIntervalForResource = 120.0 // 2 minutes
         let uploadSession = URLSession(configuration: configuration)
 
-        let (data, response) = try await uploadSession.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await uploadSession.data(for: request)
+        } catch {
+            throw mapUploadEndpointError(error, action: "Photo upload")
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             // print("❌ PhotoUploadManager: Invalid response type")
-            throw PhotoError.uploadFailed("Invalid response")
+            throw PhotoError.uploadFailed("Photo upload failed. Please try again.")
         }
 
         // print("📸 PhotoUploadManager: Storage upload response: \(httpResponse.statusCode)")
@@ -419,9 +470,19 @@ class PhotoUploadManager: ObservableObject {
     private func processImageWithCloudinary(storagePath: String, metricsId: String) async throws -> String {
         let token = try await authenticatedJWT()
 
-        guard let url = try? SupabaseURLBuilder.functionURL("process-progress-photo") else {
-            throw PhotoError.processingFailed("Invalid processing URL")
+        let url: URL
+        do {
+            url = try SupabaseURLBuilder.functionURL("process-progress-photo")
+        } catch {
+            if error is SupabaseError {
+                throw PhotoError.processingFailed("Photo processing is temporarily unavailable. Please try again.")
+            }
+            if let networkError = mapNetworkError(error) {
+                throw networkError
+            }
+            throw PhotoError.processingFailed("Photo processing failed. Please try again.")
         }
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
@@ -434,11 +495,20 @@ class PhotoUploadManager: ObservableObject {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            if let networkError = mapNetworkError(error) {
+                throw networkError
+            }
+            throw PhotoError.processingFailed("Photo processing failed. Please try again.")
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             // print("❌ PhotoUploadManager: Invalid edge function response")
-            throw PhotoError.processingFailed("Invalid response")
+            throw PhotoError.processingFailed("Photo processing failed. Please try again.")
         }
 
         // print("📸 PhotoUploadManager: Edge function response: \(httpResponse.statusCode)")
