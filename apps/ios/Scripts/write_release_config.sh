@@ -16,7 +16,7 @@ is_placeholder() {
   value="$(lowercase "$1")"
 
   case "$value" in
-    ""|*"\$("*|*your-*|*placeholder*|*replace*|*todo*)
+    ""|*"\$("*|*your-*|*placeholder*|*replace*|*todo*|*changeme*|*xxx*|*"*"*)
       return 0
       ;;
     *)
@@ -94,6 +94,8 @@ esac
 require_https_url "SUPABASE_URL" "$SUPABASE_URL"
 require_https_url "CLERK_FRONTEND_API" "$CLERK_FRONTEND_API"
 require_https_url "API_BASE_URL" "$API_BASE_URL"
+
+bash "$SCRIPT_DIR/verify_upload_hosts.sh"
 
 case "$REVENUE_CAT_PUBLIC_KEY" in
   appl_*) ;;
