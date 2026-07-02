@@ -256,6 +256,7 @@ run_xcodebuild_test \
   "launch-quality-unit-tests" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
+  -only-testing:LogYourBodyTests/GoldenPathTests \
   -only-testing:LogYourBodyTests/PhotoTimelineHUDPolicyTests \
   -only-testing:LogYourBodyTests/BodyScoreShareCardTests \
   -only-testing:LogYourBodyTests/SupabaseURLBuilderTests
