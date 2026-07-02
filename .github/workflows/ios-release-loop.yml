@@ -49,7 +49,9 @@ jobs:
   validate-release:
     name: Validate Release
     runs-on: macos-26
-    timeout-minutes: 20
+    # Must exceed validate-release-source.sh's RELEASE_CHECK_TIMEOUT_SECONDS (2700s):
+    # CI Summary only completes after the ~30-minute iOS quality gate on iOS merges.
+    timeout-minutes: 50
     permissions:
       contents: read
       checks: read
