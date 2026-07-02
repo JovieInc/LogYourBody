@@ -92,6 +92,7 @@
 		FE09A9A900000000000000B9 /* ProgressPhotoImagePipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE09A9A900000000000000F9 /* ProgressPhotoImagePipelineTests.swift */; };
 		FE10B0B000000000000000BA /* DashboardTimelineProviderPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE10B0B000000000000000FA /* DashboardTimelineProviderPerformanceTests.swift */; };
 		FE11C1C100000000000000BB /* ImageCacheServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE11C1C100000000000000FB /* ImageCacheServiceTests.swift */; };
+		FE12D2D100000000000000BC /* GoldenPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE12D2D100000000000000FC /* GoldenPathTests.swift */; };
 		AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872322EB405C00041C426 /* BackgroundTaskType.swift */; };
 		AD8872352EB4061F0041C426 /* BackgroundTaskMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872342EB4061F0041C426 /* BackgroundTaskMonitor.swift */; };
 		AD8872372EB406430041C426 /* BackgroundTaskDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872362EB406430041C426 /* BackgroundTaskDetailsSheet.swift */; };
@@ -760,6 +761,7 @@
 		FE09A9A900000000000000F9 /* ProgressPhotoImagePipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoImagePipelineTests.swift; sourceTree = "<group>"; };
 		FE10B0B000000000000000FA /* DashboardTimelineProviderPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardTimelineProviderPerformanceTests.swift; sourceTree = "<group>"; };
 		FE11C1C100000000000000FB /* ImageCacheServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheServiceTests.swift; sourceTree = "<group>"; };
+		FE12D2D100000000000000FC /* GoldenPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldenPathTests.swift; sourceTree = "<group>"; };
 		FECEBC7B2B956D26BF45822F /* DSLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLogo.swift; path = DesignSystem/Atoms/DSLogo.swift; sourceTree = "<group>"; };
 		FF0B649CA62200DAACE12AA8 /* AddEntrySheet+Part03.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AddEntrySheet+Part03.swift"; path = "AddEntrySheet+Part03.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1265,6 +1267,7 @@
 				FE09A9A900000000000000F9 /* ProgressPhotoImagePipelineTests.swift */,
 				FE10B0B000000000000000FA /* DashboardTimelineProviderPerformanceTests.swift */,
 				FE11C1C100000000000000FB /* ImageCacheServiceTests.swift */,
+				FE12D2D100000000000000FC /* GoldenPathTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1714,6 +1717,7 @@
 				FE09A9A900000000000000B9 /* ProgressPhotoImagePipelineTests.swift in Sources */,
 				FE10B0B000000000000000BA /* DashboardTimelineProviderPerformanceTests.swift in Sources */,
 				FE11C1C100000000000000BB /* ImageCacheServiceTests.swift in Sources */,
+				FE12D2D100000000000000BC /* GoldenPathTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

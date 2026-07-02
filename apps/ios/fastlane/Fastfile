@@ -598,6 +598,36 @@ platform :ios do
     lint
     build_check
   end
+
+  desc "Golden Path gate: the core paid-user journey must always pass (docs/GOLDEN_PATH.md)"
+  lane :golden_path do |options|
+    ios_dir = File.expand_path("..", Dir.pwd)
+    proj_path = File.join(ios_dir, "LogYourBody.xcodeproj")
+
+    # Hard gate: run_tests fails the lane (and CI) on any test failure.
+    # Prefer an explicit xcodebuild destination (resolved by
+    # scripts/ios/resolve-simulator-destination.sh in CI) over a device name,
+    # so the gate survives Xcode/simulator image changes on runners.
+    destination = options[:destination].to_s.strip
+    device = destination.empty? ? (options[:device] || "iPhone 16") : nil
+
+    run_tests(
+      project: proj_path,
+      scheme: scheme,
+      device: device,
+      destination: destination.empty? ? nil : destination,
+      configuration: "Debug",
+      clean: false,
+      code_coverage: false,
+      output_types: "junit",
+      output_directory: options[:output_directory] || "./test_results/golden-path",
+      result_bundle: true,
+      disable_concurrent_testing: true,
+      only_testing: "LogYourBodyTests/GoldenPathTests",
+      xcargs: "CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO",
+      xcodebuild_formatter: ENV["CI"] ? "xcbeautify --renderer github-actions" : "xcbeautify"
+    )
+  end
   
   desc "PR verification - lint, build, and test"
   lane :pr_verify do |options|
