@@ -115,11 +115,17 @@ enum Configuration {
             return true
         }
 
-        if let host = URL(string: normalized)?.host ?? URL(string: "https://\(normalized)")?.host {
+        // Host validation only applies to URL-shaped values (SUPABASE_URL, API_BASE_URL).
+        // Non-URL values (pk_live_…, appl_… keys) are not hosts and must pass through,
+        // otherwise stringValue() silently erases real credentials to their defaults.
+        if let url = URL(string: normalized),
+           let scheme = url.scheme,
+           ["http", "https"].contains(scheme),
+           let host = url.host {
             return !SupabaseURLBuilder.isValidServiceHost(host)
         }
 
-        return true
+        return false
     }
 
     // MARK: - API Configuration

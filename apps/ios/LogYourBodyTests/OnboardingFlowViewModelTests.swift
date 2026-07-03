@@ -15,12 +15,22 @@ import UIKit
 final class OnboardingFlowViewModelTests: XCTestCase {
     override func setUp() {
         super.setUp()
-        OnboardingStateManager.shared.updateCompletionStatus(false)
+        Self.clearPersistedOnboardingCompletion()
     }
 
     override func tearDown() {
-        OnboardingStateManager.shared.updateCompletionStatus(false)
+        Self.clearPersistedOnboardingCompletion()
         super.tearDown()
+    }
+
+    // updateCompletionStatus(false) is deliberately ignored while a completed
+    // userId is persisted (stale-false protection), so another suite's leftover
+    // completion state survives it. Clear the raw keys instead.
+    private static func clearPersistedOnboardingCompletion() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: Constants.hasCompletedOnboardingKey)
+        defaults.removeObject(forKey: Constants.onboardingCompletedVersionKey)
+        defaults.removeObject(forKey: Constants.onboardingCompletedUserIdKey)
     }
 
     func testAdvanceAfterHealthConfirmationSkipsToLoadingWhenMetricsExist() {
