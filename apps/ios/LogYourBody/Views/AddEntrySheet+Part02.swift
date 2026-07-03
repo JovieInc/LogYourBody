@@ -166,6 +166,7 @@ func saveWeight(userId: String) {
                 )
                 RealtimeSyncManager.shared.syncIfNeeded()
 
+                BodyScoreCache.shared.invalidate(for: userId)
                 BodyScoreRecalculationService.shared.scheduleRecalculation()
 
                 trackEntrySaved(
@@ -201,6 +202,7 @@ func saveBodyFat(userId: String) {
                 )
                 RealtimeSyncManager.shared.syncIfNeeded()
 
+                BodyScoreCache.shared.invalidate(for: userId)
                 BodyScoreRecalculationService.shared.scheduleRecalculation()
 
                 trackEntrySaved(type: "body_fat")

@@ -65,6 +65,8 @@
 		9B5611E2F8314E22A5BF7889 /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75034CADEA1D4697BDCB5555 /* ImageCacheService.swift */; };
 		9BCEB21BE7B69676BCA5C211 /* HealthSyncCoordinatorPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */; };
 		9EBBDD6AF2FF4E4FF8B9E3BC /* BodyCompositionMathGoldenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 927B7D58E8E1756BB92364B6 /* BodyCompositionMathGoldenTests.swift */; };
+		B12671012F16000100ABCDEF /* BodyScoreEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B12671002F16000100ABCDEF /* BodyScoreEngineTests.swift */; };
+		B12671032F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B12671022F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift */; };
 		A4856A2B9E1FC174F9F1739F /* RevenueCatFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FE602CA4F092CAB186EE952 /* RevenueCatFlowTests.swift */; };
 		A7876ACC0BAFED8A57643661 /* AccountDeletionAndShareCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8631504046C70A4EE432C9B8 /* AccountDeletionAndShareCardTests.swift */; };
 		AD0054EB2E2197600029E0FF /* privacy-policy.md in Resources */ = {isa = PBXBuildFile; fileRef = AD0054E82E2197600029E0FF /* privacy-policy.md */; };
@@ -487,6 +489,8 @@
 		8EA82A71E77423D56A70AA46 /* SupabaseProfilePayloadTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupabaseProfilePayloadTests.swift; sourceTree = "<group>"; };
 		91C10C0E4F8B40568047DA88 /* AddEntrySheet+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AddEntrySheet+Part01.swift"; path = "AddEntrySheet+Part01.swift"; sourceTree = "<group>"; };
 		927B7D58E8E1756BB92364B6 /* BodyCompositionMathGoldenTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyCompositionMathGoldenTests.swift; sourceTree = "<group>"; };
+		B12671002F16000100ABCDEF /* BodyScoreEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyScoreEngineTests.swift; sourceTree = "<group>"; };
+		B12671022F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyScoreHealthKitTriggerTests.swift; sourceTree = "<group>"; };
 		9C89CCE0BFAE9B2ACB9A017B /* UserHeaderSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserHeaderSection.swift; path = DesignSystem/Organisms/UserHeaderSection.swift; sourceTree = "<group>"; };
 		9ED9F05E697F00813F824903 /* LogoutButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogoutButton.swift; path = DesignSystem/Molecules/LogoutButton.swift; sourceTree = "<group>"; };
 		9F0DAD82BAAEB27B75923381 /* FullMetricChartView+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "FullMetricChartView+Part02.swift"; path = "Components/FullMetricChartView+Part02.swift"; sourceTree = "<group>"; };
@@ -1070,6 +1074,8 @@
 				FBDA30F8A24DC3754F3CD216 /* AuthProfileBootstrapPolicyTests.swift */,
 				DA456B8668AB1B5DDFA6C5CA /* AuthSurfacePolicyTests.swift */,
 				927B7D58E8E1756BB92364B6 /* BodyCompositionMathGoldenTests.swift */,
+				B12671002F16000100ABCDEF /* BodyScoreEngineTests.swift */,
+				B12671022F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift */,
 				EB121088934BE398599BE39A /* BodyMetricContractTests.swift */,
 				776620205152E0A15A875703 /* BodyMetricLocalDateContractTests.swift */,
 				192238EEFD8161597A0B99AA /* BodyMetricLoggingAndInsightTests.swift */,
@@ -1891,6 +1897,8 @@
 				9528AB022858D682E801AC01 /* AuthProfileBootstrapPolicyTests.swift in Sources */,
 				BB64CACAE821CFB2A97F53BA /* AuthSurfacePolicyTests.swift in Sources */,
 				9EBBDD6AF2FF4E4FF8B9E3BC /* BodyCompositionMathGoldenTests.swift in Sources */,
+				B12671012F16000100ABCDEF /* BodyScoreEngineTests.swift in Sources */,
+				B12671032F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift in Sources */,
 				022D79AC5B1840BC58FB7D70 /* BodyMetricContractTests.swift in Sources */,
 				1564F129E1D9BAAC5F85C703 /* BodyMetricLocalDateContractTests.swift in Sources */,
 				8F1D82C327BC8A6B5FB2A6DB /* BodyMetricLoggingAndInsightTests.swift in Sources */,
