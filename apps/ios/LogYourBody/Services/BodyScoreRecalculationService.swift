@@ -6,29 +6,55 @@ import Foundation
 final class BodyScoreRecalculationService {
     static let shared = BodyScoreRecalculationService()
 
-    private let debounceInterval: TimeInterval = 0.4
+    private let debounceInterval: TimeInterval
     private var lastScheduledAt: Date?
+    private var pendingWorkItem: DispatchWorkItem?
     private let queue = DispatchQueue(label: "com.logyourbody.bodyScore.recalculation", qos: .userInitiated)
 
-    private init() {}
+    init(debounceInterval: TimeInterval = 0.4) {
+        self.debounceInterval = debounceInterval
+    }
 
     /// Schedule a background recalculation. Multiple calls in quick succession
     /// are coalesced to avoid redundant work.
-    func scheduleRecalculation() {
-        queue.async { [weak self] in
-            guard let self else { return }
+    @discardableResult
+    func scheduleRecalculation(now: Date = Date(), startTask: Bool = true) -> Bool {
+        queue.sync { [weak self] in
+            guard let self else { return false }
 
-            let now = Date()
-            if let last = self.lastScheduledAt, now.timeIntervalSince(last) < self.debounceInterval {
+            if let last = self.lastScheduledAt,
+               now >= last,
+               now.timeIntervalSince(last) < self.debounceInterval {
                 self.lastScheduledAt = now
-                return
+                self.scheduleTrailingRecalculation(startTask: startTask)
+                return false
             }
 
             self.lastScheduledAt = now
+            self.pendingWorkItem?.cancel()
+            self.startRecalculationIfNeeded(startTask: startTask)
 
-            Task.detached(priority: .userInitiated) {
-                await self.recalculateIfPossible()
-            }
+            return true
+        }
+    }
+
+    private func scheduleTrailingRecalculation(startTask: Bool) {
+        pendingWorkItem?.cancel()
+        guard startTask else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.startRecalculationIfNeeded(startTask: true)
+        }
+
+        pendingWorkItem = workItem
+        queue.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)
+    }
+
+    private func startRecalculationIfNeeded(startTask: Bool) {
+        guard startTask else { return }
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            await self?.recalculateIfPossible()
         }
     }
 

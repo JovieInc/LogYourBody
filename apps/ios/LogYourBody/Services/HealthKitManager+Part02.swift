@@ -497,8 +497,11 @@ func processBatchHealthKitData(
             }
         }
 
-        // Trigger a background body score recalculation now that metrics have changed.
-        BodyScoreRecalculationService.shared.scheduleRecalculation()
+        if imported > 0 {
+            // Trigger a background body score recalculation now that metrics have changed.
+            BodyScoreCache.shared.invalidate(for: userId)
+            BodyScoreRecalculationService.shared.scheduleRecalculation()
+        }
 
         return (imported, skipped)
     }
