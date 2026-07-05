@@ -264,6 +264,27 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["dashboard_home_timeline_photo_stage"].exists)
     }
 
+    func testHorizontalSwipeOnTimelineHeroDoesNotOpenStatsPage() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
+        app.launch()
+
+        let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 12))
+
+        // Regression guard for JovieInc/Jovie#11350: a horizontal swipe on the
+        // home visual must own date navigation — it must NOT flip the root
+        // page to Stats/Analytics.
+        let start = hero.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.4))
+        let end = hero.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.4))
+        start.press(forDuration: 0.05, thenDragTo: end)
+
+        XCTAssertFalse(
+            app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 2)
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].exists)
+    }
+
     func testMetricDetailOpensFromStatsAndShowsSharedTimelineContext() throws {
         let app = XCUIApplication()
         app.launchArguments = [
