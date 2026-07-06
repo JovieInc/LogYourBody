@@ -86,36 +86,12 @@ jobs:
           bundle exec fastlane -f Fastfile.nuke nuke_all || echo "Some certificates may not have existed"
           rm -f Fastfile.nuke
 
-      - name: Clean certificates repository
-        env:
-          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
-          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-          MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
-        run: |
-          echo "🗑️ Cleaning certificates repository..."
-          
-          # Extract the auth token from base64
-          AUTH_HEADER=$(echo $MATCH_GIT_BASIC_AUTHORIZATION | base64 -d)
-          
-          # Clone with authentication
-          git clone https://${AUTH_HEADER}@github.com/JovieInc/certificates.git certificates-temp
-          cd certificates-temp
-          git checkout $MATCH_GIT_BRANCH || git checkout -b $MATCH_GIT_BRANCH
-          
-          # Clean all certificate files
-          rm -rf certs profiles
-          mkdir -p certs profiles
-          touch certs/.gitkeep profiles/.gitkeep
-          
-          # Commit and push
-          git add -A
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "GitHub Actions"
-          git commit -m "Clean repository for certificate regeneration" || echo "Nothing to commit"
-          git push origin $MATCH_GIT_BRANCH
-          
-          cd ..
-          rm -rf certificates-temp
+      # (Removed a redundant manual "Clean certificates repository" step that
+      # hardcoded https://github.com/JovieInc/certificates.git — a repo that does
+      # not exist (the real match repo is MATCH_GIT_URL) — and failed the job
+      # under `set -e` before regeneration could run. match_nuke above already
+      # revokes and clears the match repo via MATCH_GIT_URL, and
+      # setup_provisioning force:true below recreates certs/profiles.
 
       - name: Generate new App Store certificates
         working-directory: apps/ios
