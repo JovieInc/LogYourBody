@@ -313,7 +313,7 @@
         
         # Add API key if available
         # Handle OpenSSL curve compatibility issues by passing API key directly
-        if ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_API_ISSUER_ID"]
+        if ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"]
           if ENV["APP_STORE_CONNECT_API_KEY_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_PATH"])
             match_params[:api_key_path] = ENV["APP_STORE_CONNECT_API_KEY_PATH"]
             UI.message("Using App Store Connect API key from file: #{ENV["APP_STORE_CONNECT_API_KEY_PATH"]}")
@@ -321,7 +321,7 @@
             # Pass API key directly to Match to bypass OpenSSL curve issues
             match_params[:api_key] = {
               key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-              issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+              issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
               key: ENV["APP_STORE_CONNECT_API_KEY"],
               is_key_content_base64: false,
               duration: 1200,
