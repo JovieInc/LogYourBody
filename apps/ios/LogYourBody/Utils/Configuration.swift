@@ -110,14 +110,26 @@ enum Configuration {
             return true
         }
 
-        // Corrupt/redacted xcconfig values (e.g. "***)") must not reach URLSession.
+        return false
+    }
+
+    /// Returns `true` if `value` looks like a corrupt/redacted/placeholder URL.
+    /// Used only on fields where a URL/host is expected (SUPABASE_URL, API_BASE_URL).
+    /// Does NOT apply to non-URL secrets (Clerk publishable key, RevenueCat key, etc.).
+    static func isInvalidURLValue(_ value: String) -> Bool {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        // Keyword placeholders that apply to URLs too.
+        if isPlaceholder(normalized) {
+            return true
+        }
+
+        // Corrupt/redacted xcconfig URL values (e.g. "***)") must not reach URLSession.
         if normalized.contains("*") {
             return true
         }
 
-        // Host validation only applies to URL-shaped values (SUPABASE_URL, API_BASE_URL).
-        // Non-URL values (pk_live_…, appl_… keys) are not hosts and must pass through,
-        // otherwise stringValue() silently erases real credentials to their defaults.
+        // Host validation — only meaningful for URL-shaped values.
         if let url = URL(string: normalized),
            let scheme = url.scheme,
            ["http", "https"].contains(scheme),
@@ -250,12 +262,12 @@ enum Configuration {
         }
 
         let supabaseURL = URL(string: snapshot.supabaseURL)
-        if supabaseURL == nil || isPlaceholder(snapshot.supabaseURL) {
+        if supabaseURL == nil || isInvalidURLValue(snapshot.supabaseURL) {
             messages.append("Supabase URL must be configured.")
         }
 
         let apiBaseURL = URL(string: snapshot.apiBaseURL)
-        if apiBaseURL == nil || isPlaceholder(snapshot.apiBaseURL) {
+        if apiBaseURL == nil || isInvalidURLValue(snapshot.apiBaseURL) {
             messages.append("API base URL must be configured.")
         }
 
