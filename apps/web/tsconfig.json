@@ -29,7 +29,8 @@
       "@/contexts/*": ["./src/contexts/*"],
       "@/types/*": ["./src/types/*"],
       "@/constants/*": ["./src/constants/*"],
-      "@/data/*": ["./src/data/*"]
+      "@/data/*": ["./src/data/*"],
+      "@/generated/*": ["./src/generated/*"]
     },
     "incremental": true
   },

@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
   // Disable image optimization for Capacitor builds
   images: {
     unoptimized: process.env.BUILD_TARGET === 'capacitor',
+    localPatterns: [
+      { pathname: '/brand/**' },
+      { pathname: '/marketing/**' },
+      { pathname: '/product-screenshots/**' },
+    ],
     remotePatterns: [
       {
         protocol: 'https',

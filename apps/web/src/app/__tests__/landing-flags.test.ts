@@ -1,8 +1,10 @@
 describe('landing flags', () => {
   const originalFlag = process.env.NEXT_PUBLIC_LYB_FULL_LANDING;
+  const originalWaitlistV2Flag = process.env.NEXT_PUBLIC_LYB_WAITLIST_V2;
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_LYB_FULL_LANDING = originalFlag;
+    process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 = originalWaitlistV2Flag;
     jest.resetModules();
   });
 
@@ -16,5 +18,16 @@ describe('landing flags', () => {
     process.env.NEXT_PUBLIC_LYB_FULL_LANDING = '1';
     const { LANDING_FLAGS } = await import('@/lib/flags/landing');
     expect(LANDING_FLAGS.FULL_LANDING_ENABLED).toBe(true);
+  });
+
+  it('defaults waitlist v2 to off and enables it only with an explicit flag', async () => {
+    delete process.env.NEXT_PUBLIC_LYB_WAITLIST_V2;
+    let flags = (await import('@/lib/flags/landing')).LANDING_FLAGS;
+    expect(flags.WAITLIST_V2_ENABLED).toBe(false);
+
+    jest.resetModules();
+    process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 = '1';
+    flags = (await import('@/lib/flags/landing')).LANDING_FLAGS;
+    expect(flags.WAITLIST_V2_ENABLED).toBe(true);
   });
 });

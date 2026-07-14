@@ -8,4 +8,5 @@
  */
 export const LANDING_FLAGS = {
   FULL_LANDING_ENABLED: process.env.NEXT_PUBLIC_LYB_FULL_LANDING === '1',
+  WAITLIST_V2_ENABLED: process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 === '1',
 } as const;

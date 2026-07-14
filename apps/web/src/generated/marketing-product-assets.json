@@ -1,0 +1,26 @@
+{
+  "weightLog": {
+    "source": "apps/ios/fastlane/screenshots/en-US/01_APP_IPHONE_65.png",
+    "output": "apps/web/public/product-screenshots/ios/weight-log.png",
+    "publicUrl": "/product-screenshots/ios/weight-log.png",
+    "sourceKind": "ios-fastlane-capture",
+    "truthStatus": "real-app-capture",
+    "width": 1242,
+    "height": 2688,
+    "sourceSha256": "4b7bad9ba2e81a960f4ea073561a4650ca9a7af94a9a09fee3c05cf8e41063f9",
+    "outputSha256": "4b7bad9ba2e81a960f4ea073561a4650ca9a7af94a9a09fee3c05cf8e41063f9",
+    "capturedAt": "2026-06-04T01:41:49-07:00"
+  },
+  "appIcon": {
+    "source": "apps/ios/LogYourBody/Assets.xcassets/AppIcon.appiconset/lyb_icon-iOS-Dark-1024x1024@1x.png",
+    "output": "apps/web/public/brand/logyourbody-app-icon.png",
+    "publicUrl": "/brand/logyourbody-app-icon.png",
+    "sourceKind": "ios-asset-catalog",
+    "truthStatus": "canonical-brand-asset",
+    "width": 1024,
+    "height": 1024,
+    "sourceSha256": "c4d37d21f7decac5dbc0fe34f19e7295ef986c937f5e174fc7348076a6d37d31",
+    "outputSha256": "c4d37d21f7decac5dbc0fe34f19e7295ef986c937f5e174fc7348076a6d37d31",
+    "capturedAt": "2025-11-23T16:53:31-08:00"
+  }
+}
