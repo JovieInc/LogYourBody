@@ -82,7 +82,6 @@ extension DashboardViewLiquid {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
-            .simultaneousGesture(photoTimelineRootSwipeGesture)
         }
     }
 
@@ -129,27 +128,6 @@ extension DashboardViewLiquid {
         .accessibilityLabel(page.navigationTitle)
         .accessibilityAddTraits(selectedPhotoTimelineRootPage == page ? [.isSelected] : [])
         .accessibilityIdentifier(page.accessibilityIdentifier)
-    }
-
-    private var photoTimelineRootSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 12, coordinateSpace: .local)
-            .onEnded { value in
-                updatePhotoTimelineRootPage(from: value.translation)
-            }
-    }
-
-    private func updatePhotoTimelineRootPage(from translation: CGSize) {
-        let horizontal = translation.width
-        let vertical = translation.height
-        let threshold: CGFloat = 44
-        guard abs(horizontal) > abs(vertical), abs(horizontal) > threshold else { return }
-
-        let nextPage: PhotoTimelineRootPage = horizontal < 0 ? .analytics : .timeline
-        guard selectedPhotoTimelineRootPage != nextPage else { return }
-
-        withAnimation(.easeOut(duration: 0.2)) {
-            selectedPhotoTimelineRootPage = nextPage
-        }
     }
 
     var hudTimelineSection: some View {
@@ -262,12 +240,14 @@ extension DashboardViewLiquid {
     }
 
     func selectClosestMetric(to date: Date) {
-        guard let index = nearestBodyMetricIndex(in: bodyMetrics, to: date) else {
-            return
-        }
+        PerfSignpost.measure("scrub_select_closest") {
+            guard let index = nearestBodyMetricIndex(in: bodyMetrics, to: date) else {
+                return
+            }
 
-        selectedIndex = index
-        updateAnimatedValues(for: index)
+            selectedIndex = index
+            updateAnimatedValues(for: index)
+        }
     }
 
     func formatHUDDate(_ date: Date) -> String {

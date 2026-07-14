@@ -416,7 +416,9 @@ struct MetricChartDataHelper {
             startDate: startDate
         )
 
-        return composeChartData(with: context)
+        return PerfSignpost.measure("chart_generate") {
+            composeChartData(with: context)
+        }
     }
 
     /// Async version for generating chart data using non-blocking Core Data fetches
@@ -448,7 +450,9 @@ struct MetricChartDataHelper {
             startDate: startDate
         )
 
-        return composeChartData(with: context)
+        return PerfSignpost.measure("chart_generate_async") {
+            composeChartData(with: context)
+        }
     }
 
     private struct ChartCompositionContext {

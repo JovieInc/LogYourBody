@@ -6,11 +6,15 @@ final class BodyScoreCache {
     static let shared = BodyScoreCache()
 
     private let userDefaults: UserDefaults
-    private let storageKey = "bodyScoreCache.latestResults"
+    private let storageKey: String
     private var cache: [String: BodyScoreResult] = [:]
 
-    private init(userDefaults: UserDefaults = .standard) {
+    init(
+        userDefaults: UserDefaults = .standard,
+        storageKey: String = "bodyScoreCache.latestResults"
+    ) {
         self.userDefaults = userDefaults
+        self.storageKey = storageKey
         loadFromDisk()
     }
 
@@ -23,6 +27,17 @@ final class BodyScoreCache {
         guard let userId else { return }
         cache[userId] = result
         persistToDisk()
+    }
+
+    func invalidate(for userId: String?) {
+        guard let userId else { return }
+        cache.removeValue(forKey: userId)
+        persistToDisk()
+    }
+
+    func removeAll() {
+        cache.removeAll()
+        userDefaults.removeObject(forKey: storageKey)
     }
 
     private func loadFromDisk() {

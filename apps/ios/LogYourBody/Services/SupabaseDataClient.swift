@@ -157,16 +157,60 @@ enum SupabaseError: LocalizedError, Equatable {
 
 enum SupabaseURLBuilder {
     static func restURL(table: String, query: String? = nil, baseURL: String = Constants.supabaseURL) throws -> URL {
+        let normalizedBase = try normalizedBaseURL(baseURL)
         let suffix = query.map { "/rest/v1/\(table)?\($0)" } ?? "/rest/v1/\(table)"
-        return try url(from: baseURL + suffix)
+        return try url(from: normalizedBase + suffix)
     }
 
     static func storageURL(bucket: String, path: String, baseURL: String = Constants.supabaseURL) throws -> URL {
-        try url(from: baseURL + "/storage/v1/object/\(bucket)/\(path)")
+        let normalizedBase = try normalizedBaseURL(baseURL)
+        return try url(from: normalizedBase + "/storage/v1/object/\(bucket)/\(path)")
     }
 
     static func functionURL(_ functionName: String, baseURL: String = Constants.supabaseURL) throws -> URL {
-        try url(from: baseURL + "/functions/v1/\(functionName)")
+        let normalizedBase = try normalizedBaseURL(baseURL)
+        return try url(from: normalizedBase + "/functions/v1/\(functionName)")
+    }
+
+    static func isValidServiceHost(_ host: String) -> Bool {
+        let normalized = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        guard
+            !normalized.isEmpty,
+            !normalized.contains("*"),
+            normalized.contains("."),
+            normalized.rangeOfCharacter(from: .whitespacesAndNewlines) == nil
+        else {
+            return false
+        }
+
+        return true
+    }
+
+    static func normalizedBaseURL(_ rawValue: String) throws -> String {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !Configuration.isPlaceholder(trimmed) else {
+            throw SupabaseError.invalidConfiguration
+        }
+
+        if let url = URL(string: trimmed),
+           let scheme = url.scheme?.lowercased(),
+           ["http", "https"].contains(scheme),
+           let host = url.host,
+           isValidServiceHost(host) {
+            return "\(scheme)://\(host)"
+        }
+
+        let candidate = "https://\(trimmed)"
+        if let url = URL(string: candidate),
+           url.scheme?.lowercased() == "https",
+           let host = url.host,
+           isValidServiceHost(host) {
+            return candidate
+        }
+
+        throw SupabaseError.invalidConfiguration
     }
 
     static func url(from absoluteString: String) throws -> URL {
@@ -174,7 +218,8 @@ enum SupabaseURLBuilder {
             let url = URL(string: absoluteString),
             let scheme = url.scheme?.lowercased(),
             ["http", "https"].contains(scheme),
-            url.host?.isEmpty == false
+            let host = url.host,
+            isValidServiceHost(host)
         else {
             throw SupabaseError.invalidConfiguration
         }

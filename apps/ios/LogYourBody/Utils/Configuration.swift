@@ -96,17 +96,36 @@ enum Configuration {
         }
     }
 
-    private static func isPlaceholder(_ value: String) -> Bool {
+    static func isPlaceholder(_ value: String) -> Bool {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
-        return normalized.isEmpty ||
+        if normalized.isEmpty ||
             normalized.contains("$(") ||
             normalized.contains("your-") ||
             normalized.contains("placeholder") ||
             normalized.contains("replace") ||
             normalized.contains("todo") ||
             normalized.contains("changeme") ||
-            normalized.contains("xxx")
+            normalized.contains("xxx") {
+            return true
+        }
+
+        // Corrupt/redacted xcconfig values (e.g. "***)") must not reach URLSession.
+        if normalized.contains("*") {
+            return true
+        }
+
+        // Host validation only applies to URL-shaped values (SUPABASE_URL, API_BASE_URL).
+        // Non-URL values (pk_live_…, appl_… keys) are not hosts and must pass through,
+        // otherwise stringValue() silently erases real credentials to their defaults.
+        if let url = URL(string: normalized),
+           let scheme = url.scheme,
+           ["http", "https"].contains(scheme),
+           let host = url.host {
+            return !SupabaseURLBuilder.isValidServiceHost(host)
+        }
+
+        return false
     }
 
     // MARK: - API Configuration

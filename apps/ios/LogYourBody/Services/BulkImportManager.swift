@@ -101,6 +101,17 @@ class BulkImportManager: ObservableObject {
 
     // MARK: - Private Methods
 
+    /// Safely mutate the import task at `index`, guarding against `importTasks`
+    /// being resized while an async import is still in flight. `importPhoto(at:)`
+    /// bounds-checks only once before its first `await`; if the user cancels and
+    /// starts a smaller import, the array shrinks and the still-suspended task
+    /// would otherwise index out of range. No-ops when the index is stale.
+    @MainActor
+    func updateImportTask(at index: Int, _ mutate: (inout ImportTask) -> Void) {
+        guard importTasks.indices.contains(index) else { return }
+        mutate(&importTasks[index])
+    }
+
     private func importPhoto(at index: Int) async {
         guard index < importTasks.count else { return }
 
@@ -109,7 +120,7 @@ class BulkImportManager: ObservableObject {
         dateFormatter.dateStyle = .medium
 
         await MainActor.run {
-            importTasks[index].status = .extracting
+            updateImportTask(at: index) { $0.status = .extracting }
             currentPhotoName = dateFormatter.string(from: photo.date)
         }
 
@@ -120,8 +131,10 @@ class BulkImportManager: ObservableObject {
             }
 
             await MainActor.run {
-                importTasks[index].status = .processing
-                importTasks[index].progress = 0.3
+                updateImportTask(at: index) {
+                    $0.status = .processing
+                    $0.progress = 0.3
+                }
             }
 
             // Step 2: Create body metrics entry for the photo date
@@ -167,8 +180,10 @@ class BulkImportManager: ObservableObject {
             }
 
             await MainActor.run {
-                importTasks[index].status = .uploading
-                importTasks[index].progress = 0.6
+                updateImportTask(at: index) {
+                    $0.status = .uploading
+                    $0.progress = 0.6
+                }
             }
 
             // Step 3: Upload photo
@@ -178,8 +193,10 @@ class BulkImportManager: ObservableObject {
             )
 
             await MainActor.run {
-                importTasks[index].status = .completed
-                importTasks[index].progress = 1.0
+                updateImportTask(at: index) {
+                    $0.status = .completed
+                    $0.progress = 1.0
+                }
             }
 
             // Trigger sync
@@ -189,8 +206,10 @@ class BulkImportManager: ObservableObject {
         } catch {
             // print("❌ Failed to import photo: \(error)")
             await MainActor.run {
-                importTasks[index].status = .failed
-                importTasks[index].error = error
+                updateImportTask(at: index) {
+                    $0.status = .failed
+                    $0.error = error
+                }
             }
         }
     }

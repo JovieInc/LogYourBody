@@ -261,9 +261,12 @@ func saveHKSamples(_ samples: [HKRawSample]) async {
                     try context.save()
                 }
 
-                let updated = cachedMetric.toBodyMetrics()
+                guard let updated = cachedMetric.toBodyMetrics() else {
+                    return nil
+                }
 
                 // Schedule background body score recalculation when weight/body fat entries change.
+                BodyScoreCache.shared.invalidate(for: updated.userId)
                 BodyScoreRecalculationService.shared.scheduleRecalculation()
 
                 return updated

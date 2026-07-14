@@ -52,4 +52,30 @@ final class SupabaseURLBuilderTests: XCTestCase {
             XCTAssertEqual(error as? SupabaseError, .invalidConfiguration)
         }
     }
+
+    func testRejectsRedactedSupabaseBaseURLBeforeNetwork() {
+        let corruptValues = ["***)", "https://***", "https://***.supabase.co"]
+
+        for corruptValue in corruptValues {
+            XCTAssertTrue(
+                Configuration.isPlaceholder(corruptValue),
+                "Expected placeholder rejection for \(corruptValue)"
+            )
+            XCTAssertThrowsError(
+                try SupabaseURLBuilder.storageURL(
+                    bucket: "photos",
+                    path: "user-123/photo.jpg",
+                    baseURL: corruptValue
+                )
+            ) { error in
+                XCTAssertEqual(error as? SupabaseError, .invalidConfiguration)
+            }
+        }
+    }
+
+    func testRejectsHostWithoutDomainSegment() {
+        XCTAssertFalse(SupabaseURLBuilder.isValidServiceHost("localhost"))
+        XCTAssertFalse(SupabaseURLBuilder.isValidServiceHost("***"))
+        XCTAssertTrue(SupabaseURLBuilder.isValidServiceHost("abc123.supabase.co"))
+    }
 }

@@ -1,0 +1,253 @@
+# Security scanning workflow for secret detection, vulnerability scanning, and supply chain security
+#
+# This workflow complements CodeQL by adding:
+# - Gitleaks: Secret detection in git history
+# - TruffleHog: Defense-in-depth secret scanning (JOV-3215)
+# - Trivy: Vulnerability scanning for dependencies and filesystem (added in subtask-1-4)
+# - OSSF Scorecard: Supply chain security scoring (added in subtask-1-5)
+#
+name: Security Scanning
+
+on:
+  # Risk-tiered CI (JOV-3461). The FAST secret scans (gitleaks + trufflehog,
+  # diff-scoped via `scan-secrets.sh ci-pr`) run on PRs — a leaked key on a
+  # PUBLIC repo is scraped within seconds of hitting main, so secret detection
+  # must gate pre-merge (EVENT-class). The HEAVY scans (Trivy full-tree, CodeQL,
+  # Scorecard) stay post-merge on main + nightly — they saturated runners and
+  # stalled the queue when run per-PR (2026-06-22). Per-job `if:` guards below
+  # keep the heavy ones off the PR path.
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+  schedule:
+    - cron: '0 6 * * *' # Nightly at 06:00 UTC
+  workflow_dispatch:
+
+# Default permissions - each job specifies its own required permissions
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Gitleaks Secret Scanning
+    # Secret scanning requires an authoritative Git object store. Persistent
+    # self-hosted workspaces can retain shallow/promisor state that survives
+    # checkout cleanup and makes intermediate PR commits unreadable.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -d .git ]]; then exit 0; fi
+          git sparse-checkout disable 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+          rm -f .git/info/sparse-checkout
+          git config --local --unset-all extensions.partialClone 2>/dev/null || true
+          git config --local --unset-all remote.origin.promisorRemote 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          clean: true
+
+      - name: Materialize full tree (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git sparse-checkout disable 2>/dev/null || true
+          git reset --hard HEAD
+          git checkout-index -a -f
+
+      - name: Verify checkout sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          sentinel="scripts/security/scan-secrets.sh"
+          if [[ ! -f "$sentinel" ]]; then
+            echo "::error::Incomplete checkout — missing ${sentinel}"
+            exit 1
+          fi
+
+      - name: Run secret scan (gitleaks + trufflehog)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}"
+            ./scripts/security/scan-secrets.sh ci-pr "origin/${{ github.base_ref }}"
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+              git fetch origin main --depth=1
+              ./scripts/security/scan-secrets.sh ci-pr "origin/main"
+            else
+              ./scripts/security/scan-secrets.sh ci-pr "${{ github.event.before }}"
+            fi
+          else
+            ./scripts/security/scan-secrets.sh full
+          fi
+
+      - name: Verify gitleaks detects Neon/Clerk leak shapes and backup files
+        run: ./scripts/security/verify-gitleaks-coverage.sh
+
+  trufflehog:
+    name: TruffleHog Secret Scanning
+    # TruffleHog clones the checkout internally, so it must start from a clean
+    # hosted object store rather than a reused partial-clone workspace.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -d .git ]]; then exit 0; fi
+          git sparse-checkout disable 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+          rm -f .git/info/sparse-checkout
+          git config --local --unset-all extensions.partialClone 2>/dev/null || true
+          git config --local --unset-all remote.origin.promisorRemote 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          clean: true
+
+      - name: Materialize full tree (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git sparse-checkout disable 2>/dev/null || true
+          git reset --hard HEAD
+          git checkout-index -a -f
+
+      - name: Verify checkout sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          sentinel="scripts/security/scan-secrets.sh"
+          if [[ ! -f "$sentinel" ]]; then
+            echo "::error::Incomplete checkout — missing ${sentinel}"
+            exit 1
+          fi
+
+      - name: Test secret scan corruption recovery
+        run: ./scripts/security/scan-secrets.test.sh
+
+      - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}"
+            ./scripts/security/scan-secrets.sh ci-pr-trufflehog "origin/${{ github.base_ref }}"
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+              git fetch origin main --depth=1
+              ./scripts/security/scan-secrets.sh ci-pr-trufflehog "origin/main"
+            else
+              ./scripts/security/scan-secrets.sh ci-pr-trufflehog "${{ github.event.before }}"
+            fi
+          else
+            ./scripts/security/scan-secrets.sh full-trufflehog
+          fi
+
+  trivy:
+    name: Trivy Vulnerability Scanning
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Heavy full-tree scan stays off the PR path (post-merge on main + nightly).
+    # Only the fast diff-scoped secret scans (gitleaks/trufflehog) gate PRs.
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Run Trivy vulnerability scanner (filesystem mode)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          ignore-unfixed: true
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3.28.15
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy-filesystem'
+
+  scorecard:
+    name: OSSF Scorecard Supply Chain Security
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Scorecard only runs on main branch push and schedule to avoid token issues on PRs
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write # Required for OIDC token authentication
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Run OSSF Scorecard
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: scorecard-results.sarif
+          results_format: sarif
+          # Avoid flaky failures from transient api.scorecard.dev timeouts.
+          publish_results: false
+
+      - name: Upload Scorecard results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3.28.15
+        with:
+          sarif_file: 'scorecard-results.sarif'
+          category: 'ossf-scorecard'
+
+  commit-signature-check:
+    name: Commit Signature Verification
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Run on every push to main so unsigned agent-authored merges are surfaced immediately.
+    # This is observability only — blocking unsigned commits requires enabling
+    # "Require signed commits" in branch protection settings (human/admin action).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    steps:
+      - name: Verify commit is signed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          response=$(gh api "repos/${REPO}/commits/${COMMIT_SHA}" \
+            --jq '{verified: .commit.verification.verified, reason: .commit.verification.reason}')
+          verified=$(echo "$response" | jq -r '.verified')
+          reason=$(echo "$response" | jq -r '.reason')
+          echo "commit=${COMMIT_SHA}: verified=${verified}, reason=${reason}"
+          if [ "$verified" = "true" ]; then
+            echo "✅ Commit is cryptographically signed and verified."
+          else
+            printf '⚠️ Unsigned commit merged to main (reason: %s)\n' "$reason"
+            echo "::warning title=Unsigned commit::SHA ${COMMIT_SHA} reached main without a cryptographic signature (reason: ${reason}). Enable branch-protection \"Require signed commits\" to block unsigned merges — see https://github.com/${REPO}/settings/branches"
+          fi

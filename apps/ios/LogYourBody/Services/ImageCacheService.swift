@@ -104,11 +104,27 @@ class ImageCacheService: ObservableObject {
         return image
     }
 
-    /// Preload images in background
+    /// Preload images in the background with bounded concurrency.
+    ///
+    /// Adjacent photos decode in parallel — so timeline scrubbing lands on an
+    /// already-cached image instead of stalling on a serial decode chain — while
+    /// the concurrency cap avoids firing every request at once. `loadImage`'s
+    /// per-URL deduplication still prevents redundant work.
     func preloadImages(_ urlStrings: [String]) {
+        let urls = urlStrings.filter { !$0.isEmpty }
+        guard !urls.isEmpty else { return }
+
         Task {
-            for urlString in urlStrings {
-                _ = await loadImage(from: urlString)
+            let maxConcurrent = min(4, urls.count)
+            await withTaskGroup(of: Void.self) { group in
+                for (offset, urlString) in urls.enumerated() {
+                    // Keep at most `maxConcurrent` decodes in flight: once the
+                    // window is full, wait for one to finish before starting the next.
+                    if offset >= maxConcurrent {
+                        await group.next()
+                    }
+                    group.addTask { _ = await self.loadImage(from: urlString) }
+                }
             }
         }
     }
