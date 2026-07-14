@@ -112,6 +112,25 @@ struct ProgressPhotoCarouselView: View {
 
     // MARK: - Photo Preloading for Smooth Experience
 
+    /// The clamped ±`window` index range to preload around `index` for a
+    /// collection of `count` items. Returns `nil` when there is nothing safe to
+    /// preload so callers never construct an inverted `ClosedRange` (which traps
+    /// with "Range requires lowerBound <= upperBound").
+    ///
+    /// `selectedMetricsIndex` is an externally-shared binding that can legitimately
+    /// exceed `displayMetrics.count` — the TabView tags in-flight processing
+    /// placeholders as `count + i`, and the index can go stale when metrics shrink
+    /// after a sync/delete. Clamping here keeps preloading crash-safe for those cases.
+    static func preloadIndexRange(around index: Int, count: Int, window: Int = 2) -> ClosedRange<Int>? {
+        let lastIndex = count - 1
+        guard lastIndex >= 0 else { return nil }
+        let clamped = min(max(index, 0), lastIndex)
+        let lower = max(0, clamped - window)
+        let upper = min(lastIndex, clamped + window)
+        guard lower <= upper else { return nil }
+        return lower...upper
+    }
+
     private func preloadAdjacentPhotos() {
         // Cancel previous preload task to prevent accumulation
         preloadTask?.cancel()
@@ -124,9 +143,12 @@ struct ProgressPhotoCarouselView: View {
             // Check if task was cancelled during sleep
             guard !Task.isCancelled else { return }
 
-            // Preload photos around current selection (±2 indices)
-            let currentIndex = selectedMetricsIndex
-            let range = max(0, currentIndex - 2)...min(displayMetrics.count - 1, currentIndex + 2)
+            // Preload photos around current selection (±2 indices), clamped so a
+            // stale/oversized index can never form an inverted range.
+            guard let range = Self.preloadIndexRange(
+                around: selectedMetricsIndex,
+                count: displayMetrics.count
+            ) else { return }
 
             let urlsToPreload = range.compactMap { index -> String? in
                 guard index < displayMetrics.count else { return nil }

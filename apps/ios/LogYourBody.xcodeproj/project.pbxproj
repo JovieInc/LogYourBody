@@ -31,6 +31,8 @@
 		42B0784EAF04F40C031D0186 /* DailyReminderPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 095D9694F1EA5B5091B0AE8B /* DailyReminderPolicyTests.swift */; };
 		43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */; };
 		46D2D60CC0C168272E5B0A14 /* BulkProgressPhotoImportPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 060DD24271B0B2120CB0AA33 /* BulkProgressPhotoImportPolicyTests.swift */; };
+		AD9E00112F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9E00102F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift */; };
+		AD9E00132F20001100ABCDEF /* BulkImportManagerBoundsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */; };
 		4C2DA948F919366D436CEF26 /* DSIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458AAF24645E3634CCF88E16 /* DSIcon.swift */; };
 		4C64677ABA2986677DDE1389 /* LogWeightFormValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B3ECAB100575E759C5A3D7A /* LogWeightFormValidatorTests.swift */; };
 		4DF78B8A5B5E0DBAF777CBC1 /* DSLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = FECEBC7B2B956D26BF45822F /* DSLogo.swift */; };
@@ -418,6 +420,8 @@
 		0401CF23AE214F20C7EB5886 /* DeveloperTapHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeveloperTapHandler.swift; path = DesignSystem/Molecules/DeveloperTapHandler.swift; sourceTree = "<group>"; };
 		05F19CFBFEA440516AFCE98B /* DSText.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSText.swift; path = DesignSystem/Atoms/DSText.swift; sourceTree = "<group>"; };
 		060DD24271B0B2120CB0AA33 /* BulkProgressPhotoImportPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BulkProgressPhotoImportPolicyTests.swift; sourceTree = "<group>"; };
+		AD9E00102F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProgressPhotoCarouselPreloadRangeTests.swift; sourceTree = "<group>"; };
+		AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BulkImportManagerBoundsTests.swift; sourceTree = "<group>"; };
 		07AFDB2060EF2522DE93E10D /* CachedPaywallOfferingDisplayTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CachedPaywallOfferingDisplayTests.swift; sourceTree = "<group>"; };
 		095D9694F1EA5B5091B0AE8B /* DailyReminderPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DailyReminderPolicyTests.swift; sourceTree = "<group>"; };
 		0AB2ACF16AEA86A36EDAD936 /* BiometricAuthView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BiometricAuthView.swift; path = DesignSystem/Organisms/BiometricAuthView.swift; sourceTree = "<group>"; };
@@ -1087,6 +1091,8 @@
 				3F2E34BC49376B87D43D81AD /* BodyMetricPhotoUpdateTests.swift */,
 				6EBD5BF3F1671BC8D17ABE5D /* BodyMetricSourceContractTests.swift */,
 				060DD24271B0B2120CB0AA33 /* BulkProgressPhotoImportPolicyTests.swift */,
+				AD9E00102F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift */,
+				AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */,
 				07AFDB2060EF2522DE93E10D /* CachedPaywallOfferingDisplayTests.swift */,
 				CA050E7DCEBA5BAF62341363 /* CoreDataAndPhotoPolicyTests.swift */,
 				095D9694F1EA5B5091B0AE8B /* DailyReminderPolicyTests.swift */,
@@ -1912,6 +1918,8 @@
 				D5F71D2685408ED4D599FC28 /* BodyMetricPhotoUpdateTests.swift in Sources */,
 				04EB1D7AD1947D32BDE7AD70 /* BodyMetricSourceContractTests.swift in Sources */,
 				46D2D60CC0C168272E5B0A14 /* BulkProgressPhotoImportPolicyTests.swift in Sources */,
+				AD9E00112F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift in Sources */,
+				AD9E00132F20001100ABCDEF /* BulkImportManagerBoundsTests.swift in Sources */,
 				BC360577C7E72F397010D7B1 /* CachedPaywallOfferingDisplayTests.swift in Sources */,
 				04BF4BAC82CF6B37F817592F /* CoreDataAndPhotoPolicyTests.swift in Sources */,
 				42B0784EAF04F40C031D0186 /* DailyReminderPolicyTests.swift in Sources */,
