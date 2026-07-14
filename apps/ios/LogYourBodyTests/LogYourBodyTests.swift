@@ -58,8 +58,8 @@ final class SupabaseURLBuilderTests: XCTestCase {
 
         for corruptValue in corruptValues {
             XCTAssertTrue(
-                Configuration.isPlaceholder(corruptValue),
-                "Expected placeholder rejection for \(corruptValue)"
+                Configuration.isInvalidURLValue(corruptValue),
+                "Expected invalid URL rejection for \(corruptValue)"
             )
             XCTAssertThrowsError(
                 try SupabaseURLBuilder.storageURL(

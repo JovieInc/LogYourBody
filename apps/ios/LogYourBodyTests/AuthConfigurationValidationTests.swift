@@ -98,4 +98,43 @@ final class AuthConfigurationValidationTests: XCTestCase {
         XCTAssertTrue(result.isValid)
         XCTAssertTrue(result.messages.isEmpty)
     }
+
+    func testValidClerkLiveKeyIsNotTreatedAsPlaceholder() {
+        // Regression guard: a real pk_live_ key must survive stringValue()
+        // and not be treated as a placeholder by the URL/host fallback.
+        let snapshot = Configuration.AuthEnvironmentSnapshot(
+            environment: .production,
+            clerkPublishableKey: "pk_live_Y2xlcmsua292YXNpay5haS5hcHBfMTAy",
+            supabaseURL: "https://prod-project.supabase.co",
+            supabaseExpectedHost: "prod-project.supabase.co",
+            apiBaseURL: "https://www.logyourbody.com",
+            apiExpectedHost: "www.logyourbody.com",
+            revenueCatAPIKey: "appl_prod_123",
+            sentryEnvironment: "production",
+            statsigEnvironmentTier: "production",
+            allowProductionServicesInDevelopment: false
+        )
+
+        // The key must NOT be flagged as a placeholder by the generic check.
+        XCTAssertFalse(
+            Configuration.isPlaceholder(snapshot.clerkPublishableKey),
+            "A valid pk_live_ key must not be treated as a placeholder"
+        )
+
+        // The key must NOT be flagged as an invalid URL value
+        // (it is not a URL, so URL validation is not applicable).
+        XCTAssertFalse(
+            Configuration.isInvalidURLValue(snapshot.clerkPublishableKey),
+            "A valid pk_live_ key must not be treated as an invalid URL value"
+        )
+
+        let result = Configuration.validateAuthEnvironment(snapshot)
+
+        // No Clerk-related error should be emitted for a valid pk_live_ key.
+        XCTAssertTrue(result.isValid, "Validation should pass: \(result.messages)")
+        XCTAssertFalse(
+            result.messages.contains(where: { $0.contains("Clerk") }),
+            "No Clerk-related errors should appear: \(result.messages)"
+        )
+    }
 }
