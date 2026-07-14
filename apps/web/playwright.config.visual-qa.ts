@@ -38,7 +38,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm run dev --port ${port}`,
+    command: `NEXT_PUBLIC_LYB_FULL_LANDING=1 pnpm run dev --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
