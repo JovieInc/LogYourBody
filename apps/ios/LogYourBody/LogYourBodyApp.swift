@@ -20,7 +20,11 @@ struct LogYourBodyApp: App {
     let persistenceController = CoreDataManager.shared
 
     init() {
+        LaunchMetrics.begin()
         LogYourBodyAppShortcuts.updateAppShortcutParameters()
+        #if DEBUG
+        FrameHitchMonitor.shared.start()
+        #endif
     }
 
     var body: some Scene {

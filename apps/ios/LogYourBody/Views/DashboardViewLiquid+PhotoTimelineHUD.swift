@@ -262,12 +262,14 @@ extension DashboardViewLiquid {
     }
 
     func selectClosestMetric(to date: Date) {
-        guard let index = nearestBodyMetricIndex(in: bodyMetrics, to: date) else {
-            return
-        }
+        PerfSignpost.measure("scrub_select_closest") {
+            guard let index = nearestBodyMetricIndex(in: bodyMetrics, to: date) else {
+                return
+            }
 
-        selectedIndex = index
-        updateAnimatedValues(for: index)
+            selectedIndex = index
+            updateAnimatedValues(for: index)
+        }
     }
 
     func formatHUDDate(_ date: Date) -> String {
