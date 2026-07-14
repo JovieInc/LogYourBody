@@ -50,6 +50,12 @@ struct DashboardViewLiquid: View {
     @State var glp1Medications: [Glp1Medication] = []
     @State var dailyMetricsLookupCache: [Date: DailyMetrics] = [:]
 
+    // Reused interpolation contexts for the hero weight/body-fat/FFMI values so
+    // scrubbing doesn't rebuild them per index change. Reference type: mutating its
+    // internals does not invalidate the view. (Accessed from the +MetricsHelpers
+    // extension, so not file-private.)
+    @State var heroInterpolationCache = HeroMetricInterpolationCache()
+
     // Animated metric values for tweening
     @State var animatedWeight: Double = 0
     @State var animatedBodyFat: Double = 0
@@ -170,6 +176,7 @@ struct DashboardViewLiquid: View {
 
         let withLifecycle = base
             .onAppear {
+                LaunchMetrics.markFirstDashboardFrame()
                 Task { @MainActor in
                     await Task.yield()
                     handleOnAppear()
@@ -380,14 +387,16 @@ struct DashboardViewLiquid: View {
         Task { @MainActor in
             await Task.yield()
 
-            if rebuildDailyMetricsLookup {
-                rebuildDailyMetricsLookupCache()
-            }
+            PerfSignpost.measure("dashboard_derived_refresh") {
+                if rebuildDailyMetricsLookup {
+                    rebuildDailyMetricsLookupCache()
+                }
 
-            refreshGlobalTimelineStore()
+                refreshGlobalTimelineStore()
 
-            if let animatedIndex, !viewModel.bodyMetrics.isEmpty {
-                updateAnimatedValues(for: animatedIndex)
+                if let animatedIndex, !viewModel.bodyMetrics.isEmpty {
+                    updateAnimatedValues(for: animatedIndex)
+                }
             }
         }
     }

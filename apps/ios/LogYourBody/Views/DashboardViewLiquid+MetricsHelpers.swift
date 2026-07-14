@@ -4,67 +4,42 @@ import Foundation
 extension DashboardViewLiquid {
     // MARK: - Animation Helpers
 
-    /// Update animated metric values with 180ms ease-out animation
+    /// Update animated metric values with 180ms ease-out animation.
+    ///
+    /// The interpolation contexts are cached and reused across scrubs (rebuilt only
+    /// when the metrics/height change), so a scrub reads precomputed contexts instead
+    /// of re-sorting and re-walking the EMA trend on every index change. The resulting
+    /// values are identical to the previous per-call estimate path.
     func updateAnimatedValues(for index: Int) {
         let metrics = viewModel.bodyMetrics
         guard index >= 0 && index < metrics.count else { return }
         let metric = metrics[index]
 
+        let interval = PerfSignpost.begin("scrub_update_animated_values")
+        defer { PerfSignpost.end(interval) }
+
+        let heightInches = convertHeightToInches(
+            height: authManager.currentUser?.profile?.height,
+            heightUnit: authManager.currentUser?.profile?.heightUnit
+        )
+        let values = heroInterpolationCache.values(
+            for: metric,
+            in: metrics,
+            heightInches: heightInches
+        )
+
         withAnimation(.easeOut(duration: 0.18)) {
-            // Weight
-            let weightResult: InterpolatedMetric?
-            if let weight = metric.weight {
-                weightResult = InterpolatedMetric(
-                    value: weight,
-                    isInterpolated: false,
-                    isLastKnown: false,
-                    confidenceLevel: nil
-                )
-            } else {
-                weightResult = MetricsInterpolationService.shared.estimateWeight(
-                    for: metric.date,
-                    metrics: viewModel.bodyMetrics
-                )
-            }
-
-            if let weightResult {
+            if let weight = values.weight {
                 let system = currentMeasurementSystem
-                animatedWeight = convertWeight(weightResult.value, to: system) ?? weightResult.value
+                animatedWeight = convertWeight(weight, to: system) ?? weight
             }
 
-            // Body Fat
-            let bodyFatResult: InterpolatedMetric?
-            if let bodyFatPercentage = metric.bodyFatPercentage {
-                bodyFatResult = InterpolatedMetric(
-                    value: bodyFatPercentage,
-                    isInterpolated: false,
-                    isLastKnown: false,
-                    confidenceLevel: nil
-                )
-            } else {
-                bodyFatResult = MetricsInterpolationService.shared.estimateBodyFat(
-                    for: metric.date,
-                    metrics: viewModel.bodyMetrics
-                )
+            if let bodyFat = values.bodyFat {
+                animatedBodyFat = bodyFat
             }
 
-            if let bodyFatResult {
-                animatedBodyFat = bodyFatResult.value
-            }
-
-            // FFMI
-            let heightInches = convertHeightToInches(
-                height: authManager.currentUser?.profile?.height,
-                heightUnit: authManager.currentUser?.profile?.heightUnit
-            )
-
-            if let heightInches,
-               let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                   for: metric.date,
-                   metrics: viewModel.bodyMetrics,
-                   heightInches: heightInches
-               ) {
-                animatedFFMI = ffmiResult.value
+            if let ffmi = values.ffmi {
+                animatedFFMI = ffmi
             }
         }
     }
