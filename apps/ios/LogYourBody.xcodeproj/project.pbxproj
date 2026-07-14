@@ -84,6 +84,7 @@
 		AD050C512EC135360082A313 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C502EC135360082A313 /* RevenueCatUI */; };
 		AD0B7BF52EC552FA008B29E7 /* LogYourBody.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */; };
 		AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */; };
+		AD9E00212F20002000ABCDEF /* HeroMetricInterpolationCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9E00202F20002000ABCDEF /* HeroMetricInterpolationCache.swift */; };
 		AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */; };
 		AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */; };
 		AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */; };
@@ -379,6 +380,7 @@
 		FE09A9A900000000000000B9 /* ProgressPhotoImagePipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE09A9A900000000000000F9 /* ProgressPhotoImagePipelineTests.swift */; };
 		FE10B0B000000000000000BA /* DashboardTimelineProviderPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE10B0B000000000000000FA /* DashboardTimelineProviderPerformanceTests.swift */; };
 		FE11C1C100000000000000BB /* ImageCacheServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE11C1C100000000000000FB /* ImageCacheServiceTests.swift */; };
+		AD9E00312F20003000ABCDEF /* HeroMetricInterpolationCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9E00302F20003000ABCDEF /* HeroMetricInterpolationCacheTests.swift */; };
 		FE12D2D100000000000000BC /* GoldenPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE12D2D100000000000000FC /* GoldenPathTests.swift */; };
 		FFC041175CAD1871B45B8FE6 /* RevenueCatPurchaseRestoreFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F9119B26AB2A527AA6E344 /* RevenueCatPurchaseRestoreFlowTests.swift */; };
 /* End PBXBuildFile section */
@@ -521,6 +523,7 @@
 		AD050C4A2EC12E590082A313 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = LogYourBody.storekit; sourceTree = "<group>"; };
 		AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricChartDataHelper.swift; sourceTree = "<group>"; };
+		AD9E00202F20002000ABCDEF /* HeroMetricInterpolationCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroMetricInterpolationCache.swift; sourceTree = "<group>"; };
 		AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PeriodSelector.swift; path = Components/PeriodSelector.swift; sourceTree = "<group>"; };
 		AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricAppIntents.swift; sourceTree = "<group>"; };
 		AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricLoggingService.swift; sourceTree = "<group>"; };
@@ -883,6 +886,7 @@
 		FE09A9A900000000000000F9 /* ProgressPhotoImagePipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoImagePipelineTests.swift; sourceTree = "<group>"; };
 		FE10B0B000000000000000FA /* DashboardTimelineProviderPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardTimelineProviderPerformanceTests.swift; sourceTree = "<group>"; };
 		FE11C1C100000000000000FB /* ImageCacheServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheServiceTests.swift; sourceTree = "<group>"; };
+		AD9E00302F20003000ABCDEF /* HeroMetricInterpolationCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroMetricInterpolationCacheTests.swift; sourceTree = "<group>"; };
 		FE12D2D100000000000000FC /* GoldenPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldenPathTests.swift; sourceTree = "<group>"; };
 		FECEBC7B2B956D26BF45822F /* DSLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLogo.swift; path = DesignSystem/Atoms/DSLogo.swift; sourceTree = "<group>"; };
 		FF0B649CA62200DAACE12AA8 /* AddEntrySheet+Part03.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AddEntrySheet+Part03.swift"; path = "AddEntrySheet+Part03.swift"; sourceTree = "<group>"; };
@@ -1450,6 +1454,7 @@
 				FE09A9A900000000000000F9 /* ProgressPhotoImagePipelineTests.swift */,
 				FE10B0B000000000000000FA /* DashboardTimelineProviderPerformanceTests.swift */,
 				FE11C1C100000000000000FB /* ImageCacheServiceTests.swift */,
+				AD9E00302F20003000ABCDEF /* HeroMetricInterpolationCacheTests.swift */,
 				FE12D2D100000000000000FC /* GoldenPathTests.swift */,
 			);
 			path = LogYourBodyTests;
@@ -1693,6 +1698,7 @@
 				ADA4B73D2ECFAB0B00F4262A /* TimelineCalculator.swift */,
 				AD4B1C7D2FFC0A4E00A3B9E1 /* LRUCache.swift */,
 				AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */,
+				AD9E00202F20002000ABCDEF /* HeroMetricInterpolationCache.swift */,
 				ADE1464A2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift */,
 				ADE1464B2EBF0BDF00B64DA0 /* TimelineZoomLevel.swift */,
 			);
@@ -1900,6 +1906,7 @@
 				FE09A9A900000000000000B9 /* ProgressPhotoImagePipelineTests.swift in Sources */,
 				FE10B0B000000000000000BA /* DashboardTimelineProviderPerformanceTests.swift in Sources */,
 				FE11C1C100000000000000BB /* ImageCacheServiceTests.swift in Sources */,
+				AD9E00312F20003000ABCDEF /* HeroMetricInterpolationCacheTests.swift in Sources */,
 				FE12D2D100000000000000BC /* GoldenPathTests.swift in Sources */,
 				A7876ACC0BAFED8A57643661 /* AccountDeletionAndShareCardTests.swift in Sources */,
 				5A5834631DA85239D455F320 /* AccountDeletionCleanupServiceTests.swift in Sources */,
@@ -2215,6 +2222,7 @@
 				AD050C412EBFD8160082A313 /* HapticManager.swift in Sources */,
 				AD4B1C7E2FFC0A4E00A3B9E1 /* LRUCache.swift in Sources */,
 				AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */,
+				AD9E00212F20002000ABCDEF /* HeroMetricInterpolationCache.swift in Sources */,
 				AD8F12F52ED7C987003C4559 /* BugReportManager.swift in Sources */,
 				AD8872D02EB946BE0041C426 /* MarkdownView.swift in Sources */,
 				AD8872D12EB946BE0041C426 /* StandardCard.swift in Sources */,
