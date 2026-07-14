@@ -96,6 +96,9 @@ enum Configuration {
         }
     }
 
+    /// Checks whether a value is a generic placeholder or default (keyword/empty only).
+    /// Used in `stringValue()` for ALL reads (Clerk, RevenueCat, Statsig, etc.).
+    /// Does NOT apply URL/host validation — that belongs in `isInvalidURLValue()`.
     static func isPlaceholder(_ value: String) -> Bool {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
@@ -110,14 +113,20 @@ enum Configuration {
             return true
         }
 
+        return false
+    }
+
+    /// Checks whether a URL-shaped value is invalid (corrupt/redacted or bad host).
+    /// Applied ONLY where a URL/host is expected (SUPABASE_URL, API_BASE_URL).
+    static func isInvalidURLValue(_ value: String) -> Bool {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
         // Corrupt/redacted xcconfig values (e.g. "***)") must not reach URLSession.
         if normalized.contains("*") {
             return true
         }
 
-        // Host validation only applies to URL-shaped values (SUPABASE_URL, API_BASE_URL).
-        // Non-URL values (pk_live_…, appl_… keys) are not hosts and must pass through,
-        // otherwise stringValue() silently erases real credentials to their defaults.
+        // Host validation: treat as invalid if the host fails service-host checks.
         if let url = URL(string: normalized),
            let scheme = url.scheme,
            ["http", "https"].contains(scheme),
@@ -250,12 +259,12 @@ enum Configuration {
         }
 
         let supabaseURL = URL(string: snapshot.supabaseURL)
-        if supabaseURL == nil || isPlaceholder(snapshot.supabaseURL) {
+        if supabaseURL == nil || isInvalidURLValue(snapshot.supabaseURL) {
             messages.append("Supabase URL must be configured.")
         }
 
         let apiBaseURL = URL(string: snapshot.apiBaseURL)
-        if apiBaseURL == nil || isPlaceholder(snapshot.apiBaseURL) {
+        if apiBaseURL == nil || isInvalidURLValue(snapshot.apiBaseURL) {
             messages.append("API base URL must be configured.")
         }
 
