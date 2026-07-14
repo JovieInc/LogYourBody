@@ -74,6 +74,47 @@ final class ImageCacheServiceTests: XCTestCase {
         XCTAssertNil(service.cachedImage(for: url))
     }
 
+    func testPreloadImagesLoadsAllDistinctURLsWithBoundedConcurrency() async throws {
+        let loader = CountingImageLoader(image: makeImage(color: .systemGreen), delayNanoseconds: 0)
+        let service = ImageCacheService(imageLoader: loader, notificationCenter: NotificationCenter())
+        // More URLs than the concurrency cap (4) to prove the sliding window still
+        // covers every item rather than dropping the tail.
+        let urls = (0..<7).map { "https://example.com/preload-\($0).jpg" }
+
+        service.preloadImages(urls)
+
+        // preloadImages is fire-and-forget; poll until every distinct URL loaded.
+        try await waitUntil { await loader.loadCount() == urls.count }
+
+        let cachedCount = urls.filter { service.cachedImage(for: $0) != nil }.count
+        XCTAssertEqual(cachedCount, urls.count)
+    }
+
+    func testPreloadImagesSkipsEmptyURLs() async throws {
+        let loader = CountingImageLoader(image: makeImage(color: .systemOrange), delayNanoseconds: 0)
+        let service = ImageCacheService(imageLoader: loader, notificationCenter: NotificationCenter())
+
+        service.preloadImages(["https://example.com/a.jpg", "", "https://example.com/b.jpg", ""])
+
+        try await waitUntil { await loader.loadCount() == 2 }
+        // Give any erroneous empty-string load a chance to register before asserting.
+        try await Task.sleep(nanoseconds: 20_000_000)
+        let loadCount = await loader.loadCount()
+        XCTAssertEqual(loadCount, 2)
+    }
+
+    private func waitUntil(
+        timeout: TimeInterval = 2.0,
+        _ condition: () async -> Bool
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if await condition() { return }
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        XCTFail("Condition not met within \(timeout)s")
+    }
+
     private func makeImage(color: UIColor) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
