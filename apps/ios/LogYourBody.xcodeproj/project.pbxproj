@@ -199,6 +199,8 @@
 		ADA4B7532ED0E61600F4262A /* ErrorReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7522ED0E61600F4262A /* ErrorReporter.swift */; };
 		ADA4B7542ED0E61600F4262A /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7502ED0E61600F4262A /* AppError.swift */; };
 		ADA4B7552ED0E61600F4262A /* AppLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7512ED0E61600F4262A /* AppLogger.swift */; };
+		AD9E000B2F20000100ABCDEF /* PerfSignpost.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9E000A2F20000100ABCDEF /* PerfSignpost.swift */; };
+		AD9E000D2F20000200ABCDEF /* FrameHitchMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9E000C2F20000200ABCDEF /* FrameHitchMonitor.swift */; };
 		ADA4B7582ED0E7D700F4262A /* DashboardFFMITile.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */; };
 		ADA4B7592ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */; };
 		ADA4B75B2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B75A2ED10FFC00F4262A /* DashboardViewLiquid+MetricsHelpers.swift */; };
@@ -708,6 +710,8 @@
 		ADA4B74E2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardBodyScoreHeroCard.swift; path = Components/DashboardBodyScoreHeroCard.swift; sourceTree = "<group>"; };
 		ADA4B7502ED0E61600F4262A /* AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppError.swift; sourceTree = "<group>"; };
 		ADA4B7512ED0E61600F4262A /* AppLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLogger.swift; sourceTree = "<group>"; };
+		AD9E000A2F20000100ABCDEF /* PerfSignpost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfSignpost.swift; sourceTree = "<group>"; };
+		AD9E000C2F20000200ABCDEF /* FrameHitchMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameHitchMonitor.swift; sourceTree = "<group>"; };
 		ADA4B7522ED0E61600F4262A /* ErrorReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorReporter.swift; sourceTree = "<group>"; };
 		ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardFFMITile.swift; path = Components/DashboardFFMITile.swift; sourceTree = "<group>"; };
 		ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardPrimaryMetricCard.swift; path = Components/DashboardPrimaryMetricCard.swift; sourceTree = "<group>"; };
@@ -1251,6 +1255,8 @@
 				ADF1F6BB2ED4C69F00745F33 /* UnitConversion.swift */,
 				ADA4B7502ED0E61600F4262A /* AppError.swift */,
 				ADA4B7512ED0E61600F4262A /* AppLogger.swift */,
+				AD9E000A2F20000100ABCDEF /* PerfSignpost.swift */,
+				AD9E000C2F20000200ABCDEF /* FrameHitchMonitor.swift */,
 				ADA4B7522ED0E61600F4262A /* ErrorReporter.swift */,
 				ADE6D39B2E24AD30001F82A8 /* LiquidGlassComponents.swift */,
 				ADE6D3962E24A96A001F82A8 /* ShakeDetector.swift */,
@@ -2116,6 +2122,8 @@
 				ADA6003A2ED2602F00088042 /* BodySpecAuthManager.swift in Sources */,
 				ADA4B7542ED0E61600F4262A /* AppError.swift in Sources */,
 				ADA4B7552ED0E61600F4262A /* AppLogger.swift in Sources */,
+				AD9E000B2F20000100ABCDEF /* PerfSignpost.swift in Sources */,
+				AD9E000D2F20000200ABCDEF /* FrameHitchMonitor.swift in Sources */,
 				43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */,
 				F0451813784DE99328797E5F /* DSText.swift in Sources */,
 				ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */,

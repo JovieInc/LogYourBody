@@ -10,6 +10,9 @@ extension DashboardViewLiquid {
         guard index >= 0 && index < metrics.count else { return }
         let metric = metrics[index]
 
+        let interval = PerfSignpost.begin("scrub_update_animated_values")
+        defer { PerfSignpost.end(interval) }
+
         withAnimation(.easeOut(duration: 0.18)) {
             // Weight
             let weightResult: InterpolatedMetric?

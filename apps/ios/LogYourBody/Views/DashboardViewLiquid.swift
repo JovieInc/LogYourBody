@@ -170,6 +170,7 @@ struct DashboardViewLiquid: View {
 
         let withLifecycle = base
             .onAppear {
+                LaunchMetrics.markFirstDashboardFrame()
                 Task { @MainActor in
                     await Task.yield()
                     handleOnAppear()
@@ -380,14 +381,16 @@ struct DashboardViewLiquid: View {
         Task { @MainActor in
             await Task.yield()
 
-            if rebuildDailyMetricsLookup {
-                rebuildDailyMetricsLookupCache()
-            }
+            PerfSignpost.measure("dashboard_derived_refresh") {
+                if rebuildDailyMetricsLookup {
+                    rebuildDailyMetricsLookupCache()
+                }
 
-            refreshGlobalTimelineStore()
+                refreshGlobalTimelineStore()
 
-            if let animatedIndex, !viewModel.bodyMetrics.isEmpty {
-                updateAnimatedValues(for: animatedIndex)
+                if let animatedIndex, !viewModel.bodyMetrics.isEmpty {
+                    updateAnimatedValues(for: animatedIndex)
+                }
             }
         }
     }
