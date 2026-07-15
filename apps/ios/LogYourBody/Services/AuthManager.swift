@@ -480,7 +480,11 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func getSupabaseToken() async -> String? {
-        await getAccessToken()
+        // The Jovie OAuth access token is scoped to LYB's first-party APIs and
+        // must never be forwarded to the retired Supabase data plane. Keep
+        // legacy sync fail-closed until those endpoints move behind LYB's
+        // server-side Neon adapter.
+        nil
     }
 
     private func refreshAccessToken() async -> String? {

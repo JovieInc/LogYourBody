@@ -19,6 +19,7 @@ Controls:
 - Apple, Google, email OTP, and password authentication are absent from the
   current product surface.
 
-The Supabase acceptance contract is mandatory: trusted issuer, pinned audience,
-`role=authenticated`, and RLS ownership based on the Better Auth `sub`. See
-`shared-identity-architecture.md` and `ios-auth-smoke-test.md` for rollout proof.
+Jovie access tokens are accepted only by LYB/Jovie first-party APIs. The legacy
+Supabase data plane is fail-closed during the Neon cutover and must not receive
+or attempt to validate a Jovie token. See `shared-identity-architecture.md` and
+`ios-auth-smoke-test.md` for rollout proof.

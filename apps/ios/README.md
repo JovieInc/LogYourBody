@@ -19,8 +19,8 @@ Native iOS app for LogYourBody - a fitness tracking application that helps users
 ## Tech Stack
 
 - **SwiftUI** - iOS 26 Liquid Glass design system
-- **Jovie Better Auth** - Shared phone-number identity through Supabase OIDC
-- **Supabase** - Product sessions, backend, and cloud sync
+- **Jovie Better Auth** - Shared phone-number identity through first-party OAuth/OIDC
+- **Neon** - Server-side identity projection and onboarding profile
 - **Core Data** - Local data persistence
 - **HealthKit** - Weight and step data integration
 
@@ -31,7 +31,7 @@ Native iOS app for LogYourBody - a fitness tracking application that helps users
 - Progress photo management
 - HealthKit integration
 - Body composition metrics
-- Cloud sync with Supabase
+- Local-first tracking while cloud data sync moves behind LYB's Neon-backed API
 - iOS widgets
 
 ## CI/CD

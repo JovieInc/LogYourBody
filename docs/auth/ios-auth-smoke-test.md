@@ -18,4 +18,4 @@
 7. Sign out; confirm the local session is removed and protected screens require login.
 8. Verify one `public.app_users` row exists for the Jovie `sub`, with no auth credentials stored in Neon.
 
-Reject the release if callback state validation fails, tokens appear in `UserDefaults`, the app connects directly to Neon, or any Supabase/Clerk/SSO surface appears.
+Reject the release if callback state validation fails, tokens appear in `UserDefaults`, the app connects directly to Neon, a Jovie token is sent to Supabase, or any Supabase/Clerk/SSO auth surface appears.

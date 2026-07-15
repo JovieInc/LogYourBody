@@ -4,7 +4,9 @@
 
 Jovie Better Auth is the single identity authority for Jovie, LogYourBody, and future first-party products. LogYourBody does not run its own auth service and does not broker authentication through Supabase, Clerk, Neon Auth, or another identity vendor.
 
-LogYourBody application data lives in its dedicated Neon project in the Jovie Neon organization. Neon stores a product-local projection keyed by Jovie's immutable OpenID Connect `sub`; it is not a second user directory.
+LogYourBody's identity projection and onboarding profile live in its dedicated Neon project in the Jovie Neon organization. Neon stores a product-local projection keyed by Jovie's immutable OpenID Connect `sub`; it is not a second user directory.
+
+The remaining native metrics, photo-storage, realtime, and sync migration is a separate rollout. Legacy Supabase paths are disabled during that cutover and must never receive a Jovie OAuth token.
 
 ## Login surface
 
@@ -42,9 +44,10 @@ Development web redirects are registered explicitly. Redirect matching is exact.
 ## Data ownership
 
 - Jovie owns credentials, verified phone numbers, OAuth grants, and global account identity.
-- LYB Neon owns onboarding state and all LYB product data.
+- LYB Neon owns the identity projection and onboarding state today, and is the destination for product data as each server-side replacement is verified.
 - `public.app_users.identity_subject` is the immutable join key to Jovie.
 - Neon credentials are server-only. iOS and browser clients use LYB APIs and never connect to Postgres directly.
+- Jovie access tokens are accepted only by LYB/Jovie first-party APIs. They are never forwarded to Supabase REST, Storage, Realtime, or Functions.
 - Vendor SDK/API calls remain behind internal ports and adapters.
 
 ## Security invariants
@@ -54,4 +57,4 @@ Development web redirects are registered explicitly. Redirect matching is exact.
 - Access tokens expire after 15 minutes; refresh tokens expire after 30 days.
 - OAuth client secrets and tokens are hashed in Jovie storage.
 - Web auth cookies are HttpOnly, Secure in production, SameSite=Lax, and path-scoped to `/`.
-- No Supabase or Clerk session is created anywhere in the flow.
+- No Supabase or Clerk auth session is created anywhere in the flow.
