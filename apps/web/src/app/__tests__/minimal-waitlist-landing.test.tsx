@@ -20,6 +20,12 @@ describe('MinimalWaitlistLanding', () => {
       screen.getByRole('button', { name: waitlistLandingCopy.submitLabel }),
     ).toBeInTheDocument();
     expect(screen.getByTestId('landing-product-proof')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: /one number is a moment/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /your progress/i })).toBeInTheDocument();
+    expect(screen.getByText('Weight')).toBeInTheDocument();
+    expect(screen.getByText('Body fat')).toBeInTheDocument();
     expect(screen.getByTestId('marketing-footer')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy');
     expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms');

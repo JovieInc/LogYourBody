@@ -1,4 +1,6 @@
 import { MinimalWaitlistLanding } from './MinimalWaitlistLanding';
+import { LegacyMinimalWaitlistLanding } from './LegacyMinimalWaitlistLanding';
+import { LANDING_FLAGS } from '@/lib/flags/landing';
 
 const landingStructuredData = {
   '@context': 'https://schema.org',
@@ -40,7 +42,11 @@ export default function HomePage() {
           __html: JSON.stringify(landingStructuredData).replace(/</g, '\\u003c'),
         }}
       />
-      <MinimalWaitlistLanding />
+      {LANDING_FLAGS.ART_DIRECTION_V2_ENABLED ? (
+        <MinimalWaitlistLanding />
+      ) : (
+        <LegacyMinimalWaitlistLanding />
+      )}
     </>
   );
 }

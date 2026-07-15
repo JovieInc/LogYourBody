@@ -31,7 +31,7 @@ describe('WaitlistForm', () => {
     const email = screen.getByRole('textbox', { name: 'Email' });
     fireEvent.focus(email);
     fireEvent.change(email, { target: { value: 'person@example.com' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Join the waitlist' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
 
     await screen.findByText(/TestFlight spot opens/i);
     expect(fetchMock).toHaveBeenCalledWith(
@@ -54,7 +54,7 @@ describe('WaitlistForm', () => {
 
   it('announces invalid email without making a request', async () => {
     render(<WaitlistForm />);
-    fireEvent.click(screen.getByRole('button', { name: 'Join the waitlist' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address.');
     expect(fetchMock).not.toHaveBeenCalled();
