@@ -10,6 +10,8 @@ LogYourBody is an iOS-first paid product. It should not become another food logg
 
 The first shippable wedge is a native iOS app where a user can sign in, pay, log weight/body composition/progress photos, and see a clear body-composition trend. Everything else waits for measured user pull.
 
+Product decisions must follow the [LogYourBody Brand Ethos](product/brand-ethos.md) and [Evidence and Recommendation Standard](product/evidence-and-recommendation-standard.md). The product optimizes changeable aspects of appearance within health and user agency; population reference ranges must never become silent personal targets.
+
 ## Design System Direction
 
 - Use the Joby/Jovie-style product language: dark-only, minimal, quiet, high-contrast, generous white space, and crisp system typography.
@@ -32,6 +34,7 @@ The app should feel like a body-composition heads-up display:
 - Know whether weight/body fat/FFMI are moving in the right direction.
 - Scrub the timeline to understand how the body changed over time.
 - Get a short, low-friction signal like "cutting", "maintenance", or "gaining" only when the data supports it.
+- Compare trends against goals the user explicitly selected, not sex-based aesthetic defaults.
 
 ## KPI Ladder
 

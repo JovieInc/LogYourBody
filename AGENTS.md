@@ -39,6 +39,18 @@ LogYourBody/
 
 ### Product Scope Guardrails
 
+The canonical product and brand standards are:
+
+- [`docs/product/brand-ethos.md`](docs/product/brand-ethos.md)
+- [`docs/product/evidence-and-recommendation-standard.md`](docs/product/evidence-and-recommendation-standard.md)
+
+- Optimize changeable aspects of physical appearance within health, informed consent, user agency, and body-image safety.
+- Never assign aesthetic goals from race, phenotype, hair or eye color, height, or another immutable trait.
+- Never infer a user's aesthetic preferences solely from sex or gender. Use biological sex only where a validated physiological calculation materially requires it.
+- Treat measured values, estimates, population references, and user-selected targets as distinct concepts in code and copy.
+- Do not provide prescriptive aesthetic coaching to minors, pregnant/postpartum users, users with known eating-disorder risk, or users pursuing unsafe targets.
+- Use scientific literature as the evidence source. Practitioners and creators may interpret research but do not replace it.
+
 - Treat the native paid iOS app as the only default product surface until usage proves otherwise.
 - Core product promise: answer "How am I doing?" from weight, body-composition, HealthKit, and progress-photo data with minimal user input.
 - Design should follow the Joby/Jovie-style system: dark-only, clean, concise, generous white space, pill-shaped auth controls, neutral surfaces, and Geist-like accent colors only where they communicate metric meaning or state.

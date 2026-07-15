@@ -112,6 +112,4 @@ This structure provides a clean separation of concerns between UI components, ro
 ## Database Migration Command
 
 To push migrations to the remote Supabase database, use:
-```bash
-npx supabase db push --password zzbTSr5i2y9QBXPu
-```
+Use the repository's documented Supabase migration workflow and provide credentials through the approved secret manager or environment variables. Never place database passwords in commands, source files, or tracked documentation.

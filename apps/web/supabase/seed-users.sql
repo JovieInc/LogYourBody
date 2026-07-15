@@ -48,10 +48,7 @@ BEGIN
     activity_level,
     bio,
     goal_weight,
-    goal_weight_unit,
-    goal_body_fat_percentage,
-    goal_waist_to_hip_ratio,
-    goal_waist_to_height_ratio
+    goal_weight_unit
   ) VALUES (
     id,
     'Sarah Chen',
@@ -63,10 +60,7 @@ BEGIN
     'moderately_active',
     'On a weight loss journey. Down 15 lbs so far! Love yoga and hiking.',
     63.5, -- 140 lbs goal
-    'kg',
-    20.0, -- Female optimal body fat
-    0.7,  -- Female optimal WHR
-    0.45  -- Female optimal WHtR
+    'kg'
   );
 
   -- Add body metrics showing weight loss progress with waist/hip measurements
@@ -117,11 +111,7 @@ BEGIN
     activity_level,
     bio,
     goal_weight,
-    goal_weight_unit,
-    goal_body_fat_percentage,
-    goal_ffmi,
-    goal_waist_to_hip_ratio,
-    goal_waist_to_height_ratio
+    goal_weight_unit
   ) VALUES (
     id,
     'Marcus Johnson',
@@ -133,11 +123,7 @@ BEGIN
     'very_active',
     'Powerlifter on a lean bulk. 4 years of training experience.',
     90.7, -- 200 lbs goal
-    'kg',
-    11.0, -- Male optimal body fat
-    22.0, -- Male optimal FFMI
-    0.9,  -- Male optimal WHR
-    0.475 -- Male optimal WHtR
+    'kg'
   );
 
   INSERT INTO body_metrics (user_id, date, weight, weight_unit, body_fat_percentage, muscle_mass, waist_circumference, hip_circumference, waist_unit, notes) VALUES

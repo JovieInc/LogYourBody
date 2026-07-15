@@ -70,7 +70,7 @@ func applyFirstPhotoUITestFixtureIfNeeded() {
             ffmi: 21.4,
             leanPercentile: 0.72,
             ffmiStatus: "Strong",
-            targetBodyFat: .init(lowerBound: 10, upperBound: 15, label: "Athletic"),
+            bodyFatReferenceRange: .init(lowerBound: 10, upperBound: 15, label: "Athletic"),
             statusTagline: "Strong base"
         )
         defaultHomeMode = .photo

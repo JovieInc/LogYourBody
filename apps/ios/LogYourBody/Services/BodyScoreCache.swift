@@ -66,19 +66,30 @@ private struct BodyScoreResultCodable: Codable {
     let ffmi: Double
     let leanPercentile: Double
     let ffmiStatus: String
-    let targetLower: Double
-    let targetUpper: Double
-    let targetLabel: String
+    let referenceLower: Double
+    let referenceUpper: Double
+    let referenceLabel: String
     let statusTagline: String
+
+    private enum CodingKeys: String, CodingKey {
+        case score
+        case ffmi
+        case leanPercentile
+        case ffmiStatus
+        case referenceLower = "targetLower"
+        case referenceUpper = "targetUpper"
+        case referenceLabel = "targetLabel"
+        case statusTagline
+    }
 
     init(result: BodyScoreResult) {
         self.score = result.score
         self.ffmi = result.ffmi
         self.leanPercentile = result.leanPercentile
         self.ffmiStatus = result.ffmiStatus
-        self.targetLower = result.targetBodyFat.lowerBound
-        self.targetUpper = result.targetBodyFat.upperBound
-        self.targetLabel = result.targetBodyFat.label
+        self.referenceLower = result.bodyFatReferenceRange.lowerBound
+        self.referenceUpper = result.bodyFatReferenceRange.upperBound
+        self.referenceLabel = result.bodyFatReferenceRange.label
         self.statusTagline = result.statusTagline
     }
 
@@ -88,7 +99,11 @@ private struct BodyScoreResultCodable: Codable {
             ffmi: ffmi,
             leanPercentile: leanPercentile,
             ffmiStatus: ffmiStatus,
-            targetBodyFat: .init(lowerBound: targetLower, upperBound: targetUpper, label: targetLabel),
+            bodyFatReferenceRange: .init(
+                lowerBound: referenceLower,
+                upperBound: referenceUpper,
+                label: referenceLabel
+            ),
             statusTagline: statusTagline
         )
     }

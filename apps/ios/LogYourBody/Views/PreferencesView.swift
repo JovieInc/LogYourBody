@@ -36,8 +36,9 @@ struct PreferencesView: View {
     @State var dailyReminderDate = Date()
     @State var cachedUserGender = ""
     @State var cachedIsFemale = false
-    @State var cachedDefaultBodyFatGoal = Constants.BodyComposition.BodyFat.maleIdealValue
-    @State var cachedDefaultFFMIGoal = Constants.BodyComposition.FFMI.maleIdealValue
+    @State var cachedLegacyBodyFatReference = Constants.BodyComposition.BodyFat.maleReferenceMidpoint
+    @State var cachedLegacyFFMIReference = Constants.BodyComposition.FFMI.maleReferenceMidpoint
+    @State var featureGateRefreshToken = UUID()
 
     static var defaultMeasurementSystem: String {
         MeasurementSystem.imperial.rawValue
@@ -115,6 +116,9 @@ struct PreferencesView: View {
             Task {
                 await notificationManager.refreshAuthorizationStatus()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            featureGateRefreshToken = UUID()
         }
     }
 

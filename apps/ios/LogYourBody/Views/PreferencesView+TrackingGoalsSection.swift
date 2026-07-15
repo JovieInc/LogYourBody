@@ -8,7 +8,9 @@ extension PreferencesView {
     var trackingGoalsSection: some View {
         SettingsSection(
             header: "Tracking & goals",
-            footer: "Set custom targets or use defaults."
+            footer: usesIndividualizedAestheticGoals
+                ? "Set targets that reflect your goals."
+                : "Set custom targets or use defaults."
         ) {
             VStack(spacing: 0) {
                 measurementSystemSection
@@ -70,29 +72,47 @@ extension PreferencesView {
         cachedIsFemale
     }
 
-    var defaultBodyFatGoal: Double {
-        cachedDefaultBodyFatGoal
+    var usesIndividualizedAestheticGoals: Bool {
+        _ = featureGateRefreshToken
+
+        return AppServicePorts.analyticsTracker.isFeatureEnabled(
+            flagKey: AppFeatureGate.individualizedAestheticGoals
+        )
     }
 
-    var defaultFFMIGoal: Double {
-        cachedDefaultFFMIGoal
+    var legacyBodyFatReference: Double {
+        cachedLegacyBodyFatReference
     }
 
-    var currentBodyFatGoal: Double {
-        customBodyFatGoal ?? defaultBodyFatGoal
+    var legacyFFMIReference: Double {
+        cachedLegacyFFMIReference
     }
 
-    var currentFFMIGoal: Double {
-        customFFMIGoal ?? defaultFFMIGoal
+    var currentBodyFatGoal: Double? {
+        AestheticGoalPolicy.resolvedGoal(
+            explicitGoal: customBodyFatGoal,
+            legacyReferenceMidpoint: legacyBodyFatReference,
+            individualizedGoalsEnabled: usesIndividualizedAestheticGoals
+        )
+    }
+
+    var currentFFMIGoal: Double? {
+        AestheticGoalPolicy.resolvedGoal(
+            explicitGoal: customFFMIGoal,
+            legacyReferenceMidpoint: legacyFFMIReference,
+            individualizedGoalsEnabled: usesIndividualizedAestheticGoals
+        )
     }
 
     func updateCachedValues() {
         cachedUserGender = authManager.currentUser?.profile?.gender?.lowercased() ?? ""
         cachedIsFemale = cachedUserGender.contains("female") || cachedUserGender.contains("woman")
-        cachedDefaultBodyFatGoal = cachedIsFemale ? Constants.BodyComposition.BodyFat.femaleIdealValue :
-            Constants.BodyComposition.BodyFat.maleIdealValue
-        cachedDefaultFFMIGoal = cachedIsFemale ? Constants.BodyComposition.FFMI.femaleIdealValue :
-            Constants.BodyComposition.FFMI.maleIdealValue
+        cachedLegacyBodyFatReference = cachedIsFemale ?
+            Constants.BodyComposition.BodyFat.femaleReferenceMidpoint :
+            Constants.BodyComposition.BodyFat.maleReferenceMidpoint
+        cachedLegacyFFMIReference = cachedIsFemale ?
+            Constants.BodyComposition.FFMI.femaleReferenceMidpoint :
+            Constants.BodyComposition.FFMI.maleReferenceMidpoint
     }
 
     func resetToDefaults() {
@@ -108,9 +128,13 @@ extension PreferencesView {
                 "\(String(format: "%.1f", $0)) \(currentSystem.weightUnit)"
             } ?? "Not set"
         case .bodyFat:
-            return String(format: "%.1f%%", currentBodyFatGoal) + (customBodyFatGoal == nil ? " (default)" : "")
+            guard let currentBodyFatGoal else { return "Not set" }
+            let suffix = customBodyFatGoal == nil ? " (default)" : ""
+            return String(format: "%.1f%%", currentBodyFatGoal) + suffix
         case .ffmi:
-            return String(format: "%.1f", currentFFMIGoal) + (customFFMIGoal == nil ? " (default)" : "")
+            guard let currentFFMIGoal else { return "Not set" }
+            let suffix = customFFMIGoal == nil ? " (default)" : ""
+            return String(format: "%.1f", currentFFMIGoal) + suffix
         }
     }
 
@@ -141,9 +165,15 @@ extension PreferencesView {
         case .weight:
             return customWeightGoal.map { String(format: "%.1f", $0) } ?? ""
         case .bodyFat:
-            return customBodyFatGoal.map { String(format: "%.1f", $0) } ?? String(format: "%.1f", defaultBodyFatGoal)
+            if let customBodyFatGoal {
+                return String(format: "%.1f", customBodyFatGoal)
+            }
+            return usesIndividualizedAestheticGoals ? "" : String(format: "%.1f", legacyBodyFatReference)
         case .ffmi:
-            return customFFMIGoal.map { String(format: "%.1f", $0) } ?? String(format: "%.1f", defaultFFMIGoal)
+            if let customFFMIGoal {
+                return String(format: "%.1f", customFFMIGoal)
+            }
+            return usesIndividualizedAestheticGoals ? "" : String(format: "%.1f", legacyFFMIReference)
         }
     }
 

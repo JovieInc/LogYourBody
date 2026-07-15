@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { BodyFatScale } from '@/components/BodyFatScale';
+import { usesIndividualizedAestheticGoals } from '@/lib/flags/aesthetic-goals';
 import { UserProfile } from '@/types/body-metrics';
 import { calculateFFMI, getBodyFatCategory, convertWeight } from '@/utils/body-calculations';
 import { getAvatarUrl } from '@/utils/avatar-utils';
@@ -511,6 +512,13 @@ export const ProfilePanel = ({
               <BodyFatScale
                 currentBF={displayValues?.bodyFatPercentage}
                 gender={user?.gender as 'male' | 'female' | undefined}
+                goalRange={
+                  usesIndividualizedAestheticGoals()
+                    ? undefined
+                    : user?.gender === 'female'
+                      ? { min: 18, max: 22 }
+                      : { min: 8, max: 12 }
+                }
               />
             </div>
           </div>

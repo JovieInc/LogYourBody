@@ -8,6 +8,7 @@ struct BodyScoreRevealView: View {
     @State private var animateScore = false
     @State private var isSharePresented = false
     @State private var sharePayload: BodyScoreSharePayload?
+    @State private var featureGateRefreshToken = UUID()
 
     private var percentileGroupLabel: String {
         let sex = viewModel.bodyScoreInput.sex
@@ -19,6 +20,14 @@ struct BodyScoreRevealView: View {
         default:
             return "people your age and height"
         }
+    }
+
+    private var usesIndividualizedAestheticGoals: Bool {
+        _ = featureGateRefreshToken
+
+        return AppServicePorts.analyticsTracker.isFeatureEnabled(
+            flagKey: AppFeatureGate.individualizedAestheticGoals
+        )
     }
 
     var body: some View {
@@ -41,7 +50,7 @@ struct BodyScoreRevealView: View {
                             .offset(y: animateScore ? 0 : 12)
                             .animation(.easeOut(duration: 0.4).delay(0.1), value: animateScore)
 
-                        targetPill(result: result)
+                        referencePill(result: result)
                             .opacity(animateScore ? 1 : 0)
                             .offset(y: animateScore ? 0 : 16)
                             .animation(.easeOut(duration: 0.4).delay(0.15), value: animateScore)
@@ -77,6 +86,9 @@ struct BodyScoreRevealView: View {
             } else {
                 animateScore = false
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            featureGateRefreshToken = UUID()
         }
         .sheet(isPresented: $isSharePresented) {
             if let payload = sharePayload {
@@ -116,13 +128,18 @@ struct BodyScoreRevealView: View {
         }
     }
 
-    private func targetPill(result: BodyScoreResult) -> some View {
+    private func referencePill(result: BodyScoreResult) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "info.circle")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Color.appPrimary)
 
-            Text("Target: \(Int(result.targetBodyFat.lowerBound))–\(Int(result.targetBodyFat.upperBound))% (\(result.targetBodyFat.label))")
+            Text(
+                "\(usesIndividualizedAestheticGoals ? "Reference" : "Target"): " +
+                    "\(Int(result.bodyFatReferenceRange.lowerBound))–" +
+                    "\(Int(result.bodyFatReferenceRange.upperBound))% " +
+                    "(\(result.bodyFatReferenceRange.label))"
+            )
                 .font(OnboardingTypography.caption)
                 .foregroundStyle(Color.appTextSecondary)
         }
@@ -198,7 +215,7 @@ struct BodyScoreRevealView: View {
         ffmi: 21.4,
         leanPercentile: 78,
         ffmiStatus: "Advanced",
-        targetBodyFat: .init(lowerBound: 10, upperBound: 15, label: "Lean"),
+        bodyFatReferenceRange: .init(lowerBound: 10, upperBound: 15, label: "Lean"),
         statusTagline: "Solid base. Room to tighten up."
     )
     let vm = OnboardingFlowViewModel()

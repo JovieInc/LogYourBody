@@ -61,7 +61,7 @@ struct DashboardViewLiquid: View {
     @State var animatedBodyFat: Double = 0
     @State var animatedFFMI: Double = 0
 
-    // Goals - Optional values, nil means use gender-based default
+    // User-owned goals. Legacy reference fallbacks remain behind the rollout gate.
     @AppStorage("stepGoal") var stepGoal: Int = 10_000
     @AppStorage(Constants.goalFFMIKey) var customFFMIGoal: Double?
     @AppStorage(Constants.goalBodyFatPercentageKey) var customBodyFatGoal: Double?

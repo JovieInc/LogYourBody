@@ -194,7 +194,7 @@ struct BodyScoreInput: Codable, Equatable {
 }
 
 struct BodyScoreResult: Equatable {
-    struct TargetRange: Equatable {
+    struct ReferenceRange: Equatable {
         let lowerBound: Double
         let upperBound: Double
         let label: String
@@ -204,7 +204,7 @@ struct BodyScoreResult: Equatable {
     let ffmi: Double
     let leanPercentile: Double
     let ffmiStatus: String
-    let targetBodyFat: TargetRange
+    let bodyFatReferenceRange: ReferenceRange
     let statusTagline: String
 }
 

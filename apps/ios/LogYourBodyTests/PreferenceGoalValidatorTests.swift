@@ -13,6 +13,65 @@ import UIKit
 
 
 final class PreferenceGoalValidatorTests: XCTestCase {
+    func testIndividualizedGoalPolicyLeavesUnsetGoalsNilForEverySexReference() {
+        XCTAssertNil(
+            AestheticGoalPolicy.resolvedGoal(
+                explicitGoal: nil,
+                legacyReferenceMidpoint: Constants.BodyComposition.BodyFat.maleReferenceMidpoint,
+                individualizedGoalsEnabled: true
+            )
+        )
+        XCTAssertNil(
+            AestheticGoalPolicy.resolvedGoal(
+                explicitGoal: nil,
+                legacyReferenceMidpoint: Constants.BodyComposition.BodyFat.femaleReferenceMidpoint,
+                individualizedGoalsEnabled: true
+            )
+        )
+        XCTAssertNil(
+            AestheticGoalPolicy.resolvedGoal(
+                explicitGoal: nil,
+                legacyReferenceMidpoint: 0,
+                individualizedGoalsEnabled: true
+            ),
+            "Unknown sex must not create an aesthetic goal"
+        )
+    }
+
+    func testIndividualizedGoalPolicyPreservesExplicitGoal() {
+        XCTAssertEqual(
+            AestheticGoalPolicy.resolvedGoal(
+                explicitGoal: 19.5,
+                legacyReferenceMidpoint: 10,
+                individualizedGoalsEnabled: true
+            ),
+            19.5
+        )
+    }
+
+    func testClearingExplicitGoalReturnsToUnset() {
+        let clearedGoal: Double? = nil
+
+        XCTAssertNil(
+            AestheticGoalPolicy.resolvedGoal(
+                explicitGoal: clearedGoal,
+                legacyReferenceMidpoint: 18,
+                individualizedGoalsEnabled: true
+            )
+        )
+    }
+
+    func testLegacyGoalPolicyRetainsFallbackUntilGateRollout() {
+        XCTAssertEqual(
+            AestheticGoalPolicy.resolvedGoal(
+                explicitGoal: nil,
+                legacyReferenceMidpoint: 18,
+                individualizedGoalsEnabled: false
+            ),
+            18
+        )
+    }
+
     func testAcceptsValidGoalValuesAtBoundaries() {
         XCTAssertEqual(
             PreferenceGoalValidator.validate("1", for: .weight),

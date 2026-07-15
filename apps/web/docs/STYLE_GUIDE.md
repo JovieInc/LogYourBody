@@ -1,6 +1,8 @@
 # LogYourBody Style Guide
 
-This guide defines the design principles and tokens used across our product. It serves as the single source of truth for our team and for any automated tools.
+This guide defines the implementation principles and tokens used across the web product.
+
+All visual and copy decisions must also follow the canonical [Brand Ethos](../../../docs/product/brand-ethos.md) and [Evidence and Recommendation Standard](../../../docs/product/evidence-and-recommendation-standard.md).
 
 ## Design Tokens
 

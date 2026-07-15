@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
-import { format, subDays, subMonths, subYears } from 'date-fns'
+import { format, subYears } from 'date-fns'
 import { getProfileAvatarUrl } from '../src/utils/pravatar-utils'
 
 // Load environment variables
@@ -73,9 +73,9 @@ const users = [
       bio: 'On a weight loss journey. Down 15 lbs so far! Love yoga and hiking.',
       goal_weight: 63.5,
       goal_weight_unit: 'kg',
-      goal_body_fat_percentage: 20.0,
-      goal_waist_to_hip_ratio: 0.7,
-      goal_waist_to_height_ratio: 0.45,
+      goal_body_fat_percentage: null,
+      goal_waist_to_hip_ratio: null,
+      goal_waist_to_height_ratio: null,
       avatar_url: getProfileAvatarUrl('sarahc', 300),
       settings: {
         units: {
@@ -132,10 +132,10 @@ const users = [
       bio: 'Powerlifter on a lean bulk. 4 years of training experience.',
       goal_weight: 90.7,
       goal_weight_unit: 'kg',
-      goal_body_fat_percentage: 11.0,
-      goal_ffmi: 22.0,
-      goal_waist_to_hip_ratio: 0.9,
-      goal_waist_to_height_ratio: 0.475,
+      goal_body_fat_percentage: null,
+      goal_ffmi: null,
+      goal_waist_to_hip_ratio: null,
+      goal_waist_to_height_ratio: null,
       avatar_url: getProfileAvatarUrl('marcusj', 300),
       settings: {
         units: {
@@ -195,9 +195,9 @@ const users = [
       height_unit: 'cm',
       activity_level: 'very_active',
       bio: 'Personal trainer. Maintaining my physique year-round.',
-      goal_body_fat_percentage: 20.0,
-      goal_waist_to_hip_ratio: 0.7,
-      goal_waist_to_height_ratio: 0.45,
+      goal_body_fat_percentage: null,
+      goal_waist_to_hip_ratio: null,
+      goal_waist_to_height_ratio: null,
       avatar_url: getProfileAvatarUrl('emilyr', 300),
       settings: {
         units: {
@@ -254,10 +254,10 @@ const users = [
       bio: 'Software engineer getting back in shape. Down 25 lbs!',
       goal_weight: 77.1,
       goal_weight_unit: 'kg',
-      goal_body_fat_percentage: 11.0,
-      goal_ffmi: 22.0,
-      goal_waist_to_hip_ratio: 0.9,
-      goal_waist_to_height_ratio: 0.475,
+      goal_body_fat_percentage: null,
+      goal_ffmi: null,
+      goal_waist_to_hip_ratio: null,
+      goal_waist_to_height_ratio: null,
       avatar_url: getProfileAvatarUrl('davidk', 300),
       settings: {
         units: {
@@ -312,9 +312,9 @@ const users = [
       height_unit: 'cm',
       activity_level: 'extremely_active',
       bio: 'CrossFit athlete. Body recomposition in progress!',
-      goal_body_fat_percentage: 20.0,
-      goal_waist_to_hip_ratio: 0.7,
-      goal_waist_to_height_ratio: 0.45,
+      goal_body_fat_percentage: null,
+      goal_waist_to_hip_ratio: null,
+      goal_waist_to_height_ratio: null,
       avatar_url: getProfileAvatarUrl('jessicat', 300),
       settings: {
         units: {
@@ -379,7 +379,7 @@ async function seedComprehensiveData() {
     
     // Try to sign in first (in case user already exists)
     let userId: string | null = null
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    const { data: signInData } = await supabase.auth.signInWithPassword({
       email: userData.email,
       password: userData.password
     })
@@ -483,13 +483,6 @@ async function seedComprehensiveData() {
     const progressPhotos = userData.progressPhotos.map(photo => {
       const photoDate = new Date()
       photoDate.setDate(photoDate.getDate() - photo.daysAgo)
-      
-      // Find closest body metrics entry
-      const closestMetric = metricsToInsert.reduce((prev, curr) => {
-        const prevDiff = Math.abs(new Date(prev.date).getTime() - photoDate.getTime())
-        const currDiff = Math.abs(new Date(curr.date).getTime() - photoDate.getTime())
-        return currDiff < prevDiff ? curr : prev
-      })
       
       return {
         user_id: userId,
