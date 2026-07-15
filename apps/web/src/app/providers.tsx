@@ -64,7 +64,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             </ClerkAuthProvider>
           </AuthRuntimeProvider>
         ) : (
-          <PWAProvider>{children}</PWAProvider>
+          <>{children}</>
         )}
       </ThemeProvider>
     </QueryClientProvider>

@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "sync:marketing-assets": "node ../../scripts/marketing/sync-ios-marketing-assets.mjs",
+    "prebuild": "pnpm sync:marketing-assets",
     "build": "node scripts/next-build.cjs",
     "build:analyze": "ANALYZE=true next build",
     "start": "next start",

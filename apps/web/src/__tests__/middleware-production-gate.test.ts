@@ -82,12 +82,19 @@ const discoveredProductionDebugRoutes = collectAppRouteFiles(join(process.cwd(),
 
 describe('middleware production debug/test gate', () => {
   const originalVercelEnv = process.env.VERCEL_ENV;
+  const originalLandingV2 = process.env.NEXT_PUBLIC_LYB_WAITLIST_V2;
 
   afterEach(() => {
     if (originalVercelEnv === undefined) {
       delete process.env.VERCEL_ENV;
     } else {
       process.env.VERCEL_ENV = originalVercelEnv;
+    }
+
+    if (originalLandingV2 === undefined) {
+      delete process.env.NEXT_PUBLIC_LYB_WAITLIST_V2;
+    } else {
+      process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 = originalLandingV2;
     }
 
     jest.resetModules();
@@ -226,4 +233,43 @@ describe('middleware production debug/test gate', () => {
       expect(mockProtect).not.toHaveBeenCalled();
     },
   );
+
+  it('assigns an explicit campaign audience through an internal rewrite and sticky cookie', async () => {
+    process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 = '1';
+    const { default: middleware } = await import('../middleware');
+    const request = new NextRequest('https://logyourbody.com/?audience=women&goal=fat-loss');
+
+    const response = await middleware(request, {} as never);
+    const rewrite = response?.headers.get('x-middleware-rewrite');
+
+    expect(rewrite).toContain('_lyb_audience=women');
+    expect(rewrite).toContain('_lyb_assignment_source=campaign');
+    expect(response?.cookies.get('lyb_landing_audience_v1')?.value).toBe('women');
+    expect(mockProtectedMiddleware).not.toHaveBeenCalled();
+  });
+
+  it('reuses a returning audience assignment instead of randomizing again', async () => {
+    process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 = '1';
+    const { default: middleware } = await import('../middleware');
+    const request = new NextRequest('https://logyourbody.com/', {
+      headers: { cookie: 'lyb_landing_audience_v1=men' },
+    });
+
+    const response = await middleware(request, {} as never);
+    const rewrite = response?.headers.get('x-middleware-rewrite');
+
+    expect(rewrite).toContain('_lyb_audience=men');
+    expect(rewrite).toContain('_lyb_assignment_source=returning');
+  });
+
+  it('allocates an unassigned visitor to one of the two registered experiment arms', async () => {
+    process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 = '1';
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.75);
+    const { default: middleware } = await import('../middleware');
+    const response = await middleware(new NextRequest('https://logyourbody.com/'), {} as never);
+    const rewrite = response?.headers.get('x-middleware-rewrite');
+
+    expect(rewrite).toContain('_lyb_audience=women');
+    expect(rewrite).toContain('_lyb_assignment_source=experiment');
+  });
 });
