@@ -16,8 +16,9 @@ AUTH_REDIRECT_URI = logyourbody:/$()/oauth
 ```
 
 The Supabase project must register `custom:jovie` as an OIDC provider with issuer
-`https://jov.ie`. Its confidential Better Auth client allows only the callback URL
-shown by Supabase. Supabase must allow `logyourbody://oauth` as an app redirect.
+`https://jov.ie/api/auth`. Its confidential Better Auth client allows only the
+callback URL shown by Supabase. Supabase must allow `logyourbody://oauth` as an app
+redirect.
 
 Supabase values remain environment-specific:
 

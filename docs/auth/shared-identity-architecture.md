@@ -17,8 +17,8 @@ legacy session migration for LogYourBody.
 
 ## Service Boundary
 
-The identity module is published by `https://jov.ie` and owns only identity
-concerns:
+The identity module is published at `https://jov.ie/api/auth` (the exact OIDC
+issuer, including Better Auth's base path) and owns only identity concerns:
 
 - Better Auth core user, account, session, verification, and signing-key tables.
 - OAuth client registrations and grants for first-party products.
@@ -210,7 +210,10 @@ Do not merge or deploy the identity flip until all of these pass:
 
 - Better Auth OAuth discovery and JWKS are reachable at the production-shaped
   issuer path.
-- Public-client authorization code flow rejects missing/wrong PKCE and state.
+- The confidential Supabase authorization-code flow rejects the wrong client
+  secret, redirect URI, nonce, or state.
+- Supabase's downstream native authorization-code flow rejects missing/wrong PKCE
+  and state.
 - SMS send/verify is rate-limited, non-enumerating, and works through Twilio Verify.
 - Access-token refresh, reuse rejection, logout, and remote revocation are proven.
 - Supabase links the Jovie OIDC subject to a stable product principal and accepts
