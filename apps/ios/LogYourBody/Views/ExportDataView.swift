@@ -4,6 +4,7 @@
 //
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct ExportDataView: View {
     @Environment(\.dismiss)
@@ -28,9 +29,9 @@ struct ExportDataView: View {
         var description: String {
             switch self {
             case .email:
-                return "Receive a secure download link via email"
+                return "Receive a secure JSON download link at your registered email address."
             case .download:
-                return "Download directly to this device"
+                return "Save one JSON file directly to this device."
             }
         }
     }
@@ -57,305 +58,31 @@ struct ExportDataView: View {
 
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.jovieCanvas
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 16) {
-                        Image(systemName: "square.and.arrow.up.on.square")
-                            .font(.system(size: 50))
-                            .foregroundColor(.appPrimary)
-                            .symbolRenderingMode(.hierarchical)
-
-                        Text("Export Your Data")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.appText)
-
-                        Text("Download all your LogYourBody data for your records or to transfer to another service")
-                            .font(.body)
-                            .foregroundColor(.appTextSecondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    .padding(.top, 20)
-
-                    // Export Options
-                    VStack(spacing: 16) {
-                        // Export Method Selection
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Export Method")
-                                .font(.headline)
-                                .foregroundColor(.appText)
-                                .padding(.horizontal)
-
-                            VStack(spacing: 0) {
-                                ForEach(ExportMethod.allCases, id: \.self) { method in
-                                    Button(
-                                        action: {
-                                            exportMethod = method
-                                        },
-                                        label: {
-                                            HStack {
-                                                Image(systemName: exportMethod == method ? "checkmark.circle.fill" : "circle")
-                                                    .font(.system(size: 20))
-                                                    .foregroundColor(exportMethod == method ? .appPrimary : .appBorder)
-
-                                                VStack(alignment: .leading, spacing: 4) {
-                                                    Text(method.rawValue)
-                                                        .font(.body)
-                                                        .foregroundColor(.appText)
-
-                                                    Text(method.description)
-                                                        .font(.caption)
-                                                        .foregroundColor(.appTextSecondary)
-                                                }
-
-                                                Spacer()
-                                            }
-                                            .padding()
-                                            .background(Color.appCard)
-                                        }
-                                    )
-                                    .buttonStyle(PlainButtonStyle())
-
-                                    if method != ExportMethod.allCases.last {
-                                        Divider()
-                                            .background(Color.appBorder)
-                                    }
-                                }
-                            }
-                            .background(Color.appCard)
-                            .cornerRadius(12)
-                            .padding(.horizontal)
-                        }
-
-                        // Format Selection (only for direct download)
-                        if exportMethod == .download {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Export Format")
-                                    .font(.headline)
-                                    .foregroundColor(.appText)
-                                    .padding(.horizontal)
-
-                                VStack(spacing: 0) {
-                                    ForEach(ExportFormat.allCases, id: \.self) { format in
-                                        Button(
-                                            action: {
-                                                guard format == .json else { return }
-
-                                                if selectedFormats.contains(format) {
-                                                    selectedFormats.remove(format)
-                                                } else {
-                                                    selectedFormats = [format]
-                                                }
-                                            },
-                                            label: {
-                                                HStack {
-                                                    Image(
-                                                        systemName: selectedFormats.contains(format)
-                                                            ? "checkmark.square.fill"
-                                                            : "square"
-                                                    )
-                                                    .font(.system(size: 20))
-                                                    .foregroundColor(
-                                                        selectedFormats.contains(format)
-                                                            ? .appPrimary
-                                                            : .appBorder
-                                                    )
-
-                                                    VStack(alignment: .leading, spacing: 4) {
-                                                        Text(format.rawValue)
-                                                            .font(.body)
-                                                            .foregroundColor(format == .json ? .appText : .appTextSecondary)
-
-                                                        Text(
-                                                            format == .json
-                                                                ? "Complete data with all fields"
-                                                                : "Use the email request option for CSV export"
-                                                        )
-                                                        .font(.caption)
-                                                        .foregroundColor(.appTextSecondary)
-                                                    }
-
-                                                    Spacer()
-                                                }
-                                                .padding()
-                                                .background(Color.appCard)
-                                            }
-                                        )
-                                        .buttonStyle(PlainButtonStyle())
-                                        .disabled(format != .json)
-                                        .opacity(format == .json ? 1 : 0.6)
-
-                                        if format != ExportFormat.allCases.last {
-                                            Divider()
-                                                .background(Color.appBorder)
-                                        }
-                                    }
-                                }
-                                .background(Color.appCard)
-                                .cornerRadius(12)
-                                .padding(.horizontal)
-                            }
-                        }
-
-                        // Include Photos Option (only for direct download)
-                        if exportMethod == .download {
-                            Button(
-                                action: {
-                                    includePhotos = false
-                                },
-                                label: {
-                                    HStack {
-                                        Image(systemName: includePhotos ? "checkmark.square.fill" : "square")
-                                            .font(.system(size: 20))
-                                            .foregroundColor(includePhotos ? .appPrimary : .appBorder)
-
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("Include Progress Photos")
-                                                .font(.body)
-                                                .foregroundColor(.appTextSecondary)
-
-                                            Text("Use the email request option for progress photos")
-                                                .font(.caption)
-                                                .foregroundColor(.appTextSecondary)
-                                        }
-
-                                        Spacer()
-                                    }
-                                    .padding()
-                                    .background(Color.appCard)
-                                    .cornerRadius(12)
-                                }
-                            )
-                            .buttonStyle(PlainButtonStyle())
-                            .disabled(true)
-                            .opacity(0.6)
-                            .padding(.horizontal)
-                        }
-                    }
-
-                    // Data Included Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Data Included")
-                            .font(.headline)
-                            .foregroundColor(.appText)
-                            .padding(.horizontal)
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            DataTypeRow(
-                                icon: "person.fill",
-                                title: "Profile Information",
-                                description: "Name, email, date of birth, height"
-                            )
-                            DataTypeRow(
-                                icon: "scalemass",
-                                title: "Body Metrics",
-                                description: "Weight, body fat %, measurements"
-                            )
-                            DataTypeRow(
-                                icon: "chart.line.uptrend.xyaxis",
-                                title: "Progress History",
-                                description: "All historical data points"
-                            )
-                            DataTypeRow(
-                                icon: "calendar",
-                                title: "Daily Logs",
-                                description: "Activity, notes, and check-ins"
-                            )
-                            if exportMethod == .download && includePhotos {
-                                DataTypeRow(
-                                    icon: "photo",
-                                    title: "Progress Photos",
-                                    description: "All uploaded photos"
-                                )
-                            }
-                        }
-                        .padding()
-                        .background(Color.appCard)
-                        .cornerRadius(12)
-                        .padding(.horizontal)
-                    }
-
-                    // Export Button
-                    Button(action: exportData) {
-                        HStack {
-                            if isExporting {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "square.and.arrow.up")
-                                Text("Export Data")
-                                    .fontWeight(.semibold)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(isExportDisabled ? Color.appBorder : Color.white)
-                        .foregroundColor(isExportDisabled ? .appTextTertiary : .black)
-                        .cornerRadius(25)
-                    }
-                    .disabled(isExportDisabled)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-
-                    if exportMethod == .download {
-                        Text(
-                            "Direct download currently exports one JSON file. "
-                            + "Use the email request link for CSV or progress photos."
-                        )
-                            .font(.caption)
-                            .foregroundColor(.appTextSecondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                    }
-
-                    // Privacy Note
-                    VStack(spacing: 8) {
-                        Text(
-                            exportMethod == .email
-                                ? "A secure download link will be sent to your registered email address. "
-                                + "The link will expire after 24 hours."
-                                : "Your data export will be prepared and saved to your device. You can then "
-                                + "share it or save it to your preferred location."
-                        )
-                        .font(.caption)
-                        .foregroundColor(.appTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-
-                        Button(action: requestExportViaEmail) {
-                            Text("Or email support to request a data export")
-                                .font(.caption)
-                                .foregroundColor(.appPrimary)
-                                .underline()
-                        }
-                    }
-                    .padding(.bottom, 20)
+                VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
+                    exportHeader
+                    deliveryMethodPicker
+                    deliveryDetails
+                    includedData
+                    privacyAndSupport
                 }
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.top, JovieTokens.sectionGap)
+                .padding(.bottom, 20)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
 
             if isExporting {
-                Color.black.opacity(0.5)
-                    .ignoresSafeArea()
-
-                VStack(spacing: 20) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.5)
-
-                    Text("Preparing your data...")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                }
-                .padding(40)
-                .background(Color.appCard)
-                .cornerRadius(20)
+                exportProgressOverlay
             }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            exportAction
         }
         .navigationTitle("Export Data")
         .navigationBarTitleDisplayMode(.inline)
@@ -364,15 +91,19 @@ struct ExportDataView: View {
                 Button("Cancel") {
                     dismiss()
                 }
+                .accessibilityLabel("Cancel export")
             }
         }
-        .alert("Export Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
+        .alert("Export failed", isPresented: $showError) {
+            Button("Try Again") {
+                exportData()
+            }
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text(errorMessage)
         }
-        .alert("Export Successful", isPresented: $showSuccess) {
-            Button("OK", role: .cancel) {
+        .alert("Export ready", isPresented: $showSuccess) {
+            Button("Done", role: .cancel) {
                 dismiss()
             }
         } message: {
@@ -383,6 +114,195 @@ struct ExportDataView: View {
                 ShareSheet(items: [url])
                     .ignoresSafeArea()
             }
+        }
+        .onChange(of: exportMethod) { _, method in
+            if method == .download {
+                selectedFormats = [.json]
+                includePhotos = false
+            }
+        }
+        .onChange(of: showError) { _, isShowing in
+            if isShowing {
+                UIAccessibility.post(notification: .announcement, argument: errorMessage)
+            }
+        }
+    }
+
+    private var exportHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Your data, on your terms", systemImage: "lock.document.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.jovieTextSecondary)
+
+            Text("Export your data")
+                .font(.title2.weight(.bold))
+                .foregroundColor(.jovieText)
+
+            Text("Create a portable copy of your LogYourBody records.")
+                .font(.body)
+                .foregroundColor(.jovieTextSecondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var deliveryMethodPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Delivery")
+                .font(.headline)
+                .foregroundColor(.jovieText)
+
+            Picker("Delivery method", selection: $exportMethod) {
+                ForEach(ExportMethod.allCases, id: \.self) { method in
+                    Text(method.rawValue).tag(method)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(minHeight: JovieTokens.minimumHitTarget)
+            .padding(4)
+            .background(
+                RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                    .fill(Color.jovieSurface)
+            )
+            .accessibilityIdentifier("export_delivery_method_picker")
+        }
+    }
+
+    private var deliveryDetails: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(exportMethod == .email ? "Secure email link" : "Direct device download")
+                .font(.headline)
+                .foregroundColor(.jovieText)
+
+            Text(exportMethod.description)
+                .font(.subheadline)
+                .foregroundColor(.jovieTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if exportMethod == .download {
+                Label("Direct download contains one JSON file and does not include progress photos.", systemImage: "info.circle")
+                    .font(.footnote)
+                    .foregroundColor(.jovieTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .systemBGlassSurface(
+            cornerRadius: JovieTokens.cardRadius,
+            tint: .jovieText,
+            tintOpacity: 0.045,
+            borderColor: .jovieHairline,
+            borderOpacity: 0.9
+        )
+        .accessibilityElement(children: .combine)
+    }
+
+    private var includedData: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Included")
+                .font(.headline)
+                .foregroundColor(.jovieText)
+
+            VStack(alignment: .leading, spacing: 4) {
+                DataTypeRow(
+                    icon: "person.fill",
+                    title: "Profile information",
+                    description: "Name, email, date of birth, and height"
+                )
+                DataTypeRow(
+                    icon: "scalemass",
+                    title: "Body metrics",
+                    description: "Weight, body fat, and measurements"
+                )
+                DataTypeRow(
+                    icon: "chart.line.uptrend.xyaxis",
+                    title: "Progress history",
+                    description: "Historical data points and daily logs"
+                )
+            }
+            .padding(12)
+            .systemBGlassSurface(
+                cornerRadius: JovieTokens.cardRadius,
+                tint: .jovieText,
+                tintOpacity: 0.045,
+                borderColor: .jovieHairline,
+                borderOpacity: 0.9
+            )
+        }
+    }
+
+    private var privacyAndSupport: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(
+                exportMethod == .email
+                    ? "A secure download link will be sent to your registered email address and expires after 24 hours."
+                    : "The JSON file is saved to your device. Share it only with people and services you trust."
+            )
+            .font(.footnote)
+            .foregroundColor(.jovieTextSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Button("Email support about an export") {
+                requestExportViaEmail()
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(.jovieText)
+            .frame(minHeight: JovieTokens.minimumHitTarget)
+            .accessibilityHint("Opens an email to LogYourBody support.")
+        }
+    }
+
+    private var exportAction: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.jovieHairline)
+                .frame(height: 1)
+
+            BaseButton(
+                exportMethod == .email ? "Email secure link" : "Download JSON",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                    isLoading: isExporting,
+                    isEnabled: !isExportDisabled,
+                    fullWidth: true,
+                    icon: "square.and.arrow.up",
+                    cornerRadius: JovieTokens.controlRadius
+                ),
+                action: exportData
+            )
+            .accessibilityIdentifier("export_data_action")
+            .accessibilityHint(
+                exportMethod == .email
+                    ? "Sends a secure export link to your registered email address."
+                    : "Prepares a JSON export on this device."
+            )
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.vertical, 12)
+        }
+        .background(Color.jovieCanvas.opacity(0.96).ignoresSafeArea(edges: .bottom))
+    }
+
+    private var exportProgressOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.55)
+                .ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .jovieText))
+                    .scaleEffect(1.2)
+
+                Text("Preparing your data")
+                    .font(.headline)
+                    .foregroundColor(.jovieText)
+            }
+            .padding(28)
+            .background(
+                RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
+                    .fill(Color.jovieSurfaceElevated)
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Preparing your data")
+            .accessibilityAddTraits(.updatesFrequently)
         }
     }
 
@@ -683,14 +603,14 @@ enum ExportError: LocalizedError {
         case .exportFailed(let reason):
             return "Export failed: \(reason)"
         case .unsupportedDirectDownload:
-            return "Direct download currently supports one JSON file. Use the email request link for CSV or progress photos."
+            return "Direct download supports one JSON file without progress photos. Contact support for other export requests."
         }
     }
 }
 
 // MARK: - Helper Views
 
-struct DataTypeRow: View {
+private struct DataTypeRow: View {
     let icon: String
     let title: String
     let description: String
@@ -698,23 +618,26 @@ struct DataTypeRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(.appPrimary)
-                .frame(width: 30)
+                .font(.body.weight(.medium))
+                .foregroundColor(.jovieTextSecondary)
+                .frame(width: JovieTokens.minimumHitTarget)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.appText)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.jovieText)
 
                 Text(description)
-                    .font(.caption)
-                    .foregroundColor(.appTextSecondary)
+                    .font(.footnote)
+                    .foregroundColor(.jovieTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer()
         }
+        .frame(minHeight: JovieTokens.minimumHitTarget)
+        .accessibilityElement(children: .combine)
     }
 }
 

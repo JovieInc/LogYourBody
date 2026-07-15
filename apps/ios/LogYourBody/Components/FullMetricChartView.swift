@@ -43,6 +43,39 @@ enum TimeRange: String, CaseIterable {
             return nil
         }
     }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .week1:
+            return "1 week"
+        case .month1:
+            return "1 month"
+        case .month3:
+            return "3 months"
+        case .month6:
+            return "6 months"
+        case .year1:
+            return "1 year"
+        case .all:
+            return "All time"
+        }
+    }
+}
+
+enum MetricChartLayoutPolicy {
+    static func xAxisTickCount(
+        for range: TimeRange,
+        isAccessibilitySize: Bool
+    ) -> Int {
+        guard !isAccessibilitySize else { return 3 }
+
+        switch range {
+        case .week1, .month1, .month3, .month6:
+            return 4
+        case .year1, .all:
+            return 3
+        }
+    }
 }
 
 struct MetricChartDataPoint: Identifiable, Sendable {
@@ -278,6 +311,9 @@ struct ChartPresenceLegendItem: Identifiable {
 // MARK: - Full Metric Chart View
 
 struct FullMetricChartView: View {
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
+
     let title: String
     let icon: String
     let iconColor: Color
@@ -308,7 +344,9 @@ struct FullMetricChartView: View {
 
     @ScaledMetric(relativeTo: .largeTitle) var headlineValueFontSize: CGFloat = 56
 
-    let chartHeight: CGFloat = 320
+    var chartHeight: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 360 : 320
+    }
 
     init(
         title: String,

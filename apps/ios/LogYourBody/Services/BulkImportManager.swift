@@ -66,7 +66,7 @@ class BulkImportManager: ObservableObject {
             overallProgress = 0
         }
 
-        currentTask = Task {
+        let task = Task {
             for index in photos.indices {
                 if Task.isCancelled { break }
 
@@ -88,6 +88,8 @@ class BulkImportManager: ObservableObject {
                 // Completion notification will be shown by the caller
             }
         }
+        currentTask = task
+        await task.value
     }
 
     func cancelImport() {

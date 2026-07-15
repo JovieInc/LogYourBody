@@ -210,23 +210,31 @@ var timeRangeSelector: some View {
             HStack {
                 HStack(spacing: 4) {
                     ForEach(TimeRange.allCases, id: \.self) { range in
+                        let isSelected = selectedTimeRange == range
+
                         Button {
                             selectedTimeRange = range
                         } label: {
                             Text(range.rawValue)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundColor(
-                                    selectedTimeRange == range ? Color.black : Color.metricTextPrimary
+                                    isSelected ? Color.black : Color.metricTextPrimary
                                 )
                                 .padding(.vertical, 8)
                                 .padding(.horizontal, 14)
-                                .frame(minWidth: 44, minHeight: 36)
+                                .frame(minWidth: 44, minHeight: 44)
                                 .background(
                                     Capsule()
-                                        .fill(selectedTimeRange == range ? Color.white : Color.clear)
+                                        .fill(isSelected ? Color.white : Color.clear)
                                 )
                         }
                         .buttonStyle(.plain)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(range.accessibilityLabel)
+                        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+                        .accessibilityHint("Shows \(range.accessibilityLabel.lowercased()) of data")
+                        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                        .accessibilityIdentifier("metric_detail_range_\(range.rawValue)")
                     }
                 }
                 .padding(.horizontal, 6)
@@ -266,19 +274,41 @@ var chartCard: some View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.white)
 
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
-                    ],
-                    spacing: 10
-                ) {
-                    ForEach(relatedMetrics) { metric in
-                        relatedMetricTile(metric)
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(spacing: 10) {
+                        ForEach(relatedMetrics) { metric in
+                            relatedMetricTile(metric)
+                        }
+                    }
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(relatedMetricRows.indices, id: \.self) { index in
+                            let row = relatedMetricRows[index]
+
+                            HStack(spacing: 10) {
+                                ForEach(row) { metric in
+                                    relatedMetricTile(metric)
+                                }
+
+                                if row.count == 1 {
+                                    Color.clear
+                                        .frame(maxWidth: .infinity)
+                                        .accessibilityHidden(true)
+                                }
+                            }
+                        }
                     }
                 }
             }
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("metric_detail_related_metrics")
+        }
+    }
+
+    private var relatedMetricRows: [[MetricDetailRelatedMetric]] {
+        stride(from: 0, to: relatedMetrics.count, by: 2).map { start in
+            let end = min(start + 2, relatedMetrics.count)
+            return Array(relatedMetrics[start..<end])
         }
     }
 
@@ -364,6 +394,10 @@ var chartHeader: some View {
                 Spacer()
             }
 
+            if let goalValue {
+                goalLegend(goalValue)
+            }
+
             if shouldShowPresenceLegend {
                 chartPresenceLegend
             }
@@ -401,28 +435,60 @@ var chartPresenceLegend: some View {
         }
     }
 
-var chartModeToggle: some View {
+    var chartModeToggle: some View {
         HStack(spacing: 8) {
             ForEach(ChartMode.allCases, id: \.self) { mode in
+                let isSelected = chartMode == mode
+
                 Button {
                     chartMode = mode
                 } label: {
                     Text(mode.label)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundColor(
-                            chartMode == mode ? Color.metricAccent : Color.metricTextSecondary
+                            isSelected ? Color.metricAccent : Color.metricTextSecondary
                         )
                         .padding(.vertical, 8)
                         .padding(.horizontal, 14)
-                        .frame(minWidth: 44, minHeight: 36)
+                        .frame(minWidth: 44, minHeight: 44)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(chartMode == mode ? Color.metricAccent.opacity(0.18) : Color.clear)
+                                .fill(isSelected ? Color.metricAccent.opacity(0.18) : Color.clear)
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(mode.label)
+                .accessibilityValue(isSelected ? "Selected" : "Not selected")
+                .accessibilityHint("Changes the chart to \(mode.label.lowercased()) values")
+                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                .accessibilityIdentifier("metric_detail_mode_\(mode.label.lowercased())")
             }
         }
+    }
+
+    func goalLegend(_ goalValue: Double) -> some View {
+        let value = formatHeadlineValue(goalValue)
+        let displayValue = unit.isEmpty ? value : "\(value) \(unit)"
+
+        return HStack(spacing: 7) {
+            Circle()
+                .fill(Color.metricAccent.opacity(0.8))
+                .frame(width: 7, height: 7)
+
+            Text("Goal \(displayValue)")
+                .font(.footnote.weight(.semibold))
+                .foregroundColor(Color.metricTextSecondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.06))
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Goal \(displayValue)")
+        .accessibilityIdentifier("metric_detail_goal_legend")
     }
 
 var chartView: some View {
@@ -460,7 +526,7 @@ var chartView: some View {
                     .symbolSize(chartPointSymbolSize(for: point.presence))
                     .foregroundStyle(chartPointColor(for: point.presence))
                     .opacity(chartPointOpacity(for: point.presence))
-                    .accessibilityLabel("\(presenceLabel(for: point.presence)) point")
+                    .accessibilityLabel(chartPointAccessibilityLabel(for: point))
 
                     if chartMode == .trend {
                         AreaMark(
@@ -484,22 +550,6 @@ var chartView: some View {
                 RuleMark(y: .value("Goal", goalValue))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     .foregroundStyle(Color.metricAccent.opacity(0.45))
-                    .annotation(position: .topTrailing, alignment: .trailing) {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(Color.metricAccent.opacity(0.7))
-                                .frame(width: 6, height: 6)
-                            Text("Goal")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(Color.metricTextSecondary)
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.black.opacity(0.35))
-                        )
-                    }
             }
 
             if let stats = computeSeriesStats(for: activeSeries) {
@@ -524,36 +574,37 @@ var chartView: some View {
                 }
                 .symbol(CircleSymbol())
                 .foregroundStyle(Color.metricChartLine)
-                .accessibilityLabel("Selected point")
+                .accessibilityLabel("Selected \(chartPointAccessibilityLabel(for: focus))")
             }
         }
         .chartXAxis {
-            if selectedTimeRange == .week1 {
-                AxisMarks(values: .stride(by: .day)) { _ in
-                    AxisValueLabel()
+            if selectedTimeRange == .week1 || selectedTimeRange == .month1 {
+                AxisMarks(values: .automatic(desiredCount: xAxisTickCount)) { _ in
+                    AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(Color.metricGridMajor.opacity(0.25))
+                    AxisTick()
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                         .foregroundStyle(Color.metricTextSecondary)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.caption2.weight(.medium))
                 }
             } else {
                 AxisMarks(values: .automatic(desiredCount: xAxisTickCount)) { _ in
-                    AxisValueLabel()
+                    AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(Color.metricGridMajor.opacity(0.25))
+                    AxisTick()
+                    AxisValueLabel(format: .dateTime.month(.abbreviated))
                         .foregroundStyle(Color.metricTextSecondary)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.caption2.weight(.medium))
                 }
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
-                AxisValueLabel()
-                    .foregroundStyle(Color.metricTextSecondary)
-                    .font(.system(size: 10, weight: .medium))
-            }
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 0.5))
                     .foregroundStyle(Color.metricGridMajor.opacity(0.4))
                 AxisValueLabel()
                     .foregroundStyle(Color.metricTextSecondary)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.caption2.weight(.medium))
             }
         }
         .chartYScale(domain: .automatic(includesZero: false))
@@ -588,7 +639,15 @@ var chartView: some View {
                     )
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: activeSeries.count)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title) chart")
+        .accessibilityValue(chartAccessibilityValue)
+        .accessibilityHint(chartAccessibilityHint)
+        .accessibilityAdjustableAction { direction in
+            adjustChartFocus(for: direction)
+        }
+        .accessibilityIdentifier("metric_detail_chart_plot")
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: activeSeries.count)
     }
 
 func selectedPointCallout(for point: MetricChartDataPoint) -> some View {

@@ -38,15 +38,13 @@ extension PreferencesView {
         }
     }
 
-    var integrationsSection: some View {
-        SettingsSection(header: "Integrations") {
-            SettingsNavigationLink(
-                icon: "square.stack.3d.up.fill",
-                title: "Integrations",
-                subtitle: "Connect Apple Health and other services."
-            ) {
-                IntegrationsView()
-            }
+    var integrationsLauncherRow: some View {
+        SettingsNavigationLink(
+            icon: "square.stack.3d.up.fill",
+            title: "Integrations",
+            subtitle: "Apple Health, imports, and export"
+        ) {
+            IntegrationsView()
         }
     }
 

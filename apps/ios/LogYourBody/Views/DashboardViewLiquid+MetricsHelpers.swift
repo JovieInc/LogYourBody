@@ -82,8 +82,7 @@ extension DashboardViewLiquid {
             metrics: bodyMetrics,
             heightInches: heightInches
         ) {
-            // Apple Health-style: no decimals for FFMI headline value
-            return String(format: "%.0f", ffmiResult.value)
+            return String(format: "%.1f", ffmiResult.value)
         }
         return "–"
     }

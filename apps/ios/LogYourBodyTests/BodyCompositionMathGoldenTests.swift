@@ -82,6 +82,35 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         }
     }
 
+    func testWeightGoalStoresKilogramsAndPresentsOncePerSelectedUnit() throws {
+        let goal = try XCTUnwrap(WeightGoal(displayValue: 180, measurementSystem: .imperial))
+
+        XCTAssertEqual(goal.kilograms, UnitConversion.lbsToKg(180), accuracy: 0.0001)
+        XCTAssertEqual(goal.displayValue(in: .imperial), 180, accuracy: 0.0001)
+        XCTAssertEqual(goal.displayValue(in: .metric), UnitConversion.lbsToKg(180), accuracy: 0.0001)
+        XCTAssertEqual(goal.displayText(in: .imperial), "180.0 lbs")
+
+        let migrated = try XCTUnwrap(WeightGoal.migrateLegacy(180, measurementSystem: .imperial))
+        XCTAssertEqual(migrated, goal)
+    }
+
+    func testInterpolatedFFMIUsesTheCanonicalNormalizedFormula() throws {
+        let date = date(daysAfterStart: 0)
+        let metrics = [makeMetric(date: date, weight: 80, bodyFatPercentage: 10)]
+        let result = try XCTUnwrap(
+            MetricsInterpolationService.shared.estimateFFMI(
+                for: date,
+                metrics: metrics,
+                heightInches: 70
+            )
+        )
+        let expected = try XCTUnwrap(
+            UnitConversion.calculateFFMI(weightKg: 80, bodyFatPercentage: 10, heightCm: 177.8)
+        )
+
+        XCTAssertEqual(result.value, (expected * 10).rounded() / 10, accuracy: 0.001)
+    }
+
     func testWeightSanityRangeMatchesLaunchValidationBounds() {
         XCTAssertFalse(UnitConversion.isValidWeight(31.9))
         XCTAssertTrue(UnitConversion.isValidWeight(32))
@@ -144,14 +173,14 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         return try XCTUnwrap(MetricsInterpolationService.shared.makeWeightInterpolationContext(for: metrics))
     }
 
-    private func makeMetric(date: Date, weight: Double) -> BodyMetrics {
+    private func makeMetric(date: Date, weight: Double, bodyFatPercentage: Double? = nil) -> BodyMetrics {
         BodyMetrics(
             id: UUID().uuidString,
             userId: "body-comp-golden-tests",
             date: date,
             weight: weight,
             weightUnit: "kg",
-            bodyFatPercentage: nil,
+            bodyFatPercentage: bodyFatPercentage,
             bodyFatMethod: nil,
             muscleMass: nil,
             boneMass: nil,

@@ -252,7 +252,7 @@ func saveGlp1Dose(userId: String) {
                 takenAt: takenDate,
                 medicationId: medication.id,
                 doseAmount: dose,
-                doseUnit: glp1IsRestDay ? nil : medication.doseUnit ?? glp1DoseUnit,
+                doseUnit: glp1IsRestDay ? nil : glp1DoseUnit,
                 drugClass: medication.drugClass,
                 brand: medication.brand ?? medication.displayName,
                 isCompounded: medication.isCompounded,
@@ -275,7 +275,7 @@ func saveGlp1Dose(userId: String) {
                     type: "glp1",
                     properties: [
                         "medication_id": medication.id,
-                        "dose_unit": medication.doseUnit ?? glp1DoseUnit
+                        "dose_unit": glp1DoseUnit
                     ]
                 )
                 dismiss()
@@ -492,6 +492,12 @@ var glp1UnitForSelectedMedication: String? {
         return config.unit
     }
 
+var glp1SelectedDoseAccessibilityValue: String {
+        guard !glp1IsRestDay else { return "Rest day" }
+        guard let amount = Double(glp1Dose) else { return "No dose selected" }
+        return "\(Glp1DoseHistoryFormatter.numberText(amount)) \(glp1DoseUnit)"
+    }
+
 var recentGlp1DoseLogs: [Glp1DoseLog] {
         Array(glp1DoseLogs.sorted(by: { $0.takenAt > $1.takenAt }).prefix(5))
     }
@@ -527,16 +533,19 @@ var glp1DeleteConfirmationBinding: Binding<Bool> {
 @MainActor
     func loadGlp1Medications(userId: String) async {
         glp1IsLoadingMedications = true
+        let shouldPrefillInitialDraft = selectedGlp1MedicationId == nil && editingGlp1DoseLogId == nil
+        var automaticallySelectedMedicationID: String?
         let cached = await CoreDataManager.shared.fetchGlp1Medications(for: userId)
         await loadGlp1DoseLogs(userId: userId)
 
         if !cached.isEmpty {
             glp1Medications = cached.sorted { $0.startedAt < $1.startedAt }
 
-            if selectedGlp1MedicationId == nil,
+            if shouldPrefillInitialDraft,
                let active = glp1Medications.last(where: { $0.endedAt == nil }) ?? glp1Medications.last {
                 selectedGlp1MedicationId = active.id
-                applyDefaultDoseConfig(for: active)
+                automaticallySelectedMedicationID = active.id
+                applyResolvedGlp1DoseDraft(for: active)
             }
         }
 
@@ -556,10 +565,16 @@ var glp1DeleteConfirmationBinding: Binding<Bool> {
             CoreDataManager.shared.saveGlp1DoseLogs(doseLogs, userId: userId)
             glp1DoseLogs = doseLogs.sorted(by: { $0.takenAt < $1.takenAt })
 
-            if selectedGlp1MedicationId == nil,
-               let active = glp1Medications.last(where: { $0.endedAt == nil }) ?? glp1Medications.last {
-                selectedGlp1MedicationId = active.id
-                applyDefaultDoseConfig(for: active)
+            if shouldPrefillInitialDraft {
+                if let automaticallySelectedMedicationID,
+                   selectedGlp1MedicationId == automaticallySelectedMedicationID,
+                   let medication = glp1Medications.first(where: { $0.id == automaticallySelectedMedicationID }) {
+                    applyResolvedGlp1DoseDraft(for: medication)
+                } else if selectedGlp1MedicationId == nil,
+                          let active = glp1Medications.last(where: { $0.endedAt == nil }) ?? glp1Medications.last {
+                    selectedGlp1MedicationId = active.id
+                    applyResolvedGlp1DoseDraft(for: active)
+                }
             }
         } catch {
         }
@@ -583,25 +598,28 @@ func loadGlp1MedicationsIfNeeded() {
         }
     }
 
-func applyDefaultDoseConfig(for medication: Glp1Medication) {
-        let config = Glp1MedicationCatalog.doseConfig(for: medication)
-        glp1DoseUnit = config.unit
-        selectedGlp1DoseIndex = 0
-        glp1UseCustomDose = false
+func applyResolvedGlp1DoseDraft(for medication: Glp1Medication) {
+        applyGlp1DoseDraft(
+            Glp1DoseDraftResolver.resolve(
+                for: medication,
+                doseLogs: glp1DoseLogs
+            )
+        )
+    }
+
+func applyGlp1DoseDraft(_ draft: Glp1DoseDraft) {
+        glp1DoseUnit = draft.doseUnit
+        selectedGlp1DoseIndex = draft.selectedDoseIndex ?? 0
+        glp1UseCustomDose = draft.usesCustomDose
         glp1IsRestDay = false
-
-        if let first = config.doses.first {
-            glp1Dose = String(first)
-        } else {
-            glp1Dose = ""
-        }
-
+        glp1Dose = draft.doseText
+        glp1LastLoggedDoseText = draft.lastLoggedDoseText
         glp1Error = nil
     }
 
 func selectGlp1Medication(_ medication: Glp1Medication) {
         selectedGlp1MedicationId = medication.id
-        applyDefaultDoseConfig(for: medication)
+        applyResolvedGlp1DoseDraft(for: medication)
     }
 
 func editGlp1Dose(_ log: Glp1DoseLog) {
@@ -609,6 +627,7 @@ func editGlp1Dose(_ log: Glp1DoseLog) {
         editingGlp1DoseCreatedAt = log.createdAt
         selectedDate = log.takenAt
         glp1DoseNotes = log.notes ?? ""
+        glp1LastLoggedDoseText = nil
         glp1IsRestDay = Glp1DoseHistoryFormatter.isRestDay(log)
 
         if let medicationId = log.medicationId,

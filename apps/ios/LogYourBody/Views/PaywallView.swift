@@ -2,14 +2,18 @@
 // PaywallView.swift
 // LogYourBody
 //
-// Premium subscription paywall with glassmorphic design
+// One compact, trust-first subscription surface. Pricing is shown only when the
+// currently loaded offering is available; stale partial offers are never reused
+// as a purchase proposition.
 //
 import SwiftUI
 
 struct PaywallView: View {
     @Environment(\.openURL) private var openURL
-    @EnvironmentObject var authManager: AuthManager
-    @EnvironmentObject var subscriptionManager: SubscriptionManager
+    @Environment(\.theme) private var theme
+    @EnvironmentObject private var authManager: AuthManager
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
+
     @State private var isLoading = true
     @State private var showRestoreSuccess = false
     @State private var showRestoreError = false
@@ -21,66 +25,54 @@ struct PaywallView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color.appBackground, Color.black],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            theme.colors.background.ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 24) {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: JovieTokens.sectionGap) {
                     header
-                    featuresSection
+                    valueProposition
 
                     if !availablePrimaryPackages.isEmpty {
-                        pricingOptionsSection(packages: availablePrimaryPackages)
+                        pricingOptions
                     } else if isLoading {
-                        ProgressView()
-                            .tint(.appPrimary)
+                        ProgressView("Loading plans…")
+                            .tint(theme.colors.text)
+                            .foregroundStyle(theme.colors.textSecondary)
+                            .frame(maxWidth: .infinity, minHeight: 96)
                     } else {
-                        plansUnavailableState(
-                            cachedPackage: subscriptionManager.cachedPaywallOfferingDisplay?.preferredPackage
-                        )
+                        plansUnavailableState
                     }
 
                     if let package = selectedPackage {
                         purchaseButton(package: package)
                     }
 
-                    restorePurchasesButton
-                    logoutButton
+                    recoveryActions
                     legalLinks
-
-                    Spacer(minLength: 50)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 60)
-                .padding(.bottom, 40)
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.top, JovieTokens.sectionGap)
+                .padding(.bottom, JovieTokens.sectionGap)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .accessibilityIdentifier("paywall_screen")
 
-            // Loading overlay
             if subscriptionManager.isPurchasing {
-                LoadingOverlay(message: "Processing purchase...")
+                LoadingOverlay(message: "Processing purchase…")
             }
         }
         .alert("Purchase Error", isPresented: $showPurchaseError) {
-            Button("OK", role: .cancel) {
-                subscriptionManager.errorMessage = nil
-            }
+            Button("OK", role: .cancel) { subscriptionManager.errorMessage = nil }
         } message: {
             Text(subscriptionManager.errorMessage ?? "An error occurred")
         }
         .alert("Restore Successful", isPresented: $showRestoreSuccess) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Your subscription has been restored!")
+            Text("Your subscription has been restored.")
         }
         .alert("No Subscription Found", isPresented: $showRestoreError) {
-            Button("OK", role: .cancel) {
-                subscriptionManager.errorMessage = nil
-            }
+            Button("OK", role: .cancel) { subscriptionManager.errorMessage = nil }
         } message: {
             Text(subscriptionManager.errorMessage ?? "No active subscription found")
         }
@@ -99,412 +91,328 @@ struct PaywallView: View {
         } message: {
             Text("Use this to switch accounts on this device.")
         }
-        .onAppear {
-            // Use cached offerings if available, otherwise fetch
-            if !subscriptionManager.paywallPackages.isEmpty {
-                isLoading = false
-                // print("💰 Using cached offerings")
+        .task {
+            if subscriptionManager.paywallPackages.isEmpty {
+                await loadOfferings()
             } else {
-                Task {
-                    await loadOfferings()
-                }
+                isLoading = false
             }
-
             AppServicePorts.analyticsTracker.track(event: "paywall_view")
         }
         .sheet(isPresented: $showTermsSheet) {
-            NavigationStack {
-                LegalDocumentView(documentType: .terms)
-            }
+            NavigationStack { LegalDocumentView(documentType: .terms) }
         }
         .sheet(isPresented: $showPrivacySheet) {
-            NavigationStack {
-                LegalDocumentView(documentType: .privacy)
-            }
+            NavigationStack { LegalDocumentView(documentType: .privacy) }
         }
     }
-
-    // MARK: - Computed Properties
 
     private var availablePrimaryPackages: [PaywallPackageDisplay] {
         subscriptionManager.paywallPackages
     }
 
     private var selectedPackage: PaywallPackageDisplay? {
-        let packages = availablePrimaryPackages
-
-        if let selected = packages.first(where: { $0.packageIdentifier == selectedPackageIdentifier }) {
-            return selected
-        }
-
-        if let annual = packages.first(where: { $0.packageIdentifier == "$rc_annual" }) {
-            return annual
-        }
-
-        return packages.first
+        availablePrimaryPackages.first { $0.packageIdentifier == selectedPackageIdentifier }
+            ?? availablePrimaryPackages.first { $0.packageIdentifier == "$rc_annual" }
+            ?? availablePrimaryPackages.first
     }
-
-    // MARK: - Components
 
     private var header: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "chart.line.uptrend.xyaxis.circle.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.appPrimary)
+        VStack(spacing: 10) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .font(.system(.title, design: .rounded).weight(.semibold))
+                .foregroundStyle(theme.colors.text)
+                .frame(width: 52, height: 52)
+                .background(Circle().fill(theme.colors.text.opacity(0.08)))
 
             Text("LogYourBody Pro")
-                .font(.system(size: 32, weight: .bold, design: .rounded))
-                .foregroundColor(.appText)
+                .font(theme.typography.headlineLarge)
+                .foregroundStyle(theme.colors.text)
                 .accessibilityIdentifier("paywall_title")
 
-            Text("Log your body in under 10 seconds and see if you are moving in the right direction.")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.appTextSecondary)
+            Text("A clear, private view of your progress.")
+                .font(theme.typography.bodySmall)
+                .foregroundStyle(theme.colors.textSecondary)
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity)
     }
 
-    private var featuresSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            PaywallFeatureRow(
-                icon: "scalemass.fill",
-                title: "Daily logging",
-                description: "Save weight and body fat fast."
-            )
-
-            PaywallFeatureRow(
-                icon: "chart.xyaxis.line",
-                title: "Clear trends",
-                description: "See weight, body fat, FFMI, and body score."
-            )
-
-            PaywallFeatureRow(
-                icon: "icloud.fill",
-                title: "Private sync",
-                description: "Keep local data backed up to your account."
-            )
-        }
-        .padding(.horizontal, 8)
+    private var valueProposition: some View {
+        Text("Log quickly. See weight, body fat, FFMI, and your trend in one place.")
+            .font(theme.typography.bodyMedium)
+            .foregroundStyle(theme.colors.textSecondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
     }
 
-    private func pricingOptionsSection(packages: [PaywallPackageDisplay]) -> some View {
-        VStack(spacing: 12) {
-            if packages.count > 1 {
-                HStack(spacing: 10) {
-                    ForEach(packages) { package in
-                        pricingOptionCard(
-                            package: package,
-                            isSelected: package.packageIdentifier == selectedPackage?.packageIdentifier
-                        )
-                    }
+    private var pricingOptions: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: JovieTokens.itemGap) {
+                ForEach(availablePrimaryPackages) { package in
+                    pricingOption(package)
+                        .frame(minWidth: 156)
                 }
-            } else if let package = packages.first {
-                pricingOptionCard(
-                    package: package,
-                    isSelected: package.packageIdentifier == selectedPackage?.packageIdentifier
-                )
+            }
+
+            VStack(spacing: JovieTokens.itemGap) {
+                ForEach(availablePrimaryPackages) { package in
+                    pricingOption(package)
+                }
             }
         }
+        .accessibilityElement(children: .contain)
     }
 
-    private func pricingOptionCard(package: PaywallPackageDisplay, isSelected: Bool) -> some View {
-        Button {
+    private func pricingOption(_ package: PaywallPackageDisplay) -> some View {
+        let isSelected = package.packageIdentifier == selectedPackage?.packageIdentifier
+
+        return Button {
             selectedPackageIdentifier = package.packageIdentifier
             HapticManager.shared.impact(style: .light)
         } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(package.planTitle)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.appText)
-
-                        if let trialText = package.trialText {
-                            Text(trialText.uppercased())
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.appPrimary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.85)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(package.planTitle)
+                        .font(theme.typography.labelLarge)
+                        .foregroundStyle(theme.colors.text)
 
                     Spacer(minLength: 4)
 
-                    selectionIndicator(isSelected: isSelected)
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(.headline, design: .default).weight(.semibold))
+                        .foregroundStyle(isSelected ? theme.colors.text : theme.colors.textTertiary)
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text(package.localizedPrice)
-                            .font(.system(size: 30, weight: .bold, design: .rounded))
-                            .foregroundColor(.appText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(package.localizedPrice)
+                        .font(theme.typography.displaySmall)
+                        .foregroundStyle(theme.colors.text)
+                        .monospacedDigit()
 
-                        Text(package.billingPeriodSuffix)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.appTextSecondary)
-                    }
-
-                    Text(package.summaryText)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.appTextSecondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(package.billingPeriodSuffix)
+                        .font(theme.typography.bodySmall)
+                        .foregroundStyle(theme.colors.textSecondary)
                 }
+
+                Text(package.summaryText)
+                    .font(theme.typography.captionLarge)
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 if let savingsText = package.savingsBadgeText {
                     Text(savingsText)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.black)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.appPrimary)
-                        .clipShape(Capsule())
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text("Flexible")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.appTextSecondary)
-                        .lineLimit(1)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.appCard.opacity(0.8))
-                        .clipShape(Capsule())
+                        .font(theme.typography.labelSmall)
+                        .foregroundStyle(theme.colors.background)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(theme.colors.text))
+                } else if let trialText = package.trialText {
+                    Text(trialText)
+                        .font(theme.typography.labelSmall)
+                        .foregroundStyle(theme.colors.textSecondary)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 166, alignment: .topLeading)
-            .padding(14)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(isSelected ? Color.appCard : Color.appCard.opacity(0.68))
-
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(
-                            isSelected ? Color.appPrimary : Color.appBorder.opacity(0.75),
-                            lineWidth: isSelected ? 2 : 1
-                        )
-                }
+            .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+            .padding(16)
+            .systemBGlassSurface(
+                cornerRadius: JovieTokens.cardRadius,
+                tint: theme.colors.text,
+                tintOpacity: isSelected ? 0.08 : 0.03,
+                borderColor: isSelected ? theme.colors.text : theme.colors.border,
+                borderOpacity: isSelected ? 0.62 : 0.6,
+                borderWidth: isSelected ? 1.5 : 1,
+                shadowOpacity: isSelected ? 0.12 : 0.04,
+                shadowRadius: isSelected ? 14 : 8,
+                shadowY: 5
             )
-            .shadow(color: isSelected ? Color.appPrimary.opacity(0.18) : .clear, radius: 14, x: 0, y: 8)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(package.planTitle) plan")
-        .accessibilityHint(isSelected ? "Selected" : "Double tap to select this plan")
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityHint("Double tap to select this plan")
         .accessibilityIdentifier("paywall_plan_\(package.accessibilityIdentifierSuffix)")
     }
 
-    private func selectionIndicator(isSelected: Bool) -> some View {
-        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundColor(isSelected ? .appPrimary : .appTextSecondary.opacity(0.65))
-    }
-
     private func purchaseButton(package: PaywallPackageDisplay) -> some View {
-        Button {
-            Task {
-                AppServicePorts.analyticsTracker.track(
-                    event: "purchase_start",
-                    properties: [
-                        "package_id": package.packageIdentifier
-                    ]
-                )
-
-                let success = await subscriptionManager.purchase(packageIdentifier: package.packageIdentifier)
-                if !success && subscriptionManager.errorMessage != nil {
-                    showPurchaseError = true
-                }
-
-                AppServicePorts.analyticsTracker.track(
-                    event: success ? "purchase_success" : "purchase_failed",
-                    properties: [
-                        "package_id": package.packageIdentifier
-                    ]
-                )
+        BaseButton(
+            subscriptionManager.isPurchasing ? "Processing…" : package.purchaseButtonTitle,
+            configuration: ButtonConfiguration(
+                style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                size: .large,
+                isLoading: subscriptionManager.isPurchasing,
+                isEnabled: !subscriptionManager.isPurchasing,
+                fullWidth: true,
+                icon: subscriptionManager.isPurchasing ? nil : "checkmark",
+                iconPosition: .leading,
+                cornerRadius: 9_999
+            ),
+            action: {
+                Task { await purchase(package) }
             }
-        } label: {
-            HStack(spacing: 12) {
-                if !subscriptionManager.isPurchasing {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                }
-
-                Text(subscriptionManager.isPurchasing ? "Processing..." : package.purchaseButtonTitle)
-                    .font(.system(size: 18, weight: .semibold))
-            }
-            .foregroundColor(.black)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(Color.appPrimary)
-            .cornerRadius(16)
-        }
-        .disabled(subscriptionManager.isPurchasing)
+        )
         .accessibilityIdentifier("paywall_purchase_button")
     }
 
-    private var restorePurchasesButton: some View {
-        Button {
-            Task {
-                let success = await subscriptionManager.restorePurchases()
-                if success {
-                    showRestoreSuccess = true
-                } else if subscriptionManager.errorMessage != nil {
-                    showRestoreError = true
-                }
+    private var plansUnavailableState: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Plans are temporarily unavailable", systemImage: "wifi.exclamationmark")
+                .font(theme.typography.labelLarge)
+                .foregroundStyle(theme.colors.text)
+                .accessibilityIdentifier("paywall_plans_unavailable_state")
 
-                AppServicePorts.analyticsTracker.track(
-                    event: success ? "restore_success" : "restore_failed"
-                )
-            }
-        } label: {
-            Text("Restore Purchases")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.7))
+            Text("Check your connection and try again. You can still restore a previous purchase or switch accounts.")
+                .font(theme.typography.bodySmall)
+                .foregroundStyle(theme.colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            unavailablePlanActions
         }
-        .disabled(subscriptionManager.isPurchasing)
-        .accessibilityIdentifier("paywall_restore_purchases_button")
+        .padding(16)
+        .systemBGlassSurface(
+            cornerRadius: JovieTokens.cardRadius,
+            tint: theme.colors.text,
+            tintOpacity: 0.035,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.65,
+            shadowOpacity: 0.06,
+            shadowRadius: 10,
+            shadowY: 4
+        )
     }
 
-    private var logoutButton: some View {
-        Button(role: .destructive) {
-            HapticManager.shared.notification(type: .warning)
-            showLogoutConfirmation = true
-        } label: {
-            Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.red.opacity(0.85))
+    private var unavailablePlanActions: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                retryOfferingsButton
+                contactSupportButton
+            }
+
+            VStack(spacing: 8) {
+                retryOfferingsButton
+                contactSupportButton
+            }
         }
-        .disabled(subscriptionManager.isPurchasing)
-        .accessibilityLabel("Log out")
-        .accessibilityHint("Signs you out so you can use another account.")
-        .accessibilityIdentifier("paywall_logout_button")
+    }
+
+    private var retryOfferingsButton: some View {
+        Button {
+            Task { await loadOfferings() }
+        } label: {
+            Label("Retry", systemImage: "arrow.clockwise")
+                .font(theme.typography.labelLarge)
+                .foregroundStyle(theme.colors.text)
+                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                .background(
+                    RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                        .fill(theme.colors.text.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                        .stroke(theme.colors.border, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoading)
+        .accessibilityLabel("Retry loading subscription plans")
+        .accessibilityHint("Attempts to load the available subscription plans again.")
+        .accessibilityIdentifier("paywall_retry_offerings_button")
+    }
+
+    private var contactSupportButton: some View {
+        Button(action: contactSupportAboutUnavailablePlans) {
+            Label("Contact support", systemImage: "envelope")
+                .font(theme.typography.labelLarge)
+                .foregroundStyle(theme.colors.text)
+                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Contact support")
+        .accessibilityHint("Opens email support for unavailable subscription plans.")
+        .accessibilityIdentifier("paywall_contact_support_button")
+    }
+
+    private var recoveryActions: some View {
+        VStack(spacing: 4) {
+            Button {
+                Task { await restorePurchases() }
+            } label: {
+                Label("Restore Purchases", systemImage: "arrow.clockwise")
+                    .font(theme.typography.labelLarge)
+                    .foregroundStyle(theme.colors.text)
+                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+            }
+            .buttonStyle(.plain)
+            .disabled(subscriptionManager.isPurchasing)
+            .accessibilityIdentifier("paywall_restore_purchases_button")
+
+            Button(role: .destructive) {
+                showLogoutConfirmation = true
+            } label: {
+                Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
+                    .font(theme.typography.labelMedium)
+                    .foregroundStyle(theme.colors.error)
+                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+            }
+            .buttonStyle(.plain)
+            .disabled(subscriptionManager.isPurchasing)
+            .accessibilityIdentifier("paywall_logout_button")
+        }
     }
 
     private var legalLinks: some View {
-        HStack(spacing: 16) {
-            Button {
-                showTermsSheet = true
-            } label: {
-                Text("Terms of Service")
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.5))
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 16) {
+                termsButton
+                Text("•").foregroundStyle(theme.colors.textTertiary)
+                privacyButton
             }
 
-            Text("•")
-                .foregroundColor(.white.opacity(0.3))
-
-            Button {
-                showPrivacySheet = true
-            } label: {
-                Text("Privacy Policy")
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.5))
+            VStack(spacing: 2) {
+                termsButton
+                privacyButton
             }
         }
+        .font(theme.typography.captionLarge)
     }
 
-    private func plansUnavailableState(
-        cachedPackage: CachedPaywallOfferingDisplay.PackageDisplay?
-    ) -> some View {
-        VStack(spacing: 12) {
-            Text("Subscription plans are unavailable")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.appText)
+    private var termsButton: some View {
+        Button("Terms of Service") { showTermsSheet = true }
+            .foregroundStyle(theme.colors.textSecondary)
+            .frame(minHeight: JovieTokens.minimumHitTarget)
+    }
 
-            if let cachedPackage {
-                cachedPricingSummary(package: cachedPackage)
-            }
+    private var privacyButton: some View {
+        Button("Privacy Policy") { showPrivacySheet = true }
+            .foregroundStyle(theme.colors.textSecondary)
+            .frame(minHeight: JovieTokens.minimumHitTarget)
+    }
 
-            Text("Check your connection and retry. You can still restore a purchase or log out below.")
-                .font(.system(size: 14))
-                .foregroundColor(.appTextSecondary)
-                .multilineTextAlignment(.center)
-
-            HStack(spacing: 10) {
-                Button {
-                    Task {
-                        await loadOfferings()
-                    }
-                } label: {
-                    Label("Retry", systemImage: "arrow.clockwise")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.appText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.appCard)
-                        .cornerRadius(12)
-                }
-                .disabled(isLoading)
-                .accessibilityIdentifier("paywall_retry_offerings_button")
-
-                Button {
-                    contactSupportAboutUnavailablePlans()
-                } label: {
-                    Label("Contact Support", systemImage: "envelope")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.appTextSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.appCard.opacity(0.45))
-                        .cornerRadius(12)
-                }
-                .accessibilityLabel("Contact Support")
-                .accessibilityHint("Opens an email to LogYourBody support.")
-                .accessibilityIdentifier("paywall_contact_support_button")
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(20)
-        .background(Color.appCard.opacity(0.65))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.appBorder.opacity(0.8), lineWidth: 1)
+    private func purchase(_ package: PaywallPackageDisplay) async {
+        AppServicePorts.analyticsTracker.track(
+            event: "purchase_start",
+            properties: ["package_id": package.packageIdentifier]
         )
-        .cornerRadius(16)
-        .accessibilityIdentifier("paywall_plans_unavailable_state")
+
+        let success = await subscriptionManager.purchase(packageIdentifier: package.packageIdentifier)
+        if !success, subscriptionManager.errorMessage != nil {
+            showPurchaseError = true
+        }
+
+        AppServicePorts.analyticsTracker.track(
+            event: success ? "purchase_success" : "purchase_failed",
+            properties: ["package_id": package.packageIdentifier]
+        )
     }
 
-    private func cachedPricingSummary(package: CachedPaywallOfferingDisplay.PackageDisplay) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Last loaded price")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.appTextSecondary)
-                    .textCase(.uppercase)
-
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(package.localizedPrice)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(.appText)
-
-                    Text(package.billingPeriod.isEmpty ? "" : "/\(package.billingPeriod)")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.appTextSecondary)
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            if let trialText = package.trialText {
-                Text(trialText.uppercased())
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.appPrimary.opacity(0.8))
-                    .clipShape(Capsule())
-            }
+    private func restorePurchases() async {
+        let success = await subscriptionManager.restorePurchases()
+        if success {
+            showRestoreSuccess = true
+        } else if subscriptionManager.errorMessage != nil {
+            showRestoreError = true
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Color.appCard.opacity(0.65))
-        .cornerRadius(14)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("paywall_cached_pricing_card")
+        AppServicePorts.analyticsTracker.track(event: success ? "restore_success" : "restore_failed")
     }
 
     private func contactSupportAboutUnavailablePlans() {
@@ -512,55 +420,18 @@ struct PaywallView: View {
             .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Subscription%20plans%20unavailable"
         let body = "I cannot load subscription plans in the iOS app."
             .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        if let url = URL(string: "mailto:support@logyourbody.com?subject=\(subject)&body=\(body)") {
-            openURL(url)
+        guard let url = URL(string: "mailto:support@logyourbody.com?subject=\(subject)&body=\(body)") else {
+            return
         }
+        openURL(url)
     }
-
-    // MARK: - Functions
 
     private func loadOfferings() async {
         isLoading = true
         await subscriptionManager.fetchOfferings()
         isLoading = false
-
-        if subscriptionManager.paywallPackages.isEmpty {
-            // print("⚠️ No offerings available")
-        }
     }
 }
-
-// MARK: - Feature Row Component
-
-private struct PaywallFeatureRow: View {
-    let icon: String
-    let title: String
-    let description: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 21, weight: .semibold))
-                .foregroundColor(.appPrimary)
-                .frame(width: 30, height: 28, alignment: .top)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.appText)
-
-                Text(description)
-                    .font(.system(size: 15))
-                    .foregroundColor(.appTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer()
-        }
-    }
-}
-
-// MARK: - Preview
 
 #Preview {
     PaywallView()

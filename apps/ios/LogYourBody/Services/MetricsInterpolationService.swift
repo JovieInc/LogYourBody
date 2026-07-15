@@ -329,19 +329,42 @@ class MetricsInterpolationService {
         }
 
         func estimate(for date: Date) -> InterpolatedMetric? {
-            guard let leanMassResult = estimateLeanMass(for: date) else {
+            guard let weightResult = weightContext.trendWeight(for: date),
+                  let bodyFatResult = bodyFatContext.estimate(for: date),
+                  let ffmi = UnitConversion.calculateFFMI(
+                    weightKg: weightResult.value,
+                    bodyFatPercentage: bodyFatResult.value,
+                    heightCm: heightInches * 2.54
+                  ) else {
                 return nil
             }
 
-            let heightMeters = heightInches * 0.0254
-            let ffmi = leanMassResult.value / (heightMeters * heightMeters)
+            let isInterpolated = weightResult.isInterpolated || bodyFatResult.isInterpolated
+            let isLastKnown = weightResult.isLastKnown || bodyFatResult.isLastKnown
+            let confidence = lowestConfidence(
+                weightResult.confidenceLevel,
+                bodyFatResult.confidenceLevel,
+                isInterpolated: isInterpolated
+            )
 
             return InterpolatedMetric(
                 value: round(ffmi * 10) / 10,
-                isInterpolated: leanMassResult.isInterpolated,
-                isLastKnown: leanMassResult.isLastKnown,
-                confidenceLevel: leanMassResult.confidenceLevel
+                isInterpolated: isInterpolated,
+                isLastKnown: isLastKnown,
+                confidenceLevel: confidence
             )
+        }
+
+        private func lowestConfidence(
+            _ first: InterpolatedMetric.ConfidenceLevel?,
+            _ second: InterpolatedMetric.ConfidenceLevel?,
+            isInterpolated: Bool
+        ) -> InterpolatedMetric.ConfidenceLevel? {
+            guard isInterpolated else { return nil }
+            let levels: [InterpolatedMetric.ConfidenceLevel] = [.high, .medium, .low]
+            let firstIndex = first.flatMap { levels.firstIndex(of: $0) } ?? 0
+            let secondIndex = second.flatMap { levels.firstIndex(of: $0) } ?? 0
+            return levels[max(firstIndex, secondIndex)]
         }
 
         private func estimateLeanMass(for date: Date) -> InterpolatedMetric? {
@@ -587,25 +610,39 @@ class MetricsInterpolationService {
     // MARK: - FFMI Calculation
 
     /// Calculate or estimate FFMI for a given date
-    /// FFMI = lean_mass_kg / (height_meters^2)
+    /// FFMI follows the canonical normalized formula in `UnitConversion` so
+    /// Home, Stats, charts, and Body Score agree for the same selected date.
     /// Requires height to be provided
     func estimateFFMI(for date: Date, metrics: [BodyMetrics], heightInches: Double?) -> InterpolatedMetric? {
         guard let heightInches = heightInches, heightInches > 0 else { return nil }
 
-        // Get lean mass (actual or interpolated)
-        guard let leanMassResult = estimateLeanMass(for: date, metrics: metrics) else {
+        guard let weightResult = estimateTrendWeight(for: date, metrics: metrics),
+              let bodyFatResult = estimateBodyFat(for: date, metrics: metrics),
+              let ffmi = UnitConversion.calculateFFMI(
+                weightKg: weightResult.value,
+                bodyFatPercentage: bodyFatResult.value,
+                heightCm: heightInches * 2.54
+              ) else {
             return nil
         }
 
-        // Calculate FFMI
-        let heightMeters = heightInches * 0.0254
-        let ffmi = leanMassResult.value / (heightMeters * heightMeters)
+        let isInterpolated = weightResult.isInterpolated || bodyFatResult.isInterpolated
+        let isLastKnown = weightResult.isLastKnown || bodyFatResult.isLastKnown
+        let confidence: InterpolatedMetric.ConfidenceLevel?
+        if isInterpolated {
+            let levels: [InterpolatedMetric.ConfidenceLevel] = [.high, .medium, .low]
+            let weightIndex = weightResult.confidenceLevel.flatMap { levels.firstIndex(of: $0) } ?? 0
+            let bodyFatIndex = bodyFatResult.confidenceLevel.flatMap { levels.firstIndex(of: $0) } ?? 0
+            confidence = levels[max(weightIndex, bodyFatIndex)]
+        } else {
+            confidence = nil
+        }
 
         return InterpolatedMetric(
             value: round(ffmi * 10) / 10,
-            isInterpolated: leanMassResult.isInterpolated,
-            isLastKnown: leanMassResult.isLastKnown,
-            confidenceLevel: leanMassResult.confidenceLevel
+            isInterpolated: isInterpolated,
+            isLastKnown: isLastKnown,
+            confidenceLevel: confidence
         )
     }
 

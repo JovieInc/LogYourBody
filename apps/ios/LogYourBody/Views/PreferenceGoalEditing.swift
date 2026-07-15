@@ -96,12 +96,22 @@ enum PreferenceGoalValidator {
 }
 
 struct PreferenceGoalEditorSheet: View {
+    private enum Field: Hashable {
+        case value
+    }
+
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let goal: PreferenceGoalKind
     let initialText: String
     let unitLabel: String?
     let save: (Double) -> Void
+
     @State private var draftText: String
+    @FocusState private var focusedField: Field?
+    @AccessibilityFocusState private var errorFocused: Bool
 
     init(
         goal: PreferenceGoalKind,
@@ -122,69 +132,179 @@ struct PreferenceGoalEditorSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(goal.title)
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(.appText)
+            ZStack {
+                Color.jovieCanvas
+                    .ignoresSafeArea()
 
-                    Text(goal.helperText)
-                        .font(.subheadline)
-                        .foregroundColor(.appTextSecondary)
-                }
-
-                HStack(spacing: 10) {
-                    TextField(goal.placeholder, text: $draftText)
-                        .keyboardType(.decimalPad)
-                        .textInputAutocapitalization(.never)
-                        .disableAutocorrection(true)
-                        .font(.system(size: 20, weight: .semibold))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(Color.appCard)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.appBorder, lineWidth: 1)
-                        )
-                        .accessibilityIdentifier("settings_goal_editor_text_field")
-
-                    if let unitLabel {
-                        Text(unitLabel)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.appTextSecondary)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
+                        valueCard
                     }
+                    .frame(maxWidth: 560, alignment: .leading)
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.top, JovieTokens.itemGap)
+                    .padding(.bottom, JovieTokens.sectionGap)
                 }
-
-                if let message = validation.errorMessage {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .accessibilityIdentifier("settings_goal_editor_error")
-                }
-
-                Spacer()
             }
-            .padding(20)
-            .background(Color.appBackground.ignoresSafeArea())
+            .scrollDismissesKeyboard(.interactively)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                saveAction
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.top, JovieTokens.itemGap)
+                    .padding(
+                        .bottom,
+                        dynamicTypeSize.isAccessibilitySize ? JovieTokens.sectionGap : JovieTokens.itemGap
+                    )
+                    .background(Color.jovieCanvas.opacity(0.98))
+            }
             .navigationTitle(goal.title)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.jovieCanvas, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
+                    Button(action: dismiss.callAsFunction) {
+                        Image(systemName: "xmark")
+                            .font(.body.weight(.semibold))
+                            .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
                     }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.jovieText)
+                    .accessibilityLabel("Cancel editing")
+                    .accessibilityHint("Discards changes to this goal")
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        if let value = validation.value {
-                            save(value)
-                            dismiss()
-                        }
+
+                ToolbarItem(placement: .keyboard) {
+                    Button("Done") {
+                        focusedField = nil
                     }
-                    .disabled(!validation.isValid)
+                    .font(.body.weight(.semibold))
+                    .accessibilityIdentifier("settings_goal_editor_keyboard_done_button")
                 }
             }
         }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .onAppear {
+            errorFocused = validation.errorMessage != nil
+        }
+        .onChange(of: focusedField) { _, field in
+            if field == nil, validation.errorMessage != nil {
+                errorFocused = true
+            }
+        }
+        .onChange(of: draftText) { _, _ in
+            if validation.isValid {
+                errorFocused = false
+            }
+        }
+        .accessibilityIdentifier("settings_goal_editor_sheet")
+    }
+
+    private var valueCard: some View {
+        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+            Text("Goal")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.jovieTextSecondary)
+
+            HStack(alignment: .center, spacing: JovieTokens.itemGap) {
+                TextField(goal.placeholder, text: $draftText)
+                    .keyboardType(.decimalPad)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .font(.system(.title, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color.jovieText)
+                    .focused($focusedField, equals: .value)
+                    .accessibilityLabel(goal.title)
+                    .accessibilityValue(accessibilityValue)
+                    .accessibilityHint(validation.errorMessage ?? goal.helperText)
+                    .accessibilityIdentifier("settings_goal_editor_text_field")
+
+                if let unitLabel {
+                    Text(unitLabel)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Color.jovieTextSecondary)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, JovieTokens.compactInset)
+            .frame(maxWidth: .infinity, minHeight: 64)
+            .background(Color.jovieSurfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                    .stroke(fieldBorderColor, lineWidth: focusedField == .value ? 2 : 1)
+            }
+            .animation(
+                reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration),
+                value: focusedField
+            )
+
+            if let message = validation.errorMessage {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .accessibilityHidden(true)
+
+                    Text(message)
+                        .accessibilityIdentifier("settings_goal_editor_error")
+                        .accessibilityFocused($errorFocused)
+                }
+                .font(.footnote)
+                .foregroundStyle(Color.red)
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Label(goal.helperText, systemImage: "info.circle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(Color.jovieTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(goal.helperText)
+            }
+        }
+        .padding(JovieTokens.compactInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .systemBGlassSurface(
+            cornerRadius: JovieTokens.controlRadius,
+            tint: .white,
+            tintOpacity: 0.025,
+            borderColor: .jovieHairline
+        )
+    }
+
+    private var saveAction: some View {
+        BaseButton(
+            "Save",
+            configuration: ButtonConfiguration(
+                style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                isEnabled: validation.isValid,
+                fullWidth: true,
+                icon: "checkmark"
+            )
+        ) {
+            guard let value = validation.value else { return }
+            save(value)
+            dismiss()
+        }
+        .disabled(!validation.isValid)
+        .accessibilityLabel("Save")
+        .accessibilityHint(validation.isValid ? "Saves this goal" : validation.errorMessage ?? "Enter a valid goal")
+    }
+
+    private var accessibilityValue: String {
+        let value = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return "No value" }
+
+        if let unitLabel, !unitLabel.isEmpty {
+            return "\(value) \(unitLabel)"
+        }
+        return value
+    }
+
+    private var fieldBorderColor: Color {
+        if validation.errorMessage != nil {
+            return .red.opacity(0.85)
+        }
+        return focusedField == .value ? .jovieMetricAccent : .jovieHairline
     }
 }

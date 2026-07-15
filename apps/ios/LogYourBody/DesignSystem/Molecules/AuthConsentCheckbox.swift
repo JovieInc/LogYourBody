@@ -33,40 +33,48 @@ struct AuthConsentCheckbox: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Checkbox
+        HStack(alignment: .center, spacing: 8) {
             Button(action: { isChecked.toggle() }, label: {
-                Image(systemName: isChecked ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 20))
-                    .foregroundColor(isChecked ? theme.colors.primary : theme.colors.border)
+                Image(systemName: isChecked ? "checkmark" : "square")
+                    .font(.system(.body, design: .default).weight(.semibold))
+                    .foregroundColor(isChecked ? .jovieActionText : theme.colors.textSecondary)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(isChecked ? Color.jovieAction : Color.jovieSurfaceElevated)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(isChecked ? Color.clear : Color.jovieHairline, lineWidth: 1)
+                    )
+                    .frame(width: 44, height: 44)
             })
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.plain)
+            .accessibilityLabel("Agree to \(linkText)")
+            .accessibilityValue(isChecked ? "Selected" : "Not selected")
+            .accessibilityHint("Required to create an account.")
 
-            // Text with link
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    Text("I agree to the")
-                        .font(theme.typography.bodySmall)
-                        .foregroundColor(theme.colors.textSecondary)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("I agree to the")
+                    .font(theme.typography.bodySmall)
+                    .foregroundColor(theme.colors.textSecondary)
+                    .accessibilityHidden(true)
 
-                    Button(action: handleLinkTap) {
-                        Text(linkText)
-                            .font(theme.typography.labelMedium)
-                            .foregroundColor(theme.colors.primary)
-                            .underline()
-                    }
-                    .buttonStyle(PlainButtonStyle())
+                Button(action: handleLinkTap) {
+                    Text(linkText)
+                        .font(theme.typography.labelMedium)
+                        .foregroundColor(.jovieText)
+                        .underline()
+                        .multilineTextAlignment(.leading)
                 }
-                .multilineTextAlignment(.leading)
-
-                Text(text)
-                    .font(theme.typography.captionMedium)
-                    .foregroundColor(theme.colors.textTertiary)
-                    .multilineTextAlignment(.leading)
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .accessibilityLabel("Read \(linkText)")
+                .accessibilityHint(text)
             }
-
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func handleLinkTap() {

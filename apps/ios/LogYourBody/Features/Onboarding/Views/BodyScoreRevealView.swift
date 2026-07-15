@@ -4,11 +4,15 @@ struct BodyScoreRevealView: View {
     @Environment(\.theme)
     private var theme
 
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @State private var animateScore = false
     @State private var isSharePresented = false
     @State private var sharePayload: BodyScoreSharePayload?
     @State private var featureGateRefreshToken = UUID()
+    @AccessibilityFocusState private var scoreFocused: Bool
 
     private var percentileGroupLabel: String {
         let sex = viewModel.bodyScoreInput.sex
@@ -43,17 +47,24 @@ struct BodyScoreRevealView: View {
                         scoreHero(result: result)
                             .scaleEffect(animateScore ? 1 : 0.9)
                             .opacity(animateScore ? 1 : 0)
-                            .animation(.spring(response: 0.6, dampingFraction: 0.75), value: animateScore)
+                            .animation(reduceMotion ? nil : theme.animation.spring, value: animateScore)
+                            .accessibilityFocused($scoreFocused)
 
                         statRow(result: result, groupLabel: percentileGroupLabel)
                             .opacity(animateScore ? 1 : 0)
                             .offset(y: animateScore ? 0 : 12)
-                            .animation(.easeOut(duration: 0.4).delay(0.1), value: animateScore)
+                            .animation(
+                                reduceMotion ? nil : theme.animation.fast.delay(0.1),
+                                value: animateScore
+                            )
 
                         referencePill(result: result)
                             .opacity(animateScore ? 1 : 0)
                             .offset(y: animateScore ? 0 : 16)
-                            .animation(.easeOut(duration: 0.4).delay(0.15), value: animateScore)
+                            .animation(
+                                reduceMotion ? nil : theme.animation.fast.delay(0.15),
+                                value: animateScore
+                            )
                     }
                 } footer: {
                     VStack(spacing: 12) {
@@ -100,7 +111,8 @@ struct BodyScoreRevealView: View {
     private func scoreHero(result: BodyScoreResult) -> some View {
         VStack(spacing: 8) {
             Text("\(result.score)")
-                .font(.system(size: 56, weight: .bold, design: .default))
+                .font(theme.typography.displayLarge)
+                .monospacedDigit()
                 .foregroundStyle(theme.colors.text)
 
             Text("Starting point")
@@ -109,39 +121,46 @@ struct BodyScoreRevealView: View {
 
             Text("Based on FFMI, body fat %, and trends.")
                 .font(OnboardingTypography.caption)
-                .foregroundStyle(Color.appTextSecondary)
+                .foregroundStyle(theme.colors.textSecondary)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Body Score \(result.score). \(result.statusTagline)")
     }
 
-    private func statRow(result: BodyScoreResult, groupLabel _: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
-            Text("FFMI \(String(format: "%.1f", result.ffmi)) — \(result.ffmiStatus)")
-                .font(OnboardingTypography.body)
-                .foregroundStyle(Color.appText)
+    private func statRow(result: BodyScoreResult, groupLabel: String) -> some View {
+        OnboardingCard {
+            VStack(alignment: .leading, spacing: 8) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 16) {
+                        ffmiLabel(result: result)
+                        Spacer()
+                        percentileLabel(result: result)
+                    }
 
-            Spacer()
+                    VStack(alignment: .leading, spacing: 8) {
+                        ffmiLabel(result: result)
+                        percentileLabel(result: result)
+                    }
+                }
 
-            Text("Lean %ile \(String(format: "%.0f", result.leanPercentile))")
-                .font(OnboardingTypography.body)
-                .foregroundStyle(Color.appTextSecondary)
+                Text("Compared with \(groupLabel).")
+                    .font(OnboardingTypography.caption)
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
     private func referencePill(result: BodyScoreResult) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "info.circle")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.appPrimary)
+                .font(.system(.body, design: .default).weight(.semibold))
+                .foregroundStyle(theme.colors.primary)
 
-            Text(
-                "\(usesIndividualizedAestheticGoals ? "Reference" : "Target"): " +
-                    "\(Int(result.bodyFatReferenceRange.lowerBound))–" +
-                    "\(Int(result.bodyFatReferenceRange.upperBound))% " +
-                    "(\(result.bodyFatReferenceRange.label))"
-            )
+            Text(referenceText(result: result))
                 .font(OnboardingTypography.caption)
-                .foregroundStyle(Color.appTextSecondary)
+                .foregroundStyle(theme.colors.textSecondary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -152,6 +171,22 @@ struct BodyScoreRevealView: View {
             borderColor: theme.colors.border,
             borderOpacity: 0.55
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(referenceAccessibilityText(result: result))
+    }
+
+    private func referenceText(result: BodyScoreResult) -> String {
+        let label = usesIndividualizedAestheticGoals ? "Reference" : "Target"
+        let lowerBound = Int(result.bodyFatReferenceRange.lowerBound)
+        let upperBound = Int(result.bodyFatReferenceRange.upperBound)
+        return "\(label): \(lowerBound)–\(upperBound)% (\(result.bodyFatReferenceRange.label))"
+    }
+
+    private func referenceAccessibilityText(result: BodyScoreResult) -> String {
+        let label = usesIndividualizedAestheticGoals ? "Reference" : "Target"
+        let lowerBound = Int(result.bodyFatReferenceRange.lowerBound)
+        let upperBound = Int(result.bodyFatReferenceRange.upperBound)
+        return "\(label) body fat: \(lowerBound) to \(upperBound) percent. \(result.bodyFatReferenceRange.label)."
     }
 
     private func makeSharePayload(from result: BodyScoreResult) -> BodyScoreSharePayload? {
@@ -202,10 +237,29 @@ struct BodyScoreRevealView: View {
     }
 
     private func triggerRevealFeedback() {
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
+        if reduceMotion {
             animateScore = true
+        } else {
+            withAnimation(theme.animation.spring) {
+                animateScore = true
+            }
+        }
+        DispatchQueue.main.async {
+            scoreFocused = true
         }
         HapticManager.shared.successAction()
+    }
+
+    private func ffmiLabel(result: BodyScoreResult) -> some View {
+        Text("FFMI \(String(format: "%.1f", result.ffmi)) — \(result.ffmiStatus)")
+            .font(OnboardingTypography.body)
+            .foregroundStyle(theme.colors.text)
+    }
+
+    private func percentileLabel(result: BodyScoreResult) -> some View {
+        Text("Lean percentile \(String(format: "%.0f", result.leanPercentile))")
+            .font(OnboardingTypography.body)
+            .foregroundStyle(theme.colors.textSecondary)
     }
 }
 

@@ -1,6 +1,35 @@
 import SwiftUI
 import UIKit
 
+/// Controls precisely which personal details leave the app in a rendered card.
+/// The private default keeps the card to the Body Score until the person opts in.
+struct BodyScoreShareOptions: Equatable {
+    var includeWeight = false
+    var includeBodyFat = false
+    var includeFFMI = false
+    var includeVisual = false
+
+    static let all = BodyScoreShareOptions(
+        includeWeight: true,
+        includeBodyFat: true,
+        includeFFMI: true,
+        includeVisual: true
+    )
+
+    var hasMetrics: Bool {
+        includeWeight || includeBodyFat || includeFFMI
+    }
+
+    var includedSummary: String {
+        var items = ["Body Score"]
+        if includeWeight { items.append("weight") }
+        if includeBodyFat { items.append("body fat") }
+        if includeFFMI { items.append("FFMI") }
+        if includeVisual { items.append("visual") }
+        return items.joined(separator: ", ")
+    }
+}
+
 struct BodyScoreSharePayload {
     let score: Int
     let scoreText: String
@@ -20,8 +49,9 @@ struct BodyScoreSharePayload {
         AvatarBodyFatCatalog.match(bodyFatPercentage: bodyFatPercentage, gender: gender)
     }
 
-    var visualBadgeText: String {
-        photoImage == nil ? avatarMatch.badgeText : "Progress photo"
+    func visualBadgeText(includeVisual: Bool) -> String {
+        guard includeVisual else { return "Private summary" }
+        return photoImage == nil ? avatarMatch.badgeText : "Progress photo"
     }
 }
 
@@ -79,10 +109,21 @@ enum BodyScoreShareAspect: String, CaseIterable, Identifiable {
 struct BodyScoreShareCardView: View {
     let payload: BodyScoreSharePayload
     let aspect: BodyScoreShareAspect
+    let options: BodyScoreShareOptions
+
+    init(
+        payload: BodyScoreSharePayload,
+        aspect: BodyScoreShareAspect,
+        options: BodyScoreShareOptions = .all
+    ) {
+        self.payload = payload
+        self.aspect = aspect
+        self.options = options
+    }
 
     var body: some View {
         GeometryReader { geometry in
-            let layout = ShareCardLayout(size: geometry.size, aspect: aspect)
+            let layout = ShareCardLayout(size: geometry.size, aspect: aspect, includesMetrics: options.hasMetrics)
 
             ZStack {
                 Color.black
@@ -108,6 +149,7 @@ struct BodyScoreShareCardView: View {
         .clipped()
         .dynamicTypeSize(.medium)
         .accessibilityElement(children: .contain)
+        .accessibilityLabel("Body Score share card. Includes \(options.includedSummary).")
         .accessibilityIdentifier("body_score_share_card")
     }
 
@@ -119,7 +161,7 @@ struct BodyScoreShareCardView: View {
 
     private func visualStage(layout: ShareCardLayout) -> some View {
         Group {
-            if let photoImage = payload.photoImage {
+            if options.includeVisual, let photoImage = payload.photoImage {
                 Image(uiImage: photoImage)
                     .resizable()
                     .scaledToFit()
@@ -127,7 +169,7 @@ struct BodyScoreShareCardView: View {
                     .clipped()
                     .accessibilityLabel("Progress photo")
                     .accessibilityIdentifier("body_score_share_photo_visual")
-            } else {
+            } else if options.includeVisual {
                 VStack(spacing: 0) {
                     Spacer(minLength: layout.visualTopOffset)
 
@@ -163,7 +205,7 @@ struct BodyScoreShareCardView: View {
                     .minimumScaleFactor(0.78)
                     .accessibilityIdentifier("body_score_share_brand")
 
-                Text(payload.visualBadgeText)
+                Text(payload.visualBadgeText(includeVisual: options.includeVisual))
                     .font(.system(size: layout.badgeFontSize, weight: .medium))
                     .foregroundColor(Color.white.opacity(0.62))
                     .lineLimit(1)
@@ -219,28 +261,8 @@ struct BodyScoreShareCardView: View {
                 Spacer(minLength: 0)
             }
 
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: layout.metricSpacing) {
-                    shareMetric("Weight", payload.weightValue, payload.weightCaption, identifier: "weight", layout: layout)
-                    shareMetric("Body Fat", payload.bodyFatValue, payload.bodyFatCaption, identifier: "body_fat", layout: layout)
-                    shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, identifier: "ffmi", layout: layout)
-                }
-                .accessibilityIdentifier("body_score_share_metrics")
-
-                VStack(spacing: layout.metricSpacing * 0.55) {
-                    HStack(spacing: layout.metricSpacing) {
-                        shareMetric("Weight", payload.weightValue, payload.weightCaption, identifier: "weight", layout: layout)
-                        shareMetric(
-                            "Body Fat",
-                            payload.bodyFatValue,
-                            payload.bodyFatCaption,
-                            identifier: "body_fat",
-                            layout: layout
-                        )
-                    }
-                    shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, identifier: "ffmi", layout: layout)
-                }
-                .accessibilityIdentifier("body_score_share_metrics_stacked")
+            if options.hasMetrics {
+                shareMetrics(layout: layout)
             }
 
             Text("Shared from LogYourBody")
@@ -317,11 +339,49 @@ struct BodyScoreShareCardView: View {
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("body_score_share_metric_\(identifier)")
     }
+
+    @ViewBuilder
+    private func shareMetrics(layout: ShareCardLayout) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: layout.metricSpacing) {
+                if options.includeWeight {
+                    shareMetric("Weight", payload.weightValue, payload.weightCaption, identifier: "weight", layout: layout)
+                }
+                if options.includeBodyFat {
+                    shareMetric("Body Fat", payload.bodyFatValue, payload.bodyFatCaption, identifier: "body_fat", layout: layout)
+                }
+                if options.includeFFMI {
+                    shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, identifier: "ffmi", layout: layout)
+                }
+            }
+            .accessibilityIdentifier("body_score_share_metrics")
+
+            VStack(alignment: .leading, spacing: layout.metricSpacing * 0.55) {
+                if options.includeWeight {
+                    shareMetric("Weight", payload.weightValue, payload.weightCaption, identifier: "weight", layout: layout)
+                }
+                if options.includeBodyFat {
+                    shareMetric("Body Fat", payload.bodyFatValue, payload.bodyFatCaption, identifier: "body_fat", layout: layout)
+                }
+                if options.includeFFMI {
+                    shareMetric("FFMI", payload.ffmiValue, payload.ffmiCaption, identifier: "ffmi", layout: layout)
+                }
+            }
+            .accessibilityIdentifier("body_score_share_metrics_stacked")
+        }
+    }
 }
 
 struct ShareCardLayout {
     let size: CGSize
     let aspect: BodyScoreShareAspect
+    let includesMetrics: Bool
+
+    init(size: CGSize, aspect: BodyScoreShareAspect, includesMetrics: Bool = true) {
+        self.size = size
+        self.aspect = aspect
+        self.includesMetrics = includesMetrics
+    }
 
     var scale: CGFloat {
         let reference = referenceSize
@@ -396,7 +456,8 @@ struct ShareCardLayout {
         let scoreLabelStack = scoreLabelFontSize + taglineFontSize * 2.6 + deltaFontSize + scoreLabelSpacing * 3
         let scoreRow = max(scoreFontSize * 1.02, scoreLabelStack)
         let metricRow = metricTitleFontSize + metricValueFontSize + metricCaptionFontSize + metricTextSpacing * 2
-        return scoreRow + summarySpacing + metricRow * 1.12 + summarySpacing + footerFontSize * 1.2
+        let metricHeight = includesMetrics ? summarySpacing + metricRow * 1.12 : 0
+        return scoreRow + metricHeight + summarySpacing + footerFontSize * 1.2
     }
 
     var summaryTopY: CGFloat {
@@ -442,11 +503,15 @@ struct ShareCardLayout {
 
 struct BodyScoreShareSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let payload: BodyScoreSharePayload
     let onClose: (() -> Void)?
 
     @State private var selectedAspect: BodyScoreShareAspect
+    @State private var shareOptions = BodyScoreShareOptions()
+    @State private var areContentControlsExpanded = true
     @State private var renderedImage: UIImage?
     @State private var isRendering = false
     @State private var showSystemShareSheet = false
@@ -458,49 +523,17 @@ struct BodyScoreShareSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 18) {
-            sheetHeader
-
-            Picker("Format", selection: $selectedAspect) {
-                ForEach(BodyScoreShareAspect.allCases) { aspect in
-                    Text(aspect.displayName).tag(aspect)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                ScrollView(showsIndicators: false) {
+                    shareSheetContent(previewHeight: 360)
+                        .padding(.vertical, JovieTokens.itemGap)
                 }
+            } else {
+                shareSheetContent(previewHeight: nil)
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 20)
-
-            GeometryReader { geometry in
-                let verticalInset = previewVerticalInset
-                let availableSize = CGSize(
-                    width: geometry.size.width,
-                    height: max(0, geometry.size.height - verticalInset * 2)
-                )
-                let size = fittedSize(for: availableSize, target: selectedAspect.pixelSize)
-
-                BodyScoreShareCardView(payload: payload, aspect: selectedAspect)
-                    .frame(width: size.width, height: size.height)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .padding(.vertical, verticalInset)
-            }
-            .frame(maxWidth: .infinity)
-
-            HStack(spacing: 12) {
-                GlassPillButton(icon: "square.and.arrow.down", title: "Save") {
-                    Task { await saveToPhotos() }
-                }
-                .accessibilityIdentifier("body_score_share_save_button")
-
-                GlassPillButton(icon: "square.and.arrow.up", title: "Share") {
-                    Task { await shareImage() }
-                }
-                .accessibilityIdentifier("body_score_share_system_button")
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
-            .disabled(isRendering)
         }
-        .padding(.top, 62)
-        .background(Color.appBackground.ignoresSafeArea())
+        .background(Color.jovieCanvas.ignoresSafeArea())
         .overlay {
             if isRendering {
                 ZStack {
@@ -521,6 +554,9 @@ struct BodyScoreShareSheet: View {
         .onChange(of: selectedAspect) { _, _ in
             renderedImage = nil
         }
+        .onChange(of: shareOptions) { _, _ in
+            renderedImage = nil
+        }
     }
 
     private var sheetHeader: some View {
@@ -532,16 +568,15 @@ struct BodyScoreShareSheet: View {
                     dismiss()
                 }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-            .tint(.white.opacity(0.12))
-            .foregroundColor(.white)
+            .font(theme.typography.labelMedium)
+            .foregroundColor(theme.colors.text)
+            .jovieTouchTarget()
 
             Spacer()
 
             Text("Share Body Score")
-                .font(.headline.weight(.semibold))
-                .foregroundColor(.white)
+                .font(theme.typography.headlineSmall)
+                .foregroundColor(theme.colors.text)
                 .lineLimit(1)
 
             Spacer()
@@ -549,10 +584,115 @@ struct BodyScoreShareSheet: View {
             Color.clear
                 .frame(width: 72, height: 1)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, JovieTokens.screenInset)
     }
 
     private var previewVerticalInset: CGFloat { 8 }
+
+    private func shareSheetContent(previewHeight: CGFloat?) -> some View {
+        VStack(spacing: JovieTokens.itemGap) {
+            sheetHeader
+
+            Picker("Format", selection: $selectedAspect) {
+                ForEach(BodyScoreShareAspect.allCases) { aspect in
+                    Text(aspect.displayName).tag(aspect)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, JovieTokens.screenInset)
+            .accessibilityLabel("Card format")
+
+            contentControls
+
+            cardPreview(height: previewHeight)
+
+            shareActions
+                .disabled(isRendering)
+        }
+        .padding(.top, JovieTokens.itemGap)
+        .padding(.bottom, JovieTokens.compactInset)
+    }
+
+    private var contentControls: some View {
+        DisclosureGroup(isExpanded: $areContentControlsExpanded) {
+            VStack(spacing: 0) {
+                Toggle("Weight", isOn: $shareOptions.includeWeight)
+                Toggle("Body fat", isOn: $shareOptions.includeBodyFat)
+                Toggle("FFMI", isOn: $shareOptions.includeFFMI)
+                Toggle(payload.photoImage == nil ? "Body visual" : "Progress photo", isOn: $shareOptions.includeVisual)
+            }
+            .font(theme.typography.bodyMedium)
+            .tint(theme.colors.info)
+            .padding(.top, theme.spacing.xs)
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Included on card")
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(theme.colors.text)
+
+                Text(shareOptions.includedSummary)
+                    .font(theme.typography.captionLarge)
+                    .foregroundColor(theme.colors.textSecondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(theme.spacing.sm)
+        .background(theme.colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: theme.radius.input, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: theme.radius.input, style: .continuous)
+                .stroke(theme.colors.border, lineWidth: 1)
+        )
+        .padding(.horizontal, JovieTokens.screenInset)
+        .accessibilityIdentifier("body_score_share_content_controls")
+    }
+
+    private func cardPreview(height: CGFloat?) -> some View {
+        GeometryReader { geometry in
+            let verticalInset = previewVerticalInset
+            let availableSize = CGSize(
+                width: geometry.size.width,
+                height: max(0, geometry.size.height - verticalInset * 2)
+            )
+            let size = fittedSize(for: availableSize, target: selectedAspect.pixelSize)
+
+            BodyScoreShareCardView(payload: payload, aspect: selectedAspect, options: shareOptions)
+                .frame(width: size.width, height: size.height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .padding(.vertical, verticalInset)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(height: height)
+        .padding(.horizontal, JovieTokens.screenInset)
+    }
+
+    private var shareActions: some View {
+        HStack(spacing: JovieTokens.itemGap) {
+            shareActionButton(title: "Save", icon: "square.and.arrow.down") {
+                Task { await saveToPhotos() }
+            }
+            .accessibilityIdentifier("body_score_share_save_button")
+
+            shareActionButton(title: "Share", icon: "square.and.arrow.up") {
+                Task { await shareImage() }
+            }
+            .accessibilityIdentifier("body_score_share_system_button")
+        }
+        .padding(.horizontal, JovieTokens.screenInset)
+    }
+
+    private func shareActionButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(theme.typography.labelLarge)
+                .frame(maxWidth: .infinity, minHeight: JovieTokens.compactControlHeight)
+        }
+        .buttonStyle(.plain)
+        .foregroundColor(Color.jovieActionText)
+        .background(theme.colors.interactive)
+        .clipShape(Capsule())
+        .accessibilityHint("Renders a card containing \(shareOptions.includedSummary)")
+    }
 
     private func fittedSize(for container: CGSize, target: CGSize) -> CGSize {
         guard container.width > 0, container.height > 0 else {
@@ -571,7 +711,7 @@ struct BodyScoreShareSheet: View {
         let size = selectedAspect.pixelSize
         let renderer = ImageRenderer(
             content:
-                BodyScoreShareCardView(payload: payload, aspect: selectedAspect)
+                BodyScoreShareCardView(payload: payload, aspect: selectedAspect, options: shareOptions)
                 .frame(width: size.width, height: size.height)
                 .environment(\.colorScheme, .dark)
         )

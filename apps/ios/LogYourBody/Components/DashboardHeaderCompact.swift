@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct DashboardHeaderCompact: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let scrollProgress: CGFloat
     let avatarURL: URL?
     let userFirstName: String
@@ -13,10 +15,12 @@ struct DashboardHeaderCompact: View {
     let onShowSyncDetails: () -> Void
     let onAddEntry: () -> Void
 
-    @State private var isSyncIndicatorExpanded = false
-
     private var clampedScrollProgress: CGFloat {
         min(max(scrollProgress, 0), 1)
+    }
+
+    private var shouldShowPersistentSyncStatus: Bool {
+        isSyncError || syncStatusTitle == "Offline"
     }
 
     var body: some View {
@@ -25,7 +29,9 @@ struct DashboardHeaderCompact: View {
                 NavigationLink(destination: PreferencesView()) {
                     avatarView
                 }
-                .buttonStyle(PlainButtonStyle())
+                .buttonStyle(.plain)
+                .frame(width: 44, height: 44)
+                .accessibilityLabel("Open profile and settings")
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Welcome back")
@@ -41,11 +47,12 @@ struct DashboardHeaderCompact: View {
                         .lineLimit(1)
                         .offset(y: -3 * clampedScrollProgress)
                 }
-                .animation(.easeOut(duration: 0.2), value: clampedScrollProgress)
+                .animation(
+                    reduceMotion ? nil : .easeOut(duration: 0.2),
+                    value: clampedScrollProgress
+                )
 
                 Spacer(minLength: 8)
-
-                syncIndicator
 
                 Button {
                     onAddEntry()
@@ -59,8 +66,15 @@ struct DashboardHeaderCompact: View {
                                 .fill(Color.appPrimary)
                         )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+                .buttonStyle(.plain)
                 .accessibilityLabel("New Entry")
+                .accessibilityHint("Opens a new body metric entry")
+            }
+
+            if shouldShowPersistentSyncStatus {
+                syncStatusNotice
             }
 
             if !hasAge || !hasHeight {
@@ -79,7 +93,10 @@ struct DashboardHeaderCompact: View {
                                 .foregroundColor(Color.liquidTextPrimary.opacity(0.8))
                                 .clipShape(Capsule())
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.plain)
+                        .frame(minHeight: 44)
+                        .contentShape(Capsule())
+                        .accessibilityLabel("Add your age")
                     }
 
                     if !hasHeight {
@@ -96,7 +113,10 @@ struct DashboardHeaderCompact: View {
                                 .foregroundColor(Color.liquidTextPrimary.opacity(0.8))
                                 .clipShape(Capsule())
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.plain)
+                        .frame(minHeight: 44)
+                        .contentShape(Capsule())
+                        .accessibilityLabel("Add your height")
                     }
                 }
             }
@@ -140,69 +160,69 @@ struct DashboardHeaderCompact: View {
         }
     }
 
-    private var syncIndicator: some View {
+    private var syncStatusNotice: some View {
         Button {
             onShowSyncDetails()
         } label: {
-            HStack(spacing: 8) {
-                if isSyncIndicatorExpanded, isSyncError {
-                    Text(syncIndicatorLabelText)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.7))
-                        .lineLimit(1)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.06))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 999)
-                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                    )
-                    .clipShape(Capsule())
-                    .transition(
-                        .move(edge: .trailing)
-                            .combined(with: .opacity)
-                    )
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: syncStatusSymbolName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(syncStatusColor)
+                    .frame(width: 20, height: 20)
+                    .padding(.top, 1)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(syncStatusTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(Color.liquidTextPrimary)
+
+                    Text(syncStatusDetailText)
+                        .font(.footnote)
+                        .foregroundColor(Color.liquidTextPrimary.opacity(0.72))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Circle()
-                    .fill(syncStatusColor)
-                    .frame(width: 6, height: 6)
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(Color.liquidTextPrimary.opacity(0.55))
+                    .padding(.top, 3)
             }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(syncStatusColor.opacity(0.42), lineWidth: 1)
+            )
         }
-        .buttonStyle(PlainButtonStyle())
-        .fixedSize(horizontal: false, vertical: true)
-        .onAppear {
-            handleSyncIndicatorStatusChange()
-        }
-        .onChange(of: isSyncError) { _, _ in
-            handleSyncIndicatorStatusChange()
-        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(syncStatusTitle). \(syncStatusDetailText)")
+        .accessibilityHint("Opens sync details and recovery options")
+        .accessibilityIdentifier("dashboard_sync_status")
     }
 
-    private var syncIndicatorLabelText: String {
-        guard isSyncError else {
-            return syncStatusTitle
+    private var syncStatusSymbolName: String {
+        if isSyncError {
+            return "exclamationmark.triangle.fill"
         }
 
-        return "Sync paused (tap for details)"
+        return "icloud.slash.fill"
     }
 
-    private func handleSyncIndicatorStatusChange() {
-        guard isSyncError else {
-            withAnimation(.easeOut(duration: 0.25)) {
-                isSyncIndicatorExpanded = false
-            }
-            return
+    private var syncStatusDetailText: String {
+        if let syncStatusDetail, !syncStatusDetail.isEmpty {
+            return syncStatusDetail
         }
 
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            isSyncIndicatorExpanded = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            withAnimation(.easeOut(duration: 0.25)) {
-                isSyncIndicatorExpanded = false
-            }
-        }
+        return isSyncError
+            ? "Tap for sync details and retry options."
+            : "Changes are queued until you are back online."
     }
 }

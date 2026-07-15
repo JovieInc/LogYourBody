@@ -5,6 +5,20 @@
 import SwiftUI
 
 public extension Color {
+    // MARK: - Jovie canonical surface tokens
+    //
+    // These are intentionally neutral. Accent colour is reserved for metric meaning
+    // and system state; primary actions use the high-contrast white-on-black pair.
+    static let jovieCanvas = Color(hex: "#000000")
+    static let jovieSurface = Color(hex: "#141414")
+    static let jovieSurfaceElevated = Color(hex: "#1C1C1E")
+    static let jovieHairline = Color(hex: "#2A2A2C")
+    static let jovieText = Color(hex: "#F7F7F8")
+    static let jovieTextSecondary = Color(hex: "#A7A7AD")
+    static let jovieAction = Color.white
+    static let jovieActionText = Color.black
+    static let jovieMetricAccent = Color(hex: "#1EB4EA")
+
     // MARK: - Primary Colors
     static let linearPurple = Color(hex: "#5B63D3")
     static let linearBlue = Color(hex: "#3B82F6")
@@ -57,14 +71,14 @@ public extension Color {
     static let linearDisabledText = Color(hex: "#5A5A5A")
 
     // MARK: - App Specific (Aliases for consistency)
-    static let appBackground = linearBg
-    static let appCard = linearCard
-    static let appBorder = linearBorder
-    static let appPrimary = metricAccent  // Note: linearPurple is the canonical name
-    static let appSurfaceSecondary = linearCard
-    static let appText = linearText
-    static let appTextPrimary = linearText
-    static let appTextSecondary = linearTextSecondary
+    static let appBackground = jovieCanvas
+    static let appCard = jovieSurface
+    static let appBorder = jovieHairline
+    static let appPrimary = jovieMetricAccent
+    static let appSurfaceSecondary = jovieSurface
+    static let appText = jovieText
+    static let appTextPrimary = jovieText
+    static let appTextSecondary = jovieTextSecondary
     static let appTextTertiary = linearTextTertiary
     static let appDisabled = linearDisabled
     static let appDisabledText = linearDisabledText

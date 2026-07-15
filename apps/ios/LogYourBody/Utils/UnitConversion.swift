@@ -40,6 +40,43 @@ enum MeasurementSystem: String, Codable, CaseIterable {
     }
 }
 
+/// A weight target is persisted in kilograms and converted only at the display
+/// boundary. This prevents a user-entered pound goal from being interpreted as
+/// kilograms later in Home, Stats, or chart detail.
+struct WeightGoal: Equatable, Codable, Sendable {
+    let kilograms: Double
+
+    init?(displayValue: Double, measurementSystem: MeasurementSystem) {
+        guard displayValue.isFinite, displayValue > 0 else { return nil }
+        kilograms = measurementSystem == .imperial
+            ? UnitConversion.lbsToKg(displayValue)
+            : displayValue
+    }
+
+    init?(kilograms: Double) {
+        guard kilograms.isFinite, kilograms > 0 else { return nil }
+        self.kilograms = kilograms
+    }
+
+    func displayValue(in measurementSystem: MeasurementSystem) -> Double {
+        measurementSystem == .imperial ? UnitConversion.kgToLbs(kilograms) : kilograms
+    }
+
+    func displayText(in measurementSystem: MeasurementSystem) -> String {
+        String(format: "%.1f %@", displayValue(in: measurementSystem), measurementSystem.weightUnit)
+    }
+
+    /// The original app stored an untyped display value. Its migration is kept
+    /// pure so Settings and Home can apply the exact same conversion once.
+    static func migrateLegacy(
+        _ legacyDisplayValue: Double?,
+        measurementSystem: MeasurementSystem
+    ) -> WeightGoal? {
+        guard let legacyDisplayValue else { return nil }
+        return WeightGoal(displayValue: legacyDisplayValue, measurementSystem: measurementSystem)
+    }
+}
+
 // MARK: - Unit Conversion Helper
 
 struct UnitConversion {

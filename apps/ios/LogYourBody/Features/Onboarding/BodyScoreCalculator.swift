@@ -36,9 +36,11 @@ struct BodyScoreCalculator: BodyScoreCalculating {
     }
 
     private func calculateFFMI(weightKg: Double, bodyFatPercentage: Double, heightCm: Double) -> Double {
-        let heightM = heightCm / 100.0
-        let leanMassKg = weightKg * (1 - bodyFatPercentage / 100)
-        return (leanMassKg / (heightM * heightM)) + 6.1 * (1.8 - heightM)
+        UnitConversion.calculateFFMI(
+            weightKg: weightKg,
+            bodyFatPercentage: bodyFatPercentage,
+            heightCm: heightCm
+        ) ?? 0
     }
 
     private func bodyFatReferenceRange(for sex: BiologicalSex) -> BodyScoreResult.ReferenceRange {

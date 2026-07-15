@@ -219,7 +219,9 @@ var body: some View {
 
                     if glp1SelectedMedication != nil {
                         let options = glp1DoseOptions
-                        let unit = glp1UnitForSelectedMedication ?? glp1DoseUnit
+                        let unit = glp1DoseUnit.isEmpty
+                            ? (glp1UnitForSelectedMedication ?? "mg")
+                            : glp1DoseUnit
 
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
@@ -253,7 +255,7 @@ var body: some View {
                                 Text("Record this date as a planned no-dose day.")
                                     .font(.appBodySmall)
                                     .foregroundColor(.appTextTertiary)
-                            } else if !options.isEmpty {
+                            } else if !glp1UseCustomDose && !options.isEmpty {
                                 Picker("Dose", selection: $selectedGlp1DoseIndex) {
                                     ForEach(options.indices, id: \.self) { index in
                                         Text(String(format: "%.2f", options[index]))
@@ -267,6 +269,10 @@ var body: some View {
                                 .onChange(of: selectedGlp1DoseIndex) { _, _ in
                                     updateGlp1DoseFromSelection()
                                 }
+                                .accessibilityLabel("GLP-1 dose")
+                                .accessibilityValue(glp1SelectedDoseAccessibilityValue)
+                                .accessibilityHint("Selected dose for this log.")
+                                .accessibilityIdentifier("glp1_dose_picker")
 
                                 HStack {
                                     Text(unit)
@@ -274,6 +280,14 @@ var body: some View {
                                         .foregroundColor(.appTextSecondary)
                                     Spacer()
                                 }
+                            }
+
+                            if let lastLoggedDoseText = glp1LastLoggedDoseText {
+                                Text("Last logged: \(lastLoggedDoseText)")
+                                    .font(.appBodySmall)
+                                    .foregroundColor(.appTextSecondary)
+                                    .accessibilityLabel("Last logged dose: \(lastLoggedDoseText)")
+                                    .accessibilityIdentifier("glp1_last_logged_dose_status")
                             }
 
                             if !glp1IsRestDay {
@@ -296,6 +310,7 @@ var body: some View {
                                         .frame(maxWidth: .infinity)
                                         .modernTextFieldStyle()
                                         .accessibilityLabel("GLP-1 custom dose value")
+                                        .accessibilityIdentifier("glp1_custom_dose_field")
                                         .submitLabel(.done)
                                         .onChange(of: glp1Dose) { _, newValue in
                                             validateGlp1Dose(newValue)
@@ -331,8 +346,8 @@ var body: some View {
                         .onAppear {
                             if glp1Dose.isEmpty {
                                 updateGlp1DoseFromSelection()
+                                glp1DoseUnit = unit
                             }
-                            glp1DoseUnit = unit
                         }
                     }
                 }
@@ -345,11 +360,11 @@ var body: some View {
         .padding(.horizontal)
         .sheet(isPresented: $isPresentingGlp1AddMedication) {
             if let userId = glp1UserId {
-                Glp1AddMedicationView(userId: userId) { medication in
-                    glp1Medications.append(medication)
-                    selectedGlp1MedicationId = medication.id
-                    applyDefaultDoseConfig(for: medication)
-                }
+                    Glp1AddMedicationView(userId: userId) { medication in
+                        glp1Medications.append(medication)
+                        selectedGlp1MedicationId = medication.id
+                        applyResolvedGlp1DoseDraft(for: medication)
+                    }
             }
         }
         .confirmationDialog(

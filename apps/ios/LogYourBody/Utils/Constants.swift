@@ -69,6 +69,9 @@ struct Constants {
     static let goalBodyFatPercentageKey = "goalBodyFatPercentage"
     static let goalFFMIKey = "goalFFMI"
     static let goalWeightKey = "goalWeight"
+    /// Canonical storage for the user's weight target. The legacy `goalWeight`
+    /// value was a display-unit value and could be converted twice.
+    static let goalWeightKilogramsKey = "goalWeightKilograms"
 
     // Timeline Keys
     static let timelineModeKey = "timelineMode"

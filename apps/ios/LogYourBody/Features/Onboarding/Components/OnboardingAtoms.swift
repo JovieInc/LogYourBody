@@ -64,13 +64,13 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
     private var theme
 
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Self.Configuration) -> some View {
         configuration.label
             .font(theme.typography.labelLarge)
             .frame(maxWidth: .infinity)
-            .frame(minHeight: 56)
-            .padding(.vertical, 2)
+            .frame(minHeight: JovieTokens.controlHeight)
             .foregroundStyle(isEnabled ? theme.colors.background : theme.colors.background.opacity(0.55))
             .background(
                 Capsule(style: .continuous)
@@ -81,7 +81,7 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
                     .stroke(theme.colors.text.opacity(0.16))
             )
             .opacity(configuration.isPressed ? 0.85 : 1)
-            .animation(theme.animation.fast, value: configuration.isPressed)
+            .animation(reduceMotion ? nil : theme.animation.fast, value: configuration.isPressed)
     }
 
     private func buttonOpacity(isPressed: Bool) -> Double {
@@ -93,12 +93,13 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
 struct OnboardingSecondaryButtonStyle: ButtonStyle {
     @Environment(\.theme)
     private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Self.Configuration) -> some View {
         configuration.label
             .font(theme.typography.labelLarge)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .frame(minHeight: JovieTokens.compactControlHeight)
             .foregroundStyle(theme.colors.text)
             .systemBGlassSurface(
                 cornerRadius: theme.radius.button,
@@ -107,7 +108,7 @@ struct OnboardingSecondaryButtonStyle: ButtonStyle {
                 borderColor: theme.colors.border,
                 borderOpacity: 0.65
             )
-            .animation(theme.animation.fast, value: configuration.isPressed)
+            .animation(reduceMotion ? nil : theme.animation.fast, value: configuration.isPressed)
     }
 }
 
@@ -125,6 +126,7 @@ struct OnboardingTextButton: View {
                 .foregroundStyle(theme.colors.primary)
                 .padding(.vertical, 8)
         }
+        .jovieTouchTarget()
     }
 }
 
@@ -145,7 +147,7 @@ struct OnboardingIconBullet: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: item.iconName)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(.body, design: .rounded).weight(.semibold))
                 .foregroundStyle(theme.colors.primary)
                 .frame(width: 24, height: 24)
                 .background(
@@ -195,7 +197,7 @@ struct OnboardingCard<Content: View>: View {
         content
             .padding(20)
             .systemBGlassSurface(
-                cornerRadius: 20,
+                cornerRadius: theme.radius.card,
                 tint: theme.colors.text,
                 tintOpacity: 0.04,
                 borderColor: theme.colors.border,
@@ -231,6 +233,9 @@ struct FFMIInfoContent: View {
 }
 
 struct FFMIInfoLink: View {
+    @Environment(\.theme)
+    private var theme
+
     @State private var isPresenting = false
 
     var body: some View {
@@ -242,11 +247,11 @@ struct FFMIInfoLink: View {
             label: {
                 HStack(spacing: 6) {
                     Image(systemName: "questionmark.circle")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(.footnote, design: .default).weight(.semibold))
                     Text("What's FFMI?")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(theme.typography.labelMedium)
                 }
-                .foregroundStyle(Color.appPrimary)
+                .foregroundStyle(Color.jovieAction)
                 .padding(.vertical, 4)
             }
         )
@@ -257,13 +262,13 @@ struct FFMIInfoLink: View {
                     FFMIInfoContent()
                         .padding(24)
                 }
-                .background(Color.appBackground.ignoresSafeArea())
+                .background(Color.jovieCanvas.ignoresSafeArea())
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Done") {
                             isPresenting = false
                         }
-                        .foregroundStyle(Color.appPrimary)
+                        .foregroundStyle(Color.jovieAction)
                     }
                 }
             }

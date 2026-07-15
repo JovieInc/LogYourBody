@@ -500,6 +500,22 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertNil(disabledViewModel.progress(for: .firstPhoto))
     }
 
+    func testProgressUsesStableMilestonesAcrossConditionalMeasurementBranches() throws {
+        let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: true)
+
+        let health = try XCTUnwrap(viewModel.progress(for: .healthConnect))
+        let manualWeight = try XCTUnwrap(viewModel.progress(for: .manualWeight))
+        let visualBodyFat = try XCTUnwrap(viewModel.progress(for: .bodyFatVisual))
+        let finalPhoto = try XCTUnwrap(viewModel.progress(for: .firstPhoto))
+
+        XCTAssertEqual(health.label, "Measurements")
+        XCTAssertEqual(health.currentIndex, manualWeight.currentIndex)
+        XCTAssertEqual(manualWeight.currentIndex, visualBodyFat.currentIndex)
+        XCTAssertEqual(health.totalCount, finalPhoto.totalCount)
+        XCTAssertEqual(finalPhoto.currentIndex, finalPhoto.totalCount)
+        XCTAssertEqual(finalPhoto.fractionComplete, 1)
+    }
+
     func testBuildOnboardingProfileUpdatesIncludesGenderDobAndHeight() {
         let viewModel = OnboardingFlowViewModel()
         viewModel.updateSex(.female)

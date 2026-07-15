@@ -41,4 +41,27 @@ final class MetricChartDataPointPresenceTests: XCTestCase {
         XCTAssertFalse(measuredPoint.isEstimated)
         XCTAssertTrue(MetricPresence.allCases.contains(.missing))
     }
+
+    func testChartLayoutPolicyLimitsXAxisLabelsForCompactAndAccessibilityLayouts() {
+        XCTAssertEqual(
+            MetricChartLayoutPolicy.xAxisTickCount(for: .week1, isAccessibilitySize: false),
+            4
+        )
+        XCTAssertEqual(
+            MetricChartLayoutPolicy.xAxisTickCount(for: .month6, isAccessibilitySize: false),
+            4
+        )
+        XCTAssertEqual(
+            MetricChartLayoutPolicy.xAxisTickCount(for: .year1, isAccessibilitySize: false),
+            3
+        )
+
+        for range in TimeRange.allCases {
+            XCTAssertEqual(
+                MetricChartLayoutPolicy.xAxisTickCount(for: range, isAccessibilitySize: true),
+                3,
+                "\(range.rawValue) should retain room for readable accessibility labels"
+            )
+        }
+    }
 }

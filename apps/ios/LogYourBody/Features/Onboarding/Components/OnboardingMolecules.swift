@@ -62,6 +62,10 @@ struct OnboardingOptionButton: View {
             )
         })
         .buttonStyle(.plain)
+        .jovieTouchTarget()
+        .accessibilityLabel(title)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -81,7 +85,7 @@ struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: V
                     Text(option.description)
                         .font(theme.typography.labelMedium)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .frame(minHeight: JovieTokens.compactControlHeight)
                         .foregroundStyle(selection == option ? theme.colors.text : theme.colors.textSecondary)
                         .systemBGlassSurface(
                             cornerRadius: 14,
@@ -92,6 +96,8 @@ struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: V
                         )
                 })
                 .buttonStyle(.plain)
+                .accessibilityValue(selection == option ? "Selected" : "Not selected")
+                .accessibilityAddTraits(selection == option ? .isSelected : [])
             }
         }
         .padding(4)
@@ -151,7 +157,7 @@ struct OnboardingTextFieldRow: View {
                 .textInputAutocapitalization(.never)
                 .focused($isFocused)
                 .padding(.horizontal, 14)
-                .padding(.vertical, 12)
+                .frame(minHeight: JovieTokens.compactControlHeight)
                 .systemBGlassSurface(
                     cornerRadius: theme.radius.input,
                     tint: isFocused ? theme.colors.primary : theme.colors.text,
@@ -200,6 +206,7 @@ struct OnboardingValueRow: View {
                         .foregroundStyle(theme.colors.primary)
                 })
                 .buttonStyle(.plain)
+                .jovieTouchTarget()
             }
         }
         .padding(20)
@@ -268,7 +275,7 @@ struct OnboardingProgressIndicator: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Step \(context.currentIndex) of \(context.totalCount)")
+            Text("\(context.label) · \(Int((context.fractionComplete * 100).rounded()))% complete")
                 .font(theme.typography.labelSmall)
                 .foregroundStyle(theme.colors.textSecondary)
 
@@ -324,7 +331,7 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
             ScrollView {
                 content
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, JovieTokens.screenInset)
                     .padding(.top, 16)
                     .padding(.bottom, showsCTA ? 24 : 40)
             }
@@ -348,7 +355,7 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
                 .frame(height: 1)
 
             cta
-                .padding(.horizontal, 24)
+                .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.top, 14)
                 .padding(.bottom, 12)
         }
@@ -429,6 +436,7 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
                         )
                 })
                 .buttonStyle(.plain)
+                .jovieTouchTarget()
             }
 
             if let progress {

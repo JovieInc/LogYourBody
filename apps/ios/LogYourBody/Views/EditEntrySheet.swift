@@ -1,8 +1,20 @@
 import SwiftUI
 import Foundation
+import UIKit
 
+/// A focused editor for an existing weight or body-fat log.
+///
+/// The sheet deliberately keeps the task to two decisions: when the entry belongs
+/// and what its value is. The save action stays above the keyboard so a user does
+/// not need to hunt through a long form to finish editing.
 struct EditEntrySheet: View {
+    private enum Field: Hashable {
+        case value
+    }
+
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let entry: MetricEntry
     let metricType: DashboardViewLiquid.DashboardMetricKind
@@ -13,6 +25,8 @@ struct EditEntrySheet: View {
     @State private var primaryValue: String
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
+    @AccessibilityFocusState private var feedbackFocused: Bool
 
     private var measurementSystem: MeasurementSystem {
         useMetricUnits ? .metric : .imperial
@@ -34,96 +48,206 @@ struct EditEntrySheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                if showsHealthBanner {
-                    healthIntegrationBanner
-                        .padding(.horizontal)
-                        .padding(.top, 20)
-                }
-
-                Form {
-                    Section(header: Text("Date")) {
-                        DatePicker(
-                            "Entry Date",
-                            selection: $selectedDate,
-                            displayedComponents: .date
-                        )
-                        .datePickerStyle(.graphical)
-                        .onChange(of: selectedDate) { _, _ in
-                            errorMessage = nil
-                        }
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
+                    if showsHealthBanner {
+                        healthIntegrationBanner
                     }
 
-                    Section(header: Text(primaryFieldLabel)) {
-                        TextField("0.0", text: $primaryValue)
-                            .keyboardType(.decimalPad)
-                            .disabled(isSaving)
-                            .onChange(of: primaryValue) { _, _ in
-                                errorMessage = nil
-                            }
-
-                        if metricType == .weight {
-                            HStack {
-                                Spacer()
-                                Text(measurementSystem.weightUnit.uppercased())
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        } else if metricType == .bodyFat {
-                            HStack {
-                                Spacer()
-                                Text("%").font(.caption).foregroundColor(.secondary)
-                            }
-                        }
-
-                        if let message = validationMessage {
-                            Text(message)
-                                .font(.footnote)
-                                .foregroundColor(.red)
-                        } else {
-                            Text(validationHint)
-                                .font(.footnote)
-                                .foregroundColor(.secondary)
-                        }
-                    }
+                    dateField
+                    valueField
 
                     if let message = errorMessage {
-                        Section {
-                            Text(message)
-                                .foregroundColor(.red)
-                                .font(.footnote)
-                        }
+                        feedbackCallout(message, isError: true)
+                            .accessibilityFocused($feedbackFocused)
                     }
                 }
-                .disabled(isSaving)
+                .frame(maxWidth: 560, alignment: .leading)
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.top, JovieTokens.itemGap)
+                .padding(.bottom, JovieTokens.sectionGap)
             }
-            .navigationTitle("Edit Entry")
+            .scrollDismissesKeyboard(.interactively)
+            .disabled(isSaving)
+            .background(Color.jovieCanvas)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                saveAction
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.top, JovieTokens.itemGap)
+                    .padding(
+                        .bottom,
+                        dynamicTypeSize.isAccessibilitySize ? JovieTokens.sectionGap : JovieTokens.itemGap
+                    )
+                    .background(Color.jovieCanvas.opacity(0.98))
+            }
+            .navigationTitle("Edit \(metricName)")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.jovieCanvas, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .disabled(isSaving)
+                    Button(action: dismiss.callAsFunction) {
+                        Image(systemName: "xmark")
+                            .font(.body.weight(.semibold))
+                            .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.jovieText)
+                    .disabled(isSaving)
+                    .accessibilityLabel("Cancel editing")
+                    .accessibilityHint("Discards changes to this entry")
                 }
 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        Task { await saveChanges() }
-                    } label: {
-                        if isSaving {
-                            ProgressView()
-                        } else {
-                            Text("Save")
-                        }
+                ToolbarItem(placement: .keyboard) {
+                    Button("Done") {
+                        focusedField = nil
                     }
-                    .disabled(!EditEntrySavePolicy.canAttemptSave(
-                        isSaving: isSaving,
-                        validationMessage: validationMessage,
-                        value: primaryValue
-                    ))
+                    .font(.body.weight(.semibold))
+                    .disabled(isSaving)
+                    .accessibilityIdentifier("edit_entry_keyboard_done_button")
                 }
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(isSaving)
+        .accessibilityIdentifier("edit_entry_sheet")
+    }
+
+    private var dateField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Date")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.jovieTextSecondary)
+
+            DatePicker(
+                "Entry date",
+                selection: $selectedDate,
+                displayedComponents: .date
+            )
+            .datePickerStyle(.compact)
+            .labelsHidden()
+            .tint(Color.jovieMetricAccent)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: JovieTokens.minimumHitTarget)
+            .accessibilityLabel("Entry date")
+            .accessibilityHint("Choose the date for this \(metricName.lowercased()) entry")
+            .onChange(of: selectedDate) { _, _ in
+                errorMessage = nil
+                feedbackFocused = false
+            }
+        }
+        .padding(JovieTokens.compactInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .systemBGlassSurface(
+            cornerRadius: JovieTokens.controlRadius,
+            tint: .white,
+            tintOpacity: 0.025,
+            borderColor: .jovieHairline
+        )
+    }
+
+    private var valueField: some View {
+        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+            Text(primaryFieldLabel)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.jovieTextSecondary)
+
+            HStack(alignment: .center, spacing: JovieTokens.itemGap) {
+                TextField("0.0", text: $primaryValue)
+                    .keyboardType(.decimalPad)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .font(.system(.title, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color.jovieText)
+                    .focused($focusedField, equals: .value)
+                    .accessibilityLabel("\(primaryFieldLabel) value")
+                    .accessibilityHint(validationHint)
+                    .accessibilityIdentifier("edit_entry_value_field")
+                    .onChange(of: primaryValue) { _, _ in
+                        handleValueChange()
+                    }
+
+                Text(unitLabel)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Color.jovieTextSecondary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, JovieTokens.compactInset)
+            .frame(maxWidth: .infinity, minHeight: 64)
+            .background(Color.jovieSurfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                    .stroke(fieldBorderColor, lineWidth: focusedField == .value ? 2 : 1)
+            }
+            .animation(
+                reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration),
+                value: focusedField
+            )
+
+            feedbackCallout(validationMessage ?? validationHint, isError: validationMessage != nil)
+        }
+        .padding(JovieTokens.compactInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .systemBGlassSurface(
+            cornerRadius: JovieTokens.controlRadius,
+            tint: .white,
+            tintOpacity: 0.025,
+            borderColor: .jovieHairline
+        )
+    }
+
+    private var saveAction: some View {
+        BaseButton(
+            "Save changes",
+            configuration: ButtonConfiguration(
+                style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                isLoading: isSaving,
+                isEnabled: canSave,
+                fullWidth: true,
+                icon: "checkmark"
+            )
+        ) {
+            focusedField = nil
+            Task { await saveChanges() }
+        }
+        .disabled(!canSave)
+        .accessibilityIdentifier("edit_entry_save_button")
+        .accessibilityHint(canSave ? "Saves the changes to this entry" : saveDisabledHint)
+    }
+
+    private func feedbackCallout(_ message: String, isError: Bool) -> some View {
+        Label(message, systemImage: isError ? "exclamationmark.circle.fill" : "info.circle.fill")
+            .font(.footnote)
+            .foregroundStyle(isError ? Color.red : Color.jovieTextSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(message)
+            .accessibilityIdentifier(isError ? "edit_entry_validation_message" : "edit_entry_validation_hint")
+    }
+
+    private var fieldBorderColor: Color {
+        if validationMessage != nil {
+            return .red.opacity(0.85)
+        }
+        return focusedField == .value ? .jovieMetricAccent : .jovieHairline
+    }
+
+    private var metricName: String {
+        switch metricType {
+        case .weight:
+            return "Weight"
+        case .bodyFat:
+            return "Body Fat"
+        case .steps:
+            return "Steps"
+        case .ffmi:
+            return "FFMI"
+        case .waist:
+            return "Waist"
+        }
     }
 
     private var primaryFieldLabel: String {
@@ -131,9 +255,20 @@ struct EditEntrySheet: View {
         case .weight:
             return "Weight"
         case .bodyFat:
-            return "Body Fat Percentage"
+            return "Body fat percentage"
         default:
             return "Value"
+        }
+    }
+
+    private var unitLabel: String {
+        switch metricType {
+        case .weight:
+            return measurementSystem.weightUnit
+        case .bodyFat:
+            return "%"
+        default:
+            return entry.primaryUnit
         }
     }
 
@@ -142,10 +277,17 @@ struct EditEntrySheet: View {
         case .weight:
             return measurementSystem == .metric ? "Enter weight in kilograms" : "Enter weight in pounds"
         case .bodyFat:
-            return "Enter percentage between 3 and 60"
+            return "Enter a percentage between 3 and 60"
         default:
-            return ""
+            return "Enter a value"
         }
+    }
+
+    private var saveDisabledHint: String {
+        if isSaving {
+            return "Saving changes"
+        }
+        return validationMessage ?? "Enter a value before saving"
     }
 
     private var validationMessage: String? {
@@ -161,9 +303,8 @@ struct EditEntrySheet: View {
                 _ = try ValidationService.shared.validateBodyFat(primaryValue)
             }
         default:
-            break
+            return nil
         }
-        return nil
     }
 
     private var canSave: Bool {
@@ -179,28 +320,43 @@ struct EditEntrySheet: View {
     }
 
     private var healthIntegrationBanner: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: JovieTokens.itemGap) {
             Image(systemName: "heart.fill")
-                .foregroundColor(.red)
-                .font(.title2)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Color.red)
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                .background(Color.red.opacity(0.12), in: Circle())
+                .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Synced from Health")
-                    .font(.headline)
-                Text("This entry was imported from HealthKit. Updating it here will override the synced value.")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Synced from Apple Health")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.jovieText)
+
+                Text("Saving here replaces the synced value for this date.")
                     .font(.footnote)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Color.jovieTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.red.opacity(0.12))
+        .padding(JovieTokens.compactInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .systemBGlassSurface(
+            cornerRadius: JovieTokens.controlRadius,
+            tint: Color.red,
+            tintOpacity: 0.07,
+            borderColor: Color.red.opacity(0.45)
         )
+        .accessibilityElement(children: .combine)
     }
 
     private static func initialValue(for entry: MetricEntry) -> String {
         String(format: "%.1f", entry.primaryValue)
+    }
+
+    private func handleValueChange() {
+        errorMessage = nil
+        feedbackFocused = false
     }
 
     private func saveChanges() async {
@@ -226,7 +382,7 @@ struct EditEntrySheet: View {
                 weightKg = convertToKilograms(validatedWeight)
                 bodyFat = nil
             } catch {
-                errorMessage = error.localizedDescription
+                presentError(error.localizedDescription)
                 return
             }
         case .bodyFat:
@@ -234,7 +390,7 @@ struct EditEntrySheet: View {
                 weightKg = nil
                 bodyFat = try ValidationService.shared.validateBodyFat(primaryValue)
             } catch {
-                errorMessage = error.localizedDescription
+                presentError(error.localizedDescription)
                 return
             }
         default:
@@ -255,9 +411,15 @@ struct EditEntrySheet: View {
                     await MainActor.run { dismiss() }
                 }
             } else {
-                errorMessage = "Failed to save changes. Please try again."
+                presentError("Couldn’t save changes. Try again.")
             }
         }
+    }
+
+    private func presentError(_ message: String) {
+        errorMessage = message
+        feedbackFocused = true
+        UIAccessibility.post(notification: .announcement, argument: message)
     }
 
     private func convertToKilograms(_ value: Double) -> Double {

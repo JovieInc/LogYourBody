@@ -25,7 +25,7 @@ func resetGlp1DoseEditing() {
         glp1IsRestDay = false
 
         if let medication = glp1SelectedMedication {
-            applyDefaultDoseConfig(for: medication)
+            applyResolvedGlp1DoseDraft(for: medication)
         } else {
             glp1Dose = ""
             glp1Error = nil

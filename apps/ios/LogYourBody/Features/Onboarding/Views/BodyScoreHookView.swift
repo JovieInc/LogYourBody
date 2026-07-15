@@ -17,9 +17,7 @@ struct BodyScoreHookView: View {
             showsBackButton: false,
             progress: viewModel.progress(for: .hook)
         ) {
-            VStack(spacing: 24) {
-                OnboardingBadge(text: "Body Score Early Access")
-
+            VStack(spacing: JovieTokens.sectionGap) {
                 OnboardingBulletList(items: bulletItems)
             }
         } footer: {
@@ -28,7 +26,6 @@ struct BodyScoreHookView: View {
                     viewModel.goToNextStep()
                 } label: {
                     Text("Start my 60-sec Body Score")
-                        .font(.system(size: 18, weight: .semibold))
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .accessibilityIdentifier("body_score_onboarding_start_button")

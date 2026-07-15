@@ -115,7 +115,7 @@ extension DashboardViewLiquid {
                 },
                 metricEntries: cachedMetricEntries(for: .weight),
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .weight),
-                goalValue: weightGoal,
+                goalValue: weightGoal.flatMap { convertWeight($0, to: currentMeasurementSystem) },
                 selectedTimeRange: $selectedRange,
                 selectedTimelineDate: metricDetailSelectedDateBinding
             )

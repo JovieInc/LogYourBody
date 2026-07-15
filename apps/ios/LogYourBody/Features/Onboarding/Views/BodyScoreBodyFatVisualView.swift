@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct BodyScoreBodyFatVisualView: View {
+    @Environment(\.theme)
+    private var theme
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
     private struct VisualEstimate: Identifiable {
@@ -51,7 +54,7 @@ struct BodyScoreBodyFatVisualView: View {
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .bodyFatVisual),
             content: {
-                VStack(spacing: 8) {
+                VStack(spacing: JovieTokens.itemGap) {
                     ForEach(Self.visualEstimates) { estimate in
                         Button {
                             handleSelection(estimate)
@@ -60,35 +63,47 @@ struct BodyScoreBodyFatVisualView: View {
                                 HStack(spacing: 8) {
                                     Text("\(Int(estimate.percentage))% \(estimate.label)")
                                         .font(OnboardingTypography.headline)
-                                        .foregroundStyle(Color.appText)
+                                        .foregroundStyle(theme.colors.text)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
 
                                     Spacer()
 
                                     Image(
                                         systemName: isSelected(estimate) ? "largecircle.fill.circle" : "circle"
                                     )
-                                    .font(.system(size: 20, weight: .semibold))
+                                    .font(.system(.title3, design: .default).weight(.semibold))
                                     .foregroundStyle(
                                         isSelected(estimate)
-                                            ? Color.appPrimary
-                                            : Color.appTextSecondary.opacity(0.6)
+                                            ? theme.colors.primary
+                                            : theme.colors.textSecondary.opacity(0.6)
                                     )
                                 }
 
                                 if isSelected(estimate) {
                                     Text(estimate.description)
                                         .font(OnboardingTypography.caption)
-                                        .foregroundStyle(Color.appTextSecondary)
+                                        .foregroundStyle(theme.colors.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                            .systemBGlassSurface(
+                                cornerRadius: theme.radius.card,
+                                tint: isSelected(estimate) ? theme.colors.primary : theme.colors.text,
+                                tintOpacity: isSelected(estimate) ? 0.13 : 0.035,
+                                borderColor: isSelected(estimate) ? theme.colors.primary : theme.colors.border,
+                                borderOpacity: isSelected(estimate) ? 0.85 : 0.65,
+                                borderWidth: isSelected(estimate) ? 2 : 1
+                            )
                         }
                         .buttonStyle(.plain)
-
-                        if estimate.percentage != Self.visualEstimates.last?.percentage {
-                            Divider()
-                                .overlay(Color.appBorder.opacity(0.4))
-                        }
+                        .jovieTouchTarget()
+                        .accessibilityLabel("\(Int(estimate.percentage)) percent, \(estimate.label). \(estimate.description)")
+                        .accessibilityValue(isSelected(estimate) ? "Selected" : "Not selected")
+                        .accessibilityAddTraits(isSelected(estimate) ? .isSelected : [])
                     }
                 }
             },
@@ -97,24 +112,15 @@ struct BodyScoreBodyFatVisualView: View {
                     viewModel.goToNextStep()
                 } label: {
                     Text("Continue")
-                        .font(.system(size: 18, weight: .semibold))
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueBodyFatVisual)
-                .opacity(continueButtonOpacity)
             }
         )
     }
 }
 
 extension BodyScoreBodyFatVisualView {
-    private var continueButtonOpacity: Double {
-        if viewModel.canContinueBodyFatVisual {
-            return 1
-        }
-        return 0.4
-    }
-
     private func isSelected(_ estimate: VisualEstimate) -> Bool {
         viewModel.selectedVisualBodyFat == estimate.percentage
     }

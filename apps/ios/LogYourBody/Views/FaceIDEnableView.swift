@@ -2,36 +2,43 @@
 //  FaceIDEnableView.swift
 //  LogYourBody
 //
-//  Guided flow for enabling Face ID lock from Settings.
+//  Guided flow for enabling the device biometric lock from Settings.
 //
-
 import SwiftUI
 
 struct FaceIDEnableView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let onEnabled: () -> Void
 
     @State private var isAuthenticating = false
     @State private var showError = false
+    @AccessibilityFocusState private var errorFocused: Bool
+
     private let biometricAuthenticator: BiometricAuthenticating = LocalBiometricAuthenticationAdapter.shared
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 28) {
-                header
-                description
-                Spacer(minLength: 0)
-                if showError {
-                    errorCallout
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    ScrollView {
+                        content
+                            .padding(.vertical, JovieTokens.sectionGap)
+                    }
+                } else {
+                    content
                 }
-                actionButtons
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 32)
-            .padding(.bottom, 24)
-            .background(Color.appBackground.ignoresSafeArea())
-            .navigationTitle("")
+            .padding(.horizontal, JovieTokens.screenInset)
+            .background(Color.jovieCanvas.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                actionButtons
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.top, JovieTokens.itemGap)
+                    .padding(.bottom, JovieTokens.itemGap)
+                    .background(Color.jovieCanvas)
+            }
             .toolbar(.hidden, for: .navigationBar)
         }
         .presentationDetents([.medium, .large])
@@ -42,82 +49,114 @@ struct FaceIDEnableView: View {
         }
     }
 
+    private var content: some View {
+        VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
+            header
+            privacyDetails
+
+            if showError {
+                errorCallout
+            }
+        }
+        .frame(maxWidth: 520, alignment: .leading)
+    }
+
     private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Enable Face ID for LogYourBody")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundColor(.appText)
-            Text("Use Face ID to lock the app and keep your data private.")
-                .font(.system(size: 16))
-                .foregroundColor(.appTextSecondary)
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: "faceid")
+                .font(.system(.largeTitle, design: .default).weight(.medium))
+                .foregroundStyle(Color.jovieText)
+                .frame(width: 64, height: 64)
+                .background(Color.jovieSurfaceElevated, in: Circle())
+                .overlay(Circle().stroke(Color.jovieHairline, lineWidth: 1))
+                .accessibilityHidden(true)
+
+            Text("Enable Face ID")
+                .font(.title.weight(.bold))
+                .foregroundStyle(Color.jovieText)
+
+            Text("Use Face ID to add a privacy lock when you open LogYourBody.")
+                .font(.body)
+                .foregroundStyle(Color.jovieTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private var description: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Required to open LogYourBody", systemImage: "lock.fill")
-            Label("You can turn this off in Settings", systemImage: "gear")
+    private var privacyDetails: some View {
+        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+            FaceIDDetailRow(
+                title: "Required when opening the app",
+                icon: "lock.fill"
+            )
+            FaceIDDetailRow(
+                title: "You can turn this off in Settings",
+                icon: "gearshape.fill"
+            )
         }
-        .font(.system(size: 15))
-        .foregroundColor(.appTextSecondary)
-        .labelStyle(FaceIDBulletedLabelStyle())
-    }
-
-    private var errorCallout: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
-                    .font(.system(size: 18))
-                Text("Couldn't enable Face ID. Try again or use your passcode.")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.appText)
-            }
-
-            BaseButton(
-                "Try Again",
-                configuration: ButtonConfiguration(style: .secondary, fullWidth: true)
-            ) {
-                triggerFaceID(isRetry: true)
-            }
-            .accessibilityLabel("Try Face ID again to enable the lock")
-        }
-        .padding(16)
+        .padding(JovieTokens.cardRadius - 4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.appCard)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.orange.opacity(0.4), lineWidth: 1)
-                )
+        .systemBGlassSurface(
+            cornerRadius: JovieTokens.controlRadius,
+            tint: .white,
+            tintOpacity: 0.02,
+            borderColor: .jovieHairline
         )
     }
 
+    private var errorCallout: some View {
+        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+            Label("Couldn’t enable Face ID", systemImage: "exclamationmark.triangle.fill")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(Color.jovieText)
+
+            Text("Try again, or come back to this from Settings later.")
+                .font(.body)
+                .foregroundStyle(Color.jovieTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Try again") {
+                triggerFaceID(isRetry: true)
+            }
+            .font(.body.weight(.semibold))
+            .foregroundStyle(Color.jovieText)
+            .frame(minHeight: JovieTokens.minimumHitTarget)
+            .jovieTouchTarget()
+            .accessibilityHint("Starts Face ID setup again")
+        }
+        .padding(JovieTokens.compactInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .systemBGlassSurface(
+            cornerRadius: JovieTokens.controlRadius,
+            tint: Color.orange,
+            tintOpacity: 0.08,
+            borderColor: Color.orange.opacity(0.55)
+        )
+        .accessibilityFocused($errorFocused)
+    }
+
     private var actionButtons: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: JovieTokens.itemGap) {
             BaseButton(
-                "Turn On Face ID",
-                configuration: ButtonConfiguration(fullWidth: true, isLoading: isAuthenticating)
+                "Turn on Face ID",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                    isLoading: isAuthenticating,
+                    fullWidth: true,
+                    icon: "faceid"
+                )
             ) {
-                guard !isAuthenticating else { return }
                 triggerFaceID()
             }
-            .accessibilityLabel("Turn on Face ID for LogYourBody")
             .disabled(isAuthenticating)
+            .accessibilityHint("Requires Face ID before enabling the app lock")
 
-            Button {
-                dismiss()
-            } label: {
-                Text("Not Now")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.appTextSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Dismiss without enabling Face ID")
+            Button("Not now", action: dismiss.callAsFunction)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Color.jovieTextSecondary)
+                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                .buttonStyle(.plain)
+                .jovieTouchTarget()
+                .accessibilityHint("Dismisses without enabling the lock")
         }
     }
 
@@ -125,12 +164,13 @@ struct FaceIDEnableView: View {
         if !isRetry {
             showError = false
         }
+        guard !isAuthenticating else { return }
         isAuthenticating = true
 
         Task {
             let result = await biometricAuthenticator.authenticate(
                 reason: "Enable Face ID for LogYourBody",
-                cancelTitle: "Not Now",
+                cancelTitle: "Not now",
                 fallbackTitle: "",
                 timeout: nil
             )
@@ -148,20 +188,22 @@ struct FaceIDEnableView: View {
             dismiss()
         } else {
             showError = true
+            errorFocused = true
             HapticManager.shared.notification(type: .error)
         }
     }
 }
 
-private struct FaceIDBulletedLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            configuration.icon
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.appPrimary)
-                .padding(.top, 2)
-            configuration.title
-        }
+private struct FaceIDDetailRow: View {
+    let title: String
+    let icon: String
+
+    var body: some View {
+        Label(title, systemImage: icon)
+            .font(.body)
+            .foregroundStyle(Color.jovieTextSecondary)
+            .labelStyle(.titleAndIcon)
+            .accessibilityElement(children: .combine)
     }
 }
 

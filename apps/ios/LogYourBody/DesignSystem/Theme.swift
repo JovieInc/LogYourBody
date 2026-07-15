@@ -5,6 +5,23 @@
 import SwiftUI
 import UIKit
 
+/// The single set of geometry and interaction values for production iPhone UI.
+/// Keep these semantic values at the shared boundary instead of creating another
+/// screen-specific spacing or control system.
+enum JovieTokens {
+    static let screenInset: CGFloat = 20
+    static let compactInset: CGFloat = 16
+    static let sectionGap: CGFloat = 24
+    static let itemGap: CGFloat = 12
+    static let minimumHitTarget: CGFloat = 44
+    static let controlHeight: CGFloat = 48
+    static let compactControlHeight: CGFloat = 44
+    static let cardRadius: CGFloat = 20
+    static let controlRadius: CGFloat = 16
+    static let subtleDuration: Double = 0.15
+    static let cinematicDuration: Double = 0.42
+}
+
 protocol Theme {
     var colors: ColorTheme { get }
     var materials: MaterialTheme { get }
@@ -123,7 +140,7 @@ struct SpacingTheme {
     // Semantic spacing
     let elementSpacing: CGFloat = 8
     let sectionSpacing: CGFloat = 24
-    let screenPadding: CGFloat = 16
+    let screenPadding: CGFloat = JovieTokens.screenInset
     let cardPadding: CGFloat = 16
     let listItemSpacing: CGFloat = 12
 }
@@ -134,16 +151,16 @@ struct RadiusTheme {
     let none: CGFloat = 0
     let xs: CGFloat = 2
     let sm: CGFloat = 4
-    let md: CGFloat = 10
-    let lg: CGFloat = 14
+    let md: CGFloat = 12
+    let lg: CGFloat = 16
     let xl: CGFloat = 48
     let xxl: CGFloat = 48
     let full: CGFloat = 48
 
     // Semantic radius
     let button: CGFloat = 48
-    let card: CGFloat = 14
-    let input: CGFloat = 10
+    let card: CGFloat = JovieTokens.cardRadius
+    let input: CGFloat = JovieTokens.controlRadius
     let chip: CGFloat = 48
     let avatar: CGFloat = 48
 }
@@ -151,13 +168,13 @@ struct RadiusTheme {
 // MARK: - Animation Theme
 
 struct AnimationTheme {
-    let subtle: Animation = .easeInOut(duration: 0.15)
-    let cinematic: Animation = .easeInOut(duration: 0.42)
+    let subtle: Animation = .easeInOut(duration: JovieTokens.subtleDuration)
+    let cinematic: Animation = .easeInOut(duration: JovieTokens.cinematicDuration)
 
-    let ultraFast: Animation = .easeInOut(duration: 0.15)
-    let fast: Animation = .easeInOut(duration: 0.15)
-    let medium: Animation = .easeInOut(duration: 0.42)
-    let slow: Animation = .easeInOut(duration: 0.42)
+    let ultraFast: Animation = .easeInOut(duration: JovieTokens.subtleDuration)
+    let fast: Animation = .easeInOut(duration: JovieTokens.subtleDuration)
+    let medium: Animation = .easeInOut(duration: JovieTokens.cinematicDuration)
+    let slow: Animation = .easeInOut(duration: JovieTokens.cinematicDuration)
 
     let spring: Animation = .spring(response: 0.42, dampingFraction: 0.8)
     let springBouncy: Animation = .spring(response: 0.42, dampingFraction: 0.7)
@@ -203,9 +220,9 @@ struct DefaultTheme: Theme {
         surfaceTertiary: Color(hex: "#1f1f1f"),
 
         // Primary
-        primary: Color(hex: "#2563FF"),
-        primaryMuted: Color(hex: "#2563FF").opacity(0.8),
-        primarySubtle: Color(hex: "#2563FF").opacity(0.3),
+        primary: .jovieAction,
+        primaryMuted: .jovieAction.opacity(0.82),
+        primarySubtle: .jovieAction.opacity(0.12),
 
         // Accents
         accentViolet: Color(hex: "#8b1eff"),
@@ -221,53 +238,53 @@ struct DefaultTheme: Theme {
         textQuaternary: Color(hex: "#4A4D52"),
 
         // Borders
-        border: Color(hex: "#1f1f1f"),
-        borderSecondary: Color(hex: "#141414"),
-        borderFocused: Color(hex: "#2563FF"),
+        border: .jovieHairline,
+        borderSecondary: Color(hex: "#1A1A1C"),
+        borderFocused: .jovieAction.opacity(0.72),
 
         // States
         success: Color(hex: "#2F9E44"),
         warning: Color(hex: "#ff9800"),
         error: Color(hex: "#F3122D"),
-        info: Color(hex: "#2563FF"),
+        info: .jovieMetricAccent,
 
         // Interactive
-        interactive: Color(hex: "#2563FF"),
-        interactiveHover: Color(hex: "#3b74ff"),
-        interactivePressed: Color(hex: "#1d4ed8"),
-        interactiveDisabled: Color(hex: "#2563FF").opacity(0.4)
+        interactive: .jovieAction,
+        interactiveHover: .jovieAction,
+        interactivePressed: .jovieAction.opacity(0.82),
+        interactiveDisabled: .jovieAction.opacity(0.35)
     )
 
     let materials = MaterialTheme()
     let typography = TypographyTheme(
         // Display
-        displayLarge: .system(size: 48, weight: .bold, design: .rounded),
-        displayMedium: .system(size: 36, weight: .bold, design: .rounded),
-        displaySmall: .system(size: 32, weight: .semibold, design: .rounded),
+        displayLarge: .system(.largeTitle, design: .rounded).weight(.bold),
+        displayMedium: .system(.title, design: .rounded).weight(.bold),
+        displaySmall: .system(.title2, design: .rounded).weight(.semibold),
 
         // Headline
-        headlineLarge: .system(size: 28, weight: .semibold, design: .rounded),
-        headlineMedium: .system(size: 24, weight: .semibold, design: .rounded),
-        headlineSmall: .system(size: 20, weight: .semibold, design: .rounded),
+        headlineLarge: .system(.title2, design: .default).weight(.semibold),
+        headlineMedium: .system(.title3, design: .default).weight(.semibold),
+        headlineSmall: .system(.headline, design: .default).weight(.semibold),
 
         // Body
-        bodyLarge: .system(size: 18, weight: .regular, design: .rounded),
-        bodyMedium: .system(size: 16, weight: .regular, design: .rounded),
-        bodySmall: .system(size: 14, weight: .regular, design: .rounded),
+        bodyLarge: .system(.body, design: .default),
+        bodyMedium: .system(.callout, design: .default),
+        bodySmall: .system(.subheadline, design: .default),
 
         // Label
-        labelLarge: .system(size: 16, weight: .medium, design: .rounded),
-        labelMedium: .system(size: 14, weight: .medium, design: .rounded),
-        labelSmall: .system(size: 12, weight: .medium, design: .rounded),
+        labelLarge: .system(.body, design: .default).weight(.semibold),
+        labelMedium: .system(.subheadline, design: .default).weight(.semibold),
+        labelSmall: .system(.footnote, design: .default).weight(.semibold),
 
         // Caption
-        captionLarge: .system(size: 13, weight: .regular, design: .rounded),
-        captionMedium: .system(size: 12, weight: .regular, design: .rounded),
-        captionSmall: .system(size: 11, weight: .regular, design: .rounded),
+        captionLarge: .system(.footnote, design: .default),
+        captionMedium: .system(.caption, design: .default),
+        captionSmall: .system(.caption2, design: .default),
 
         // Special
-        monospace: .system(size: 16, weight: .regular, design: .monospaced),
-        monospaceLarge: .system(size: 24, weight: .semibold, design: .monospaced)
+        monospace: .system(.body, design: .monospaced),
+        monospaceLarge: .system(.title3, design: .monospaced).weight(.semibold)
     )
 
     let spacing = SpacingTheme()
@@ -332,6 +349,16 @@ extension View {
                 shadowY: shadowY
             )
         )
+    }
+
+    /// Expands a visual control to Apple's minimum recommended hit target without
+    /// forcing surrounding layout to use a one-off frame.
+    func jovieTouchTarget() -> some View {
+        contentShape(Rectangle())
+            .frame(
+                minWidth: JovieTokens.minimumHitTarget,
+                minHeight: JovieTokens.minimumHitTarget
+            )
     }
 }
 

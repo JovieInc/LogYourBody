@@ -5,7 +5,7 @@
 import SwiftUI
 
 private enum SettingsLayout {
-    static let rowMinHeight: CGFloat = 50
+    static let rowMinHeight: CGFloat = max(52, JovieTokens.minimumHitTarget)
     static let iconSize: CGFloat = 20
     static let iconFrame: CGFloat = 24
 }
@@ -72,6 +72,8 @@ struct SettingsSection<Content: View>: View {
 struct SettingsRow: View {
     @Environment(\.theme)
     private var theme
+    @Environment(\.dynamicTypeSize)
+    private var dynamicTypeSize
 
     let icon: String?
     let title: String
@@ -100,8 +102,58 @@ struct SettingsRow: View {
     }
 
     var body: some View {
+        Group {
+            if usesStackedValueLayout, let value {
+                VStack(alignment: .leading, spacing: theme.spacing.xs) {
+                    HStack(spacing: theme.spacing.sm) {
+                        leadingContent
+
+                        Spacer(minLength: theme.spacing.xs)
+
+                        disclosureIndicator
+                    }
+
+                    Text(value)
+                        .font(theme.typography.captionLarge)
+                        .foregroundColor(theme.colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, valueLeadingInset)
+                }
+            } else {
+                HStack(spacing: theme.spacing.sm) {
+                    leadingContent
+
+                    Spacer(minLength: theme.spacing.xs)
+
+                    if let value {
+                        Text(value)
+                            .font(theme.typography.captionLarge)
+                            .foregroundColor(theme.colors.textSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                    }
+
+                    disclosureIndicator
+                }
+            }
+        }
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
+        .frame(minHeight: SettingsLayout.rowMinHeight)
+        .contentShape(Rectangle())
+    }
+
+    private var usesStackedValueLayout: Bool {
+        dynamicTypeSize.isAccessibilitySize && value != nil
+    }
+
+    private var valueLeadingInset: CGFloat {
+        icon == nil ? 0 : SettingsLayout.iconFrame + theme.spacing.sm
+    }
+
+    private var leadingContent: some View {
         HStack(spacing: theme.spacing.sm) {
-            if let icon = icon {
+            if let icon {
                 Image(systemName: icon)
                     .font(theme.typography.headlineSmall)
                     .foregroundColor(resolvedTint)
@@ -112,37 +164,28 @@ struct SettingsRow: View {
                 Text(title)
                     .font(theme.typography.labelLarge)
                     .foregroundColor(resolvedTint)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if let subtitle = subtitle {
+                if let subtitle {
                     Text(subtitle)
                         .font(theme.typography.captionLarge)
                         .foregroundColor(theme.colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-
-            Spacer()
-
-            if let value = value {
-                Text(value)
-                    .font(theme.typography.captionLarge)
-                    .foregroundColor(theme.colors.textSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-            }
-
-            if showChevron {
-                Image(systemName: isExternal ? "arrow.up.right.square" : "chevron.right")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundColor(theme.colors.textTertiary)
-            }
+            .layoutPriority(1)
         }
-        .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
-        .frame(minHeight: SettingsLayout.rowMinHeight)
-        .contentShape(Rectangle())
+        .layoutPriority(1)
+    }
+
+    @ViewBuilder
+    private var disclosureIndicator: some View {
+        if showChevron {
+            Image(systemName: isExternal ? "arrow.up.right.square" : "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(theme.colors.textTertiary)
+        }
     }
 
     private var resolvedTint: Color {
@@ -190,11 +233,45 @@ struct SettingsNavigationLink<Destination: View>: View {
     }
 }
 
+// MARK: - Detail Screen
+
+struct SettingsDetailScreen<Content: View>: View {
+    @Environment(\.theme)
+    private var theme
+
+    let title: String
+    @ViewBuilder let content: Content
+
+    init(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: theme.spacing.sectionSpacing) {
+                content
+            }
+            .padding(.horizontal, theme.spacing.screenPadding)
+            .padding(.vertical, theme.spacing.md)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .settingsBackground()
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 // MARK: - Toggle Row
 
 struct SettingsToggleRow: View {
     @Environment(\.theme)
     private var theme
+    @Environment(\.dynamicTypeSize)
+    private var dynamicTypeSize
 
     let icon: String?
     let title: String
@@ -220,8 +297,35 @@ struct SettingsToggleRow: View {
     }
 
     var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: theme.spacing.sm) {
+                    toggleLabel
+
+                    toggle
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            } else {
+                HStack(spacing: theme.spacing.sm) {
+                    toggleLabel
+
+                    Spacer(minLength: theme.spacing.xs)
+
+                    toggle
+                }
+            }
+        }
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
+        .frame(minHeight: SettingsLayout.rowMinHeight)
+        .onChange(of: isOn) { _, newValue in
+            onToggle?(newValue)
+        }
+    }
+
+    private var toggleLabel: some View {
         HStack(spacing: theme.spacing.sm) {
-            if let icon = icon {
+            if let icon {
                 Image(systemName: icon)
                     .font(theme.typography.headlineSmall)
                     .foregroundColor(resolvedTint)
@@ -232,29 +336,26 @@ struct SettingsToggleRow: View {
                 Text(title)
                     .font(theme.typography.labelLarge)
                     .foregroundColor(resolvedTint)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if let subtitle = subtitle {
+                if let subtitle {
                     Text(subtitle)
                         .font(theme.typography.captionLarge)
                         .foregroundColor(theme.colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-
-            Spacer()
-
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
-                .tint(theme.colors.primary)
         }
-        .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
-        .frame(minHeight: SettingsLayout.rowMinHeight)
-        .onChange(of: isOn) { _, newValue in
-            onToggle?(newValue)
-        }
+        .layoutPriority(1)
+    }
+
+    private var toggle: some View {
+        Toggle(title, isOn: $isOn)
+            .labelsHidden()
+            .accessibilityLabel(title)
+            .accessibilityHint(subtitle ?? "")
+            .tint(theme.colors.primary)
     }
 
     private var resolvedTint: Color {

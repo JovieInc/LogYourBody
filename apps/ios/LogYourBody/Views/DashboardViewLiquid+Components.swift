@@ -39,6 +39,8 @@ struct DashboardEmptyStateLiquid: View {
 
 struct DashboardHomeTimelineHero: View {
     @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .largeTitle) private var bodyScoreFontSize: CGFloat = 50
 
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
@@ -154,8 +156,11 @@ struct DashboardHomeTimelineHero: View {
                         .frame(width: 32, height: 32)
                         .background(Circle().fill(theme.colors.background.opacity(0.42)))
                 }
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
                 .buttonStyle(.plain)
                 .accessibilityLabel("Share Body Score")
+                .accessibilityHint("Opens sharing options for this Body Score")
                 .accessibilityIdentifier("body_score_hero_share_button")
             }
 
@@ -170,51 +175,100 @@ struct DashboardHomeTimelineHero: View {
         }
     }
 
+    @ViewBuilder
     private var timelineMetricsHUD: some View {
         VStack(alignment: .leading, spacing: 14) {
             bodyScoreSummary
 
-            GeometryReader { geometry in
-                let dividerTrackWidth = 42.0
-                let columnWidth = max(0, (geometry.size.width - dividerTrackWidth) / 3.0)
-
-                HStack(alignment: .top, spacing: 0) {
-                    DashboardHomeTimelineMetricButton(
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 10) {
+                    timelineMetricButton(
                         title: "Weight",
                         value: weightValue,
                         caption: weightCaption,
                         color: theme.colors.accentViolet,
                         action: onTapWeight
                     )
-                    .frame(width: columnWidth, alignment: .leading)
 
-                    metricDivider
+                    horizontalMetricDivider
 
-                    DashboardHomeTimelineMetricButton(
+                    timelineMetricButton(
                         title: "Body Fat",
                         value: bodyFatValue,
                         caption: bodyFatCaption,
                         color: theme.colors.accentPink,
                         action: onTapBodyFat
                     )
-                    .frame(width: columnWidth, alignment: .leading)
 
-                    metricDivider
+                    horizontalMetricDivider
 
-                    DashboardHomeTimelineMetricButton(
+                    timelineMetricButton(
                         title: "FFMI",
                         value: ffmiValue,
                         caption: ffmiCaption,
                         color: theme.colors.accentTeal,
                         action: onTapFFMI
                     )
-                    .frame(width: columnWidth, alignment: .leading)
                 }
-                .frame(width: geometry.size.width, alignment: .leading)
+            } else {
+                GeometryReader { geometry in
+                    let dividerTrackWidth = 42.0
+                    let columnWidth = max(0, (geometry.size.width - dividerTrackWidth) / 3.0)
+
+                    HStack(alignment: .top, spacing: 0) {
+                        timelineMetricButton(
+                            title: "Weight",
+                            value: weightValue,
+                            caption: weightCaption,
+                            color: theme.colors.accentViolet,
+                            action: onTapWeight
+                        )
+                        .frame(width: columnWidth, alignment: .leading)
+
+                        metricDivider
+
+                        timelineMetricButton(
+                            title: "Body Fat",
+                            value: bodyFatValue,
+                            caption: bodyFatCaption,
+                            color: theme.colors.accentPink,
+                            action: onTapBodyFat
+                        )
+                        .frame(width: columnWidth, alignment: .leading)
+
+                        metricDivider
+
+                        timelineMetricButton(
+                            title: "FFMI",
+                            value: ffmiValue,
+                            caption: ffmiCaption,
+                            color: theme.colors.accentTeal,
+                            action: onTapFFMI
+                        )
+                        .frame(width: columnWidth, alignment: .leading)
+                    }
+                    .frame(width: geometry.size.width, alignment: .leading)
+                }
+                .frame(height: 68)
             }
-            .frame(height: 68)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func timelineMetricButton(
+        title: String,
+        value: String,
+        caption: String,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> DashboardHomeTimelineMetricButton {
+        DashboardHomeTimelineMetricButton(
+            title: title,
+            value: value,
+            caption: caption,
+            color: color,
+            action: action
+        )
     }
 
     @ViewBuilder
@@ -232,7 +286,7 @@ struct DashboardHomeTimelineHero: View {
     private var bodyScoreContent: some View {
         HStack(alignment: .lastTextBaseline, spacing: 12) {
             Text(bodyScoreText)
-                .font(.system(size: 50, weight: .bold, design: .rounded))
+                .font(.system(size: bodyScoreFontSize, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundColor(theme.colors.text)
                 .lineLimit(1)
@@ -247,8 +301,8 @@ struct DashboardHomeTimelineHero: View {
                 Text(bodyScoreTagline)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(theme.colors.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                    .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.72)
 
                 if let bodyScoreDeltaText {
                     Text(bodyScoreDeltaText)
@@ -273,10 +327,17 @@ struct DashboardHomeTimelineHero: View {
             .frame(width: 1, height: 44)
             .padding(.horizontal, 10)
     }
+
+    private var horizontalMetricDivider: some View {
+        Rectangle()
+            .fill(theme.colors.border)
+            .frame(height: 1)
+    }
 }
 
 private struct DashboardHomeTimelineMetricButton: View {
     @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let title: String
     let value: String
@@ -293,30 +354,31 @@ private struct DashboardHomeTimelineMetricButton: View {
                     .cornerRadius(1)
 
                 Text(title)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundColor(theme.colors.textSecondary)
                     .lineLimit(1)
 
                 Text(value)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(.title3.weight(.bold))
                     .monospacedDigit()
                     .foregroundColor(theme.colors.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.68)
 
                 Text(caption)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.caption2.weight(.medium))
                     .foregroundColor(theme.colors.textTertiary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                    .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.72)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title), \(value), \(caption)")
+        .accessibilityHint("Opens \(title) details")
     }
 }
 

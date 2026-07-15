@@ -116,7 +116,8 @@ extension PreferencesView {
     }
 
     func resetToDefaults() {
-        customWeightGoal = nil
+        customWeightGoalKilograms = nil
+        legacyCustomWeightGoal = nil
         customBodyFatGoal = nil
         customFFMIGoal = nil
     }
@@ -124,9 +125,7 @@ extension PreferencesView {
     func goalValueText(for goal: PreferenceGoalKind) -> String {
         switch goal {
         case .weight:
-            return customWeightGoal.map {
-                "\(String(format: "%.1f", $0)) \(currentSystem.weightUnit)"
-            } ?? "Not set"
+            return currentWeightGoal?.displayText(in: currentSystem) ?? "Not set"
         case .bodyFat:
             guard let currentBodyFatGoal else { return "Not set" }
             let suffix = customBodyFatGoal == nil ? " (default)" : ""
@@ -141,7 +140,7 @@ extension PreferencesView {
     func isGoalCustom(_ goal: PreferenceGoalKind) -> Bool {
         switch goal {
         case .weight:
-            return customWeightGoal != nil
+            return currentWeightGoal != nil
         case .bodyFat:
             return customBodyFatGoal != nil
         case .ffmi:
@@ -152,7 +151,8 @@ extension PreferencesView {
     func resetGoal(_ goal: PreferenceGoalKind) {
         switch goal {
         case .weight:
-            customWeightGoal = nil
+            customWeightGoalKilograms = nil
+            legacyCustomWeightGoal = nil
         case .bodyFat:
             customBodyFatGoal = nil
         case .ffmi:
@@ -163,7 +163,9 @@ extension PreferencesView {
     func initialGoalEditorText(for goal: PreferenceGoalKind) -> String {
         switch goal {
         case .weight:
-            return customWeightGoal.map { String(format: "%.1f", $0) } ?? ""
+            return currentWeightGoal.map {
+                String(format: "%.1f", $0.displayValue(in: currentSystem))
+            } ?? ""
         case .bodyFat:
             if let customBodyFatGoal {
                 return String(format: "%.1f", customBodyFatGoal)
@@ -191,11 +193,32 @@ extension PreferencesView {
     func saveGoal(_ value: Double, for goal: PreferenceGoalKind) {
         switch goal {
         case .weight:
-            customWeightGoal = value
+            customWeightGoalKilograms = WeightGoal(
+                displayValue: value,
+                measurementSystem: currentSystem
+            )?.kilograms
+            legacyCustomWeightGoal = nil
         case .bodyFat:
             customBodyFatGoal = value
         case .ffmi:
             customFFMIGoal = value
         }
+    }
+
+    var currentWeightGoal: WeightGoal? {
+        WeightGoal(kilograms: customWeightGoalKilograms ?? -1)
+    }
+
+    func migrateLegacyWeightGoalIfNeeded() {
+        guard customWeightGoalKilograms == nil,
+              let migrated = WeightGoal.migrateLegacy(
+                legacyCustomWeightGoal,
+                measurementSystem: currentSystem
+              ) else {
+            return
+        }
+
+        customWeightGoalKilograms = migrated.kilograms
+        legacyCustomWeightGoal = nil
     }
 }

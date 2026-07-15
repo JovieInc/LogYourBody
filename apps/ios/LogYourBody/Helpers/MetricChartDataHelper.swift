@@ -351,10 +351,11 @@ struct MetricChartDataHelper {
     /// Calculate Fat Free Mass Index
     /// FFMI = (weight × (1 - body fat %)) / height² + 6.1 × (1.8 - height)
     private static func calculateFFMI(weightKg: Double, bodyFatPercentage: Double, heightCm: Double) -> Double {
-        let heightM = heightCm / 100.0
-        let fatFreeMassKg = weightKg * (1 - bodyFatPercentage / 100)
-        let ffmi = (fatFreeMassKg / (heightM * heightM)) + 6.1 * (1.8 - heightM)
-        return ffmi
+        UnitConversion.calculateFFMI(
+            weightKg: weightKg,
+            bodyFatPercentage: bodyFatPercentage,
+            heightCm: heightCm
+        ) ?? 0
     }
 
     // MARK: - Data Downsampling

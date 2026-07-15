@@ -5,6 +5,93 @@
 import SwiftUI
 
 extension PreferencesView {
+    var settingsLauncher: some View {
+        VStack(spacing: theme.spacing.sectionSpacing) {
+            heroHeader
+
+            SettingsSection(header: "Personal") {
+                VStack(spacing: 0) {
+                    SettingsNavigationLink(
+                        icon: "person.crop.circle",
+                        title: "Profile",
+                        subtitle: "Personal details and profile photo"
+                    ) {
+                        SettingsDetailScreen(title: "Profile") {
+                            VStack(spacing: theme.spacing.sectionSpacing) {
+                                accountSection
+                                profileSection
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("settings_profile_link")
+
+                    DSDivider().insetted(16)
+
+                    SettingsNavigationLink(
+                        icon: "target",
+                        title: "Tracking",
+                        subtitle: "Goals, units, and reminders"
+                    ) {
+                        SettingsDetailScreen(title: "Tracking") {
+                            VStack(spacing: theme.spacing.sectionSpacing) {
+                                trackingGoalsSection
+                                remindersSection
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("settings_tracking_link")
+
+                    DSDivider().insetted(16)
+
+                    integrationsLauncherRow
+                        .accessibilityIdentifier("settings_integrations_link")
+                }
+            }
+
+            SettingsSection(header: "Account & data") {
+                VStack(spacing: 0) {
+                    SettingsNavigationLink(
+                        icon: "person.badge.key",
+                        title: "Account & subscription",
+                        subtitle: accountSubscriptionSummary
+                    ) {
+                        SettingsDetailScreen(title: "Account & subscription") {
+                            VStack(spacing: theme.spacing.sectionSpacing) {
+                                subscriptionSection
+                                advancedSection
+                                securitySection
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("settings_account_subscription_link")
+
+                    DSDivider().insetted(16)
+
+                    SettingsNavigationLink(
+                        icon: "hand.raised",
+                        title: "Privacy & data",
+                        subtitle: "Photo handling and account deletion"
+                    ) {
+                        SettingsDetailScreen(title: "Privacy & data") {
+                            VStack(spacing: theme.spacing.sectionSpacing) {
+                                photosSection
+                                dangerSection
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("settings_privacy_data_link")
+                }
+            }
+        }
+    }
+
+    var accountSubscriptionSummary: String {
+        if let plan = subscriptionPlanDisplay {
+            return "\(subscriptionStatusText) · \(plan)"
+        }
+        return subscriptionStatusText
+    }
+
     var heroHeader: some View {
         VStack(spacing: theme.spacing.md) {
             HStack(alignment: .center, spacing: theme.spacing.md) {
@@ -132,6 +219,7 @@ extension PreferencesView {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     var avatarPlaceholder: some View {

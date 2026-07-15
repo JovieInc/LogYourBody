@@ -28,12 +28,19 @@ struct OTPField: View {
 
     var body: some View {
         ZStack {
-            // Hidden TextField
+            // Keep one real, labelled text field in the accessibility tree. The
+            // six visual cells are a presentation of that field, not six separate
+            // controls a VoiceOver user has to navigate.
             TextField("", text: $code)
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)
                 .focused($isFieldFocused)
-                .opacity(0)
+                .opacity(0.01)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .accessibilityLabel("Verification code")
+                .accessibilityValue("\(code.count) of \(length) digits entered")
+                .accessibilityHint("Enter the \(length)-digit code we emailed you.")
+                .accessibilityIdentifier(accessibilityIdentifier ?? "otp_field")
                 .onChange(of: code) { newValue in
                     // Limit to specified length
                     if newValue.count > length {
@@ -55,12 +62,9 @@ struct OTPField: View {
                     )
                 }
             }
-            .onTapGesture {
-                isFieldFocused = true
-            }
+            .allowsHitTesting(false)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(accessibilityIdentifier ?? "otp_field")
+        .contentShape(Rectangle())
     }
 
     private func digitAt(_ index: Int) -> String {
@@ -77,11 +81,12 @@ struct OTPField: View {
 private struct OTPDigitBox: View {
     let digit: String
     let isActive: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(.systemGray6))
+                .fill(Color.appCard)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(isActive ? Color.appPrimary : Color.appBorder, lineWidth: 1)
@@ -89,7 +94,7 @@ private struct OTPDigitBox: View {
                 .frame(width: 46, height: 56)
 
             Text(digit)
-                .font(.system(size: 24, weight: .semibold))
+                .font(.system(.title2, design: .rounded).weight(.semibold))
                 .foregroundColor(.appText)
 
             if isActive {
@@ -99,7 +104,7 @@ private struct OTPDigitBox: View {
                     .opacity(digit.isEmpty ? 1 : 0)
             }
         }
-        .animation(.easeInOut(duration: 0.1), value: isActive)
+        .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: isActive)
     }
 }
 

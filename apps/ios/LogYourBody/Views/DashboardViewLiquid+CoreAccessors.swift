@@ -41,7 +41,7 @@ extension DashboardViewLiquid {
 
     /// Returns the weight goal (optional, nil if not set)
     var weightGoal: Double? {
-        customWeightGoal
+        WeightGoal(kilograms: customWeightGoalKilograms ?? -1)?.kilograms
     }
 
     var currentMeasurementSystem: MeasurementSystem {

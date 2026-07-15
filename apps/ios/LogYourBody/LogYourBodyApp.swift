@@ -408,6 +408,11 @@ struct LogYourBodyApp: App {
             MeasurementSystem.imperial.rawValue,
             forKey: Constants.preferredMeasurementSystemKey
         )
+        // UI fixtures must not inherit a goal saved by a prior test process. The
+        // weight-goal editor intentionally starts empty in this fixture so its
+        // validation and disabled-save state remain reproducible.
+        UserDefaults.standard.removeObject(forKey: Constants.goalWeightKilogramsKey)
+        UserDefaults.standard.removeObject(forKey: Constants.goalWeightKey)
         OnboardingStateManager.shared.updateCompletionStatus(!usesBodyScoreOnboardingFixture)
 
         realtimeSyncManager.isOnline = false

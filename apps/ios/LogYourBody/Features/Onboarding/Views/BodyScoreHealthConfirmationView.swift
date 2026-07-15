@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct BodyScoreHealthConfirmationView: View {
+    @Environment(\.theme)
+    private var theme
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
     private struct Metric: Identifiable {
@@ -18,62 +21,69 @@ struct BodyScoreHealthConfirmationView: View {
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .healthConfirmation),
             content: {
-                VStack(spacing: 24) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        if let status = viewModel.healthKitConnectionStatusText {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color.green)
+                VStack(spacing: JovieTokens.sectionGap) {
+                    OnboardingCard {
+                        VStack(alignment: .leading, spacing: 16) {
+                            if let status = viewModel.healthKitConnectionStatusText {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(.body, design: .default).weight(.semibold))
+                                        .foregroundStyle(theme.colors.success)
 
-                                Text(status)
-                                    .font(OnboardingTypography.caption)
-                                    .foregroundStyle(Color.appTextSecondary)
-
-                                Spacer()
-                            }
-
-                            Divider()
-                                .overlay(Color.appBorder.opacity(0.4))
-                        }
-
-                        ForEach(metrics) { metric in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: metric.icon)
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(Color.appPrimary)
-
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(metric.title.uppercased())
+                                    Text(status)
                                         .font(OnboardingTypography.caption)
-                                        .foregroundStyle(Color.appTextSecondary)
+                                        .foregroundStyle(theme.colors.textSecondary)
 
-                                    Text(metric.value)
-                                        .font(OnboardingTypography.title)
-                                        .foregroundStyle(Color.appText)
-
-                                    Text(metric.subtitle)
-                                        .font(OnboardingTypography.body)
-                                        .foregroundStyle(Color.appTextSecondary)
+                                    Spacer()
                                 }
 
-                                Spacer()
-
-                                if metric.title != "No data" {
-                                    Button {
-                                        edit(metric: metric)
-                                    } label: {
-                                        Image(systemName: "square.and.pencil")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundStyle(Color.appPrimary)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
+                                Divider()
+                                    .overlay(theme.colors.border.opacity(0.65))
                             }
 
-                            if metric.id != metrics.last?.id {
-                                Divider()
-                                    .overlay(Color.appBorder.opacity(0.4))
+                            ForEach(metrics) { metric in
+                                HStack(alignment: .top, spacing: 12) {
+                                    Image(systemName: metric.icon)
+                                        .font(.system(.title3, design: .rounded).weight(.semibold))
+                                        .foregroundStyle(theme.colors.primary)
+                                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(metric.title.uppercased())
+                                            .font(OnboardingTypography.caption)
+                                            .foregroundStyle(theme.colors.textSecondary)
+
+                                        Text(metric.value)
+                                            .font(theme.typography.headlineLarge)
+                                            .foregroundStyle(theme.colors.text)
+                                            .fixedSize(horizontal: false, vertical: true)
+
+                                        Text(metric.subtitle)
+                                            .font(OnboardingTypography.body)
+                                            .foregroundStyle(theme.colors.textSecondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+
+                                    Spacer()
+
+                                    if metric.title != "No data" {
+                                        Button {
+                                            edit(metric: metric)
+                                        } label: {
+                                            Image(systemName: "square.and.pencil")
+                                                .font(.system(.body, design: .default).weight(.medium))
+                                                .foregroundStyle(theme.colors.primary)
+                                                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel("Edit \(metric.title)")
+                                    }
+                                }
+
+                                if metric.id != metrics.last?.id {
+                                    Divider()
+                                        .overlay(theme.colors.border.opacity(0.65))
+                                }
                             }
                         }
                     }
@@ -90,7 +100,6 @@ struct BodyScoreHealthConfirmationView: View {
                         viewModel.goToNextStep()
                     } label: {
                         Text("Continue")
-                            .font(.system(size: 18, weight: .semibold))
                     }
                     .buttonStyle(OnboardingPrimaryButtonStyle())
 
