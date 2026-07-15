@@ -306,7 +306,6 @@
 		ADDC487C2E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48772E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift */; };
 		ADDC487D2E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48752E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift */; };
 		ADDC487F2E2D8A6B003C97E7 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC486E2E2D8A6B003C97E7 /* CameraView.swift */; };
-		ADDC48802E2D8A6B003C97E7 /* ChangePasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC486F2E2D8A6B003C97E7 /* ChangePasswordView.swift */; };
 		ADDC48812E2D8A6B003C97E7 /* EnhancedOTPInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48722E2D8A6B003C97E7 /* EnhancedOTPInputView.swift */; };
 		ADDC48822E2D8A6B003C97E7 /* OTPInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48762E2D8A6B003C97E7 /* OTPInputView.swift */; };
 		ADDC48832E2D8A6B003C97E7 /* LegalConsentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDC48742E2D8A6B003C97E7 /* LegalConsentView.swift */; };
@@ -765,7 +764,6 @@
 		ADDC48692E2D8A4C003C97E7 /* open-source-licenses.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "open-source-licenses.md"; sourceTree = "<group>"; };
 		ADDC486D2E2D8A6B003C97E7 /* BiometricLockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricLockView.swift; sourceTree = "<group>"; };
 		ADDC486E2E2D8A6B003C97E7 /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
-		ADDC486F2E2D8A6B003C97E7 /* ChangePasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangePasswordView.swift; sourceTree = "<group>"; };
 		ADDC48722E2D8A6B003C97E7 /* EnhancedOTPInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancedOTPInputView.swift; sourceTree = "<group>"; };
 		ADDC48732E2D8A6B003C97E7 /* HealthDisclaimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthDisclaimerView.swift; sourceTree = "<group>"; };
 		ADDC48742E2D8A6B003C97E7 /* LegalConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalConsentView.swift; sourceTree = "<group>"; };
@@ -1285,7 +1283,6 @@
 				AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */,
 				ADDC486D2E2D8A6B003C97E7 /* BiometricLockView.swift */,
 				ADDC486E2E2D8A6B003C97E7 /* CameraView.swift */,
-				ADDC486F2E2D8A6B003C97E7 /* ChangePasswordView.swift */,
 				ADDC48722E2D8A6B003C97E7 /* EnhancedOTPInputView.swift */,
 				ADDC48732E2D8A6B003C97E7 /* HealthDisclaimerView.swift */,
 				ADDC48742E2D8A6B003C97E7 /* LegalConsentView.swift */,
@@ -1979,7 +1976,6 @@
 				AD8872332EB405C00041C426 /* BackgroundTaskType.swift in Sources */,
 				ADDC487F2E2D8A6B003C97E7 /* CameraView.swift in Sources */,
 				ADF1F6BA2ED4C66400745F33 /* GlobalTimelineStore.swift in Sources */,
-				ADDC48802E2D8A6B003C97E7 /* ChangePasswordView.swift in Sources */,
 				ADBAF04E2ECAD88A00A95F98 /* BodyScoreHeightView.swift in Sources */,
 				ADBAF04F2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift in Sources */,
 				ADBAF0502ECAD88A00A95F98 /* BodyScoreCalculator.swift in Sources */,

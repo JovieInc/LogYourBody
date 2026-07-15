@@ -65,14 +65,6 @@ enum AuthProfileBootstrapPolicy {
     }
 }
 
-enum PasswordUpdateError: LocalizedError {
-    case notSupported
-
-    var errorDescription: String? {
-        "LogYourBody uses phone verification codes instead of passwords."
-    }
-}
-
 struct SessionInfo: Identifiable {
     let id: String
     let deviceName: String
@@ -736,10 +728,6 @@ final class AuthManager: NSObject, ObservableObject {
     func deleteCurrentAccount() async throws {
         try await deleteProductAccount()
         await performLogout(exitReason: .userInitiated)
-    }
-
-    func changePassword(currentPassword: String, newPassword: String) async throws {
-        throw PasswordUpdateError.notSupported
     }
 
     func fetchActiveSessions() async throws -> [SessionInfo] {
