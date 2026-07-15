@@ -1,73 +1,41 @@
-import { upsertWaitlistEntry } from '../store';
+import { acceptWaitlistEntry } from '../store';
 
-const mockMaybeSingle = jest.fn();
-const mockSingle = jest.fn();
-const mockInsert = jest.fn();
-const mockSelect = jest.fn();
-const mockEq = jest.fn();
-const mockFrom = jest.fn();
+const mockQuery = jest.fn();
 
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => ({
-    from: mockFrom,
-  })),
+jest.mock('@neondatabase/serverless', () => ({
+  neon: jest.fn(() => mockQuery),
 }));
 
-describe('upsertWaitlistEntry', () => {
+describe('acceptWaitlistEntry', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
-    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
-
-    mockFrom.mockImplementation(() => ({
-      select: mockSelect,
-      insert: mockInsert,
-    }));
-
-    mockSelect.mockImplementation(() => ({
-      eq: mockEq,
-    }));
-
-    mockEq.mockImplementation(() => ({
-      maybeSingle: mockMaybeSingle,
-    }));
-
-    mockInsert.mockImplementation(() => ({
-      select: mockSelect,
-    }));
+    process.env.WAITLIST_DATABASE_URL = 'postgresql://example.test/waitlist';
   });
 
-  it('creates a new waitlist entry when email is new', async () => {
-    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
-    mockSingle.mockResolvedValueOnce({ data: { id: 'entry-1' }, error: null });
-    mockSelect.mockImplementationOnce(() => ({
-      eq: mockEq,
-    }));
-    mockSelect.mockImplementationOnce(() => ({
-      single: mockSingle,
-    }));
+  it('creates a normalized waitlist entry', async () => {
+    mockQuery.mockResolvedValueOnce([]);
 
-    const result = await upsertWaitlistEntry({ email: 'new@example.com' });
+    await acceptWaitlistEntry({ email: ' New@Example.com ', source: 'landing:minimal:direct' });
 
-    expect(result).toEqual({ status: 'created', id: 'entry-1' });
-    expect(mockInsert).toHaveBeenCalledWith({
-      email: 'new@example.com',
-      email_normalized: 'new@example.com',
-      source: 'landing',
-    });
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockQuery.mock.calls[0]?.slice(1)).toEqual([
+      'new@example.com',
+      'new@example.com',
+      'landing:minimal:direct',
+    ]);
   });
 
-  it('returns existing entry without inserting duplicates', async () => {
-    mockMaybeSingle.mockResolvedValueOnce({ data: { id: 'entry-2' }, error: null });
-
-    const result = await upsertWaitlistEntry({ email: 'existing@example.com' });
-
-    expect(result).toEqual({ status: 'existing', id: 'entry-2' });
-    expect(mockInsert).not.toHaveBeenCalled();
+  it('accepts repeat submissions idempotently', async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await expect(
+      acceptWaitlistEntry({ email: 'existing@example.com', source: 'landing:minimal:direct' }),
+    ).resolves.toBeUndefined();
   });
 
   it('throws on invalid email before hitting the database', async () => {
-    await expect(upsertWaitlistEntry({ email: 'bad-email' })).rejects.toThrow('INVALID_EMAIL');
-    expect(mockFrom).not.toHaveBeenCalled();
+    await expect(
+      acceptWaitlistEntry({ email: 'bad-email', source: 'landing:minimal:direct' }),
+    ).rejects.toThrow('INVALID_EMAIL');
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });

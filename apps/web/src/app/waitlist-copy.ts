@@ -1,12 +1,12 @@
 export const waitlistLandingCopy = {
-  headline: 'Track your body composition privately.',
+  headline: 'Know if the work is working.',
   subheading:
-    'LogYourBody is coming soon. Join the waitlist for early access when the app launches.',
+    'Weight, body fat, lean mass, and progress photos in one private timeline that shows the trend.',
   emailLabel: 'Email',
   emailPlaceholder: 'you@example.com',
   submitLabel: 'Join the waitlist',
-  successMessage: "You're on the list. We'll email you when LogYourBody launches.",
-  duplicateMessage: "You're already on the waitlist. We'll be in touch.",
+  successMessage: "You're on the list. We'll email you when a TestFlight spot opens.",
+  duplicateMessage: "You're on the list. We'll email you when a TestFlight spot opens.",
   errorMessage: 'Something went wrong. Please try again.',
   invalidEmailMessage: 'Enter a valid email address.',
 } as const;

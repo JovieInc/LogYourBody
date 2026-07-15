@@ -1,10 +1,14 @@
 'use client';
 
 import { createStatsigAnalytics, type StatsigAnalyticsConfig } from './statsigAnalyticsAdapter';
+import { createVercelAnalytics } from './vercelAnalyticsAdapter';
 
 export type AnalyticsEvent =
   | 'app_open'
   | 'web_landing_viewed'
+  | 'web_waitlist_started'
+  | 'web_waitlist_submit_attempted'
+  | 'web_waitlist_submit_result'
   | 'web_waitlist_submitted'
   | 'web_cta_clicked'
   | 'login_attempt'
@@ -32,6 +36,15 @@ const config: StatsigAnalyticsConfig = {
   environmentTier: process.env.NEXT_PUBLIC_STATSIG_ENV_TIER ?? 'development',
 };
 
-const implementation = createStatsigAnalytics(config);
+const statsig = createStatsigAnalytics(config);
+const vercel = createVercelAnalytics();
 
-export const analytics: AnalyticsPort = implementation;
+export const analytics: AnalyticsPort = {
+  identify: statsig.identify,
+  track(event, properties) {
+    statsig.track(event, properties);
+    vercel.track(event, properties);
+  },
+  reset: statsig.reset,
+  isFeatureEnabled: statsig.isFeatureEnabled,
+};

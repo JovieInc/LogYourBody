@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Providers } from './providers';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
@@ -140,6 +141,7 @@ export default function RootLayout({
           <PWAInstallPrompt />
           <ServiceWorkerUpdater />
         </Providers>
+        <Analytics />
         <SpeedInsights />
       </body>
     </html>
