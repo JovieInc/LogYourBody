@@ -59,7 +59,9 @@ We use the information we collect to:
 
 ### Where We Store Data
 
-- Your data is stored on secure servers provided by Supabase (PostgreSQL database)
+- Account profile and onboarding data are stored in Neon Postgres; body metrics
+  and progress-photo storage may remain on Supabase while the product-data
+  migration is completed
 - Progress photos are stored in encrypted cloud storage
 - We use industry-standard encryption for data in transit and at rest
 
@@ -70,7 +72,7 @@ We use the information we collect to:
 - HTTPS/TLS encryption for all data transmission
 - Regular security audits and updates
 - Limited access to personal data (need-to-know basis)
-- First-party identity service with Supabase-issued product sessions
+- Jovie-hosted Better Auth identity service with short-lived OAuth sessions
 
 ### Data Retention
 
@@ -84,7 +86,8 @@ We do not sell, trade, or rent your personal information. We may share your info
 
 1. **With Your Consent**: When you explicitly agree to share
 2. **Service Providers**: Third-party services that help operate our Service:
-   - Supabase (product authentication, database, and storage)
+   - Neon (account profile and onboarding data)
+   - Supabase (body-metric data and progress-photo storage during migration)
    - Twilio (delivery and verification of sign-in codes)
    - Vercel (web hosting)
    - RevenueCat (subscription and purchase entitlements)

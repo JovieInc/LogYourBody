@@ -56,7 +56,7 @@ The app has reached feature-complete status with major functionality implemented
 
 ### 3. Authentication & Security
 
-- [x] ✅ Shared Jovie Better Auth identity implemented through Supabase OIDC
+- [x] ✅ Shared Jovie Better Auth identity with direct OAuth 2.1 PKCE
 - [x] ✅ Phone OTP flow
 - [x] ✅ Handle expired sessions gracefully
 - [x] ✅ Secure token management
@@ -87,7 +87,7 @@ The app has reached feature-complete status with major functionality implemented
 
 - [x] ✅ Test on real devices
 - [x] ✅ Memory optimization for photo handling
-- [x] ✅ Remove debug logging from Apple Sign In
+- [x] ✅ Remove debug logging from the phone OTP sign-in flow
 - [x] ✅ Error handling for network failures
 - [ ] ❌ Performance testing on older devices
 - [ ] ❌ Analytics integration (optional)
@@ -143,7 +143,7 @@ The app has reached feature-complete status with major functionality implemented
 - [ ] Complete onboarding flow
 - [ ] Log weight, body fat, and photo
 - [ ] Test HealthKit sync
-- [ ] Test Apple Sign In
+- [ ] Test phone OTP sign-in and session refresh
 - [ ] Test data export
 - [ ] Test account deletion
 - [ ] Verify offline functionality

@@ -173,7 +173,8 @@ Sensitive information we collect:
 
 ### Service Providers We Share With
 
-- **Supabase**: Product authentication, database, and storage
+- **Neon**: Account profile and onboarding data
+- **Supabase**: Body-metric data and progress-photo storage during migration
 - **AWS**: Cloud infrastructure
 - **Twilio**: Delivery and verification of sign-in codes
 - **RevenueCat**: Subscription and purchase entitlements

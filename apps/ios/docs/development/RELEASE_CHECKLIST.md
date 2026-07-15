@@ -65,7 +65,8 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
   timeline point.
 - HealthKit allow, deny, and skip paths all lead to a usable app state.
 - Sync retries after the device returns online.
-- Supabase rows use the product auth principal UUID for `user_id` or profile `id`.
+- Product-data rows use the Jovie Better Auth subject as the stable `user_id`
+  or profile `id`; no Supabase auth principal is created.
 - Sync failure shows recoverable UI and does not block local logging.
 
 ## Legal And Store Review

@@ -8,7 +8,7 @@ This directory contains all documentation for the LogYourBody iOS app, organized
 
 Environment configuration, dependencies, and initial setup guides.
 
-- [Shared identity architecture](../../../docs/auth/shared-identity-architecture.md) - Jovie Better Auth and Supabase OIDC setup
+- [Shared identity architecture](../../../docs/auth/shared-identity-architecture.md) - Jovie Better Auth, phone OTP, and direct PKCE setup
 - [CONFIGURATION.md](./setup/CONFIGURATION.md) - App configuration
 - [GITHUB_SECRETS_SETUP.md](./setup/GITHUB_SECRETS_SETUP.md) - CI/CD secrets configuration
 - [MATCH_SETUP_INSTRUCTIONS.md](./setup/MATCH_SETUP_INSTRUCTIONS.md) - Code signing with fastlane match
@@ -53,7 +53,7 @@ Historical documentation, old troubleshooting guides, and deprecated instruction
 New to the project? Start here:
 
 1. [CONFIGURATION.md](./setup/CONFIGURATION.md) - Set up your development environment
-2. [Shared identity architecture](../../../docs/auth/shared-identity-architecture.md) - Configure authentication and Supabase OIDC
+2. [Shared identity architecture](../../../docs/auth/shared-identity-architecture.md) - Configure Jovie-hosted phone authentication and direct PKCE
 3. [CI_README.md](./development/CI_README.md) - Understand the CI/CD pipeline
 4. [PROJECT_STRUCTURE.md](./architecture/PROJECT_STRUCTURE.md) - Learn the codebase structure
 
