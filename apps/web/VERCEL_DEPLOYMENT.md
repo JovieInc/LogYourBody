@@ -67,12 +67,12 @@ The `vercel.json` file is already configured with:
    - Configure `JOVIE_AUTH_ISSUER`, `JOVIE_AUTH_CLIENT_ID`, and the exact Jovie OAuth callback URI.
    - Configure the pooled Neon `DATABASE_URL` server-side; never expose it with a `NEXT_PUBLIC_` prefix.
    - Add the exact Supabase callback URL to the confidential Jovie OAuth client.
-   - Test phone OTP, callback exchange, refresh, and sign-out.
+   - Test Apple sign in, callback exchange, refresh, and sign-out.
 
 2. **Test Authentication**:
    - Sign up flow
    - Sign in flow
-   - Shared phone OTP
+   - Shared Apple identity
 
 3. **Test Supabase Connection**:
    - Data fetching

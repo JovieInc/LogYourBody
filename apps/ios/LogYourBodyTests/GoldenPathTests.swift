@@ -34,11 +34,11 @@ final class GoldenPathTests: XCTestCase {
         )
     }
 
-    func testGP1_PrimarySignInMethodIsSMSOTP() {
+    func testGP1_PrimarySignInMethodIsApple() {
         XCTAssertEqual(
             AuthSurfacePolicy.primarySignInMethod,
-            "sms_otp",
-            "SMS OTP is the launch-premise primary sign-in method"
+            "apple",
+            "Apple is the launch-premise primary sign-in method"
         )
     }
 

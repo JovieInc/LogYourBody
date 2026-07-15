@@ -302,7 +302,7 @@ final class AuthManager: NSObject, ObservableObject {
         await ensureAuthInitializationTask().value
     }
 
-    func signInWithPhone() async throws {
+    func signInWithApple() async throws {
         guard isAuthProviderReady else { throw AuthError.providerNotReady }
         let verifier = Self.randomURLSafeString(byteCount: 48)
         let challenge = Self.base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
@@ -316,7 +316,7 @@ final class AuthManager: NSObject, ObservableObject {
             URLQueryItem(name: "client_id", value: Configuration.authClientID),
             URLQueryItem(name: "redirect_uri", value: Configuration.authRedirectURI),
             URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "scope", value: "openid profile email phone offline_access"),
+            URLQueryItem(name: "scope", value: "openid profile email offline_access"),
             URLQueryItem(name: "state", value: state),
             URLQueryItem(name: "code_challenge", value: challenge),
             URLQueryItem(name: "code_challenge_method", value: "S256")
@@ -342,7 +342,7 @@ final class AuthManager: NSObject, ObservableObject {
         let userInfo = try await fetchOAuthUserInfo(accessToken: tokenResponse.accessToken)
         try await registerProductSession(accessToken: tokenResponse.accessToken)
         try persist(tokenResponse: tokenResponse, userInfo: userInfo)
-        AppServicePorts.analyticsTracker.track(event: "login_completed", properties: ["method": "sms_otp"])
+        AppServicePorts.analyticsTracker.track(event: "login_completed", properties: ["method": "apple"])
     }
 
     private func openAuthorizationSession(url: URL) async throws -> URL {

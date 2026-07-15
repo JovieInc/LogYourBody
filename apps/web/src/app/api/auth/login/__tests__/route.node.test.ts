@@ -16,7 +16,7 @@ describe('GET /api/auth/login', () => {
       'http://localhost:3000/api/auth/callback',
     );
     expect(location.searchParams.get('response_type')).toBe('code');
-    expect(location.searchParams.get('scope')).toBe('openid profile email phone offline_access');
+    expect(location.searchParams.get('scope')).toBe('openid profile email offline_access');
     expect(location.searchParams.get('code_challenge_method')).toBe('S256');
     expect(location.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(response.cookies.get('lyb_oauth_state')?.value).toBe(location.searchParams.get('state'));

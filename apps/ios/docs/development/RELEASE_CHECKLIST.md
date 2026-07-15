@@ -45,7 +45,7 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
 
 ## Product Path
 
-- Fresh install opens to phone OTP authentication.
+- Fresh install opens to Apple authentication.
 - Unpaid authenticated user sees the paywall.
 - Purchase success unlocks the photo-first HUD.
 - Restore success unlocks the photo-first HUD.
@@ -77,7 +77,7 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
 - Native settings expose account deletion and data export paths, with support
   email fallback for export requests.
 - Camera, photo library, HealthKit, and Face ID usage strings are accurate for any enabled surfaces.
-- App Review notes explain the reviewer-accessible phone OTP path, purchase
+- App Review notes explain the reviewer-accessible Apple path, purchase
   path, photo-first HUD, HealthKit skip/deny behavior, Restore Purchases, Export
   Data, and Delete Account.
 - No secrets or local config files are committed.

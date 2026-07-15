@@ -6,21 +6,21 @@ export function AuthRuntimeProvider({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function PhoneAuthButton() {
+function AppleAuthButton() {
   return (
     <a
       href="/api/auth/login"
       className="bg-linear-purple hover:bg-linear-purple/90 block w-full rounded-full px-5 py-3 text-center font-medium text-white"
     >
-      Continue with phone
+      Continue with Apple
     </a>
   );
 }
 
 export function AuthSignUp() {
-  return <PhoneAuthButton />;
+  return <AppleAuthButton />;
 }
 
 export function AuthSignIn() {
-  return <PhoneAuthButton />;
+  return <AppleAuthButton />;
 }

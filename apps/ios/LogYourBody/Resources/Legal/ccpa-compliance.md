@@ -176,7 +176,7 @@ Sensitive information we collect:
 - **Neon**: Account profile and onboarding data
 - **Supabase**: Body-metric data and progress-photo storage during migration
 - **AWS**: Cloud infrastructure
-- **Twilio**: Delivery and verification of sign-in codes
+- **Apple**: Authentication
 - **RevenueCat**: Subscription and purchase entitlements
 - **Sentry**: Error tracking and crash reports
 

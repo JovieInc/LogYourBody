@@ -32,13 +32,13 @@ UI smoke (launch, fixtures for signed-out/paywall/MVP surfaces): `LogYourBodyUIT
 
 ## Web (secondary — marketing/support/account until expansion trigger per [product-development-roadmap.md](product-development-roadmap.md))
 
-| Journey                 | Expected user outcome                          | Asserting tests                                              | Status              |
-| ----------------------- | ---------------------------------------------- | ------------------------------------------------------------ | ------------------- |
-| Sign in / auth callback | User authenticates by phone through Jovie OIDC | `src/app/signin/__tests__/page.test.tsx`                     | ✅ (Jest, CI-gated) |
-| Log weight              | Entry saves and renders                        | `weight-logging.test.tsx`                                    | ✅                  |
-| Import DEXA/InBody PDF  | Parsed metrics land in the user's data         | `import.test.tsx`                                            | ✅                  |
-| Sync/conflict handling  | No data loss across devices                    | conflict-resolver, sync-manager, realtime-sync-manager tests | ✅                  |
-| Visual regression       | Pages render correctly across viewports        | Playwright `tests/e2e/visual-regression.spec.ts`             | ✅ (non-blocking)   |
+| Journey                 | Expected user outcome                            | Asserting tests                                              | Status              |
+| ----------------------- | ------------------------------------------------ | ------------------------------------------------------------ | ------------------- |
+| Sign in / auth callback | User authenticates with Apple through Jovie OIDC | `src/app/signin/__tests__/page.test.tsx`                     | ✅ (Jest, CI-gated) |
+| Log weight              | Entry saves and renders                          | `weight-logging.test.tsx`                                    | ✅                  |
+| Import DEXA/InBody PDF  | Parsed metrics land in the user's data           | `import.test.tsx`                                            | ✅                  |
+| Sync/conflict handling  | No data loss across devices                      | conflict-resolver, sync-manager, realtime-sync-manager tests | ✅                  |
+| Visual regression       | Pages render correctly across viewports          | Playwright `tests/e2e/visual-regression.spec.ts`             | ✅ (non-blocking)   |
 
 ## The one human step to revenue
 

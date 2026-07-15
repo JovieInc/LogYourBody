@@ -5,13 +5,13 @@ describe('shared auth UI', () => {
   it.each([
     ['sign in', <AuthSignIn />],
     ['sign up', <AuthSignUp />],
-  ])('uses only the direct Jovie phone flow for %s', (_label, surface) => {
+  ])('uses only the Jovie-brokered Apple flow for %s', (_label, surface) => {
     render(surface);
 
-    expect(screen.getByRole('link', { name: 'Continue with phone' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Continue with Apple' })).toHaveAttribute(
       'href',
       '/api/auth/login',
     );
-    expect(screen.queryByText(/apple|google|email|password/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/google|phone|email|password/i)).not.toBeInTheDocument();
   });
 });

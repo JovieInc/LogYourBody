@@ -136,7 +136,7 @@ enum AestheticGoalPolicy {
 }
 
 struct AuthSurfacePolicy {
-    static let primarySignInMethod = "sms_otp"
+    static let primarySignInMethod = "apple"
 }
 
 enum PhotoTimelineHUDPolicy {

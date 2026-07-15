@@ -571,13 +571,13 @@ func createAccount(authManager: AuthManager) async {
             await MainActor.run {
                 accountCreationStage = .creatingAccount
             }
-            try await authManager.signInWithPhone()
+            try await authManager.signInWithApple()
 
             AppServicePorts.analyticsTracker.track(
                 event: "onboarding_account_created",
                 properties: [
                     "entry_context": entryContext.analyticsContext,
-                    "method": "sms_otp"
+                    "method": "apple"
                 ]
             )
 

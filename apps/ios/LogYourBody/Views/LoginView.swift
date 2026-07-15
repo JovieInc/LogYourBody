@@ -34,10 +34,10 @@ struct LoginView: View {
                                     .progressViewStyle(.circular)
                                     .tint(theme.colors.background)
                             } else {
-                                Image(systemName: "message.fill")
+                                Image(systemName: "apple.logo")
                             }
 
-                            Text(isLoading ? "Opening secure sign in…" : "Continue with phone")
+                            Text(isLoading ? "Opening Apple…" : "Continue with Apple")
                                 .font(theme.typography.labelLarge)
                         }
                         .foregroundColor(theme.colors.background)
@@ -46,9 +46,9 @@ struct LoginView: View {
                         .background(Capsule(style: .continuous).fill(theme.colors.text))
                     }
                     .disabled(isLoading || !authManager.isAuthProviderReady)
-                    .accessibilityIdentifier("continueWithPhoneButton")
+                    .accessibilityIdentifier("continueWithAppleButton")
 
-                    Text("We’ll text you a one-time code. No password needed.")
+                    Text("Fast, private sign in with your Apple ID.")
                         .font(theme.typography.captionLarge)
                         .foregroundColor(theme.colors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -102,13 +102,13 @@ struct LoginView: View {
         isLoading = true
         AppServicePorts.analyticsTracker.track(
             event: "login_attempt",
-            properties: ["method": "sms_otp"]
+            properties: ["method": "apple"]
         )
 
         Task { @MainActor in
             defer { isLoading = false }
             do {
-                try await authManager.signInWithPhone()
+                try await authManager.signInWithApple()
             } catch AuthError.cancelled {
                 return
             } catch {
@@ -116,7 +116,7 @@ struct LoginView: View {
                 showError = true
                 AppServicePorts.analyticsTracker.track(
                     event: "login_failed",
-                    properties: ["method": "sms_otp"]
+                    properties: ["method": "apple"]
                 )
             }
         }

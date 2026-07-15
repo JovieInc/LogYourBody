@@ -10,9 +10,9 @@ The remaining native metrics, photo-storage, realtime, and sync migration is a s
 
 ## Login surface
 
-Jovie hosts the shared `/identity` experience. The only enabled onboarding method is a phone number followed by an SMS one-time code. Better Auth owns the user, session, OAuth grants, token rotation, and OpenID Connect claims. Twilio Verify is accessed only through Jovie's internal phone-verification adapter.
+Jovie hosts the shared `/identity` experience. The only enabled LogYourBody onboarding method is Sign in with Apple, brokered through Jovie Better Auth. Better Auth owns the user, session, OAuth grants, token rotation, and OpenID Connect claims. LogYourBody never accepts an Apple token directly.
 
-Social login, enterprise SSO, email/password, and dynamic OAuth client registration are disabled for this phase.
+Google, enterprise SSO, email/password, SMS, and dynamic OAuth client registration are disabled for this phase. The Twilio Verify adapter remains dormant for a later revenue-supported SMS option and is not a launch dependency.
 
 ## First-party OAuth clients
 
@@ -21,13 +21,13 @@ Social login, enterprise SSO, email/password, and dynamic OAuth client registrat
 | `logyourbody-ios` | Native/public  | `logyourbody://oauth`                       | Authorization Code + PKCE (S256) |
 | `logyourbody-web` | Web/public BFF | `https://logyourbody.com/api/auth/callback` | Authorization Code + PKCE (S256) |
 
-Development web redirects are registered explicitly. Redirect matching is exact. Both clients request `openid profile email phone offline_access`, use refresh-token rotation, and have no distributable client secret. The verified phone number is released only under the standard OIDC `phone` scope.
+Development web redirects are registered explicitly. Redirect matching is exact. Both clients request `openid profile email offline_access`, use refresh-token rotation, and have no distributable client secret.
 
 ## Web flow
 
 1. `/api/auth/login` generates cryptographically random state and a PKCE verifier.
 2. Transaction values are stored in short-lived, secure, HttpOnly, SameSite=Lax cookies.
-3. The browser opens Jovie's `/api/auth/oauth2/authorize` endpoint and completes SMS verification.
+3. The browser opens Jovie's `/api/auth/oauth2/authorize` endpoint and completes Apple authentication on Jovie's hosted identity surface.
 4. `/api/auth/callback` validates state and exchanges the code directly with Jovie.
 5. LYB reads `/oauth2/userinfo`, upserts the Jovie `sub` into Neon, and stores tokens only in secure HttpOnly cookies.
 6. `/api/auth/session` refreshes expired access tokens server-side. Browser code never receives the refresh token.
@@ -43,7 +43,7 @@ Development web redirects are registered explicitly. Redirect matching is exact.
 
 ## Data ownership
 
-- Jovie owns credentials, verified phone numbers, OAuth grants, and global account identity.
+- Jovie owns upstream Apple account linkage, OAuth grants, and global account identity.
 - LYB Neon owns the identity projection and onboarding state today, and is the destination for product data as each server-side replacement is verified.
 - `public.app_users.identity_subject` is the immutable join key to Jovie.
 - Neon credentials are server-only. iOS and browser clients use LYB APIs and never connect to Postgres directly.
