@@ -5,6 +5,9 @@ import { createStatsigAnalytics, type StatsigAnalyticsConfig } from './statsigAn
 export type AnalyticsEvent =
   | 'app_open'
   | 'web_landing_viewed'
+  | 'web_waitlist_started'
+  | 'web_waitlist_submit_attempted'
+  | 'web_waitlist_submit_result'
   | 'web_waitlist_submitted'
   | 'web_cta_clicked'
   | 'login_attempt'

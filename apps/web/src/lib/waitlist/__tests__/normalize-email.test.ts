@@ -8,5 +8,6 @@ describe('normalizeWaitlistEmail', () => {
   it('rejects invalid addresses', () => {
     expect(normalizeWaitlistEmail('not-an-email')).toBeNull();
     expect(normalizeWaitlistEmail('')).toBeNull();
+    expect(normalizeWaitlistEmail(`${'a'.repeat(245)}@example.com`)).toBeNull();
   });
 });

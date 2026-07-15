@@ -1,151 +1,82 @@
-'use client';
-
-import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { MarketingFooter } from '@/components/MarketingFooter';
 import { APP_CONFIG } from '@/constants/app';
-import { analytics } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
+import { LANDING_BRAND_ASSET, LANDING_PRODUCT_PROOF } from '@/lib/marketing/landing-registry';
+import { WaitlistForm } from './WaitlistForm';
 import { waitlistLandingCopy } from './waitlist-copy';
 
-type SubmitState = 'idle' | 'submitting' | 'success' | 'duplicate' | 'error';
-
 export function MinimalWaitlistLanding() {
-  const [email, setEmail] = useState('');
-  const [submitState, setSubmitState] = useState<SubmitState>('idle');
-  const [fieldError, setFieldError] = useState<string | null>(null);
-
-  useEffect(() => {
-    analytics.track('web_landing_viewed', { variant: 'waitlist_minimal' });
-  }, []);
-
-  const statusMessage =
-    submitState === 'success'
-      ? waitlistLandingCopy.successMessage
-      : submitState === 'duplicate'
-        ? waitlistLandingCopy.duplicateMessage
-        : submitState === 'error'
-          ? waitlistLandingCopy.errorMessage
-          : null;
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFieldError(null);
-
-    const trimmed = email.trim();
-    if (!trimmed) {
-      setFieldError(waitlistLandingCopy.invalidEmailMessage);
-      return;
-    }
-
-    setSubmitState('submitting');
-
-    try {
-      const response = await fetch('/api/waitlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmed, source: 'landing' }),
-      });
-
-      const payload = (await response.json()) as {
-        success?: boolean;
-        status?: 'created' | 'existing';
-        error?: string;
-      };
-
-      if (!response.ok || !payload.success) {
-        if (response.status === 400) {
-          setFieldError(waitlistLandingCopy.invalidEmailMessage);
-          setSubmitState('idle');
-          return;
-        }
-        setSubmitState('error');
-        return;
-      }
-
-      analytics.track('web_waitlist_submitted', {
-        variant: 'waitlist_minimal',
-        status: payload.status,
-      });
-
-      setSubmitState(payload.status === 'existing' ? 'duplicate' : 'success');
-    } catch {
-      setSubmitState('error');
-    }
-  }
-
   return (
-    <div className="font-inter flex min-h-screen flex-col bg-[#08090a] text-white">
-      <header className="flex items-center justify-center px-6 py-8">
-        <span className="text-sm font-semibold tracking-[0.18em] text-white/70">
-          {APP_CONFIG.appName}
-        </span>
+    <div className="min-h-screen overflow-x-hidden bg-[#06070a] text-[#f7f8f8]">
+      <a
+        href="#main-content"
+        className="sr-only z-50 rounded bg-white px-4 py-2 text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+      >
+        Skip to content
+      </a>
+
+      <header className="mx-auto flex h-20 w-full max-w-7xl items-center px-5 sm:px-8">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
+        >
+          <Image
+            src={LANDING_BRAND_ASSET.src}
+            alt=""
+            width={LANDING_BRAND_ASSET.width}
+            height={LANDING_BRAND_ASSET.height}
+            className="h-9 w-9 rounded-[11px]"
+            priority
+          />
+          <span className="text-base font-medium tracking-[-0.025em]">{APP_CONFIG.appName}</span>
+        </Link>
       </header>
 
-      <main
-        id="main-content"
-        className="flex flex-1 items-center justify-center px-6 pb-16"
-        tabIndex={-1}
-      >
-        <div className="w-full max-w-xl text-center">
-          <h1 className="text-4xl font-semibold leading-tight tracking-tight text-white sm:text-5xl md:text-6xl">
-            {waitlistLandingCopy.headline}
-          </h1>
-          <p className="text-white/62 mx-auto mt-5 max-w-lg text-lg leading-8 sm:text-xl">
-            {waitlistLandingCopy.subheading}
-          </p>
-
-          <form
-            className="mx-auto mt-10 flex w-full max-w-md flex-col gap-3 sm:flex-row"
-            onSubmit={handleSubmit}
-            noValidate
-          >
-            <label className="sr-only" htmlFor="waitlist-email">
-              {waitlistLandingCopy.emailLabel}
-            </label>
-            <input
-              id="waitlist-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              placeholder={waitlistLandingCopy.emailPlaceholder}
-              value={email}
-              onChange={(event) => {
-                setEmail(event.target.value);
-                if (fieldError) setFieldError(null);
-                if (submitState === 'error') setSubmitState('idle');
-              }}
-              disabled={submitState === 'submitting' || submitState === 'success'}
-              className="border-white/14 min-h-12 flex-1 rounded-full border bg-white/[0.04] px-5 text-base text-white outline-none transition placeholder:text-white/35 focus:border-white/30 focus:ring-2 focus:ring-white/15 disabled:opacity-60"
-            />
-            <button
-              type="submit"
-              disabled={submitState === 'submitting' || submitState === 'success'}
-              className="hover:bg-white/88 inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-black transition focus:outline-none focus:ring-2 focus:ring-white/40 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitState === 'submitting' ? 'Joining...' : waitlistLandingCopy.submitLabel}
-            </button>
-          </form>
-
-          <div className="mt-4 min-h-6">
-            {fieldError ? (
-              <p className="text-sm text-rose-300" role="alert">
-                {fieldError}
+      <main id="main-content" tabIndex={-1}>
+        <section
+          className="relative isolate border-b border-white/[0.07]"
+          aria-labelledby="landing-heading"
+        >
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_72%_45%,rgba(48,91,167,0.14),transparent_36%)]" />
+          <div className="mx-auto grid min-h-[calc(100svh-5rem)] w-full max-w-7xl items-center gap-12 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-[minmax(0,1.06fr)_minmax(340px,0.62fr)] lg:gap-20 lg:pb-20 lg:pt-12">
+            <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 max-w-3xl motion-safe:duration-700">
+              <p className="mb-5 text-sm font-medium tracking-[-0.01em] text-sky-300">
+                Private iPhone beta
               </p>
-            ) : null}
-            {statusMessage ? (
-              <p
-                className={cn(
-                  'text-sm',
-                  submitState === 'error' ? 'text-rose-300' : 'text-emerald-300',
-                )}
-                role="status"
+              <h1
+                id="landing-heading"
+                className="max-w-[11ch] text-balance text-[clamp(3.15rem,8vw,6.4rem)] font-semibold leading-[0.94] tracking-[-0.06em]"
               >
-                {statusMessage}
+                {waitlistLandingCopy.headline}
+              </h1>
+              <p className="mt-7 max-w-2xl text-pretty text-lg leading-8 tracking-[-0.015em] text-white/60 sm:text-xl sm:leading-9">
+                {waitlistLandingCopy.subheading}
               </p>
-            ) : null}
+              <WaitlistForm />
+            </div>
+
+            <div
+              className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-5 relative mx-auto h-[430px] w-full max-w-[390px] overflow-hidden rounded-[2.2rem] border border-white/10 bg-black shadow-[0_28px_90px_rgba(0,0,0,0.55)] motion-safe:duration-700 lg:h-[590px]"
+              aria-label="LogYourBody product preview"
+              data-testid="landing-product-proof"
+            >
+              <Image
+                src={LANDING_PRODUCT_PROOF.src}
+                alt={LANDING_PRODUCT_PROOF.alt}
+                width={LANDING_PRODUCT_PROOF.width}
+                height={LANDING_PRODUCT_PROOF.height}
+                sizes="(min-width: 1024px) 390px, calc(100vw - 40px)"
+                className="h-auto w-full"
+                priority
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black to-transparent" />
+            </div>
           </div>
-        </div>
+        </section>
       </main>
+
+      <MarketingFooter />
     </div>
   );
 }
