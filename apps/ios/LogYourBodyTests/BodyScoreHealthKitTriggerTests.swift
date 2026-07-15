@@ -113,7 +113,7 @@ final class BodyScoreHealthKitTriggerTests: XCTestCase {
             ffmi: Double(score) / 10,
             leanPercentile: Double(score),
             ffmiStatus: "Athletic",
-            targetBodyFat: .init(lowerBound: 8, upperBound: 12, label: "Lean"),
+            bodyFatReferenceRange: .init(lowerBound: 8, upperBound: 12, label: "Lean"),
             statusTagline: "HealthKit cache fixture"
         )
     }

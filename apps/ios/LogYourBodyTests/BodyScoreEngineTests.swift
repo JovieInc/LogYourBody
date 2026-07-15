@@ -103,16 +103,16 @@ final class BodyScoreEngineTests: XCTestCase {
             testCase.expectedStatusTagline,
             testCase.name
         )
-        XCTAssertEqual(result.targetBodyFat.label, "Lean", testCase.name)
+        XCTAssertEqual(result.bodyFatReferenceRange.label, "Lean", testCase.name)
         XCTAssertEqual(
-            result.targetBodyFat.lowerBound,
-            testCase.targetBodyFatRange.lowerBound,
+            result.bodyFatReferenceRange.lowerBound,
+            testCase.bodyFatReferenceRange.lowerBound,
             accuracy: 0.001,
             testCase.name
         )
         XCTAssertEqual(
-            result.targetBodyFat.upperBound,
-            testCase.targetBodyFatRange.upperBound,
+            result.bodyFatReferenceRange.upperBound,
+            testCase.bodyFatReferenceRange.upperBound,
             accuracy: 0.001,
             testCase.name
         )
@@ -124,7 +124,7 @@ final class BodyScoreEngineTests: XCTestCase {
             ffmi: Double(score) / 10,
             leanPercentile: Double(score),
             ffmiStatus: "Athletic",
-            targetBodyFat: .init(lowerBound: 8, upperBound: 12, label: "Lean"),
+            bodyFatReferenceRange: .init(lowerBound: 8, upperBound: 12, label: "Lean"),
             statusTagline: "Pinned cache fixture"
         )
     }
@@ -155,10 +155,10 @@ private struct BodyScoreGoldenCase {
         )
     }
 
-    var targetBodyFatRange: ClosedRange<Double> {
+    var bodyFatReferenceRange: ClosedRange<Double> {
         sex == .male
-            ? Constants.BodyComposition.BodyFat.maleOptimalRange
-            : Constants.BodyComposition.BodyFat.femaleOptimalRange
+            ? Constants.BodyComposition.BodyFat.maleReferenceRange
+            : Constants.BodyComposition.BodyFat.femaleReferenceRange
     }
 }
 

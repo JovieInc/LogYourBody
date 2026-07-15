@@ -16,7 +16,7 @@ struct BodyScoreCalculator: BodyScoreCalculating {
 
         let ffmi = calculateFFMI(weightKg: weightKg, bodyFatPercentage: bodyFat, heightCm: heightCm)
         let percentile = clamp(calculateLeanPercentile(sex: sex, age: context.input.age, bodyFat: bodyFat), min: 1, max: 99)
-        let targetRange = idealBodyFatRange(for: sex)
+        let referenceRange = bodyFatReferenceRange(for: sex)
         let ffmiStatus = descriptiveFFMIStatus(ffmi, sex: sex)
         let config = config(for: sex)
 
@@ -30,7 +30,7 @@ struct BodyScoreCalculator: BodyScoreCalculating {
             ffmi: round(ffmi * 10) / 10,
             leanPercentile: round(percentile * 10) / 10,
             ffmiStatus: ffmiStatus,
-            targetBodyFat: targetRange,
+            bodyFatReferenceRange: referenceRange,
             statusTagline: statusTagline(for: finalScore)
         )
     }
@@ -41,13 +41,13 @@ struct BodyScoreCalculator: BodyScoreCalculating {
         return (leanMassKg / (heightM * heightM)) + 6.1 * (1.8 - heightM)
     }
 
-    private func idealBodyFatRange(for sex: BiologicalSex) -> BodyScoreResult.TargetRange {
+    private func bodyFatReferenceRange(for sex: BiologicalSex) -> BodyScoreResult.ReferenceRange {
         switch sex {
         case .male:
-            let range = Constants.BodyComposition.BodyFat.maleOptimalRange
+            let range = Constants.BodyComposition.BodyFat.maleReferenceRange
             return .init(lowerBound: range.lowerBound, upperBound: range.upperBound, label: "Lean")
         case .female:
-            let range = Constants.BodyComposition.BodyFat.femaleOptimalRange
+            let range = Constants.BodyComposition.BodyFat.femaleReferenceRange
             return .init(lowerBound: range.lowerBound, upperBound: range.upperBound, label: "Lean")
         }
     }
@@ -57,10 +57,11 @@ struct BodyScoreCalculator: BodyScoreCalculating {
     }
 
     private func muscleBonus(ffmi: Double, bodyFat: Double, config: BodyScoreConfig) -> Double {
-        guard config.ffmiGoal > config.ffmiBaseline else { return 0 }
+        guard config.ffmiReferenceMidpoint > config.ffmiBaseline else { return 0 }
 
         let clampedFFMI = clamp(ffmi, min: config.ffmiBaseline, max: config.ffmiCeiling)
-        let normalized = (clampedFFMI - config.ffmiBaseline) / (config.ffmiGoal - config.ffmiBaseline)
+        let normalized = (clampedFFMI - config.ffmiBaseline) /
+            (config.ffmiReferenceMidpoint - config.ffmiBaseline)
         let boundedNormalized = clamp(normalized, min: 0, max: 1)
 
         let ffmiExponent: Double = 0.7
@@ -136,8 +137,8 @@ struct BodyScoreCalculator: BodyScoreCalculating {
                     .init(bodyFat: 6, gate: 0.7)
                 ],
                 ffmiBaseline: 17,
-                ffmiGoal: Constants.BodyComposition.FFMI.maleIdealValue,
-                ffmiCeiling: Constants.BodyComposition.FFMI.maleOptimalRange.upperBound + 1
+                ffmiReferenceMidpoint: Constants.BodyComposition.FFMI.maleReferenceMidpoint,
+                ffmiCeiling: Constants.BodyComposition.FFMI.maleReferenceRange.upperBound + 1
             )
         case .female:
             return BodyScoreConfig(
@@ -170,8 +171,8 @@ struct BodyScoreCalculator: BodyScoreCalculating {
                     .init(bodyFat: 17, gate: 0.7)
                 ],
                 ffmiBaseline: 15,
-                ffmiGoal: Constants.BodyComposition.FFMI.femaleIdealValue,
-                ffmiCeiling: Constants.BodyComposition.FFMI.femaleOptimalRange.upperBound + 1
+                ffmiReferenceMidpoint: Constants.BodyComposition.FFMI.femaleReferenceMidpoint,
+                ffmiCeiling: Constants.BodyComposition.FFMI.femaleReferenceRange.upperBound + 1
             )
         }
     }
@@ -190,7 +191,7 @@ struct BodyScoreCalculator: BodyScoreCalculating {
         let leannessPoints: [LeannessPoint]
         let visibilityPoints: [VisibilityPoint]
         let ffmiBaseline: Double
-        let ffmiGoal: Double
+        let ffmiReferenceMidpoint: Double
         let ffmiCeiling: Double
     }
 

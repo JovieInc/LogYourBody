@@ -106,23 +106,41 @@ struct Constants {
     static let springAnimation = SwiftUI.Animation.spring(response: 0.4, dampingFraction: 0.8)
     static let smoothAnimation = SwiftUI.Animation.easeInOut(duration: 0.3)
 
-    // MARK: - Body Composition Ideal Ranges
+    // MARK: - Body Composition Reference Ranges
     struct BodyComposition {
         // Body Fat Percentage
         struct BodyFat {
-            static let maleOptimalRange: ClosedRange<Double> = 8...12
-            static let maleIdealValue: Double = 10
-            static let femaleOptimalRange: ClosedRange<Double> = 16...20
-            static let femaleIdealValue: Double = 18
+            static let maleReferenceRange: ClosedRange<Double> = 8...12
+            static let maleReferenceMidpoint: Double = 10
+            static let femaleReferenceRange: ClosedRange<Double> = 16...20
+            static let femaleReferenceMidpoint: Double = 18
         }
 
         // Fat-Free Mass Index (FFMI)
         struct FFMI {
-            static let maleOptimalRange: ClosedRange<Double> = 20...23
-            static let maleIdealValue: Double = 22
-            static let femaleOptimalRange: ClosedRange<Double> = 14...17
-            static let femaleIdealValue: Double = 15
+            static let maleReferenceRange: ClosedRange<Double> = 20...23
+            static let maleReferenceMidpoint: Double = 22
+            static let femaleReferenceRange: ClosedRange<Double> = 14...17
+            static let femaleReferenceMidpoint: Double = 15
         }
+    }
+}
+
+enum AppFeatureGate {
+    static let individualizedAestheticGoals = "individualized_aesthetic_goals"
+}
+
+enum AestheticGoalPolicy {
+    static func resolvedGoal(
+        explicitGoal: Double?,
+        legacyReferenceMidpoint: Double,
+        individualizedGoalsEnabled: Bool
+    ) -> Double? {
+        if individualizedGoalsEnabled {
+            return explicitGoal
+        }
+
+        return explicitGoal ?? legacyReferenceMidpoint
     }
 }
 

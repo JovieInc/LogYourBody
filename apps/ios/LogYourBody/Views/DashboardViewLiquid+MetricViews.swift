@@ -33,11 +33,13 @@ extension DashboardViewLiquid {
         }()
 
         let bodyFatGoalText: String? = {
+            guard let bodyFatGoal else { return nil }
             let formatted = String(format: "%.1f%%", bodyFatGoal)
             return "Target \(formatted)"
         }()
 
         let ffmiGoalText: String? = {
+            guard let ffmiGoal else { return nil }
             let formatted = String(format: "%.1f", ffmiGoal)
             return "Target \(formatted)"
         }()

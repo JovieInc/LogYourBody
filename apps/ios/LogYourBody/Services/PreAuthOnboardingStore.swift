@@ -96,19 +96,30 @@ private struct PreAuthBodyScoreResultCodable: Codable {
     let ffmi: Double
     let leanPercentile: Double
     let ffmiStatus: String
-    let targetLower: Double
-    let targetUpper: Double
-    let targetLabel: String
+    let referenceLower: Double
+    let referenceUpper: Double
+    let referenceLabel: String
     let statusTagline: String
+
+    private enum CodingKeys: String, CodingKey {
+        case score
+        case ffmi
+        case leanPercentile
+        case ffmiStatus
+        case referenceLower = "targetLower"
+        case referenceUpper = "targetUpper"
+        case referenceLabel = "targetLabel"
+        case statusTagline
+    }
 
     init(result: BodyScoreResult) {
         score = result.score
         ffmi = result.ffmi
         leanPercentile = result.leanPercentile
         ffmiStatus = result.ffmiStatus
-        targetLower = result.targetBodyFat.lowerBound
-        targetUpper = result.targetBodyFat.upperBound
-        targetLabel = result.targetBodyFat.label
+        referenceLower = result.bodyFatReferenceRange.lowerBound
+        referenceUpper = result.bodyFatReferenceRange.upperBound
+        referenceLabel = result.bodyFatReferenceRange.label
         statusTagline = result.statusTagline
     }
 
@@ -118,7 +129,11 @@ private struct PreAuthBodyScoreResultCodable: Codable {
             ffmi: ffmi,
             leanPercentile: leanPercentile,
             ffmiStatus: ffmiStatus,
-            targetBodyFat: .init(lowerBound: targetLower, upperBound: targetUpper, label: targetLabel),
+            bodyFatReferenceRange: .init(
+                lowerBound: referenceLower,
+                upperBound: referenceUpper,
+                label: referenceLabel
+            ),
             statusTagline: statusTagline
         )
     }

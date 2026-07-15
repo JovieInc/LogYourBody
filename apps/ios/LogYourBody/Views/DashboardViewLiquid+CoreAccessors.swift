@@ -3,26 +3,40 @@ import SwiftUI
 extension DashboardViewLiquid {
     // MARK: - Goal Helpers
 
-    /// Returns the FFMI goal based on custom setting or gender-based default
-    var ffmiGoal: Double {
-        if let custom = customFFMIGoal {
-            return custom
-        }
-        let gender = authManager.currentUser?.profile?.gender?.lowercased() ?? ""
-        return gender.contains("female") || gender.contains("woman") ?
-            Constants.BodyComposition.FFMI.femaleIdealValue :
-            Constants.BodyComposition.FFMI.maleIdealValue
+    var usesIndividualizedAestheticGoals: Bool {
+        _ = featureGateRefreshToken
+
+        return AppServicePorts.analyticsTracker.isFeatureEnabled(
+            flagKey: AppFeatureGate.individualizedAestheticGoals
+        )
     }
 
-    /// Returns the body fat % goal based on custom setting or gender-based default
-    var bodyFatGoal: Double {
-        if let custom = customBodyFatGoal {
-            return custom
-        }
+    /// Returns an explicit FFMI goal, or the legacy reference fallback while the gate is disabled.
+    var ffmiGoal: Double? {
         let gender = authManager.currentUser?.profile?.gender?.lowercased() ?? ""
-        return gender.contains("female") || gender.contains("woman") ?
-            Constants.BodyComposition.BodyFat.femaleIdealValue :
-            Constants.BodyComposition.BodyFat.maleIdealValue
+        let legacyReference = gender.contains("female") || gender.contains("woman") ?
+            Constants.BodyComposition.FFMI.femaleReferenceMidpoint :
+            Constants.BodyComposition.FFMI.maleReferenceMidpoint
+
+        return AestheticGoalPolicy.resolvedGoal(
+            explicitGoal: customFFMIGoal,
+            legacyReferenceMidpoint: legacyReference,
+            individualizedGoalsEnabled: usesIndividualizedAestheticGoals
+        )
+    }
+
+    /// Returns an explicit body-fat goal, or the legacy reference fallback while the gate is disabled.
+    var bodyFatGoal: Double? {
+        let gender = authManager.currentUser?.profile?.gender?.lowercased() ?? ""
+        let legacyReference = gender.contains("female") || gender.contains("woman") ?
+            Constants.BodyComposition.BodyFat.femaleReferenceMidpoint :
+            Constants.BodyComposition.BodyFat.maleReferenceMidpoint
+
+        return AestheticGoalPolicy.resolvedGoal(
+            explicitGoal: customBodyFatGoal,
+            legacyReferenceMidpoint: legacyReference,
+            individualizedGoalsEnabled: usesIndividualizedAestheticGoals
+        )
     }
 
     /// Returns the weight goal (optional, nil if not set)
