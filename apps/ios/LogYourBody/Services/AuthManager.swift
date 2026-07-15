@@ -124,6 +124,55 @@ struct OAuthUserInfo: Decodable {
     }
 }
 
+private struct ProductProfileEnvelope: Decodable {
+    let profile: ProductProfilePayload
+}
+
+private struct ProductProfilePayload: Decodable {
+    let id: String
+    let email: String?
+    let username: String?
+    let fullName: String?
+    let dateOfBirth: Date?
+    let height: Double?
+    let heightUnit: String?
+    let gender: String?
+    let activityLevel: String?
+    let goalWeight: Double?
+    let goalWeightUnit: String?
+    let onboardingCompleted: Bool?
+    let legalAcceptedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, email, username, height, gender
+        case fullName = "full_name"
+        case dateOfBirth = "date_of_birth"
+        case heightUnit = "height_unit"
+        case activityLevel = "activity_level"
+        case goalWeight = "goal_weight"
+        case goalWeightUnit = "goal_weight_unit"
+        case onboardingCompleted = "onboarding_completed"
+        case legalAcceptedAt = "legal_accepted_at"
+    }
+
+    var userProfile: UserProfile {
+        UserProfile(
+            id: id,
+            email: email,
+            username: username,
+            fullName: fullName,
+            dateOfBirth: dateOfBirth,
+            height: height,
+            heightUnit: heightUnit,
+            gender: gender,
+            activityLevel: activityLevel,
+            goalWeight: goalWeight,
+            goalWeightUnit: goalWeightUnit,
+            onboardingCompleted: onboardingCompleted
+        )
+    }
+}
+
 actor AsyncGate {
     private var isLocked = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
@@ -159,7 +208,6 @@ final class AuthManager: NSObject, ObservableObject {
     @Published var lastExitReason: AuthExitReason = .none
     @Published var memberSinceDate: Date?
 
-    let supabase = SupabaseClient.shared
     let userDefaults: UserDefaults
     let keychain: KeychainManager
     let urlSession: URLSession
@@ -493,12 +541,9 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func updateProfileDurably(_ updates: [String: Any]) async throws {
-        guard let currentUser else { throw SupabaseError.notAuthenticated }
-        var payload = updates
-        payload["id"] = currentUser.id
-        payload["email"] = payload["email"] ?? currentUser.email
-        guard let token = await getSupabaseToken() else { throw SupabaseError.tokenGenerationFailed }
-        try await SupabaseManager.shared.updateProfile(payload, token: token)
+        guard currentUser != nil else { throw AuthError.invalidToken }
+        let payload = try Self.normalizedProductProfilePayload(updates)
+        _ = try await requestProductProfile(method: "PATCH", body: payload)
     }
 
     func updateProfile(_ updates: [String: Any]) async {
@@ -542,8 +587,9 @@ final class AuthManager: NSObject, ObservableObject {
         }
 
         do {
-            if let remote = try await SupabaseManager.shared.fetchProfile(userId: user.id) {
-                applyAuthenticatedProfile(remote, fallbackEmail: user.email)
+            let remote = try await requestProductProfile(method: "GET").profile.userProfile
+            applyAuthenticatedProfile(remote, fallbackEmail: user.email)
+            if AuthProfileBootstrapPolicy.shouldPersistProjectedProfile(remote) {
                 CoreDataManager.shared.saveProfile(
                     remote,
                     userId: user.id,
@@ -587,56 +633,100 @@ final class AuthManager: NSObject, ObservableObject {
     func checkLegalConsent(userId: String) async -> Bool {
         await legalConsentGate.wait()
         defer { Task { await legalConsentGate.signal() } }
-        guard let token = await getSupabaseToken(),
-              let url = try? SupabaseURLBuilder.restURL(
-                  table: "profiles",
-                  query: "id=eq.\(userId)&select=legal_accepted_at"
-              ) else { return false }
-        var request = URLRequest(url: url)
-        request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        guard let (data, _) = try? await urlSession.data(for: request),
-              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return false }
-        return rows.first?["legal_accepted_at"] is String
+        guard currentUser?.id == userId,
+              let response = try? await requestProductProfile(method: "GET") else { return false }
+        return response.profile.legalAcceptedAt != nil
     }
 
     func acceptLegalConsent(userId: String) async {
         await legalConsentGate.wait()
         defer { Task { await legalConsentGate.signal() } }
-        guard let token = await getSupabaseToken(),
-              let url = try? SupabaseURLBuilder.restURL(table: "profiles") else { return }
-        let payload: [String: Any] = [
-            "id": userId,
-            "legal_accepted_at": ISO8601DateFormatter().string(from: Date()),
-            "terms_accepted": true,
-            "privacy_accepted": true
-        ]
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: [payload])
-        if let (_, response) = try? await urlSession.data(for: request),
-           let http = response as? HTTPURLResponse,
-           (200...299).contains(http.statusCode) {
+        guard currentUser?.id == userId else { return }
+        if (try? await requestProductProfile(
+            method: "PATCH",
+            body: ["legalAccepted": true]
+        )) != nil {
             needsLegalConsent = false
         }
     }
 
     func deleteProductAccount() async throws {
-        guard let token = await getSupabaseToken(),
-              let url = try? SupabaseURLBuilder.functionURL("delete-user-assets") else {
-            throw SupabaseError.notAuthenticated
+        _ = try await requestProductProfile(method: "DELETE")
+    }
+
+    private func requestProductProfile(
+        method: String,
+        body: [String: Any]? = nil
+    ) async throws -> ProductProfileEnvelope {
+        guard let accessToken = await getAccessToken(),
+              let baseURL = URL(string: Configuration.apiBaseURL),
+              let url = URL(string: "/api/auth/mobile/profile", relativeTo: baseURL)?.absoluteURL else {
+            throw AuthError.invalidToken
         }
+
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (_, response) = try await urlSession.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw SupabaseError.invalidResponse }
-        guard (200...299).contains(http.statusCode) else { throw SupabaseError.httpError(http.statusCode) }
+        request.httpMethod = method
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+
+        let (data, response) = try await urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AuthError.networkError }
+        guard (200...299).contains(http.statusCode) else {
+            if http.statusCode == 401 { throw AuthError.invalidToken }
+            throw AuthError.server("Your LogYourBody profile could not be updated.")
+        }
+
+        if http.statusCode == 204 {
+            return ProductProfileEnvelope(profile: ProductProfilePayload(
+                id: currentUser?.id ?? "",
+                email: currentUser?.email,
+                username: nil,
+                fullName: currentUser?.name,
+                dateOfBirth: nil,
+                height: nil,
+                heightUnit: nil,
+                gender: nil,
+                activityLevel: nil,
+                goalWeight: nil,
+                goalWeightUnit: nil,
+                onboardingCompleted: nil,
+                legalAcceptedAt: nil
+            ))
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(Self.productDateFormatter)
+        return try decoder.decode(ProductProfileEnvelope.self, from: data)
+    }
+
+    nonisolated private static let productDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    nonisolated private static func normalizedProductProfilePayload(
+        _ updates: [String: Any]
+    ) throws -> [String: Any] {
+        var payload: [String: Any] = [:]
+        for (key, value) in updates {
+            if let date = value as? Date {
+                payload[key] = productDateFormatter.string(from: date)
+            } else if JSONSerialization.isValidJSONObject([key: value]) {
+                payload[key] = value
+            }
+        }
+        guard JSONSerialization.isValidJSONObject(payload) else {
+            throw AuthError.server("Your profile details could not be saved.")
+        }
+        return payload
     }
 
     func deleteCurrentAccount() async throws {
