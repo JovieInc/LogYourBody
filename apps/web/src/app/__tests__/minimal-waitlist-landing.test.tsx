@@ -9,7 +9,7 @@ jest.mock('@/lib/analytics', () => ({
 }));
 
 describe('MinimalWaitlistLanding', () => {
-  it('renders a single 100vh waitlist hero without unverified marketing claims', () => {
+  it('renders the product promise, proof, waitlist, and canonical legal footer', () => {
     render(<MinimalWaitlistLanding />);
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
@@ -19,6 +19,14 @@ describe('MinimalWaitlistLanding', () => {
     expect(
       screen.getByRole('button', { name: waitlistLandingCopy.submitLabel }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId('landing-product-proof')).toBeInTheDocument();
+    expect(screen.getByTestId('marketing-footer')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy');
+    expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms');
+    expect(screen.getByRole('link', { name: 'Health disclosure' })).toHaveAttribute(
+      'href',
+      '/health-disclosure',
+    );
 
     expect(screen.queryByText(/10,000\+/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/93%/i)).not.toBeInTheDocument();
