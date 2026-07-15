@@ -19,7 +19,7 @@ Social login, enterprise SSO, email/password, and dynamic OAuth client registrat
 | `logyourbody-ios` | Native/public  | `logyourbody://oauth`                       | Authorization Code + PKCE (S256) |
 | `logyourbody-web` | Web/public BFF | `https://logyourbody.com/api/auth/callback` | Authorization Code + PKCE (S256) |
 
-Development web redirects are registered explicitly. Redirect matching is exact. Both clients request `openid profile email offline_access`, use refresh-token rotation, and have no distributable client secret.
+Development web redirects are registered explicitly. Redirect matching is exact. Both clients request `openid profile email phone offline_access`, use refresh-token rotation, and have no distributable client secret. The verified phone number is released only under the standard OIDC `phone` scope.
 
 ## Web flow
 
