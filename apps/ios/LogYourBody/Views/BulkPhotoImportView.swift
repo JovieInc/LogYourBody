@@ -3,9 +3,13 @@
 // LogYourBody
 //
 import SwiftUI
+import UIKit
 
 struct BulkPhotoImportView: View {
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.theme) private var theme
+    @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var scanner = PhotoLibraryScanner.shared
     @StateObject private var importManager = BulkImportManager.shared
     @Environment(\.dismiss)
@@ -16,6 +20,23 @@ struct BulkPhotoImportView: View {
     @State private var isImporting = false
     @State private var showWelcomeScreen = true
     @State private var hasStartedScan = false
+    @State private var importCompletion: ImportCompletion?
+
+    private struct ImportCompletion: Equatable {
+        let importedCount: Int
+        let failedCount: Int
+
+        var title: String {
+            failedCount == 0 ? "Photos imported" : "Import complete"
+        }
+
+        var message: String {
+            if failedCount == 0 {
+                return "\(importedCount) photo\(importedCount == 1 ? "" : "s") added to your timeline."
+            }
+            return "\(importedCount) added. \(failedCount) could not be imported; you can try those again later."
+        }
+    }
 
     private var selectedCount: Int {
         selectedPhotos.count
@@ -27,7 +48,7 @@ struct BulkPhotoImportView: View {
 
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.jovieCanvas
                 .ignoresSafeArea()
 
             content
@@ -44,14 +65,13 @@ struct BulkPhotoImportView: View {
                             selectedPhotos = Set(scanner.scannedPhotos.map { $0.id })
                         }
                     }
+                    .jovieTouchTarget()
                 }
             }
         }
         .alert("Photo Library Access", isPresented: $showPermissionAlert) {
             Button("Open Settings") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
+                openSettings()
             }
             Button("Cancel", role: .cancel) {
                 dismiss()
@@ -79,7 +99,9 @@ struct BulkPhotoImportView: View {
     @ViewBuilder
 
     private var content: some View {
-        if showWelcomeScreen && !hasStartedScan {
+        if let importCompletion {
+            importCompletionView(importCompletion)
+        } else if showWelcomeScreen && !hasStartedScan {
             welcomeView
         } else if scanner.authorizationStatus == .notDetermined {
             permissionRequestView
@@ -99,99 +121,88 @@ struct BulkPhotoImportView: View {
     // MARK: - Welcome View
 
     private var welcomeView: some View {
-        VStack(spacing: 40) {
+        VStack(spacing: JovieTokens.sectionGap) {
             Spacer()
 
-            // Icon
             ZStack {
                 Circle()
-                    .fill(Color.appPrimary.opacity(0.1))
-                    .frame(width: 120, height: 120)
+                    .fill(theme.colors.info.opacity(0.12))
+                    .frame(width: 88, height: 88)
 
                 Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 60))
-                    .foregroundColor(.appPrimary)
+                    .font(.system(.largeTitle, design: .rounded).weight(.semibold))
+                    .foregroundColor(theme.colors.info)
             }
 
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 Text("Bulk Photo Import")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(theme.typography.displaySmall)
 
-                Text("Scan your photo library for progress photos and import them with their original dates")
-                    .font(.body)
-                    .foregroundColor(.appTextSecondary)
+                Text("Find likely progress photos and choose exactly which ones to add, keeping their original dates.")
+                    .font(theme.typography.bodyLarge)
+                    .foregroundColor(theme.colors.textSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, JovieTokens.screenInset)
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Label("Analyzes photos to find potential progress photos", systemImage: "magnifyingglass")
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("Scans on this iPhone before anything is imported", systemImage: "lock.shield")
                     Label("Preserves original photo dates", systemImage: "calendar")
-                    Label("Import multiple photos at once", systemImage: "square.stack.3d.up")
+                    Label("Uploads only the photos you select", systemImage: "checkmark.circle")
                 }
-                .font(.footnote)
-                .foregroundColor(.appTextSecondary)
-                .padding(.horizontal, 40)
+                .font(theme.typography.bodySmall)
+                .foregroundColor(theme.colors.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(theme.spacing.md)
+                .background(theme.colors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: theme.radius.input, style: .continuous))
+                .padding(.horizontal, JovieTokens.screenInset)
             }
 
             Spacer()
 
-            VStack(spacing: 12) {
-                BaseButton(
-                    "Start Scanning",
-                    configuration: ButtonConfiguration(
-                        style: .custom(background: .appPrimary, foreground: .white),
-                        fullWidth: true
-                    ),
-                    action: {
-                        showWelcomeScreen = false
-                        hasStartedScan = true
-                        checkPermissionAndScan()
-                    }
-                )
-
-                BaseButton(
-                    "Cancel",
-                    configuration: ButtonConfiguration(
-                        style: .tertiary
-                    ),
-                    action: {
-                        dismiss()
-                    }
-                )
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 40)
+            BaseButton(
+                "Start Scanning",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                    fullWidth: true
+                ),
+                action: {
+                    showWelcomeScreen = false
+                    hasStartedScan = true
+                    checkPermissionAndScan()
+                }
+            )
+            .accessibilityIdentifier("bulk_photo_import_start_scanning")
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.bottom, JovieTokens.sectionGap)
         }
     }
 
     // MARK: - Permission Request View
 
     private var permissionRequestView: some View {
-        VStack(spacing: 40) {
+        VStack(spacing: JovieTokens.sectionGap) {
             Spacer()
 
-            // Icon
             ZStack {
                 Circle()
-                    .fill(Color.appPrimary.opacity(0.1))
-                    .frame(width: 120, height: 120)
+                    .fill(theme.colors.info.opacity(0.12))
+                    .frame(width: 88, height: 88)
 
                 Image(systemName: "photo.stack")
-                    .font(.system(size: 60))
-                    .foregroundColor(.appPrimary)
+                    .font(.system(.largeTitle, design: .rounded).weight(.semibold))
+                    .foregroundColor(theme.colors.info)
             }
 
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 Text("Access Your Photos")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(theme.typography.displaySmall)
 
-                Text("Allow LogYourBody to scan your photo library for potential progress photos")
-                    .font(.body)
-                    .foregroundColor(.appTextSecondary)
+                Text("Allow access to find likely progress photos on this iPhone. No photo is added until you choose it.")
+                    .font(theme.typography.bodyLarge)
+                    .foregroundColor(theme.colors.textSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, JovieTokens.screenInset)
             }
 
             Spacer()
@@ -199,7 +210,7 @@ struct BulkPhotoImportView: View {
             BaseButton(
                 "Allow Access",
                 configuration: ButtonConfiguration(
-                    style: .custom(background: .appPrimary, foreground: .white),
+                    style: .custom(background: .jovieAction, foreground: .jovieActionText),
                     fullWidth: true
                 ),
                 action: {
@@ -213,31 +224,30 @@ struct BulkPhotoImportView: View {
                     }
                 }
             )
-            .padding(.horizontal)
-            .padding(.bottom, 40)
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.bottom, JovieTokens.sectionGap)
         }
     }
 
     // MARK: - Access Denied View
 
     private var accessDeniedView: some View {
-        VStack(spacing: 40) {
+        VStack(spacing: JovieTokens.sectionGap) {
             Spacer()
 
             Image(systemName: "photo.slash")
-                .font(.system(size: 80))
-                .foregroundColor(.appTextTertiary)
+                .font(.system(.largeTitle, design: .rounded).weight(.semibold))
+                .foregroundColor(theme.colors.error)
 
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 Text("Photo Access Required")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(theme.typography.displaySmall)
 
                 Text("Please enable photo library access in Settings to import progress photos")
-                    .font(.body)
-                    .foregroundColor(.appTextSecondary)
+                    .font(theme.typography.bodyLarge)
+                    .foregroundColor(theme.colors.textSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, JovieTokens.screenInset)
             }
 
             Spacer()
@@ -245,59 +255,57 @@ struct BulkPhotoImportView: View {
             BaseButton(
                 "Open Settings",
                 configuration: ButtonConfiguration(
-                    style: .custom(background: .appPrimary, foreground: .white),
+                    style: .custom(background: .jovieAction, foreground: .jovieActionText),
                     fullWidth: true
                 ),
                 action: {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
+                    openSettings()
                 }
             )
-            .padding(.horizontal)
-            .padding(.bottom, 40)
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.bottom, JovieTokens.sectionGap)
         }
     }
 
     // MARK: - Scanning View
 
     private var scanningView: some View {
-        VStack(spacing: 40) {
+        VStack(spacing: JovieTokens.sectionGap) {
             Spacer()
 
-            // Animated scanner
             ZStack {
                 Circle()
-                    .stroke(Color.appBorder, lineWidth: 3)
-                    .frame(width: 120, height: 120)
+                    .stroke(theme.colors.border, lineWidth: 3)
+                    .frame(width: 88, height: 88)
 
                 Circle()
                     .trim(from: 0, to: scanner.scanProgress)
-                    .stroke(Color.appPrimary, lineWidth: 3)
-                    .frame(width: 120, height: 120)
+                    .stroke(theme.colors.info, lineWidth: 3)
+                    .frame(width: 88, height: 88)
                     .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 0.3), value: scanner.scanProgress)
+                    .animation(reduceMotion ? nil : theme.animation.subtle, value: scanner.scanProgress)
 
                 Image(systemName: "photo.stack")
-                    .font(.system(size: 50))
-                    .foregroundColor(.appPrimary)
+                    .font(.system(.title, design: .rounded).weight(.semibold))
+                    .foregroundColor(theme.colors.info)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Scanning photos, \(Int(scanner.scanProgress * 100)) percent complete")
 
             VStack(spacing: 12) {
-                Text("Scanning Photos...")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                Text("Scanning photos")
+                    .font(theme.typography.displaySmall)
 
-                Text("Analyzing your photo library for potential progress photos")
-                    .font(.body)
-                    .foregroundColor(.appTextSecondary)
+                Text("Looking for likely progress photos on this iPhone.")
+                    .font(theme.typography.bodyLarge)
+                    .foregroundColor(theme.colors.textSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, JovieTokens.screenInset)
 
                 if scanner.scanProgress > 0 {
                     Text("\(Int(scanner.scanProgress * 100))%")
-                        .font(.caption)
-                        .foregroundColor(.appTextTertiary)
+                        .font(theme.typography.labelMedium)
+                        .foregroundColor(theme.colors.textSecondary)
                 }
             }
 
@@ -313,30 +321,29 @@ struct BulkPhotoImportView: View {
                     dismiss()
                 }
             )
-            .padding(.bottom, 40)
+            .padding(.bottom, JovieTokens.sectionGap)
         }
     }
 
     // MARK: - No Photos Found View
 
     private var noPhotosFoundView: some View {
-        VStack(spacing: 40) {
+        VStack(spacing: JovieTokens.sectionGap) {
             Spacer()
 
             Image(systemName: "photo.badge.exclamationmark")
-                .font(.system(size: 80))
-                .foregroundColor(.appTextTertiary)
+                .font(.system(.largeTitle, design: .rounded).weight(.semibold))
+                .foregroundColor(theme.colors.textSecondary)
 
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 Text("No Progress Photos Found")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(theme.typography.displaySmall)
 
                 Text("We couldn't find any photos that look like progress photos in your library")
-                    .font(.body)
-                    .foregroundColor(.appTextSecondary)
+                    .font(theme.typography.bodyLarge)
+                    .foregroundColor(theme.colors.textSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, JovieTokens.screenInset)
             }
 
             Spacer()
@@ -344,15 +351,15 @@ struct BulkPhotoImportView: View {
             BaseButton(
                 "Done",
                 configuration: ButtonConfiguration(
-                    style: .custom(background: .appPrimary, foreground: .white),
+                    style: .custom(background: .jovieAction, foreground: .jovieActionText),
                     fullWidth: true
                 ),
                 action: {
                     dismiss()
                 }
             )
-            .padding(.horizontal)
-            .padding(.bottom, 40)
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.bottom, JovieTokens.sectionGap)
         }
     }
 
@@ -360,25 +367,24 @@ struct BulkPhotoImportView: View {
 
     private var photoSelectionView: some View {
         VStack(spacing: 0) {
-            // Header
-            VStack(spacing: 8) {
+            VStack(spacing: 4) {
                 Text("Found \(scanner.scannedPhotos.count) potential photos")
-                    .font(.headline)
+                    .font(theme.typography.headlineSmall)
 
                 Text("Select the photos you want to import")
-                    .font(.subheadline)
-                    .foregroundColor(.appTextSecondary)
+                    .font(theme.typography.bodySmall)
+                    .foregroundColor(theme.colors.textSecondary)
             }
-            .padding()
-            .background(Color.appCard)
+            .padding(theme.spacing.md)
+            .background(theme.colors.surface)
 
             // Photo Grid
             ScrollView {
                 LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8)
-                ], spacing: 8) {
+                    GridItem(.flexible(), spacing: JovieTokens.itemGap),
+                    GridItem(.flexible(), spacing: JovieTokens.itemGap),
+                    GridItem(.flexible(), spacing: JovieTokens.itemGap)
+                ], spacing: JovieTokens.itemGap) {
                     ForEach(scanner.scannedPhotos) { photo in
                         PhotoGridItem(
                             photo: photo,
@@ -388,7 +394,7 @@ struct BulkPhotoImportView: View {
                         }
                     }
                 }
-                .padding()
+                .padding(JovieTokens.compactInset)
             }
 
             // Import Button
@@ -399,7 +405,7 @@ struct BulkPhotoImportView: View {
                     BaseButton(
                         "Import \(selectedCount) Photo\(selectedCount == 1 ? "" : "s")",
                         configuration: ButtonConfiguration(
-                            style: .custom(background: .appPrimary, foreground: .white),
+                            style: .custom(background: .jovieAction, foreground: .jovieActionText),
                             fullWidth: true,
                             icon: "square.and.arrow.down"
                         ),
@@ -407,8 +413,8 @@ struct BulkPhotoImportView: View {
                             showImportConfirmation = true
                         }
                     )
-                    .padding()
-                    .background(Color.appCard)
+                    .padding(JovieTokens.compactInset)
+                    .background(theme.colors.surface)
                 }
             }
         }
@@ -417,40 +423,40 @@ struct BulkPhotoImportView: View {
     // MARK: - Importing View
 
     private var importingView: some View {
-        VStack(spacing: 40) {
+        VStack(spacing: JovieTokens.sectionGap) {
             Spacer()
 
-            // Progress
             ZStack {
                 Circle()
-                    .stroke(Color.appBorder, lineWidth: 3)
-                    .frame(width: 120, height: 120)
+                    .stroke(theme.colors.border, lineWidth: 3)
+                    .frame(width: 88, height: 88)
 
                 Circle()
                     .trim(from: 0, to: importManager.overallProgress)
-                    .stroke(Color.appPrimary, lineWidth: 3)
-                    .frame(width: 120, height: 120)
+                    .stroke(theme.colors.info, lineWidth: 3)
+                    .frame(width: 88, height: 88)
                     .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 0.3), value: importManager.overallProgress)
+                    .animation(reduceMotion ? nil : theme.animation.subtle, value: importManager.overallProgress)
 
                 VStack(spacing: 4) {
                     Text("\(importManager.completedCount)")
-                        .font(.system(size: 32, weight: .bold))
+                        .font(theme.typography.displaySmall)
                     Text("of \(importManager.totalCount)")
-                        .font(.caption)
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.captionLarge)
+                        .foregroundColor(theme.colors.textSecondary)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Importing photos, \(importManager.completedCount) of \(importManager.totalCount) complete")
 
             VStack(spacing: 12) {
-                Text("Importing Photos...")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                Text("Importing photos")
+                    .font(theme.typography.displaySmall)
 
                 if let currentPhoto = importManager.currentPhotoName {
                     Text(currentPhoto)
-                        .font(.caption)
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.captionLarge)
+                        .foregroundColor(theme.colors.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -466,7 +472,7 @@ struct BulkPhotoImportView: View {
                     dismiss()
                 }
             )
-            .padding(.bottom, 40)
+            .padding(.bottom, JovieTokens.sectionGap)
         }
     }
 
@@ -494,21 +500,66 @@ struct BulkPhotoImportView: View {
     }
 
     private func startImport() {
-        // Prevent multiple imports
         guard !importManager.isImporting else { return }
 
         let photosToImport = scanner.scannedPhotos.filter { selectedPhotos.contains($0.id) }
         isImporting = true
+        importCompletion = nil
 
         Task {
             await importManager.importPhotos(photosToImport)
-
-            // Show success and dismiss
             await MainActor.run {
-                // Show success notification in the import manager instead
-                dismiss()
+                isImporting = false
+                importCompletion = ImportCompletion(
+                    importedCount: max(importManager.completedCount - importManager.failedCount, 0),
+                    failedCount: importManager.failedCount
+                )
+                UIAccessibility.post(
+                    notification: .announcement,
+                    argument: importCompletion?.message
+                )
             }
         }
+    }
+
+    private func openSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        openURL(url)
+    }
+
+    private func importCompletionView(_ completion: ImportCompletion) -> some View {
+        VStack(spacing: JovieTokens.sectionGap) {
+            Spacer()
+
+            Image(systemName: completion.failedCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .font(.system(.largeTitle, design: .rounded).weight(.semibold))
+                .foregroundColor(completion.failedCount == 0 ? theme.colors.success : theme.colors.warning)
+
+            VStack(spacing: 12) {
+                Text(completion.title)
+                    .font(theme.typography.displaySmall)
+
+                Text(completion.message)
+                    .font(theme.typography.bodyLarge)
+                    .foregroundColor(theme.colors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, JovieTokens.screenInset)
+            }
+
+            Spacer()
+
+            BaseButton(
+                "Done",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                    fullWidth: true
+                ),
+                action: { dismiss() }
+            )
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.bottom, JovieTokens.sectionGap)
+        }
+        .accessibilityIdentifier("bulk_photo_import_completion")
     }
 }
 
@@ -531,10 +582,10 @@ struct PhotoGridItem: View {
                         .aspectRatio(contentMode: .fill)
                         .frame(height: 120)
                         .clipped()
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous))
                 } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.appCard)
+                    RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                        .fill(Color.jovieSurface)
                         .frame(height: 120)
                         .overlay(
                             ProgressView()
@@ -544,18 +595,18 @@ struct PhotoGridItem: View {
 
                 // Selection overlay
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.appPrimary.opacity(0.3))
+                    RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                        .fill(Color.jovieMetricAccent.opacity(0.24))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.appPrimary, lineWidth: 3)
+                            RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                                .stroke(Color.jovieMetricAccent, lineWidth: 3)
                         )
                 }
 
                 // Selection checkmark
                 ZStack {
                     Circle()
-                        .fill(isSelected ? Color.appPrimary : Color.black.opacity(0.5))
+                        .fill(isSelected ? Color.jovieMetricAccent : Color.black.opacity(0.5))
                         .frame(width: 24, height: 24)
 
                     if isSelected {
@@ -577,7 +628,7 @@ struct PhotoGridItem: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.black.opacity(0.6))
-                            .cornerRadius(4)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         Spacer()
                     }
                     .padding(8)
@@ -598,6 +649,12 @@ struct PhotoGridItem: View {
                 }
             }
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            "Photo from \(photo.date.formatted(.dateTime.month(.wide).day().year()))\(photo.confidence > 0.85 ? ", high-confidence suggestion" : ", suggested progress photo")"
+        )
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityHint("Double tap to \(isSelected ? "remove from" : "add to") import")
         .onAppear {
             Task {
                 thumbnail = await PhotoLibraryScanner.shared.loadThumbnail(for: photo.asset)

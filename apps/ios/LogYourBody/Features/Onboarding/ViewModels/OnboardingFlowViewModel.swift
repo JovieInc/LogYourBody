@@ -74,8 +74,32 @@ final class OnboardingFlowViewModel: ObservableObject {
         let label: String
 
         var fractionComplete: Double {
-            guard totalCount > 0 else { return 0 }
-            return min(max(Double(currentIndex) / Double(totalCount), 0), 1)
+            guard totalCount > 1 else { return 1 }
+            return min(max(Double(currentIndex - 1) / Double(totalCount - 1), 0), 1)
+        }
+    }
+
+    /// A stable, user-facing plan. Branch-specific input screens belong to a
+    /// milestone instead of changing the visible progress denominator mid-flow.
+    enum ProgressMilestone: CaseIterable {
+        case welcome
+        case basics
+        case measurements
+        case score
+        case home
+        case profile
+        case photo
+
+        var label: String {
+            switch self {
+            case .welcome: return "Welcome"
+            case .basics: return "Basics"
+            case .measurements: return "Measurements"
+            case .score: return "Your Score"
+            case .home: return "Home"
+            case .profile: return "Profile"
+            case .photo: return "Photo"
+            }
         }
     }
 

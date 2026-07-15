@@ -238,39 +238,40 @@ func trackStepTransition(from: Step, to: Step) {
     }
 
 func progress(for step: Step) -> ProgressContext? {
-        let steps = activeProgressSteps
-        guard let index = steps.firstIndex(of: step) else { return nil }
+        guard let milestone = progressMilestone(for: step) else { return nil }
+        let plan = progressMilestonePlan
+        guard let index = plan.firstIndex(of: milestone) else { return nil }
         return ProgressContext(
             currentIndex: index + 1,
-            totalCount: steps.count,
-            label: step.progressLabel
+            totalCount: plan.count,
+            label: milestone.label
         )
     }
 
-var activeProgressSteps: [Step] {
-        Step.progressSequence.filter { shouldIncludeInProgress($0) }
+var progressMilestonePlan: [ProgressMilestone] {
+        includesFirstPhotoStep
+            ? ProgressMilestone.allCases
+            : ProgressMilestone.allCases.filter { $0 != .photo }
     }
 
-func shouldIncludeInProgress(_ step: Step) -> Bool {
+func progressMilestone(for step: Step) -> ProgressMilestone? {
         switch step {
-        case .hook, .basics, .height, .healthConnect, .bodyScore, .defaultHomeMode, .profileDetails:
-            return true
+        case .hook:
+            return .welcome
+        case .basics, .height:
+            return .basics
+        case .healthConnect, .healthConfirmation, .manualWeight, .bodyFatChoice, .bodyFatNumeric, .bodyFatVisual:
+            return .measurements
+        case .bodyScore:
+            return .score
+        case .defaultHomeMode:
+            return .home
+        case .emailCapture, .account, .profileDetails:
+            return .profile
         case .firstPhoto:
-            return includesFirstPhotoStep
-        case .emailCapture, .account:
-            return !hasAuthenticatedAccountEmail
-        case .healthConfirmation:
-            return healthKitManager.isAuthorized
-        case .manualWeight:
-            return !hasWeightEntry
-        case .bodyFatChoice:
-            return !hasBodyFatEntry
-        case .bodyFatNumeric:
-            return bodyScoreInput.bodyFat.source == .manualValue
-        case .bodyFatVisual:
-            return bodyScoreInput.bodyFat.source == .visualEstimate
+            return includesFirstPhotoStep ? .photo : nil
         case .loading, .paywall:
-            return false
+            return nil
         }
     }
 

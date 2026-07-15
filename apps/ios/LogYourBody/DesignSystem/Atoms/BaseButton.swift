@@ -28,7 +28,7 @@ struct ButtonConfiguration {
 
         var backgroundColor: Color {
             switch self {
-            case .primary: return .appPrimary
+            case .primary: return .jovieAction
             case .secondary: return .appCard
             case .tertiary: return .appCard
             case .destructive: return .red
@@ -40,7 +40,7 @@ struct ButtonConfiguration {
 
         var foregroundColor: Color {
             switch self {
-            case .primary: return .white
+            case .primary: return .jovieActionText
             case .secondary: return .appText
             case .tertiary: return .appText
             case .destructive: return .white
@@ -107,6 +107,7 @@ struct ButtonConfiguration {
 
 struct BaseButton<Label: View>: View {
     @Environment(\.isEnabled) private var isEnvironmentEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let configuration: ButtonConfiguration
     let action: () -> Void
@@ -119,22 +120,37 @@ struct BaseButton<Label: View>: View {
     }
 
     private var cornerRadius: CGFloat {
-        configuration.cornerRadius ?? 10
+        configuration.cornerRadius ?? JovieTokens.controlRadius
+    }
+
+    private var labelTextStyle: Font.TextStyle {
+        switch configuration.size {
+        case .small:
+            return .subheadline
+        case .medium, .custom:
+            return .body
+        case .large:
+            return .headline
+        }
+    }
+
+    private var minimumHeight: CGFloat {
+        max(configuration.size.height, JovieTokens.minimumHitTarget)
     }
 
     var body: some View {
         Button(action: handleTap, label: {
             buttonContent
                 .frame(maxWidth: configuration.fullWidth ? .infinity : nil)
-                .frame(height: configuration.size.height)
-                .padding(configuration.size.padding)
+                .frame(minHeight: minimumHeight)
+                .padding(.horizontal, configuration.size.padding.leading)
                 .background(backgroundView)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 .overlay(borderOverlay)
-                .scaleEffect(isPressed || configuration.isLoading ? 0.98 : 1.0)
+                .scaleEffect(reduceMotion ? 1 : (isPressed || configuration.isLoading ? 0.98 : 1.0))
                 .opacity(isEnabled ? 1.0 : 0.6)
-                .animation(.easeInOut(duration: 0.15), value: isPressed)
-                .animation(.easeInOut(duration: 0.15), value: configuration.isLoading)
+                .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: isPressed)
+                .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: configuration.isLoading)
         })
         .buttonStyle(PlainButtonStyle())
         .disabled(!isEnabled)
@@ -158,8 +174,9 @@ struct BaseButton<Label: View>: View {
                 .scaleEffect(0.8)
         } else {
             label()
-                .font(.system(size: configuration.size.fontSize, weight: .semibold))
+                .font(.system(labelTextStyle, design: .default).weight(.semibold))
                 .foregroundColor(configuration.style.foregroundColor)
+                .multilineTextAlignment(.center)
         }
     }
 
@@ -228,6 +245,7 @@ struct BaseIconButton: View {
 
     @State private var isPressed = false
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     enum IconButtonStyle {
         case filled
@@ -256,9 +274,9 @@ struct BaseIconButton: View {
             action()
         }, label: {
             Image(systemName: icon)
-                .font(.system(size: size, weight: .medium))
+                .font(.system(.body, design: .default).weight(.medium))
                 .foregroundColor(.appText)
-                .frame(width: size * 2, height: size * 2)
+                .frame(width: max(size * 2, 32), height: max(size * 2, 32))
                 .background(
                     Circle()
                         .fill(style.backgroundColor)
@@ -268,9 +286,10 @@ struct BaseIconButton: View {
                             }
                         )
                 )
-                .scaleEffect(isPressed ? 0.9 : 1.0)
+                .frame(minWidth: JovieTokens.minimumHitTarget, minHeight: JovieTokens.minimumHitTarget)
+                .scaleEffect(reduceMotion ? 1 : (isPressed ? 0.9 : 1.0))
                 .opacity(isEnabled ? 1.0 : 0.6)
-                .animation(.easeInOut(duration: 0.1), value: isPressed)
+                .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: isPressed)
         })
         .buttonStyle(PlainButtonStyle())
         .disabled(!isEnabled)

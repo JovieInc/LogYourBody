@@ -15,57 +15,57 @@ extension DashboardViewLiquid {
             theme.colors.background.ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
                     photoTimelineStatsHeader
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, JovieTokens.screenInset)
 
                     photoTimelinePresenceSummary
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, JovieTokens.screenInset)
 
                     metricsView
                 }
-                .padding(.top, 14)
-                .padding(.bottom, 32)
+                .padding(.top, JovieTokens.itemGap)
+                .padding(.bottom, JovieTokens.sectionGap)
             }
             .scrollBounceBehavior(.basedOnSize)
         }
     }
 
     var photoTimelineStatsHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Body trends")
-                .font(.system(size: 28, weight: .bold))
+                .font(.title.weight(.bold))
                 .foregroundColor(theme.colors.text)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Open a metric for chart and history.")
-                .font(.system(size: 14, weight: .medium))
+                .font(.body)
                 .foregroundColor(theme.colors.textSecondary)
         }
     }
 
     var photoTimelinePresenceSummary: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Timeline data")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(theme.colors.text)
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    timelineDataTitle
+                    Spacer(minLength: JovieTokens.itemGap)
+                    timelineValueCount
+                }
 
-                Spacer()
-
-                Text("\(timelinePresenceValueCount) values")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(theme.colors.textTertiary)
+                VStack(alignment: .leading, spacing: 4) {
+                    timelineDataTitle
+                    timelineValueCount
+                }
             }
 
             Text(photoTimelinePresenceLegendText)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.footnote.weight(.medium))
                 .foregroundColor(theme.colors.textSecondary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("photo_timeline_stats_presence_legend")
         }
-        .padding(14)
+        .padding(JovieTokens.compactInset)
         .systemBGlassSurface(
             cornerRadius: theme.radius.card,
             tint: theme.colors.text,
@@ -76,6 +76,18 @@ extension DashboardViewLiquid {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Timeline data. \(photoTimelinePresenceLegendText). \(timelinePresenceValueCount) values.")
         .accessibilityIdentifier("photo_timeline_stats_presence_summary")
+    }
+
+    private var timelineDataTitle: some View {
+        Text("Timeline data")
+            .font(.body.weight(.semibold))
+            .foregroundColor(theme.colors.text)
+    }
+
+    private var timelineValueCount: some View {
+        Text("\(timelinePresenceValueCount) values")
+            .font(.footnote.weight(.semibold))
+            .foregroundColor(theme.colors.textTertiary)
     }
 
     var photoTimelinePresenceLegendText: String {

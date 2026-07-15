@@ -102,7 +102,8 @@ final class BodyScoreShareCardTests: XCTestCase {
 
         XCTAssertEqual(payload.avatarMatch.assetName, "avatar_male_15")
         XCTAssertEqual(payload.avatarMatch.badgeText, "Male 15% body fat")
-        XCTAssertEqual(payload.visualBadgeText, "Male 15% body fat")
+        XCTAssertEqual(payload.visualBadgeText(includeVisual: true), "Male 15% body fat")
+        XCTAssertEqual(payload.visualBadgeText(includeVisual: false), "Private summary")
         XCTAssertNil(payload.photoImage)
     }
 
@@ -113,8 +114,22 @@ final class BodyScoreShareCardTests: XCTestCase {
             photoImage: makeShareTestImage()
         )
 
-        XCTAssertEqual(payload.visualBadgeText, "Progress photo")
+        XCTAssertEqual(payload.visualBadgeText(includeVisual: true), "Progress photo")
         XCTAssertNotNil(payload.photoImage)
+    }
+
+    func testShareOptionsStartPrivateAndDescribeOnlyChosenDetails() {
+        var options = BodyScoreShareOptions()
+
+        XCTAssertFalse(options.hasMetrics)
+        XCTAssertFalse(options.includeVisual)
+        XCTAssertEqual(options.includedSummary, "Body Score")
+
+        options.includeWeight = true
+        options.includeVisual = true
+
+        XCTAssertTrue(options.hasMetrics)
+        XCTAssertEqual(options.includedSummary, "Body Score, weight, visual")
     }
 
     func testShareCardRendersRequestedExportSize() throws {

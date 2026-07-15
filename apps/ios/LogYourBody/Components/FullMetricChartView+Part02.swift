@@ -29,8 +29,12 @@ var historyBlock: some View {
                                     .fill(Color.white.opacity(0.08))
                             )
                     }
+                    .frame(width: 44, height: 44)
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .buttonStyle(.plain)
                     .accessibilityLabel("Add Entry")
+                    .accessibilityHint("Opens a new \(title.lowercased()) entry")
+                    .accessibilityIdentifier("metric_detail_history_add_button")
                 }
             }
 
@@ -214,7 +218,10 @@ func historyScrubber(proxy: ScrollViewProxy) -> some View {
                             .opacity(isHistoryScrubbing ? 1 : 0)
                     }
                     .padding(.trailing, 4)
-                    .animation(.easeInOut(duration: 0.2), value: isHistoryScrubbing)
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 0.2),
+                        value: isHistoryScrubbing
+                    )
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
@@ -229,8 +236,12 @@ func historyScrubber(proxy: ScrollViewProxy) -> some View {
                                         isHistoryScrubbing = true
                                     }
                                     let sectionId = displayedHistorySections[index].id
-                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                    if reduceMotion {
                                         proxy.scrollTo(sectionId, anchor: .top)
+                                    } else {
+                                        withAnimation(.easeInOut(duration: 0.15)) {
+                                            proxy.scrollTo(sectionId, anchor: .top)
+                                        }
                                     }
                                     HapticManager.shared.selection()
                                 }
@@ -313,13 +324,42 @@ var headlineDateText: String {
         return currentDate
     }
 
-var selectedFocusPoint: MetricChartDataPoint? {
+    var selectedFocusPoint: MetricChartDataPoint? {
         if let activePoint {
             return activePoint
         }
 
         guard let selectedTimelineDate else { return nil }
         return nearestPoint(to: selectedTimelineDate)
+    }
+
+    var chartAccessibilityValue: String {
+        guard let first = activeSeries.first, let last = activeSeries.last else {
+            return "No data in this range"
+        }
+
+        let firstDate = first.date.formatted(.dateTime.month().day().year())
+        let lastDate = last.date.formatted(.dateTime.month().day().year())
+        let latest = selectedFocusPoint ?? last
+        let latestValue = formattedChartValue(latest.value)
+
+        var parts = [
+            "\(activeSeries.count) data points",
+            "from \(firstDate) to \(lastDate)",
+            "current selection \(latestValue) on \(latest.date.formatted(.dateTime.month().day().year()))"
+        ]
+
+        if let goalValue {
+            parts.append("goal \(formattedChartValue(goalValue))")
+        }
+
+        return parts.joined(separator: ", ")
+    }
+
+    var chartAccessibilityHint: String {
+        activeSeries.count > 1
+            ? "Swipe up or down to move between dates, or drag across the chart to inspect a value."
+            : "The chart has one logged value."
     }
 
 var chartDataFingerprint: String {
@@ -361,6 +401,42 @@ func formatStatValue(_ value: Double) -> String {
             return String(format: "%.1f%%", value)
         }
         return String(format: value < 10 ? "%.2f" : "%.1f", value)
+    }
+
+    func formattedChartValue(_ value: Double) -> String {
+        let formatted = formatHeadlineValue(value)
+        return unit.isEmpty ? formatted : "\(formatted) \(unit)"
+    }
+
+    func chartPointAccessibilityLabel(for point: MetricChartDataPoint) -> String {
+        let date = point.date.formatted(.dateTime.month().day().year())
+        return "\(date), \(formattedChartValue(point.value)), \(presenceLabel(for: point.presence))"
+    }
+
+    func adjustChartFocus(for direction: AccessibilityAdjustmentDirection) {
+        let points = activeSeries.sorted { $0.date < $1.date }
+        guard !points.isEmpty else { return }
+
+        let currentIndex = selectedFocusPoint.flatMap { selected in
+            points.firstIndex(where: { $0.id == selected.id })
+        }
+        let nextIndex: Int
+
+        switch direction {
+        case .increment:
+            nextIndex = currentIndex.map { min($0 + 1, points.count - 1) } ?? 0
+        case .decrement:
+            nextIndex = currentIndex.map { max($0 - 1, 0) } ?? (points.count - 1)
+        @unknown default:
+            return
+        }
+
+        let next = points[nextIndex]
+        guard selectedFocusPoint?.id != next.id else { return }
+
+        activePoint = next
+        selectedTimelineDate = next.date
+        HapticManager.shared.selection()
     }
 
 func formattedValue(_ value: Double) -> String {
@@ -549,19 +625,11 @@ var isStepsMetric: Bool {
         unit.lowercased() == "steps"
     }
 
-var xAxisTickCount: Int {
-        switch selectedTimeRange {
-        case .week1:
-            return 7
-        case .month1:
-            return 8
-        case .month3:
-            return 6
-        case .month6:
-            return 6
-        case .year1, .all:
-            return 6
-        }
+    var xAxisTickCount: Int {
+        MetricChartLayoutPolicy.xAxisTickCount(
+            for: selectedTimeRange,
+            isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+        )
     }
 
 @MainActor

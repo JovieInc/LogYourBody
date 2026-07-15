@@ -75,6 +75,8 @@ struct ProgressPhotoAttachPolicy {
 struct ProgressPhotoAttachSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authManager: AuthManager
+    @Environment(\.theme) private var theme
+    @Environment(\.openURL) private var openURL
     @ObservedObject private var uploadManager = PhotoUploadManager.shared
     private let photoLibrary: PhotoLibraryManaging = LivePhotoLibraryAdapter.shared
     private let cameraAuthorizer: CameraAuthorizing = LiveCameraAuthorizationAdapter.shared
@@ -88,6 +90,7 @@ struct ProgressPhotoAttachSheet: View {
     @State private var attachStatus: ProgressPhotoAttachStatus = .empty
     @State private var isCameraPresented = false
     @State private var photoSelectionLoadID = UUID()
+    @AccessibilityFocusState private var isStatusFocused: Bool
 
     private var targetDate: Date {
         targetMetric?.date ?? selectedImageDate ?? fallbackDate
@@ -116,19 +119,27 @@ struct ProgressPhotoAttachSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.metricCanvas.ignoresSafeArea()
+            GeometryReader { geometry in
+                ZStack {
+                    Color.jovieCanvas.ignoresSafeArea()
 
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        header
-                        previewPane
-                        statusPane
-                        actionPane
-                        attachButton
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+                            header
+                            previewPane(height: previewHeight(for: geometry.size.height))
+                            statusPane
+                            actionPane
+                        }
+                        .padding(.horizontal, JovieTokens.screenInset)
+                        .padding(.top, JovieTokens.itemGap)
+                        .padding(.bottom, JovieTokens.itemGap)
                     }
-                    .padding(20)
-                    .padding(.bottom, 18)
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    attachButton
+                        .padding(.horizontal, JovieTokens.screenInset)
+                        .padding(.vertical, JovieTokens.itemGap)
+                        .background(Color.jovieCanvas.opacity(0.96))
                 }
             }
             .navigationTitle("Progress Photo")
@@ -140,14 +151,6 @@ struct ProgressPhotoAttachSheet: View {
                     }
                     .disabled(isBusy)
                 }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if isSuccess {
-                        Button("Done") {
-                            dismiss()
-                        }
-                    }
-                }
             }
             .sheet(isPresented: $isCameraPresented) {
                 CameraView { image in
@@ -157,15 +160,18 @@ struct ProgressPhotoAttachSheet: View {
             .onAppear {
                 updateInitialPermissionState()
             }
+            .onChange(of: attachStatus) { status in
+                announceStatusChange(status)
+            }
         }
         .accessibilityIdentifier("progress_photo_attach_sheet")
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(ProgressPhotoAttachPolicy.title(targetHasPhoto: PhotoTimelineHUDPolicy.hasUsablePhoto(targetMetric)))
-                .font(.system(size: 26, weight: .bold))
-                .foregroundColor(.white)
+                .font(theme.typography.displaySmall)
+                .foregroundColor(theme.colors.text)
 
             Text(
                 ProgressPhotoAttachPolicy.targetCopy(
@@ -173,38 +179,38 @@ struct ProgressPhotoAttachSheet: View {
                     targetDate: targetDate
                 )
             )
-            .font(.system(size: 14, weight: .medium))
-            .foregroundColor(Color.metricTextSecondary)
+            .font(theme.typography.bodySmall)
+            .foregroundColor(theme.colors.textSecondary)
         }
     }
 
-    private var previewPane: some View {
+    private func previewPane(height: CGFloat) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.white.opacity(0.065))
-                .frame(height: 360)
+            RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
+                .fill(theme.colors.surface)
+                .frame(height: height)
 
             if let selectedImage {
                 Image(uiImage: selectedImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 360)
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                    .frame(height: height)
+                    .clipShape(RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 24)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
+                            .stroke(theme.colors.border, lineWidth: 1)
                     )
                     .accessibilityLabel("Selected progress photo preview")
             } else {
-                VStack(spacing: 14) {
+                VStack(spacing: 8) {
                     Image(systemName: "photo.on.rectangle.angled")
-                        .font(.system(size: 42, weight: .semibold))
-                        .foregroundColor(Color.white.opacity(0.48))
+                        .font(.system(.title, design: .rounded).weight(.semibold))
+                        .foregroundColor(theme.colors.textSecondary)
 
                     Text("No photo selected")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color.metricTextSecondary)
+                        .font(theme.typography.labelLarge)
+                        .foregroundColor(theme.colors.textSecondary)
                 }
                 .accessibilityLabel("No photo selected")
             }
@@ -217,18 +223,18 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private var processingOverlay: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             ProgressView(value: uploadManager.uploadProgress > 0 ? uploadManager.uploadProgress : nil)
-                .tint(.white)
+                .tint(theme.colors.text)
                 .frame(width: 120)
 
             Text(uploadProgressText)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
+                .font(theme.typography.labelSmall)
+                .foregroundColor(theme.colors.text)
         }
-        .padding(18)
+        .padding(theme.spacing.md)
         .background(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: theme.radius.input, style: .continuous)
                 .fill(Color.black.opacity(0.58))
         )
         .accessibilityIdentifier("progress_photo_attach_processing")
@@ -244,33 +250,46 @@ struct ProgressPhotoAttachSheet: View {
     private var statusPane: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: statusIcon)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(.headline, design: .rounded).weight(.semibold))
                 .foregroundColor(statusColor)
-                .frame(width: 30, height: 30)
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
                 .background(Circle().fill(statusColor.opacity(0.12)))
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(ProgressPhotoAttachPolicy.statusTitle(for: attachStatus))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(theme.colors.text)
 
                 Text(ProgressPhotoAttachPolicy.statusMessage(for: attachStatus))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color.metricTextSecondary)
+                    .font(theme.typography.bodySmall)
+                    .foregroundColor(theme.colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if case .permissionDenied = attachStatus {
+                    Button("Open Settings") {
+                        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                        openURL(url)
+                    }
+                    .font(theme.typography.labelMedium)
+                    .foregroundColor(theme.colors.text)
+                    .jovieTouchTarget()
+                    .accessibilityHint("Opens iPhone Settings to allow camera or photo access")
+                }
             }
 
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(theme.spacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.white.opacity(0.06))
+            RoundedRectangle(cornerRadius: theme.radius.input, style: .continuous)
+                .fill(theme.colors.surface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: theme.radius.input, style: .continuous)
+                .stroke(theme.colors.border, lineWidth: 1)
         )
+        .accessibilityElement(children: .contain)
+        .accessibilityFocused($isStatusFocused)
         .accessibilityIdentifier("progress_photo_attach_status")
     }
 
@@ -294,15 +313,15 @@ struct ProgressPhotoAttachSheet: View {
     private var statusColor: Color {
         switch attachStatus {
         case .empty:
-            return Color.metricTextTertiary
+            return theme.colors.textSecondary
         case .ready:
-            return Color.metricAccent
+            return theme.colors.info
         case .permissionDenied, .failed:
-            return Color.metricAccentBodyFat
+            return theme.colors.error
         case .processing:
-            return Color.metricAccentFFMI
+            return theme.colors.info
         case .success:
-            return Color.metricAccentSteps
+            return theme.colors.success
         }
     }
 
@@ -338,8 +357,8 @@ struct ProgressPhotoAttachSheet: View {
 
             if !cameraAuthorizer.isCameraAvailable {
                 Text("Camera capture is unavailable in Simulator. Choose from Library for simulator validation.")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color.metricTextTertiary)
+                    .font(theme.typography.captionLarge)
+                    .foregroundColor(theme.colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -371,32 +390,38 @@ struct ProgressPhotoAttachSheet: View {
     private func actionRow(title: String, subtitle: String, icon: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(Color.metricAccent)
-                .frame(width: 32, height: 32)
-                .background(Circle().fill(Color.white.opacity(0.08)))
+                .font(.system(.body, design: .rounded).weight(.semibold))
+                .foregroundColor(theme.colors.info)
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                .background(Circle().fill(theme.colors.info.opacity(0.12)))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(theme.colors.text)
 
                 Text(subtitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color.metricTextSecondary)
+                    .font(theme.typography.bodySmall)
+                    .foregroundColor(theme.colors.textSecondary)
+                    .lineLimit(2)
             }
 
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color.metricTextTertiary)
+                .font(.system(.footnote, design: .default).weight(.semibold))
+                .foregroundColor(theme.colors.textSecondary)
         }
-        .padding(14)
+        .padding(.horizontal, theme.spacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.white.opacity(0.06))
+            RoundedRectangle(cornerRadius: theme.radius.input, style: .continuous)
+                .fill(theme.colors.surface)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: theme.radius.input, style: .continuous)
+                .stroke(theme.colors.border, lineWidth: 1)
+        )
+        .jovieTouchTarget()
     }
 
     private var attachButton: some View {
@@ -410,22 +435,34 @@ struct ProgressPhotoAttachSheet: View {
                     ProgressView()
                         .tint(.black)
                 } else if isSuccess {
-                    Label("Done", systemImage: "checkmark")
+                    Label("Close", systemImage: "checkmark")
                 } else {
                     Label("Attach Photo", systemImage: "paperclip")
                 }
 
                 Spacer()
             }
-            .font(.system(size: 15, weight: .semibold))
-            .frame(height: 48)
-            .background(canAttach || isSuccess ? Color.white : Color.white.opacity(0.18))
-            .foregroundColor(canAttach || isSuccess ? .black : Color.white.opacity(0.42))
+            .font(theme.typography.labelLarge)
+            .frame(minHeight: JovieTokens.controlHeight)
+            .background(canAttach || isSuccess ? theme.colors.interactive : theme.colors.interactiveDisabled)
+            .foregroundColor(canAttach || isSuccess ? Color.jovieActionText : theme.colors.textSecondary)
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
         .disabled((!canAttach && !isSuccess) || isBusy)
+        .accessibilityLabel(isSuccess ? "Close progress photo" : "Attach progress photo")
+        .accessibilityHint(canAttach ? "Attaches the selected photo to this timeline point" : "Choose a photo before attaching")
         .accessibilityIdentifier("progress_photo_attach_submit_button")
+    }
+
+    private func previewHeight(for availableHeight: CGFloat) -> CGFloat {
+        min(260, max(184, availableHeight * 0.30))
+    }
+
+    private func announceStatusChange(_ status: ProgressPhotoAttachStatus) {
+        let message = "\(ProgressPhotoAttachPolicy.statusTitle(for: status)). \(ProgressPhotoAttachPolicy.statusMessage(for: status))"
+        UIAccessibility.post(notification: .announcement, argument: message)
+        isStatusFocused = true
     }
 
     private func updateInitialPermissionState() {

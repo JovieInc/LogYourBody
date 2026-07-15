@@ -56,7 +56,6 @@ class LoadingManager: ObservableObject {
     private var usesUITestAuthFixture: Bool {
         let arguments = ProcessInfo.processInfo.arguments
         return arguments.contains("-lybUITestSignedOutFixture")
-            || arguments.contains("-lybUITestEmailVerificationFixture")
             || arguments.contains("-lybUITestPaidMVPFixture")
             || arguments.contains("-lybUITestPaywallFixture")
             || arguments.contains("-lybUITestPaywallPlansFixture")

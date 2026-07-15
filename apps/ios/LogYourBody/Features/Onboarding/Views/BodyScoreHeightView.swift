@@ -4,8 +4,12 @@ struct BodyScoreHeightView: View {
     @Environment(\.theme)
     private var theme
 
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var centimetersFocused: Bool
+    @AccessibilityFocusState private var heightErrorFocused: Bool
     @State private var heightError: String?
     @State private var showWhyWeAsk = false
 
@@ -34,11 +38,9 @@ struct BodyScoreHeightView: View {
                     viewModel.goToNextStep()
                 } label: {
                     Text("Continue")
-                        .font(.system(size: 18, weight: .semibold))
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueHeight)
-                .opacity(continueButtonOpacity)
             }
         )
         .toolbar {
@@ -51,6 +53,9 @@ struct BodyScoreHeightView: View {
                 }
             }
         }
+        .onChange(of: heightError) { _, error in
+            heightErrorFocused = error != nil
+        }
     }
 
     private var heightUnitBinding: Binding<HeightUnit> {
@@ -58,10 +63,6 @@ struct BodyScoreHeightView: View {
             get: { viewModel.heightUnit },
             set: { viewModel.setHeightUnit($0) }
         )
-    }
-
-    private var continueButtonOpacity: Double {
-        viewModel.canContinueHeight ? 1 : 0.4
     }
 
     private func validateHeightCentimeters(_ value: String) {
@@ -82,7 +83,7 @@ struct BodyScoreHeightView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Enter centimeters")
                 .font(OnboardingTypography.caption)
-                .foregroundStyle(Color.appTextSecondary)
+                .foregroundStyle(theme.colors.textSecondary)
 
             TextField("175", text: Binding(
                 get: { viewModel.heightCentimetersText },
@@ -98,7 +99,7 @@ struct BodyScoreHeightView: View {
                 validateHeightCentimeters(newValue)
             }
             .padding(.horizontal, 18)
-            .padding(.vertical, 14)
+            .frame(minHeight: JovieTokens.controlHeight)
             .systemBGlassSurface(
                 cornerRadius: theme.radius.input,
                 tint: centimetersFocused ? theme.colors.primary : theme.colors.text,
@@ -111,15 +112,19 @@ struct BodyScoreHeightView: View {
                     self.centimetersFocused = true
                 }
             }
+            .accessibilityLabel("Height in centimeters")
+            .accessibilityHint("Enter a height between 100 and 250 centimeters.")
 
             if let error = heightError {
                 Text(error)
                     .font(OnboardingTypography.caption)
                     .foregroundStyle(theme.colors.error)
+                    .accessibilityFocused($heightErrorFocused)
+                    .accessibilityAddTraits(.isStaticText)
             } else {
                 Text("Most adults fall between 100–250 cm.")
                     .font(OnboardingTypography.caption)
-                    .foregroundStyle(Color.appTextTertiary)
+                    .foregroundStyle(theme.colors.textTertiary)
             }
         }
     }
@@ -166,7 +171,7 @@ struct BodyScoreHeightView: View {
 
             Text("We’ll convert everything into centimeters automatically.")
                 .font(OnboardingTypography.caption)
-                .foregroundStyle(Color.appTextSecondary)
+                .foregroundStyle(theme.colors.textSecondary)
                 .multilineTextAlignment(.center)
         }
     }
@@ -174,30 +179,40 @@ struct BodyScoreHeightView: View {
     private var helperCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showWhyWeAsk.toggle()
-                }
+                toggleWhyWeAsk()
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "questionmark.circle")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, design: .default).weight(.semibold))
                     Text("Why we ask")
                         .font(OnboardingTypography.caption)
                 }
-                .foregroundStyle(Color.appPrimary)
+                .foregroundStyle(theme.colors.primary)
             }
             .buttonStyle(.plain)
+            .jovieTouchTarget()
+            .accessibilityValue(showWhyWeAsk ? "Expanded" : "Collapsed")
 
             if showWhyWeAsk {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Height anchors lean mass so taller frames stay comparable.")
-                        .font(OnboardingTypography.body)
-                        .foregroundStyle(Color.appTextSecondary)
+                        Text("Height anchors lean mass so taller frames stay comparable.")
+                            .font(OnboardingTypography.body)
+                            .foregroundStyle(theme.colors.textSecondary)
 
                     FFMIInfoLink()
                         .padding(.top, 2)
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private func toggleWhyWeAsk() {
+        if reduceMotion {
+            showWhyWeAsk.toggle()
+        } else {
+            withAnimation(theme.animation.fast) {
+                showWhyWeAsk.toggle()
             }
         }
     }

@@ -5,6 +5,8 @@
 import SwiftUI
 
 struct LegalConsentView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @Binding var isPresented: Bool
     let userId: String
     let onAccept: () async -> Void
@@ -21,93 +23,56 @@ struct LegalConsentView: View {
 
     var body: some View {
         ZStack {
-            // Background
-            Color.black.opacity(0.8)
+            Color.jovieCanvas
                 .ignoresSafeArea()
-                .onTapGesture { } // Prevent dismissal by tapping background
 
-            VStack(spacing: 0) {
-                // Content
-                VStack(spacing: 24) {
-                    // Title
+            ScrollView {
+                VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
+                    header
+
                     VStack(spacing: 8) {
-                        Text("Welcome to LogYourBody")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-
-                        Text("Please review and accept our terms")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    .padding(.top, 32)
-
-                    // Checkboxes
-                    VStack(spacing: 16) {
-                        ConsentCheckbox(
+                        LegalConsentCheckbox(
                             isChecked: $acceptedTerms,
-                            text: "I accept the ",
-                            linkText: "Terms of Service",
-                            url: nil,
-                            onLinkTap: {
-                                showTermsSheet = true
-                            }
+                            agreement: "I accept the Terms of Service",
+                            linkTitle: "Read Terms of Service",
+                            linkHint: "Opens the Terms of Service.",
+                            onLinkTap: { showTermsSheet = true }
                         )
 
-                        ConsentCheckbox(
+                        LegalConsentCheckbox(
                             isChecked: $acceptedPrivacy,
-                            text: "I accept the ",
-                            linkText: "Privacy Policy",
-                            url: nil,
-                            onLinkTap: {
-                                showPrivacySheet = true
-                            }
+                            agreement: "I accept the Privacy Policy",
+                            linkTitle: "Read Privacy Policy",
+                            linkHint: "Opens the Privacy Policy.",
+                            onLinkTap: { showPrivacySheet = true }
                         )
                     }
-                    .padding(.horizontal, 24)
-
-                    // Continue Button
-                    Button(
-                        action: {
-                            Task {
-                                isLoading = true
-                                await onAccept()
-                                isLoading = false
-                                isPresented = false
-                            }
-                        },
-                        label: {
-                            HStack {
-                                if isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Text("Continue")
-                                        .font(.system(size: 17, weight: .semibold))
-                                        .foregroundColor(canContinue ? .black : .white.opacity(0.5))
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(canContinue ? Color.white : Color.white.opacity(0.2))
-                            .cornerRadius(12)
-                            .animation(.easeInOut(duration: 0.2), value: canContinue)
-                        }
+                    .padding(12)
+                    .systemBGlassSurface(
+                        cornerRadius: JovieTokens.cardRadius,
+                        tint: .jovieText,
+                        tintOpacity: 0.045,
+                        borderColor: .jovieHairline,
+                        borderOpacity: 0.9
                     )
-                    .disabled(!canContinue)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 32)
+
+                    Text("You can review these documents again in Settings.")
+                        .font(.footnote)
+                        .foregroundColor(.jovieTextSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .background(Color.black)
-                .cornerRadius(20)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
-                .padding(.horizontal, 24)
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.top, 48)
+                .padding(.bottom, 24)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            continueAction
+        }
+        .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98)))
         .sheet(isPresented: $showTermsSheet) {
             NavigationStack {
                 LegalDocumentView(documentType: .terms)
@@ -119,69 +84,103 @@ struct LegalConsentView: View {
             }
         }
     }
-}
 
-struct ConsentCheckbox: View {
-    @Binding var isChecked: Bool
-    let text: String
-    let linkText: String
-    let url: URL?
-    let onLinkTap: (() -> Void)?
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Before you continue")
+                .font(.title2.weight(.bold))
+                .foregroundColor(.jovieText)
 
-    @Environment(\.openURL) private var openURL
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Custom checkbox
-            Button(
-                action: {
-                    isChecked.toggle()
-                },
-                label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 2)
-                            .frame(width: 24, height: 24)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(isChecked ? Color.white : Color.clear)
-                            )
-
-                        if isChecked {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.black)
-                        }
-                    }
-                }
-            )
-            .buttonStyle(PlainButtonStyle())
-
-            // Text with link
-            HStack(spacing: 0) {
-                Text(text)
-                    .font(.system(size: 15))
-                    .foregroundColor(.white.opacity(0.9))
-
-                Button(action: handleLinkTap) {
-                    Text(linkText)
-                        .font(.system(size: 15))
-                        .foregroundColor(.white)
-                        .underline()
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-
-            Spacer()
+            Text("Please review and accept the Terms of Service and Privacy Policy.")
+                .font(.body)
+                .foregroundColor(.jovieTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .accessibilityElement(children: .combine)
     }
 
-    private func handleLinkTap() {
-        if let onLinkTap {
-            onLinkTap()
-        } else if let url {
-            openURL(url)
+    private var continueAction: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.jovieHairline)
+                .frame(height: 1)
+
+            BaseButton(
+                "Continue",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                    isLoading: isLoading,
+                    isEnabled: canContinue,
+                    fullWidth: true,
+                    cornerRadius: JovieTokens.controlRadius
+                ),
+                action: accept
+            )
+            .accessibilityIdentifier("legal_consent_continue_button")
+            .accessibilityHint(
+                canContinue
+                    ? "Accepts the selected agreements and continues."
+                    : "Accept both agreements to continue."
+            )
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.vertical, 12)
         }
+        .background(Color.jovieCanvas.opacity(0.96).ignoresSafeArea(edges: .bottom))
+    }
+
+    private func accept() {
+        guard canContinue else { return }
+
+        isLoading = true
+        Task { @MainActor in
+            await onAccept()
+            isLoading = false
+            isPresented = false
+        }
+    }
+}
+
+private struct LegalConsentCheckbox: View {
+    @Binding var isChecked: Bool
+    let agreement: String
+    let linkTitle: String
+    let linkHint: String
+    let onLinkTap: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Button(action: { isChecked.toggle() }, label: {
+                Image(systemName: isChecked ? "checkmark" : "square")
+                    .font(.system(.body, design: .default).weight(.semibold))
+                    .foregroundColor(isChecked ? .jovieActionText : .jovieTextSecondary)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(isChecked ? Color.jovieAction : Color.jovieSurfaceElevated)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(isChecked ? Color.clear : Color.jovieHairline, lineWidth: 1)
+                    )
+                    .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+            })
+            .buttonStyle(.plain)
+            .accessibilityLabel(agreement)
+            .accessibilityValue(isChecked ? "Selected" : "Not selected")
+            .accessibilityHint("Required to continue.")
+
+            Button(action: onLinkTap) {
+                Text(linkTitle)
+                    .font(.body.weight(.medium))
+                    .foregroundColor(.jovieText)
+                    .underline()
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(linkHint)
+        }
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

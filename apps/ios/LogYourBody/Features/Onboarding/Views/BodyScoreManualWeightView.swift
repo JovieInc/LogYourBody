@@ -4,8 +4,12 @@ struct BodyScoreManualWeightView: View {
     @Environment(\.theme)
     private var theme
 
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var weightFieldFocused: Bool
+    @AccessibilityFocusState private var weightErrorFocused: Bool
     @State private var weightError: String?
     @State private var showWhyWeAsk = false
 
@@ -16,14 +20,14 @@ struct BodyScoreManualWeightView: View {
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .manualWeight),
             content: {
-                VStack(spacing: 28) {
+                VStack(spacing: JovieTokens.sectionGap) {
                     VStack(alignment: .leading, spacing: 16) {
                         OnboardingSegmentedControl(options: WeightUnit.allCases, selection: weightUnitBinding)
 
                         VStack(alignment: .leading, spacing: 12) {
                             Text(viewModel.weightFieldTitle)
                                 .font(OnboardingTypography.caption)
-                                .foregroundStyle(Color.appTextSecondary)
+                                .foregroundStyle(theme.colors.textSecondary)
 
                             TextField(viewModel.weightPlaceholder, text: Binding(
                                 get: { viewModel.manualWeightText },
@@ -39,7 +43,7 @@ struct BodyScoreManualWeightView: View {
                                 validateWeight(newValue)
                             }
                             .padding(.horizontal, 18)
-                            .padding(.vertical, 14)
+                            .frame(minHeight: JovieTokens.controlHeight)
                             .systemBGlassSurface(
                                 cornerRadius: theme.radius.input,
                                 tint: weightFieldFocused ? theme.colors.primary : theme.colors.text,
@@ -52,19 +56,21 @@ struct BodyScoreManualWeightView: View {
                                     Spacer()
                                     Text(viewModel.weightUnit == .kilograms ? "kg" : "lb")
                                         .font(OnboardingTypography.caption)
-                                        .foregroundStyle(Color.appTextSecondary)
+                                        .foregroundStyle(theme.colors.textSecondary)
                                         .padding(.trailing, 20)
                                 }
                             )
+                            .accessibilityLabel(viewModel.weightFieldTitle)
+                            .accessibilityHint("Enter your most recent weight.")
 
                             HStack(spacing: 12) {
                                 Button {
                                     nudgeWeight(by: -stepAmount)
                                 } label: {
                                     Image(systemName: "minus")
-                                        .font(.system(size: 14, weight: .medium))
+                                        .font(.system(.body, design: .default).weight(.medium))
                                         .foregroundStyle(theme.colors.text)
-                                        .frame(width: 32, height: 32)
+                                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
                                         .systemBGlassSurface(
                                             cornerRadius: 16,
                                             tint: theme.colors.text,
@@ -74,14 +80,15 @@ struct BodyScoreManualWeightView: View {
                                         )
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel("Decrease weight by \(stepDescription)")
 
                                 Button {
                                     nudgeWeight(by: stepAmount)
                                 } label: {
                                     Image(systemName: "plus")
-                                        .font(.system(size: 14, weight: .medium))
+                                        .font(.system(.body, design: .default).weight(.medium))
                                         .foregroundStyle(theme.colors.text)
-                                        .frame(width: 32, height: 32)
+                                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
                                         .systemBGlassSurface(
                                             cornerRadius: 16,
                                             tint: theme.colors.text,
@@ -91,6 +98,7 @@ struct BodyScoreManualWeightView: View {
                                         )
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel("Increase weight by \(stepDescription)")
                             }
                         }
 
@@ -98,28 +106,29 @@ struct BodyScoreManualWeightView: View {
                             Text(error)
                                 .font(OnboardingTypography.caption)
                                 .foregroundStyle(theme.colors.error)
+                                .accessibilityFocused($weightErrorFocused)
                         }
 
                         Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                showWhyWeAsk.toggle()
-                            }
+                            toggleWhyWeAsk()
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "questionmark.circle")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(.footnote, design: .default).weight(.semibold))
                                 Text("Why we ask")
                                     .font(OnboardingTypography.caption)
                             }
-                            .foregroundStyle(Color.appPrimary)
+                            .foregroundStyle(theme.colors.primary)
                         }
                         .buttonStyle(.plain)
+                        .jovieTouchTarget()
+                        .accessibilityValue(showWhyWeAsk ? "Expanded" : "Collapsed")
 
                         if showWhyWeAsk {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Weight plus body fat unlocks lean-mass insights for your Body Score.")
                                     .font(OnboardingTypography.body)
-                                    .foregroundStyle(Color.appTextSecondary)
+                                    .foregroundStyle(theme.colors.textSecondary)
 
                                 FFMIInfoLink()
                                     .padding(.top, 2)
@@ -135,11 +144,9 @@ struct BodyScoreManualWeightView: View {
                     viewModel.goToNextStep()
                 } label: {
                     Text("Continue")
-                        .font(.system(size: 18, weight: .semibold))
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueWeight)
-                .opacity(continueButtonOpacity)
             }
         )
         .onAppear {
@@ -157,6 +164,9 @@ struct BodyScoreManualWeightView: View {
                 }
             }
         }
+        .onChange(of: weightError) { _, error in
+            weightErrorFocused = error != nil
+        }
     }
 
     private var weightUnitBinding: Binding<WeightUnit> {
@@ -164,10 +174,6 @@ struct BodyScoreManualWeightView: View {
             get: { viewModel.weightUnit },
             set: { viewModel.setWeightUnit($0) }
         )
-    }
-
-    private var continueButtonOpacity: Double {
-        viewModel.canContinueWeight ? 1 : 0.4
     }
 
     private var stepAmount: Double {
@@ -205,9 +211,27 @@ struct BodyScoreManualWeightView: View {
 
     private var weightFieldBorderColor: Color {
         if weightFieldFocused {
-            return Color.appPrimary
+            return theme.colors.primary
         }
-        return Color.appBorder.opacity(0.4)
+        return theme.colors.border.opacity(0.65)
+    }
+
+    private var stepDescription: String {
+        "\(BodyScoreManualWeightView.format(stepAmount)) \(viewModel.weightUnit == .kilograms ? "kilograms" : "pounds")"
+    }
+
+    private func toggleWhyWeAsk() {
+        if reduceMotion {
+            showWhyWeAsk.toggle()
+        } else {
+            withAnimation(theme.animation.fast) {
+                showWhyWeAsk.toggle()
+            }
+        }
+    }
+
+    private static func format(_ value: Double) -> String {
+        value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 
     private func nudgeWeight(by amount: Double) {

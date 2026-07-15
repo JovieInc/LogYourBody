@@ -28,22 +28,24 @@ struct BodyScoreBodyFatChoiceView: View {
                         } label: {
                             HStack(alignment: .center, spacing: 12) {
                                 Image(systemName: option.icon)
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundStyle(Color.appPrimary)
+                                    .font(.system(.title3, design: .rounded).weight(.semibold))
+                                    .foregroundStyle(theme.colors.primary)
+                                    .frame(width: JovieTokens.minimumHitTarget)
 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(option.title)
                                         .font(OnboardingTypography.headline)
-                                        .foregroundStyle(Color.appText)
+                                        .foregroundStyle(theme.colors.text)
 
                                     Text(option.subtitle)
                                         .font(OnboardingTypography.caption)
-                                        .foregroundStyle(Color.appTextSecondary)
+                                        .foregroundStyle(theme.colors.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
 
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .foregroundStyle(Color.appTextSecondary)
+                                    .foregroundStyle(theme.colors.textSecondary)
                             }
                             .padding(20)
                             .systemBGlassSurface(
@@ -55,6 +57,9 @@ struct BodyScoreBodyFatChoiceView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .jovieTouchTarget()
+                        .accessibilityLabel("\(option.title). \(option.subtitle)")
+                        .accessibilityHint("Continues to the next step.")
                     }
 
                     Button("Skip for now") {
@@ -69,6 +74,7 @@ struct BodyScoreBodyFatChoiceView: View {
                             .foregroundStyle(theme.colors.error)
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity)
+                            .accessibilityAddTraits(.isStaticText)
                     }
                 }
             }

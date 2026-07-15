@@ -18,14 +18,13 @@ final class LogYourBodyUITests: XCTestCase {
         // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
-    func testSignedOutPhoneOTPIsTheOnlyAuthAction() throws {
+    func testSignedOutAppleIsTheOnlyAuthAction() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestSignedOutFixture"]
         app.launch()
 
         XCTAssertTrue(app.staticTexts["LogYourBody"].waitForExistence(timeout: 8))
-        XCTAssertTrue(app.buttons["continueWithPhoneButton"].exists)
-        XCTAssertFalse(app.buttons["Continue with Apple"].exists)
+        XCTAssertTrue(app.buttons["continueWithAppleButton"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["login_email_field"].exists)
     }
 
@@ -87,11 +86,16 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)["paywall_plans_unavailable_state"].waitForExistence(timeout: 8)
         )
-        XCTAssertTrue(app.staticTexts["$79.99"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["$79.99"].exists, "Unavailable offerings must not show a stale price")
 
-        let supportButton = app.buttons["Contact Support"]
+        let supportButton = app.buttons["paywall_contact_support_button"]
         XCTAssertTrue(supportButton.waitForExistence(timeout: 3))
         XCTAssertTrue(supportButton.isHittable)
+        XCTAssertEqual(supportButton.label, "Contact support")
+
+        let retryButton = app.buttons["paywall_retry_offerings_button"]
+        XCTAssertTrue(retryButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(retryButton.isHittable)
 
         let restoreButton = app.buttons["paywall_restore_purchases_button"]
         XCTAssertTrue(restoreButton.waitForExistence(timeout: 3))
@@ -134,9 +138,23 @@ final class LogYourBodyUITests: XCTestCase {
 
         try openSettings(in: app)
 
+        let profileLink = app.descendants(matching: .any)["settings_profile_link"]
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 5))
+        XCTAssertTrue(profileLink.isHittable)
+        profileLink.tap()
+
         let logoutButton = app.descendants(matching: .any)["settings_logout_button"]
         XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
         XCTAssertTrue(logoutButton.isHittable)
+
+        let settingsBackButton = app.navigationBars.buttons["Settings"]
+        XCTAssertTrue(settingsBackButton.waitForExistence(timeout: 5))
+        settingsBackButton.tap()
+
+        let accountLink = app.descendants(matching: .any)["settings_account_subscription_link"]
+        XCTAssertTrue(accountLink.waitForExistence(timeout: 5))
+        XCTAssertTrue(accountLink.isHittable)
+        accountLink.tap()
 
         let manageSubscriptionButton = app.descendants(matching: .any)["settings_manage_subscription_button"]
         scrollUntilHittable(manageSubscriptionButton, in: app)
@@ -153,6 +171,11 @@ final class LogYourBodyUITests: XCTestCase {
         app.launch()
 
         try openSettings(in: app)
+
+        let trackingLink = app.descendants(matching: .any)["settings_tracking_link"]
+        XCTAssertTrue(trackingLink.waitForExistence(timeout: 5))
+        XCTAssertTrue(trackingLink.isHittable)
+        trackingLink.tap()
 
         let weightGoalButton = app.buttons["settings_weight_goal_edit_button"]
         scrollUntilHittable(weightGoalButton, in: app)
@@ -430,6 +453,12 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Zepbound"].waitForExistence(timeout: 10))
+        let selectedDose = app.descendants(matching: .any)["glp1_dose_picker"]
+        XCTAssertTrue(selectedDose.waitForExistence(timeout: 10))
+        XCTAssertTrue((selectedDose.value as? String)?.contains("5 mg/week") == true)
+        let lastLoggedDose = app.descendants(matching: .any)["glp1_last_logged_dose_status"]
+        XCTAssertTrue(lastLoggedDose.waitForExistence(timeout: 10))
+        XCTAssertTrue(lastLoggedDose.label.contains("5 mg/week"))
         XCTAssertTrue(app.descendants(matching: .any)["glp1DoseHistorySection"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.switches["Rest day"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.textFields["GLP-1 dose notes"].waitForExistence(timeout: 5))
@@ -704,7 +733,8 @@ final class LogYourBodyUITests: XCTestCase {
 
         let shareCard = app.descendants(matching: .any)["body_score_share_card"]
         XCTAssertTrue(shareCard.waitForExistence(timeout: 8))
-        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_avatar_visual"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["body_score_share_content_controls"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["body_score_share_avatar_visual"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["body_score_share_save_button"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["body_score_share_system_button"].exists)
 
@@ -744,20 +774,22 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(presenceSummary.label.contains("Measured"))
         XCTAssertTrue(presenceSummary.label.contains("Interpolated"))
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_stack"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_card_body_fat"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_card_ffmi"].exists)
+        let weightCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"]
+        XCTAssertTrue(weightCard.waitForExistence(timeout: 10))
+        let bodyFatCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_body_fat"]
+        XCTAssertTrue(bodyFatCard.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Timeline states"].exists)
         attachScreenshot(named: "launch-quality-analytics", from: app)
+        let ffmiCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_ffmi"]
+        scrollUntilExists(ffmiCard, in: app)
+        XCTAssertTrue(ffmiCard.waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
 
     private func openIntegrations(in app: XCUIApplication) throws {
         try openSettings(in: app)
 
-        let integrationsButton = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS %@", "Integrations")
-        ).firstMatch
+        let integrationsButton = app.descendants(matching: .any)["settings_integrations_link"]
         scrollUntilHittable(integrationsButton, in: app)
         XCTAssertTrue(integrationsButton.waitForExistence(timeout: 5))
         XCTAssertTrue(integrationsButton.isHittable)

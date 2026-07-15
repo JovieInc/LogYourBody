@@ -17,10 +17,12 @@ struct DSAuthLink: View {
         Button(action: action) {
             Text(title)
                 .font(theme.typography.labelMedium)
-                .foregroundColor(theme.colors.primary)
+                .foregroundColor(.jovieText)
                 .underline()
         }
         .buttonStyle(PlainButtonStyle())
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Rectangle())
     }
 }
 
@@ -37,10 +39,12 @@ struct DSAuthNavigationLink<Destination: View>: View {
         NavigationLink(destination: destination) {
             Text(title)
                 .font(theme.typography.labelMedium)
-                .foregroundColor(theme.colors.primary)
+                .foregroundColor(.jovieText)
                 .underline()
         }
         .buttonStyle(PlainButtonStyle())
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Rectangle())
     }
 }
 

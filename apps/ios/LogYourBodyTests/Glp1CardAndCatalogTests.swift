@@ -110,18 +110,180 @@ final class Glp1CardAndCatalogTests: XCTestCase {
         }
     }
 
+    // MARK: - Glp1DoseDraftResolver
+
+    func testDoseDraftUsesLatestCompatibleDoseForMedicationID() {
+        let medication = makeMedication(
+            id: "zepbound-current",
+            brand: "Zepbound",
+            genericName: "tirzepatide",
+            doseUnit: "mg/week"
+        )
+        let draft = Glp1DoseDraftResolver.resolve(
+            for: medication,
+            doseLogs: [
+                makeDoseLog(
+                    id: "older",
+                    takenAt: base,
+                    doseAmount: 2.5,
+                    medicationID: medication.id,
+                    brand: "Zepbound"
+                ),
+                makeDoseLog(
+                    id: "latest",
+                    takenAt: base.addingTimeInterval(86_400),
+                    doseAmount: 5,
+                    medicationID: medication.id,
+                    brand: "Zepbound"
+                )
+            ]
+        )
+
+        XCTAssertEqual(draft.source, .latestLog)
+        XCTAssertEqual(draft.doseText, "5")
+        XCTAssertEqual(draft.doseUnit, "mg/week")
+        XCTAssertEqual(draft.selectedDoseIndex, 1)
+        XCTAssertFalse(draft.usesCustomDose)
+        XCTAssertEqual(draft.lastLoggedDoseText, "5 mg/week")
+    }
+
+    func testDoseDraftUsesCustomValueForDoseOutsideCatalog() {
+        let medication = makeMedication(
+            id: "zepbound-current",
+            brand: "Zepbound",
+            genericName: "tirzepatide",
+            doseUnit: "mg/week"
+        )
+        let draft = Glp1DoseDraftResolver.resolve(
+            for: medication,
+            doseLogs: [
+                makeDoseLog(
+                    id: "custom",
+                    takenAt: base,
+                    doseAmount: 6.25,
+                    medicationID: medication.id,
+                    brand: "Zepbound"
+                )
+            ]
+        )
+
+        XCTAssertEqual(draft.doseText, "6.25")
+        XCTAssertNil(draft.selectedDoseIndex)
+        XCTAssertTrue(draft.usesCustomDose)
+        XCTAssertEqual(draft.lastLoggedDoseText, "6.25 mg/week")
+    }
+
+    func testDoseDraftPrefersMedicationIDOverNewerBrandFallback() {
+        let medication = makeMedication(
+            id: "zepbound-current",
+            brand: "Zepbound",
+            genericName: "tirzepatide",
+            doseUnit: "mg/week"
+        )
+        let draft = Glp1DoseDraftResolver.resolve(
+            for: medication,
+            doseLogs: [
+                makeDoseLog(
+                    id: "current-medication",
+                    takenAt: base,
+                    doseAmount: 5,
+                    medicationID: medication.id,
+                    brand: "Zepbound"
+                ),
+                makeDoseLog(
+                    id: "legacy-medication",
+                    takenAt: base.addingTimeInterval(86_400),
+                    doseAmount: 7.5,
+                    medicationID: "previous-zepbound-record",
+                    brand: "Zepbound"
+                ),
+                makeDoseLog(
+                    id: "different-medication",
+                    takenAt: base.addingTimeInterval(172_800),
+                    doseAmount: 2.4,
+                    medicationID: "wegovy",
+                    brand: "Wegovy"
+                )
+            ]
+        )
+
+        XCTAssertEqual(draft.doseText, "5")
+        XCTAssertEqual(draft.selectedDoseIndex, 1)
+        XCTAssertEqual(draft.lastLoggedDoseText, "5 mg/week")
+    }
+
+    func testDoseDraftFallsBackToMatchingBrandWhenMedicationIDChanged() {
+        let medication = makeMedication(
+            id: "zepbound-current",
+            brand: "Zepbound",
+            genericName: "tirzepatide",
+            doseUnit: "mg/week"
+        )
+        let draft = Glp1DoseDraftResolver.resolve(
+            for: medication,
+            doseLogs: [
+                makeDoseLog(
+                    id: "legacy-zepbound",
+                    takenAt: base,
+                    doseAmount: 7.5,
+                    medicationID: nil,
+                    brand: "Zepbound"
+                )
+            ]
+        )
+
+        XCTAssertEqual(draft.source, .latestLog)
+        XCTAssertEqual(draft.doseText, "7.5")
+        XCTAssertEqual(draft.selectedDoseIndex, 2)
+        XCTAssertFalse(draft.usesCustomDose)
+    }
+
+    func testDoseDraftUsesFirstCatalogDoseWhenThereIsNoCompatibleHistory() {
+        let medication = makeMedication(
+            id: "zepbound-current",
+            brand: "Zepbound",
+            genericName: "tirzepatide",
+            doseUnit: "mg/week"
+        )
+        let draft = Glp1DoseDraftResolver.resolve(
+            for: medication,
+            doseLogs: [
+                makeDoseLog(
+                    id: "other-medication",
+                    takenAt: base,
+                    doseAmount: 2.4,
+                    medicationID: "wegovy",
+                    brand: "Wegovy"
+                )
+            ]
+        )
+
+        XCTAssertEqual(draft.source, .catalogDefault)
+        XCTAssertEqual(draft.doseText, "2.5")
+        XCTAssertEqual(draft.selectedDoseIndex, 0)
+        XCTAssertFalse(draft.usesCustomDose)
+        XCTAssertNil(draft.lastLoggedDoseText)
+    }
+
     // MARK: - Fixtures
 
-    private func makeDoseLog(id: String, takenAt: Date, doseAmount: Double?, unit: String? = "mg/week") -> Glp1DoseLog {
+    private func makeDoseLog(
+        id: String,
+        takenAt: Date,
+        doseAmount: Double?,
+        unit: String? = "mg/week",
+        medicationID: String? = "med",
+        brand: String? = "Ozempic"
+    ) -> Glp1DoseLog {
         Glp1DoseLog(
             id: id,
             userId: "glp1-card-user",
             takenAt: takenAt,
-            medicationId: "med",
+            medicationId: medicationID,
             doseAmount: doseAmount,
             doseUnit: unit,
             drugClass: "GLP-1 receptor agonist",
-            brand: "Ozempic",
+            brand: brand,
             isCompounded: false,
             supplierType: nil,
             supplierName: nil,
@@ -131,9 +293,14 @@ final class Glp1CardAndCatalogTests: XCTestCase {
         )
     }
 
-    private func makeMedication(brand: String?, genericName: String?, doseUnit: String?) -> Glp1Medication {
+    private func makeMedication(
+        id: String = "med",
+        brand: String?,
+        genericName: String?,
+        doseUnit: String?
+    ) -> Glp1Medication {
         Glp1Medication(
-            id: "med",
+            id: id,
             userId: "glp1-card-user",
             displayName: brand ?? "Custom",
             genericName: genericName,

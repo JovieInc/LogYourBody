@@ -92,6 +92,7 @@ struct AddEntrySheet: View {
     @State var glp1IsRestDay = false
     @State var glp1UserId: String?
     @State var glp1DoseLogs: [Glp1DoseLog] = []
+    @State var glp1LastLoggedDoseText: String?
     @State var glp1DoseNotes: String = ""
     @State var editingGlp1DoseLogId: String?
     @State var editingGlp1DoseCreatedAt: Date?

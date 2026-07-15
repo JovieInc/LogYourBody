@@ -4,6 +4,7 @@
 //
 import SwiftUI
 import OSLog
+import UIKit
 
 struct ProfileSettingsViewV2: View {
     @EnvironmentObject var authManager: AuthManager
@@ -28,19 +29,18 @@ struct ProfileSettingsViewV2: View {
     @State private var hasChanges = false
     @State private var isSaving = false
     @State private var showingSaveSuccess = false
+    @State private var saveErrorMessage: String?
 
     var body: some View {
         ZStack {
             ScrollView {
                 VStack(spacing: theme.spacing.sectionSpacing) {
-                    profileHeader
-                        .padding(.top)
-
                     basicInformationCard
 
                     physicalInformationCard
                 }
                 .padding(.horizontal, theme.spacing.screenPadding)
+                .padding(.top, theme.spacing.md)
                 .padding(.bottom, 40)
             }
             .scrollBounceBehavior(.basedOnSize)
@@ -54,12 +54,15 @@ struct ProfileSettingsViewV2: View {
                     ProgressView()
                         .scaleEffect(0.8)
                         .tint(theme.colors.primary)
+                        .frame(minWidth: JovieTokens.minimumHitTarget, minHeight: JovieTokens.minimumHitTarget)
                 } else if hasChanges {
                     Button("Save") {
                         saveProfile()
                     }
                     .fontWeight(.medium)
                     .foregroundColor(theme.colors.primary)
+                    .jovieTouchTarget()
+                    .accessibilityHint("Saves your profile changes.")
                 }
             }
         }
@@ -85,6 +88,23 @@ struct ProfileSettingsViewV2: View {
                 message: "Profile updated"
             )
         )
+        .alert(
+            "Couldn’t save profile",
+            isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { if !$0 { saveErrorMessage = nil } }
+            )
+        ) {
+            Button("Try Again") {
+                saveErrorMessage = nil
+                saveProfile()
+            }
+            Button("Cancel", role: .cancel) {
+                saveErrorMessage = nil
+            }
+        } message: {
+            Text(saveErrorMessage ?? "Check your connection and try again.")
+        }
     }
 
     // MARK: - View Components
@@ -92,48 +112,20 @@ struct ProfileSettingsViewV2: View {
     private var basicInformationCard: some View {
         SettingsSection(header: "Basic Information") {
             VStack(spacing: 0) {
-                // First Name Field
-                settingsRow(
+                editableTextRow(
                     label: "First name",
-                    value: editableFirstName.isEmpty ? "Not set" : editableFirstName,
-                    showDisclosure: false
-                ) {
-                    AnyView(
-                        TextField("First name", text: $editableFirstName)
-                            .multilineTextAlignment(.trailing)
-                            .onChange(of: editableFirstName) { _, _ in
-                                hasChanges = true
-                                let first = editableFirstName.trimmingCharacters(in: .whitespaces)
-                                let last = editableLastName.trimmingCharacters(in: .whitespaces)
-                                editableName = [first, last]
-                                    .filter { !$0.isEmpty }
-                                    .joined(separator: " ")
-                            }
-                    )
-                }
+                    text: $editableFirstName,
+                    contentType: .givenName
+                )
 
                 Divider()
                     .padding(.leading, 16)
 
-                // Last Name Field
-                settingsRow(
+                editableTextRow(
                     label: "Last name",
-                    value: editableLastName.isEmpty ? "Not set" : editableLastName,
-                    showDisclosure: false
-                ) {
-                    AnyView(
-                        TextField("Last name", text: $editableLastName)
-                            .multilineTextAlignment(.trailing)
-                            .onChange(of: editableLastName) { _, _ in
-                                hasChanges = true
-                                let first = editableFirstName.trimmingCharacters(in: .whitespaces)
-                                let last = editableLastName.trimmingCharacters(in: .whitespaces)
-                                editableName = [first, last]
-                                    .filter { !$0.isEmpty }
-                                    .joined(separator: " ")
-                            }
-                    )
-                }
+                    text: $editableLastName,
+                    contentType: .familyName
+                )
 
                 Divider()
                     .padding(.leading, 16)
@@ -149,40 +141,43 @@ struct ProfileSettingsViewV2: View {
                 Divider()
                     .padding(.leading, 16)
 
-                // Gender Selector with modern segmented control
                 genderSelector
             }
         }
     }
 
     private var genderSelector: some View {
-        HStack {
-            Text("Biological sex")
-                .foregroundColor(theme.colors.text)
-                .font(theme.typography.labelLarge)
-
-            Spacer()
-
-            Picker("Biological Sex", selection: $editableGender) {
-                ForEach(BiologicalSex.allCases, id: \.self) { gender in
-                    Text(gender.description)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.9)
-                        .tag(gender)
-                }
+        Picker(selection: $editableGender) {
+            ForEach(BiologicalSex.allCases, id: \.self) { gender in
+                Text(gender.description).tag(gender)
             }
-            .pickerStyle(SegmentedPickerStyle())
-            .frame(width: 160)
-            .scaleEffect(0.95) // Slightly smaller for better fit
-            .onChange(of: editableGender) { _, _ in
-                hasChanges = true
+        } label: {
+            HStack(spacing: theme.spacing.xs) {
+                Text("Biological sex")
+                    .foregroundColor(theme.colors.text)
+                    .font(theme.typography.labelLarge)
+
+                Spacer(minLength: theme.spacing.sm)
+
+                Text(editableGender.description)
+                    .font(theme.typography.labelMedium)
+                    .foregroundColor(theme.colors.textSecondary)
+                    .lineLimit(1)
+
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(theme.typography.captionMedium.weight(.semibold))
+                    .foregroundColor(theme.colors.textTertiary)
             }
         }
+        .pickerStyle(.menu)
+        .tint(theme.colors.text)
         .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
-        .accessibilityElement(children: .combine)
+        .frame(minHeight: JovieTokens.minimumHitTarget)
         .accessibilityLabel("Biological sex")
         .accessibilityValue(editableGender.description)
+        .onChange(of: editableGender) { _, _ in
+            hasChanges = true
+        }
     }
 
     private var physicalInformationCard: some View {
@@ -206,11 +201,11 @@ struct ProfileSettingsViewV2: View {
                                 .foregroundColor(theme.colors.textSecondary)
                         }
                         Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
+                            .font(theme.typography.captionMedium.weight(.semibold))
                             .foregroundColor(theme.colors.textTertiary)
                     }
                     .padding(.horizontal, theme.spacing.md)
-                    .padding(.vertical, theme.spacing.sm)
+                    .frame(minHeight: JovieTokens.minimumHitTarget)
                 }
                 .accessibilityLabel("Height")
                 .accessibilityValue(formattedHeight)
@@ -237,62 +232,15 @@ struct ProfileSettingsViewV2: View {
                                 .foregroundColor(theme.colors.textSecondary)
                         }
                         Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
+                            .font(theme.typography.captionMedium.weight(.semibold))
                             .foregroundColor(theme.colors.textTertiary)
                     }
                     .padding(.horizontal, theme.spacing.md)
-                    .padding(.vertical, theme.spacing.sm)
+                    .frame(minHeight: JovieTokens.minimumHitTarget)
                 }
                 .accessibilityLabel("Age")
                 .accessibilityValue(formattedAge)
                 .accessibilityHint("Double-tap to edit your date of birth.")
-            }
-        }
-    }
-
-    private var profileHeader: some View {
-        VStack(spacing: theme.spacing.md) {
-            ZStack {
-                if let avatarUrl = authManager.currentUser?.avatarUrl,
-                   !avatarUrl.isEmpty,
-                   let url = URL(string: avatarUrl) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 80, height: 80)
-                            .clipShape(Circle())
-                    } placeholder: {
-                        Circle()
-                            .fill(theme.colors.surfaceTertiary)
-                            .frame(width: 80, height: 80)
-                            .overlay(
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                            )
-                    }
-                } else {
-                    Circle()
-                        .fill(theme.colors.surfaceTertiary)
-                        .frame(width: 80, height: 80)
-                        .overlay(
-                            Text(profileInitials)
-                                .font(theme.typography.displaySmall)
-                                .foregroundColor(theme.colors.textSecondary)
-                        )
-                }
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Profile photo")
-
-            VStack(spacing: theme.spacing.xxs) {
-                Text(authManager.currentUser?.displayName ?? authManager.currentUser?.name ?? "User")
-                    .font(theme.typography.headlineSmall)
-                    .foregroundColor(theme.colors.text)
-
-                Text(authManager.currentUser?.email ?? "")
-                    .font(theme.typography.captionLarge)
-                    .foregroundColor(theme.colors.textSecondary)
             }
         }
     }
@@ -302,8 +250,7 @@ struct ProfileSettingsViewV2: View {
         label: String,
         value: String,
         showDisclosure: Bool = true,
-        isDisabled: Bool = false,
-        customContent: (() -> AnyView)? = nil
+        isDisabled: Bool = false
     ) -> some View {
         HStack {
             Text(label)
@@ -312,43 +259,60 @@ struct ProfileSettingsViewV2: View {
 
             Spacer()
 
-            if let customContent = customContent {
-                customContent()
-            } else {
-                Text(value)
-                    .font(theme.typography.labelMedium)
-                    .foregroundColor(isDisabled ? theme.colors.textTertiary : theme.colors.textSecondary)
-            }
+            Text(value)
+                .font(theme.typography.labelMedium)
+                .foregroundColor(isDisabled ? theme.colors.textTertiary : theme.colors.textSecondary)
 
             if showDisclosure && !isDisabled {
                 Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.semibold))
+                    .font(theme.typography.captionMedium.weight(.semibold))
                     .foregroundColor(theme.colors.textTertiary)
             }
         }
         .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
+        .frame(minHeight: JovieTokens.minimumHitTarget)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(label)
         .accessibilityValue(value)
     }
 
-    // MARK: - Computed Properties
+    private func editableTextRow(
+        label: String,
+        text: Binding<String>,
+        contentType: UITextContentType
+    ) -> some View {
+        HStack(spacing: theme.spacing.md) {
+            Text(label)
+                .font(theme.typography.labelLarge)
+                .foregroundColor(theme.colors.text)
+                .accessibilityHidden(true)
 
-    private var profileInitials: String {
-        let name: String
-        if !editableName.isEmpty {
-            name = editableName
-        } else {
-            name = authManager.currentUser?.name ?? authManager.currentUser?.email ?? ""
+            TextField(label, text: text)
+                .textContentType(contentType)
+                .textInputAutocapitalization(.words)
+                .submitLabel(.done)
+                .font(theme.typography.labelMedium)
+                .foregroundColor(theme.colors.text)
+                .multilineTextAlignment(.trailing)
+                .accessibilityLabel(label)
+                .onChange(of: text.wrappedValue) { _, _ in
+                    hasChanges = true
+                    updateEditableName()
+                }
         }
-        let components = name.components(separatedBy: " ")
-        if components.count >= 2 {
-            return String(components[0].prefix(1) + components[1].prefix(1)).uppercased()
-        } else {
-            return String(name.prefix(2)).uppercased()
-        }
+        .padding(.horizontal, theme.spacing.md)
+        .frame(minHeight: JovieTokens.minimumHitTarget)
     }
+
+    private func updateEditableName() {
+        let first = editableFirstName.trimmingCharacters(in: .whitespaces)
+        let last = editableLastName.trimmingCharacters(in: .whitespaces)
+        editableName = [first, last]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    // MARK: - Computed Properties
 
     private var formattedHeight: String {
         if useMetricHeight {
@@ -460,7 +424,7 @@ struct ProfileSettingsViewV2: View {
                 await MainActor.run {
                     isSaving = false
                     hasChanges = true
-                    // print("Failed to update profile: \(error)")
+                    saveErrorMessage = "Your changes are still here. Check your connection and try again."
                 }
 
                 let elapsed = Date().timeIntervalSince(start)
@@ -487,6 +451,8 @@ struct ProfileHeightPickerSheet: View {
                 heightDisplay
                 heightPicker
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .settingsBackground()
             .navigationTitle("Set Height")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -494,6 +460,7 @@ struct ProfileHeightPickerSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .jovieTouchTarget()
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -501,6 +468,7 @@ struct ProfileHeightPickerSheet: View {
                         dismiss()
                     }
                     .fontWeight(.medium)
+                    .jovieTouchTarget()
                 }
             }
         }
@@ -511,8 +479,11 @@ struct ProfileHeightPickerSheet: View {
             Text("Imperial (ft/in)").tag(false)
             Text("Metric (cm)").tag(true)
         }
-        .pickerStyle(SegmentedPickerStyle())
-        .padding()
+        .pickerStyle(.menu)
+        .tint(theme.colors.text)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, theme.spacing.md)
+        .frame(minHeight: JovieTokens.minimumHitTarget)
     }
 
     private var heightDisplay: some View {
@@ -572,7 +543,7 @@ struct ProfileHeightPickerSheet: View {
                 }
             }
             .pickerStyle(WheelPickerStyle())
-            .frame(width: 100)
+            .frame(maxWidth: .infinity)
 
             Picker("Inches", selection: inchesBinding) {
                 ForEach(0...11, id: \.self) { inches in
@@ -580,7 +551,7 @@ struct ProfileHeightPickerSheet: View {
                 }
             }
             .pickerStyle(WheelPickerStyle())
-            .frame(width: 100)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -614,12 +585,15 @@ struct DatePickerSheet: View {
     @Binding var hasChanges: Bool
     @Environment(\.dismiss)
     var dismiss
+    @Environment(\.theme)
+    private var theme
     var body: some View {
         NavigationStack {
-            VStack {
+            VStack(spacing: theme.spacing.md) {
                 DatePicker(
                     "",
                     selection: $date,
+                    in: ...Date(),
                     displayedComponents: .date
                 )
                 .datePickerStyle(WheelDatePickerStyle())
@@ -627,6 +601,8 @@ struct DatePickerSheet: View {
 
                 Spacer()
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .settingsBackground()
             .navigationTitle("Date of Birth")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -634,6 +610,7 @@ struct DatePickerSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .jovieTouchTarget()
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -641,6 +618,7 @@ struct DatePickerSheet: View {
                         dismiss()
                     }
                     .fontWeight(.medium)
+                    .jovieTouchTarget()
                 }
             }
         }

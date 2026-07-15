@@ -7,6 +7,7 @@ import SwiftUI
 // MARK: - VerificationForm Organism
 
 struct VerificationForm: View {
+    @Environment(\.theme) private var theme
     @Binding var verificationCode: String
     @Binding var isLoading: Bool
 
@@ -23,13 +24,13 @@ struct VerificationForm: View {
         VStack(spacing: 32) {
             // Instructions
             VStack(spacing: 8) {
-                Text("We've sent a verification code to")
-                    .font(.system(size: 16))
-                    .foregroundColor(.appTextSecondary)
+                Text("We sent a 6-digit code to")
+                    .font(theme.typography.bodySmall)
+                    .foregroundColor(theme.colors.textSecondary)
 
                 Text(email)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.appText)
+                    .font(theme.typography.labelLarge)
+                    .foregroundColor(theme.colors.text)
                     .accessibilityIdentifier("email_verification_pending_email")
             }
             .multilineTextAlignment(.center)
@@ -63,14 +64,14 @@ struct VerificationForm: View {
             VStack(spacing: 4) {
                 if timerActive && timeRemaining > 0 {
                     Text("Resend code in \(timeRemaining)s")
-                        .font(.system(size: 14))
-                        .foregroundColor(.appTextSecondary)
+                        .font(theme.typography.bodySmall)
+                        .foregroundColor(theme.colors.textSecondary)
                         .accessibilityIdentifier("email_verification_resend_timer")
                 } else {
                     HStack(spacing: 4) {
                         Text("Didn't receive code?")
-                            .font(.system(size: 14))
-                            .foregroundColor(.appTextSecondary)
+                            .font(theme.typography.bodySmall)
+                            .foregroundColor(theme.colors.textSecondary)
 
                         DSAuthLink(title: "Resend") {
                             onResend()

@@ -1,8 +1,15 @@
 import SwiftUI
 
 struct BodyScoreEmailCaptureView: View {
+    @Environment(\.theme)
+    private var theme
+
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var emailFieldFocused: Bool
+    @AccessibilityFocusState private var emailErrorFocused: Bool
     @State private var emailError: String?
     @State private var showWhyEmail = false
 
@@ -32,27 +39,28 @@ struct BodyScoreEmailCaptureView: View {
                         if let error = emailError {
                             Text(error)
                                 .font(OnboardingTypography.caption)
-                                .foregroundStyle(Color.appError)
+                                .foregroundStyle(theme.colors.error)
+                                .accessibilityFocused($emailErrorFocused)
                         } else {
                             Button {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    showWhyEmail.toggle()
-                                }
+                                toggleWhyEmail()
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "info.circle")
-                                        .font(.system(size: 13, weight: .semibold))
+                                        .font(.system(.footnote, design: .default).weight(.semibold))
                                     Text("No spam. Only to save your progress.")
                                         .font(OnboardingTypography.caption)
                                 }
-                                .foregroundStyle(Color.appTextSecondary)
+                                .foregroundStyle(theme.colors.textSecondary)
                             }
                             .buttonStyle(.plain)
+                            .jovieTouchTarget()
+                            .accessibilityValue(showWhyEmail ? "Expanded" : "Collapsed")
 
                             if showWhyEmail {
                                 Text("We'll only use this email to save your Body Score and keep progress in sync.")
                                     .font(OnboardingTypography.body)
-                                    .foregroundStyle(Color.appTextSecondary)
+                                    .foregroundStyle(theme.colors.textSecondary)
                                     .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
@@ -65,11 +73,9 @@ struct BodyScoreEmailCaptureView: View {
                     viewModel.goToNextStep()
                 } label: {
                     Text("Continue")
-                        .font(.system(size: 18, weight: .semibold))
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueEmailCapture)
-                .opacity(continueButtonOpacity)
             }
         )
         .onAppear {
@@ -88,14 +94,13 @@ struct BodyScoreEmailCaptureView: View {
                 }
             }
         }
+        .onChange(of: emailError) { _, error in
+            emailErrorFocused = error != nil
+        }
     }
 }
 
 private extension BodyScoreEmailCaptureView {
-    var continueButtonOpacity: Double {
-        viewModel.canContinueEmailCapture ? 1 : 0.4
-    }
-
     private func updateEmailError() {
         let trimmed = viewModel.emailAddress.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -107,6 +112,16 @@ private extension BodyScoreEmailCaptureView {
             emailError = nil
         } else {
             emailError = "Enter a valid email address."
+        }
+    }
+
+    private func toggleWhyEmail() {
+        if reduceMotion {
+            showWhyEmail.toggle()
+        } else {
+            withAnimation(theme.animation.fast) {
+                showWhyEmail.toggle()
+            }
         }
     }
 }

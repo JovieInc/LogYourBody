@@ -7,11 +7,39 @@ import SwiftUI
 struct PreferenceMeasurementSystemRow: View {
     @Environment(\.theme)
     private var theme
+    @Environment(\.dynamicTypeSize)
+    private var dynamicTypeSize
 
     @Binding var measurementSystem: String
     let currentSystem: MeasurementSystem
 
     var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: theme.spacing.sm) {
+                    measurementLabel
+                    measurementPicker
+                        .frame(maxWidth: .infinity)
+                }
+            } else {
+                HStack(spacing: theme.spacing.sm) {
+                    measurementLabel
+
+                    Spacer(minLength: theme.spacing.sm)
+
+                    measurementPicker
+                        .frame(maxWidth: 210)
+                }
+            }
+        }
+        .padding(.horizontal, theme.spacing.md)
+        .padding(.vertical, theme.spacing.sm)
+        .frame(minHeight: JovieTokens.minimumHitTarget)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("settings_units_row")
+    }
+
+    private var measurementLabel: some View {
         HStack(spacing: theme.spacing.sm) {
             Image(systemName: "globe")
                 .font(theme.typography.headlineSmall)
@@ -27,20 +55,17 @@ struct PreferenceMeasurementSystemRow: View {
                     .font(theme.typography.captionLarge)
                     .foregroundColor(theme.colors.textSecondary)
             }
-
-            Spacer(minLength: theme.spacing.sm)
-
-            Picker("Units", selection: $measurementSystem) {
-                Text("Metric").tag(MeasurementSystem.metric.rawValue)
-                Text("Imperial").tag(MeasurementSystem.imperial.rawValue)
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 210)
         }
-        .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("settings_units_row")
+        .layoutPriority(1)
+    }
+
+    private var measurementPicker: some View {
+        Picker("Units", selection: $measurementSystem) {
+            Text("Metric").tag(MeasurementSystem.metric.rawValue)
+            Text("Imperial").tag(MeasurementSystem.imperial.rawValue)
+        }
+        .pickerStyle(.segmented)
+        .frame(minHeight: JovieTokens.minimumHitTarget)
     }
 }
 
@@ -72,6 +97,7 @@ struct PreferenceStepGoalRow: View {
         }
         .padding(.horizontal, theme.spacing.md)
         .padding(.vertical, theme.spacing.sm)
+        .frame(minHeight: JovieTokens.minimumHitTarget)
         .accessibilityIdentifier("settings_step_goal_row")
     }
 }
@@ -122,7 +148,10 @@ struct PreferenceGoalRow: View {
                     Image(systemName: "arrow.counterclockwise.circle.fill")
                         .font(theme.typography.headlineSmall)
                         .foregroundColor(theme.colors.textSecondary)
-                        .frame(width: 36, height: 36)
+                        .frame(
+                            width: JovieTokens.minimumHitTarget,
+                            height: JovieTokens.minimumHitTarget
+                        )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Reset \(goal.title)")
@@ -131,5 +160,6 @@ struct PreferenceGoalRow: View {
         }
         .padding(.horizontal, theme.spacing.md)
         .padding(.vertical, theme.spacing.sm)
+        .frame(minHeight: JovieTokens.minimumHitTarget)
     }
 }

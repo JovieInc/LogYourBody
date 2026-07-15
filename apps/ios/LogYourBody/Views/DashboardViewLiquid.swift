@@ -22,6 +22,7 @@ struct DashboardViewLiquid: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     @Environment(\.theme) var theme
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @StateObject var viewModel = DashboardViewModel()
     @StateObject var globalTimelineStore = GlobalTimelineStore()
 
@@ -65,7 +66,8 @@ struct DashboardViewLiquid: View {
     @AppStorage("stepGoal") var stepGoal: Int = 10_000
     @AppStorage(Constants.goalFFMIKey) var customFFMIGoal: Double?
     @AppStorage(Constants.goalBodyFatPercentageKey) var customBodyFatGoal: Double?
-    @AppStorage(Constants.goalWeightKey) var customWeightGoal: Double?
+    @AppStorage(Constants.goalWeightKilogramsKey) var customWeightGoalKilograms: Double?
+    @AppStorage(Constants.goalWeightKey) var legacyCustomWeightGoal: Double?
 
     // Preferences
     @AppStorage(Constants.preferredMeasurementSystemKey)
@@ -92,12 +94,13 @@ struct DashboardViewLiquid: View {
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
     @State var bodyScoreSharePayload: BodyScoreSharePayload?
+    @State var bodyScoreSharePresentationID: UUID?
     @State private var hasPerformedInitialRefresh = false
     @State var featureGateRefreshToken = UUID()
     @State var addEntryInitialTab = 0
     @State var addEntryIncludesGlp1Entry = false
 
-    init(layoutMode: LayoutMode = .legacyTabbed) {
+    init(layoutMode: LayoutMode = .photoTimelineHUD) {
         self.layoutMode = layoutMode
 
         #if DEBUG
@@ -256,7 +259,9 @@ struct DashboardViewLiquid: View {
                 guard selectedTab == .home else { return }
                 guard !isMetricDetailActive else { return }
                 guard let payload = makeBodyScoreSharePayload() else { return }
+                let presentationID = UUID()
                 DispatchQueue.main.async {
+                    bodyScoreSharePresentationID = presentationID
                     bodyScoreSharePayload = payload
                 }
             }
@@ -274,6 +279,7 @@ struct DashboardViewLiquid: View {
         if let payload = bodyScoreSharePayload {
             BodyScoreShareSheet(payload: payload) {
                 bodyScoreSharePayload = nil
+                bodyScoreSharePresentationID = nil
             }
             .ignoresSafeArea()
             .zIndex(20)
@@ -312,6 +318,7 @@ struct DashboardViewLiquid: View {
     }
 
     private func handleOnAppear() {
+        migrateLegacyWeightGoalIfNeeded()
         loadMetricsOrder()
 
         selectedRange = TimeRange(rawValue: storedTimeRangeRawValue) ?? .month1
@@ -344,6 +351,19 @@ struct DashboardViewLiquid: View {
         isPhotosTabEnabled = true
 
         loadGlp1WeeklyCheckInDataIfNeeded()
+    }
+
+    private func migrateLegacyWeightGoalIfNeeded() {
+        guard customWeightGoalKilograms == nil,
+              let migrated = WeightGoal.migrateLegacy(
+                legacyCustomWeightGoal,
+                measurementSystem: currentMeasurementSystem
+              ) else {
+            return
+        }
+
+        customWeightGoalKilograms = migrated.kilograms
+        legacyCustomWeightGoal = nil
     }
 
     private func handleCoreDataContextChange(_ notification: Notification) {

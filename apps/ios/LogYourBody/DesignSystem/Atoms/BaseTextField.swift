@@ -15,8 +15,11 @@ struct TextFieldConfiguration {
     var errorMessage: String?
     var helperText: String?
     var characterLimit: Int?
-    var cornerRadius: CGFloat = 10
-    var padding = EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
+    var cornerRadius: CGFloat = JovieTokens.controlRadius
+    var padding = EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+    var accessibilityLabel: String?
+    var accessibilityIdentifier: String?
+    var messageAccessibilityIdentifier: String?
 
     enum TextFieldStyle {
         case `default`
@@ -26,7 +29,7 @@ struct TextFieldConfiguration {
 
         var backgroundColor: Color {
             switch self {
-            case .default: return Color(.systemGray6)
+            case .default: return .jovieSurfaceElevated
             case .outlined, .underlined: return .clear
             case .custom(let bg, _): return bg
             }
@@ -61,6 +64,7 @@ struct BaseTextField: View {
     @State private var isSecureTextVisible = false
     @FocusState private var isFocused: Bool
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var hasError: Bool {
         configuration.errorMessage != nil
@@ -70,7 +74,7 @@ struct BaseTextField: View {
         if hasError {
             return .appError
         } else if isFocused {
-            return .appPrimary
+            return .jovieAction
         } else {
             return configuration.style.borderColor ?? .clear
         }
@@ -95,7 +99,7 @@ struct BaseTextField: View {
                         TextField(placeholder, text: $text)
                     }
                 }
-                .font(.system(size: 16))
+                .font(.body)
                 .foregroundColor(.appText)
                 .keyboardType(keyboardType)
                 .textContentType(textContentType)
@@ -105,16 +109,19 @@ struct BaseTextField: View {
                 .onSubmit {
                     onSubmit?()
                 }
-                .onChange(of: text) { newValue in
+                .onChange(of: text) { _, newValue in
                     if let limit = configuration.characterLimit, newValue.count > limit {
                         text = String(newValue.prefix(limit))
                     }
                     onChange?(newValue)
                 }
                 .focused($isFocused)
-                .onChange(of: isFocused) { isFocused in
+                .onChange(of: isFocused) { _, isFocused in
                     onEditingChanged?(isFocused)
                 }
+                .accessibilityLabel(configuration.accessibilityLabel ?? placeholder)
+                .accessibilityHint(configuration.helperText ?? "")
+                .accessibilityIdentifier(configuration.accessibilityIdentifier ?? "")
 
                 // Trailing elements
                 HStack(spacing: 8) {
@@ -135,6 +142,8 @@ struct BaseTextField: View {
                                 .foregroundColor(.appTextSecondary)
                         })
                         .buttonStyle(PlainButtonStyle())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .accessibilityLabel(isSecureTextVisible ? "Hide password" : "Show password")
                     }
 
                     // Error icon
@@ -146,11 +155,12 @@ struct BaseTextField: View {
                 }
             }
             .padding(configuration.padding)
+            .frame(minHeight: JovieTokens.controlHeight)
             .background(fieldBackground)
             .overlay(fieldOverlay)
             .opacity(isEnabled ? 1.0 : 0.6)
-            .animation(.easeInOut(duration: 0.2), value: isFocused)
-            .animation(.easeInOut(duration: 0.2), value: hasError)
+            .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: isFocused)
+            .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: hasError)
 
             // Helper/Error text
             if let errorMessage = configuration.errorMessage {
@@ -158,6 +168,8 @@ struct BaseTextField: View {
                     .font(.caption)
                     .foregroundColor(.appError)
                     .padding(.horizontal, 4)
+                    .accessibilityAddTraits(.isStaticText)
+                    .accessibilityIdentifier(configuration.messageAccessibilityIdentifier ?? "")
             } else if let helperText = configuration.helperText {
                 Text(helperText)
                     .font(.caption)

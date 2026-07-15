@@ -3,38 +3,20 @@
 // LogYourBody
 //
 import SwiftUI
+
 struct HealthDisclaimerView: View {
-    @Environment(\.dismiss)
-    private var dismiss
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.jovieCanvas
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Header Section
-                    VStack(alignment: .center, spacing: 16) {
-                        Image(systemName: "heart.text.square.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.red)
-                            .padding(.top, 20)
+                VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
+                    header
 
-                        Text("Health & Medical Disclaimer")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.primary)
-                            .multilineTextAlignment(.center)
-
-                        Text("Please read this important information")
-                            .font(.system(size: 16))
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal)
-
-                    // Disclaimer Content
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 24) {
                         DisclaimerSection(
                             title: "General Information",
                             content: """
@@ -80,7 +62,8 @@ struct HealthDisclaimerView: View {
                             content: """
                             In case of a medical emergency, call your local emergency services immediately.
                             Do not rely on this app for emergency medical situations.
-                            """
+                            """,
+                            emphasis: .emergency
                         )
 
                         DisclaimerSection(
@@ -109,30 +92,24 @@ struct HealthDisclaimerView: View {
                             """
                         )
 
-                        // Acknowledgment
-                        VStack(spacing: 16) {
-                            Text(
-                                """
-                                By using LogYourBody, you acknowledge that you have read and understood this disclaimer
-                                and agree to use the app at your own risk.
-                                """
-                            )
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.primary)
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
-
-                            Text("Last updated: \(Date(), style: .date)")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.top, 20)
+                        acknowledgment
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
+                    .padding(JovieTokens.screenInset)
+                    .systemBGlassSurface(
+                        cornerRadius: JovieTokens.cardRadius,
+                        tint: .jovieText,
+                        tintOpacity: 0.045,
+                        borderColor: .jovieHairline,
+                        borderOpacity: 0.9
+                    )
                 }
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.top, JovieTokens.sectionGap)
+                .padding(.bottom, 32)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
         }
         .navigationTitle("Health Disclaimer")
         .navigationBarTitleDisplayMode(.inline)
@@ -141,35 +118,83 @@ struct HealthDisclaimerView: View {
                 Button("Done") {
                     dismiss()
                 }
-                .fontWeight(.medium)
+                .accessibilityLabel("Done")
             }
         }
     }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Important health information", systemImage: "cross.case.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.warning)
+
+            Text("Health & Medical Disclaimer")
+                .font(.title2.weight(.bold))
+                .foregroundColor(.jovieText)
+
+            Text("Please read this information before relying on LogYourBody data.")
+                .font(.body)
+                .foregroundColor(.jovieTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var acknowledgment: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(
+                """
+                By using LogYourBody, you acknowledge that you have read and understood this disclaimer
+                and agree to use the app at your own risk.
+                """
+            )
+            .font(.subheadline.weight(.medium))
+            .foregroundColor(.jovieText)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Text("Last updated: \(Date(), style: .date)")
+                .font(.footnote)
+                .foregroundColor(.jovieTextSecondary)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                .fill(Color.jovieSurfaceElevated)
+        )
+        .accessibilityElement(children: .combine)
+    }
 }
 
-struct DisclaimerSection: View {
+private struct DisclaimerSection: View {
+    enum Emphasis: Equatable {
+        case standard
+        case emergency
+    }
+
     let title: String
     let content: String
+    var emphasis: Emphasis = .standard
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(.orange)
-
+            if emphasis == .emergency {
+                Label(title, systemImage: "exclamationmark.triangle.fill")
+                    .font(.headline)
+                    .foregroundColor(.jovieText)
+            } else {
                 Text(title)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .font(.headline)
+                    .foregroundColor(.jovieText)
             }
 
             Text(content)
-                .font(.system(size: 15))
-                .foregroundColor(.secondary)
-                .lineSpacing(4)
+                .font(.body)
+                .foregroundColor(.jovieTextSecondary)
+                .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
     }
 }
 

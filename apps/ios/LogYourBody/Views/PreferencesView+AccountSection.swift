@@ -99,33 +99,12 @@ extension PreferencesView {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: theme.spacing.sm) {
-                Image(systemName: icon)
-                    .font(theme.typography.headlineSmall)
-                    .foregroundColor(theme.colors.textSecondary)
-                    .frame(width: 30)
-
-                VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                    Text(title)
-                        .font(theme.typography.labelLarge)
-                        .foregroundColor(theme.colors.text)
-
-                    Text(value)
-                        .font(theme.typography.captionLarge)
-                        .foregroundColor(theme.colors.textSecondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(theme.colors.textTertiary)
-            }
-            .padding(.horizontal, theme.spacing.md)
-            .padding(.vertical, theme.spacing.sm)
-            .background(Color.clear)
+            SettingsRow(
+                icon: icon,
+                title: title,
+                value: value,
+                showChevron: true
+            )
         }
         .buttonStyle(.plain)
     }

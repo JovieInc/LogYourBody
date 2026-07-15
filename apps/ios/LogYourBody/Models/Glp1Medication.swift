@@ -371,3 +371,119 @@ enum Glp1MedicationCatalog {
         )
     }
 }
+
+enum Glp1DoseDraftSource: Equatable {
+    case latestLog
+    case catalogDefault
+}
+
+struct Glp1DoseDraft: Equatable {
+    let doseText: String
+    let doseUnit: String
+    let selectedDoseIndex: Int?
+    let usesCustomDose: Bool
+    let source: Glp1DoseDraftSource
+    let lastLoggedDoseText: String?
+}
+
+/// Resolves the initial dose shown when someone starts a new GLP-1 log.
+///
+/// A matching medication ID is authoritative. Brand matching is a fallback for
+/// legacy or re-created medication records.
+enum Glp1DoseDraftResolver {
+    static func resolve(
+        for medication: Glp1Medication,
+        doseLogs: [Glp1DoseLog]
+    ) -> Glp1DoseDraft {
+        let config = Glp1MedicationCatalog.doseConfig(for: medication)
+
+        guard let latestLog = latestCompatibleLog(for: medication, in: doseLogs),
+              let amount = latestLog.doseAmount else {
+            return catalogDefault(using: config)
+        }
+
+        let unit = nonEmptyString(latestLog.doseUnit) ?? config.unit
+        let matchesCatalogUnit = normalized(unit) == normalized(config.unit)
+        let selectedDoseIndex = matchesCatalogUnit
+            ? config.doses.firstIndex(where: { abs($0 - amount) < 0.0001 })
+            : nil
+
+        return Glp1DoseDraft(
+            doseText: Glp1DoseHistoryFormatter.numberText(amount),
+            doseUnit: unit,
+            selectedDoseIndex: selectedDoseIndex,
+            usesCustomDose: selectedDoseIndex == nil,
+            source: .latestLog,
+            lastLoggedDoseText: "\(Glp1DoseHistoryFormatter.numberText(amount)) \(unit)"
+        )
+    }
+
+    private static func catalogDefault(using config: Glp1MedicationDoseConfig) -> Glp1DoseDraft {
+        guard let firstDose = config.doses.first else {
+            return Glp1DoseDraft(
+                doseText: "",
+                doseUnit: config.unit,
+                selectedDoseIndex: nil,
+                usesCustomDose: true,
+                source: .catalogDefault,
+                lastLoggedDoseText: nil
+            )
+        }
+
+        return Glp1DoseDraft(
+            doseText: Glp1DoseHistoryFormatter.numberText(firstDose),
+            doseUnit: config.unit,
+            selectedDoseIndex: 0,
+            usesCustomDose: false,
+            source: .catalogDefault,
+            lastLoggedDoseText: nil
+        )
+    }
+
+    private static func latestCompatibleLog(
+        for medication: Glp1Medication,
+        in doseLogs: [Glp1DoseLog]
+    ) -> Glp1DoseLog? {
+        let doseLogsWithAmounts = doseLogs.filter { ($0.doseAmount ?? 0) > 0 }
+        let matchingIDs = doseLogsWithAmounts.filter { $0.medicationId == medication.id }
+
+        if let latestIDMatch = latestLog(in: matchingIDs) {
+            return latestIDMatch
+        }
+
+        let medicationNames = Set(
+            [medication.brand, medication.displayName]
+                .compactMap(normalized)
+        )
+        let matchingBrands = doseLogsWithAmounts.filter { log in
+            guard let brand = normalized(log.brand) else { return false }
+            return medicationNames.contains(brand)
+        }
+
+        return latestLog(in: matchingBrands)
+    }
+
+    private static func latestLog(in logs: [Glp1DoseLog]) -> Glp1DoseLog? {
+        logs.max { lhs, rhs in
+            if lhs.takenAt != rhs.takenAt {
+                return lhs.takenAt < rhs.takenAt
+            }
+
+            if lhs.updatedAt != rhs.updatedAt {
+                return lhs.updatedAt < rhs.updatedAt
+            }
+
+            return lhs.createdAt < rhs.createdAt
+        }
+    }
+
+    private static func nonEmptyString(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func normalized(_ value: String?) -> String? {
+        nonEmptyString(value)?.lowercased()
+    }
+}

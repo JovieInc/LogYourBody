@@ -11,6 +11,8 @@ import SwiftUI
 struct ProgressTimelineView: View {
     // MARK: - Properties
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let bodyMetrics: [BodyMetrics]
     @Binding var selectedIndex: Int
     @Binding var mode: TimelineMode
@@ -66,6 +68,7 @@ struct ProgressTimelineView: View {
                         anchors: renderData.anchors,
                         zoomLevel: renderData.zoomLevel
                     )
+                    .accessibilityHidden(true)
 
                     // Scrubber handle
                     scrubberHandle
@@ -95,7 +98,7 @@ struct ProgressTimelineView: View {
 
     private var dateLabel: some View {
         Text(currentDateLabel)
-            .font(.system(size: 13, weight: .medium))
+            .font(.footnote.weight(.medium))
             .foregroundColor(Color.liquidTextPrimary)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -108,6 +111,7 @@ struct ProgressTimelineView: View {
                     )
             )
             .padding(.bottom, 4)
+            .accessibilityHidden(true)
     }
 
     private var timelineTrack: some View {
@@ -119,6 +123,7 @@ struct ProgressTimelineView: View {
             )
             .frame(height: 6)
             .padding(.vertical, (timelineHeight - 6) / 2)
+            .accessibilityHidden(true)
     }
 
     private func anchorsView(
@@ -199,18 +204,23 @@ struct ProgressTimelineView: View {
     }
 
     private var scrubberHandle: some View {
-        VStack(spacing: 2) {
-            // Pill handle
+        ZStack {
             Capsule()
                 .fill(Color.liquidAccent)
                 .frame(width: 4, height: 24)
                 .shadow(color: Color.liquidAccent.opacity(0.5), radius: 4, x: 0, y: 2)
 
-            // Touch target (invisible but tappable)
             Color.clear
-                .frame(width: scrubberHandleSize, height: scrubberHandleSize)
         }
         .frame(width: scrubberHandleSize, height: scrubberHandleSize)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Timeline scrubber")
+        .accessibilityValue(accessibilityTimelineValue)
+        .accessibilityHint("Swipe up or down to move between logged dates")
+        .accessibilityAdjustableAction { direction in
+            adjustSelection(for: direction)
+        }
         .accessibilityIdentifier("dashboard_timeline_scrubber_handle")
     }
 
@@ -258,11 +268,11 @@ struct ProgressTimelineView: View {
         // Update selected index to nearest entry
         if let photo = result.photo {
             if let index = bodyMetrics.firstIndex(where: { $0.id == photo.bodyMetrics.id }) {
-                selectedIndex = index
+                updateSelectedIndex(index)
             }
         } else if let metrics = result.metrics {
             if let index = bodyMetrics.firstIndex(where: { $0.id == metrics.bodyMetrics.id }) {
-                selectedIndex = index
+                updateSelectedIndex(index)
             }
         }
     }
@@ -278,18 +288,62 @@ struct ProgressTimelineView: View {
         // Update selected index
         if let metric = provider.getMetric(for: nearestDate),
            let index = bodyMetrics.firstIndex(where: { $0.id == metric.id }) {
-            selectedIndex = index
+            updateSelectedIndex(index)
         }
     }
 
     private func handleDragEnd() {
-        withAnimation(.easeOut(duration: 0.2)) {
+        if reduceMotion {
             isDragging = false
+        } else {
+            withAnimation(.easeOut(duration: 0.2)) {
+                isDragging = false
+            }
         }
 
         // Haptic feedback
         let impact = UIImpactFeedbackGenerator(style: .light)
         impact.impactOccurred()
+    }
+
+    private var accessibilityTimelineValue: String {
+        guard !bodyMetrics.isEmpty else {
+            return "No logged dates"
+        }
+
+        let clampedIndex = min(max(selectedIndex, 0), bodyMetrics.count - 1)
+        let date = bodyMetrics[clampedIndex].date
+        let formattedDate = TimelineDateFormatterCache.string(from: date, style: .mediumDate)
+        return "\(formattedDate), \(clampedIndex + 1) of \(bodyMetrics.count)"
+    }
+
+    private func adjustSelection(for direction: AccessibilityAdjustmentDirection) {
+        guard !bodyMetrics.isEmpty else { return }
+
+        let current = min(max(selectedIndex, 0), bodyMetrics.count - 1)
+        let nextIndex: Int
+
+        switch direction {
+        case .increment:
+            nextIndex = min(current + 1, bodyMetrics.count - 1)
+        case .decrement:
+            nextIndex = max(current - 1, 0)
+        @unknown default:
+            return
+        }
+
+        guard nextIndex != current else { return }
+        updateSelectedIndex(nextIndex)
+        currentDateLabel = TimelineDateFormatterCache.string(
+            from: bodyMetrics[nextIndex].date,
+            style: .mediumDate
+        )
+        HapticManager.shared.selection()
+    }
+
+    private func updateSelectedIndex(_ index: Int) {
+        guard bodyMetrics.indices.contains(index), selectedIndex != index else { return }
+        selectedIndex = index
     }
 
     private func refreshRenderDataIfNeeded(for signature: TimelineRenderSignature) {

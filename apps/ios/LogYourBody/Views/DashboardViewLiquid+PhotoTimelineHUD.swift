@@ -98,10 +98,10 @@ extension DashboardViewLiquid {
     }
 
     private func photoTimelineRootNavigationButton(page: PhotoTimelineRootPage) -> some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.2)) {
-                selectedPhotoTimelineRootPage = page
-            }
+        let isSelected = selectedPhotoTimelineRootPage == page
+
+        return Button {
+            selectedPhotoTimelineRootPage = page
         } label: {
             VStack(spacing: 6) {
                 Text(page.navigationTitle)
@@ -114,19 +114,21 @@ extension DashboardViewLiquid {
 
                 Capsule()
                     .fill(
-                        selectedPhotoTimelineRootPage == page
+                        isSelected
                             ? theme.colors.text
                             : Color.clear
                     )
                     .frame(width: 24, height: 2)
             }
-            .frame(minHeight: 32, alignment: .bottom)
+            .frame(minHeight: 44, alignment: .bottom)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(page.navigationTitle)
-        .accessibilityAddTraits(selectedPhotoTimelineRootPage == page ? [.isSelected] : [])
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityHint("Shows the \(page.navigationTitle.lowercased()) page")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .accessibilityIdentifier(page.accessibilityIdentifier)
     }
 
@@ -279,18 +281,7 @@ extension DashboardViewLiquid {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Button {
-                    presentProgressPhotoAttach(for: nil)
-                } label: {
-                    Label("Add photo", systemImage: "camera.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Capsule().fill(theme.colors.text))
-                        .foregroundColor(theme.colors.background)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("photo_timeline_hud_empty_add_photo_button")
+                photoTimelineHUDEmptyActions
             }
             .padding(24)
             .frame(maxWidth: .infinity, minHeight: 420, alignment: .bottomLeading)
@@ -306,6 +297,55 @@ extension DashboardViewLiquid {
             Spacer(minLength: 80)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    @ViewBuilder
+    private var photoTimelineHUDEmptyActions: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: 12) {
+                photoTimelineHUDEmptyAddWeightButton
+                photoTimelineHUDEmptyAddPhotoButton
+            }
+        } else {
+            HStack(spacing: 12) {
+                photoTimelineHUDEmptyAddWeightButton
+                photoTimelineHUDEmptyAddPhotoButton
+            }
+        }
+    }
+
+    private var photoTimelineHUDEmptyAddWeightButton: some View {
+        Button {
+            presentAddEntrySheet(initialTab: 0)
+        } label: {
+            Label("Add weight", systemImage: "scalemass.fill")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(theme.colors.background)
+        .background(Capsule().fill(theme.colors.text))
+        .contentShape(Capsule())
+        .accessibilityLabel("Add weight")
+        .accessibilityHint("Opens the weight entry form")
+        .accessibilityIdentifier("photo_timeline_hud_empty_add_weight_button")
+    }
+
+    private var photoTimelineHUDEmptyAddPhotoButton: some View {
+        Button {
+            presentProgressPhotoAttach(for: nil)
+        } label: {
+            Label("Add photo", systemImage: "camera.fill")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(theme.colors.background)
+        .background(Capsule().fill(theme.colors.text))
+        .contentShape(Capsule())
+        .accessibilityLabel("Add photo")
+        .accessibilityHint("Opens progress photo options")
+        .accessibilityIdentifier("photo_timeline_hud_empty_add_photo_button")
     }
 }
 

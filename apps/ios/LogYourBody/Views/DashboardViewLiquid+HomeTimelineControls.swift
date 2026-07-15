@@ -50,11 +50,10 @@ extension DashboardViewLiquid {
             HapticManager.shared.selection()
         } label: {
             Label(mode.title, systemImage: mode.iconName)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity)
-                .frame(height: 34)
+                .frame(minHeight: 44)
                 .foregroundColor(isSelected ? theme.colors.background : theme.colors.textSecondary)
                 .background(
                     Capsule(style: .continuous)
@@ -62,6 +61,10 @@ extension DashboardViewLiquid {
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(mode.title)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityHint("Shows the \(mode.title.lowercased()) home timeline")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .accessibilityIdentifier("home_mode_\(mode.rawValue)_button")
     }
 
@@ -107,12 +110,21 @@ extension DashboardViewLiquid {
 
     func makeBodyScoreShareAction(metric: BodyMetrics? = nil, score: Int? = nil) -> (() -> Void)? {
         if let score, score <= 0 { return nil }
+        guard let initialPayload = makeBodyScoreSharePayload(metric: metric) else { return nil }
 
         return {
+            let presentationID = UUID()
+            bodyScoreSharePresentationID = presentationID
+            bodyScoreSharePayload = initialPayload
+
             Task { @MainActor in
-                if let payload = await makeBodyScoreSharePayloadResolvingPhoto(metric: metric) {
-                    bodyScoreSharePayload = payload
+                guard let resolvedPayload = await makeBodyScoreSharePayloadResolvingPhoto(metric: metric),
+                      resolvedPayload.photoImage != nil,
+                      bodyScoreSharePresentationID == presentationID else {
+                    return
                 }
+
+                bodyScoreSharePayload = resolvedPayload
             }
         }
     }

@@ -4,12 +4,17 @@ struct BodyScoreProfileDetailsView: View {
     @Environment(\.theme)
     private var theme
 
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
     @EnvironmentObject var authManager: AuthManager
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
     @State private var isSaving: Bool = false
     @State private var errorMessage: String?
     @FocusState private var focusedNameField: NameField?
+    @FocusState private var heightFieldFocused: Bool
+    @AccessibilityFocusState private var saveErrorFocused: Bool
 
     private var trimmedFirstName: String {
         viewModel.profileFirstName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -127,26 +132,18 @@ struct BodyScoreProfileDetailsView: View {
                 case .firstName:
                     viewModel.goBack()
                 case .lastName:
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        viewModel.profileDetailsActiveSubstep = .firstName
-                    }
+                    transition(to: .firstName)
                 case .dateOfBirth:
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        viewModel.profileDetailsActiveSubstep = .lastName
-                    }
+                    transition(to: .lastName)
                 case .sex:
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        viewModel.profileDetailsActiveSubstep = .dateOfBirth
-                    }
+                    transition(to: .dateOfBirth)
                 case .height:
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        viewModel.profileDetailsActiveSubstep = viewModel.profileShouldAskSex ? .sex : .dateOfBirth
-                    }
+                    transition(to: viewModel.profileShouldAskSex ? .sex : .dateOfBirth)
                 }
             },
             progress: viewModel.progress(for: .profileDetails),
             content: {
-                VStack(spacing: 24) {
+                VStack(spacing: JovieTokens.sectionGap) {
                     switch viewModel.profileDetailsActiveSubstep {
                     case .firstName, .lastName:
                         nameSection
@@ -164,21 +161,20 @@ struct BodyScoreProfileDetailsView: View {
                     Button(action: handlePrimaryAction) {
                         if isSaving {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.background))
                         } else {
                             Text(primaryButtonTitle)
-                                .font(.system(size: 18, weight: .semibold))
                         }
                     }
                     .buttonStyle(OnboardingPrimaryButtonStyle())
                     .disabled(!canContinue || isSaving)
-                    .opacity(canContinue ? 1 : 0.4)
 
                     if let errorMessage {
                         Text(errorMessage)
                             .font(OnboardingTypography.caption)
                             .foregroundStyle(theme.colors.error)
                             .multilineTextAlignment(.center)
+                            .accessibilityFocused($saveErrorFocused)
                     }
                 }
             }
@@ -194,6 +190,20 @@ struct BodyScoreProfileDetailsView: View {
                 focusNameFieldIfNeeded(newValue)
             }
         }
+        .onChange(of: errorMessage) { _, error in
+            saveErrorFocused = error != nil
+        }
+        .toolbar {
+            ToolbarItem(placement: .keyboard) {
+                HStack {
+                    Spacer()
+                    Button("Done") {
+                        focusedNameField = nil
+                        heightFieldFocused = false
+                    }
+                }
+            }
+        }
     }
 
     private var nameSection: some View {
@@ -203,7 +213,7 @@ struct BodyScoreProfileDetailsView: View {
                 case .firstName:
                     Text("First name")
                         .font(OnboardingTypography.caption)
-                        .foregroundStyle(Color.appTextSecondary)
+                        .foregroundStyle(theme.colors.textSecondary)
 
                     TextField("First name", text: $viewModel.profileFirstName)
                         .textInputAutocapitalization(.words)
@@ -211,7 +221,7 @@ struct BodyScoreProfileDetailsView: View {
                         .submitLabel(.next)
                         .focused($focusedNameField, equals: .firstName)
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
+                        .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
                             cornerRadius: theme.radius.input,
                             tint: focusedNameField == .firstName ? theme.colors.primary : theme.colors.text,
@@ -227,16 +237,16 @@ struct BodyScoreProfileDetailsView: View {
                     if isFirstNameValid {
                         Text("Nice to meet you,")
                             .font(OnboardingTypography.caption)
-                            .foregroundStyle(Color.appTextSecondary)
+                            .foregroundStyle(theme.colors.textSecondary)
 
                         Text(trimmedFirstName)
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(Color.appText)
+                            .font(theme.typography.headlineLarge)
+                            .foregroundStyle(theme.colors.text)
                     }
 
                     Text("What's your last name?")
                         .font(OnboardingTypography.headline)
-                        .foregroundStyle(Color.appText)
+                        .foregroundStyle(theme.colors.text)
 
                     TextField("Last name", text: $viewModel.profileLastName)
                         .textInputAutocapitalization(.words)
@@ -244,7 +254,7 @@ struct BodyScoreProfileDetailsView: View {
                         .submitLabel(.next)
                         .focused($focusedNameField, equals: .lastName)
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
+                        .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
                             cornerRadius: theme.radius.input,
                             tint: focusedNameField == .lastName ? theme.colors.primary : theme.colors.text,
@@ -272,6 +282,12 @@ struct BodyScoreProfileDetailsView: View {
             )
             .datePickerStyle(.wheel)
             .labelsHidden()
+
+            OnboardingCaptionText(
+                text: "You must be 16–80 years old to continue.",
+                alignment: .leading
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -296,12 +312,10 @@ struct BodyScoreProfileDetailsView: View {
     private var heightSection: some View {
         OnboardingFormSection(title: nil, caption: "You can update this later in Settings.") {
             VStack(alignment: .leading, spacing: 18) {
-                Picker("Height unit", selection: $viewModel.profileHeightUnit) {
-                    ForEach(HeightUnit.allCases, id: \.self) { unit in
-                        Text(unit.description).tag(unit)
-                    }
-                }
-                .pickerStyle(.segmented)
+                OnboardingSegmentedControl(
+                    options: HeightUnit.allCases,
+                    selection: $viewModel.profileHeightUnit
+                )
                 .onChange(of: viewModel.profileHeightUnit) { oldValue, newValue in
                     convertHeightFields(from: oldValue, to: newValue)
                 }
@@ -310,10 +324,11 @@ struct BodyScoreProfileDetailsView: View {
                 case .centimeters:
                     TextField("178", text: $viewModel.profileHeightCentimetersText)
                         .keyboardType(.decimalPad)
-                        .font(theme.typography.displayMedium)
+                        .font(theme.typography.headlineLarge)
                         .multilineTextAlignment(.center)
+                        .focused($heightFieldFocused)
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
+                        .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
                             cornerRadius: theme.radius.input,
                             tint: theme.colors.text,
@@ -322,10 +337,11 @@ struct BodyScoreProfileDetailsView: View {
                             borderOpacity: 0.65
                         )
                         .accessibilityLabel("Height in centimeters")
+                        .accessibilityHint("Enter a height between 100 and 250 centimeters.")
 
                     Text("Enter a height from 100 to 250 cm.")
                         .font(OnboardingTypography.caption)
-                        .foregroundStyle(Color.appTextSecondary)
+                        .foregroundStyle(theme.colors.textSecondary)
 
                 case .inches:
                     HStack(spacing: 12) {
@@ -352,7 +368,7 @@ struct BodyScoreProfileDetailsView: View {
 
                     Text("Enter a height from 4'0\" to 8'0\".")
                         .font(OnboardingTypography.caption)
-                        .foregroundStyle(Color.appTextSecondary)
+                        .foregroundStyle(theme.colors.textSecondary)
                 }
             }
         }
@@ -441,13 +457,9 @@ private extension BodyScoreProfileDetailsView {
         case .lastName:
             handleLastNameContinue()
         case .dateOfBirth:
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                viewModel.profileDetailsActiveSubstep = viewModel.profileShouldAskSex ? .sex : .height
-            }
+            transition(to: viewModel.profileShouldAskSex ? .sex : .height)
         case .sex:
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                viewModel.profileDetailsActiveSubstep = .height
-            }
+            transition(to: .height)
         case .height:
             submit()
         }
@@ -456,17 +468,13 @@ private extension BodyScoreProfileDetailsView {
     func handleFirstNameContinue() {
         guard isFirstNameValid else { return }
         HapticManager.shared.selection()
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            viewModel.profileDetailsActiveSubstep = .lastName
-        }
+        transition(to: .lastName)
     }
 
     func handleLastNameContinue() {
         guard isLastNameValid else { return }
         HapticManager.shared.selection()
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            viewModel.profileDetailsActiveSubstep = .dateOfBirth
-        }
+        transition(to: .dateOfBirth)
     }
 
     func focusNameFieldIfNeeded(_ step: OnboardingFlowViewModel.ProfileDetailsSubstep? = nil) {
@@ -494,6 +502,16 @@ private extension BodyScoreProfileDetailsView {
             viewModel.profileHeightCentimetersText = String(format: "%.0f", totalInches * 2.54)
         default:
             break
+        }
+    }
+
+    func transition(to substep: OnboardingFlowViewModel.ProfileDetailsSubstep) {
+        if reduceMotion {
+            viewModel.profileDetailsActiveSubstep = substep
+        } else {
+            withAnimation(theme.animation.springSmooth) {
+                viewModel.profileDetailsActiveSubstep = substep
+            }
         }
     }
 }

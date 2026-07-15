@@ -20,42 +20,17 @@ extension PreferencesView {
     }
 
     var advancedSection: some View {
-        SettingsSection(header: "Advanced") {
-            VStack(spacing: 12) {
-                Button {
-                    HapticManager.shared.selection()
-                    Task {
-                        let success = await subscriptionManager.restorePurchases()
-                        await MainActor.run {
-                            restoreAlertMessage = success
-                                ? "Your subscription has been restored"
-                                : (subscriptionManager.errorMessage ?? "No active subscription found")
-                            showingRestoreAlert = true
-                        }
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                        Text("Restore purchases")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, theme.spacing.sm)
-                    .systemBGlassSurface(
-                        cornerRadius: theme.radius.input,
-                        tint: theme.colors.text,
-                        tintOpacity: 0.045,
-                        borderColor: theme.colors.border,
-                        borderOpacity: 0.75
-                    )
-                }
-                .accessibilityLabel("Restore purchases")
-                .accessibilityHint("Attempts to restore your active subscription.")
-                .accessibilityIdentifier("settings_restore_purchases_button")
+        SettingsSection(header: "Restore purchases") {
+            SettingsButtonRow(
+                icon: "arrow.triangle.2.circlepath",
+                title: isRestoringPurchases ? "Restoring purchases…" : "Restore purchases"
+            ) {
+                restorePurchases()
             }
-            .padding(.top, theme.spacing.xxs)
-            .padding(.bottom, theme.spacing.xs)
-            .padding(.horizontal, theme.spacing.md)
+            .disabled(isRestoringPurchases)
+            .accessibilityValue(isRestoringPurchases ? "In progress" : "")
+            .accessibilityHint("Attempts to restore your active subscription.")
+            .accessibilityIdentifier("settings_restore_purchases_button")
         }
     }
 
@@ -67,15 +42,13 @@ extension PreferencesView {
             NavigationLink {
                 DeleteAccountView()
             } label: {
-                Text("Delete account")
-                    .font(theme.typography.labelLarge)
-                    .foregroundColor(theme.colors.error)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, theme.spacing.md)
-                    .background(
-                        RoundedRectangle(cornerRadius: theme.radius.card)
-                            .fill(theme.colors.error.opacity(0.14))
-                    )
+                SettingsRow(
+                    icon: "trash",
+                    title: "Delete account",
+                    subtitle: "Permanently remove your account and data.",
+                    showChevron: true,
+                    tintColor: theme.colors.error
+                )
             }
             .accessibilityLabel("Delete account")
             .accessibilityHint("Permanently deletes your account and all data.")
@@ -85,7 +58,24 @@ extension PreferencesView {
                 }
             )
             .buttonStyle(.plain)
-            .padding(.horizontal, theme.spacing.md)
+        }
+    }
+
+    func restorePurchases() {
+        guard !isRestoringPurchases else { return }
+
+        isRestoringPurchases = true
+        HapticManager.shared.selection()
+
+        Task {
+            let success = await subscriptionManager.restorePurchases()
+            await MainActor.run {
+                isRestoringPurchases = false
+                restoreAlertMessage = success
+                    ? "Your subscription has been restored"
+                    : (subscriptionManager.errorMessage ?? "No active subscription found")
+                showingRestoreAlert = true
+            }
         }
     }
 }

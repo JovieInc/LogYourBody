@@ -16,7 +16,8 @@ struct PreferencesView: View {
     @AppStorage("healthKitSyncEnabled") var healthKitSyncEnabled = true
     @AppStorage(Constants.deletePhotosAfterImportKey) var deletePhotosAfterImport = false
     @AppStorage("stepGoal") var stepGoal = 10_000
-    @AppStorage(Constants.goalWeightKey) var customWeightGoal: Double?
+    @AppStorage(Constants.goalWeightKilogramsKey) var customWeightGoalKilograms: Double?
+    @AppStorage(Constants.goalWeightKey) var legacyCustomWeightGoal: Double?
     @AppStorage(Constants.goalBodyFatPercentageKey) var customBodyFatGoal: Double?
     @AppStorage(Constants.goalFFMIKey) var customFFMIGoal: Double?
 
@@ -24,6 +25,7 @@ struct PreferencesView: View {
     @ObservedObject var healthKitManager = HealthKitManager.shared
     @State var showingRestoreAlert = false
     @State var restoreAlertMessage = ""
+    @State var isRestoringPurchases = false
     @State var activeGoalEditor: PreferenceGoalKind?
     @State var isShowingProfileSettings = false
     @State var isUploadingPhoto = false
@@ -51,19 +53,7 @@ struct PreferencesView: View {
     var body: some View {
         ZStack(alignment: .top) {
             ScrollView {
-                VStack(spacing: theme.spacing.sectionSpacing) {
-                    heroHeader
-                    accountSection
-                    profileSection
-                    trackingGoalsSection
-                    remindersSection
-                    integrationsSection
-                    securitySection
-                    subscriptionSection
-                    photosSection
-                    advancedSection
-                    dangerSection
-                }
+                settingsLauncher
                 .padding(.horizontal, theme.spacing.screenPadding)
                 .padding(.vertical, theme.spacing.md)
                 .background(
@@ -110,6 +100,7 @@ struct PreferencesView: View {
             goalEditorSheet(for: goal)
         }
         .onAppear {
+            migrateLegacyWeightGoalIfNeeded()
             checkBiometricAvailability()
             updateCachedValues()
             dailyReminderDate = notificationManager.dailyWeighInReminderDate

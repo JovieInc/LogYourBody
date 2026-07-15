@@ -1,6 +1,12 @@
 import SwiftUI
 
 struct BodyScoreBasicsView: View {
+    @Environment(\.theme)
+    private var theme
+
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @State private var showWhyWeAsk = false
 
@@ -11,7 +17,7 @@ struct BodyScoreBasicsView: View {
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .basics),
             content: {
-                VStack(spacing: 24) {
+                VStack(spacing: JovieTokens.sectionGap) {
                     OnboardingFormSection {
                         VStack(spacing: 12) {
                             ForEach(BiologicalSex.allCases, id: \.self) { sex in
@@ -27,19 +33,19 @@ struct BodyScoreBasicsView: View {
                         }
 
                         Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                showWhyWeAsk.toggle()
-                            }
+                            toggleWhyWeAsk()
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "questionmark.circle")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(.footnote, design: .default).weight(.semibold))
                                 Text("Why we ask")
                                     .font(OnboardingTypography.caption)
                             }
-                            .foregroundStyle(Color.appPrimary)
+                            .foregroundStyle(theme.colors.primary)
                         }
                         .buttonStyle(.plain)
+                        .jovieTouchTarget()
+                        .accessibilityValue(showWhyWeAsk ? "Expanded" : "Collapsed")
 
                         if showWhyWeAsk {
                             OnboardingInfoRow(
@@ -55,11 +61,9 @@ struct BodyScoreBasicsView: View {
                     viewModel.goToNextStep()
                 } label: {
                     Text("Continue")
-                        .font(.system(size: 18, weight: .semibold))
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueBasics)
-                .opacity(viewModel.canContinueBasics ? 1 : 0.4)
             }
         )
     }
@@ -67,6 +71,16 @@ struct BodyScoreBasicsView: View {
     private func handleSexSelection(_ sex: BiologicalSex) {
         viewModel.updateSex(sex)
         HapticManager.shared.selection()
+    }
+
+    private func toggleWhyWeAsk() {
+        if reduceMotion {
+            showWhyWeAsk.toggle()
+        } else {
+            withAnimation(theme.animation.fast) {
+                showWhyWeAsk.toggle()
+            }
+        }
     }
 }
 

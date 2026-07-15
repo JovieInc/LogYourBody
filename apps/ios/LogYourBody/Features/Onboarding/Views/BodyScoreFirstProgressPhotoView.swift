@@ -39,30 +39,30 @@ struct BodyScoreFirstProgressPhotoView: View {
     private var previewCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Image(systemName: "camera.metering.center.weighted")
-                .font(.system(size: 34, weight: .semibold))
+                .font(.system(.title, design: .rounded).weight(.semibold))
                 .foregroundStyle(theme.colors.text.opacity(0.82))
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Photos make the timeline useful.")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Color.appText)
+                    .font(theme.typography.headlineSmall)
+                    .foregroundStyle(theme.colors.text)
 
                 Text(
                     "We attach the photo to the baseline metrics you just entered, so Home opens with your first visual check-in."
                 )
                     .font(OnboardingTypography.body)
-                    .foregroundStyle(Color.appTextSecondary)
+                    .foregroundStyle(theme.colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "lock.shield")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.appPrimary)
+                    .font(.system(.footnote, design: .default).weight(.semibold))
+                    .foregroundStyle(theme.colors.text)
 
-                Text("Camera and photo library access are optional. You can skip this and add a photo later.")
+                Text("Camera and photo library access are optional. You choose what to add, and can skip this for now.")
                     .font(OnboardingTypography.caption)
-                    .foregroundStyle(Color.appTextTertiary)
+                    .foregroundStyle(theme.colors.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -113,9 +113,9 @@ struct BodyScoreFirstProgressPhotoView: View {
             .disabled(viewModel.isCompletingOnboarding)
             .accessibilityIdentifier("onboarding_first_photo_skip_button")
 
-            Text("You can add progress photos later from Home.")
-                .font(OnboardingTypography.caption)
-                .foregroundStyle(Color.appTextTertiary)
+                Text("You can add progress photos later from Home.")
+                    .font(OnboardingTypography.caption)
+                .foregroundStyle(theme.colors.textTertiary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 

@@ -4,8 +4,12 @@ struct BodyScoreBodyFatNumericView: View {
     @Environment(\.theme)
     private var theme
 
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @FocusState private var percentageFieldFocused: Bool
+    @AccessibilityFocusState private var bodyFatErrorFocused: Bool
     @State private var bodyFatError: String?
     @State private var showHelp = false
 
@@ -20,7 +24,7 @@ struct BodyScoreBodyFatNumericView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Body fat %")
                             .font(OnboardingTypography.caption)
-                            .foregroundStyle(Color.appTextSecondary)
+                            .foregroundStyle(theme.colors.textSecondary)
 
                         TextField("14.5", text: Binding(
                             get: { viewModel.bodyFatPercentageText },
@@ -36,7 +40,7 @@ struct BodyScoreBodyFatNumericView: View {
                             validateBodyFat(newValue)
                         }
                         .padding(.horizontal, 20)
-                        .padding(.vertical, 16)
+                        .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
                             cornerRadius: 20,
                             tint: percentageFieldFocused ? theme.colors.primary : theme.colors.text,
@@ -44,11 +48,14 @@ struct BodyScoreBodyFatNumericView: View {
                             borderColor: percentageFieldStrokeColor,
                             borderOpacity: 1
                         )
+                        .accessibilityLabel("Body fat percentage")
+                        .accessibilityHint("Enter a value between 4 and 60 percent.")
 
                         if let error = bodyFatError {
                             Text(error)
                                 .font(OnboardingTypography.caption)
                                 .foregroundStyle(theme.colors.error)
+                                .accessibilityFocused($bodyFatErrorFocused)
                         } else {
                             OnboardingCaptionText(
                                 text: "Most people fall between 4–60% body fat.",
@@ -59,24 +66,24 @@ struct BodyScoreBodyFatNumericView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                showHelp.toggle()
-                            }
+                            toggleHelp()
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "questionmark.circle")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(.footnote, design: .default).weight(.semibold))
                                 Text("Not sure your %?")
                                     .font(OnboardingTypography.caption)
                             }
-                            .foregroundStyle(Color.appPrimary)
+                            .foregroundStyle(theme.colors.primary)
                         }
                         .buttonStyle(.plain)
+                        .jovieTouchTarget()
+                        .accessibilityValue(showHelp ? "Expanded" : "Collapsed")
 
                         if showHelp {
                             Text("You can go back and choose visual estimate instead. We’ll guide you with reference photos.")
                                 .font(OnboardingTypography.body)
-                                .foregroundStyle(Color.appTextSecondary)
+                                .foregroundStyle(theme.colors.textSecondary)
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
@@ -88,11 +95,9 @@ struct BodyScoreBodyFatNumericView: View {
                     viewModel.goToNextStep()
                 } label: {
                     Text("Continue")
-                        .font(.system(size: 18, weight: .semibold))
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueBodyFatNumeric)
-                .opacity(continueButtonOpacity)
             }
         )
         .onAppear {
@@ -110,6 +115,9 @@ struct BodyScoreBodyFatNumericView: View {
                 }
             }
         }
+        .onChange(of: bodyFatError) { _, error in
+            bodyFatErrorFocused = error != nil
+        }
     }
 }
 
@@ -119,15 +127,21 @@ struct BodyScoreBodyFatNumericView: View {
 }
 
 private extension BodyScoreBodyFatNumericView {
-    var continueButtonOpacity: Double {
-        viewModel.canContinueBodyFatNumeric ? 1 : 0.4
-    }
-
     var percentageFieldStrokeColor: Color {
         if percentageFieldFocused {
-            return Color.appPrimary
+            return theme.colors.primary
         }
-        return Color.appBorder.opacity(0.4)
+        return theme.colors.border.opacity(0.65)
+    }
+
+    private func toggleHelp() {
+        if reduceMotion {
+            showHelp.toggle()
+        } else {
+            withAnimation(theme.animation.fast) {
+                showHelp.toggle()
+            }
+        }
     }
 
     private func validateBodyFat(_ value: String) {

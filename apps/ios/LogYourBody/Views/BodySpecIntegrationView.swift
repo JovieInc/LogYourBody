@@ -2,49 +2,35 @@ import SwiftUI
 
 struct BodySpecIntegrationView: View {
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.theme) private var theme
 
     @State private var isConfigured = false
     @State private var isConnected = false
     @State private var connectedEmail: String?
-
     @State private var isConnecting = false
     @State private var isSyncing = false
     @State private var lastSyncSummary: String?
     @State private var errorMessage: String?
-
+    @State private var recoveryAction: RecoveryAction?
     @State private var isLoadingScans = false
     @State private var recentScans: [DexaResult] = []
     @State private var recentScansError: String?
 
+    private enum RecoveryAction {
+        case connect
+    }
+
     var body: some View {
-        ZStack {
-            Color.appBackground
-                .ignoresSafeArea()
+        SettingsDetailScreen(title: "BodySpec") {
+            introductionSection
+            connectionSection
+            syncSection
+            recentScansSection
 
-            ScrollView {
-                VStack(spacing: 24) {
-                    headerSection
-                    connectionSection
-                    syncSection
-                    recentScansSection
-
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundColor(.red)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 16)
-                    }
-
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
-                .padding(.bottom, 40)
+            if let errorMessage {
+                errorRecoverySection(message: errorMessage)
             }
         }
-        .navigationTitle("BodySpec")
-        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             Task { @MainActor in
                 await handleOnAppear()
@@ -52,180 +38,230 @@ struct BodySpecIntegrationView: View {
         }
     }
 
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("BodySpec DEXA")
-                .font(.title3.weight(.semibold))
-                .foregroundColor(.appText)
-
-            Text(
-                "Connect your BodySpec account to import DEXA scans into LogYourBody. " +
-                    "This feature is currently in early internal testing."
+    private var introductionSection: some View {
+        SettingsSection(header: "About") {
+            DataInfoRow(
+                icon: "waveform.path.ecg",
+                title: "DEXA scan import",
+                description: "Connect BodySpec to bring your DEXA scan history into LogYourBody.",
+                iconColor: theme.colors.info
             )
-            .font(.subheadline)
-            .foregroundColor(.appTextSecondary)
         }
     }
 
     private var connectionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Connection")
-                .font(.headline)
-                .foregroundColor(.appText)
+        SettingsSection(
+            header: "Connection",
+            footer: isConfigured
+                ? "You can disconnect at any time."
+                : "BodySpec is not available in this version of the app."
+        ) {
+            VStack(spacing: 0) {
+                SettingsRow(
+                    icon: connectionIcon,
+                    title: connectionTitle,
+                    subtitle: connectionDescription,
+                    tintColor: connectionTint
+                )
 
-            VStack(alignment: .leading, spacing: 8) {
-                if !isConfigured {
-                    Text("BodySpec is not configured for this build.")
-                        .font(.subheadline)
-                        .foregroundColor(.appTextSecondary)
-                } else if isConnected {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
+                if isConfigured {
+                    Divider()
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Connected")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundColor(.appText)
-
-                            if let connectedEmail {
-                                Text(connectedEmail)
-                                    .font(.footnote)
-                                    .foregroundColor(.appTextSecondary)
-                            }
-                        }
-                    }
-                } else {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-
-                        Text("Not connected")
-                            .font(.subheadline)
-                            .foregroundColor(.appTextSecondary)
-                    }
-                }
-
-                HStack(spacing: 12) {
-                    Button(action: connectTapped) {
-                        HStack {
-                            if isConnecting {
-                                ProgressView()
-                                    .progressViewStyle(.circular)
-                            }
-
-                            Text(isConnected ? "Reconnect" : "Connect BodySpec")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.appPrimary)
-                    .disabled(!isConfigured || isConnecting)
+                    BaseButton(
+                        isConnected ? "Reconnect BodySpec" : "Connect BodySpec",
+                        configuration: ButtonConfiguration(
+                            style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                            isLoading: isConnecting,
+                            isEnabled: !isConnecting,
+                            fullWidth: true,
+                            icon: "link"
+                        ),
+                        action: connectTapped
+                    )
+                    .padding(theme.spacing.md)
+                    .accessibilityHint("Connects your BodySpec account.")
 
                     if isConnected {
-                        Button(role: .destructive, action: disconnectTapped) {
-                            Text("Disconnect")
-                                .font(.subheadline)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(isConnecting)
+                        Divider()
+
+                        BaseButton(
+                            "Disconnect BodySpec",
+                            configuration: ButtonConfiguration(
+                                style: .destructive,
+                                isEnabled: !isConnecting,
+                                fullWidth: true,
+                                icon: "link.badge.minus"
+                            ),
+                            action: disconnectTapped
+                        )
+                        .padding(theme.spacing.md)
+                        .accessibilityHint("Disconnects your BodySpec account from LogYourBody.")
                     }
                 }
             }
-            .padding(16)
-            .background(Color.appCard)
-            .cornerRadius(16)
-        }
-    }
-
-    private var recentScansSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Scans")
-                .font(.headline)
-                .foregroundColor(.appText)
-
-            VStack(alignment: .leading, spacing: 8) {
-                if isLoadingScans {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-
-                        Text("Loading scans...")
-                            .font(.subheadline)
-                            .foregroundColor(.appTextSecondary)
-                    }
-                } else if let recentScansError {
-                    Text(recentScansError)
-                        .font(.footnote)
-                        .foregroundColor(.appTextSecondary)
-                } else if recentScans.isEmpty {
-                    Text("No DEXA scans found yet.")
-                        .font(.subheadline)
-                        .foregroundColor(.appTextSecondary)
-                } else {
-                    ForEach(recentScans.prefix(5)) { scan in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(formattedDate(scan.acquireTime))
-                                .font(.subheadline)
-                                .foregroundColor(.appText)
-
-                            if let location = scan.locationName, !location.isEmpty {
-                                Text(location)
-                                    .font(.footnote)
-                                    .foregroundColor(.appTextSecondary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-            .padding(16)
-            .background(Color.appCard)
-            .cornerRadius(16)
         }
     }
 
     private var syncSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("DEXA Sync")
-                .font(.headline)
-                .foregroundColor(.appText)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(
-                    "Manually import your DEXA scans from BodySpec. " +
-                        "New scans will be added as body metrics and linked to your account."
-                )
-                .font(.subheadline)
-                .foregroundColor(.appTextSecondary)
-
-                Button(action: syncTapped) {
-                    HStack {
-                        if isSyncing {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                        }
-
-                        Text("Sync DEXA Scans")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .frame(maxWidth: .infinity)
+        SettingsSection(
+            header: "DEXA sync",
+            footer: "New scans are added to your body metrics."
+        ) {
+            VStack(spacing: 0) {
+                if isConfigured, isConnected {
+                    BaseButton(
+                        "Sync DEXA scans",
+                        configuration: ButtonConfiguration(
+                            style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                            isLoading: isSyncing,
+                            isEnabled: !isSyncing,
+                            fullWidth: true,
+                            icon: "arrow.triangle.2.circlepath"
+                        ),
+                        action: syncTapped
+                    )
+                    .padding(theme.spacing.md)
+                    .accessibilityHint("Checks BodySpec for new DEXA scans now.")
+                } else {
+                    SettingsRow(
+                        icon: "arrow.triangle.2.circlepath",
+                        title: "Sync unavailable",
+                        subtitle: syncUnavailableDescription,
+                        tintColor: theme.colors.textSecondary
+                    )
                 }
-                .buttonStyle(.bordered)
-                .disabled(!isConfigured || !isConnected || isSyncing)
 
                 if let lastSyncSummary {
-                    Text(lastSyncSummary)
-                        .font(.footnote)
-                        .foregroundColor(.appTextSecondary)
+                    Divider()
+
+                    DataInfoRow(
+                        icon: "checkmark.circle",
+                        title: "Sync complete",
+                        description: lastSyncSummary,
+                        iconColor: theme.colors.success
+                    )
                 }
             }
-            .padding(16)
-            .background(Color.appCard)
-            .cornerRadius(16)
         }
+    }
+
+    private var recentScansSection: some View {
+        SettingsSection(
+            header: "Recent scans",
+            footer: "Your five most recent BodySpec DEXA scans appear here."
+        ) {
+            VStack(spacing: 0) {
+                if isLoadingScans {
+                    DataInfoRow(
+                        icon: "arrow.triangle.2.circlepath",
+                        title: "Loading scans",
+                        description: "Checking your BodySpec history…",
+                        iconColor: theme.colors.textSecondary
+                    )
+                } else if let recentScansError {
+                    DataInfoRow(
+                        icon: "exclamationmark.triangle",
+                        title: "Couldn’t load scans",
+                        description: recentScansError,
+                        iconColor: theme.colors.warning
+                    )
+
+                    Divider()
+
+                    BaseButton(
+                        "Try again",
+                        configuration: ButtonConfiguration(
+                            style: .secondary,
+                            fullWidth: true,
+                            icon: "arrow.clockwise"
+                        ),
+                        action: reloadRecentScans
+                    )
+                    .padding(theme.spacing.md)
+                } else if recentScans.isEmpty {
+                    DataInfoRow(
+                        icon: "doc.text.magnifyingglass",
+                        title: "No DEXA scans yet",
+                        description: isConnected
+                            ? "New scans from BodySpec will appear here after syncing."
+                            : "Connect BodySpec to see your DEXA scan history.",
+                        iconColor: theme.colors.textSecondary
+                    )
+                } else {
+                    ForEach(Array(recentScans.prefix(5).enumerated()), id: \.element.id) { index, scan in
+                        SettingsRow(
+                            icon: "calendar",
+                            title: formattedDate(scan.acquireTime),
+                            subtitle: scan.locationName?.isEmpty == false ? scan.locationName : "BodySpec DEXA scan",
+                            tintColor: theme.colors.text
+                        )
+
+                        if index < min(recentScans.count, 5) - 1 {
+                            Divider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func errorRecoverySection(message: String) -> some View {
+        SettingsSection(header: "Needs attention") {
+            VStack(spacing: 0) {
+                DataInfoRow(
+                    icon: "exclamationmark.triangle",
+                    title: "BodySpec couldn’t finish",
+                    description: message,
+                    iconColor: theme.colors.error
+                )
+
+                if recoveryAction != nil {
+                    Divider()
+
+                    BaseButton(
+                        "Try again",
+                        configuration: ButtonConfiguration(
+                            style: .secondary,
+                            fullWidth: true,
+                            icon: "arrow.clockwise"
+                        ),
+                        action: retryLastAction
+                    )
+                    .padding(theme.spacing.md)
+                }
+            }
+        }
+    }
+
+    private var connectionIcon: String {
+        if !isConfigured { return "exclamationmark.triangle" }
+        return isConnected ? "checkmark.circle.fill" : "link"
+    }
+
+    private var connectionTint: Color {
+        if !isConfigured { return theme.colors.warning }
+        return isConnected ? theme.colors.success : theme.colors.textSecondary
+    }
+
+    private var connectionTitle: String {
+        if !isConfigured { return "BodySpec isn’t available" }
+        return isConnected ? "Connected" : "Not connected"
+    }
+
+    private var connectionDescription: String {
+        if !isConfigured {
+            return "This build can’t connect to BodySpec."
+        }
+        return connectedEmail ?? (isConnected
+            ? "Your BodySpec account is ready to sync."
+            : "Connect your account to import DEXA scans.")
+    }
+
+    private var syncUnavailableDescription: String {
+        if !isConfigured {
+            return "BodySpec isn’t available in this build."
+        }
+        return "Connect BodySpec before syncing your scans."
     }
 
     @MainActor
@@ -265,16 +301,22 @@ struct BodySpecIntegrationView: View {
             CoreDataManager.shared.saveDexaResults(scans, userId: userId)
         } catch {
             if recentScans.isEmpty {
-                recentScans = []
-                recentScansError = "Unable to load recent scans."
+                recentScansError = "Check your connection and try again."
             }
         }
 
         isLoadingScans = false
     }
 
+    private func reloadRecentScans() {
+        Task { @MainActor in
+            await loadRecentScansIfNeeded()
+        }
+    }
+
     private func connectTapped() {
         errorMessage = nil
+        recoveryAction = nil
         isConnecting = true
 
         Task { @MainActor in
@@ -283,7 +325,8 @@ struct BodySpecIntegrationView: View {
                 refreshConnectionState()
                 await loadRecentScansIfNeeded()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = "We couldn’t connect BodySpec. Check your connection and try again."
+                recoveryAction = .connect
             }
 
             isConnecting = false
@@ -292,6 +335,7 @@ struct BodySpecIntegrationView: View {
 
     private func disconnectTapped() {
         errorMessage = nil
+        recoveryAction = nil
 
         Task { @MainActor in
             BodySpecAuthManager.shared.disconnect()
@@ -302,32 +346,47 @@ struct BodySpecIntegrationView: View {
 
     private func syncTapped() {
         guard isConfigured else {
-            errorMessage = "BodySpec is not configured for this build."
+            errorMessage = "BodySpec isn’t available in this build."
+            recoveryAction = nil
             return
         }
 
         guard isConnected else {
-            errorMessage = "Connect your BodySpec account before syncing."
+            errorMessage = "Connect BodySpec before syncing your scans."
+            recoveryAction = .connect
             return
         }
 
         errorMessage = nil
+        recoveryAction = nil
         lastSyncSummary = nil
         isSyncing = true
 
         Task { @MainActor in
             let result = await BodySpecDexaImporter.shared.importDexaResults()
-
             isSyncing = false
-
-            if result.importedCount == 0 && result.skippedCount == 0 {
-                lastSyncSummary = "No new DEXA scans found."
-            } else {
-                lastSyncSummary = "Imported \(result.importedCount) new scan(s), skipped \(result.skippedCount)."
-            }
-
+            lastSyncSummary = syncSummary(for: result)
             await loadRecentScansIfNeeded()
         }
+    }
+
+    private func retryLastAction() {
+        switch recoveryAction {
+        case .connect:
+            connectTapped()
+        case nil:
+            break
+        }
+    }
+
+    private func syncSummary(for result: BodySpecDexaImporter.ImportResult) -> String {
+        if result.importedCount == 0, result.skippedCount == 0 {
+            return "No new DEXA scans found."
+        }
+
+        let importedUnit = result.importedCount == 1 ? "scan" : "scans"
+        let skippedUnit = result.skippedCount == 1 ? "scan" : "scans"
+        return "Imported \(result.importedCount) new \(importedUnit) and skipped \(result.skippedCount) \(skippedUnit)."
     }
 
     private func formattedDate(_ date: Date?) -> String {

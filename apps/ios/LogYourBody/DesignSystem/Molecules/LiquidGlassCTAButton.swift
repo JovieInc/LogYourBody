@@ -126,18 +126,20 @@ struct LiquidGlassSecondaryCTAButton: View {
 
 struct LiquidGlassCTAModifier: ViewModifier {
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let isEnabled: Bool
 
     func body(content: Content) -> some View {
         content
-            .font(.system(size: 17, weight: .semibold))
+            .font(.system(.headline, design: .default).weight(.semibold))
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
+            .frame(minHeight: 56)
             .foregroundColor(isEnabled ? .black : .white.opacity(0.5))
             .background(backgroundView)
             .overlay(overlayView)
             .clipShape(RoundedRectangle(cornerRadius: 28))
+            .animation(reduceMotion ? nil : theme.animation.fast, value: isEnabled)
     }
 
     @ViewBuilder private var backgroundView: some View {

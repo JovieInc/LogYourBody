@@ -6,6 +6,7 @@ struct BodyScoreAccountCreationView: View {
 
     @EnvironmentObject var authManager: AuthManager
     @ObservedObject var viewModel: OnboardingFlowViewModel
+    @AccessibilityFocusState private var accountCreationErrorFocused: Bool
 
     var body: some View {
         OnboardingPageTemplate(
@@ -14,7 +15,7 @@ struct BodyScoreAccountCreationView: View {
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .account),
             content: {
-                VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
                     OnboardingTextFieldRow(
                         title: "Email address",
                         placeholder: "you@domain.com",
@@ -24,38 +25,38 @@ struct BodyScoreAccountCreationView: View {
                         ),
                         keyboardType: .emailAddress
                     )
+
+                    OnboardingCaptionText(
+                        text: "We’ll send a verification code to this address.",
+                        alignment: .leading
+                    )
+
+                    if let error = viewModel.accountCreationError {
+                        Text(error)
+                            .font(OnboardingTypography.caption)
+                            .foregroundStyle(theme.colors.error)
+                            .accessibilityFocused($accountCreationErrorFocused)
+                    }
                 }
             },
             footer: {
                 Button(action: submit) {
-                    if viewModel.isCreatingAccount {
-                        VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        if viewModel.isCreatingAccount {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.background))
-                            if let status = viewModel.accountCreationStatusMessage {
-                                Text(status)
-                                    .font(OnboardingTypography.caption)
-                                    .foregroundStyle(theme.colors.background.opacity(0.65))
-                            }
                         }
-                    } else {
-                        Text("Create account")
-                            .font(.system(size: 18, weight: .semibold))
+                        Text(viewModel.isCreatingAccount ? "Creating account…" : "Create account")
                     }
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueAccountCreation || viewModel.isCreatingAccount)
-                .opacity(viewModel.canContinueAccountCreation ? 1 : 0.85)
-
-                if let error = viewModel.accountCreationError {
-                    Text(error)
-                        .font(OnboardingTypography.caption)
-                        .foregroundStyle(theme.colors.error)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 8)
-                }
+                .accessibilityValue(viewModel.isCreatingAccount ? "Creating account" : "")
             }
         )
+        .onChange(of: viewModel.accountCreationError) { _, error in
+            accountCreationErrorFocused = error != nil
+        }
     }
 
     private func submit() {
