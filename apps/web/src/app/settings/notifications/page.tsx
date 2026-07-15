@@ -1,30 +1,24 @@
-'use client'
+'use client';
 
-import { useAuth } from '@/contexts/ClerkAuthContext'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Input } from '@/components/ui/input'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Separator } from '@/components/ui/separator'
-import { toast } from '@/hooks/use-toast'
-import {
-  Loader2,
-  ArrowLeft,
-  Mail,
-  Save,
-  Info
-} from 'lucide-react'
-import Link from 'next/link'
+import { useAuth } from '@/contexts/ProductAuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
+import { toast } from '@/hooks/use-toast';
+import { Loader2, ArrowLeft, Mail, Save, Info } from 'lucide-react';
+import Link from 'next/link';
 
 export default function NotificationsSettingsPage() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
-  const [isSaving, setIsSaving] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const [settings, setSettings] = useState({
     push_notifications: {
@@ -33,81 +27,82 @@ export default function NotificationsSettingsPage() {
       reminder_time: '09:00',
       weekly_summary: true,
       goal_achievements: true,
-      tips_and_insights: false
+      tips_and_insights: false,
     },
     email_notifications: {
       weekly_report: true,
       monthly_summary: true,
       product_updates: true,
-      marketing_emails: false
+      marketing_emails: false,
     },
     reminder_settings: {
       reminder_days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
-      snooze_duration: '30' // minutes
-    }
-  })
+      snooze_duration: '30', // minutes
+    },
+  });
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/signin')
+      router.push('/signin');
     }
-  }, [user, loading, router])
+  }, [user, loading, router]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-bg">
-        <Loader2 className="h-8 w-8 animate-spin text-linear-text-secondary" />
+      <div className="bg-linear-bg flex min-h-screen items-center justify-center">
+        <Loader2 className="text-linear-text-secondary h-8 w-8 animate-spin" />
       </div>
-    )
+    );
   }
 
   if (!user) {
-    return null
+    return null;
   }
 
-  const primaryEmail = user.primaryEmailAddress?.emailAddress
-    ?? user.emailAddresses?.[0]?.emailAddress
-    ?? ''
+  const primaryEmail =
+    user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? '';
 
-  const updateSettings = (category: string, setting: string, value: boolean | string | string[]) => {
-    setSettings(prev => ({
+  const updateSettings = (
+    category: string,
+    setting: string,
+    value: boolean | string | string[],
+  ) => {
+    setSettings((prev) => ({
       ...prev,
       [category]: {
         ...prev[category as keyof typeof prev],
-        [setting]: value
-      }
-    }))
-    setHasChanges(true)
-  }
+        [setting]: value,
+      },
+    }));
+    setHasChanges(true);
+  };
 
   const toggleReminderDay = (day: string) => {
-    const days = settings.reminder_settings.reminder_days
-    const newDays = days.includes(day)
-      ? days.filter(d => d !== day)
-      : [...days, day]
+    const days = settings.reminder_settings.reminder_days;
+    const newDays = days.includes(day) ? days.filter((d) => d !== day) : [...days, day];
 
-    updateSettings('reminder_settings', 'reminder_days', newDays)
-  }
+    updateSettings('reminder_settings', 'reminder_days', newDays);
+  };
 
   const handleSave = async () => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       toast({
-        title: "Notifications updated",
-        description: "Your notification preferences have been saved."
-      })
-      setHasChanges(false)
+        title: 'Notifications updated',
+        description: 'Your notification preferences have been saved.',
+      });
+      setHasChanges(false);
     } catch {
       toast({
-        title: "Error",
-        description: "Failed to save notification settings. Please try again.",
-        variant: "destructive"
-      })
+        title: 'Error',
+        description: 'Failed to save notification settings. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const DAYS = [
     { value: 'mon', label: 'M' },
@@ -116,13 +111,13 @@ export default function NotificationsSettingsPage() {
     { value: 'thu', label: 'T' },
     { value: 'fri', label: 'F' },
     { value: 'sat', label: 'S' },
-    { value: 'sun', label: 'S' }
-  ]
+    { value: 'sun', label: 'S' },
+  ];
 
   return (
-    <div className="min-h-screen bg-linear-bg">
+    <div className="bg-linear-bg min-h-screen">
       {/* Header */}
-      <header className="bg-linear-card shadow-sm border-b border-linear-border sticky top-0 z-10">
+      <header className="bg-linear-card border-linear-border sticky top-0 z-10 border-b shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -131,7 +126,7 @@ export default function NotificationsSettingsPage() {
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
-              <h1 className="text-xl font-bold text-linear-text">Notifications</h1>
+              <h1 className="text-linear-text text-xl font-bold">Notifications</h1>
             </div>
             {hasChanges && (
               <Button
@@ -152,7 +147,7 @@ export default function NotificationsSettingsPage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 max-w-2xl space-y-6">
+      <main className="container mx-auto max-w-2xl space-y-6 px-4 py-6">
         {/* Push Notifications */}
         <Card className="bg-linear-card border-linear-border">
           <CardHeader>
@@ -165,7 +160,9 @@ export default function NotificationsSettingsPage() {
               </div>
               <Switch
                 checked={settings.push_notifications.enabled}
-                onCheckedChange={(checked) => updateSettings('push_notifications', 'enabled', checked)}
+                onCheckedChange={(checked) =>
+                  updateSettings('push_notifications', 'enabled', checked)
+                }
               />
             </div>
           </CardHeader>
@@ -178,48 +175,48 @@ export default function NotificationsSettingsPage() {
                     <Label htmlFor="dailyReminder" className="text-linear-text font-normal">
                       Daily Reminder
                     </Label>
-                    <p className="text-sm text-linear-text-secondary">
+                    <p className="text-linear-text-secondary text-sm">
                       Get reminded to log your daily metrics
                     </p>
                   </div>
                   <Switch
                     id="dailyReminder"
                     checked={settings.push_notifications.daily_reminder}
-                    onCheckedChange={(checked) => updateSettings('push_notifications', 'daily_reminder', checked)}
+                    onCheckedChange={(checked) =>
+                      updateSettings('push_notifications', 'daily_reminder', checked)
+                    }
                   />
                 </div>
 
                 {settings.push_notifications.daily_reminder && (
                   <div className="ml-6 space-y-3">
                     <div className="space-y-2">
-                      <Label htmlFor="reminderTime" className="text-sm text-linear-text">
+                      <Label htmlFor="reminderTime" className="text-linear-text text-sm">
                         Reminder Time
                       </Label>
                       <Input
                         id="reminderTime"
                         type="time"
                         value={settings.push_notifications.reminder_time}
-                        onChange={(e) => updateSettings('push_notifications', 'reminder_time', e.target.value)}
+                        onChange={(e) =>
+                          updateSettings('push_notifications', 'reminder_time', e.target.value)
+                        }
                         className="bg-linear-bg border-linear-border text-linear-text max-w-xs"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-sm text-linear-text">
-                        Reminder Days
-                      </Label>
+                      <Label className="text-linear-text text-sm">Reminder Days</Label>
                       <div className="flex gap-2">
                         {DAYS.map((day) => (
                           <button
                             key={day.value}
                             onClick={() => toggleReminderDay(day.value)}
-                            className={`
-                              h-10 w-10 rounded-lg border-2 text-sm font-medium transition-colors
-                              ${settings.reminder_settings.reminder_days.includes(day.value)
+                            className={`h-10 w-10 rounded-lg border-2 text-sm font-medium transition-colors ${
+                              settings.reminder_settings.reminder_days.includes(day.value)
                                 ? 'border-linear-purple bg-linear-purple/10 text-linear-text'
                                 : 'border-linear-border text-linear-text-tertiary hover:border-linear-text-tertiary'
-                              }
-                            `}
+                            } `}
                           >
                             {day.label}
                           </button>
@@ -238,14 +235,16 @@ export default function NotificationsSettingsPage() {
                   <Label htmlFor="weeklySummary" className="text-linear-text font-normal">
                     Weekly Summary
                   </Label>
-                  <p className="text-sm text-linear-text-secondary">
+                  <p className="text-linear-text-secondary text-sm">
                     Review your progress every Sunday
                   </p>
                 </div>
                 <Switch
                   id="weeklySummary"
                   checked={settings.push_notifications.weekly_summary}
-                  onCheckedChange={(checked) => updateSettings('push_notifications', 'weekly_summary', checked)}
+                  onCheckedChange={(checked) =>
+                    updateSettings('push_notifications', 'weekly_summary', checked)
+                  }
                 />
               </div>
 
@@ -257,14 +256,16 @@ export default function NotificationsSettingsPage() {
                   <Label htmlFor="goalAchievements" className="text-linear-text font-normal">
                     Goal Achievements
                   </Label>
-                  <p className="text-sm text-linear-text-secondary">
+                  <p className="text-linear-text-secondary text-sm">
                     Celebrate when you reach milestones
                   </p>
                 </div>
                 <Switch
                   id="goalAchievements"
                   checked={settings.push_notifications.goal_achievements}
-                  onCheckedChange={(checked) => updateSettings('push_notifications', 'goal_achievements', checked)}
+                  onCheckedChange={(checked) =>
+                    updateSettings('push_notifications', 'goal_achievements', checked)
+                  }
                 />
               </div>
 
@@ -276,14 +277,14 @@ export default function NotificationsSettingsPage() {
                   <Label htmlFor="tipsInsights" className="text-linear-text font-normal">
                     Tips & Insights
                   </Label>
-                  <p className="text-sm text-linear-text-secondary">
-                    Personalized recommendations
-                  </p>
+                  <p className="text-linear-text-secondary text-sm">Personalized recommendations</p>
                 </div>
                 <Switch
                   id="tipsInsights"
                   checked={settings.push_notifications.tips_and_insights}
-                  onCheckedChange={(checked) => updateSettings('push_notifications', 'tips_and_insights', checked)}
+                  onCheckedChange={(checked) =>
+                    updateSettings('push_notifications', 'tips_and_insights', checked)
+                  }
                 />
               </div>
             </CardContent>
@@ -300,7 +301,7 @@ export default function NotificationsSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert className="border-linear-border bg-linear-card">
-              <Mail className="h-4 w-4 text-linear-text" />
+              <Mail className="text-linear-text h-4 w-4" />
               <AlertDescription className="text-linear-text-secondary">
                 Emails will be sent to: <strong className="text-linear-text">{primaryEmail}</strong>
               </AlertDescription>
@@ -312,14 +313,14 @@ export default function NotificationsSettingsPage() {
                 <Label htmlFor="weeklyReport" className="text-linear-text font-normal">
                   Weekly Progress Report
                 </Label>
-                <p className="text-sm text-linear-text-secondary">
-                  Detailed summary of your week
-                </p>
+                <p className="text-linear-text-secondary text-sm">Detailed summary of your week</p>
               </div>
               <Switch
                 id="weeklyReport"
                 checked={settings.email_notifications.weekly_report}
-                onCheckedChange={(checked) => updateSettings('email_notifications', 'weekly_report', checked)}
+                onCheckedChange={(checked) =>
+                  updateSettings('email_notifications', 'weekly_report', checked)
+                }
               />
             </div>
 
@@ -331,14 +332,14 @@ export default function NotificationsSettingsPage() {
                 <Label htmlFor="monthlySummary" className="text-linear-text font-normal">
                   Monthly Summary
                 </Label>
-                <p className="text-sm text-linear-text-secondary">
-                  Long-term trends and insights
-                </p>
+                <p className="text-linear-text-secondary text-sm">Long-term trends and insights</p>
               </div>
               <Switch
                 id="monthlySummary"
                 checked={settings.email_notifications.monthly_summary}
-                onCheckedChange={(checked) => updateSettings('email_notifications', 'monthly_summary', checked)}
+                onCheckedChange={(checked) =>
+                  updateSettings('email_notifications', 'monthly_summary', checked)
+                }
               />
             </div>
 
@@ -350,14 +351,14 @@ export default function NotificationsSettingsPage() {
                 <Label htmlFor="productUpdates" className="text-linear-text font-normal">
                   Product Updates
                 </Label>
-                <p className="text-sm text-linear-text-secondary">
-                  New features and improvements
-                </p>
+                <p className="text-linear-text-secondary text-sm">New features and improvements</p>
               </div>
               <Switch
                 id="productUpdates"
                 checked={settings.email_notifications.product_updates}
-                onCheckedChange={(checked) => updateSettings('email_notifications', 'product_updates', checked)}
+                onCheckedChange={(checked) =>
+                  updateSettings('email_notifications', 'product_updates', checked)
+                }
               />
             </div>
 
@@ -369,14 +370,14 @@ export default function NotificationsSettingsPage() {
                 <Label htmlFor="marketingEmails" className="text-linear-text font-normal">
                   Marketing Emails
                 </Label>
-                <p className="text-sm text-linear-text-secondary">
-                  Tips, offers, and promotions
-                </p>
+                <p className="text-linear-text-secondary text-sm">Tips, offers, and promotions</p>
               </div>
               <Switch
                 id="marketingEmails"
                 checked={settings.email_notifications.marketing_emails}
-                onCheckedChange={(checked) => updateSettings('email_notifications', 'marketing_emails', checked)}
+                onCheckedChange={(checked) =>
+                  updateSettings('email_notifications', 'marketing_emails', checked)
+                }
               />
             </div>
           </CardContent>
@@ -392,7 +393,7 @@ export default function NotificationsSettingsPage() {
           </CardHeader>
           <CardContent>
             <Alert className="border-linear-border bg-linear-card">
-              <Info className="h-4 w-4 text-linear-text" />
+              <Info className="text-linear-text h-4 w-4" />
               <AlertDescription className="text-linear-text-secondary">
                 Quiet hours respect your device's Do Not Disturb settings
               </AlertDescription>
@@ -401,5 +402,5 @@ export default function NotificationsSettingsPage() {
         </Card>
       </main>
     </div>
-  )
+  );
 }

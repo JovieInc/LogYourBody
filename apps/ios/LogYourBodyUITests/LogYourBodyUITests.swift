@@ -18,32 +18,15 @@ final class LogYourBodyUITests: XCTestCase {
         // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
-    func testSignedOutAppleSignInVisibleByDefault() throws {
+    func testSignedOutPhoneOTPIsTheOnlyAuthAction() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestSignedOutFixture"]
         app.launch()
 
         XCTAssertTrue(app.staticTexts["LogYourBody"].waitForExistence(timeout: 8))
-        XCTAssertTrue(app.descendants(matching: .any)["login_email_field"].exists)
-        XCTAssertTrue(app.buttons["login_email_code_button"].exists)
-        XCTAssertTrue(app.buttons["Continue with Apple"].exists)
-    }
-
-    func testEmailVerificationFixtureShowsOTPReadyState() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestEmailVerificationFixture"]
-        app.launch()
-
-        XCTAssertTrue(
-            app.descendants(matching: .any)["email_verification_screen"].waitForExistence(timeout: 10)
-        )
-        XCTAssertTrue(app.staticTexts["Verify Your Email"].exists)
-        XCTAssertTrue(app.staticTexts["email_verification_pending_email"].exists)
-        XCTAssertEqual(app.staticTexts["email_verification_pending_email"].label, "otp-ready-ui@example.com")
-        XCTAssertTrue(app.descendants(matching: .any)["email_verification_code_field"].exists)
-        XCTAssertTrue(app.buttons["email_verification_verify_button"].exists)
-        XCTAssertFalse(app.buttons["email_verification_verify_button"].isEnabled)
-        XCTAssertTrue(app.staticTexts["email_verification_resend_timer"].exists)
+        XCTAssertTrue(app.buttons["continueWithPhoneButton"].exists)
+        XCTAssertFalse(app.buttons["Continue with Apple"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["login_email_field"].exists)
     }
 
     func testPaidMVPWeightEntrySavesWithKeyboardOpen() throws {

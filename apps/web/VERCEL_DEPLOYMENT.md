@@ -5,9 +5,9 @@
 The web app is configured and ready for Vercel deployment:
 
 - **Framework**: Next.js 15.3.3
-- **Build Command**: `npm run build` (default)
+- **Build Command**: `pnpm build`
 - **Output Directory**: `.next` (default)
-- **Install Command**: `npm install` (default)
+- **Install Command**: `pnpm install --frozen-lockfile`
 
 ## ✅ Environment Variables
 
@@ -16,11 +16,6 @@ The following environment variables need to be configured in Vercel:
 ### Required Variables:
 
 ```env
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your-clerk-publishable-key
-CLERK_SECRET_KEY=your-clerk-secret-key
-CLERK_WEBHOOK_SECRET=your-clerk-webhook-secret
-
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
@@ -39,11 +34,6 @@ NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY=your-revenuecat-key
 
 # OpenAI (for avatar generation)
 OPENAI_API_KEY=your-openai-api-key-here
-
-# Twilio (for SMS login)
-TWILIO_ACCOUNT_SID=your-twilio-sid
-TWILIO_AUTH_TOKEN=your-twilio-token
-TWILIO_PHONE_NUMBER=+1234567890
 
 # Version (auto-populated in CI)
 NEXT_PUBLIC_VERSION=production
@@ -65,6 +55,7 @@ NEXT_PUBLIC_VERSION=production
 ## ✅ Deployment Configuration
 
 The `vercel.json` file is already configured with:
+
 - Clean URLs enabled
 - Proper caching headers for assets
 - Git deployment enabled for `dev` and `main` branches
@@ -72,14 +63,15 @@ The `vercel.json` file is already configured with:
 
 ## ✅ Post-Deployment Checklist
 
-1. **Verify Clerk Webhook**: 
-   - Add Vercel deployment URL to Clerk webhook endpoints
-   - Test webhook at `/api/webhooks/clerk`
+1. **Verify shared authentication**:
+   - Configure Supabase provider `custom:jovie` against the Jovie issuer.
+   - Add the exact Supabase callback URL to the confidential Jovie OAuth client.
+   - Test phone OTP, callback exchange, refresh, and sign-out.
 
 2. **Test Authentication**:
    - Sign up flow
    - Sign in flow
-   - OAuth providers (if configured)
+   - Shared phone OTP
 
 3. **Test Supabase Connection**:
    - Data fetching
@@ -93,38 +85,43 @@ The `vercel.json` file is already configured with:
 ## 🚀 Deployment Commands
 
 ### Initial Setup:
+
 ```bash
-# Install Vercel CLI globally
-npm i -g vercel
+# Use the workspace package manager and an ephemeral Vercel CLI
+pnpm dlx vercel@latest --version
 
 # Link to Vercel project (from apps/web directory)
 cd apps/web
-vercel link
+pnpm dlx vercel@latest link
 
 # Deploy to preview
-vercel
+pnpm dlx vercel@latest
 
 # Deploy to production
-vercel --prod
+pnpm dlx vercel@latest --prod
 ```
 
 ### Automatic Deployments:
+
 - Push to `dev` branch → Preview deployment
 - Push to `main` branch → Production deployment
 
 ## 📋 Troubleshooting
 
 ### Build Failures:
+
 1. Check build logs in Vercel dashboard
 2. Ensure all environment variables are set
-3. Run `npm run build` locally to reproduce
+3. Run `pnpm --filter logyourbody build` locally to reproduce
 
 ### Runtime Errors:
+
 1. Check function logs in Vercel dashboard
 2. Verify environment variables are accessible
 3. Check browser console for client-side errors
 
 ### Performance Issues:
+
 1. Enable Vercel Analytics
 2. Check Core Web Vitals
 3. Optimize images and bundle size

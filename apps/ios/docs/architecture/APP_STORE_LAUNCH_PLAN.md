@@ -56,9 +56,8 @@ The app has reached feature-complete status with major functionality implemented
 
 ### 3. Authentication & Security
 
-- [x] ✅ Clerk authentication implemented
-- [x] ✅ Email verification flow
-- [x] ✅ **Apple Sign In** - Implemented with browser-based OAuth flow
+- [x] ✅ Shared Jovie Better Auth identity implemented through Supabase OIDC
+- [x] ✅ Phone OTP flow
 - [x] ✅ Handle expired sessions gracefully
 - [x] ✅ Secure token management
 
@@ -245,7 +244,7 @@ The app has excellent features and UI but needs critical fixes before App Store 
 - Age gate (17+) and privacy consent
 - Health disclaimer in signup
 - Data export (JSON/CSV)
-- Apple Sign In with Clerk
+- Shared phone OTP authentication
 - HealthKit integration
 - Offline support
 

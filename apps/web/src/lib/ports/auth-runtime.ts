@@ -1,14 +1,13 @@
 'use client';
 
-import { useAuth as useClerkAuth, useSignIn, useUser } from '@clerk/nextjs';
+import { useEffect, useMemo, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
-export type AuthProviderName = 'google' | 'apple';
+export type AuthProviderName = 'jovie';
 
 export type AuthEmailAddress = {
   emailAddress: string;
-  verification?: {
-    status?: string | null;
-  } | null;
+  verification?: { status?: string | null } | null;
 };
 
 export type AppAuthUser = {
@@ -29,62 +28,106 @@ export type AppAuthSession = {
   getToken: () => Promise<string | null>;
 };
 
-type ClerkUserResource = ReturnType<typeof useUser>['user'];
-
-function toEmailAddress(
-  address: NonNullable<ClerkUserResource>['emailAddresses'][number],
-): AuthEmailAddress {
-  return {
-    emailAddress: address.emailAddress,
-    verification: address.verification
-      ? {
-          status: address.verification.status,
-        }
-      : null,
-  };
-}
-
-function toAppAuthUser(user: ClerkUserResource): AppAuthUser | null {
-  if (!user) return null;
-
-  return {
-    id: user.id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    fullName: user.fullName,
-    imageUrl: user.imageUrl,
-    createdAt: user.createdAt,
-    lastSignInAt: user.lastSignInAt,
-    primaryEmailAddress: user.primaryEmailAddress ? toEmailAddress(user.primaryEmailAddress) : null,
-    emailAddresses: user.emailAddresses.map(toEmailAddress),
-    setProfileImage: user.setProfileImage.bind(user),
-    reload: user.reload.bind(user),
-  };
-}
-
 export function useAuthRuntime() {
-  const { user, isLoaded } = useUser();
-  const { signOut, getToken } = useClerkAuth();
-  const { signIn } = useSignIn();
+  const supabase = useMemo(() => createClient(), []);
+  const [user, setUser] = useState<AppAuthUser | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const projectUser = async (): Promise<AppAuthUser | null> => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return null;
+      const source = data.user;
+      const metadata = source.user_metadata ?? {};
+      const email = source.email
+        ? { emailAddress: source.email, verification: { status: 'verified' } }
+        : null;
+
+      return {
+        id: source.id,
+        firstName: typeof metadata.first_name === 'string' ? metadata.first_name : null,
+        lastName: typeof metadata.last_name === 'string' ? metadata.last_name : null,
+        fullName:
+          typeof metadata.full_name === 'string'
+            ? metadata.full_name
+            : typeof metadata.name === 'string'
+              ? metadata.name
+              : null,
+        imageUrl: typeof metadata.avatar_url === 'string' ? metadata.avatar_url : '',
+        createdAt: source.created_at ? new Date(source.created_at) : null,
+        lastSignInAt: source.last_sign_in_at ? new Date(source.last_sign_in_at) : null,
+        primaryEmailAddress: email,
+        emailAddresses: email ? [email] : [],
+        async setProfileImage({ file }) {
+          if (!file) {
+            const { error } = await supabase.auth.updateUser({ data: { avatar_url: null } });
+            if (error) throw error;
+            return;
+          }
+
+          const path = `${source.id}/profile.jpg`;
+          const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(path, file, { contentType: 'image/jpeg', upsert: true });
+          if (uploadError) throw uploadError;
+          const { data: publicURL } = supabase.storage.from('avatars').getPublicUrl(path);
+          const { error: updateError } = await supabase.auth.updateUser({
+            data: { avatar_url: publicURL.publicUrl },
+          });
+          if (updateError) throw updateError;
+        },
+        async reload() {
+          await supabase.auth.getUser();
+        },
+      };
+    };
+
+    void projectUser().then((nextUser) => {
+      if (active) {
+        setUser(nextUser);
+        setIsLoaded(true);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void projectUser().then((nextUser) => {
+        if (active) {
+          setUser(nextUser);
+          setIsLoaded(true);
+        }
+      });
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   return {
-    user: toAppAuthUser(user),
+    user,
     isLoaded,
-    getToken,
-    signOut,
-    signInWithProvider: async (provider: AuthProviderName) => {
-      if (!signIn) throw new Error('Sign in not available');
-
-      const providerMap: Record<AuthProviderName, 'oauth_google' | 'oauth_apple'> = {
-        google: 'oauth_google',
-        apple: 'oauth_apple',
-      };
-
-      await signIn.authenticateWithRedirect({
-        strategy: providerMap[provider],
-        redirectUrl: '/auth/callback',
-        redirectUrlComplete: '/dashboard',
+    getToken: async () => {
+      const { data } = await supabase.auth.getSession();
+      return data.session?.access_token ?? null;
+    },
+    signOut: async () => {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    },
+    signInWithProvider: async (_provider: AuthProviderName) => {
+      const provider = 'custom:jovie' as Parameters<
+        typeof supabase.auth.signInWithOAuth
+      >[0]['provider'];
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
+      if (error) throw error;
     },
   };
 }

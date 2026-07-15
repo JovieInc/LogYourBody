@@ -156,6 +156,11 @@ enum SupabaseError: LocalizedError, Equatable {
 }
 
 enum SupabaseURLBuilder {
+    static func authURL(_ path: String, baseURL: String = Constants.supabaseURL) throws -> URL {
+        let normalizedBase = try normalizedBaseURL(baseURL)
+        return try url(from: normalizedBase + "/auth/v1/" + path)
+    }
+
     static func restURL(table: String, query: String? = nil, baseURL: String = Constants.supabaseURL) throws -> URL {
         let normalizedBase = try normalizedBaseURL(baseURL)
         let suffix = query.map { "/rest/v1/\(table)?\($0)" } ?? "/rest/v1/\(table)"

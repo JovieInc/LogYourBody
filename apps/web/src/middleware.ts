@@ -1,36 +1,22 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
-import { NextFetchEvent, NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { isLandingAudience, type LandingAudience } from '@/lib/marketing/landing-registry';
+import { updateSession } from '@/lib/supabase/middleware';
 
 const LANDING_AUDIENCE_COOKIE = 'lyb_landing_audience_v1';
-
-const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)',
-  '/log(.*)',
-  '/api/weights(.*)',
+const protectedRoutePrefixes = [
+  '/dashboard',
+  '/log',
+  '/api/weights',
   '/api/auth/delete-account',
   '/api/parse-pdf',
   '/api/parse-pdf-alt',
   '/api/parse-pdf-v2',
-  '/onboarding(.*)',
-  '/settings(.*)',
-  '/photos(.*)',
-  '/steps(.*)',
-  '/import(.*)',
-]);
-
-const _isPublicRoute = createRouteMatcher([
-  '/signin(.*)',
-  '/signup(.*)',
-  '/login(.*)', // Keep for backwards compatibility
-  '/',
-  '/forgot-password(.*)',
-  '/terms(.*)',
-  '/privacy(.*)',
-  '/about(.*)',
-  '/blog(.*)',
-  '/mobile(.*)',
-]);
+  '/onboarding',
+  '/settings',
+  '/photos',
+  '/steps',
+  '/import',
+];
 
 const productionDebugRoutePatterns = [
   /^\/debug(?:\/.*)?$/,
@@ -48,11 +34,7 @@ const productionDebugRoutePatterns = [
 ];
 
 function normalizePathname(pathname: string) {
-  if (pathname === '/') {
-    return pathname;
-  }
-
-  return pathname.replace(/\/+$/, '');
+  return pathname === '/' ? pathname : pathname.replace(/\/+$/, '');
 }
 
 export function isProductionDebugRoute(pathname: string) {
@@ -64,12 +46,11 @@ export function shouldBlockDebugRoute(pathname: string) {
   return isProductionDebugRoute(pathname);
 }
 
-const protectedRouteMiddleware = clerkMiddleware(async (auth) => {
-  await auth.protect();
-});
-
-export function shouldUseClerkMiddleware(req: NextRequest) {
-  return isProtectedRoute(req);
+export function shouldUseProductAuthMiddleware(req: NextRequest) {
+  const pathname = normalizePathname(req.nextUrl.pathname);
+  return protectedRoutePrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 }
 
 function randomLandingAudience(): LandingAudience {
@@ -78,26 +59,17 @@ function randomLandingAudience(): LandingAudience {
 
 export function resolveLandingAudience(req: NextRequest) {
   const requested = req.nextUrl.searchParams.get('audience');
-  if (isLandingAudience(requested)) {
-    return { audience: requested, source: 'campaign' as const };
-  }
+  if (isLandingAudience(requested)) return { audience: requested, source: 'campaign' as const };
 
   const stored = req.cookies.get(LANDING_AUDIENCE_COOKIE)?.value;
-  if (isLandingAudience(stored)) {
-    return { audience: stored, source: 'returning' as const };
-  }
+  if (isLandingAudience(stored)) return { audience: stored, source: 'returning' as const };
 
   return { audience: randomLandingAudience(), source: 'experiment' as const };
 }
 
-export default function middleware(req: NextRequest, event: NextFetchEvent) {
+export default function middleware(req: NextRequest) {
   if (shouldBlockDebugRoute(req.nextUrl.pathname)) {
-    return new NextResponse(null, {
-      status: 404,
-      headers: {
-        'Cache-Control': 'no-store',
-      },
-    });
+    return new NextResponse(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
 
   if (
@@ -120,23 +92,9 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
     return response;
   }
 
-  if (!shouldUseClerkMiddleware(req)) {
-    return NextResponse.next();
-  }
-
-  return protectedRouteMiddleware(req, event);
+  return updateSession(req);
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
-     * Feel free to modify this pattern to include more paths.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

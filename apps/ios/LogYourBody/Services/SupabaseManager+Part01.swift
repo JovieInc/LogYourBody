@@ -1,20 +1,11 @@
 import Foundation
 import SwiftUI
-import Clerk
 
 extension SupabaseManager {
 // MARK: - JWT Token Management
 
     func getSupabaseJWT() async throws -> String {
-        guard let session = Clerk.shared.session else {
-            throw SupabaseError.notAuthenticated
-        }
-
-        // Get JWT token from Clerk using the new native integration pattern
-        // No template parameter needed - Supabase will validate the Clerk session token directly
-        let tokenResource = try await session.getToken()
-
-        guard let jwtString = tokenResource?.jwt else {
+        guard let jwtString = await AuthManager.shared.getSupabaseToken() else {
             throw SupabaseError.tokenGenerationFailed
         }
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   UserDataDeletionError,
   accountDeletionTargets,
+  deleteProductAuthUser,
   deleteUserDatabaseRows,
 } from '../../../supabase/functions/delete-user-assets/account-deletion';
 
@@ -105,5 +106,41 @@ describe('deleteUserDatabaseRows', () => {
     await expect(
       deleteUserDatabaseRows(mock.client, '   ', { error: () => undefined }),
     ).rejects.toThrow('Cannot delete account data without a user id');
+  });
+});
+
+describe('deleteProductAuthUser', () => {
+  it('deletes the Supabase product principal after account data is gone', async () => {
+    const calls: string[] = [];
+    const client = {
+      auth: {
+        admin: {
+          async deleteUser(userId: string) {
+            calls.push(userId);
+            return {};
+          },
+        },
+      },
+    };
+
+    await deleteProductAuthUser(client, 'user_123');
+
+    expect(calls).toEqual(['user_123']);
+  });
+
+  it('fails closed when the product principal cannot be deleted', async () => {
+    const client = {
+      auth: {
+        admin: {
+          async deleteUser() {
+            return { error: { message: 'provider unavailable' } };
+          },
+        },
+      },
+    };
+
+    await expect(deleteProductAuthUser(client, 'user_123')).rejects.toThrow(
+      'Failed to delete product auth user: provider unavailable',
+    );
   });
 });

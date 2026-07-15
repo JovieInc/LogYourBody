@@ -1,11 +1,11 @@
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import SettingsPage from '../page';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
 
 // Mock dependencies
-jest.mock('@/contexts/ClerkAuthContext');
+jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation');
 jest.mock('@/components/MobileNavbar', () => ({
   MobileNavbar: () => <div data-testid="mobile-navbar" />,
@@ -17,7 +17,7 @@ jest.mock('@/components/VersionDisplay', () => ({
 jest.mock('../page', () => {
   const React = require('react') as typeof import('react');
   const { useAuth } =
-    require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
+    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
 
   const TestSettingsPage: React.FC = () => {
     const { signOut } = useAuth();

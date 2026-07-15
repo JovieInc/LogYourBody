@@ -108,7 +108,7 @@ class LoadingManager: ObservableObject {
     private func performAuthStep() async {
         await updateProgress(for: .checkAuth, partial: 0.5)
 
-        // Skip Clerk loading wait if using mock auth
+        // Skip provider loading wait if using mock auth
         if !Constants.useMockAuth {
             #if DEBUG
             if usesUITestAuthFixture {
@@ -117,19 +117,19 @@ class LoadingManager: ObservableObject {
             }
             #endif
 
-            let clerkTask = authManager.ensureClerkInitializationTask()
+            let authTask = authManager.ensureAuthInitializationTask()
             let maxWaitTimeNanoseconds: UInt64 = 500_000_000 // 0.5 seconds
-            let clerkReady = await waitForClerkInitialization(
-                task: clerkTask,
+            let authReady = await waitForAuthInitialization(
+                task: authTask,
                 timeoutNanoseconds: maxWaitTimeNanoseconds
             )
 
-            if clerkReady {
-                // print("✅ LoadingManager: Clerk loaded successfully")
-            } else if authManager.clerkInitError != nil {
-                // print("⚠️ LoadingManager: Clerk failed to load: \(error)")
+            if authReady {
+                // Provider loaded successfully.
+            } else if authManager.authProviderInitError != nil {
+                // Provider configuration failed.
             } else {
-                // print("⚠️ LoadingManager: Clerk loading timed out after \(Double(maxWaitTimeNanoseconds) / 1_000_000_000)s")
+                // Provider loading timed out.
             }
         }
 
@@ -234,7 +234,7 @@ class LoadingManager: ObservableObject {
         try? await Task.sleep(nanoseconds: 10_000_000) // 0.01s
     }
 
-    private func waitForClerkInitialization(
+    private func waitForAuthInitialization(
         task: Task<Void, Never>,
         timeoutNanoseconds: UInt64
     ) async -> Bool {

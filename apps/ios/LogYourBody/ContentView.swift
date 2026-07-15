@@ -147,9 +147,9 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $showLegalConsent) {
             LegalConsentView(
                 isPresented: $showLegalConsent,
-                userId: authManager.pendingAppleUserId ?? "",
+                userId: authManager.currentUser?.id ?? "",
                 onAccept: {
-                    await authManager.acceptLegalConsent(userId: authManager.pendingAppleUserId ?? "")
+                    await authManager.acceptLegalConsent(userId: authManager.currentUser?.id ?? "")
                 }
             )
             .interactiveDismissDisabled(true) // Prevent dismissing without accepting
@@ -225,8 +225,6 @@ struct ContentView: View {
         Group {
             if authManager.isAuthenticated {
                 authenticatedContent
-            } else if authManager.needsEmailVerification {
-                emailVerificationContent
             } else {
                 loginContent
             }
@@ -255,12 +253,6 @@ struct ContentView: View {
                         AppServicePorts.analyticsTracker.track(event: "dashboard_view")
                     }
             }
-        }
-    }
-
-    private var emailVerificationContent: some View {
-        NavigationStack {
-            EmailVerificationView()
         }
     }
 

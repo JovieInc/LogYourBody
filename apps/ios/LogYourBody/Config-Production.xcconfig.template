@@ -4,9 +4,9 @@
 APP_ENVIRONMENT = production
 ALLOW_PRODUCTION_SERVICES_IN_DEBUG = NO
 
-// Clerk live instance. Must be a publishable key; never use secret keys.
-CLERK_PUBLISHABLE_KEY = pk_live_replace_me
-CLERK_FRONTEND_API = https:/$()/your-production-clerk-frontend-api
+// Supabase custom OIDC provider backed by the shared Jovie Better Auth issuer.
+AUTH_PROVIDER_ID = custom:jovie
+AUTH_REDIRECT_URI = logyourbody:/$()/oauth
 
 // Supabase production project. SUPABASE_EXPECTED_HOST must match SUPABASE_URL host.
 SUPABASE_URL = https:/$()/your-prod-project.supabase.co

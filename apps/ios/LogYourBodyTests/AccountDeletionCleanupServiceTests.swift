@@ -14,7 +14,7 @@ import UIKit
 
 final class AccountDeletionCleanupServiceTests: XCTestCase {
     private enum TestError: Error, Equatable {
-        case clerkDeletionFailed
+        case productDeletionFailed
         case coreDataCleanupFailed
     }
 
@@ -28,11 +28,8 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
                 resetHealthKitAnchors: {
                     events.append("healthkit")
                 },
-                notifyBackendOfAccountDeletion: {
-                    events.append("backend")
-                },
-                deleteAuthAccount: {
-                    events.append("clerk")
+                deleteProductAccount: {
+                    events.append("product")
                 },
                 deleteCoreData: {
                     events.append("coredata")
@@ -60,8 +57,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
             [
                 "revenuecat",
                 "healthkit",
-                "backend",
-                "clerk",
+                "product",
                 "coredata",
                 "keychain",
                 "defaults",
@@ -81,11 +77,8 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
                 resetHealthKitAnchors: {
                     events.append("healthkit")
                 },
-                notifyBackendOfAccountDeletion: {
-                    events.append("backend")
-                },
-                deleteAuthAccount: {
-                    events.append("clerk")
+                deleteProductAccount: {
+                    events.append("product")
                 },
                 deleteCoreData: {
                     events.append("coredata")
@@ -119,8 +112,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
             [
                 "revenuecat",
                 "healthkit",
-                "backend",
-                "clerk",
+                "product",
                 "coredata",
                 "keychain",
                 "defaults",
@@ -130,7 +122,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
         )
     }
 
-    func testPerformDeletionStopsBeforeLocalDestructiveCleanupWhenClerkDeletionFails() async {
+    func testPerformDeletionStopsBeforeLocalCleanupWhenProductDeletionFails() async {
         var events: [String] = []
         let service = AccountDeletionCleanupService(
             dependencies: .init(
@@ -140,12 +132,9 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
                 resetHealthKitAnchors: {
                     events.append("healthkit")
                 },
-                notifyBackendOfAccountDeletion: {
-                    events.append("backend")
-                },
-                deleteAuthAccount: {
-                    events.append("clerk")
-                    throw TestError.clerkDeletionFailed
+                deleteProductAccount: {
+                    events.append("product")
+                    throw TestError.productDeletionFailed
                 },
                 deleteCoreData: {
                     events.append("coredata")
@@ -168,12 +157,12 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
 
         do {
             try await service.performDeletion()
-            XCTFail("Expected Clerk deletion failure to be rethrown")
+            XCTFail("Expected product deletion failure to be rethrown")
         } catch {
-            XCTAssertEqual(error as? TestError, .clerkDeletionFailed)
+            XCTAssertEqual(error as? TestError, .productDeletionFailed)
         }
 
-        XCTAssertEqual(events, ["revenuecat", "healthkit", "backend", "clerk"])
+        XCTAssertEqual(events, ["revenuecat", "healthkit", "product"])
     }
 
     func testClearAccountUserDefaultsRemovesAuthHealthKitBillingAndLaunchState() {

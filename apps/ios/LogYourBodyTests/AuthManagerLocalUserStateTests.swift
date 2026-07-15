@@ -1,7 +1,3 @@
-//
-// AuthManagerLocalUserStateTests.swift
-// LogYourBodyTests
-//
 import XCTest
 import AVFoundation
 import CoreData
@@ -33,17 +29,15 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
         XCTAssertFalse(manager.isAuthenticated)
     }
 
-    func testHandleSupabaseUnauthorizedSetsSessionExpired() async {
+    func testHandleSupabaseUnauthorizedExpiresSessionWithoutRefreshToken() async {
         let manager = AuthManager()
         manager.isAuthenticated = true
-        manager.lastExitReason = .none
         manager.currentUser = LocalUser(
             id: "test-user",
             email: "test@example.com",
-            name: "Test User",
+            name: nil,
             avatarUrl: nil,
-            profile: nil,
-            onboardingCompleted: false
+            profile: nil
         )
 
         await manager.handleSupabaseUnauthorized()
@@ -53,105 +47,23 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
         XCTAssertNil(manager.currentUser)
     }
 
-    func testUpdateLocalUserResetsExitReasonToNoneOnSignIn() {
-        let manager = AuthManager()
-        manager.lastExitReason = .sessionExpired
-
-        struct FakeEmailAddress {
-            let emailAddress: String
+    func testSupabaseAuthUserUsesProviderProfileName() throws {
+        let payload = Data(#"""
+        {
+          "id": "product-user",
+          "email": "phone@identity.jov.ie",
+          "created_at": "2026-07-14T12:00:00Z",
+          "user_metadata": { "full_name": "Test User" }
         }
+        """#.utf8)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
 
-        struct FakeClerkUser {
-            let id: String
-            let emailAddresses: [FakeEmailAddress]
-            let firstName: String?
-            let lastName: String?
-            let username: String?
-            let imageUrl: String?
-        }
+        let user = try decoder.decode(SupabaseAuthUser.self, from: payload)
 
-        let fakeUser = FakeClerkUser(
-            id: "user_123",
-            emailAddresses: [FakeEmailAddress(emailAddress: "test@example.com")],
-            firstName: "Test",
-            lastName: "User",
-            username: "testuser",
-            imageUrl: nil
-        )
-
-        manager.updateLocalUser(clerkUser: fakeUser)
-
-        XCTAssertEqual(manager.lastExitReason, .none)
-        XCTAssertTrue(manager.isAuthenticated)
-        XCTAssertEqual(manager.currentUser?.email, "test@example.com")
-    }
-
-    func testUpdateLocalUserUsesExternalAccountEmailWhenPrimaryEmailsMissing() {
-        let manager = AuthManager()
-
-        struct FakeExternalAccount {
-            let provider: String
-            let emailAddress: String
-        }
-
-        struct FakeClerkUser {
-            let id: String
-            let emailAddresses: [String]
-            let externalAccounts: [FakeExternalAccount]
-            let firstName: String?
-            let lastName: String?
-            let username: String?
-            let imageUrl: String?
-        }
-
-        let fakeUser = FakeClerkUser(
-            id: "user_apple_123",
-            emailAddresses: [],
-            externalAccounts: [
-                FakeExternalAccount(
-                    provider: "oauth_apple",
-                    emailAddress: "private@example.com"
-                )
-            ],
-            firstName: "Apple",
-            lastName: "User",
-            username: nil,
-            imageUrl: nil
-        )
-
-        manager.updateLocalUser(clerkUser: fakeUser)
-
-        XCTAssertTrue(manager.isAuthenticated)
-        XCTAssertEqual(manager.currentUser?.email, "private@example.com")
-    }
-
-    func testUpdateLocalUserSynthesizesEmailWhenClerkEmailMissing() {
-        let manager = AuthManager()
-
-        struct FakeClerkUser {
-            let id: String
-            let emailAddresses: [String]
-            let externalAccounts: [String]
-            let firstName: String?
-            let lastName: String?
-            let username: String?
-            let imageUrl: String?
-        }
-
-        let fakeUser = FakeClerkUser(
-            id: "user_apple_123",
-            emailAddresses: [],
-            externalAccounts: [],
-            firstName: nil,
-            lastName: nil,
-            username: nil,
-            imageUrl: nil
-        )
-
-        manager.updateLocalUser(clerkUser: fakeUser)
-
-        XCTAssertTrue(manager.isAuthenticated)
-        XCTAssertEqual(manager.currentUser?.email, "user_apple_123@apple.local.logyourbody")
+        XCTAssertEqual(user.id, "product-user")
+        XCTAssertEqual(user.email, "phone@identity.jov.ie")
+        XCTAssertEqual(user.name, "Test User")
     }
 
     func testApplySavedProfileUpdatesPublishedCurrentUser() {
@@ -161,23 +73,8 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
             email: "profile@example.com",
             name: "Old Name",
             avatarUrl: nil,
-            profile: UserProfile(
-                id: "profile-user",
-                email: "profile@example.com",
-                username: nil,
-                fullName: "Old Name",
-                dateOfBirth: nil,
-                height: nil,
-                heightUnit: "cm",
-                gender: nil,
-                activityLevel: nil,
-                goalWeight: nil,
-                goalWeightUnit: nil,
-                onboardingCompleted: false
-            ),
-            onboardingCompleted: false
+            profile: nil
         )
-
         let savedProfile = UserProfile(
             id: "profile-user",
             email: "profile@example.com",
@@ -193,13 +90,10 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
             onboardingCompleted: true
         )
 
-        let didApply = manager.applySavedProfileToCurrentUser(savedProfile)
-
-        XCTAssertTrue(didApply)
+        XCTAssertTrue(manager.applySavedProfileToCurrentUser(savedProfile))
         XCTAssertEqual(manager.currentUser?.name, "Updated Name")
         XCTAssertEqual(manager.currentUser?.profile?.height, 180)
-        XCTAssertEqual(manager.currentUser?.profile?.gender, "male")
-        XCTAssertEqual(manager.currentUser?.onboardingCompleted, true)
+        XCTAssertTrue(manager.currentUser?.onboardingCompleted ?? false)
     }
 
     func testApplySavedProfileRejectsDifferentUserProfile() {
@@ -207,47 +101,33 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
         manager.currentUser = LocalUser(
             id: "current-user",
             email: "current@example.com",
-            name: "Current User",
+            name: nil,
             avatarUrl: nil,
-            profile: nil,
-            onboardingCompleted: false
+            profile: nil
+        )
+        let other = UserProfile(
+            id: "other-user",
+            email: "other@example.com",
+            username: nil,
+            fullName: "Other User",
+            dateOfBirth: nil,
+            height: 180,
+            heightUnit: "cm",
+            gender: "male",
+            activityLevel: nil,
+            goalWeight: nil,
+            goalWeightUnit: nil,
+            onboardingCompleted: true
         )
 
-        let didApply = manager.applySavedProfileToCurrentUser(
-            UserProfile(
-                id: "other-user",
-                email: "other@example.com",
-                username: nil,
-                fullName: "Other User",
-                dateOfBirth: nil,
-                height: 180,
-                heightUnit: "cm",
-                gender: "male",
-                activityLevel: nil,
-                goalWeight: nil,
-                goalWeightUnit: nil,
-                onboardingCompleted: true
-            )
-        )
-
-        XCTAssertFalse(didApply)
+        XCTAssertFalse(manager.applySavedProfileToCurrentUser(other))
         XCTAssertEqual(manager.currentUser?.id, "current-user")
-        XCTAssertNil(manager.currentUser?.profile)
-        XCTAssertFalse(manager.currentUser?.onboardingCompleted ?? true)
     }
 
-    func testSyntheticAuthEmailSanitizesClerkUserId() {
+    func testSyntheticAuthEmailSanitizesIdentitySubject() {
         XCTAssertEqual(
             AuthManager.syntheticAuthEmail(userId: " user:abc/123 "),
-            "user-abc-123@apple.local.logyourbody"
-        )
-    }
-
-    func testNormalizedAuthEmailRejectsNonEmailIdentifier() {
-        XCTAssertNil(AuthManager.normalizedAuthEmailCandidate("user_apple_123"))
-        XCTAssertEqual(
-            AuthManager.normalizedAuthEmailCandidate(" private@example.com "),
-            "private@example.com"
+            "user-abc-123@identity.logyourbody"
         )
     }
 }

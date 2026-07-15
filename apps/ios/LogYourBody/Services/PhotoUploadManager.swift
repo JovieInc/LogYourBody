@@ -103,12 +103,7 @@ class PhotoUploadManager: ObservableObject {
     }
 
     private func authenticatedJWT() async throws -> String {
-        guard let session = authManager.clerkSession else {
-            throw PhotoError.notAuthenticated
-        }
-
-        let tokenResource = try await session.getToken()
-        guard let token = tokenResource?.jwt else {
+        guard let token = await authManager.getSupabaseToken() else {
             throw PhotoError.notAuthenticated
         }
 

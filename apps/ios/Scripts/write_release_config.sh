@@ -65,11 +65,11 @@ xcconfig_url() {
   printf '%s' "$1" | sed "s#://#:/\$()/#"
 }
 
-CLERK_PUBLISHABLE_KEY="${CLERK_PUBLISHABLE_KEY:-${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}}"
 SUPABASE_URL="${SUPABASE_URL:-${NEXT_PUBLIC_SUPABASE_URL:-}}"
 SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-${NEXT_PUBLIC_SUPABASE_ANON_KEY:-${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY:-}}}"
 REVENUE_CAT_PUBLIC_KEY="${REVENUE_CAT_PUBLIC_KEY:-}"
-CLERK_FRONTEND_API="${CLERK_FRONTEND_API:-https://clerk.logyourbody.com}"
+AUTH_PROVIDER_ID="${AUTH_PROVIDER_ID:-custom:jovie}"
+AUTH_REDIRECT_URI="${AUTH_REDIRECT_URI:-logyourbody://oauth}"
 API_BASE_URL="${API_BASE_URL:-https://www.logyourbody.com}"
 STATSIG_CLIENT_SDK_KEY="${STATSIG_CLIENT_SDK_KEY:-}"
 STATSIG_ENVIRONMENT_TIER="${STATSIG_ENVIRONMENT_TIER:-production}"
@@ -79,21 +79,23 @@ SENTRY_TRACES_SAMPLE_RATE="${SENTRY_TRACES_SAMPLE_RATE:-0.1}"
 BODYSPEC_CLIENT_ID="${BODYSPEC_CLIENT_ID:-}"
 BODYSPEC_REDIRECT_URI="${BODYSPEC_REDIRECT_URI:-}"
 
-require_value "CLERK_PUBLISHABLE_KEY" "$CLERK_PUBLISHABLE_KEY"
 require_value "SUPABASE_URL" "$SUPABASE_URL"
 require_value "SUPABASE_ANON_KEY" "$SUPABASE_ANON_KEY"
 require_value "REVENUE_CAT_PUBLIC_KEY" "$REVENUE_CAT_PUBLIC_KEY"
-require_value "CLERK_FRONTEND_API" "$CLERK_FRONTEND_API"
+require_value "AUTH_PROVIDER_ID" "$AUTH_PROVIDER_ID"
+require_value "AUTH_REDIRECT_URI" "$AUTH_REDIRECT_URI"
 require_value "API_BASE_URL" "$API_BASE_URL"
 
-case "$CLERK_PUBLISHABLE_KEY" in
-  pk_live_*) ;;
-  *) fail "CLERK_PUBLISHABLE_KEY must be a Clerk live publishable key for iOS production releases." ;;
-esac
-
 require_https_url "SUPABASE_URL" "$SUPABASE_URL"
-require_https_url "CLERK_FRONTEND_API" "$CLERK_FRONTEND_API"
 require_https_url "API_BASE_URL" "$API_BASE_URL"
+
+if [ "$AUTH_PROVIDER_ID" != "custom:jovie" ]; then
+  fail "AUTH_PROVIDER_ID must be custom:jovie for iOS production releases."
+fi
+
+if [ "$AUTH_REDIRECT_URI" != "logyourbody://oauth" ]; then
+  fail "AUTH_REDIRECT_URI must be logyourbody://oauth for iOS production releases."
+fi
 
 bash "$SCRIPT_DIR/verify_upload_hosts.sh"
 
@@ -136,8 +138,8 @@ cat > "$CONFIG_FILE" <<EOF
 APP_ENVIRONMENT = production
 ALLOW_PRODUCTION_SERVICES_IN_DEBUG = NO
 
-CLERK_PUBLISHABLE_KEY = $CLERK_PUBLISHABLE_KEY
-CLERK_FRONTEND_API = $(xcconfig_url "$CLERK_FRONTEND_API")
+AUTH_PROVIDER_ID = $AUTH_PROVIDER_ID
+AUTH_REDIRECT_URI = $(xcconfig_url "$AUTH_REDIRECT_URI")
 
 SUPABASE_URL = $(xcconfig_url "$SUPABASE_URL")
 SUPABASE_EXPECTED_HOST = $SUPABASE_EXPECTED_HOST

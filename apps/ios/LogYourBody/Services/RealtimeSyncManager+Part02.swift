@@ -1,7 +1,6 @@
 import Foundation
 import Combine
 import Network
-import Clerk
 import UIKit
 
 extension RealtimeSyncManager {

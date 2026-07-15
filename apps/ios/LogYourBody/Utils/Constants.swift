@@ -24,23 +24,14 @@ struct Constants {
         Configuration.apiBaseURL
     }
 
-    // MARK: - Clerk Configuration (from Config.xcconfig via Info.plist)
-    static var clerkPublishableKey: String {
-        Configuration.clerkPublishableKey
-    }
-
-    static var clerkFrontendAPI: String {
-        Configuration.clerkFrontendAPI
-    }
-
     #if DEBUG
     static let useMockAuth = false  // Set to true only for local mock testing in debug builds
     #else
     static let useMockAuth = false  // Always disabled in non-debug builds
     #endif
 
-    static var isClerkConfigured: Bool {
-        Configuration.isClerkConfigured
+    static var isAuthConfigured: Bool {
+        Configuration.isAuthConfigured
     }
 
     // MARK: - Supabase Configuration (from Config.xcconfig via Info.plist)
@@ -145,12 +136,7 @@ enum AestheticGoalPolicy {
 }
 
 struct AuthSurfacePolicy {
-    static let defaultShowsAppleSignIn = true
-    static let primarySignInMethod = "email_otp"
-
-    static func shouldShowAppleSignIn() -> Bool {
-        true
-    }
+    static let primarySignInMethod = "sms_otp"
 }
 
 enum PhotoTimelineHUDPolicy {

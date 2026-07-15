@@ -198,7 +198,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
 
         XCTAssertFalse(
             EntryDeepLinkRoutingPolicy.canStoreForLater(
-                isClerkLoaded: true,
+                isAuthProviderLoaded: true,
                 isAuthenticated: false
             )
         )
@@ -233,7 +233,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
 
         XCTAssertTrue(
             EntryDeepLinkRoutingPolicy.canStoreForLater(
-                isClerkLoaded: true,
+                isAuthProviderLoaded: true,
                 isAuthenticated: true
             )
         )

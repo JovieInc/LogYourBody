@@ -54,7 +54,6 @@
 		7EE44B7F0195FDD490B3D5F6 /* FullMetricChartView+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83248F0638FB24D0201A0C1 /* FullMetricChartView+Part01.swift */; };
 		841527E772D0CA94BE0D3F96 /* HealthKitManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */; };
 		8A693BCF3584DF89630F50C5 /* OnboardingFlowViewModel+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5586EC0657B1F9E652068FBA /* OnboardingFlowViewModel+Part02.swift */; };
-		8A84CA90D762411919167564 /* AuthManager+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01742F215DBF41472D1BAD01 /* AuthManager+Part02.swift */; };
 		8DDCF5DB348BB94E94C669D0 /* PhotoUploadBatchPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BDF63906AA2DF9D7BEC1CA0 /* PhotoUploadBatchPolicyTests.swift */; };
 		8F1D82C327BC8A6B5FB2A6DB /* BodyMetricLoggingAndInsightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192238EEFD8161597A0B99AA /* BodyMetricLoggingAndInsightTests.swift */; };
 		8FB91216C622624E0F7815CC /* HealthSyncPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C662CF613D4755CA2B93A43 /* HealthSyncPipelineTests.swift */; };
@@ -89,7 +88,6 @@
 		AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */; };
 		AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */; };
 		AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */; };
-		AD25A7822E17439500611A56 /* Clerk in Frameworks */ = {isa = PBXBuildFile; productRef = AD25A7812E17439500611A56 /* Clerk */; };
 		AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134002F01313400D134A1 /* NotificationManager.swift */; };
 		AD3134032F01313400D134A1 /* DailyWeighInReminderPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */; };
 		AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145A12F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift */; };
@@ -140,7 +138,6 @@
 		AD8872962EB946BE0041C426 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872912EB946BE0041C426 /* Theme.swift */; };
 		AD8872972EB946BE0041C426 /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872712EB946BE0041C426 /* ErrorStateView.swift */; };
 		AD8872982EB946BE0041C426 /* LiquidGlassTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872862EB946BE0041C426 /* LiquidGlassTabBar.swift */; };
-		AD8872992EB946BE0041C426 /* DSAuthDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872702EB946BE0041C426 /* DSAuthDivider.swift */; };
 		AD88729B2EB946BE0041C426 /* AuthFormField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88726A2EB946BE0041C426 /* AuthFormField.swift */; };
 		AD88729C2EB946BE0041C426 /* StandardTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872632EB946BE0041C426 /* StandardTextField.swift */; };
 		AD88729D2EB946BE0041C426 /* UserGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727C2EB946BE0041C426 /* UserGreeting.swift */; };
@@ -148,9 +145,7 @@
 		AD88729F2EB946BE0041C426 /* CommonModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872672EB946BE0041C426 /* CommonModifiers.swift */; };
 		AD8872A02EB946BE0041C426 /* SettingsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88725F2EB946BE0041C426 /* SettingsRow.swift */; };
 		AD8872A22EB946BE0041C426 /* BiometricAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727E2EB946BE0041C426 /* BiometricAuthView.swift */; };
-		AD8872A32EB946BE0041C426 /* SocialLoginButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872792EB946BE0041C426 /* SocialLoginButton.swift */; };
 		AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724C2EB946BE0041C426 /* DSAuthLink.swift */; };
-		AD8872A52EB946BE0041C426 /* LoginForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872882EB946BE0041C426 /* LoginForm.swift */; };
 		AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728D2EB946BE0041C426 /* UserHeaderSection.swift */; };
 		AD8872AB2EB946BE0041C426 /* DSAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88724D2EB946BE0041C426 /* DSAvatar.swift */; };
 		AD8872AC2EB946BE0041C426 /* StepsIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88727A2EB946BE0041C426 /* StepsIndicator.swift */; };
@@ -175,7 +170,6 @@
 		AD8872C92EB946BE0041C426 /* SettingsSectionGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728B2EB946BE0041C426 /* SettingsSectionGroup.swift */; };
 		AD8872CA2EB946BE0041C426 /* StateViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872642EB946BE0041C426 /* StateViews.swift */; };
 		AD8872CC2EB946BE0041C426 /* LegalDocumentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872722EB946BE0041C426 /* LegalDocumentRow.swift */; };
-		AD8872CD2EB946BE0041C426 /* SignUpForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88728C2EB946BE0041C426 /* SignUpForm.swift */; };
 		AD8872CE2EB946BE0041C426 /* DSMetricValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872572EB946BE0041C426 /* DSMetricValue.swift */; };
 		AD8872CF2EB946BE0041C426 /* StandardHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872622EB946BE0041C426 /* StandardHeader.swift */; };
 		AD8872D02EB946BE0041C426 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872892EB946BE0041C426 /* MarkdownView.swift */; };
@@ -283,7 +277,6 @@
 		ADDC47CE2E2D89F3003C97E7 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AEF2E15FA5C002376C6 /* Constants.swift */; };
 		ADDC47D02E2D89F3003C97E7 /* SecuritySessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F02E22E7D500B82C49 /* SecuritySessionsView.swift */; };
 		ADDC47D12E2D89F3003C97E7 /* ProfileSettingsViewV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8552532E19A2A1003552EE /* ProfileSettingsViewV2.swift */; };
-		ADDC47D82E2D89F3003C97E7 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AFC2E15FA5C002376C6 /* AppleSignInButton.swift */; };
 		ADDC47DD2E2D89F3003C97E7 /* SyncStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8552632E19DCB6003552EE /* SyncStatusView.swift */; };
 		ADDC47DE2E2D89F3003C97E7 /* IntegrationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D3892E24A566001F82A8 /* IntegrationsView.swift */; };
 		ADDC47DF2E2D89F3003C97E7 /* LegalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD933E042E24A22D00801078 /* LegalView.swift */; };
@@ -291,7 +284,6 @@
 		ADDC47E12E2D89F3003C97E7 /* DeleteAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AFE2E15FA5C002376C6 /* DeleteAccountView.swift */; };
 		ADDC47E22E2D89F3003C97E7 /* LegalDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0054EE2E2197B00029E0FF /* LegalDocumentView.swift */; };
 		ADDC47E32E2D89F3003C97E7 /* DietPhaseHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD933DFA2E24328A00801078 /* DietPhaseHistoryView.swift */; };
-		ADDC47E42E2D89F3003C97E7 /* EmailVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AFF2E15FA5C002376C6 /* EmailVerificationView.swift */; };
 		ADDC47E52E2D89F3003C97E7 /* AddEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF5C1B12E1CD2FD00E3FB4D /* AddEntrySheet.swift */; };
 		ADDC47E62E2D89F3003C97E7 /* ExportDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B002E15FA5C002376C6 /* ExportDataView.swift */; };
 		ADDC47E72E2D89F3003C97E7 /* HealthKitPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B012E15FA5C002376C6 /* HealthKitPromptView.swift */; };
@@ -354,7 +346,6 @@
 		DB19A6EC4AA997A0EF4C5791 /* SyncIntegrationImportAndMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA338579090538FBCCA21785 /* SyncIntegrationImportAndMappingTests.swift */; };
 		DC51280D16A74D3E38D4B798 /* CoreDataManager+Part04.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62F02AB81FF64BBC27043BB9 /* CoreDataManager+Part04.swift */; };
 		DF4A68C6C15578CBB9293C37 /* Glp1WeeklyCheckInPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FEDB2A6B2D920273613C82 /* Glp1WeeklyCheckInPolicyTests.swift */; };
-		E2191483231B920BDCEF2808 /* AuthManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = E25AC47BA80AD9ED60F2A5ED /* AuthManager+Part01.swift */; };
 		E251E204A77F2161E880A19E /* RevenueCatSubscriptionAnalyticsTransitionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F1996527170EC15B242FF4B /* RevenueCatSubscriptionAnalyticsTransitionTests.swift */; };
 		E389C2EFF4E7B92EE0A9A997 /* RealtimeSyncManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = D557A5B9E670DD0A6A8BA893 /* RealtimeSyncManager+Part01.swift */; };
 		E6CBDEE0211741843DCF52AA /* CoreDataManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF02BFDD936CBA59B3704AA3 /* CoreDataManager+Part01.swift */; };
@@ -418,7 +409,6 @@
 
 /* Begin PBXFileReference section */
 		012FFE30028F04055FFF6538 /* DSTrendIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSTrendIndicator.swift; path = DesignSystem/Atoms/DSTrendIndicator.swift; sourceTree = "<group>"; };
-		01742F215DBF41472D1BAD01 /* AuthManager+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AuthManager+Part02.swift"; path = "AuthManager+Part02.swift"; sourceTree = "<group>"; };
 		0401CF23AE214F20C7EB5886 /* DeveloperTapHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeveloperTapHandler.swift; path = DesignSystem/Molecules/DeveloperTapHandler.swift; sourceTree = "<group>"; };
 		05F19CFBFEA440516AFCE98B /* DSText.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSText.swift; path = DesignSystem/Atoms/DSText.swift; sourceTree = "<group>"; };
 		060DD24271B0B2120CB0AA33 /* BulkProgressPhotoImportPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BulkProgressPhotoImportPolicyTests.swift; sourceTree = "<group>"; };
@@ -483,8 +473,6 @@
 		7A1DE682AE51BF7A3EFF75FF /* HealthKitManager+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "HealthKitManager+Part02.swift"; path = "HealthKitManager+Part02.swift"; sourceTree = "<group>"; };
 		7B5A5D6BAAD9FB2F7B8AFACB /* BaseButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BaseButton.swift; path = DesignSystem/Atoms/BaseButton.swift; sourceTree = "<group>"; };
 		7CEFB36F814C3D7E8AE709B4 /* DSCircularProgress.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSCircularProgress.swift; path = DesignSystem/Atoms/DSCircularProgress.swift; sourceTree = "<group>"; };
-		7CFEB1A3F5D9DF386EE0836D /* DSAuthDivider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAuthDivider.swift; path = DesignSystem/Molecules/DSAuthDivider.swift; sourceTree = "<group>"; };
-		7D0FE397063AA257AA67F731 /* LoginForm.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LoginForm.swift; path = DesignSystem/Organisms/LoginForm.swift; sourceTree = "<group>"; };
 		7EF9F0EEBB2D999F7FEEF7D0 /* DSAuthLink.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAuthLink.swift; path = DesignSystem/Atoms/DSAuthLink.swift; sourceTree = "<group>"; };
 		82670AD733C4BBFF727489CC /* MarkdownView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MarkdownView.swift; path = DesignSystem/Organisms/MarkdownView.swift; sourceTree = "<group>"; };
 		83531C42434F71BA31C75D89 /* RealtimeSyncManager+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "RealtimeSyncManager+Part02.swift"; path = "RealtimeSyncManager+Part02.swift"; sourceTree = "<group>"; };
@@ -504,7 +492,6 @@
 		9F0DAD82BAAEB27B75923381 /* FullMetricChartView+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "FullMetricChartView+Part02.swift"; path = "Components/FullMetricChartView+Part02.swift"; sourceTree = "<group>"; };
 		9F7D800638256D10A5ACB992 /* Glp1DoseCoreDataTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Glp1DoseCoreDataTests.swift; sourceTree = "<group>"; };
 		A4A1C6C2438CB1EDCEC43C67 /* HealthSyncTestDoubles.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthSyncTestDoubles.swift; sourceTree = "<group>"; };
-		A65AF31E24C0B8890ABB203D /* SocialLoginButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SocialLoginButton.swift; path = DesignSystem/Molecules/SocialLoginButton.swift; sourceTree = "<group>"; };
 		A88D7AC2C7FF4E14A3BB8168 /* CoreDataManager+Part03.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "CoreDataManager+Part03.swift"; path = "CoreDataManager+Part03.swift"; sourceTree = "<group>"; };
 		AB992727D1333B365F93F30E /* AccountDeletionCleanupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccountDeletionCleanupServiceTests.swift; sourceTree = "<group>"; };
 		AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PasswordStrengthIndicator.swift; path = DesignSystem/Molecules/PasswordStrengthIndicator.swift; sourceTree = "<group>"; };
@@ -586,9 +573,7 @@
 		AD723AEA2E15FA5C002376C6 /* SupabaseDataClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseDataClient.swift; sourceTree = "<group>"; };
 		AD723AEE2E15FA5C002376C6 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		AD723AEF2E15FA5C002376C6 /* Constants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
-		AD723AFC2E15FA5C002376C6 /* AppleSignInButton.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
 		AD723AFE2E15FA5C002376C6 /* DeleteAccountView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DeleteAccountView.swift; sourceTree = "<group>"; };
-		AD723AFF2E15FA5C002376C6 /* EmailVerificationView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EmailVerificationView.swift; sourceTree = "<group>"; };
 		AD723B002E15FA5C002376C6 /* ExportDataView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ExportDataView.swift; sourceTree = "<group>"; };
 		AD723B012E15FA5C002376C6 /* HealthKitPromptView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HealthKitPromptView.swift; sourceTree = "<group>"; };
 		AD723B022E15FA5C002376C6 /* LoadingView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
@@ -667,7 +652,6 @@
 		AD88726D2EB946BE0041C426 /* DeveloperTapHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperTapHandler.swift; sourceTree = "<group>"; };
 		AD88726E2EB946BE0041C426 /* DeveloperTapIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperTapIndicator.swift; sourceTree = "<group>"; };
 		AD88726F2EB946BE0041C426 /* DocumentHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentHeader.swift; sourceTree = "<group>"; };
-		AD8872702EB946BE0041C426 /* DSAuthDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSAuthDivider.swift; sourceTree = "<group>"; };
 		AD8872712EB946BE0041C426 /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
 		AD8872722EB946BE0041C426 /* LegalDocumentRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalDocumentRow.swift; sourceTree = "<group>"; };
 		AD8872732EB946BE0041C426 /* LiquidGlassCTAButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassCTAButton.swift; sourceTree = "<group>"; };
@@ -675,7 +659,6 @@
 		AD8872762EB946BE0041C426 /* MetricGauge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricGauge.swift; sourceTree = "<group>"; };
 		AD8872772EB946BE0041C426 /* OTPField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPField.swift; sourceTree = "<group>"; };
 		AD8872782EB946BE0041C426 /* PasswordStrengthIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStrengthIndicator.swift; sourceTree = "<group>"; };
-		AD8872792EB946BE0041C426 /* SocialLoginButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialLoginButton.swift; sourceTree = "<group>"; };
 		AD88727A2EB946BE0041C426 /* StepsIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepsIndicator.swift; sourceTree = "<group>"; };
 		AD88727B2EB946BE0041C426 /* UserAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAvatar.swift; sourceTree = "<group>"; };
 		AD88727C2EB946BE0041C426 /* UserGreeting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserGreeting.swift; sourceTree = "<group>"; };
@@ -687,11 +670,9 @@
 		AD8872852EB946BE0041C426 /* LegalSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalSection.swift; sourceTree = "<group>"; };
 		AD8872862EB946BE0041C426 /* LiquidGlassTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassTabBar.swift; sourceTree = "<group>"; };
 		AD8872872EB946BE0041C426 /* LoadingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingScreen.swift; sourceTree = "<group>"; };
-		AD8872882EB946BE0041C426 /* LoginForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginForm.swift; sourceTree = "<group>"; };
 		AD8872892EB946BE0041C426 /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownView.swift; sourceTree = "<group>"; };
 		AD88728A2EB946BE0041C426 /* SecondaryMetricsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondaryMetricsRow.swift; sourceTree = "<group>"; };
 		AD88728B2EB946BE0041C426 /* SettingsSectionGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSectionGroup.swift; sourceTree = "<group>"; };
-		AD88728C2EB946BE0041C426 /* SignUpForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpForm.swift; sourceTree = "<group>"; };
 		AD88728D2EB946BE0041C426 /* UserHeaderSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserHeaderSection.swift; sourceTree = "<group>"; };
 		AD88728E2EB946BE0041C426 /* VerificationForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerificationForm.swift; sourceTree = "<group>"; };
 		AD8872912EB946BE0041C426 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -826,7 +807,6 @@
 		ADF5C1F32E1E1B3600E3FB4D /* SecuritySessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySessionsView.swift; sourceTree = "<group>"; };
 		ADF5C1FC2E1E2E9100E3FB4D /* BiometricLockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricLockView.swift; sourceTree = "<group>"; };
 		ADF5C1FE2E1EFE3100E3FB4D /* OptimizedProgressPhotoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptimizedProgressPhotoView.swift; sourceTree = "<group>"; };
-		ADF5C2002E1F2BD900E3FB4D /* EmailVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailVerificationView.swift; sourceTree = "<group>"; };
 		ADF5C2012E1F2BD900E3FB4D /* EnhancedOTPInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancedOTPInputView.swift; sourceTree = "<group>"; };
 		ADFC6A1B2E185913004FCE40 /* NameInputView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NameInputView.swift; sourceTree = "<group>"; };
 		ADFC6A1C2E185913004FCE40 /* GenderInputView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GenderInputView.swift; sourceTree = "<group>"; };
@@ -859,7 +839,6 @@
 		DA456B8668AB1B5DDFA6C5CA /* AuthSurfacePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthSurfacePolicyTests.swift; sourceTree = "<group>"; };
 		DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthSyncCoordinatorPipelineTests.swift; sourceTree = "<group>"; };
 		E2465B2ED058FAFC5389161E /* DSDivider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSDivider.swift; path = DesignSystem/Atoms/DSDivider.swift; sourceTree = "<group>"; };
-		E25AC47BA80AD9ED60F2A5ED /* AuthManager+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AuthManager+Part01.swift"; path = "AuthManager+Part01.swift"; sourceTree = "<group>"; };
 		E2AC3C23E6923176F103B414 /* StepsIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StepsIndicator.swift; path = DesignSystem/Molecules/StepsIndicator.swift; sourceTree = "<group>"; };
 		E47A7741CF9BBCD0F5DC0D5C /* LaunchSurfacePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchSurfacePolicyTests.swift; sourceTree = "<group>"; };
 		E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAvatar.swift; path = DesignSystem/Atoms/DSAvatar.swift; sourceTree = "<group>"; };
@@ -870,7 +849,6 @@
 		EC645B4F52DDE739FAFF042E /* SupabaseManager+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "SupabaseManager+Part01.swift"; path = "SupabaseManager+Part01.swift"; sourceTree = "<group>"; };
 		ED6868B1C7F6167E2A9AE0A1 /* OnboardingFlowViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingFlowViewModelTests.swift; sourceTree = "<group>"; };
 		EECB82E4C8977D7158475EFB /* MetricChartDataPointPresenceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MetricChartDataPointPresenceTests.swift; sourceTree = "<group>"; };
-		F2013EF479280EB0CB67121E /* SignUpForm.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SignUpForm.swift; path = DesignSystem/Organisms/SignUpForm.swift; sourceTree = "<group>"; };
 		F51C80EB60F2EA0D7AFA62AB /* EditEntrySavePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditEntrySavePolicyTests.swift; sourceTree = "<group>"; };
 		FB947FE422689993FD02B4F6 /* AuthHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthHeader.swift; path = DesignSystem/Molecules/AuthHeader.swift; sourceTree = "<group>"; };
 		FBDA30F8A24DC3754F3CD216 /* AuthProfileBootstrapPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthProfileBootstrapPolicyTests.swift; sourceTree = "<group>"; };
@@ -899,7 +877,6 @@
 			files = (
 				AD050C4F2EC135360082A313 /* RevenueCat in Frameworks */,
 				AD050C4D2EC135360082A313 /* ReceiptParser in Frameworks */,
-				AD25A7822E17439500611A56 /* Clerk in Frameworks */,
 				AD8F12E92ED6A489003C4559 /* Statsig in Frameworks */,
 				AD050C512EC135360082A313 /* RevenueCatUI in Frameworks */,
 				AD3E4F652E17A12300345678 /* HealthKit.framework in Frameworks */,
@@ -1002,12 +979,10 @@
 				CCD81BE70A7B449921973AEA /* LegalDocumentRow.swift */,
 				1A28294A184FBD2E6E0D43EF /* DocumentHeader.swift */,
 				BBB847A2050F3135D62950A1 /* AuthFormField.swift */,
-				A65AF31E24C0B8890ABB203D /* SocialLoginButton.swift */,
 				FB947FE422689993FD02B4F6 /* AuthHeader.swift */,
 				22BF10E43507028B75EE0B6B /* OTPField.swift */,
 				AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */,
 				1424DF5DCE3F9859106AB687 /* AuthConsentCheckbox.swift */,
-				7CFEB1A3F5D9DF386EE0836D /* DSAuthDivider.swift */,
 				E2AC3C23E6923176F103B414 /* StepsIndicator.swift */,
 				D03041E8A638B1A252407398 /* UserGreeting.swift */,
 				28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */,
@@ -1248,8 +1223,6 @@
 				3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */,
 				7A1DE682AE51BF7A3EFF75FF /* HealthKitManager+Part02.swift */,
 				656A7105DE085AFF17E796C8 /* HealthKitManager+Part03.swift */,
-				E25AC47BA80AD9ED60F2A5ED /* AuthManager+Part01.swift */,
-				01742F215DBF41472D1BAD01 /* AuthManager+Part02.swift */,
 				D557A5B9E670DD0A6A8BA893 /* RealtimeSyncManager+Part01.swift */,
 				83531C42434F71BA31C75D89 /* RealtimeSyncManager+Part02.swift */,
 				29553DC6811B06CAE2621869 /* RevenueCatManager+Part01.swift */,
@@ -1325,7 +1298,6 @@
 				ADDC487B2E2D8A6B003C97E7 /* WhatsNewView.swift */,
 				ADA922F02E22E7D500B82C49 /* SecuritySessionsView.swift */,
 				AD8552532E19A2A1003552EE /* ProfileSettingsViewV2.swift */,
-				AD723AFC2E15FA5C002376C6 /* AppleSignInButton.swift */,
 				AD8552632E19DCB6003552EE /* SyncStatusView.swift */,
 				ADE6D3892E24A566001F82A8 /* IntegrationsView.swift */,
 				AD933E042E24A22D00801078 /* LegalView.swift */,
@@ -1333,7 +1305,6 @@
 				AD723AFE2E15FA5C002376C6 /* DeleteAccountView.swift */,
 				AD0054EE2E2197B00029E0FF /* LegalDocumentView.swift */,
 				AD933DFA2E24328A00801078 /* DietPhaseHistoryView.swift */,
-				AD723AFF2E15FA5C002376C6 /* EmailVerificationView.swift */,
 				ADF5C1B12E1CD2FD00E3FB4D /* AddEntrySheet.swift */,
 				AD723B002E15FA5C002376C6 /* ExportDataView.swift */,
 				AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */,
@@ -1530,7 +1501,6 @@
 				AD88726D2EB946BE0041C426 /* DeveloperTapHandler.swift */,
 				AD88726E2EB946BE0041C426 /* DeveloperTapIndicator.swift */,
 				AD88726F2EB946BE0041C426 /* DocumentHeader.swift */,
-				AD8872702EB946BE0041C426 /* DSAuthDivider.swift */,
 				AD8872712EB946BE0041C426 /* ErrorStateView.swift */,
 				AD8872722EB946BE0041C426 /* LegalDocumentRow.swift */,
 				AD8872732EB946BE0041C426 /* LiquidGlassCTAButton.swift */,
@@ -1538,7 +1508,6 @@
 				AD8872762EB946BE0041C426 /* MetricGauge.swift */,
 				AD8872772EB946BE0041C426 /* OTPField.swift */,
 				AD8872782EB946BE0041C426 /* PasswordStrengthIndicator.swift */,
-				AD8872792EB946BE0041C426 /* SocialLoginButton.swift */,
 				AD88727A2EB946BE0041C426 /* StepsIndicator.swift */,
 				AD88727B2EB946BE0041C426 /* UserAvatar.swift */,
 				AD88727C2EB946BE0041C426 /* UserGreeting.swift */,
@@ -1558,11 +1527,9 @@
 				AD8872852EB946BE0041C426 /* LegalSection.swift */,
 				AD8872862EB946BE0041C426 /* LiquidGlassTabBar.swift */,
 				AD8872872EB946BE0041C426 /* LoadingScreen.swift */,
-				AD8872882EB946BE0041C426 /* LoginForm.swift */,
 				AD8872892EB946BE0041C426 /* MarkdownView.swift */,
 				AD88728A2EB946BE0041C426 /* SecondaryMetricsRow.swift */,
 				AD88728B2EB946BE0041C426 /* SettingsSectionGroup.swift */,
-				AD88728C2EB946BE0041C426 /* SignUpForm.swift */,
 				AD88728D2EB946BE0041C426 /* UserHeaderSection.swift */,
 				AD88728E2EB946BE0041C426 /* VerificationForm.swift */,
 			);
@@ -1672,7 +1639,6 @@
 				AD8056FC2E25F5180028C0DD /* CameraView.swift */,
 				AD0054DA2E20C6270029E0FF /* HealthDisclaimerView.swift */,
 				AD0054DC2E20C9DF0029E0FF /* LegalConsentView.swift */,
-				ADF5C2002E1F2BD900E3FB4D /* EmailVerificationView.swift */,
 				ADF5C2012E1F2BD900E3FB4D /* EnhancedOTPInputView.swift */,
 				AD0054DE2E20CDB00029E0FF /* ProgressPhotoCarouselView.swift */,
 				AD85526E2E19E4DF003552EE /* ProfileSettingsViewV2.swift */,
@@ -1712,8 +1678,6 @@
 				EBA1CD2B48A471ACA4D8CD1A /* DeveloperToolsList.swift */,
 				FD8E482BE1E84E0DEAF9819D /* LegalSection.swift */,
 				82670AD733C4BBFF727489CC /* MarkdownView.swift */,
-				7D0FE397063AA257AA67F731 /* LoginForm.swift */,
-				F2013EF479280EB0CB67121E /* SignUpForm.swift */,
 				629DBB90EB2F0C9F3D9D1105 /* VerificationForm.swift */,
 				0AB2ACF16AEA86A36EDAD936 /* BiometricAuthView.swift */,
 				898E428E2D5EE162E00B0BD7 /* DashboardHeader.swift */,
@@ -1750,7 +1714,6 @@
 			);
 			name = LogYourBody;
 			packageProductDependencies = (
-				AD25A7812E17439500611A56 /* Clerk */,
 				AD050C4C2EC135360082A313 /* ReceiptParser */,
 				AD050C4E2EC135360082A313 /* RevenueCat */,
 				AD050C502EC135360082A313 /* RevenueCatUI */,
@@ -1834,7 +1797,6 @@
 			);
 			mainGroup = AD7D30892E14907F0072AA5B;
 			packageReferences = (
-				AD25A7802E17439500611A56 /* XCRemoteSwiftPackageReference "clerk-ios" */,
 				AD050C472EC061040082A313 /* XCRemoteSwiftPackageReference "purchases-ios" */,
 				AD8F12E42ED678D6003C4559 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 				AD8F12E72ED6A489003C4559 /* XCRemoteSwiftPackageReference "statsig-kit" */,
@@ -2079,7 +2041,6 @@
 				ADDC47CE2E2D89F3003C97E7 /* Constants.swift in Sources */,
 				ADDC47D02E2D89F3003C97E7 /* SecuritySessionsView.swift in Sources */,
 				ADDC47D12E2D89F3003C97E7 /* ProfileSettingsViewV2.swift in Sources */,
-				ADDC47D82E2D89F3003C97E7 /* AppleSignInButton.swift in Sources */,
 				ADA6003C2ED27D0000088042 /* PreAuthOnboardingStore.swift in Sources */,
 				ADA600472ED375EE00088042 /* GlobalTimelineModels.swift in Sources */,
 				ADA600482ED375EE00088042 /* Glp1Medication.swift in Sources */,
@@ -2093,7 +2054,6 @@
 				ADB2F6A12FFD12C500EF7A4B /* EditEntrySheet.swift in Sources */,
 				ADDC47E22E2D89F3003C97E7 /* LegalDocumentView.swift in Sources */,
 				ADDC47E32E2D89F3003C97E7 /* DietPhaseHistoryView.swift in Sources */,
-				ADDC47E42E2D89F3003C97E7 /* EmailVerificationView.swift in Sources */,
 				ADDC47E52E2D89F3003C97E7 /* AddEntrySheet.swift in Sources */,
 				ADDC47E62E2D89F3003C97E7 /* ExportDataView.swift in Sources */,
 				AD3134032F01313400D134A1 /* DailyWeighInReminderPromptView.swift in Sources */,
@@ -2158,7 +2118,6 @@
 				ADA6003E2ED2BC9100088042 /* Glp1DoseLog.swift in Sources */,
 				AD8872972EB946BE0041C426 /* ErrorStateView.swift in Sources */,
 				AD8872982EB946BE0041C426 /* LiquidGlassTabBar.swift in Sources */,
-				AD8872992EB946BE0041C426 /* DSAuthDivider.swift in Sources */,
 				AD88729B2EB946BE0041C426 /* AuthFormField.swift in Sources */,
 				AD88729C2EB946BE0041C426 /* StandardTextField.swift in Sources */,
 				AD88729D2EB946BE0041C426 /* UserGreeting.swift in Sources */,
@@ -2166,12 +2125,10 @@
 				AD88729F2EB946BE0041C426 /* CommonModifiers.swift in Sources */,
 				AD8872A02EB946BE0041C426 /* SettingsRow.swift in Sources */,
 				AD8872A22EB946BE0041C426 /* BiometricAuthView.swift in Sources */,
-				AD8872A32EB946BE0041C426 /* SocialLoginButton.swift in Sources */,
 				ADA4B7582ED0E7D700F4262A /* DashboardFFMITile.swift in Sources */,
 				ADA4B7592ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift in Sources */,
 				ADA600222ED2594300088042 /* DexaResult.swift in Sources */,
 				AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */,
-				AD8872A52EB946BE0041C426 /* LoginForm.swift in Sources */,
 				AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */,
 				ADF1F6B82ED4C63900745F33 /* GlobalTimelineHeader.swift in Sources */,
 				AD8872AB2EB946BE0041C426 /* DSAvatar.swift in Sources */,
@@ -2212,7 +2169,6 @@
 				AD8872C92EB946BE0041C426 /* SettingsSectionGroup.swift in Sources */,
 				AD8872CA2EB946BE0041C426 /* StateViews.swift in Sources */,
 				AD8872CC2EB946BE0041C426 /* LegalDocumentRow.swift in Sources */,
-				AD8872CD2EB946BE0041C426 /* SignUpForm.swift in Sources */,
 				ADA4B74F2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift in Sources */,
 				AD050C432EBFFEE50082A313 /* DashboardDisplayMode.swift in Sources */,
 				AD8872CE2EB946BE0041C426 /* DSMetricValue.swift in Sources */,
@@ -2246,8 +2202,6 @@
 				841527E772D0CA94BE0D3F96 /* HealthKitManager+Part01.swift in Sources */,
 				CB4A7A11426D64B74959C447 /* HealthKitManager+Part02.swift in Sources */,
 				73AAD5D6EADA5C5A7BEB0D4B /* HealthKitManager+Part03.swift in Sources */,
-				E2191483231B920BDCEF2808 /* AuthManager+Part01.swift in Sources */,
-				8A84CA90D762411919167564 /* AuthManager+Part02.swift in Sources */,
 				E389C2EFF4E7B92EE0A9A997 /* RealtimeSyncManager+Part01.swift in Sources */,
 				F5374395372D2C41AF05F233 /* RealtimeSyncManager+Part02.swift in Sources */,
 				929DE2322E275AEB79624023 /* RevenueCatManager+Part01.swift in Sources */,
@@ -2629,14 +2583,6 @@
 				minimumVersion = 5.47.0;
 			};
 		};
-		AD25A7802E17439500611A56 /* XCRemoteSwiftPackageReference "clerk-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/clerk/clerk-ios";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.59.0;
-			};
-		};
 		AD8F12E42ED678D6003C4559 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
@@ -2670,11 +2616,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AD050C472EC061040082A313 /* XCRemoteSwiftPackageReference "purchases-ios" */;
 			productName = RevenueCatUI;
-		};
-		AD25A7812E17439500611A56 /* Clerk */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AD25A7802E17439500611A56 /* XCRemoteSwiftPackageReference "clerk-ios" */;
-			productName = Clerk;
 		};
 		AD8F12E52ED678D6003C4559 /* Sentry */ = {
 			isa = XCSwiftPackageProductDependency;

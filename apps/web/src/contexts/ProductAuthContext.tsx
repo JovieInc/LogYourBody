@@ -10,7 +10,7 @@ import React, {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { processImageFile, validateImageFile } from '@/lib/clerk-avatar-upload';
+import { processImageFile, validateImageFile } from '@/lib/avatar-upload';
 import { analytics } from '@/lib/analytics';
 import {
   AppAuthSession,
@@ -37,7 +37,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
+export function ProductAuthProvider({ children }: { children: React.ReactNode }) {
   const authRuntime = useAuthRuntime();
   const { user, isLoaded, getToken } = authRuntime;
   const router = useRouter();
@@ -66,7 +66,7 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [exitReason]);
 
-  // Detect session transitions from Clerk user changes
+  // Detect product-session transitions.
   useEffect(() => {
     if (!isLoaded) return;
 
@@ -90,7 +90,7 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
     setExitReason('none');
   }, []);
 
-  // Sync Statsig user context with Clerk user state
+  // Sync analytics with the product principal, not the upstream identity subject.
   useEffect(() => {
     if (!isLoaded) return;
 
@@ -161,12 +161,11 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
         // Process the image (resize and compress to match iOS implementation)
         const processedBlob = await processImageFile(file);
 
-        // Convert blob to File for Clerk API
+        // Convert the processed image to the storage upload type.
         const processedFile = new File([processedBlob], file.name, {
           type: 'image/jpeg',
         });
 
-        // Upload to Clerk using the user's setProfileImage method
         await user.setProfileImage({ file: processedFile });
 
         // Reload user to get updated imageUrl
@@ -187,7 +186,6 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('User not authenticated');
       }
 
-      // Delete profile image using Clerk API
       await user.setProfileImage({ file: null });
 
       // Reload user to get updated state
@@ -235,10 +233,10 @@ export function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within a ClerkAuthProvider');
+    throw new Error('useAuth must be used within a ProductAuthProvider');
   }
   return context;
 }
 
 // Export alias for compatibility
-export const AuthProvider = ClerkAuthProvider;
+export const AuthProvider = ProductAuthProvider;

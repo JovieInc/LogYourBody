@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { getProfile } from '@/lib/supabase/profile';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
+import { createClient } from '@/lib/supabase/client';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -12,6 +13,17 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     const checkOnboardingStatus = async () => {
+      const code = new URLSearchParams(window.location.search).get('code');
+      if (code) {
+        const { error } = await createClient().auth.exchangeCodeForSession(code);
+        if (error) {
+          router.replace('/signin');
+          return;
+        }
+        window.history.replaceState({}, '', '/auth/callback');
+        return;
+      }
+
       if (loading) return;
 
       if (user) {

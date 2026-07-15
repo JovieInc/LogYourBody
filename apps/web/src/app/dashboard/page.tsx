@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, Suspense, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';

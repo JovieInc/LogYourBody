@@ -1,106 +1,100 @@
-'use client'
+'use client';
 
-import { useAuth } from '@/contexts/ClerkAuthContext'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Switch } from '@/components/ui/switch'
-import { toast } from '@/hooks/use-toast'
-import { 
-  Loader2, 
-  ArrowLeft,
-  Save,
-  Camera,
-  Sparkles
-} from 'lucide-react'
-import Link from 'next/link'
-import { UserSettings } from '@/types/body-metrics'
+import { useAuth } from '@/contexts/ProductAuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/hooks/use-toast';
+import { Loader2, ArrowLeft, Save, Camera, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { UserSettings } from '@/types/body-metrics';
 
 export default function PreferencesSettingsPage() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
-  const [isSaving, setIsSaving] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
-  
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
   const [_settings, setSettings] = useState<UserSettings>({
     units: {
       weight: 'lbs',
       height: 'ft',
-      measurements: 'in'
-    }
-  })
-  const [measurementSystem, setMeasurementSystem] = useState<'imperial' | 'metric'>('imperial')
-  const [faceBlurring, setFaceBlurring] = useState(false)
+      measurements: 'in',
+    },
+  });
+  const [measurementSystem, setMeasurementSystem] = useState<'imperial' | 'metric'>('imperial');
+  const [faceBlurring, setFaceBlurring] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/signin')
+      router.push('/signin');
     }
-  }, [user, loading, router])
+  }, [user, loading, router]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-bg">
-        <Loader2 className="h-8 w-8 animate-spin text-linear-text-secondary" />
+      <div className="bg-linear-bg flex min-h-screen items-center justify-center">
+        <Loader2 className="text-linear-text-secondary h-8 w-8 animate-spin" />
       </div>
-    )
+    );
   }
 
   if (!user) {
-    return null
+    return null;
   }
 
   const handleSystemChange = (system: 'imperial' | 'metric') => {
-    setMeasurementSystem(system)
+    setMeasurementSystem(system);
     if (system === 'imperial') {
-      setSettings(prev => ({
+      setSettings((prev) => ({
         ...prev,
         units: {
           weight: 'lbs',
           height: 'ft',
-          measurements: 'in'
-        }
-      }))
+          measurements: 'in',
+        },
+      }));
     } else {
-      setSettings(prev => ({
+      setSettings((prev) => ({
         ...prev,
         units: {
           weight: 'kg',
           height: 'cm',
-          measurements: 'cm'
-        }
-      }))
+          measurements: 'cm',
+        },
+      }));
     }
-    setHasChanges(true)
-  }
+    setHasChanges(true);
+  };
 
   const handleSave = async () => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       toast({
-        title: "Preferences saved",
-        description: "Your preferences have been updated successfully."
-      })
-      setHasChanges(false)
+        title: 'Preferences saved',
+        description: 'Your preferences have been updated successfully.',
+      });
+      setHasChanges(false);
     } catch {
       toast({
-        title: "Error",
-        description: "Failed to save preferences. Please try again.",
-        variant: "destructive"
-      })
+        title: 'Error',
+        description: 'Failed to save preferences. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-linear-bg">
+    <div className="bg-linear-bg min-h-screen">
       {/* Header */}
-      <header className="bg-linear-card shadow-sm border-b border-linear-border sticky top-0 z-10">
+      <header className="bg-linear-card border-linear-border sticky top-0 z-10 border-b shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -109,10 +103,10 @@ export default function PreferencesSettingsPage() {
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
-              <h1 className="text-xl font-bold text-linear-text">Preferences</h1>
+              <h1 className="text-linear-text text-xl font-bold">Preferences</h1>
             </div>
             {hasChanges && (
-              <Button 
+              <Button
                 onClick={handleSave}
                 disabled={isSaving}
                 size="sm"
@@ -130,7 +124,7 @@ export default function PreferencesSettingsPage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 max-w-2xl space-y-6">
+      <main className="container mx-auto max-w-2xl space-y-6 px-4 py-6">
         {/* Units & Measurements */}
         <Card className="bg-linear-card border-linear-border">
           <CardHeader>
@@ -142,15 +136,18 @@ export default function PreferencesSettingsPage() {
           <CardContent>
             <div className="space-y-4">
               <Label className="text-linear-text">Measurement System</Label>
-              <Tabs value={measurementSystem} onValueChange={(value) => handleSystemChange(value as 'imperial' | 'metric')}>
-                <TabsList className="grid w-full grid-cols-2 bg-linear-bg">
-                  <TabsTrigger 
-                    value="imperial" 
+              <Tabs
+                value={measurementSystem}
+                onValueChange={(value) => handleSystemChange(value as 'imperial' | 'metric')}
+              >
+                <TabsList className="bg-linear-bg grid w-full grid-cols-2">
+                  <TabsTrigger
+                    value="imperial"
                     className="data-[state=active]:bg-linear-purple data-[state=active]:text-white"
                   >
                     Imperial
                   </TabsTrigger>
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="metric"
                     className="data-[state=active]:bg-linear-purple data-[state=active]:text-white"
                   >
@@ -158,7 +155,7 @@ export default function PreferencesSettingsPage() {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-              <div className="mt-4 space-y-2 text-sm text-linear-text-secondary">
+              <div className="text-linear-text-secondary mt-4 space-y-2 text-sm">
                 {measurementSystem === 'imperial' ? (
                   <>
                     <p>• Weight: Pounds (lbs)</p>
@@ -196,14 +193,14 @@ export default function PreferencesSettingsPage() {
                     <Label htmlFor="face-blur" className="text-linear-text font-medium">
                       Face Blurring
                     </Label>
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/10 text-purple-400 text-xs font-medium rounded-full border border-purple-500/20">
+                    <div className="inline-flex items-center gap-1 rounded-full border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-400">
                       <Sparkles className="h-3 w-3" />
                       Coming Soon
                     </div>
                   </div>
-                  <p className="text-sm text-linear-text-secondary">
-                    Automatically blur your face in progress photos for additional privacy. 
-                    Your face will be detected and blurred before photos are stored.
+                  <p className="text-linear-text-secondary text-sm">
+                    Automatically blur your face in progress photos for additional privacy. Your
+                    face will be detected and blurred before photos are stored.
                   </p>
                 </div>
                 <Switch
@@ -214,17 +211,16 @@ export default function PreferencesSettingsPage() {
                   className="data-[state=checked]:bg-linear-purple"
                 />
               </div>
-              <div className="p-3 bg-purple-500/5 border border-purple-500/10 rounded-lg">
+              <div className="rounded-lg border border-purple-500/10 bg-purple-500/5 p-3">
                 <p className="text-xs text-purple-400/80">
-                  This feature is currently in development and will be available soon. 
-                  When enabled, it will use on-device AI to detect and blur faces automatically.
+                  This feature is currently in development and will be available soon. When enabled,
+                  it will use on-device AI to detect and blur faces automatically.
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
-
       </main>
     </div>
-  )
+  );
 }

@@ -457,7 +457,7 @@
     
     # Note: Capabilities must be enabled in Apple Developer Portal
     # before running this lane. This can be done manually or with:
-    # bundle exec fastlane produce enable_services:app_group,associated_domains,health_kit,sign_in_with_apple
+    # bundle exec fastlane produce enable_services:app_group,associated_domains,health_kit
     UI.message("Note: Ensure App ID has all required capabilities enabled in Apple Developer Portal")
     
     # Regenerate both types
@@ -472,9 +472,7 @@
     
     UI.success("Provisioning profiles regenerated!")
     UI.message("The new profiles should include all capabilities enabled for the App ID:")
-    UI.message("- Sign in with Apple")
     UI.message("- HealthKit")
     UI.message("- Associated Domains")
     UI.message("- App Groups")
   end
-

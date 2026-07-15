@@ -5,28 +5,28 @@ This directory contains all documentation for the LogYourBody iOS app, organized
 ## Directory Structure
 
 ### [Setup](./setup/)
+
 Environment configuration, dependencies, and initial setup guides.
 
-- [CLERK_SETUP.md](./setup/CLERK_SETUP.md) - Clerk authentication setup
+- [Shared identity architecture](../../../docs/auth/shared-identity-architecture.md) - Jovie Better Auth and Supabase OIDC setup
 - [CONFIGURATION.md](./setup/CONFIGURATION.md) - App configuration
 - [GITHUB_SECRETS_SETUP.md](./setup/GITHUB_SECRETS_SETUP.md) - CI/CD secrets configuration
 - [MATCH_SETUP_INSTRUCTIONS.md](./setup/MATCH_SETUP_INSTRUCTIONS.md) - Code signing with fastlane match
 - [match_usage.md](./setup/match_usage.md) - Match usage guide
-- [RLS_SETUP_GUIDE.md](./setup/RLS_SETUP_GUIDE.md) - Row Level Security setup for Supabase
-- [SUPABASE_SETUP.md](./setup/SUPABASE_SETUP.md) - Supabase backend setup
 - [SWIFTLINT_SETUP.md](./setup/SWIFTLINT_SETUP.md) - SwiftLint configuration
 - [WIDGET_SETUP.md](./setup/WIDGET_SETUP.md) - iOS widget setup
 
 ### [Development](./development/)
+
 Development workflows, testing, debugging, and optimization guides.
 
 - [CI_README.md](./development/CI_README.md) - Continuous Integration workflows
 - [CLAUDE.md](./development/CLAUDE.md) - AI-assisted development guide
 - [FIX_ONBOARDING_CRASH.md](./development/FIX_ONBOARDING_CRASH.md) - Onboarding troubleshooting
 - [LOADING_OPTIMIZATIONS.md](./development/LOADING_OPTIMIZATIONS.md) - Performance optimizations
-- [SYNC_TROUBLESHOOTING.md](./development/SYNC_TROUBLESHOOTING.md) - Data sync debugging
 
 ### [Architecture](./architecture/)
+
 System architecture, design patterns, and technical planning.
 
 - [PROJECT_STRUCTURE.md](./architecture/PROJECT_STRUCTURE.md) - Project organization
@@ -41,6 +41,7 @@ System architecture, design patterns, and technical planning.
 - [DEDUPLICATION_SUMMARY.md](./architecture/DEDUPLICATION_SUMMARY.md) - Code deduplication summary
 
 ### [Archive](./archive/)
+
 Historical documentation, old troubleshooting guides, and deprecated instructions.
 
 - Previous Xcode integration guides
@@ -52,14 +53,14 @@ Historical documentation, old troubleshooting guides, and deprecated instruction
 New to the project? Start here:
 
 1. [CONFIGURATION.md](./setup/CONFIGURATION.md) - Set up your development environment
-2. [CLERK_SETUP.md](./setup/CLERK_SETUP.md) - Configure authentication
-3. [SUPABASE_SETUP.md](./setup/SUPABASE_SETUP.md) - Set up the backend
-4. [CI_README.md](./development/CI_README.md) - Understand the CI/CD pipeline
-5. [PROJECT_STRUCTURE.md](./architecture/PROJECT_STRUCTURE.md) - Learn the codebase structure
+2. [Shared identity architecture](../../../docs/auth/shared-identity-architecture.md) - Configure authentication and Supabase OIDC
+3. [CI_README.md](./development/CI_README.md) - Understand the CI/CD pipeline
+4. [PROJECT_STRUCTURE.md](./architecture/PROJECT_STRUCTURE.md) - Learn the codebase structure
 
 ## Contributing
 
 When adding new documentation:
+
 - Place setup/configuration docs in `setup/`
 - Place development workflows/debugging docs in `development/`
 - Place architecture decisions/designs in `architecture/`

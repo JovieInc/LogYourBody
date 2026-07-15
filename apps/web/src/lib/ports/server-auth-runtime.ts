@@ -1,4 +1,4 @@
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { createClient } from '@/lib/supabase/server';
 
 export type ServerAuthSession = {
   userId: string | null;
@@ -6,15 +6,14 @@ export type ServerAuthSession = {
 };
 
 export async function getServerAuthSession(): Promise<ServerAuthSession> {
-  const session = await auth();
+  const supabase = await createClient();
+  const [{ data: userData }, { data: sessionData }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.auth.getSession(),
+  ]);
 
   return {
-    userId: session.userId,
-    getToken: () => session.getToken(),
+    userId: userData.user?.id ?? null,
+    getToken: async () => sessionData.session?.access_token ?? null,
   };
-}
-
-export async function deleteServerAuthUser(userId: string) {
-  const client = await clerkClient();
-  await client.users.deleteUser(userId);
 }

@@ -1,79 +1,35 @@
-# iOS Auth Environment Setup
+# iOS authentication environments
 
-LogYourBody iOS uses Clerk for identity and Supabase for data/storage. Real config files are gitignored.
+LogYourBody uses Jovie's first-party Better Auth deployment as its identity
+issuer. Supabase is the OIDC broker for the product's data and storage session.
 
-## Files
+The app uses Supabase Authorization Code + PKCE, stores only its Supabase
+access/refresh tokens in the iOS Keychain, and never contains a client secret.
+Supabase delegates identity to Jovie's Better Auth OIDC provider. Sign-in and
+sign-up are the same SMS one-time-code flow.
 
-- `apps/ios/LogYourBody/Config-Development.xcconfig.template`
-- `apps/ios/LogYourBody/Config-Production.xcconfig.template`
-- `apps/ios/LogYourBody/Config.xcconfig.example`
-- `apps/ios/LogYourBody/Config.xcconfig` local include file, gitignored
-- `apps/ios/LogYourBody/Config-Development.xcconfig` local secrets, gitignored
-- `apps/ios/LogYourBody/Config-Production.xcconfig` local secrets, gitignored
-
-## Development Setup
-
-For local compile and UI fixture proof with secret-free values, run from the
-repository root:
-
-```bash
-pnpm ios:bootstrap-local-config
-```
-
-This creates missing ignored config files and preserves existing real local
-config. It is enough for simulator compile and deterministic fixture proof, but
-it is not production provider evidence.
-
-1. Copy `Config-Development.xcconfig.template` to `Config-Development.xcconfig`.
-1. Fill only dev/test provider values:
-   - Clerk test/dev publishable key.
-   - Clerk dev frontend API.
-   - Supabase dev URL and anon key.
-   - `SUPABASE_EXPECTED_HOST` matching the Supabase dev URL host.
-   - Local or dev `API_BASE_URL` and matching `API_EXPECTED_HOST`.
-1. Create `Config.xcconfig` with:
+## Required values
 
 ```xcconfig
-#include "Config-Development.xcconfig"
+AUTH_PROVIDER_ID = custom:jovie
+AUTH_REDIRECT_URI = logyourbody:/$()/oauth
 ```
 
-1. Keep `ALLOW_PRODUCTION_SERVICES_IN_DEBUG = NO` unless a human explicitly approves a temporary production-provider test.
+The Supabase project must register `custom:jovie` as an OIDC provider with issuer
+`https://jov.ie`. Its confidential Better Auth client allows only the callback URL
+shown by Supabase. Supabase must allow `logyourbody://oauth` as an app redirect.
 
-## Production Setup
-
-1. Copy `Config-Production.xcconfig.template` to `Config-Production.xcconfig`.
-1. Fill reviewed production values:
-   - Clerk live publishable key.
-   - Supabase production URL and anon key.
-   - `SUPABASE_EXPECTED_HOST` matching the production Supabase URL host.
-   - HTTPS production `API_BASE_URL` and matching `API_EXPECTED_HOST`.
-   - Production Statsig and Sentry environment values.
-1. Create `Config.xcconfig` with:
+Supabase values remain environment-specific:
 
 ```xcconfig
-#include "Config-Production.xcconfig"
+SUPABASE_URL = https:/$()/your-project.supabase.co
+SUPABASE_EXPECTED_HOST = your-project.supabase.co
+SUPABASE_ANON_KEY = your-public-anon-key
 ```
 
-## Runtime Guards
+Production validation requires `custom:jovie`, the fixed native redirect URI, an
+explicit HTTPS Supabase host, and production telemetry tiers.
 
-`Configuration.currentAuthEnvironmentValidation` runs before Clerk initialization.
-
-Production rejects:
-
-- Clerk `pk_test_` keys.
-- Non-HTTPS API base URL.
-- Supabase/API hosts that do not match expected hosts.
-- Sentry or Statsig tiers that are not `production`.
-
-Development rejects:
-
-- Clerk `pk_live_` keys unless `ALLOW_PRODUCTION_SERVICES_IN_DEBUG = YES`.
-- Supabase/API hosts that do not match expected hosts.
-
-Copied templates with placeholder values are treated as invalid config.
-
-## Secret Rules
-
-- Never commit real `.xcconfig` files.
-- Never put Clerk secret keys, Supabase service role keys, Stripe secrets, or provider vault files in the app bundle.
-- iOS should use only Clerk publishable keys and Supabase anon keys.
+Never put Better Auth secrets, Twilio credentials, Supabase service-role keys,
+or OAuth client secrets in the app. Twilio is called only by the server-side
+identity adapter.

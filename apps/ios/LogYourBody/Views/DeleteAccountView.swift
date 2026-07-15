@@ -162,7 +162,7 @@ struct DeleteAccountView: View {
             do {
                 try await AccountDeletionCleanupService.live(
                     authManager: authManager,
-                    deleteAuthAccount: authManager.deleteCurrentAccount
+                    deleteProductAccount: authManager.deleteCurrentAccount
                 ).performDeletion()
             } catch {
                 await MainActor.run {
@@ -179,8 +179,7 @@ struct AccountDeletionCleanupService {
     struct Dependencies {
         var logoutSubscriptionProvider: () async -> Void
         var resetHealthKitAnchors: () async -> Void
-        var notifyBackendOfAccountDeletion: () async -> Void
-        var deleteAuthAccount: () async throws -> Void
+        var deleteProductAccount: () async throws -> Void
         var deleteCoreData: () async throws -> Void
         var clearKeychain: () -> Void
         var deleteSpotlightMetrics: () -> Void
@@ -228,7 +227,7 @@ struct AccountDeletionCleanupService {
 
     static func live(
         authManager: AuthManager,
-        deleteAuthAccount: @escaping () async throws -> Void
+        deleteProductAccount: @escaping () async throws -> Void
     ) -> AccountDeletionCleanupService {
         AccountDeletionCleanupService(
             dependencies: Dependencies(
@@ -239,10 +238,7 @@ struct AccountDeletionCleanupService {
                 resetHealthKitAnchors: {
                     await HealthSyncCoordinator.shared.resetForCurrentUser()
                 },
-                notifyBackendOfAccountDeletion: {
-                    await authManager.notifyBackendOfAccountDeletion()
-                },
-                deleteAuthAccount: deleteAuthAccount,
+                deleteProductAccount: deleteProductAccount,
                 deleteCoreData: {
                     try await CoreDataManager.shared.deleteAllDataAndWait()
                 },
@@ -265,8 +261,7 @@ struct AccountDeletionCleanupService {
     func performDeletion() async throws {
         await dependencies.logoutSubscriptionProvider()
         await dependencies.resetHealthKitAnchors()
-        await dependencies.notifyBackendOfAccountDeletion()
-        try await dependencies.deleteAuthAccount()
+        try await dependencies.deleteProductAccount()
 
         var localCleanupError: Error?
         do {

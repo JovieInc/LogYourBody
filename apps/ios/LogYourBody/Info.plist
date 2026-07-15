@@ -82,10 +82,10 @@
 	<string>$(APP_ENVIRONMENT)</string>
 	<key>ALLOW_PRODUCTION_SERVICES_IN_DEBUG</key>
 	<string>$(ALLOW_PRODUCTION_SERVICES_IN_DEBUG)</string>
-	<key>CLERK_PUBLISHABLE_KEY</key>
-	<string>$(CLERK_PUBLISHABLE_KEY)</string>
-	<key>CLERK_FRONTEND_API</key>
-	<string>$(CLERK_FRONTEND_API)</string>
+	<key>AUTH_PROVIDER_ID</key>
+	<string>$(AUTH_PROVIDER_ID)</string>
+	<key>AUTH_REDIRECT_URI</key>
+	<string>$(AUTH_REDIRECT_URI)</string>
 	<key>SUPABASE_URL</key>
 	<string>$(SUPABASE_URL)</string>
 	<key>SUPABASE_EXPECTED_HOST</key>

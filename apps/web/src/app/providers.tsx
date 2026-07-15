@@ -4,11 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { ClerkAuthProvider } from '@/contexts/ClerkAuthContext';
+import { ProductAuthProvider } from '@/contexts/ProductAuthContext';
 import { PWAProvider } from '@/components/PWAProvider';
 import { AuthRuntimeProvider } from '@/lib/ports/auth-ui';
 
-const clerkFreeMarketingPrefixes = [
+const authFreeMarketingPrefixes = [
   '/',
   '/about',
   '/blog',
@@ -25,12 +25,12 @@ const clerkFreeMarketingPrefixes = [
   '/terms',
 ];
 
-export function needsClerkRuntime(pathname: string | null | undefined) {
+export function needsProductAuthRuntime(pathname: string | null | undefined) {
   if (!pathname) {
     return true;
   }
 
-  return !clerkFreeMarketingPrefixes.some((prefix) => {
+  return !authFreeMarketingPrefixes.some((prefix) => {
     if (prefix === '/') {
       return pathname === '/';
     }
@@ -41,7 +41,7 @@ export function needsClerkRuntime(pathname: string | null | undefined) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const shouldLoadClerk = needsClerkRuntime(pathname);
+  const shouldLoadProductAuth = needsProductAuthRuntime(pathname);
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -57,11 +57,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-        {shouldLoadClerk ? (
+        {shouldLoadProductAuth ? (
           <AuthRuntimeProvider>
-            <ClerkAuthProvider>
+            <ProductAuthProvider>
               <PWAProvider>{children}</PWAProvider>
-            </ClerkAuthProvider>
+            </ProductAuthProvider>
           </AuthRuntimeProvider>
         ) : (
           <>{children}</>

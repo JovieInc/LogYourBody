@@ -68,8 +68,8 @@ class DebugResetManager {
         // 4. Clear image cache
         clearImageCache()
 
-        // 5. Sign out from Clerk
-        await signOutFromClerk()
+        // 5. Sign out from the shared identity service
+        await signOut()
 
         // 6. Clear derived data cache
         clearDerivedDataCache()
@@ -147,8 +147,7 @@ class DebugResetManager {
 
     private func clearKeychain() {
         // print("🗑️ Clearing Keychain...")
-        // Clear Clerk session data
-        // This will be handled by the Clerk SDK when we sign out
+        try? KeychainManager.shared.clearAll()
     }
 
     private func clearImageCache() {
@@ -171,8 +170,7 @@ class DebugResetManager {
         }
     }
 
-    private func signOutFromClerk() async {
-        // print("🗑️ Signing out from Clerk...")
+    private func signOut() async {
         await AuthManager.shared.logout()
     }
 

@@ -1,65 +1,52 @@
 'use client';
 
-import { ClerkProvider, SignIn, SignUp } from '@clerk/nextjs';
-import type { ReactNode } from 'react';
-
-const authAppearance = {
-  baseTheme: undefined,
-  variables: {
-    colorPrimary: '#8b5cf6',
-    colorText: '#e1e1e3',
-    colorTextSecondary: '#a1a1a8',
-    colorBackground: '#18181b',
-    colorInputBackground: '#18181b',
-    colorInputText: '#e1e1e3',
-    borderRadius: '0.5rem',
-  },
-  elements: {
-    rootBox: 'mx-auto',
-    card: 'bg-linear-card border-linear-border shadow-xl',
-    headerTitle: 'hidden',
-    headerSubtitle: 'hidden',
-    socialButtonsBlockButton: 'border-linear-border hover:bg-linear-hover',
-    formButtonPrimary: 'bg-linear-purple hover:bg-linear-purple/90',
-    footerActionLink: 'text-linear-purple hover:text-linear-purple/80',
-    identityPreviewEditButton: 'text-linear-purple hover:text-linear-purple/80',
-    formFieldLabel: 'text-linear-text-secondary',
-    formFieldInput: 'bg-linear-bg border-linear-border text-linear-text',
-    dividerLine: 'bg-linear-border',
-    dividerText: 'text-linear-text-tertiary',
-    link: 'text-linear-purple hover:text-linear-purple/80',
-    formFieldAction: 'text-linear-purple hover:text-linear-purple/80',
-    footerAction: 'text-linear-text-secondary',
-  },
-} as const;
+import { useState, type ReactNode } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 export function AuthRuntimeProvider({ children }: { children: ReactNode }) {
-  return <ClerkProvider>{children}</ClerkProvider>;
+  return <>{children}</>;
+}
+
+function PhoneAuthButton() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function continueWithPhone() {
+    setIsLoading(true);
+    setErrorMessage(null);
+    const supabase = createClient();
+    const provider = 'custom:jovie' as Parameters<
+      typeof supabase.auth.signInWithOAuth
+    >[0]['provider'];
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    if (error) {
+      setErrorMessage(error.message);
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <button
+        type="button"
+        onClick={continueWithPhone}
+        disabled={isLoading}
+        className="bg-linear-purple hover:bg-linear-purple/90 w-full rounded-full px-5 py-3 font-medium text-white disabled:opacity-60"
+      >
+        {isLoading ? 'Connecting…' : 'Continue with phone'}
+      </button>
+      {errorMessage ? <p className="text-center text-sm text-red-400">{errorMessage}</p> : null}
+    </div>
+  );
 }
 
 export function AuthSignUp() {
-  return (
-    <SignUp
-      appearance={authAppearance}
-      routing="path"
-      path="/signup"
-      signInUrl="/signin"
-      afterSignUpUrl="/onboarding"
-      afterSignInUrl="/dashboard"
-      forceRedirectUrl="/onboarding"
-    />
-  );
+  return <PhoneAuthButton />;
 }
 
 export function AuthSignIn() {
-  return (
-    <SignIn
-      appearance={authAppearance}
-      routing="path"
-      path="/signin"
-      signUpUrl="/signup"
-      afterSignInUrl="/dashboard"
-      forceRedirectUrl="/dashboard"
-    />
-  );
+  return <PhoneAuthButton />;
 }

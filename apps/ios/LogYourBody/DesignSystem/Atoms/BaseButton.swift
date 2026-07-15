@@ -350,19 +350,6 @@ struct BaseIconButton: View {
                     BaseIconButton(icon: "gear", size: 24, style: .plain, action: {})
                 }
             }
-
-            Divider()
-
-            // Custom content
-            Group {
-                Text("Custom Content").font(.headline)
-                BaseButton(configuration: ButtonConfiguration(), action: {}, label: {
-                    HStack {
-                        Image(systemName: "apple.logo")
-                        Text("Sign in with Apple")
-                    }
-                })
-            }
         }
         .padding()
     }

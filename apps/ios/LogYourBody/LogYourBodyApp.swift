@@ -75,8 +75,8 @@ enum EntryDeepLinkRoutingPolicy {
 
     static let pendingLinkTTL: TimeInterval = 120
 
-    static func canStoreForLater(isClerkLoaded: Bool, isAuthenticated: Bool) -> Bool {
-        !isClerkLoaded || isAuthenticated
+    static func canStoreForLater(isAuthProviderLoaded: Bool, isAuthenticated: Bool) -> Bool {
+        !isAuthProviderLoaded || isAuthenticated
     }
 
     static func action(
@@ -176,7 +176,7 @@ struct LogYourBodyApp: App {
                     await performStartupSequence()
                     resolvePendingEntryDeepLinkIfPossible()
                 }
-                .onChange(of: authManager.isClerkLoaded) { _, _ in
+                .onChange(of: authManager.isAuthProviderLoaded) { _, _ in
                     resolvePendingEntryDeepLinkIfPossible()
                 }
                 .onChange(of: authManager.isAuthenticated) { _, _ in
@@ -220,10 +220,6 @@ struct LogYourBodyApp: App {
             return
         }
 
-        if applyEmailVerificationUITestFixtureIfNeeded() {
-            return
-        }
-
         if await applyPaidMVPUITestFixtureIfNeeded() {
             return
         }
@@ -236,27 +232,27 @@ struct LogYourBodyApp: App {
         AppServicePorts.analyticsTracker.start()
         AppServicePorts.analyticsTracker.track(event: "app_open")
 
-        let clerkInitializationTask = authManager.ensureClerkInitializationTask(priority: .userInitiated)
+        let authInitializationTask = authManager.ensureAuthInitializationTask(priority: .userInitiated)
 
         Task { @MainActor in
-            await configureSubscriptions(waitingFor: clerkInitializationTask)
+            await configureSubscriptions(waitingFor: authInitializationTask)
         }
 
         Task { @MainActor in
             await bootstrapHealthKit()
         }
 
-        await clerkInitializationTask.value
+        await authInitializationTask.value
     }
 
     @MainActor
-    private func configureSubscriptions(waitingFor clerkTask: Task<Void, Never>) async {
+    private func configureSubscriptions(waitingFor authTask: Task<Void, Never>) async {
         let apiKey = Constants.revenueCatAPIKey
         guard !apiKey.isEmpty else { return }
 
         subscriptionManager.configure(apiKey: apiKey)
 
-        await clerkTask.value
+        await authTask.value
 
         if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
             await subscriptionManager.identifyUser(userId: userId)
@@ -296,23 +292,6 @@ struct LogYourBodyApp: App {
         }
 
         authManager.applySignedOutUITestFixture()
-        subscriptionManager.isSubscribed = false
-        subscriptionManager.customerInfo = nil
-        subscriptionManager.currentOffering = nil
-        subscriptionManager.errorMessage = nil
-        subscriptionManager.isPurchasing = false
-
-        return true
-    }
-
-    @MainActor
-    @discardableResult
-    private func applyEmailVerificationUITestFixtureIfNeeded() -> Bool {
-        guard ProcessInfo.processInfo.arguments.contains("-lybUITestEmailVerificationFixture") else {
-            return false
-        }
-
-        authManager.applyEmailVerificationUITestFixture()
         subscriptionManager.isSubscribed = false
         subscriptionManager.customerInfo = nil
         subscriptionManager.currentOffering = nil
@@ -409,7 +388,7 @@ struct LogYourBodyApp: App {
             onboardingCompleted: !usesBodyScoreOnboardingFixture
         )
         authManager.isAuthenticated = true
-        authManager.isClerkLoaded = true
+        authManager.isAuthProviderLoaded = true
         subscriptionManager.isSubscribed = isSubscribed
         subscriptionManager.customerInfo = nil
         subscriptionManager.currentOffering = nil
@@ -547,7 +526,7 @@ struct LogYourBodyApp: App {
     @MainActor
     private func handleDeepLink(_ url: URL) {
         if LogYourBodyDeepLink.isOAuthCallback(url) {
-            // Clerk SDK handles the OAuth callback automatically.
+            // ASWebAuthenticationSession owns the active OAuth callback.
             return
         }
 
@@ -608,7 +587,7 @@ struct LogYourBodyApp: App {
 
     private var canStoreEntryDeepLinkForLater: Bool {
         EntryDeepLinkRoutingPolicy.canStoreForLater(
-            isClerkLoaded: authManager.isClerkLoaded,
+            isAuthProviderLoaded: authManager.isAuthProviderLoaded,
             isAuthenticated: authManager.isAuthenticated
         )
     }

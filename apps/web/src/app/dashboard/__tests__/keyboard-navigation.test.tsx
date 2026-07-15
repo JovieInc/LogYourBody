@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 import DashboardPage from '../page';
 
 // Mock dependencies
@@ -8,7 +8,7 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 
-jest.mock('@/contexts/ClerkAuthContext', () => ({
+jest.mock('@/contexts/ProductAuthContext', () => ({
   useAuth: jest.fn(),
 }));
 

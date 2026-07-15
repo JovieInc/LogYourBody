@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 import DashboardPage from '../page';
 
 // Mock dependencies
@@ -11,7 +11,7 @@ jest.mock('next/navigation', () => ({
   useParams: jest.fn(() => ({})),
 }));
 
-// Don't mock ClerkAuthContext here as it's already mocked in jest.setup.js
+// Don't mock ProductAuthContext here as it's already mocked in jest.setup.js
 
 jest.mock('next/image', () => ({
   __esModule: true,
@@ -92,7 +92,7 @@ jest.mock('../page', () => {
   const { useRouter } = require('next/navigation') as typeof import('next/navigation');
 
   const { useAuth } =
-    require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
+    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
 
   const TestDashboardPage: React.FC = () => {
     const { user, loading } = useAuth();
