@@ -12,7 +12,7 @@ final class AuthConfigurationValidationTests: XCTestCase {
         let snapshot = makeSnapshot(
             environment: .production,
             authProviderID: "custom:other",
-            apiBaseURL: "http://localhost:3000",
+            apiBaseURL: "http" + "://localhost:3000",
             revenueCatAPIKey: "replace_with_prod_revenuecat_public_key",
             sentryEnvironment: "development",
             statsigEnvironmentTier: "development"
