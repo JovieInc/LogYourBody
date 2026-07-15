@@ -19,6 +19,6 @@ describe('HomePage landing copy', () => {
 
   it('keeps waitlist hero copy separate from full-landing section headings', () => {
     expect(waitlistLandingCopy.headline).not.toEqual(landingSectionHeadings.hero);
-    expect(waitlistLandingCopy.submitLabel).toBe('Join the waitlist');
+    expect(waitlistLandingCopy.submitLabel).toBe('Request early access');
   });
 });

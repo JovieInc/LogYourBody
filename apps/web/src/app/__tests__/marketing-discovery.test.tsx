@@ -7,6 +7,10 @@ jest.mock('../MinimalWaitlistLanding', () => ({
   MinimalWaitlistLanding: () => <main data-testid="minimal-landing" />,
 }));
 
+jest.mock('../LegacyMinimalWaitlistLanding', () => ({
+  LegacyMinimalWaitlistLanding: () => <main data-testid="legacy-minimal-landing" />,
+}));
+
 describe('marketing discovery routes', () => {
   it('publishes a nonempty robots policy and sitemap URL', () => {
     const value = robots();

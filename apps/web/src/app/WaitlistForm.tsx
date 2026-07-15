@@ -109,7 +109,7 @@ export function WaitlistForm() {
   }
 
   return (
-    <div className="mt-8 w-full max-w-xl">
+    <div className="mt-6 w-full max-w-[640px] sm:mt-9">
       <form
         className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
         onSubmit={handleSubmit}
@@ -135,7 +135,7 @@ export function WaitlistForm() {
           disabled={submitState === 'submitting' || submitState === 'success'}
           aria-invalid={Boolean(fieldError)}
           aria-describedby="waitlist-status waitlist-consent"
-          className="min-h-14 w-full rounded-full border border-white/15 bg-black/45 px-6 text-base text-white outline-none backdrop-blur-xl transition-colors placeholder:text-white/35 hover:border-white/25 focus:border-white/50 focus:ring-2 focus:ring-sky-400/30 disabled:opacity-60"
+          className="placeholder:text-white/38 min-h-[54px] w-full rounded-full border border-white/20 bg-black/55 px-6 text-base text-white shadow-[0_18px_60px_rgba(0,0,0,0.22)] outline-none backdrop-blur-xl transition-[border-color,background-color,box-shadow] hover:border-white/35 hover:bg-black/65 focus:border-white/60 focus:bg-black/70 focus:ring-2 focus:ring-sky-400/30 disabled:opacity-60 sm:min-h-[58px]"
         />
         <div className="pointer-events-none absolute -left-[10000px]" aria-hidden="true">
           <label htmlFor="waitlist-website">Website</label>
@@ -150,13 +150,13 @@ export function WaitlistForm() {
         <button
           type="submit"
           disabled={submitState === 'submitting' || submitState === 'success'}
-          className="inline-flex min-h-14 items-center justify-center rounded-full bg-white px-8 text-base font-semibold text-black transition-[background-color,transform] hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-[54px] items-center justify-center rounded-full bg-white px-8 text-base font-semibold text-black shadow-[0_18px_55px_rgba(0,0,0,0.24)] transition-[background-color,transform,box-shadow] hover:-translate-y-0.5 hover:bg-sky-50 hover:shadow-[0_22px_65px_rgba(0,0,0,0.34)] focus:outline-none focus:ring-2 focus:ring-sky-300 focus:ring-offset-2 focus:ring-offset-black active:translate-y-0 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[58px]"
         >
           {submitState === 'submitting' ? 'Joining…' : waitlistLandingCopy.submitLabel}
         </button>
       </form>
 
-      <div id="waitlist-status" className="mt-3 min-h-6" aria-live="polite">
+      <div id="waitlist-status" className="mt-2 min-h-5 sm:mt-3 sm:min-h-6" aria-live="polite">
         {fieldError ? (
           <p className="text-sm text-rose-300" role="alert">
             {fieldError}
@@ -176,7 +176,10 @@ export function WaitlistForm() {
         ) : null}
       </div>
 
-      <p id="waitlist-consent" className="mt-2 max-w-lg text-xs leading-5 text-white/45">
+      <p
+        id="waitlist-consent"
+        className="text-white/48 mt-1 max-w-lg text-[11px] leading-4 sm:mt-2 sm:text-xs sm:leading-5"
+      >
         Join to receive early-access and TestFlight invitations. Unsubscribe anytime. See our{' '}
         <Link
           href="/privacy"
