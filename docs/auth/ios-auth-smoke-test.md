@@ -1,36 +1,21 @@
-# Shared identity iOS smoke test
+# iOS SMS auth smoke test
 
-Run this on a physical iPhone against a non-production Supabase project before
-promoting the auth cutover.
+## Preconditions
 
-## Prerequisites
+- Jovie has the `logyourbody-ios` public OAuth client with exact `logyourbody://oauth` redirect.
+- Jovie Better Auth phone-number and OAuth-provider plugins are deployed.
+- Jovie Twilio Verify credentials are configured server-side.
+- LYB production has the pooled Neon `DATABASE_URL` and the `app_users` migration.
 
-- Jovie Better Auth issuer deployed with the confidential Supabase OIDC client.
-- Twilio Verify service configured on the issuer.
-- Supabase custom provider `custom:jovie` configured with the exact Jovie issuer,
-  client credentials, and callback.
-- A phone number that can receive the verification SMS.
+## Test
 
-## Flow
+1. Install a clean build and choose **Continue with phone**.
+2. Confirm the system browser shows the Jovie-hosted phone number screen with no Apple, Google, email, password, or SSO controls.
+3. Enter a real mobile number, receive the SMS code, and submit it.
+4. Confirm the browser returns to `logyourbody://oauth` and onboarding opens.
+5. Force-quit and reopen; the Keychain-backed session should restore without another code.
+6. Wait for or simulate access-token expiry; confirm refresh succeeds without UI.
+7. Sign out; confirm the local session is removed and protected screens require login.
+8. Verify one `public.app_users` row exists for the Jovie `sub`, with no auth credentials stored in Neon.
 
-1. Install a clean build and launch it.
-2. Confirm the signed-out screen has one action: **Continue with phone**. There
-   must be no Apple, Google, email, or password path.
-3. Enter a phone number in the secure Jovie identity sheet.
-4. Enter the SMS code. Confirm the sheet closes and onboarding opens.
-5. Complete the profile and save a weight and progress photo.
-6. Force-quit and reopen. Confirm the Keychain session restores without another
-   code and the data syncs from Supabase.
-7. Expire the access token and confirm refresh succeeds without signing out.
-8. Revoke/expire the refresh token and confirm the next unauthorized request
-   clears local auth and returns to the phone screen.
-9. Sign out and inspect UserDefaults. No access, refresh, legacy Clerk, or
-   Supabase session token may be present.
-
-## Ownership checks
-
-- The Supabase OIDC identity row links its provider subject to Better Auth `sub`.
-- `profiles.id` and every user-owned `user_id` equal the Supabase `auth.uid()`.
-- Supabase REST and Storage accept only the Supabase product access token.
-- A token for User A cannot read or mutate User B rows or objects.
-- RevenueCat is identified with the stable LogYourBody product principal.
+Reject the release if callback state validation fails, tokens appear in `UserDefaults`, the app connects directly to Neon, or any Supabase/Clerk/SSO surface appears.

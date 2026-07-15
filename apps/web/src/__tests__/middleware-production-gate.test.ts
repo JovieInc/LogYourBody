@@ -3,13 +3,7 @@
  */
 import { readdirSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
-import { NextRequest, NextResponse } from 'next/server';
-
-const mockUpdateSession = jest.fn((request: NextRequest) => NextResponse.next({ request }));
-
-jest.mock('@/lib/supabase/middleware', () => ({
-  updateSession: (request: NextRequest) => mockUpdateSession(request),
-}));
+import { NextRequest } from 'next/server';
 
 function collectAppRouteFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -80,8 +74,6 @@ describe('middleware production debug/test gate', () => {
     }
 
     jest.resetModules();
-    mockUpdateSession.mockReset();
-    mockUpdateSession.mockImplementation((request: NextRequest) => NextResponse.next({ request }));
   });
 
   it('keeps debug/test routes out of the mounted production route inventory', () => {
@@ -121,7 +113,6 @@ describe('middleware production debug/test gate', () => {
 
     expect(response?.status).toBe(404);
     expect(response?.headers.get('Cache-Control')).toBe('no-store');
-    expect(mockUpdateSession).not.toHaveBeenCalled();
   });
 
   it('blocks debug routes outside production deployments too', async () => {
@@ -135,7 +126,6 @@ describe('middleware production debug/test gate', () => {
 
     expect(response?.status).toBe(404);
     expect(response?.headers.get('Cache-Control')).toBe('no-store');
-    expect(mockUpdateSession).not.toHaveBeenCalled();
   });
 
   it('keeps normal protected routes behind product auth in production', async () => {
@@ -145,7 +135,9 @@ describe('middleware production debug/test gate', () => {
       shouldBlockDebugRoute,
       shouldUseProductAuthMiddleware,
     } = await import('../middleware');
-    const request = new NextRequest('https://logyourbody.com/dashboard');
+    const request = new NextRequest('https://logyourbody.com/dashboard', {
+      headers: { cookie: 'lyb_access_token=test-token' },
+    });
 
     expect(shouldBlockDebugRoute('/dashboard')).toBe(false);
     expect(shouldUseProductAuthMiddleware(request)).toBe(true);
@@ -153,7 +145,18 @@ describe('middleware production debug/test gate', () => {
     const response = await middleware(request);
 
     expect(response?.status).toBe(200);
-    expect(mockUpdateSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('redirects an unauthenticated protected route to the sign-in surface', async () => {
+    const { default: middleware } = await import('../middleware');
+    const response = await middleware(
+      new NextRequest('https://logyourbody.com/dashboard?tab=trend'),
+    );
+
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get('location')).toBe(
+      'https://logyourbody.com/signin?returnTo=%2Fdashboard%3Ftab%3Dtrend',
+    );
   });
 
   it.each(['/api/parse-pdf', '/api/parse-pdf-alt', '/api/parse-pdf-v2'])(
@@ -165,7 +168,9 @@ describe('middleware production debug/test gate', () => {
         shouldBlockDebugRoute,
         shouldUseProductAuthMiddleware,
       } = await import('../middleware');
-      const request = new NextRequest(`https://logyourbody.com${pathname}`);
+      const request = new NextRequest(`https://logyourbody.com${pathname}`, {
+        headers: { cookie: 'lyb_refresh_token=test-token' },
+      });
 
       expect(shouldBlockDebugRoute(pathname)).toBe(false);
       expect(shouldUseProductAuthMiddleware(request)).toBe(true);
@@ -173,7 +178,6 @@ describe('middleware production debug/test gate', () => {
       const response = await middleware(request);
 
       expect(response?.status).toBe(200);
-      expect(mockUpdateSession).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -187,7 +191,6 @@ describe('middleware production debug/test gate', () => {
     const response = await middleware(request);
 
     expect(response?.status).toBe(200);
-    expect(mockUpdateSession).toHaveBeenCalledTimes(1);
   });
 
   it('keeps normal public routes reachable in production', async () => {
@@ -200,7 +203,6 @@ describe('middleware production debug/test gate', () => {
     const response = await middleware(request);
 
     expect(response?.status).toBe(200);
-    expect(mockUpdateSession).toHaveBeenCalledTimes(1);
   });
 
   it.each(['/', '/download/ios', '/privacy', '/support'])(
@@ -215,7 +217,6 @@ describe('middleware production debug/test gate', () => {
       const response = await middleware(request);
 
       expect(response?.status).toBe(200);
-      expect(mockUpdateSession).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -230,7 +231,6 @@ describe('middleware production debug/test gate', () => {
     expect(rewrite).toContain('_lyb_audience=women');
     expect(rewrite).toContain('_lyb_assignment_source=campaign');
     expect(response?.cookies.get('lyb_landing_audience_v1')?.value).toBe('women');
-    expect(mockUpdateSession).not.toHaveBeenCalled();
   });
 
   it('reuses a returning audience assignment instead of randomizing again', async () => {

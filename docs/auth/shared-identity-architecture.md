@@ -1,224 +1,57 @@
-# Shared Identity Architecture: Jovie + LogYourBody
-
-Date: 2026-07-14
-Status: Accepted; implementation in progress
+# Shared first-party identity architecture
 
 ## Decision
 
-Jovie and LogYourBody will use one product-neutral, first-party identity service.
-Better Auth is the only source of a person's identity. It runs in Jovie's existing
-Next.js/Postgres deployment, behind product-neutral OAuth/OIDC endpoints and
-tables. LogYourBody's Supabase project keeps only a derived product principal and
-session so its existing RLS data plane can verify requests.
+Jovie Better Auth is the single identity authority for Jovie, LogYourBody, and future first-party products. LogYourBody does not run its own auth service and does not broker authentication through Supabase, Clerk, Neon Auth, or another identity vendor.
 
-LogYourBody has no production users, so its Clerk integration will be removed in a
-clean cutover. There will be no dual-auth period, user-ID compatibility layer, or
-legacy session migration for LogYourBody.
+LogYourBody application data lives in its dedicated Neon project in the Jovie Neon organization. Neon stores a product-local projection keyed by Jovie's immutable OpenID Connect `sub`; it is not a second user directory.
 
-## Service Boundary
+## Login surface
 
-The identity module is published at `https://jov.ie/api/auth` (the exact OIDC
-issuer, including Better Auth's base path) and owns only identity concerns:
+Jovie hosts the shared `/identity` experience. The only enabled onboarding method is a phone number followed by an SMS one-time code. Better Auth owns the user, session, OAuth grants, token rotation, and OpenID Connect claims. Twilio Verify is accessed only through Jovie's internal phone-verification adapter.
 
-- Better Auth core user, account, session, verification, and signing-key tables.
-- OAuth client registrations and grants for first-party products.
-- Verified phone numbers and identity-level recovery metadata.
-- Security events, abuse controls, and session revocation.
+Social login, enterprise SSO, email/password, and dynamic OAuth client registration are disabled for this phase.
 
-It must not create Jovie artists, LogYourBody profiles, subscriptions, onboarding
-rows, or other product records. Each product provisions its own local record after
-it accepts a valid identity token.
+## First-party OAuth clients
 
-The immutable Better Auth user ID is the cross-product identity subject (`sub`).
-Each product may project it to a local principal. Supabase assigns LogYourBody a
-local `auth.users.id`; the OIDC identity row durably links that local principal to
-the Better Auth subject. LogYourBody rows use the local UUID so native Supabase
-RLS semantics remain unchanged.
+| Client            | Type           | Redirect URI                                | Authentication                   |
+| ----------------- | -------------- | ------------------------------------------- | -------------------------------- |
+| `logyourbody-ios` | Native/public  | `logyourbody://oauth`                       | Authorization Code + PKCE (S256) |
+| `logyourbody-web` | Web/public BFF | `https://logyourbody.com/api/auth/callback` | Authorization Code + PKCE (S256) |
 
-## Better Auth Configuration
+Development web redirects are registered explicitly. Redirect matching is exact. Both clients request `openid profile email offline_access`, use refresh-token rotation, and have no distributable client secret.
 
-The shared service will pin the same reviewed Better Auth release used by Jovie
-and expose standards-based clients through the Better Auth OAuth 2.1 provider.
+## Web flow
 
-Required server capabilities:
+1. `/api/auth/login` generates cryptographically random state and a PKCE verifier.
+2. Transaction values are stored in short-lived, secure, HttpOnly, SameSite=Lax cookies.
+3. The browser opens Jovie's `/api/auth/oauth2/authorize` endpoint and completes SMS verification.
+4. `/api/auth/callback` validates state and exchanges the code directly with Jovie.
+5. LYB reads `/oauth2/userinfo`, upserts the Jovie `sub` into Neon, and stores tokens only in secure HttpOnly cookies.
+6. `/api/auth/session` refreshes expired access tokens server-side. Browser code never receives the refresh token.
 
-- `phoneNumber` for six-digit SMS OTP verification and signup-on-verification.
-- `jwt` with asymmetric signing, a `kid`, OIDC discovery, and JWKS publication.
-- `oauthProvider` for authorization-code + PKCE clients and refresh tokens.
-- `bearer` only for first-party native/service calls that cannot use cookies.
-- Durable, shared rate limits for send, verify, token, refresh, and recovery paths.
-- Postgres-backed sessions and verification state.
+## iOS flow
 
-Disabled at the LogYourBody launch:
+1. `ASWebAuthenticationSession` opens the same Jovie authorization endpoint.
+2. The app generates state and an S256 PKCE verifier/challenge locally.
+3. Jovie returns to the exact `logyourbody://oauth` callback.
+4. The app validates state, exchanges the code directly with Jovie, and calls userinfo.
+5. Access and refresh tokens are stored in Keychain, never `UserDefaults`.
+6. The app registers the authenticated Jovie subject through LYB's server-only Neon adapter.
 
-- Email/password.
-- Email OTP.
-- Google, Apple, and other social providers.
-- SAML/enterprise SSO.
-- Dynamic client registration.
+## Data ownership
 
-The provider may retain a migration-only method needed by existing Jovie users,
-but client policy must prevent that method from appearing in LogYourBody. Adding
-a provider later must not require a LogYourBody client release.
+- Jovie owns credentials, verified phone numbers, OAuth grants, and global account identity.
+- LYB Neon owns onboarding state and all LYB product data.
+- `public.app_users.identity_subject` is the immutable join key to Jovie.
+- Neon credentials are server-only. iOS and browser clients use LYB APIs and never connect to Postgres directly.
+- Vendor SDK/API calls remain behind internal ports and adapters.
 
-## SMS Provider
+## Security invariants
 
-Twilio is an adapter behind an internal SMS port. Product and UI code never call
-Twilio directly.
-
-Prefer Twilio Verify instead of sending a Better Auth-generated code through the
-Messages API. Verify owns code generation, expiry, attempt limits, and carrier
-delivery behavior. Better Auth's phone plugin supports provider-owned verification
-through `sendOTP` and `verifyOTP`.
-
-Credentials remain server-side and may reuse the existing Jovie Twilio account:
-
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- A dedicated LogYourBody/shared-auth Verify Service SID
-
-A dedicated Verify service keeps auth traffic, templates, spend, rate limits, and
-operational metrics separate from Jovie notification SMS even when the parent
-Twilio account is shared.
-
-## Product Clients
-
-Register a separate OAuth client for every trust boundary:
-
-| Client                          | Type         | Flow                           |
-| ------------------------------- | ------------ | ------------------------------ |
-| Jovie web                       | Confidential | Authorization code + PKCE      |
-| Jovie iOS                       | Public       | Authorization code + PKCE      |
-| LogYourBody Supabase broker     | Confidential | OIDC authorization code + PKCE |
-| LogYourBody account/billing web | Confidential | Authorization code + PKCE      |
-
-Each client has an exact redirect allowlist. The LogYourBody Better Auth client
-allows only the Supabase callback URL. Supabase validates issuer, audience, nonce,
-ID-token signature, and its provider-side PKCE exchange. The native app separately
-uses PKCE when obtaining its Supabase product session.
-
-Cross-product identity is shared. Cross-product silent login is a separate policy
-and should remain disabled initially by requesting an explicit login prompt. This
-keeps “one account” from silently becoming “one browser session everywhere.”
-
-## LogYourBody iOS Flow
-
-1. The app opens Supabase's authorize endpoint in `ASWebAuthenticationSession`
-   for `custom:jovie`, with its app redirect and PKCE challenge.
-2. Supabase redirects to the shared Jovie OIDC authorization endpoint.
-3. The hosted mobile-first screen asks for a phone number.
-4. Twilio Verify sends a six-digit code. The input uses `oneTimeCode` semantics so
-   iOS can offer SMS AutoFill.
-5. Better Auth verifies the code and creates or restores the shared identity.
-6. Supabase verifies the OIDC result, links or creates the product principal, and
-   returns a one-time code to the app redirect URI.
-7. The app exchanges the code and PKCE verifier for a short-lived Supabase access
-   token and rotating refresh token, then stores them in Keychain.
-8. LogYourBody provisions its local profile idempotently using `auth.uid()`.
-
-The native app never stores credentials or auth tokens in `UserDefaults` and never
-receives Twilio, Better Auth, database, or service-role secrets.
-
-## LogYourBody + Supabase Authorization
-
-LogYourBody registers Jovie as Supabase custom OIDC provider `custom:jovie`.
-Supabase validates Better Auth's discovery document, JWKS, ID token, nonce, and
-audience, then issues the product-scoped JWT used by REST, Storage, Realtime, and
-Functions. Existing policies continue comparing `auth.uid()`/JWT `sub` to the
-local profile UUID, row `user_id`, and Storage path prefix.
-
-This is deliberate federation, not a second user-facing auth system: signup,
-verification, recovery, phone ownership, and cross-product account identity all
-remain in Better Auth. Supabase owns only the LYB data-plane session and derived
-principal. No Better Auth, Twilio, OAuth-client, or Supabase service-role secret is
-placed in the app, and Jovie never receives the Supabase JWT signing secret.
-
-## Product Provisioning
-
-Authentication and product enrollment are separate transactions.
-
-- Identity creation writes only to the shared identity database.
-- A successful Jovie callback idempotently creates or links a Jovie user record.
-- A successful LogYourBody callback idempotently creates a LogYourBody profile.
-- A failure to provision a product record does not roll back or duplicate the
-  identity; the product retries on the next authenticated request.
-- Product roles, entitlements, bans, subscriptions, and onboarding state never
-  live in identity token source tables.
-
-## Clean LogYourBody Cutover
-
-Because LogYourBody has zero users, replace instead of adapt:
-
-1. Prove the issuer, PKCE, refresh, logout, revocation, SMS, and Supabase RLS
-   contracts in development.
-2. Add the shared-auth client and Keychain-backed session store to iOS.
-3. Replace the email/signup/signin screens with the single SMS authorization path.
-4. Replace Clerk token suppliers with the Supabase OIDC-brokered product session
-   in REST, Storage, photo upload, Functions, and Realtime.
-5. Remove Clerk SDK packages, imports, configuration, middleware, webhook code,
-   tests, scripts, docs, and secrets from LogYourBody.
-6. Remove Apple/Google buttons and capabilities that exist only for login. Keep
-   Apple capabilities required by unrelated app features.
-7. Rebuild the empty development data set using shared subject IDs.
-8. Verify on a physical iPhone, then ship through the normal PR, CI, TestFlight,
-   and production gates.
-
-## Security and Operations
-
-- Exact Better Auth and OAuth-provider package pins.
-- Dedicated production/staging issuers and databases; never share signing keys.
-- Rotating asymmetric signing keys with an overlap/grace period.
-- Short access-token lifetime and rotating refresh tokens with reuse detection.
-- Durable per-IP and per-phone rate limits. Store phone hashes—not raw numbers—in
-  rate-limit keys and telemetry.
-- Generic send responses to avoid phone-number enumeration.
-- Twilio errors and logs must redact phone numbers and OTPs.
-- Separate Twilio Verify service, spend alerts, geo permissions, and fraud guard.
-- No deterministic OTP outside a triple-guarded local/E2E environment.
-- Central revocation and per-product session inventory.
-- Audit login, verification, refresh, recovery, client, and revocation events
-  without recording OTP values or access tokens.
-
-## Rejected Designs
-
-### A Better Auth instance in each product
-
-Rejected because it creates two user stores, two signing-key rotations, two SMS
-configurations, and no shared identity.
-
-### Point LogYourBody at Jovie's existing auth tables unchanged
-
-Rejected because Jovie's current Better Auth lifecycle provisions Jovie-specific
-application rows. LogYourBody-only signups would leak across the product boundary,
-and an outage or schema change in the Jovie product deployment would become an
-identity outage for every product.
-
-### Use Supabase Auth as the shared identity source
-
-Rejected because the stated goal is a first-party Better Auth system aligned with
-Jovie. Supabase can remain the LogYourBody data plane and, if necessary, a temporary
-OIDC token adapter.
-
-### Mint Supabase JWTs in the iOS app
-
-Rejected because it would require a signing secret in the client and would destroy
-the RLS trust boundary.
-
-## Implementation Gate
-
-Do not merge or deploy the identity flip until all of these pass:
-
-- Better Auth OAuth discovery and JWKS are reachable at the production-shaped
-  issuer path.
-- The confidential Supabase authorization-code flow rejects the wrong client
-  secret, redirect URI, nonce, or state.
-- Supabase's downstream native authorization-code flow rejects missing/wrong PKCE
-  and state.
-- SMS send/verify is rate-limited, non-enumerating, and works through Twilio Verify.
-- Access-token refresh, reuse rejection, logout, and remote revocation are proven.
-- Supabase links the Jovie OIDC subject to a stable product principal and accepts
-  its product token for REST, Storage, Realtime, and Functions,
-  and cross-user/anonymous RLS tests fail closed.
-- Jovie-only provisioning is no longer triggered by identity creation.
-- LogYourBody can cold-launch, sign in, restore a session, upload a photo, sync,
-  sign out, and delete an account on a physical iPhone.
+- PKCE S256 and state validation are mandatory on every authorization request.
+- OAuth redirect URIs are exact and pre-registered; dynamic registration is disabled.
+- Access tokens expire after 15 minutes; refresh tokens expire after 30 days.
+- OAuth client secrets and tokens are hashed in Jovie storage.
+- Web auth cookies are HttpOnly, Secure in production, SameSite=Lax, and path-scoped to `/`.
+- No Supabase or Clerk session is created anywhere in the flow.

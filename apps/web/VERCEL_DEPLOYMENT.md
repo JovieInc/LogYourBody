@@ -64,7 +64,8 @@ The `vercel.json` file is already configured with:
 ## ✅ Post-Deployment Checklist
 
 1. **Verify shared authentication**:
-   - Configure Supabase provider `custom:jovie` against the Jovie issuer.
+   - Configure `JOVIE_AUTH_ISSUER`, `JOVIE_AUTH_CLIENT_ID`, and the exact Jovie OAuth callback URI.
+   - Configure the pooled Neon `DATABASE_URL` server-side; never expose it with a `NEXT_PUBLIC_` prefix.
    - Add the exact Supabase callback URL to the confidential Jovie OAuth client.
    - Test phone OTP, callback exchange, refresh, and sign-out.
 

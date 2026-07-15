@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
+import { authCookies, fetchUserInfo } from '@/lib/auth/jovie-oauth';
 
 export type ServerAuthSession = {
   userId: string | null;
@@ -6,14 +7,12 @@ export type ServerAuthSession = {
 };
 
 export async function getServerAuthSession(): Promise<ServerAuthSession> {
-  const supabase = await createClient();
-  const [{ data: userData }, { data: sessionData }] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.auth.getSession(),
-  ]);
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get(authCookies.accessToken)?.value ?? null;
+  const user = accessToken ? await fetchUserInfo(accessToken) : null;
 
   return {
-    userId: userData.user?.id ?? null,
-    getToken: async () => sessionData.session?.access_token ?? null,
+    userId: user?.sub ?? null,
+    getToken: async () => accessToken,
   };
 }

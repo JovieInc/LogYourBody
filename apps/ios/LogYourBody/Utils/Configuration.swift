@@ -28,10 +28,9 @@ enum Configuration {
 
     struct AuthEnvironmentSnapshot {
         let environment: AppEnvironment
-        let authProviderID: String
+        let authIssuer: String
+        let authClientID: String
         let authRedirectURI: String
-        let supabaseURL: String
-        let supabaseExpectedHost: String
         let apiBaseURL: String
         let apiExpectedHost: String
         let revenueCatAPIKey: String
@@ -141,7 +140,7 @@ enum Configuration {
     // MARK: - API Configuration
 
     static var apiBaseURL: String {
-        stringValue(for: "API_BASE_URL", default: "https://www.logyourbody.com")
+        stringValue(for: "API_BASE_URL", default: "https://logyourbody.com")
     }
 
     static var apiExpectedHost: String {
@@ -150,8 +149,12 @@ enum Configuration {
 
     // MARK: - First-party authentication
 
-    static var authProviderID: String {
-        stringValue(for: "AUTH_PROVIDER_ID", default: "custom:jovie")
+    static var authIssuer: String {
+        stringValue(for: "AUTH_ISSUER", default: "https://jov.ie/api/auth")
+    }
+
+    static var authClientID: String {
+        stringValue(for: "AUTH_CLIENT_ID", default: "logyourbody-ios")
     }
 
     static var authRedirectURI: String {
@@ -229,17 +232,17 @@ enum Configuration {
     }
 
     static var isAuthConfigured: Bool {
-        authProviderID.hasPrefix("custom:") &&
+        URL(string: authIssuer)?.scheme == "https" &&
+            authClientID == "logyourbody-ios" &&
             URL(string: authRedirectURI)?.scheme == "logyourbody"
     }
 
     static var currentAuthEnvironmentSnapshot: AuthEnvironmentSnapshot {
         AuthEnvironmentSnapshot(
             environment: appEnvironment,
-            authProviderID: authProviderID,
+            authIssuer: authIssuer,
+            authClientID: authClientID,
             authRedirectURI: authRedirectURI,
-            supabaseURL: supabaseURL,
-            supabaseExpectedHost: supabaseExpectedHost,
             apiBaseURL: apiBaseURL,
             apiExpectedHost: apiExpectedHost,
             revenueCatAPIKey: revenueCatAPIKey,
@@ -259,8 +262,13 @@ enum Configuration {
         let sentryEnvironment = snapshot.sentryEnvironment.lowercased()
         let statsigTier = snapshot.statsigEnvironmentTier.lowercased()
 
-        if isPlaceholder(snapshot.authProviderID) || !snapshot.authProviderID.hasPrefix("custom:") {
-            messages.append("Authentication provider must be a configured custom OIDC provider.")
+        let authIssuer = URL(string: snapshot.authIssuer)
+        if authIssuer?.scheme != "https" || authIssuer?.host == nil {
+            messages.append("Authentication issuer must be a valid HTTPS URL.")
+        }
+
+        if snapshot.authClientID != "logyourbody-ios" {
+            messages.append("Authentication client must be logyourbody-ios.")
         }
 
         let redirectURL = URL(string: snapshot.authRedirectURI)
@@ -268,26 +276,9 @@ enum Configuration {
             messages.append("Authentication redirect URI must be logyourbody://oauth.")
         }
 
-        let supabaseURL = URL(string: snapshot.supabaseURL)
-        if supabaseURL == nil || isInvalidURLValue(snapshot.supabaseURL) {
-            messages.append("Supabase URL must be configured.")
-        }
-
         let apiBaseURL = URL(string: snapshot.apiBaseURL)
         if apiBaseURL == nil || isInvalidURLValue(snapshot.apiBaseURL) {
             messages.append("API base URL must be configured.")
-        }
-
-        if let supabaseURL {
-            if supabaseURL.scheme != "https" {
-                messages.append("Supabase URL must use HTTPS.")
-            }
-
-            if let host = supabaseURL.host,
-               !snapshot.supabaseExpectedHost.isEmpty,
-               host != snapshot.supabaseExpectedHost {
-                messages.append("Supabase URL host must match SUPABASE_EXPECTED_HOST for this environment.")
-            }
         }
 
         if let apiBaseURL,
@@ -299,12 +290,8 @@ enum Configuration {
 
         switch snapshot.environment {
         case .production:
-            if snapshot.authProviderID != "custom:jovie" {
-                messages.append("Production authentication must use the Jovie identity provider.")
-            }
-
-            if snapshot.supabaseExpectedHost.isEmpty {
-                messages.append("Supabase expected host must be configured for production.")
+            if authIssuer?.absoluteString != "https://jov.ie/api/auth" {
+                messages.append("Production authentication must use the Jovie identity issuer.")
             }
 
             if apiBaseURL?.scheme != "https" {

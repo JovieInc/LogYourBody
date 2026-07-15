@@ -7,12 +7,12 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
 
 ## Configuration
 
-- `AUTH_PROVIDER_ID=custom:jovie` and `AUTH_REDIRECT_URI=logyourbody://oauth` are configured.
+- `AUTH_ISSUER=https://jov.ie/api/auth`, `AUTH_CLIENT_ID=logyourbody-ios`, and `AUTH_REDIRECT_URI=logyourbody://oauth` are configured.
 - Phone OTP is the only signed-out auth path.
 - Supabase production URL and anon key are configured in `Config.xcconfig`.
 - GitHub `Production` environment has `NEXT_PUBLIC_SUPABASE_URL`.
 - GitHub `Production` environment has either `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`.
-- Supabase `custom:jovie` OIDC is configured against the Jovie Better Auth issuer.
+- Jovie has the `logyourbody-ios` public OAuth client with the exact native redirect and PKCE required.
 - Supabase RLS policies accept its product session `sub` for `profiles`, `user_profiles`, `body_metrics`, and `daily_metrics`.
 - RevenueCat production public key is configured.
 - GitHub `Production` environment has `REVENUE_CAT_PUBLIC_KEY`.

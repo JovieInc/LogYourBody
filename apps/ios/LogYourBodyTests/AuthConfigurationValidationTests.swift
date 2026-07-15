@@ -8,10 +8,10 @@ import UIKit
 @testable import LogYourBody
 
 final class AuthConfigurationValidationTests: XCTestCase {
-    func testProductionRejectsWrongIdentityProviderAndTelemetryConfig() {
+    func testProductionRejectsWrongIdentityIssuerAndTelemetryConfig() {
         let snapshot = makeSnapshot(
             environment: .production,
-            authProviderID: "custom:other",
+            authIssuer: "https://identity.example.com",
             apiBaseURL: "http" + "://localhost:3000",
             revenueCatAPIKey: "replace_with_prod_revenuecat_public_key",
             sentryEnvironment: "development",
@@ -21,19 +21,19 @@ final class AuthConfigurationValidationTests: XCTestCase {
         let result = Configuration.validateAuthEnvironment(snapshot)
 
         XCTAssertFalse(result.isValid)
-        XCTAssertTrue(result.messages.contains("Production authentication must use the Jovie identity provider."))
+        XCTAssertTrue(result.messages.contains("Production authentication must use the Jovie identity issuer."))
         XCTAssertTrue(result.messages.contains("Production API base URL must use HTTPS."))
         XCTAssertTrue(result.messages.contains("Production RevenueCat API key must be configured."))
         XCTAssertTrue(result.messages.contains("Production Sentry environment must be production."))
         XCTAssertTrue(result.messages.contains("Production Statsig tier must be production."))
     }
 
-    func testProductionRequiresExplicitSupabaseExpectedHost() {
-        let snapshot = makeSnapshot(environment: .production, supabaseExpectedHost: "")
+    func testRejectsWrongNativeOAuthClient() {
+        let snapshot = makeSnapshot(authClientID: "some-other-client")
         let result = Configuration.validateAuthEnvironment(snapshot)
 
         XCTAssertFalse(result.isValid)
-        XCTAssertTrue(result.messages.contains("Supabase expected host must be configured for production."))
+        XCTAssertTrue(result.messages.contains("Authentication client must be logyourbody-ios."))
     }
 
     func testRejectsInvalidNativeRedirectURI() {
@@ -51,22 +51,21 @@ final class AuthConfigurationValidationTests: XCTestCase {
 
     private func makeSnapshot(
         environment: LogYourBody.Configuration.AppEnvironment = .development,
-        authProviderID: String = "custom:jovie",
+        authIssuer: String = "https://jov.ie/api/auth",
+        authClientID: String = "logyourbody-ios",
         authRedirectURI: String = "logyourbody://oauth",
-        supabaseExpectedHost: String = "prod-project.supabase.co",
-        apiBaseURL: String = "https://www.logyourbody.com",
+        apiBaseURL: String = "https://logyourbody.com",
         revenueCatAPIKey: String = "appl_prod_123",
         sentryEnvironment: String = "production",
         statsigEnvironmentTier: String = "production"
     ) -> LogYourBody.Configuration.AuthEnvironmentSnapshot {
         LogYourBody.Configuration.AuthEnvironmentSnapshot(
             environment: environment,
-            authProviderID: authProviderID,
+            authIssuer: authIssuer,
+            authClientID: authClientID,
             authRedirectURI: authRedirectURI,
-            supabaseURL: "https://prod-project.supabase.co",
-            supabaseExpectedHost: supabaseExpectedHost,
             apiBaseURL: apiBaseURL,
-            apiExpectedHost: apiBaseURL.contains("localhost") ? "localhost" : "www.logyourbody.com",
+            apiExpectedHost: apiBaseURL.contains("localhost") ? "localhost" : "logyourbody.com",
             revenueCatAPIKey: revenueCatAPIKey,
             sentryEnvironment: sentryEnvironment,
             statsigEnvironmentTier: statsigEnvironmentTier,

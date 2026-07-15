@@ -96,47 +96,31 @@ struct ProductAuthSession: Codable, Equatable {
     var id: String { subject }
 }
 
-struct SupabaseAuthTokenResponse: Decodable {
+struct OAuthTokenResponse: Decodable {
     let accessToken: String
-    let refreshToken: String
+    let refreshToken: String?
     let expiresIn: TimeInterval
-    let expiresAt: TimeInterval?
-    let user: SupabaseAuthUser
+    let idToken: String?
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
         case expiresIn = "expires_in"
-        case expiresAt = "expires_at"
-        case user
+        case idToken = "id_token"
     }
 }
 
-struct SupabaseAuthUser: Decodable {
-    struct Metadata: Decodable {
-        let fullName: String?
-        let name: String?
-
-        enum CodingKeys: String, CodingKey {
-            case fullName = "full_name"
-            case name
-        }
-    }
-
-    let id: String
+struct OAuthUserInfo: Decodable {
+    let subject: String
     let email: String?
-    let createdAt: Date?
-    let userMetadata: Metadata?
+    let name: String?
+    let phoneNumber: String?
 
     enum CodingKeys: String, CodingKey {
-        case id
+        case subject = "sub"
         case email
-        case createdAt = "created_at"
-        case userMetadata = "user_metadata"
-    }
-
-    var name: String? {
-        userMetadata?.fullName ?? userMetadata?.name
+        case name
+        case phoneNumber = "phone_number"
     }
 }
 
@@ -181,7 +165,7 @@ final class AuthManager: NSObject, ObservableObject {
     let urlSession: URLSession
     let legalConsentGate = AsyncGate()
 
-    private let storedSessionKey = "productAuth.supabaseSession"
+    private let storedSessionKey = "productAuth.jovieOAuthSession"
     private var initializationTask: Task<Void, Never>?
     private var refreshTask: Task<String?, Never>?
     private var webAuthenticationSession: ASWebAuthenticationSession?
@@ -282,30 +266,42 @@ final class AuthManager: NSObject, ObservableObject {
         guard isAuthProviderReady else { throw AuthError.providerNotReady }
         let verifier = Self.randomURLSafeString(byteCount: 48)
         let challenge = Self.base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
+        let state = Self.randomURLSafeString(byteCount: 32)
 
         var components = URLComponents(
-            url: try SupabaseURLBuilder.authURL("authorize"),
+            url: try oauthURL(path: "oauth2/authorize"),
             resolvingAgainstBaseURL: false
         )
         components?.queryItems = [
-            URLQueryItem(name: "provider", value: Configuration.authProviderID),
-            URLQueryItem(name: "redirect_to", value: Configuration.authRedirectURI),
+            URLQueryItem(name: "client_id", value: Configuration.authClientID),
+            URLQueryItem(name: "redirect_uri", value: Configuration.authRedirectURI),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "scope", value: "openid profile email offline_access"),
+            URLQueryItem(name: "state", value: state),
             URLQueryItem(name: "code_challenge", value: challenge),
-            URLQueryItem(name: "code_challenge_method", value: "s256")
+            URLQueryItem(name: "code_challenge_method", value: "S256")
         ]
         guard let authorizationURL = components?.url else { throw AuthError.invalidCallback }
 
         let callbackURL = try await openAuthorizationSession(url: authorizationURL)
         guard let callback = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              callback.queryItems?.first(where: { $0.name == "state" })?.value == state,
               let code = callback.queryItems?.first(where: { $0.name == "code" })?.value else {
             throw AuthError.invalidCallback
         }
 
-        let tokenResponse = try await exchangeSupabaseToken(
-            grantType: "pkce",
-            payload: ["auth_code": code, "code_verifier": verifier]
+        let tokenResponse = try await exchangeOAuthToken(
+            parameters: [
+                "grant_type": "authorization_code",
+                "client_id": Configuration.authClientID,
+                "code": code,
+                "code_verifier": verifier,
+                "redirect_uri": Configuration.authRedirectURI
+            ]
         )
-        try persist(tokenResponse: tokenResponse)
+        let userInfo = try await fetchOAuthUserInfo(accessToken: tokenResponse.accessToken)
+        try await registerProductSession(accessToken: tokenResponse.accessToken)
+        try persist(tokenResponse: tokenResponse, userInfo: userInfo)
         AppServicePorts.analyticsTracker.track(event: "login_completed", properties: ["method": "sms_otp"])
     }
 
@@ -338,19 +334,21 @@ final class AuthManager: NSObject, ObservableObject {
         }
     }
 
-    private func exchangeSupabaseToken(
-        grantType: String,
-        payload: [String: String]
-    ) async throws -> SupabaseAuthTokenResponse {
-        var components = URLComponents(url: try SupabaseURLBuilder.authURL("token"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [URLQueryItem(name: "grant_type", value: grantType)]
-        guard let url = components?.url else { throw AuthError.invalidCallback }
+    private func oauthURL(path: String) throws -> URL {
+        guard let issuer = URL(string: Configuration.authIssuer),
+              issuer.scheme == "https" else { throw AuthError.providerNotReady }
+        return issuer.appendingPathComponent(path)
+    }
+
+    private func exchangeOAuthToken(parameters: [String: String]) async throws -> OAuthTokenResponse {
+        let url = try oauthURL(path: "oauth2/token")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.httpBody = try JSONEncoder().encode(payload)
+        var form = URLComponents()
+        form.queryItems = parameters.map { URLQueryItem(name: $0.key, value: $0.value) }
+        request.httpBody = form.percentEncodedQuery?.data(using: .utf8)
 
         let (data, response) = try await urlSession.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AuthError.networkError }
@@ -361,23 +359,51 @@ final class AuthManager: NSObject, ObservableObject {
                 ?? "Sign in could not be completed."
             throw AuthError.server(message)
         }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(SupabaseAuthTokenResponse.self, from: data)
+        return try JSONDecoder().decode(OAuthTokenResponse.self, from: data)
     }
 
-    private func persist(tokenResponse: SupabaseAuthTokenResponse) throws {
-        let user = tokenResponse.user
-        let email = user.email ?? Self.syntheticAuthEmail(userId: user.id)
+    private func fetchOAuthUserInfo(accessToken: String) async throws -> OAuthUserInfo {
+        var request = URLRequest(url: try oauthURL(path: "oauth2/userinfo"))
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AuthError.networkError }
+        guard (200...299).contains(http.statusCode) else { throw AuthError.invalidToken }
+        return try JSONDecoder().decode(OAuthUserInfo.self, from: data)
+    }
+
+    private func registerProductSession(accessToken: String) async throws {
+        guard let baseURL = URL(string: Configuration.apiBaseURL),
+              let url = URL(string: "/api/auth/mobile/session", relativeTo: baseURL)?.absoluteURL else {
+            throw AuthError.providerNotReady
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AuthError.networkError }
+        guard (200...299).contains(http.statusCode) else {
+            throw AuthError.server("Your LogYourBody account could not be initialized.")
+        }
+    }
+
+    private func persist(
+        tokenResponse: OAuthTokenResponse,
+        userInfo: OAuthUserInfo,
+        fallbackRefreshToken: String? = nil
+    ) throws {
+        guard let refreshToken = tokenResponse.refreshToken ?? fallbackRefreshToken else {
+            throw AuthError.invalidToken
+        }
+        let email = userInfo.email ?? Self.syntheticAuthEmail(userId: userInfo.subject)
         let session = ProductAuthSession(
             accessToken: tokenResponse.accessToken,
-            refreshToken: tokenResponse.refreshToken,
-            expiresAt: tokenResponse.expiresAt.map(Date.init(timeIntervalSince1970:))
-                ?? Date().addingTimeInterval(tokenResponse.expiresIn),
-            subject: user.id,
+            refreshToken: refreshToken,
+            expiresAt: Date().addingTimeInterval(tokenResponse.expiresIn),
+            subject: userInfo.subject,
             email: email,
-            name: user.name,
-            issuedAt: user.createdAt ?? Date()
+            name: userInfo.name,
+            issuedAt: Date()
         )
         try keychain.save(session, forKey: storedSessionKey)
         authSession = session
@@ -420,11 +446,19 @@ final class AuthManager: NSObject, ObservableObject {
             guard let self else { return nil }
             defer { self.refreshTask = nil }
             do {
-                let response = try await self.exchangeSupabaseToken(
-                    grantType: "refresh_token",
-                    payload: ["refresh_token": current.refreshToken]
+                let response = try await self.exchangeOAuthToken(
+                    parameters: [
+                        "grant_type": "refresh_token",
+                        "client_id": Configuration.authClientID,
+                        "refresh_token": current.refreshToken
+                    ]
                 )
-                try self.persist(tokenResponse: response)
+                let userInfo = try await self.fetchOAuthUserInfo(accessToken: response.accessToken)
+                try self.persist(
+                    tokenResponse: response,
+                    userInfo: userInfo,
+                    fallbackRefreshToken: current.refreshToken
+                )
                 return self.authSession?.accessToken
             } catch {
                 await self.performLogout(exitReason: .sessionExpired)
@@ -447,14 +481,6 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func performLogout(exitReason: AuthExitReason) async {
-        if let accessToken = authSession?.accessToken,
-           let url = try? SupabaseURLBuilder.authURL("logout") {
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
-            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-            _ = try? await urlSession.data(for: request)
-        }
         try? keychain.delete(forKey: storedSessionKey)
         authSession = nil
         currentUser = nil

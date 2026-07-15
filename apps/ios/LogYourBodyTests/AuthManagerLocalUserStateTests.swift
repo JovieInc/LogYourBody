@@ -47,21 +47,18 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
         XCTAssertNil(manager.currentUser)
     }
 
-    func testSupabaseAuthUserUsesProviderProfileName() throws {
+    func testOAuthUserInfoUsesProviderProfileName() throws {
         let payload = Data(#"""
         {
-          "id": "product-user",
+          "sub": "product-user",
           "email": "phone@identity.jov.ie",
-          "created_at": "2026-07-14T12:00:00Z",
-          "user_metadata": { "full_name": "Test User" }
+          "name": "Test User",
+          "phone_number": "+15555550123"
         }
         """#.utf8)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let user = try JSONDecoder().decode(OAuthUserInfo.self, from: payload)
 
-        let user = try decoder.decode(SupabaseAuthUser.self, from: payload)
-
-        XCTAssertEqual(user.id, "product-user")
+        XCTAssertEqual(user.subject, "product-user")
         XCTAssertEqual(user.email, "phone@identity.jov.ie")
         XCTAssertEqual(user.name, "Test User")
     }

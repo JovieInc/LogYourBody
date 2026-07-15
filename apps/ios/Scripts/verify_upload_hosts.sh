@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Preflight upload endpoint hosts before release builds or CI smoke.
-# Mirrors SupabaseURLBuilder.isValidServiceHost in LogYourBody.
+# Verifies the first-party API host used for server-mediated uploads.
 
 lowercase() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
@@ -43,10 +43,8 @@ require_https_service_url() {
   fi
 }
 
-SUPABASE_URL="${SUPABASE_URL:-${NEXT_PUBLIC_SUPABASE_URL:-}}"
-API_BASE_URL="${API_BASE_URL:-https://www.logyourbody.com}"
+API_BASE_URL="${API_BASE_URL:-https://logyourbody.com}"
 
-require_https_service_url "SUPABASE_URL" "$SUPABASE_URL"
 require_https_service_url "API_BASE_URL" "$API_BASE_URL"
 
 echo "Upload host preflight passed."

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isLandingAudience, type LandingAudience } from '@/lib/marketing/landing-registry';
-import { updateSession } from '@/lib/supabase/middleware';
+import { authCookies } from '@/lib/auth/constants';
 
 const LANDING_AUDIENCE_COOKIE = 'lyb_landing_audience_v1';
 const protectedRoutePrefixes = [
@@ -92,7 +92,18 @@ export default function middleware(req: NextRequest) {
     return response;
   }
 
-  return updateSession(req);
+  if (shouldUseProductAuthMiddleware(req)) {
+    const hasSession =
+      Boolean(req.cookies.get(authCookies.accessToken)?.value) ||
+      Boolean(req.cookies.get(authCookies.refreshToken)?.value);
+    if (!hasSession) {
+      const signIn = new URL('/signin', req.url);
+      signIn.searchParams.set('returnTo', `${req.nextUrl.pathname}${req.nextUrl.search}`);
+      return NextResponse.redirect(signIn);
+    }
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

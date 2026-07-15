@@ -4,18 +4,14 @@
 APP_ENVIRONMENT = production
 ALLOW_PRODUCTION_SERVICES_IN_DEBUG = NO
 
-// Supabase custom OIDC provider backed by the shared Jovie Better Auth issuer.
-AUTH_PROVIDER_ID = custom:jovie
+// Shared first-party Jovie Better Auth issuer. Native client uses OAuth PKCE.
+AUTH_ISSUER = https:/$()/jov.ie/api/auth
+AUTH_CLIENT_ID = logyourbody-ios
 AUTH_REDIRECT_URI = logyourbody:/$()/oauth
 
-// Supabase production project. SUPABASE_EXPECTED_HOST must match SUPABASE_URL host.
-SUPABASE_URL = https:/$()/your-prod-project.supabase.co
-SUPABASE_EXPECTED_HOST = your-prod-project.supabase.co
-SUPABASE_ANON_KEY = replace_with_prod_anon_key
-
 // Production API.
-API_BASE_URL = https:/$()/www.logyourbody.com
-API_EXPECTED_HOST = www.logyourbody.com
+API_BASE_URL = https:/$()/logyourbody.com
+API_EXPECTED_HOST = logyourbody.com
 
 // Production paid/analytics/error reporting providers.
 REVENUE_CAT_API_KEY = replace_with_prod_revenuecat_public_key

@@ -4,14 +4,10 @@
 APP_ENVIRONMENT = development
 ALLOW_PRODUCTION_SERVICES_IN_DEBUG = NO
 
-// Supabase custom OIDC provider backed by the shared Jovie Better Auth issuer.
-AUTH_PROVIDER_ID = custom:jovie
+// Shared Jovie Better Auth issuer. Native client uses OAuth PKCE.
+AUTH_ISSUER = https:/$()/jov.ie/api/auth
+AUTH_CLIENT_ID = logyourbody-ios
 AUTH_REDIRECT_URI = logyourbody:/$()/oauth
-
-// Supabase dev project. SUPABASE_EXPECTED_HOST must match SUPABASE_URL host.
-SUPABASE_URL = https:/$()/your-dev-project.supabase.co
-SUPABASE_EXPECTED_HOST = your-dev-project.supabase.co
-SUPABASE_ANON_KEY = replace_with_dev_anon_key
 
 // API target for debug builds.
 API_BASE_URL = http:/$()/localhost:3000
