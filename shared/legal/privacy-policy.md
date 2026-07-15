@@ -87,6 +87,7 @@ We do not sell, trade, or rent your personal information. We may share your info
 2. **Service Providers**: Third-party services that help operate our Service:
    - Clerk (authentication)
    - Supabase (database hosting)
+   - Neon (waitlist database hosting)
    - Vercel (web hosting)
    - RevenueCat (subscription and purchase entitlements)
    - Sentry (error tracking and crash reporting)

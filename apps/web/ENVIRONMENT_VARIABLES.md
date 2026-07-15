@@ -4,6 +4,19 @@ This document describes the environment variables required for LogYourBody.
 
 ## Required Environment Variables
 
+### Waitlist storage
+
+```bash
+# Server-only pooled Neon connection for pre-launch email capture.
+# Never expose this through a NEXT_PUBLIC_ variable.
+WAITLIST_DATABASE_URL=postgresql://...
+```
+
+The waitlist database is isolated from Jovie's application database and from
+LogYourBody's future authenticated product data. Its schema lives in
+`apps/web/db/migrations` and is accessed only through the internal waitlist
+storage port.
+
 ### Supabase Configuration
 
 These variables are required for authentication and database functionality:
@@ -61,6 +74,7 @@ OPENAI_API_KEY=your-openai-api-key
 ## Build-Time Behavior
 
 The application is configured to build successfully even without Supabase credentials:
+
 - Missing credentials will show a warning banner
 - Authentication features will be disabled
 - The app will run in "demo mode"

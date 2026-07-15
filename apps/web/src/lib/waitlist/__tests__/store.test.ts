@@ -1,33 +1,32 @@
 import { acceptWaitlistEntry } from '../store';
 
-const mockInsert = jest.fn();
-const mockFrom = jest.fn(() => ({ insert: mockInsert }));
+const mockQuery = jest.fn();
 
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => ({ from: mockFrom })),
+jest.mock('@neondatabase/serverless', () => ({
+  neon: jest.fn(() => mockQuery),
 }));
 
 describe('acceptWaitlistEntry', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
-    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
+    process.env.WAITLIST_DATABASE_URL = 'postgresql://example.test/waitlist';
   });
 
   it('creates a normalized waitlist entry', async () => {
-    mockInsert.mockResolvedValueOnce({ error: null });
+    mockQuery.mockResolvedValueOnce([]);
 
     await acceptWaitlistEntry({ email: ' New@Example.com ', source: 'landing:minimal:direct' });
 
-    expect(mockInsert).toHaveBeenCalledWith({
-      email: 'new@example.com',
-      email_normalized: 'new@example.com',
-      source: 'landing:minimal:direct',
-    });
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockQuery.mock.calls[0]?.slice(1)).toEqual([
+      'new@example.com',
+      'new@example.com',
+      'landing:minimal:direct',
+    ]);
   });
 
-  it('treats a uniqueness conflict as accepted', async () => {
-    mockInsert.mockResolvedValueOnce({ error: { code: '23505' } });
+  it('accepts repeat submissions idempotently', async () => {
+    mockQuery.mockResolvedValueOnce([]);
     await expect(
       acceptWaitlistEntry({ email: 'existing@example.com', source: 'landing:minimal:direct' }),
     ).resolves.toBeUndefined();
@@ -37,6 +36,6 @@ describe('acceptWaitlistEntry', () => {
     await expect(
       acceptWaitlistEntry({ email: 'bad-email', source: 'landing:minimal:direct' }),
     ).rejects.toThrow('INVALID_EMAIL');
-    expect(mockFrom).not.toHaveBeenCalled();
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
