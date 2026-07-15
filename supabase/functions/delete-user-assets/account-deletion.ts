@@ -19,6 +19,14 @@ type SupabaseDeleteClient = {
     }
 }
 
+type SupabaseAuthAdminClient = {
+    auth: {
+        admin: {
+            deleteUser: (userId: string) => Promise<{ error?: unknown }>
+        }
+    }
+}
+
 type AccountDeletionLogger = {
     error: (message: string, context?: unknown) => void
 }
@@ -90,6 +98,20 @@ export async function deleteUserDatabaseRows(
     }
 
     return results
+}
+
+export async function deleteProductAuthUser(
+    supabase: SupabaseAuthAdminClient,
+    userId: string,
+): Promise<void> {
+    if (userId.trim().length === 0) {
+        throw new Error("Cannot delete product auth user without a user id")
+    }
+
+    const { error } = await supabase.auth.admin.deleteUser(userId)
+    if (error) {
+        throw new Error(`Failed to delete product auth user: ${describeSupabaseError(error)}`)
+    }
 }
 
 function describeSupabaseError(error: unknown): string {

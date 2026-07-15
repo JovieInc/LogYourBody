@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { realtimeSyncManager, type SyncStatus } from '@/lib/sync/realtime-sync-manager';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 
 interface RealtimeSyncState {
   isSyncing: boolean;
@@ -53,7 +53,7 @@ export function useRealtimeSync(): UseRealtimeSyncReturn {
   }, []);
 
   const clearError = useCallback(() => {
-    setState(prev => ({ ...prev, error: undefined }));
+    setState((prev) => ({ ...prev, error: undefined }));
   }, []);
 
   return {
@@ -64,9 +64,7 @@ export function useRealtimeSync(): UseRealtimeSyncReturn {
 }
 
 // Hook for components that need to track specific data changes
-export function useRealtimeData<T>(
-  dataFetcher: () => Promise<T>
-) {
+export function useRealtimeData<T>(dataFetcher: () => Promise<T>) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);

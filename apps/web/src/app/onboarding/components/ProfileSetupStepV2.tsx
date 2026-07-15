@@ -1,135 +1,151 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 // import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group' // Not used
-import { useOnboarding } from '@/contexts/OnboardingContext'
-import { useAuth } from '@/contexts/ClerkAuthContext'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DateWheelPicker, HeightWheelPicker } from '@/components/ui/wheel-picker'
-import { format } from 'date-fns'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Calendar, Ruler, User, UserCheck, Users } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { useMediaQuery } from '@/hooks/use-media-query'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DateWheelPicker, HeightWheelPicker } from '@/components/ui/wheel-picker';
+import { format } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, ArrowRight, Calendar, Ruler, User, UserCheck, Users } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useMediaQuery } from '@/hooks/use-media-query';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-type ProfileStep = 'name' | 'dob' | 'height' | 'gender'
+type ProfileStep = 'name' | 'dob' | 'height' | 'gender';
 
-const PROFILE_STEPS: ProfileStep[] = ['name', 'dob', 'height', 'gender']
+const PROFILE_STEPS: ProfileStep[] = ['name', 'dob', 'height', 'gender'];
 
 export function ProfileSetupStepV2() {
-  const { data, updateData, nextStep, previousStep } = useOnboarding()
-  const { user } = useAuth()
-  const isMobile = useMediaQuery('(max-width: 768px)')
+  const { data, updateData, nextStep, previousStep } = useOnboarding();
+  const { user } = useAuth();
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
-  const [currentProfileStep, setCurrentProfileStep] = useState<ProfileStep>('name')
+  const [currentProfileStep, setCurrentProfileStep] = useState<ProfileStep>('name');
 
-  const initialFullName = data.fullName || ''
-  const initialFirstNameFromFull = initialFullName.trim().split(/\s+/)[0] || ''
-  const initialLastNameFromFull = initialFullName.trim().split(/\s+/).slice(1).join(' ')
+  const initialFullName = data.fullName || '';
+  const initialFirstNameFromFull = initialFullName.trim().split(/\s+/)[0] || '';
+  const initialLastNameFromFull = initialFullName.trim().split(/\s+/).slice(1).join(' ');
 
-  const clerkFirstName = (user as { firstName?: string } | null)?.firstName || ''
-  const clerkLastName = (user as { lastName?: string } | null)?.lastName || ''
+  const identityFirstName = (user as { firstName?: string } | null)?.firstName || '';
+  const identityLastName = (user as { lastName?: string } | null)?.lastName || '';
 
   const [formData, setFormData] = useState({
-    firstName: initialFullName ? initialFirstNameFromFull : clerkFirstName,
-    lastName: initialFullName ? initialLastNameFromFull : clerkLastName,
+    firstName: initialFullName ? initialFirstNameFromFull : identityFirstName,
+    lastName: initialFullName ? initialLastNameFromFull : identityLastName,
     dateOfBirth: data.dateOfBirth || '',
     dateOfBirthDate: data.dateOfBirth ? new Date(data.dateOfBirth) : new Date(1990, 0, 1),
     height: data.height || 71, // Default 5'11" in inches
     heightFeet: Math.floor((data.height || 71) / 12),
     heightInches: (data.height || 71) % 12,
-    gender: data.gender || ''
-  })
+    gender: data.gender || '',
+  });
 
-  const currentStepIndex = PROFILE_STEPS.indexOf(currentProfileStep)
-  const progress = ((currentStepIndex + 1) / PROFILE_STEPS.length) * 100
+  const currentStepIndex = PROFILE_STEPS.indexOf(currentProfileStep);
+  const progress = ((currentStepIndex + 1) / PROFILE_STEPS.length) * 100;
 
   const handleProfileNext = () => {
-    const nextIndex = currentStepIndex + 1
+    const nextIndex = currentStepIndex + 1;
     if (nextIndex < PROFILE_STEPS.length) {
-      setCurrentProfileStep(PROFILE_STEPS[nextIndex])
+      setCurrentProfileStep(PROFILE_STEPS[nextIndex]);
     } else {
       // Save data and go to next onboarding step
       updateData({
         fullName: `${formData.firstName} ${formData.lastName}`.trim(),
         dateOfBirth: formData.dateOfBirth,
         height: formData.height,
-        gender: formData.gender as 'male' | 'female'
-      })
-      nextStep()
+        gender: formData.gender as 'male' | 'female',
+      });
+      nextStep();
     }
-  }
+  };
 
   const handleProfileBack = () => {
-    const prevIndex = currentStepIndex - 1
+    const prevIndex = currentStepIndex - 1;
     if (prevIndex >= 0) {
-      setCurrentProfileStep(PROFILE_STEPS[prevIndex])
+      setCurrentProfileStep(PROFILE_STEPS[prevIndex]);
     } else {
-      previousStep()
+      previousStep();
     }
-  }
+  };
 
   const isCurrentStepValid = () => {
     switch (currentProfileStep) {
       case 'name':
-        return formData.firstName.trim().length > 0 && formData.lastName.trim().length > 0
+        return formData.firstName.trim().length > 0 && formData.lastName.trim().length > 0;
       case 'dob':
-        return formData.dateOfBirth.length > 0
+        return formData.dateOfBirth.length > 0;
       case 'height':
-        return formData.height > 0
+        return formData.height > 0;
       case 'gender':
-        return formData.gender.length > 0
+        return formData.gender.length > 0;
       default:
-        return false
+        return false;
     }
-  }
+  };
 
   // Generate year options for desktop
-  const currentYear = new Date().getFullYear()
-  const years = Array.from({ length: 100 }, (_, i) => currentYear - i - 10)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 100 }, (_, i) => currentYear - i - 10);
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ]
-  const days = Array.from({ length: 31 }, (_, i) => i + 1)
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
   const stepContent = {
     name: {
       icon: User,
       title: "What's your name?",
-      description: "This helps personalize your experience"
+      description: 'This helps personalize your experience',
     },
     dob: {
       icon: Calendar,
-      title: "When were you born?",
-      description: "Used to calculate age-related metrics"
+      title: 'When were you born?',
+      description: 'Used to calculate age-related metrics',
     },
     height: {
       icon: Ruler,
-      title: "How tall are you?",
-      description: "Used to calculate BMI and other body metrics"
+      title: 'How tall are you?',
+      description: 'Used to calculate BMI and other body metrics',
     },
     gender: {
       icon: Users,
-      title: "Select your biological sex",
-      description: "Used for accurate body composition calculations"
-    }
-  }
+      title: 'Select your biological sex',
+      description: 'Used for accurate body composition calculations',
+    },
+  };
 
-  const currentContent = stepContent[currentProfileStep]
-  const StepIcon = currentContent.icon
+  const currentContent = stepContent[currentProfileStep];
+  const StepIcon = currentContent.icon;
 
   return (
-    <Card className="bg-linear-card border-linear-border max-h-[85vh] flex flex-col">
-      <CardHeader className="pb-4 flex-shrink-0">
-        <div className="flex items-center justify-between mb-4">
+    <Card className="bg-linear-card border-linear-border flex max-h-[85vh] flex-col">
+      <CardHeader className="flex-shrink-0 pb-4">
+        <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-linear-purple/10 flex items-center justify-center">
-              <StepIcon className="h-5 w-5 text-linear-text" />
+            <div className="bg-linear-purple/10 flex h-10 w-10 items-center justify-center rounded-lg">
+              <StepIcon className="text-linear-text h-5 w-5" />
             </div>
             <div>
               <CardTitle className="text-linear-text">{currentContent.title}</CardTitle>
@@ -138,11 +154,11 @@ export function ProfileSetupStepV2() {
               </CardDescription>
             </div>
           </div>
-          <span className="text-sm text-linear-text-tertiary">
+          <span className="text-linear-text-tertiary text-sm">
             {currentStepIndex + 1} of {PROFILE_STEPS.length}
           </span>
         </div>
-        <div className="w-full bg-linear-border rounded-full h-2">
+        <div className="bg-linear-border h-2 w-full rounded-full">
           <div
             className="bg-linear-purple h-2 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
@@ -163,8 +179,7 @@ export function ProfileSetupStepV2() {
             {/* Name Step */}
             {currentProfileStep === 'name' && (
               <div className="space-y-4 py-8">
-                <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}
-                >
+                <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
                   <div className="space-y-2">
                     <Label htmlFor="firstName" className="text-linear-text-secondary text-sm">
                       First name
@@ -172,16 +187,18 @@ export function ProfileSetupStepV2() {
                     <Input
                       id="firstName"
                       value={formData.firstName}
-                      onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, firstName: e.target.value }))
+                      }
                       className={cn(
-                        "bg-linear-bg border-linear-border text-linear-text",
-                        isMobile ? "text-base h-12" : "text-lg h-12"
+                        'bg-linear-bg border-linear-border text-linear-text',
+                        isMobile ? 'h-12 text-base' : 'h-12 text-lg',
                       )}
                       placeholder="First name"
                       autoFocus
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && isCurrentStepValid()) {
-                          handleProfileNext()
+                          handleProfileNext();
                         }
                       }}
                     />
@@ -194,23 +211,25 @@ export function ProfileSetupStepV2() {
                     <Input
                       id="lastName"
                       value={formData.lastName}
-                      onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, lastName: e.target.value }))
+                      }
                       className={cn(
-                        "bg-linear-bg border-linear-border text-linear-text",
-                        isMobile ? "text-base h-12" : "text-lg h-12"
+                        'bg-linear-bg border-linear-border text-linear-text',
+                        isMobile ? 'h-12 text-base' : 'h-12 text-lg',
                       )}
                       placeholder="Last name"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && isCurrentStepValid()) {
-                          handleProfileNext()
+                          handleProfileNext();
                         }
                       }}
                     />
                   </div>
                 </div>
 
-                <p className="text-center text-sm text-linear-text-tertiary">
-                  {isMobile ? "Tap Next to continue" : "Press Enter or click Next to continue"}
+                <p className="text-linear-text-tertiary text-center text-sm">
+                  {isMobile ? 'Tap Next to continue' : 'Press Enter or click Next to continue'}
                 </p>
               </div>
             )}
@@ -222,11 +241,11 @@ export function ProfileSetupStepV2() {
                   <DateWheelPicker
                     date={formData.dateOfBirthDate}
                     onDateChange={(date) => {
-                      setFormData(prev => ({
+                      setFormData((prev) => ({
                         ...prev,
                         dateOfBirthDate: date,
-                        dateOfBirth: format(date, 'yyyy-MM-dd')
-                      }))
+                        dateOfBirth: format(date, 'yyyy-MM-dd'),
+                      }));
                     }}
                     className="bg-linear-bg rounded-lg"
                   />
@@ -237,13 +256,13 @@ export function ProfileSetupStepV2() {
                       <Select
                         value={formData.dateOfBirthDate.getMonth().toString()}
                         onValueChange={(value) => {
-                          const newDate = new Date(formData.dateOfBirthDate)
-                          newDate.setMonth(parseInt(value))
-                          setFormData(prev => ({
+                          const newDate = new Date(formData.dateOfBirthDate);
+                          newDate.setMonth(parseInt(value));
+                          setFormData((prev) => ({
                             ...prev,
                             dateOfBirthDate: newDate,
-                            dateOfBirth: format(newDate, 'yyyy-MM-dd')
-                          }))
+                            dateOfBirth: format(newDate, 'yyyy-MM-dd'),
+                          }));
                         }}
                       >
                         <SelectTrigger className="bg-linear-bg border-linear-border">
@@ -264,20 +283,20 @@ export function ProfileSetupStepV2() {
                       <Select
                         value={formData.dateOfBirthDate.getDate().toString()}
                         onValueChange={(value) => {
-                          const newDate = new Date(formData.dateOfBirthDate)
-                          newDate.setDate(parseInt(value))
-                          setFormData(prev => ({
+                          const newDate = new Date(formData.dateOfBirthDate);
+                          newDate.setDate(parseInt(value));
+                          setFormData((prev) => ({
                             ...prev,
                             dateOfBirthDate: newDate,
-                            dateOfBirth: format(newDate, 'yyyy-MM-dd')
-                          }))
+                            dateOfBirth: format(newDate, 'yyyy-MM-dd'),
+                          }));
                         }}
                       >
                         <SelectTrigger className="bg-linear-bg border-linear-border">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {days.map(day => (
+                          {days.map((day) => (
                             <SelectItem key={day} value={day.toString()}>
                               {day}
                             </SelectItem>
@@ -291,20 +310,20 @@ export function ProfileSetupStepV2() {
                       <Select
                         value={formData.dateOfBirthDate.getFullYear().toString()}
                         onValueChange={(value) => {
-                          const newDate = new Date(formData.dateOfBirthDate)
-                          newDate.setFullYear(parseInt(value))
-                          setFormData(prev => ({
+                          const newDate = new Date(formData.dateOfBirthDate);
+                          newDate.setFullYear(parseInt(value));
+                          setFormData((prev) => ({
                             ...prev,
                             dateOfBirthDate: newDate,
-                            dateOfBirth: format(newDate, 'yyyy-MM-dd')
-                          }))
+                            dateOfBirth: format(newDate, 'yyyy-MM-dd'),
+                          }));
                         }}
                       >
                         <SelectTrigger className="bg-linear-bg border-linear-border">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {years.map(year => (
+                          {years.map((year) => (
                             <SelectItem key={year} value={year.toString()}>
                               {year}
                             </SelectItem>
@@ -315,9 +334,10 @@ export function ProfileSetupStepV2() {
                   </div>
                 )}
 
-                <div className="text-center pt-4">
-                  <p className="text-sm text-linear-text-secondary">
-                    You are {new Date().getFullYear() - formData.dateOfBirthDate.getFullYear()} years old
+                <div className="pt-4 text-center">
+                  <p className="text-linear-text-secondary text-sm">
+                    You are {new Date().getFullYear() - formData.dateOfBirthDate.getFullYear()}{' '}
+                    years old
                   </p>
                 </div>
               </div>
@@ -331,13 +351,13 @@ export function ProfileSetupStepV2() {
                     heightInCm={formData.height * 2.54}
                     units="imperial"
                     onHeightChange={(heightInCm) => {
-                      const inches = Math.round(heightInCm / 2.54)
-                      setFormData(prev => ({
+                      const inches = Math.round(heightInCm / 2.54);
+                      setFormData((prev) => ({
                         ...prev,
                         height: inches,
                         heightFeet: Math.floor(inches / 12),
-                        heightInches: inches % 12
-                      }))
+                        heightInches: inches % 12,
+                      }));
                     }}
                     className="bg-linear-bg rounded-lg"
                   />
@@ -348,20 +368,20 @@ export function ProfileSetupStepV2() {
                       <Select
                         value={formData.heightFeet.toString()}
                         onValueChange={(value) => {
-                          const feet = parseInt(value)
-                          const totalInches = feet * 12 + formData.heightInches
-                          setFormData(prev => ({
+                          const feet = parseInt(value);
+                          const totalInches = feet * 12 + formData.heightInches;
+                          setFormData((prev) => ({
                             ...prev,
                             heightFeet: feet,
-                            height: totalInches
-                          }))
+                            height: totalInches,
+                          }));
                         }}
                       >
                         <SelectTrigger className="bg-linear-bg border-linear-border w-24">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {[3, 4, 5, 6, 7, 8].map(ft => (
+                          {[3, 4, 5, 6, 7, 8].map((ft) => (
                             <SelectItem key={ft} value={ft.toString()}>
                               {ft}'
                             </SelectItem>
@@ -375,20 +395,20 @@ export function ProfileSetupStepV2() {
                       <Select
                         value={formData.heightInches.toString()}
                         onValueChange={(value) => {
-                          const inches = parseInt(value)
-                          const totalInches = formData.heightFeet * 12 + inches
-                          setFormData(prev => ({
+                          const inches = parseInt(value);
+                          const totalInches = formData.heightFeet * 12 + inches;
+                          setFormData((prev) => ({
                             ...prev,
                             heightInches: inches,
-                            height: totalInches
-                          }))
+                            height: totalInches,
+                          }));
                         }}
                       >
                         <SelectTrigger className="bg-linear-bg border-linear-border w-24">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: 12 }, (_, i) => i).map(inch => (
+                          {Array.from({ length: 12 }, (_, i) => i).map((inch) => (
                             <SelectItem key={inch} value={inch.toString()}>
                               {inch}"
                             </SelectItem>
@@ -399,9 +419,10 @@ export function ProfileSetupStepV2() {
                   </div>
                 )}
 
-                <div className="text-center pt-4">
-                  <p className="text-sm text-linear-text-secondary">
-                    {formData.heightFeet}'{formData.heightInches}" = {Math.round(formData.height * 2.54)} cm
+                <div className="pt-4 text-center">
+                  <p className="text-linear-text-secondary text-sm">
+                    {formData.heightFeet}'{formData.heightInches}" ={' '}
+                    {Math.round(formData.height * 2.54)} cm
                   </p>
                 </div>
               </div>
@@ -412,39 +433,39 @@ export function ProfileSetupStepV2() {
               <div className="space-y-6 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <button
-                    onClick={() => setFormData(prev => ({ ...prev, gender: 'male' }))}
+                    onClick={() => setFormData((prev) => ({ ...prev, gender: 'male' }))}
                     className={cn(
-                      "rounded-xl border-2 transition-all",
-                      isMobile ? "p-4" : "p-6",
+                      'rounded-xl border-2 transition-all',
+                      isMobile ? 'p-4' : 'p-6',
                       formData.gender === 'male'
-                        ? "border-linear-purple bg-linear-purple/10 shadow-lg"
-                        : "border-linear-border hover:border-linear-border/70"
+                        ? 'border-linear-purple bg-linear-purple/10 shadow-lg'
+                        : 'border-linear-border hover:border-linear-border/70',
                     )}
                   >
                     <div className="space-y-2">
-                      <div className={isMobile ? "text-3xl" : "text-4xl"}>♂️</div>
-                      <p className="font-medium text-linear-text">Male</p>
+                      <div className={isMobile ? 'text-3xl' : 'text-4xl'}>♂️</div>
+                      <p className="text-linear-text font-medium">Male</p>
                     </div>
                   </button>
 
                   <button
-                    onClick={() => setFormData(prev => ({ ...prev, gender: 'female' }))}
+                    onClick={() => setFormData((prev) => ({ ...prev, gender: 'female' }))}
                     className={cn(
-                      "rounded-xl border-2 transition-all",
-                      isMobile ? "p-4" : "p-6",
+                      'rounded-xl border-2 transition-all',
+                      isMobile ? 'p-4' : 'p-6',
                       formData.gender === 'female'
-                        ? "border-linear-purple bg-linear-purple/10 shadow-lg"
-                        : "border-linear-border hover:border-linear-border/70"
+                        ? 'border-linear-purple bg-linear-purple/10 shadow-lg'
+                        : 'border-linear-border hover:border-linear-border/70',
                     )}
                   >
                     <div className="space-y-2">
-                      <div className={isMobile ? "text-3xl" : "text-4xl"}>♀️</div>
-                      <p className="font-medium text-linear-text">Female</p>
+                      <div className={isMobile ? 'text-3xl' : 'text-4xl'}>♀️</div>
+                      <p className="text-linear-text font-medium">Female</p>
                     </div>
                   </button>
                 </div>
 
-                <p className="text-center text-xs text-linear-text-tertiary px-4">
+                <p className="text-linear-text-tertiary px-4 text-center text-xs">
                   This information is used for accurate body composition calculations
                 </p>
               </div>
@@ -453,13 +474,9 @@ export function ProfileSetupStepV2() {
         </AnimatePresence>
 
         {/* Navigation */}
-        <div className="flex gap-3 pt-8 mt-auto">
-          <Button
-            variant="ghost"
-            onClick={handleProfileBack}
-            className="flex items-center"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+        <div className="mt-auto flex gap-3 pt-8">
+          <Button variant="ghost" onClick={handleProfileBack} className="flex items-center">
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
 
@@ -467,26 +484,26 @@ export function ProfileSetupStepV2() {
             onClick={handleProfileNext}
             disabled={!isCurrentStepValid()}
             className={cn(
-              "ml-auto flex items-center transition-all",
+              'ml-auto flex items-center transition-all',
               isCurrentStepValid()
-                ? "bg-linear-purple hover:bg-linear-purple/90 text-white animate-glow-pulse"
-                : "bg-gray-300 text-gray-500"
+                ? 'bg-linear-purple hover:bg-linear-purple/90 animate-glow-pulse text-white'
+                : 'bg-gray-300 text-gray-500',
             )}
           >
             {currentStepIndex === PROFILE_STEPS.length - 1 ? (
               <>
                 Complete
-                <UserCheck className="h-4 w-4 ml-2" />
+                <UserCheck className="ml-2 h-4 w-4" />
               </>
             ) : (
               <>
                 Next
-                <ArrowRight className="h-4 w-4 ml-2" />
+                <ArrowRight className="ml-2 h-4 w-4" />
               </>
             )}
           </Button>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

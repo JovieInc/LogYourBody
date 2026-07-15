@@ -53,7 +53,7 @@
 
     --radius: 8px;
   }
-  
+
   /* Light mode colors */
   .light {
     --background: 0 0% 100%;
@@ -84,7 +84,7 @@
     --input: 0 0% 89.8%;
     --ring: 233 54% 60%;
   }
-  
+
   /* Dark mode colors (explicit) */
   .dark {
     --background: 0 0% 0%;
@@ -125,13 +125,13 @@
   body {
     @apply bg-background text-foreground;
     font-family:
-      "Inter",
+      'Inter',
       system-ui,
       -apple-system,
       sans-serif;
     font-feature-settings:
-      "rlig" 1,
-      "calt" 1;
+      'rlig' 1,
+      'calt' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -140,25 +140,30 @@
 @layer utilities {
   /* Hide scrollbar for wheel picker */
   .scrollbar-hide {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
   }
   .scrollbar-hide::-webkit-scrollbar {
-    display: none;  /* Chrome, Safari and Opera */
+    display: none; /* Chrome, Safari and Opera */
   }
-  
+
   /* Glow pulse animation for active buttons */
   @keyframes glow-pulse {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 1;
-      box-shadow: 0 0 20px rgba(139, 92, 246, 0.5), 0 0 40px rgba(139, 92, 246, 0.3);
+      box-shadow:
+        0 0 20px rgba(139, 92, 246, 0.5),
+        0 0 40px rgba(139, 92, 246, 0.3);
     }
     50% {
       opacity: 0.9;
-      box-shadow: 0 0 30px rgba(139, 92, 246, 0.8), 0 0 60px rgba(139, 92, 246, 0.4);
+      box-shadow:
+        0 0 30px rgba(139, 92, 246, 0.8),
+        0 0 60px rgba(139, 92, 246, 0.4);
     }
   }
-  
+
   .animate-glow-pulse {
     animation: glow-pulse 2s ease-in-out infinite;
   }
@@ -172,13 +177,13 @@
     background: transparent;
     cursor: pointer;
   }
-  
+
   .slider::-webkit-slider-track {
     background: hsl(var(--linear-border));
     height: 0.5rem;
     border-radius: 0.25rem;
   }
-  
+
   .slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
@@ -190,18 +195,18 @@
     margin-top: -0.25rem;
     transition: all 0.2s ease;
   }
-  
+
   .slider::-webkit-slider-thumb:hover {
     background: hsl(var(--primary));
     transform: scale(1.2);
   }
-  
+
   .slider::-moz-range-track {
     background: hsl(var(--linear-border));
     height: 0.5rem;
     border-radius: 0.25rem;
   }
-  
+
   .slider::-moz-range-thumb {
     background: hsl(var(--linear-text));
     width: 1rem;
@@ -211,178 +216,9 @@
     border: none;
     transition: all 0.2s ease;
   }
-  
+
   .slider::-moz-range-thumb:hover {
     background: hsl(var(--primary));
     transform: scale(1.2);
-  }
-}
-
-/* Clerk Auth Component Dark Mode Styles */
-@layer utilities {
-  /* Main Clerk container */
-  .cl-rootBox,
-  .cl-card {
-    @apply !bg-gray-900/95 !backdrop-blur-xl !border !border-gray-800;
-  }
-
-  /* Clerk modals and dialogs */
-  .cl-modalBackdrop {
-    @apply !bg-black/80 !backdrop-blur-sm;
-  }
-
-  .cl-modalContent {
-    @apply !bg-gray-900 !border !border-gray-800 !shadow-2xl;
-  }
-
-  /* Form elements */
-  .cl-formFieldRoot {
-    @apply !mb-4;
-  }
-
-  .cl-formFieldLabel {
-    @apply !text-gray-300 !text-sm !font-medium !mb-1.5;
-  }
-
-  .cl-formFieldInput {
-    @apply !bg-gray-800/50 !border !border-gray-700 !text-white !placeholder-gray-500;
-    @apply focus:!border-primary focus:!ring-2 focus:!ring-primary/20;
-    @apply hover:!border-gray-600 !transition-colors;
-  }
-
-  .cl-formFieldInputShowPasswordButton {
-    @apply !text-gray-400 hover:!text-gray-200;
-  }
-
-  /* Buttons */
-  .cl-formButtonPrimary {
-    @apply !bg-primary !text-white hover:!bg-primary/90 !transition-all;
-    @apply !font-medium !shadow-lg hover:!shadow-xl;
-  }
-
-  .cl-formButtonSecondary {
-    @apply !bg-gray-800 !text-gray-300 !border !border-gray-700;
-    @apply hover:!bg-gray-700 hover:!text-white !transition-all;
-  }
-
-  .cl-footerActionLink {
-    @apply !text-primary hover:!text-primary/80 !transition-colors;
-  }
-
-  /* Text elements */
-  .cl-headerTitle {
-    @apply !text-white !text-2xl !font-bold;
-  }
-
-  .cl-headerSubtitle {
-    @apply !text-gray-400 !text-sm;
-  }
-
-  .cl-text {
-    @apply !text-gray-300;
-  }
-
-  .cl-formFieldError {
-    @apply !text-red-400 !text-sm;
-  }
-
-  .cl-formFieldSuccessText {
-    @apply !text-green-400 !text-sm;
-  }
-
-  /* Dividers */
-  .cl-dividerLine {
-    @apply !bg-gray-800;
-  }
-
-  .cl-dividerText {
-    @apply !text-gray-500 !bg-gray-900 !px-2;
-  }
-
-  /* Social buttons */
-  .cl-socialButtonsBlockButton {
-    @apply !bg-gray-800 !border !border-gray-700 !text-gray-300;
-    @apply hover:!bg-gray-700 hover:!border-gray-600 !transition-all;
-  }
-
-  .cl-socialButtonsBlockButtonText {
-    @apply !text-gray-300;
-  }
-
-  /* OTP/Code inputs */
-  .cl-otpCodeFieldInput {
-    @apply !bg-gray-800 !border !border-gray-700 !text-white;
-    @apply focus:!border-primary focus:!ring-2 focus:!ring-primary/20;
-  }
-
-  /* User button (profile dropdown) */
-  .cl-userButtonBox {
-    @apply !bg-gray-800 hover:!bg-gray-700 !transition-colors;
-  }
-
-  .cl-userButtonPopoverCard {
-    @apply !bg-gray-900 !border !border-gray-800 !shadow-xl;
-  }
-
-  .cl-userButtonPopoverActions {
-    @apply !bg-gray-900;
-  }
-
-  .cl-userButtonPopoverActionButton {
-    @apply hover:!bg-gray-800 !text-gray-300 hover:!text-white;
-  }
-
-  .cl-userButtonPopoverFooter {
-    @apply !bg-gray-900 !border-t !border-gray-800;
-  }
-
-  /* Profile page */
-  .cl-profilePage {
-    @apply !bg-gray-900;
-  }
-
-  .cl-profileSectionTitle {
-    @apply !text-white;
-  }
-
-  .cl-profileSectionContent {
-    @apply !bg-gray-800/50 !border !border-gray-700;
-  }
-
-  /* Badges */
-  .cl-badge {
-    @apply !bg-gray-800 !text-gray-300 !border !border-gray-700;
-  }
-
-  .cl-badge__primary {
-    @apply !bg-primary/20 !text-primary !border !border-primary/30;
-  }
-
-  /* Loading states */
-  .cl-spinner {
-    @apply !text-primary;
-  }
-
-  /* Focus styles for better accessibility */
-  .cl-formFieldInput:focus,
-  .cl-otpCodeFieldInput:focus {
-    @apply !outline-none;
-  }
-
-  /* Remove any white backgrounds that might show through */
-  .cl-internal-icon {
-    @apply !text-gray-400;
-  }
-
-  .cl-identityPreview {
-    @apply !bg-gray-800/50 !border !border-gray-700;
-  }
-
-  .cl-identityPreviewText {
-    @apply !text-gray-300;
-  }
-
-  .cl-identityPreviewEditButton {
-    @apply !text-primary hover:!text-primary/80;
   }
 }

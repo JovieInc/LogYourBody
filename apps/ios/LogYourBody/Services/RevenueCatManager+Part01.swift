@@ -58,7 +58,7 @@ var cachedTrialExpirationTimestamp: Double {
         // print("✅ SDK marked as configured")
     }
 
-/// Identify the user with their Clerk user ID
+/// Identify the customer with the shared identity subject.
     func identifyUser(userId: String) async {
         guard isConfigured else {
             // print("⚠️ SDK not configured yet, skipping identifyUser()")

@@ -1,6 +1,6 @@
-import { needsClerkRuntime } from '../providers';
+import { needsProductAuthRuntime } from '../providers';
 
-describe('needsClerkRuntime', () => {
+describe('needsProductAuthRuntime', () => {
   it.each([
     '/',
     '/about',
@@ -14,8 +14,8 @@ describe('needsClerkRuntime', () => {
     '/privacy',
     '/support',
     '/terms',
-  ])('keeps %s free of the Clerk runtime', (pathname) => {
-    expect(needsClerkRuntime(pathname)).toBe(false);
+  ])('keeps %s free of the product auth runtime', (pathname) => {
+    expect(needsProductAuthRuntime(pathname)).toBe(false);
   });
 
   it.each([
@@ -26,7 +26,7 @@ describe('needsClerkRuntime', () => {
     '/onboarding',
     '/settings/profile',
     '/unknown',
-  ])('keeps Clerk runtime enabled for %s', (pathname) => {
-    expect(needsClerkRuntime(pathname)).toBe(true);
+  ])('keeps product auth runtime enabled for %s', (pathname) => {
+    expect(needsProductAuthRuntime(pathname)).toBe(true);
   });
 });

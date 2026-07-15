@@ -6,7 +6,21 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 export async function updateSession(request: NextRequest) {
   const url = request.nextUrl.clone();
   const pathname = url.pathname;
-  const protectedRoutes = ['/dashboard', '/settings', '/profile', '/log', '/photos', '/steps'];
+  const protectedRoutes = [
+    '/dashboard',
+    '/settings',
+    '/profile',
+    '/log',
+    '/photos',
+    '/steps',
+    '/import',
+    '/onboarding',
+    '/api/weights',
+    '/api/auth/delete-account',
+    '/api/parse-pdf',
+    '/api/parse-pdf-alt',
+    '/api/parse-pdf-v2',
+  ];
   const isProtectedRoute = protectedRoutes.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );

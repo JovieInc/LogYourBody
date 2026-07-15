@@ -52,7 +52,7 @@ class ChangelogManager {
             version: "1.4.0",
             date: Date(timeIntervalSince1970: 1_720_656_000), // July 11, 2025 (today)
             changes: [
-                .init(type: .feature, description: "Frictionless Apple Sign In with post-auth consent"),
+                .init(type: .feature, description: "Fast phone verification with one-time codes"),
                 .init(type: .feature, description: "Redesigned photo carousel with 16:9 aspect ratio"),
                 .init(type: .improvement, description: "Monochrome gauge design for cleaner UI"),
                 .init(type: .improvement, description: "Lightweight date slider with snap-to-value"),
@@ -107,7 +107,7 @@ class ChangelogManager {
                 .init(type: .feature, description: "Track body weight and body fat percentage"),
                 .init(type: .feature, description: "HealthKit integration for automatic syncing"),
                 .init(type: .feature, description: "Beautiful charts and visualizations"),
-                .init(type: .feature, description: "Secure authentication with Clerk"),
+                .init(type: .feature, description: "Secure first-party authentication"),
                 .init(type: .feature, description: "Cross-platform sync with web app")
             ]
         )

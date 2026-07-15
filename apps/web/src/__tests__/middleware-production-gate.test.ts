@@ -5,30 +5,6 @@ import { readdirSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { NextRequest } from 'next/server';
 
-const mockProtect = jest.fn();
-const mockProtectedMiddleware = jest.fn();
-
-jest.mock('@clerk/nextjs/server', () => ({
-  clerkMiddleware: jest.fn((handler) => {
-    mockProtectedMiddleware.mockImplementation((request, event) =>
-      handler({ protect: mockProtect }, request, event),
-    );
-    return mockProtectedMiddleware;
-  }),
-  createRouteMatcher: jest.fn((patterns: string[]) => {
-    return (request: NextRequest) => {
-      const pathname = request.nextUrl.pathname;
-
-      return patterns.some((pattern) => {
-        const prefix = pattern.replace('(.*)', '');
-        return (
-          pathname === prefix || pathname.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`)
-        );
-      });
-    };
-  }),
-}));
-
 function collectAppRouteFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const fullPath = join(dir, entry);
@@ -98,8 +74,6 @@ describe('middleware production debug/test gate', () => {
     }
 
     jest.resetModules();
-    mockProtect.mockReset();
-    mockProtectedMiddleware.mockReset();
   });
 
   it('keeps debug/test routes out of the mounted production route inventory', () => {
@@ -114,7 +88,7 @@ describe('middleware production debug/test gate', () => {
     '/api/debug/auth',
     '/api/debug-pdf',
     '/api/test-openai',
-    '/test-clerk-supabase',
+    '/test-identity-supabase',
     '/test',
     '/test-avatars',
     '/test-comprehensive',
@@ -135,12 +109,10 @@ describe('middleware production debug/test gate', () => {
 
     expect(shouldBlockDebugRoute(pathname)).toBe(true);
 
-    const response = await middleware(request, {} as never);
+    const response = await middleware(request);
 
     expect(response?.status).toBe(404);
     expect(response?.headers.get('Cache-Control')).toBe('no-store');
-    expect(mockProtectedMiddleware).not.toHaveBeenCalled();
-    expect(mockProtect).not.toHaveBeenCalled();
   });
 
   it('blocks debug routes outside production deployments too', async () => {
@@ -150,42 +122,62 @@ describe('middleware production debug/test gate', () => {
 
     expect(shouldBlockDebugRoute('/api/test-openai')).toBe(true);
 
-    const response = await middleware(request, {} as never);
+    const response = await middleware(request);
 
     expect(response?.status).toBe(404);
     expect(response?.headers.get('Cache-Control')).toBe('no-store');
-    expect(mockProtectedMiddleware).not.toHaveBeenCalled();
-    expect(mockProtect).not.toHaveBeenCalled();
   });
 
-  it('keeps normal protected routes behind Clerk auth in production', async () => {
+  it('keeps normal protected routes behind product auth in production', async () => {
     process.env.VERCEL_ENV = 'production';
-    const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
-    const request = new NextRequest('https://logyourbody.com/dashboard');
+    const {
+      default: middleware,
+      shouldBlockDebugRoute,
+      shouldUseProductAuthMiddleware,
+    } = await import('../middleware');
+    const request = new NextRequest('https://logyourbody.com/dashboard', {
+      headers: { cookie: 'lyb_access_token=test-token' },
+    });
 
     expect(shouldBlockDebugRoute('/dashboard')).toBe(false);
+    expect(shouldUseProductAuthMiddleware(request)).toBe(true);
 
-    const response = await middleware(request, {} as never);
+    const response = await middleware(request);
 
-    expect(response).toBeUndefined();
-    expect(mockProtectedMiddleware).toHaveBeenCalledTimes(1);
-    expect(mockProtect).toHaveBeenCalledTimes(1);
+    expect(response?.status).toBe(200);
+  });
+
+  it('redirects an unauthenticated protected route to the sign-in surface', async () => {
+    const { default: middleware } = await import('../middleware');
+    const response = await middleware(
+      new NextRequest('https://logyourbody.com/dashboard?tab=trend'),
+    );
+
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get('location')).toBe(
+      'https://logyourbody.com/signin?returnTo=%2Fdashboard%3Ftab%3Dtrend',
+    );
   });
 
   it.each(['/api/parse-pdf', '/api/parse-pdf-alt', '/api/parse-pdf-v2'])(
-    'keeps advanced import API route %s behind Clerk auth in production',
+    'keeps advanced import API route %s behind product auth in production',
     async (pathname) => {
       process.env.VERCEL_ENV = 'production';
-      const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
-      const request = new NextRequest(`https://logyourbody.com${pathname}`);
+      const {
+        default: middleware,
+        shouldBlockDebugRoute,
+        shouldUseProductAuthMiddleware,
+      } = await import('../middleware');
+      const request = new NextRequest(`https://logyourbody.com${pathname}`, {
+        headers: { cookie: 'lyb_refresh_token=test-token' },
+      });
 
       expect(shouldBlockDebugRoute(pathname)).toBe(false);
+      expect(shouldUseProductAuthMiddleware(request)).toBe(true);
 
-      const response = await middleware(request, {} as never);
+      const response = await middleware(request);
 
-      expect(response).toBeUndefined();
-      expect(mockProtectedMiddleware).toHaveBeenCalledTimes(1);
-      expect(mockProtect).toHaveBeenCalledTimes(1);
+      expect(response?.status).toBe(200);
     },
   );
 
@@ -196,11 +188,9 @@ describe('middleware production debug/test gate', () => {
 
     expect(shouldBlockDebugRoute('/api/parse-pdfish')).toBe(false);
 
-    const response = await middleware(request, {} as never);
+    const response = await middleware(request);
 
     expect(response?.status).toBe(200);
-    expect(mockProtectedMiddleware).not.toHaveBeenCalled();
-    expect(mockProtect).not.toHaveBeenCalled();
   });
 
   it('keeps normal public routes reachable in production', async () => {
@@ -210,15 +200,13 @@ describe('middleware production debug/test gate', () => {
 
     expect(shouldBlockDebugRoute('/about')).toBe(false);
 
-    const response = await middleware(request, {} as never);
+    const response = await middleware(request);
 
     expect(response?.status).toBe(200);
-    expect(mockProtectedMiddleware).not.toHaveBeenCalled();
-    expect(mockProtect).not.toHaveBeenCalled();
   });
 
   it.each(['/', '/download/ios', '/privacy', '/support'])(
-    'keeps marketing route %s outside Clerk protection in production',
+    'keeps marketing route %s outside product auth in production',
     async (pathname) => {
       process.env.VERCEL_ENV = 'production';
       const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
@@ -226,11 +214,9 @@ describe('middleware production debug/test gate', () => {
 
       expect(shouldBlockDebugRoute(pathname)).toBe(false);
 
-      const response = await middleware(request, {} as never);
+      const response = await middleware(request);
 
       expect(response?.status).toBe(200);
-      expect(mockProtectedMiddleware).not.toHaveBeenCalled();
-      expect(mockProtect).not.toHaveBeenCalled();
     },
   );
 
@@ -239,13 +225,12 @@ describe('middleware production debug/test gate', () => {
     const { default: middleware } = await import('../middleware');
     const request = new NextRequest('https://logyourbody.com/?audience=women&goal=fat-loss');
 
-    const response = await middleware(request, {} as never);
+    const response = await middleware(request);
     const rewrite = response?.headers.get('x-middleware-rewrite');
 
     expect(rewrite).toContain('_lyb_audience=women');
     expect(rewrite).toContain('_lyb_assignment_source=campaign');
     expect(response?.cookies.get('lyb_landing_audience_v1')?.value).toBe('women');
-    expect(mockProtectedMiddleware).not.toHaveBeenCalled();
   });
 
   it('reuses a returning audience assignment instead of randomizing again', async () => {
@@ -255,7 +240,7 @@ describe('middleware production debug/test gate', () => {
       headers: { cookie: 'lyb_landing_audience_v1=men' },
     });
 
-    const response = await middleware(request, {} as never);
+    const response = await middleware(request);
     const rewrite = response?.headers.get('x-middleware-rewrite');
 
     expect(rewrite).toContain('_lyb_audience=men');

@@ -56,9 +56,8 @@ The app has reached feature-complete status with major functionality implemented
 
 ### 3. Authentication & Security
 
-- [x] ✅ Clerk authentication implemented
-- [x] ✅ Email verification flow
-- [x] ✅ **Apple Sign In** - Implemented with browser-based OAuth flow
+- [x] ✅ Shared Jovie Better Auth identity with direct OAuth 2.1 PKCE
+- [x] ✅ Phone OTP flow
 - [x] ✅ Handle expired sessions gracefully
 - [x] ✅ Secure token management
 
@@ -88,7 +87,7 @@ The app has reached feature-complete status with major functionality implemented
 
 - [x] ✅ Test on real devices
 - [x] ✅ Memory optimization for photo handling
-- [x] ✅ Remove debug logging from Apple Sign In
+- [x] ✅ Remove debug logging from the Apple sign-in flow
 - [x] ✅ Error handling for network failures
 - [ ] ❌ Performance testing on older devices
 - [ ] ❌ Analytics integration (optional)
@@ -144,7 +143,7 @@ The app has reached feature-complete status with major functionality implemented
 - [ ] Complete onboarding flow
 - [ ] Log weight, body fat, and photo
 - [ ] Test HealthKit sync
-- [ ] Test Apple Sign In
+- [ ] Test Apple sign in and session refresh
 - [ ] Test data export
 - [ ] Test account deletion
 - [ ] Verify offline functionality
@@ -245,7 +244,7 @@ The app has excellent features and UI but needs critical fixes before App Store 
 - Age gate (17+) and privacy consent
 - Health disclaimer in signup
 - Data export (JSON/CSV)
-- Apple Sign In with Clerk
+- Shared Apple authentication through Jovie Better Auth
 - HealthKit integration
 - Offline support
 

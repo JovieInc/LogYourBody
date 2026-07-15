@@ -1,11 +1,11 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ImportPage from '../page';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
 
 // Mock dependencies
-jest.mock('@/contexts/ClerkAuthContext');
+jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
@@ -36,7 +36,7 @@ jest.mock('exifr', () => ({
 jest.mock('../page', () => {
   const React = require('react') as typeof import('react');
   const { useAuth } =
-    require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
+    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
   const { useRouter } = require('next/navigation') as typeof import('next/navigation');
 
   const TestImportPage: React.FC = () => {

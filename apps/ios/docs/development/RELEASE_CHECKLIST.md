@@ -7,15 +7,13 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
 
 ## Configuration
 
-- Clerk production publishable key is configured in `Config.xcconfig`.
-- GitHub `Production` environment has `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
-- Email OTP is the primary signed-out auth path for the paid MVP.
-- Clerk Apple Sign In is configured for the production app but hidden unless
-  `ios_apple_sign_in_enabled` is enabled for internal/proven cohorts.
+- `AUTH_ISSUER=https://jov.ie/api/auth`, `AUTH_CLIENT_ID=logyourbody-ios`, and `AUTH_REDIRECT_URI=logyourbody://oauth` are configured.
+- Phone OTP is the only signed-out auth path.
 - Supabase production URL and anon key are configured in `Config.xcconfig`.
 - GitHub `Production` environment has `NEXT_PUBLIC_SUPABASE_URL`.
 - GitHub `Production` environment has either `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`.
-- Supabase RLS policies accept Clerk session JWT `sub` for `profiles`, `user_profiles`, `body_metrics`, and `daily_metrics`.
+- Jovie has the `logyourbody-ios` public OAuth client with the exact native redirect and PKCE required.
+- Supabase RLS policies accept its product session `sub` for `profiles`, `user_profiles`, `body_metrics`, and `daily_metrics`.
 - RevenueCat production public key is configured.
 - GitHub `Production` environment has `REVENUE_CAT_PUBLIC_KEY`.
 - RevenueCat `Premium` entitlement matches `Constants.proEntitlementID`.
@@ -38,10 +36,6 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
 - Release evidence explicitly records whether production Sentry and Statsig are
   configured. If either optional secret is absent, the release notes must say
   that crash or analytics monitoring proof is not available for that service.
-- `ios_apple_sign_in_enabled` stays off for production users until Apple Sign-In
-  has physical-device proof.
-- Current JOV-2865 evidence keeps Apple Sign-In safely hidden; production
-  enablement still requires physical Apple prompt and Clerk session proof.
 - The photo-first HUD is the default paid MVP surface. V1 launch routing,
   static avatar buckets, and daily weigh-in reminders must not depend on
   Statsig feature gates.
@@ -51,9 +45,7 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
 
 ## Product Path
 
-- Fresh install opens to auth with email one-time code as the primary action.
-- Apple Sign-In is hidden by default and appears only for users/cohorts covered
-  by `ios_apple_sign_in_enabled`.
+- Fresh install opens to Apple authentication.
 - Unpaid authenticated user sees the paywall.
 - Purchase success unlocks the photo-first HUD.
 - Restore success unlocks the photo-first HUD.
@@ -73,7 +65,8 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
   timeline point.
 - HealthKit allow, deny, and skip paths all lead to a usable app state.
 - Sync retries after the device returns online.
-- Supabase rows use the Clerk user ID for `user_id` or profile `id`.
+- Product-data rows use the Jovie Better Auth subject as the stable `user_id`
+  or profile `id`; no Supabase auth principal is created.
 - Sync failure shows recoverable UI and does not block local logging.
 
 ## Legal And Store Review
@@ -84,7 +77,7 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
 - Native settings expose account deletion and data export paths, with support
   email fallback for export requests.
 - Camera, photo library, HealthKit, and Face ID usage strings are accurate for any enabled surfaces.
-- App Review notes explain the reviewer-accessible email OTP path, purchase
+- App Review notes explain the reviewer-accessible Apple path, purchase
   path, photo-first HUD, HealthKit skip/deny behavior, Restore Purchases, Export
   Data, and Delete Account.
 - No secrets or local config files are committed.

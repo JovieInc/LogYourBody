@@ -9,6 +9,7 @@ LogYourBody ("we," "our," or "us") is committed to protecting your privacy. This
 ## Information We Collect
 
 ### Personal Information You Provide
+
 We collect personal information that you voluntarily provide when registering for an account or using our Service:
 
 - **Account Information**: Name, email address, password (encrypted)
@@ -17,6 +18,7 @@ We collect personal information that you voluntarily provide when registering fo
 - **Health Data**: Step count, activity data (when you grant permission to access Apple Health or similar services)
 
 ### Information Automatically Collected
+
 When you access our Service, we automatically collect certain information about your device:
 
 - **Device Information**: Device type, operating system, unique device identifiers
@@ -24,6 +26,7 @@ When you access our Service, we automatically collect certain information about 
 - **Log Information**: IP address, browser type, access times, referring URLs
 
 ### Photos and Media
+
 - **Progress Photos**: Photos you upload to track your physical progress
 - **Photo Metadata**: Date taken, orientation (EXIF data is removed before storage)
 
@@ -55,18 +58,24 @@ We use the information we collect to:
 ## Data Storage and Security
 
 ### Where We Store Data
-- Your data is stored on secure servers provided by Supabase (PostgreSQL database)
+
+- Account profile and onboarding data are stored in Neon Postgres; body metrics
+  and progress-photo storage may remain on Supabase while the product-data
+  migration is completed
 - Progress photos are stored in encrypted cloud storage
 - We use industry-standard encryption for data in transit and at rest
 
 ### Security Measures
-- All passwords are hashed using bcrypt
+
+- Phone ownership is verified with short-lived SMS codes; LogYourBody does not
+  collect or store account passwords
 - HTTPS/TLS encryption for all data transmission
 - Regular security audits and updates
 - Limited access to personal data (need-to-know basis)
-- Secure authentication via Clerk
+- Jovie-hosted Better Auth identity service with short-lived OAuth sessions
 
 ### Data Retention
+
 - We retain your data as long as your account is active
 - Deleted accounts have data removed within 30 days
 - You can request immediate deletion via Settings > Delete Account
@@ -77,8 +86,9 @@ We do not sell, trade, or rent your personal information. We may share your info
 
 1. **With Your Consent**: When you explicitly agree to share
 2. **Service Providers**: Third-party services that help operate our Service:
-   - Clerk (authentication)
-   - Supabase (database hosting)
+   - Neon (account profile and onboarding data)
+   - Supabase (body-metric data and progress-photo storage during migration)
+   - Apple (authentication)
    - Vercel (web hosting)
    - RevenueCat (subscription and purchase entitlements)
    - Sentry (error tracking and crash reporting)
@@ -88,18 +98,22 @@ We do not sell, trade, or rent your personal information. We may share your info
 ## Your Rights and Choices
 
 ### Access and Control
+
 You have the right to:
+
 - Access your personal data via Settings > Export Data
 - Update or correct your information
 - Delete your account and all associated data
 - Download a copy of your data in JSON format
- - Email support@logyourbody.com to request a data export if you cannot access in-app export tools
+- Email support@logyourbody.com to request a data export if you cannot access in-app export tools
 
 ### Communication Preferences
+
 - Opt out of marketing emails via unsubscribe link
 - Manage notification preferences in app settings
 
 ### Health Data Permissions
+
 - Grant or revoke access to Apple Health at any time
 - Control which health metrics are synced
 
@@ -114,6 +128,7 @@ If you access our Service from outside the United States, please be aware that y
 ## California Privacy Rights
 
 California residents have additional rights under the CCPA:
+
 - Right to know what personal information is collected
 - Right to delete personal information
 - Right to opt-out of sale of personal information (we do not sell data)
@@ -122,6 +137,7 @@ California residents have additional rights under the CCPA:
 ## Changes to This Policy
 
 We may update this Privacy Policy from time to time. We will notify you of any changes by:
+
 - Posting the new Privacy Policy on this page
 - Updating the "Last Updated" date
 - Sending an email notification for material changes

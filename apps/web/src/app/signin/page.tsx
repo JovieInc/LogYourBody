@@ -1,7 +1,7 @@
 'use client';
 
 import { BarChart3, AlertCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AuthSignIn } from '@/lib/ports/auth-ui';
 

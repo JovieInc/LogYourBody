@@ -2,71 +2,61 @@
 // AuthManager.swift
 // LogYourBody
 //
-import Combine
+// First-party authentication through Jovie's Better Auth issuer.
+//
+
 import AuthenticationServices
-import UIKit
+import Combine
 import CryptoKit
-import Clerk
+import Foundation
+import Security
+import UIKit
 
 #if !canImport(Statsig)
 final class AnalyticsService {
     static let shared = AnalyticsService()
-
     func start() {}
-
     func identify(userId: String?, properties: [String: String]? = nil) {}
-
     func track(event: String, properties: [String: String]? = nil) {}
-
     func isFeatureEnabled(flagKey: String) -> Bool { false }
-
     func reset() {}
 }
 #endif
 
-typealias LocalUser = LogYourBody.User  // Disambiguate between Clerk SDK User and our User model
-
+typealias LocalUser = LogYourBody.User
 typealias ASPresentationAnchor = UIWindow
 
-typealias AppleCredentialContinuation = CheckedContinuation<ASAuthorizationAppleIDCredential, Error>
-
 enum AuthError: LocalizedError {
-    case clerkNotInitialized
-    case invalidCredentials
-    case nameUpdateFailed(String)
+    case providerNotReady
+    case cancelled
+    case invalidCallback
+    case invalidToken
     case networkError
-    case syncError(String)
+    case server(String)
+    case unsupported(String)
 
     var errorDescription: String? {
         switch self {
-        case .clerkNotInitialized:
-            return "Authentication service is not ready. Please try again."
-        case .invalidCredentials:
-            return "Invalid authentication credentials"
-        case .nameUpdateFailed(let reason):
-            return "Failed to update name: \(reason)"
+        case .providerNotReady:
+            return "Authentication is not ready. Please try again."
+        case .cancelled:
+            return "Sign in was cancelled."
+        case .invalidCallback:
+            return "The sign-in response was invalid. Please try again."
+        case .invalidToken:
+            return "Your sign-in session could not be verified. Please try again."
         case .networkError:
-            return "Network connection error. Please check your connection."
-        case .syncError(let reason):
-            return "Failed to sync data: \(reason)"
+            return "Check your connection and try again."
+        case .server(let message), .unsupported(let message):
+            return message
         }
     }
 }
 
-enum AuthExitReason {
+enum AuthExitReason: Equatable {
     case none
     case userInitiated
     case sessionExpired
-}
-
-enum EmailRegistrationStatus {
-    case available
-    case registered
-}
-
-enum EmailVerificationFlow: Equatable {
-    case signUp
-    case signIn
 }
 
 enum AuthProfileBootstrapPolicy {
@@ -75,72 +65,116 @@ enum AuthProfileBootstrapPolicy {
     }
 }
 
-enum PasswordUpdateError: LocalizedError {
-    case notAuthenticated
-    case incorrectCurrentPassword
-    case notStrongEnough
-    case failed(String)
+struct SessionInfo: Identifiable {
+    let id: String
+    let deviceName: String
+    let deviceType: String
+    let location: String
+    let ipAddress: String
+    let lastActiveAt: Date
+    let createdAt: Date
+    let isCurrentSession: Bool
+}
 
-    var errorDescription: String? {
-        switch self {
-        case .notAuthenticated:
-            return "You must be logged in to change your password"
-        case .incorrectCurrentPassword:
-            return "Current password is incorrect"
-        case .notStrongEnough:
-            return "Please choose a stronger password"
-        case .failed(let message):
-            return message
-        }
+struct ProductAuthSession: Codable, Equatable {
+    let accessToken: String
+    let refreshToken: String
+    let expiresAt: Date
+    let subject: String
+    let email: String
+    let name: String?
+    let issuedAt: Date
+
+    var id: String { subject }
+}
+
+struct OAuthTokenResponse: Decodable {
+    let accessToken: String
+    let refreshToken: String?
+    let expiresIn: TimeInterval
+    let idToken: String?
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case refreshToken = "refresh_token"
+        case expiresIn = "expires_in"
+        case idToken = "id_token"
     }
 }
 
-protocol AuthAccountManaging {
-    func updatePassword(currentPassword: String, newPassword: String) async throws
-    func deleteCurrentAccount() async throws
-}
+struct OAuthUserInfo: Decodable {
+    let subject: String
+    let email: String?
+    let name: String?
+    let phoneNumber: String?
 
-struct ClerkAuthAccountAdapter: AuthAccountManaging {
-    func updatePassword(currentPassword: String, newPassword: String) async throws {
-        guard let user = await Clerk.shared.user else {
-            throw PasswordUpdateError.notAuthenticated
-        }
-
-        try await user.updatePassword(.init(
-            newPassword: newPassword,
-            currentPassword: currentPassword,
-            signOutOfOtherSessions: true
-        ))
-    }
-
-    func deleteCurrentAccount() async throws {
-        guard let user = await Clerk.shared.user else {
-            throw NSError(
-                domain: "DeleteAccount",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "No user found"]
-            )
-        }
-
-        try await user.delete()
+    enum CodingKeys: String, CodingKey {
+        case subject = "sub"
+        case email
+        case name
+        case phoneNumber = "phone_number"
     }
 }
 
-// MARK: - AsyncGate Helper
+private struct ProductProfileEnvelope: Decodable {
+    let profile: ProductProfilePayload
+}
+
+private struct ProductProfilePayload: Decodable {
+    let id: String
+    let email: String?
+    let username: String?
+    let fullName: String?
+    let dateOfBirth: Date?
+    let height: Double?
+    let heightUnit: String?
+    let gender: String?
+    let activityLevel: String?
+    let goalWeight: Double?
+    let goalWeightUnit: String?
+    let onboardingCompleted: Bool?
+    let legalAcceptedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, email, username, height, gender
+        case fullName = "full_name"
+        case dateOfBirth = "date_of_birth"
+        case heightUnit = "height_unit"
+        case activityLevel = "activity_level"
+        case goalWeight = "goal_weight"
+        case goalWeightUnit = "goal_weight_unit"
+        case onboardingCompleted = "onboarding_completed"
+        case legalAcceptedAt = "legal_accepted_at"
+    }
+
+    var userProfile: UserProfile {
+        UserProfile(
+            id: id,
+            email: email,
+            username: username,
+            fullName: fullName,
+            dateOfBirth: dateOfBirth,
+            height: height,
+            heightUnit: heightUnit,
+            gender: gender,
+            activityLevel: activityLevel,
+            goalWeight: goalWeight,
+            goalWeightUnit: goalWeightUnit,
+            onboardingCompleted: onboardingCompleted
+        )
+    }
+}
 
 actor AsyncGate {
-    var isLocked = false
-    var waiters: [CheckedContinuation<Void, Never>] = []
+    private var isLocked = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
 
     func wait() async {
         if !isLocked {
             isLocked = true
             return
         }
-
-        await withCheckedContinuation { continuation in
-            waiters.append(continuation)
-        }
+        await withCheckedContinuation { waiters.append($0) }
     }
 
     func signal() {
@@ -153,68 +187,51 @@ actor AsyncGate {
     }
 }
 
-// MARK: - Session Information
-
-// Session information for active sessions management
-struct SessionInfo: Identifiable {
-    let id: String
-    let deviceName: String
-    let deviceType: String
-    let location: String
-    let ipAddress: String
-    let lastActiveAt: Date
-    let createdAt: Date
-    let isCurrentSession: Bool
-}
-
 @MainActor
-class AuthManager: NSObject, ObservableObject {
+final class AuthManager: NSObject, ObservableObject {
     static let shared = AuthManager()
 
     @Published var isAuthenticated = false
     @Published var currentUser: LocalUser?
-    @Published var clerkSession: Session?
-    @Published var needsEmailVerification = false
-    @Published var isClerkLoaded = false
-    @Published var clerkInitError: String?
+    @Published var authSession: ProductAuthSession?
+    @Published var isAuthProviderLoaded = false
+    @Published var authProviderInitError: String?
     @Published var needsLegalConsent = false
-    @Published var pendingAppleUserId: String?
     @Published var lastExitReason: AuthExitReason = .none
     @Published var memberSinceDate: Date?
 
-    var currentSignUp: SignUp?
-    var pendingSignUpEmail: String?
-    var currentSignIn: SignIn?
-    var pendingSignInEmail: String?
-    @Published var emailVerificationFlow: EmailVerificationFlow?
-    let clerk = Clerk.shared
-    let supabase = SupabaseClient.shared  // Keep for data operations
-    let accountAdapter: AuthAccountManaging
-    let userDefaults = UserDefaults.standard
-    let userKey = Constants.currentUserKey
-    var cancellables = Set<AnyCancellable>()
-    var sessionObservationTask: Task<Void, Never>?
+    let userDefaults: UserDefaults
+    let keychain: KeychainManager
+    let urlSession: URLSession
     let legalConsentGate = AsyncGate()
-    var clerkInitializationTask: Task<Void, Never>?
-    var bootstrappedProfileSessionIds = Set<String>()
 
-    init(accountAdapter: AuthAccountManaging = ClerkAuthAccountAdapter()) {
-        self.accountAdapter = accountAdapter
+    private let storedSessionKey = "productAuth.jovieOAuthSession"
+    private var initializationTask: Task<Void, Never>?
+    private var refreshTask: Task<String?, Never>?
+    private var webAuthenticationSession: ASWebAuthenticationSession?
+    private var bootstrappedProfileSessionIds = Set<String>()
+
+    init(
+        userDefaults: UserDefaults = .standard,
+        keychain: KeychainManager = .shared,
+        urlSession: URLSession = .shared
+    ) {
+        self.userDefaults = userDefaults
+        self.keychain = keychain
+        self.urlSession = urlSession
         super.init()
-        // print("🔐 AuthManager initialized")
-
-        // Always start with no authentication until Clerk confirms session
-        self.isAuthenticated = false
-        self.currentUser = nil
-        self.clerkSession = nil
-
-        // Clear any stale user data
-        userDefaults.removeObject(forKey: userKey)
-
-        migrateLegacyAuthToken()
+        Self.migrateLegacyAuthStorage(in: userDefaults)
     }
 
-    nonisolated static let legacySensitiveUserDefaultsKeys: [String] = [
+    var isAuthProviderReady: Bool {
+        isAuthProviderLoaded && authProviderInitError == nil
+    }
+
+    var authServiceNotReadyMessage: String {
+        authProviderInitError ?? "Authentication is still connecting. Please try again."
+    }
+
+    nonisolated static let legacySensitiveUserDefaultsKeys = [
         Constants.authTokenKey,
         Constants.currentUserKey,
         "accessToken",
@@ -230,389 +247,559 @@ class AuthManager: NSObject, ObservableObject {
         "userSession"
     ]
 
-
-    #if DEBUG
-
-    #endif
-}
-
-// MARK: - Sign Up & Profile Management
-
-extension AuthManager {
-    func getSupabaseToken() async -> String? {
-        do {
-            guard let session = clerk.session else {
-                return nil
-            }
-
-            let tokenResource = try await session.getToken()
-            return tokenResource?.jwt
-        } catch {
-            return nil
+    @discardableResult
+    nonisolated static func migrateLegacyAuthStorage(in defaults: UserDefaults) -> [String] {
+        legacySensitiveUserDefaultsKeys.compactMap { key in
+            guard defaults.object(forKey: key) != nil else { return nil }
+            defaults.removeObject(forKey: key)
+            return key
         }
+    }
+
+    func ensureAuthInitializationTask(priority: TaskPriority = .userInitiated) -> Task<Void, Never> {
+        if let initializationTask { return initializationTask }
+        let task = Task(priority: priority) { @MainActor [weak self] in
+            guard let self else { return }
+            await self.initialize()
+        }
+        initializationTask = task
+        return task
+    }
+
+    func initialize() async {
+        guard !isAuthProviderLoaded else { return }
+        let validation = Configuration.currentAuthEnvironmentValidation
+        guard validation.isValid else {
+            authProviderInitError = validation.userMessage
+            isAuthProviderLoaded = false
+            return
+        }
+
+        do {
+            if let stored: ProductAuthSession = try keychain.get(
+                forKey: storedSessionKey,
+                as: ProductAuthSession.self
+            ) {
+                authSession = stored
+                if stored.expiresAt.timeIntervalSinceNow > 60 {
+                    applyAuthenticatedSession(stored)
+                } else {
+                    _ = await refreshAccessToken()
+                }
+            }
+            authProviderInitError = nil
+            isAuthProviderLoaded = true
+        } catch {
+            authProviderInitError = "Secure sign-in storage could not be opened."
+            isAuthProviderLoaded = false
+        }
+    }
+
+    func retryAuthProviderInitialization() async {
+        initializationTask = nil
+        isAuthProviderLoaded = false
+        authProviderInitError = nil
+        await ensureAuthInitializationTask().value
+    }
+
+    func signInWithApple() async throws {
+        guard isAuthProviderReady else { throw AuthError.providerNotReady }
+        let verifier = Self.randomURLSafeString(byteCount: 48)
+        let challenge = Self.base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
+        let state = Self.randomURLSafeString(byteCount: 32)
+
+        var components = URLComponents(
+            url: try oauthURL(path: "oauth2/authorize"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            URLQueryItem(name: "client_id", value: Configuration.authClientID),
+            URLQueryItem(name: "redirect_uri", value: Configuration.authRedirectURI),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "scope", value: "openid profile email offline_access"),
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "code_challenge", value: challenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256")
+        ]
+        guard let authorizationURL = components?.url else { throw AuthError.invalidCallback }
+
+        let callbackURL = try await openAuthorizationSession(url: authorizationURL)
+        guard let callback = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              callback.queryItems?.first(where: { $0.name == "state" })?.value == state,
+              let code = callback.queryItems?.first(where: { $0.name == "code" })?.value else {
+            throw AuthError.invalidCallback
+        }
+
+        let tokenResponse = try await exchangeOAuthToken(
+            parameters: [
+                "grant_type": "authorization_code",
+                "client_id": Configuration.authClientID,
+                "code": code,
+                "code_verifier": verifier,
+                "redirect_uri": Configuration.authRedirectURI
+            ]
+        )
+        let userInfo = try await fetchOAuthUserInfo(accessToken: tokenResponse.accessToken)
+        try await registerProductSession(accessToken: tokenResponse.accessToken)
+        try persist(tokenResponse: tokenResponse, userInfo: userInfo)
+        AppServicePorts.analyticsTracker.track(event: "login_completed", properties: ["method": "apple"])
+    }
+
+    private func openAuthorizationSession(url: URL) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            let session = ASWebAuthenticationSession(
+                url: url,
+                callbackURLScheme: Configuration.authCallbackScheme
+            ) { [weak self] callbackURL, error in
+                Task { @MainActor in self?.webAuthenticationSession = nil }
+                if let authError = error as? ASWebAuthenticationSessionError,
+                   authError.code == .canceledLogin {
+                    continuation.resume(throwing: AuthError.cancelled)
+                } else if error != nil {
+                    continuation.resume(throwing: AuthError.networkError)
+                } else if let callbackURL {
+                    continuation.resume(returning: callbackURL)
+                } else {
+                    continuation.resume(throwing: AuthError.invalidCallback)
+                }
+            }
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = false
+            webAuthenticationSession = session
+            guard session.start() else {
+                webAuthenticationSession = nil
+                continuation.resume(throwing: AuthError.providerNotReady)
+                return
+            }
+        }
+    }
+
+    private func oauthURL(path: String) throws -> URL {
+        guard let issuer = URL(string: Configuration.authIssuer),
+              issuer.scheme == "https" else { throw AuthError.providerNotReady }
+        return issuer.appendingPathComponent(path)
+    }
+
+    private func exchangeOAuthToken(parameters: [String: String]) async throws -> OAuthTokenResponse {
+        let url = try oauthURL(path: "oauth2/token")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        var form = URLComponents()
+        form.queryItems = parameters.map { URLQueryItem(name: $0.key, value: $0.value) }
+        request.httpBody = form.percentEncodedQuery?.data(using: .utf8)
+
+        let (data, response) = try await urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AuthError.networkError }
+        guard (200...299).contains(http.statusCode) else {
+            let payload = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let message = payload?["error_description"] as? String
+                ?? payload?["message"] as? String
+                ?? "Sign in could not be completed."
+            throw AuthError.server(message)
+        }
+        return try JSONDecoder().decode(OAuthTokenResponse.self, from: data)
+    }
+
+    private func fetchOAuthUserInfo(accessToken: String) async throws -> OAuthUserInfo {
+        var request = URLRequest(url: try oauthURL(path: "oauth2/userinfo"))
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AuthError.networkError }
+        guard (200...299).contains(http.statusCode) else { throw AuthError.invalidToken }
+        return try JSONDecoder().decode(OAuthUserInfo.self, from: data)
+    }
+
+    private func registerProductSession(accessToken: String) async throws {
+        guard let baseURL = URL(string: Configuration.apiBaseURL),
+              let url = URL(string: "/api/auth/mobile/session", relativeTo: baseURL)?.absoluteURL else {
+            throw AuthError.providerNotReady
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AuthError.networkError }
+        guard (200...299).contains(http.statusCode) else {
+            throw AuthError.server("Your LogYourBody account could not be initialized.")
+        }
+    }
+
+    private func persist(
+        tokenResponse: OAuthTokenResponse,
+        userInfo: OAuthUserInfo,
+        fallbackRefreshToken: String? = nil
+    ) throws {
+        guard let refreshToken = tokenResponse.refreshToken ?? fallbackRefreshToken else {
+            throw AuthError.invalidToken
+        }
+        let email = userInfo.email ?? Self.syntheticAuthEmail(userId: userInfo.subject)
+        let session = ProductAuthSession(
+            accessToken: tokenResponse.accessToken,
+            refreshToken: refreshToken,
+            expiresAt: Date().addingTimeInterval(tokenResponse.expiresIn),
+            subject: userInfo.subject,
+            email: email,
+            name: userInfo.name,
+            issuedAt: Date()
+        )
+        try keychain.save(session, forKey: storedSessionKey)
+        authSession = session
+        applyAuthenticatedSession(session)
+    }
+
+    private func applyAuthenticatedSession(_ session: ProductAuthSession) {
+        currentUser = LocalUser(
+            id: session.subject,
+            email: session.email,
+            name: session.name,
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: false
+        )
+        memberSinceDate = session.issuedAt
+        isAuthenticated = true
+        lastExitReason = .none
+        Task { await bootstrapAuthenticatedProfileIfNeeded(sessionId: session.id) }
     }
 
     func getAccessToken() async -> String? {
-        await getSupabaseToken()
+        guard let session = authSession else { return nil }
+        if session.expiresAt.timeIntervalSinceNow > 60 { return session.accessToken }
+        return await refreshAccessToken()
     }
 
-    func signUp(email: String, password _: String, name: String) async throws {
-        guard isClerkLoaded else {
-            throw AuthError.clerkNotInitialized
-        }
-
-        let strategy = SignUp.CreateStrategy.standard(
-            emailAddress: email,
-            password: nil,
-            firstName: name.isEmpty ? nil : name,
-            lastName: nil,
-            username: nil,
-            phoneNumber: nil
-        )
-
-        let signUp = try await SignUp.create(strategy: strategy)
-        currentSignUp = signUp
-        pendingSignUpEmail = email
-        emailVerificationFlow = .signUp
-
-        if !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            UserDefaults.standard.set(name, forKey: "appleSignInName")
-        }
-
-        _ = try await signUp.prepareVerification(strategy: .emailCode)
-        needsEmailVerification = true
+    func getSupabaseToken() async -> String? {
+        // The Jovie OAuth access token is scoped to LYB's first-party APIs and
+        // must never be forwarded to the retired Supabase data plane. Keep
+        // legacy sync fail-closed until those endpoints move behind LYB's
+        // server-side Neon adapter.
+        nil
     }
 
-    func verifyEmail(code: String) async throws {
-        guard let signUp = currentSignUp else {
-            throw AuthError.invalidCredentials
+    private func refreshAccessToken() async -> String? {
+        if let refreshTask { return await refreshTask.value }
+        guard let current = authSession else {
+            await performLogout(exitReason: .sessionExpired)
+            return nil
         }
 
-        let updated = try await signUp.attemptVerification(strategy: .emailCode(code: code))
-        currentSignUp = updated
-
-        if updated.status == .complete {
-            if let sessionId = updated.createdSessionId {
-                try await clerk.setActive(sessionId: sessionId)
+        let task = Task<String?, Never> { @MainActor [weak self] in
+            guard let self else { return nil }
+            defer { self.refreshTask = nil }
+            do {
+                let response = try await self.exchangeOAuthToken(
+                    parameters: [
+                        "grant_type": "refresh_token",
+                        "client_id": Configuration.authClientID,
+                        "refresh_token": current.refreshToken
+                    ]
+                )
+                let userInfo = try await self.fetchOAuthUserInfo(accessToken: response.accessToken)
+                try self.persist(
+                    tokenResponse: response,
+                    userInfo: userInfo,
+                    fallbackRefreshToken: current.refreshToken
+                )
+                return self.authSession?.accessToken
+            } catch {
+                await self.performLogout(exitReason: .sessionExpired)
+                return nil
             }
+        }
+        refreshTask = task
+        return await task.value
+    }
 
-            updateSessionState()
-            await bootstrapAuthenticatedProfileIfNeeded(sessionId: clerk.session?.id)
+    func logout() async {
+        await performLogout(exitReason: .userInitiated)
+    }
 
-            needsEmailVerification = false
-            currentSignUp = nil
-            pendingSignUpEmail = nil
-            emailVerificationFlow = nil
-        } else {
-            throw AuthError.invalidCredentials
+    func handleSupabaseUnauthorized() async {
+        guard isAuthenticated else { return }
+        if await refreshAccessToken() == nil {
+            await performLogout(exitReason: .sessionExpired)
         }
     }
 
-    func resendVerificationEmail() async throws {
-        guard let signUp = currentSignUp else {
-            throw AuthError.invalidCredentials
-        }
-
-        _ = try await signUp.prepareVerification(strategy: .emailCode)
+    func performLogout(exitReason: AuthExitReason) async {
+        try? keychain.delete(forKey: storedSessionKey)
+        authSession = nil
+        currentUser = nil
+        isAuthenticated = false
+        needsLegalConsent = false
+        memberSinceDate = nil
+        bootstrappedProfileSessionIds.removeAll()
+        lastExitReason = exitReason
+        AppServicePorts.analyticsTracker.reset()
     }
 
     func updateProfileDurably(_ updates: [String: Any]) async throws {
-        guard let currentUser else { throw SupabaseError.notAuthenticated }
-
-        var payload = updates
-        payload["id"] = currentUser.id
-        if payload["email"] == nil {
-            payload["email"] = currentUser.email
-        }
-
-        guard let token = await getSupabaseToken() else {
-            throw SupabaseError.tokenGenerationFailed
-        }
-
-        try await SupabaseManager.shared.updateProfile(payload, token: token)
+        guard currentUser != nil else { throw AuthError.invalidToken }
+        let payload = try Self.normalizedProductProfilePayload(updates)
+        _ = try await requestProductProfile(method: "PATCH", body: payload)
     }
 
     func updateProfile(_ updates: [String: Any]) async {
         do {
             try await updateProfileDurably(updates)
         } catch {
-            let context = ErrorContext(
-                feature: "profile",
-                operation: "updateProfile",
-                screen: nil,
-                userId: currentUser?.id
+            ErrorReporter.shared.captureNonFatal(
+                error,
+                context: ErrorContext(
+                    feature: "profile",
+                    operation: "updateProfile",
+                    screen: nil,
+                    userId: currentUser?.id
+                )
             )
-            ErrorReporter.shared.captureNonFatal(error, context: context)
         }
+    }
+
+    func consolidateNameUpdate(_ fullName: String) async throws {
+        let trimmed = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        try await updateProfileDurably(["full_name": trimmed])
+        currentUser?.name = trimmed
+    }
+
+    func uploadProfilePicture(_ image: UIImage) async throws -> String? {
+        // Profile photo storage remains an app-data concern, not an identity-provider concern.
+        nil
     }
 
     func bootstrapAuthenticatedProfileIfNeeded(sessionId: String?) async {
         guard let sessionId,
               !bootstrappedProfileSessionIds.contains(sessionId),
-              let user = currentUser,
-              let profile = user.profile else {
-            return
-        }
-
+              let user = currentUser else { return }
         bootstrappedProfileSessionIds.insert(sessionId)
 
-        if let cachedProfile = await CoreDataManager.shared.fetchUserProfileSnapshot(for: user.id),
-           cachedProfile.hasPendingLocalChanges {
-            applyAuthenticatedProfile(cachedProfile.profile, fallbackEmail: user.email)
+        if let cached = await CoreDataManager.shared.fetchUserProfileSnapshot(for: user.id),
+           cached.hasPendingLocalChanges {
+            applyAuthenticatedProfile(cached.profile, fallbackEmail: user.email)
             return
         }
 
         do {
-            if let remoteProfile = try await SupabaseManager.shared.fetchProfile(userId: user.id) {
-                applyAuthenticatedProfile(remoteProfile, fallbackEmail: user.email)
+            let remote = try await requestProductProfile(method: "GET").profile.userProfile
+            applyAuthenticatedProfile(remote, fallbackEmail: user.email)
+            if AuthProfileBootstrapPolicy.shouldPersistProjectedProfile(remote) {
                 CoreDataManager.shared.saveProfile(
-                    remoteProfile,
+                    remote,
                     userId: user.id,
-                    email: remoteProfile.email ?? user.email,
+                    email: remote.email ?? user.email,
                     markSynced: true
                 )
-                return
             }
-
-            guard AuthProfileBootstrapPolicy.shouldPersistProjectedProfile(profile) else {
-                bootstrappedProfileSessionIds.remove(sessionId)
-                return
-            }
-
-            try await SupabaseManager.shared.upsertProfile(profile)
-            CoreDataManager.shared.saveProfile(profile, userId: user.id, email: user.email, markSynced: true)
         } catch {
-            if let cachedProfile = await CoreDataManager.shared.fetchUserProfile(for: user.id) {
-                applyAuthenticatedProfile(cachedProfile, fallbackEmail: user.email)
-                return
+            if let cached = await CoreDataManager.shared.fetchUserProfile(for: user.id) {
+                applyAuthenticatedProfile(cached, fallbackEmail: user.email)
+            } else {
+                bootstrappedProfileSessionIds.remove(sessionId)
             }
-
-            bootstrappedProfileSessionIds.remove(sessionId)
-            let context = ErrorContext(
-                feature: "auth",
-                operation: "bootstrapAuthenticatedProfile",
-                screen: nil,
-                userId: user.id
-            )
-            ErrorReporter.shared.captureNonFatal(error, context: context)
         }
     }
 
     func applyAuthenticatedProfile(_ profile: UserProfile, fallbackEmail: String) {
         guard var user = currentUser else { return }
-
         user.profile = profile
-
         if let fullName = profile.fullName?.trimmingCharacters(in: .whitespacesAndNewlines),
            !fullName.isEmpty {
             user.name = fullName
         } else if user.name == nil {
             user.name = fallbackEmail.components(separatedBy: "@").first ?? "User"
         }
-
-        if let onboardingCompleted = profile.onboardingCompleted {
-            user.onboardingCompleted = onboardingCompleted
-            OnboardingStateManager.shared.syncCompletionFlagFromProfile(onboardingCompleted, userId: user.id)
+        if let completed = profile.onboardingCompleted {
+            user.onboardingCompleted = completed
+            OnboardingStateManager.shared.syncCompletionFlagFromProfile(completed, userId: user.id)
         }
-
         currentUser = user
     }
 
     @discardableResult
     func applySavedProfileToCurrentUser(_ profile: UserProfile) -> Bool {
         guard currentUser?.id == profile.id else { return false }
-
-        applyAuthenticatedProfile(
-            profile,
-            fallbackEmail: profile.email ?? currentUser?.email ?? ""
-        )
+        applyAuthenticatedProfile(profile, fallbackEmail: profile.email ?? currentUser?.email ?? "")
         NotificationCenter.default.post(name: .profileUpdated, object: nil)
         return true
     }
 
-    // MARK: - Account Deletion Helpers
-
-    /// Best-effort call to backend delete-account pipeline.
-    /// This mirrors the web app's behavior of cleaning up Supabase data and assets.
-    func notifyBackendOfAccountDeletion() async {
-        guard let token = await getSupabaseToken(),
-              !token.isEmpty else {
-            return
-        }
-
-        guard let url = try? SupabaseURLBuilder.functionURL("delete-user-assets") else {
-            return
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        do {
-            _ = try await URLSession.shared.data(for: request)
-        } catch {
-            let context = ErrorContext(
-                feature: "auth",
-                operation: "notifyBackendOfAccountDeletion",
-                screen: nil,
-                userId: currentUser?.id
-            )
-            ErrorReporter.shared.captureNonFatal(error, context: context)
-        }
-    }
-
-    // MARK: - Legal Consent Management
-
     func checkLegalConsent(userId: String) async -> Bool {
         await legalConsentGate.wait()
         defer { Task { await legalConsentGate.signal() } }
-
-        // ...
-        // Check if user has accepted legal terms in backend
-        guard let token = await getSupabaseToken() else {
-            return false
-        }
-
-        do {
-            // Query the profiles table for legal consent status
-            let url = try SupabaseURLBuilder.restURL(
-                table: "profiles",
-                query: "id=eq.\(userId)&select=legal_accepted_at"
-            )
-            var request = URLRequest(url: url)
-            request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
-            let (data, _) = try await URLSession.shared.data(for: request)
-
-            if let json = try JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-               let profile = json.first,
-               let _ = profile["legal_accepted_at"] as? String {
-                return true // User has accepted legal terms
-            }
-        } catch {
-            // print("❌ Failed to check legal consent: \(error)")
-        }
-
-        return false
+        guard currentUser?.id == userId,
+              let response = try? await requestProductProfile(method: "GET") else { return false }
+        return response.profile.legalAcceptedAt != nil
     }
 
     func acceptLegalConsent(userId: String) async {
         await legalConsentGate.wait()
         defer { Task { await legalConsentGate.signal() } }
+        guard currentUser?.id == userId else { return }
+        if (try? await requestProductProfile(
+            method: "PATCH",
+            body: ["legalAccepted": true]
+        )) != nil {
+            needsLegalConsent = false
+        }
+    }
 
-        // Save legal consent to backend
-        guard let token = await getSupabaseToken() else {
-            return
+    func deleteProductAccount() async throws {
+        _ = try await requestProductProfile(method: "DELETE")
+    }
+
+    private func requestProductProfile(
+        method: String,
+        body: [String: Any]? = nil
+    ) async throws -> ProductProfileEnvelope {
+        guard let accessToken = await getAccessToken(),
+              let baseURL = URL(string: Configuration.apiBaseURL),
+              let url = URL(string: "/api/auth/mobile/profile", relativeTo: baseURL)?.absoluteURL else {
+            throw AuthError.invalidToken
         }
 
-        do {
-            let consentData: [String: Any] = [
-                "id": userId,
-                "legal_accepted_at": ISO8601DateFormatter().string(from: Date()),
-                "terms_accepted": true,
-                "privacy_accepted": true
-            ]
-
-            let url = try SupabaseURLBuilder.restURL(table: "profiles")
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
 
-            let jsonData = try JSONSerialization.data(withJSONObject: [consentData])
-            request.httpBody = jsonData
+        let (data, response) = try await urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AuthError.networkError }
+        guard (200...299).contains(http.statusCode) else {
+            if http.statusCode == 401 { throw AuthError.invalidToken }
+            throw AuthError.server("Your LogYourBody profile could not be updated.")
+        }
 
-            let (_, response) = try await URLSession.shared.data(for: request)
+        if http.statusCode == 204 {
+            return ProductProfileEnvelope(profile: ProductProfilePayload(
+                id: currentUser?.id ?? "",
+                email: currentUser?.email,
+                username: nil,
+                fullName: currentUser?.name,
+                dateOfBirth: nil,
+                height: nil,
+                heightUnit: nil,
+                gender: nil,
+                activityLevel: nil,
+                goalWeight: nil,
+                goalWeightUnit: nil,
+                onboardingCompleted: nil,
+                legalAcceptedAt: nil
+            ))
+        }
 
-            if let httpResponse = response as? HTTPURLResponse {
-                if (200...299).contains(httpResponse.statusCode) {
-                    // print("✅ Legal consent saved")
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(Self.productDateFormatter)
+        return try decoder.decode(ProductProfileEnvelope.self, from: data)
+    }
 
-                    // Now complete the sign in process
-                    self.needsLegalConsent = false
-                    self.pendingAppleUserId = nil
+    nonisolated private static let productDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
-                    // Force session update to complete authentication
-                    self.updateSessionState()
-                } else {
-                    // print("❌ Failed to save consent: Status \(httpResponse.statusCode)")
-                }
+    nonisolated private static func normalizedProductProfilePayload(
+        _ updates: [String: Any]
+    ) throws -> [String: Any] {
+        var payload: [String: Any] = [:]
+        for (key, value) in updates {
+            if let date = value as? Date {
+                payload[key] = productDateFormatter.string(from: date)
+            } else if JSONSerialization.isValidJSONObject([key: value]) {
+                payload[key] = value
             }
-        } catch {
-            // print("❌ Failed to save legal consent: \(error)")
         }
+        guard JSONSerialization.isValidJSONObject(payload) else {
+            throw AuthError.server("Your profile details could not be saved.")
+        }
+        return payload
+    }
+
+    func deleteCurrentAccount() async throws {
+        try await deleteProductAccount()
+        await performLogout(exitReason: .userInitiated)
+    }
+
+    func fetchActiveSessions() async throws -> [SessionInfo] {
+        guard let session = authSession else { return [] }
+        return [SessionInfo(
+            id: session.id,
+            deviceName: UIDevice.current.name,
+            deviceType: UIDevice.current.model,
+            location: "Current device",
+            ipAddress: "",
+            lastActiveAt: Date(),
+            createdAt: session.issuedAt,
+            isCurrentSession: true
+        )]
+    }
+
+    func revokeSession(sessionId: String) async throws {
+        guard sessionId == authSession?.id else { return }
+        await logout()
+    }
+
+    func loginErrorMessage(for error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? "Sign in failed. Please try again."
+    }
+
+    #if DEBUG
+    func applySignedOutUITestFixture() {
+        authSession = nil
+        currentUser = nil
+        isAuthenticated = false
+        isAuthProviderLoaded = true
+        authProviderInitError = nil
+    }
+    #endif
+
+    nonisolated static func normalizedAuthEmailCandidate(_ candidate: String?) -> String? {
+        guard let candidate else { return nil }
+        let normalized = candidate.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard normalized.contains("@"), !normalized.contains(" ") else { return nil }
+        return normalized
+    }
+
+    nonisolated static func syntheticAuthEmail(userId: String) -> String {
+        let safe = userId
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" ? $0 : "-" }
+        return "\(String(safe))@identity.logyourbody"
+    }
+
+    nonisolated static func randomURLSafeString(byteCount: Int) -> String {
+        var bytes = [UInt8](repeating: 0, count: byteCount)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        precondition(status == errSecSuccess, "Secure random generation failed")
+        return base64URL(Data(bytes))
+    }
+
+    nonisolated static func base64URL(_ data: Data) -> String {
+        data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
     }
 }
 
-extension AuthManager {
-    var isAuthProviderReady: Bool {
-        isClerkLoaded
-    }
-
-    var authProviderInitError: String? {
-        clerkInitError
-    }
-
-    func retryAuthProviderInitialization() async {
-        await retryClerkInitialization()
-    }
-}
-
-// MARK: - Apple Sign In Delegate
-class AppleSignInDelegate: NSObject,
-                                   ASAuthorizationControllerDelegate,
-                                   ASAuthorizationControllerPresentationContextProviding {
-    let continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>
-
-    init(continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) {
-        self.continuation = continuation
-        super.init()
-    }
-
-    func authorizationController(
-        controller: ASAuthorizationController,
-        didCompleteWithAuthorization authorization: ASAuthorization
-    ) {
-        if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
-            continuation.resume(returning: appleIDCredential)
-        } else {
-            continuation.resume(throwing: ASAuthorizationError(.invalidResponse))
-        }
-    }
-
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        continuation.resume(throwing: error)
-    }
-
-    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        // Get the key window
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
+extension AuthManager: ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        if let window = scenes.flatMap(\.windows).first(where: \.isKeyWindow) {
             return window
         }
-
-        // Fallback to any active window
-        if let windowScene = UIApplication.shared.connectedScenes
-            .filter({ $0.activationState == .foregroundActive })
-            .first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            return window
-        }
-
-        // Last resort: create a new window for the first available scene
-        // This prevents crashes but may not show UI properly
-        // print("⚠️ No active window found for Apple Sign In - creating fallback window")
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            return UIWindow(windowScene: windowScene)
-        }
-
-        // Absolute fallback: return a basic window (sign in won't work but won't crash)
-        // print("❌ Critical: No window scene available - Apple Sign In will likely fail")
+        if let scene = scenes.first { return UIWindow(windowScene: scene) }
         return UIWindow(frame: .zero)
     }
 }

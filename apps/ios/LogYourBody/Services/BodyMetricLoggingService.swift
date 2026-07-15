@@ -172,7 +172,7 @@ final class BodyMetricLoggingService {
 
     private func currentAuthenticatedUserId() async -> String? {
         let initializationTask = await MainActor.run {
-            AuthManager.shared.ensureClerkInitializationTask(priority: .userInitiated)
+            AuthManager.shared.ensureAuthInitializationTask(priority: .userInitiated)
         }
 
         await initializationTask.value

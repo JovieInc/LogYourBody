@@ -1,4 +1,5 @@
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { cookies } from 'next/headers';
+import { authCookies, fetchUserInfo } from '@/lib/auth/jovie-oauth';
 
 export type ServerAuthSession = {
   userId: string | null;
@@ -6,15 +7,12 @@ export type ServerAuthSession = {
 };
 
 export async function getServerAuthSession(): Promise<ServerAuthSession> {
-  const session = await auth();
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get(authCookies.accessToken)?.value ?? null;
+  const user = accessToken ? await fetchUserInfo(accessToken) : null;
 
   return {
-    userId: session.userId,
-    getToken: () => session.getToken(),
+    userId: user?.sub ?? null,
+    getToken: async () => accessToken,
   };
-}
-
-export async function deleteServerAuthUser(userId: string) {
-  const client = await clerkClient();
-  await client.users.deleteUser(userId);
 }

@@ -5,7 +5,6 @@
 import Foundation
 import Combine
 import Network
-import Clerk
 import UIKit
 
 /// Optimized sync manager with real-time capabilities and battery efficiency

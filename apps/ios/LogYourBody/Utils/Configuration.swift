@@ -28,9 +28,9 @@ enum Configuration {
 
     struct AuthEnvironmentSnapshot {
         let environment: AppEnvironment
-        let clerkPublishableKey: String
-        let supabaseURL: String
-        let supabaseExpectedHost: String
+        let authIssuer: String
+        let authClientID: String
+        let authRedirectURI: String
         let apiBaseURL: String
         let apiExpectedHost: String
         let revenueCatAPIKey: String
@@ -97,7 +97,7 @@ enum Configuration {
     }
 
     /// Checks whether a value is a generic placeholder or default (keyword/empty only).
-    /// Used in `stringValue()` for ALL reads (Clerk, RevenueCat, Statsig, etc.).
+    /// Used in `stringValue()` for all configuration reads.
     /// Does NOT apply URL/host validation — that belongs in `isInvalidURLValue()`.
     static func isPlaceholder(_ value: String) -> Bool {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -140,21 +140,29 @@ enum Configuration {
     // MARK: - API Configuration
 
     static var apiBaseURL: String {
-        stringValue(for: "API_BASE_URL", default: "https://www.logyourbody.com")
+        stringValue(for: "API_BASE_URL", default: "https://logyourbody.com")
     }
 
     static var apiExpectedHost: String {
         stringValue(for: "API_EXPECTED_HOST")
     }
 
-    // MARK: - Clerk Authentication
+    // MARK: - First-party authentication
 
-    static var clerkPublishableKey: String {
-        stringValue(for: "CLERK_PUBLISHABLE_KEY")
+    static var authIssuer: String {
+        stringValue(for: "AUTH_ISSUER", default: "https://jov.ie/api/auth")
     }
 
-    static var clerkFrontendAPI: String {
-        stringValue(for: "CLERK_FRONTEND_API", default: "https://clerk.logyourbody.com")
+    static var authClientID: String {
+        stringValue(for: "AUTH_CLIENT_ID", default: "logyourbody-ios")
+    }
+
+    static var authRedirectURI: String {
+        stringValue(for: "AUTH_REDIRECT_URI", default: "logyourbody://oauth")
+    }
+
+    static var authCallbackScheme: String {
+        URL(string: authRedirectURI)?.scheme ?? "logyourbody"
     }
 
     // MARK: - Supabase Configuration
@@ -223,17 +231,18 @@ enum Configuration {
         boolValue(for: "ALLOW_PRODUCTION_SERVICES_IN_DEBUG")
     }
 
-    static var isClerkConfigured: Bool {
-        let key = clerkPublishableKey
-        return !key.isEmpty && key.hasPrefix("pk_")
+    static var isAuthConfigured: Bool {
+        URL(string: authIssuer)?.scheme == "https" &&
+            authClientID == "logyourbody-ios" &&
+            URL(string: authRedirectURI)?.scheme == "logyourbody"
     }
 
     static var currentAuthEnvironmentSnapshot: AuthEnvironmentSnapshot {
         AuthEnvironmentSnapshot(
             environment: appEnvironment,
-            clerkPublishableKey: clerkPublishableKey,
-            supabaseURL: supabaseURL,
-            supabaseExpectedHost: supabaseExpectedHost,
+            authIssuer: authIssuer,
+            authClientID: authClientID,
+            authRedirectURI: authRedirectURI,
             apiBaseURL: apiBaseURL,
             apiExpectedHost: apiExpectedHost,
             revenueCatAPIKey: revenueCatAPIKey,
@@ -249,35 +258,27 @@ enum Configuration {
 
     static func validateAuthEnvironment(_ snapshot: AuthEnvironmentSnapshot) -> AuthEnvironmentValidationResult {
         var messages: [String] = []
-        let clerkKey = snapshot.clerkPublishableKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let revenueCatKey = snapshot.revenueCatAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let sentryEnvironment = snapshot.sentryEnvironment.lowercased()
         let statsigTier = snapshot.statsigEnvironmentTier.lowercased()
 
-        if isPlaceholder(clerkKey) || !clerkKey.hasPrefix("pk_") {
-            messages.append("Clerk publishable key must be configured with a publishable pk_ key.")
+        let authIssuer = URL(string: snapshot.authIssuer)
+        if authIssuer?.scheme != "https" || authIssuer?.host == nil {
+            messages.append("Authentication issuer must be a valid HTTPS URL.")
         }
 
-        let supabaseURL = URL(string: snapshot.supabaseURL)
-        if supabaseURL == nil || isInvalidURLValue(snapshot.supabaseURL) {
-            messages.append("Supabase URL must be configured.")
+        if snapshot.authClientID != "logyourbody-ios" {
+            messages.append("Authentication client must be logyourbody-ios.")
+        }
+
+        let redirectURL = URL(string: snapshot.authRedirectURI)
+        if redirectURL?.scheme != "logyourbody" || redirectURL?.host != "oauth" {
+            messages.append("Authentication redirect URI must be logyourbody://oauth.")
         }
 
         let apiBaseURL = URL(string: snapshot.apiBaseURL)
         if apiBaseURL == nil || isInvalidURLValue(snapshot.apiBaseURL) {
             messages.append("API base URL must be configured.")
-        }
-
-        if let supabaseURL {
-            if supabaseURL.scheme != "https" {
-                messages.append("Supabase URL must use HTTPS.")
-            }
-
-            if let host = supabaseURL.host,
-               !snapshot.supabaseExpectedHost.isEmpty,
-               host != snapshot.supabaseExpectedHost {
-                messages.append("Supabase URL host must match SUPABASE_EXPECTED_HOST for this environment.")
-            }
         }
 
         if let apiBaseURL,
@@ -289,12 +290,8 @@ enum Configuration {
 
         switch snapshot.environment {
         case .production:
-            if clerkKey.hasPrefix("pk_test_") {
-                messages.append("Production builds cannot use Clerk test publishable keys.")
-            }
-
-            if snapshot.supabaseExpectedHost.isEmpty {
-                messages.append("Supabase expected host must be configured for production.")
+            if authIssuer?.absoluteString != "https://jov.ie/api/auth" {
+                messages.append("Production authentication must use the Jovie identity issuer.")
             }
 
             if apiBaseURL?.scheme != "https" {
@@ -314,9 +311,7 @@ enum Configuration {
             }
 
         case .development:
-            if clerkKey.hasPrefix("pk_live_") && !snapshot.allowProductionServicesInDevelopment {
-                messages.append("Development builds cannot use Clerk live publishable keys unless explicitly allowed.")
-            }
+            break
         }
 
         return AuthEnvironmentValidationResult(messages: messages)

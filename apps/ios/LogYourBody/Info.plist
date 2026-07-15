@@ -82,16 +82,12 @@
 	<string>$(APP_ENVIRONMENT)</string>
 	<key>ALLOW_PRODUCTION_SERVICES_IN_DEBUG</key>
 	<string>$(ALLOW_PRODUCTION_SERVICES_IN_DEBUG)</string>
-	<key>CLERK_PUBLISHABLE_KEY</key>
-	<string>$(CLERK_PUBLISHABLE_KEY)</string>
-	<key>CLERK_FRONTEND_API</key>
-	<string>$(CLERK_FRONTEND_API)</string>
-	<key>SUPABASE_URL</key>
-	<string>$(SUPABASE_URL)</string>
-	<key>SUPABASE_EXPECTED_HOST</key>
-	<string>$(SUPABASE_EXPECTED_HOST)</string>
-	<key>SUPABASE_ANON_KEY</key>
-	<string>$(SUPABASE_ANON_KEY)</string>
+	<key>AUTH_ISSUER</key>
+	<string>$(AUTH_ISSUER)</string>
+	<key>AUTH_CLIENT_ID</key>
+	<string>$(AUTH_CLIENT_ID)</string>
+	<key>AUTH_REDIRECT_URI</key>
+	<string>$(AUTH_REDIRECT_URI)</string>
 	<key>REVENUE_CAT_API_KEY</key>
 	<string>$(REVENUE_CAT_API_KEY)</string>
 	<key>SENTRY_DSN</key>

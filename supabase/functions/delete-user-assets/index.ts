@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.210.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
-import { deleteUserDatabaseRows } from "./account-deletion.ts"
+import { deleteProductAuthUser, deleteUserDatabaseRows } from "./account-deletion.ts"
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -212,6 +212,7 @@ serve(async (req) => {
         }
 
         const deletedRows = await deleteUserDatabaseRows(supabase, userId)
+        await deleteProductAuthUser(supabase, userId)
 
         return new Response(
             JSON.stringify({ success: true, deletedRows }),

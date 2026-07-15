@@ -43,7 +43,7 @@ describe('RLS policy guard migration', () => {
     );
   });
 
-  it('reasserts Clerk user-scoped policies for health and photo data', () => {
+  it('reasserts product-user-scoped policies for health and photo data', () => {
     [
       "id = auth.jwt()->>'sub'",
       "user_id = auth.jwt()->>'sub'",
@@ -99,7 +99,7 @@ describe('RLS policy guard migration', () => {
     expect(rootMigrationSql).not.toContain('FOR ALL TO authenticated');
   });
 
-  it('keeps data export ownership aligned to Clerk text ids', () => {
+  it('keeps data export ownership aligned to authenticated subject ids', () => {
     expect(dataExportsMigrationSql).toContain('ALTER COLUMN user_id TYPE TEXT USING user_id::text');
     expect(dataExportsMigrationSql).toContain('ALTER COLUMN user_id SET NOT NULL');
     expect(dataExportsMigrationSql).toContain('DROP CONSTRAINT %I');

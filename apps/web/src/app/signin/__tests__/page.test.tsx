@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import SignInPage from '../page';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 
 // Stub SignInPage to match Next.js app router patterns in Jest tests
 jest.mock('../page', () => {
@@ -9,7 +9,7 @@ jest.mock('../page', () => {
   const React = require('react') as typeof import('react');
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useAuth } =
-    require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
+    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
 
   const TestSignInPage: React.FC = () => {
     const { exitReason } = useAuth();

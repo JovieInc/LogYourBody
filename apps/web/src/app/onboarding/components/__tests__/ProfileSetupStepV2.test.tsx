@@ -4,12 +4,12 @@ import '@testing-library/jest-dom';
 import { ProfileSetupStepV2 } from '../ProfileSetupStepV2';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 
 // Mock dependencies
 jest.mock('@/contexts/OnboardingContext');
 jest.mock('@/hooks/use-media-query');
-jest.mock('@/contexts/ClerkAuthContext');
+jest.mock('@/contexts/ProductAuthContext');
 
 jest.mock('../ProfileSetupStepV2', () => {
   const React = require('react') as typeof import('react');
@@ -18,7 +18,7 @@ jest.mock('../ProfileSetupStepV2', () => {
   const { useMediaQuery } =
     require('@/hooks/use-media-query') as typeof import('@/hooks/use-media-query');
   const { useAuth } =
-    require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
+    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
 
   const steps = ['name', 'dob', 'height', 'gender'] as const;
   type Step = (typeof steps)[number];
@@ -33,13 +33,13 @@ jest.mock('../ProfileSetupStepV2', () => {
     const initialFirstFromFull = parts[0] ?? '';
     const initialLastFromFull = parts.slice(1).join(' ');
 
-    const clerkFirst = user?.firstName ?? '';
-    const clerkLast = user?.lastName ?? '';
+    const identityFirst = user?.firstName ?? '';
+    const identityLast = user?.lastName ?? '';
 
     const [step, setStep] = React.useState<Step>('name');
     const [form, setForm] = React.useState({
-      firstName: initialFullName ? initialFirstFromFull : clerkFirst,
-      lastName: initialFullName ? initialLastFromFull : clerkLast,
+      firstName: initialFullName ? initialFirstFromFull : identityFirst,
+      lastName: initialFullName ? initialLastFromFull : identityLast,
       dateOfBirth: (data.dateOfBirth as string | undefined) ?? '1990-01-01',
       height: (data.height as number | undefined) ?? 71,
       gender: (data.gender as string | undefined) ?? '',
@@ -565,9 +565,9 @@ describe('ProfileSetupStepV2', () => {
       expect(firstNameInput).toHaveClass('h-12');
     });
 
-    it('prefers existing onboarding fullName over Clerk user data', () => {
+    it('prefers existing onboarding fullName over identity profile data', () => {
       mockUseAuth.mockReturnValue({
-        user: { firstName: 'ClerkFirst', lastName: 'ClerkLast' },
+        user: { firstName: 'TestFirst', lastName: 'TestLast' },
       });
       mockUseOnboarding.mockReturnValue({
         data: { fullName: 'Existing User' },

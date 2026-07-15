@@ -7,21 +7,7 @@ import SwiftUI
 extension PreferencesView {
     var securitySection: some View {
         SettingsSection(header: "Security") {
-            VStack(spacing: 0) {
-                changePasswordRow
-                DSDivider().insetted(16)
-                activeSessionsRow
-            }
-        }
-    }
-
-    var changePasswordRow: some View {
-        SettingsNavigationLink(
-            icon: "lock.rotation",
-            title: "Change password",
-            subtitle: "Update your password."
-        ) {
-            ChangePasswordView()
+            activeSessionsRow
         }
     }
 

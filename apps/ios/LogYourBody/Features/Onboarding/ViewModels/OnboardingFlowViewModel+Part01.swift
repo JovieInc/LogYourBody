@@ -571,17 +571,13 @@ func createAccount(authManager: AuthManager) async {
             await MainActor.run {
                 accountCreationStage = .creatingAccount
             }
-            try await authManager.signUp(
-                email: trimmedEmailAddress,
-                password: "",
-                name: ""
-            )
+            try await authManager.signInWithApple()
 
             AppServicePorts.analyticsTracker.track(
                 event: "onboarding_account_created",
                 properties: [
                     "entry_context": entryContext.analyticsContext,
-                    "method": "email_otp"
+                    "method": "apple"
                 ]
             )
 

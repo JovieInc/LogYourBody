@@ -230,7 +230,6 @@ platform :ios do
     entitlements = profile_data["Entitlements"] || {}
     required_capabilities = {
       "HealthKit" => entitlements["com.apple.developer.healthkit"],
-      "Sign in with Apple" => entitlements["com.apple.developer.applesignin"],
       "Associated Domains" => entitlements["com.apple.developer.associated-domains"],
       "App Groups" => entitlements["com.apple.security.application-groups"]
     }

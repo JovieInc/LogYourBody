@@ -1,6 +1,6 @@
 # iOS Release Evidence Path
 
-This is the exact evidence path for moving a LogYourBody iOS change from local proof to TestFlight or App Store review. The local bootstrap below is secret-free and proves compile/UI fixture health only; production Clerk, Supabase, RevenueCat, TestFlight, and App Store behavior require the later workflow and external proof steps.
+This is the exact evidence path for moving a LogYourBody iOS change from local proof to TestFlight or App Store review. The local bootstrap below is secret-free and proves compile/UI fixture health only; production Jovie identity, Supabase, RevenueCat, TestFlight, and App Store behavior require the later workflow and external proof steps.
 
 ## 1. Local Config Bootstrap
 

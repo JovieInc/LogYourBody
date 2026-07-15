@@ -1,14 +1,14 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
 import ProfileSettingsPage from '../page';
 import * as profileApi from '@/lib/supabase/profile';
 // import { format } from 'date-fns' // Not used
 
 // Mock dependencies
-jest.mock('@/contexts/ClerkAuthContext');
+jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
@@ -159,7 +159,7 @@ jest.mock('../page', () => {
   const React = require('react') as typeof import('react');
 
   const { useAuth } =
-    require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
+    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
 
   const { useRouter } = require('next/navigation') as typeof import('next/navigation');
 

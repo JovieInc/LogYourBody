@@ -1,7 +1,6 @@
 import Foundation
 import Combine
 import Network
-import Clerk
 import UIKit
 
 extension RealtimeSyncManager {
@@ -184,13 +183,7 @@ func syncAll(onCompletion: (() -> Void)? = nil) {
             var operationsNeedingRetry = operationsToProcess
 
             do {
-                let session = await MainActor.run { self.authManager.clerkSession }
-                guard let session else {
-                    throw SyncError.noAuthSession
-                }
-
-                let tokenResource = try await session.getToken()
-                guard let token = tokenResource?.jwt else {
+                guard let token = await self.authManager.getSupabaseToken() else {
                     throw SyncError.tokenGenerationFailed
                 }
 

@@ -64,8 +64,8 @@ write_if_needed "$DEV_CONFIG" "development config" <<'CONFIG'
 APP_ENVIRONMENT = development
 ALLOW_PRODUCTION_SERVICES_IN_DEBUG = NO
 
-CLERK_PUBLISHABLE_KEY = pk_test_local_build_key
-CLERK_FRONTEND_API = https:/$()/clerk.local.logyourbody.test
+AUTH_PROVIDER_ID = custom:jovie
+AUTH_REDIRECT_URI = logyourbody:/$()/oauth
 
 SUPABASE_URL = https:/$()/local-build.supabase.co
 SUPABASE_EXPECTED_HOST = local-build.supabase.co

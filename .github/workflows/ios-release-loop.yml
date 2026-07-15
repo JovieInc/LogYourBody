@@ -142,7 +142,6 @@ jobs:
       - name: Write production iOS config
         run: apps/ios/Scripts/write_release_config.sh
         env:
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
           REVENUE_CAT_PUBLIC_KEY: ${{ secrets.REVENUE_CAT_PUBLIC_KEY }}

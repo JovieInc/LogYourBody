@@ -1,13 +1,13 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import DashboardPage from '../page';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
 import { getProfile } from '@/lib/supabase/profile';
 import { createClient } from '@/lib/supabase/client';
 
 // Mock dependencies
-jest.mock('@/contexts/ClerkAuthContext');
+jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation');
 jest.mock('@/lib/supabase/profile');
 jest.mock('@/lib/supabase/client', () => ({
@@ -27,7 +27,7 @@ jest.mock('../page', () => {
         {/* Weight card */}
         <div className="bg-linear-bg border-linear-border min-w-[140px] rounded-lg border p-4">
           <div className="flex-col items-center text-center">
-            <div className="text-linear-text-secondary mb-2 text-xs tracking-wider uppercase">
+            <div className="text-linear-text-secondary mb-2 text-xs uppercase tracking-wider">
               WEIGHT
             </div>
             <div className="flex items-baseline gap-1">
@@ -40,7 +40,7 @@ jest.mock('../page', () => {
         {/* Body Fat card */}
         <div className="bg-linear-bg border-linear-border min-w-[140px] rounded-lg border p-4">
           <div className="flex-col items-center text-center">
-            <div className="text-linear-text-secondary mb-2 text-xs tracking-wider uppercase">
+            <div className="text-linear-text-secondary mb-2 text-xs uppercase tracking-wider">
               BODY FAT
             </div>
             <div className="flex items-baseline gap-0.5">
@@ -54,7 +54,7 @@ jest.mock('../page', () => {
         {/* Lean Mass card */}
         <div className="bg-linear-bg border-linear-border min-w-[140px] rounded-lg border p-4">
           <div className="flex-col items-center text-center">
-            <div className="text-linear-text-secondary mb-2 text-xs tracking-wider uppercase">
+            <div className="text-linear-text-secondary mb-2 text-xs uppercase tracking-wider">
               LEAN MASS
             </div>
             <div className="flex items-baseline gap-1">

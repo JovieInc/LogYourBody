@@ -4,18 +4,14 @@
 APP_ENVIRONMENT = production
 ALLOW_PRODUCTION_SERVICES_IN_DEBUG = NO
 
-// Clerk live instance. Must be a publishable key; never use secret keys.
-CLERK_PUBLISHABLE_KEY = pk_live_replace_me
-CLERK_FRONTEND_API = https:/$()/your-production-clerk-frontend-api
-
-// Supabase production project. SUPABASE_EXPECTED_HOST must match SUPABASE_URL host.
-SUPABASE_URL = https:/$()/your-prod-project.supabase.co
-SUPABASE_EXPECTED_HOST = your-prod-project.supabase.co
-SUPABASE_ANON_KEY = replace_with_prod_anon_key
+// Shared first-party Jovie Better Auth issuer. Native client uses OAuth PKCE.
+AUTH_ISSUER = https:/$()/jov.ie/api/auth
+AUTH_CLIENT_ID = logyourbody-ios
+AUTH_REDIRECT_URI = logyourbody:/$()/oauth
 
 // Production API.
-API_BASE_URL = https:/$()/www.logyourbody.com
-API_EXPECTED_HOST = www.logyourbody.com
+API_BASE_URL = https:/$()/logyourbody.com
+API_EXPECTED_HOST = logyourbody.com
 
 // Production paid/analytics/error reporting providers.
 REVENUE_CAT_API_KEY = replace_with_prod_revenuecat_public_key

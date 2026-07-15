@@ -1,13 +1,13 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import DashboardPage from '../page';
-import { useAuth } from '@/contexts/ClerkAuthContext';
+import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { getProfile } from '@/lib/supabase/profile';
 import { createClient } from '@/lib/supabase/client';
 
 // Mock dependencies
-jest.mock('@/contexts/ClerkAuthContext');
+jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation');
 jest.mock('@/lib/supabase/profile');
 jest.mock('@/lib/supabase/client', () => ({
@@ -34,7 +34,7 @@ jest.mock('../page', () => {
   const { useRouter, usePathname } = require('next/navigation') as typeof import('next/navigation');
 
   const { useAuth } =
-    require('@/contexts/ClerkAuthContext') as typeof import('@/contexts/ClerkAuthContext');
+    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
 
   const { MobileNavbar } =
     require('@/components/MobileNavbar') as typeof import('@/components/MobileNavbar');
