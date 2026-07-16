@@ -29,7 +29,7 @@ import {
 } from '@/utils/photo-upload-utils';
 import { uploadToStorage } from '@/utils/storage-utils';
 import { createClient } from '@/lib/supabase/client';
-import { getProfile } from '@/lib/supabase/profile';
+import { getProfile } from '@/lib/profile';
 import dynamic from 'next/dynamic';
 import { useMediaQuery } from '@/hooks/use-media-query';
 // import { useSync } from '@/hooks/use-sync'

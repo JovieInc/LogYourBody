@@ -12,7 +12,7 @@ import { BodyMetrics, UserProfile, ProgressPhoto } from '@/types/body-metrics';
 import { convertWeight } from '@/utils/body-calculations';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { getFilePathFromUrl } from '@/utils/storage-utils';
-import { getProfile } from '@/lib/supabase/profile';
+import { getProfile } from '@/lib/profile';
 import { createClient } from '@/lib/supabase/client';
 import {
   createTimelineData,

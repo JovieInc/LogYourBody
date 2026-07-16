@@ -30,7 +30,7 @@ import {
 } from '@/utils/photo-upload-utils';
 import { uploadToStorage } from '@/utils/storage-utils';
 import { createClient } from '@/lib/supabase/client';
-import { getProfile } from '@/lib/supabase/profile';
+import { getProfile } from '@/lib/profile';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MobileLogStepContent } from './MobileLogStepContent';
