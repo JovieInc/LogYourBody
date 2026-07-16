@@ -30,30 +30,33 @@ jobs:
       - name: Verify workflow concurrency policy
         run: node .github/scripts/verify-workflow-concurrency.mjs
 
-      - uses: dorny/paths-filter@v3
+      - name: Detect changed surfaces locally
         id: filter
-        with:
-          filters: |
-            web:
-              - 'apps/web/**'
-              - 'packages/**'
-              - '.github/actions/**'
-              - '.github/scripts/**'
-              - '.github/workflows/**'
-              - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
-              - 'scripts/supabase/**'
-              - 'scripts/web/**'
-              - 'supabase/**'
-              - 'turbo.json'
-            ios:
-              - 'apps/ios/**'
-              - '.github/actions/setup-ios-build/**'
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/ios*.yml'
-              - 'scripts/ios/**'
-              - 'package.json'
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            changed_files=$(git diff-tree --no-commit-id --name-only -r "$HEAD_SHA")
+          else
+            changed_files=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          fi
+
+          web_pattern='^(apps/web/|packages/|\.github/actions/|\.github/scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|scripts/(supabase|web)/|supabase/|turbo\.json$)'
+          ios_pattern='^(apps/ios/|\.github/actions/setup-ios-build/|\.github/workflows/ci\.yml$|\.github/workflows/ios[^/]*\.yml$|scripts/ios/|package\.json$)'
+
+          if printf '%s\n' "$changed_files" | grep -Eq "$web_pattern"; then
+            echo 'web=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'web=false' >> "$GITHUB_OUTPUT"
+          fi
+
+          if printf '%s\n' "$changed_files" | grep -Eq "$ios_pattern"; then
+            echo 'ios=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ios=false' >> "$GITHUB_OUTPUT"
+          fi
 
   js:
     name: JavaScript/TypeScript
