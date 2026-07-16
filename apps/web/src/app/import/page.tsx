@@ -32,7 +32,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { createClient } from '@/lib/supabase/client';
 import { uploadToStorage } from '@/utils/storage-utils';
 import {
   detectFileType,
@@ -230,7 +229,6 @@ export default function ImportPage() {
     setSuccessCount(0);
 
     try {
-      const supabase = createClient();
       const selectedData = parsedData.entries.filter((_, index) => selectedEntries.has(index));
 
       if (parsedData.type === 'photos') {
@@ -284,18 +282,17 @@ export default function ImportPage() {
               throw uploadError;
             }
 
-            // Create body metrics entry with photo
-            const { error: metricsError } = await supabase.from('body_metrics').insert({
-              user_id: user.id,
-              date: entry.date,
-              photo_url: publicUrl,
-              notes: entry.notes,
+            const metricResponse = await fetch('/api/body-metrics', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                date: entry.date,
+                photoUrl: publicUrl,
+                notes: entry.notes || null,
+                dataSource: 'photo',
+              }),
             });
-
-            if (metricsError) {
-              console.error('Metrics error:', metricsError);
-              throw metricsError;
-            }
+            if (!metricResponse.ok) throw new Error('Failed to save imported photo metric');
 
             uploadResults.push({ success: true, url: publicUrl });
             successfulUploads++;
@@ -360,20 +357,23 @@ export default function ImportPage() {
         }
       } else {
         // Import body composition or weight data
-        const metricsData = selectedData.map((entry) => ({
-          user_id: user.id,
-          date: entry.date,
-          weight: entry.weight,
-          weight_unit: entry.weight_unit || 'kg',
-          body_fat_percentage: entry.body_fat_percentage,
-          waist: entry.waist,
-          hip: entry.hip,
-          notes: entry.notes,
-        }));
-
-        const { error } = await supabase.from('body_metrics').insert(metricsData);
-
-        if (error) throw error;
+        for (const entry of selectedData) {
+          const metricResponse = await fetch('/api/body-metrics', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              date: entry.date,
+              weight: entry.weight ?? null,
+              weightUnit: entry.weight_unit || 'kg',
+              bodyFatPercentage: entry.body_fat_percentage ?? null,
+              waist: entry.waist ?? null,
+              hip: entry.hip ?? null,
+              notes: entry.notes || null,
+              dataSource: 'manual',
+            }),
+          });
+          if (!metricResponse.ok) throw new Error('Failed to save imported body metric');
+        }
       }
 
       toast({
