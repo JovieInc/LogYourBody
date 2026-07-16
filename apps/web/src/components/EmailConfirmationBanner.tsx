@@ -3,70 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/ProductAuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { X, Mail, CheckCircle } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { X, Mail } from 'lucide-react';
 
 export function EmailConfirmationBanner() {
   const { user } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [lastSent, setLastSent] = useState<Date | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const supabase = createClient();
 
   useEffect(() => {
-    // Check if user exists and email is not confirmed
-    const checkEmailStatus = async () => {
-      if (!user) {
-        setIsVisible(false);
-        return;
-      }
-
-      // Get user profile to check email verification status
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('email_verified')
-        .eq('id', user.id)
-        .single();
-
-      setIsVisible(profile?.email_verified === false);
-    };
-
-    checkEmailStatus();
-  }, [user, supabase]);
-
-  const handleResendEmail = async () => {
-    const email =
-      user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses?.[0]?.emailAddress;
-    if (!email || isSending) return;
-
-    // Check if we sent an email recently (within 60 seconds)
-    if (lastSent && new Date().getTime() - lastSent.getTime() < 60000) {
-      setMessage('Please wait a minute before requesting another email.');
-      return;
-    }
-
-    setIsSending(true);
-    setMessage(null);
-
-    try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email,
-      });
-
-      if (error) throw error;
-
-      setLastSent(new Date());
-      setMessage('Confirmation email sent! Please check your inbox.');
-    } catch (error) {
-      console.error('Error resending email:', error);
-      setMessage('Failed to send email. Please try again later.');
-    } finally {
-      setIsSending(false);
-    }
-  };
+    setIsVisible(user?.primaryEmailAddress?.verification?.status === 'unverified');
+  }, [user]);
 
   if (!isVisible) return null;
 
@@ -80,30 +25,10 @@ export function EmailConfirmationBanner() {
               <p className="font-medium">Verify your email address</p>
               <p className="mt-1 text-sm opacity-90">
                 Please check your email and click the confirmation link to unlock all features.
-                {message && (
-                  <span className="mt-2 block text-sm">
-                    {message.includes('sent') ? (
-                      <span className="flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3" />
-                        {message}
-                      </span>
-                    ) : (
-                      message
-                    )}
-                  </span>
-                )}
+                Verification emails are managed by Jovie. Use the link in your inbox to continue.
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleResendEmail}
-                disabled={isSending}
-                className="border-white/30 bg-white/20 text-white hover:bg-white/30"
-              >
-                {isSending ? 'Sending...' : 'Resend Email'}
-              </Button>
               <button
                 onClick={() => setIsVisible(false)}
                 className="text-white/80 transition-colors hover:text-white"

@@ -113,35 +113,26 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
     setIsLoading(true);
     try {
-      // Save profile data
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
       const primaryEmail =
         user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress;
 
       const normalizedGender: 'male' | 'female' = data.gender === 'female' ? 'female' : 'male';
 
       const fullName = (data.fullName || '').trim();
-      const nameParts = fullName ? fullName.split(/\s+/) : [];
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
 
-      // Update user profile
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id: user.id,
-        email: primaryEmail || '', // Include email from auth user
-        full_name: fullName || null,
-        first_name: firstName || null,
-        last_name: lastName || null,
-        date_of_birth: data.dateOfBirth,
-        height: data.height,
-        height_unit: 'ft', // Heights in inches use 'ft' unit per database constraint
-        gender: normalizedGender,
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
+      const profileResponse = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          fullName: fullName || primaryEmail || undefined,
+          dateOfBirth: data.dateOfBirth,
+          height: data.height,
+          heightUnit: 'in',
+          gender: normalizedGender,
+          onboardingCompleted: true,
+        }),
       });
-
-      if (profileError) throw profileError;
+      if (!profileResponse.ok) throw new Error('Failed to save profile');
 
       // Save body metrics - either multiple scans or single entry
       if (data.confirmedScans && data.confirmedScans.length > 0) {
@@ -167,27 +158,40 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           updated_at: new Date().toISOString(),
         }));
 
-        const { error: metricsError } = await supabase.from('body_metrics').insert(metricsToInsert);
-
-        if (metricsError) throw metricsError;
+        for (const metric of metricsToInsert) {
+          const response = await fetch('/api/body-metrics', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              date: metric.date,
+              weight: metric.weight ?? null,
+              weightUnit: 'kg',
+              bodyFatPercentage: metric.body_fat_percentage,
+              bodyFatMethod: metric.body_fat_method,
+              muscleMass: null,
+              dataSource: 'bodyspec_dexa',
+            }),
+          });
+          if (!response.ok) throw new Error('Failed to save body metric');
+        }
       } else if (data.weight && data.bodyFatPercentage) {
         // Single entry (manual or single scan)
         // Convert weight to kg for storage (database expects kg when weight_unit is 'kg')
         const weightInKg = data.weight * 0.453592; // Convert lbs to kg
 
-        const { error: metricsError } = await supabase.from('body_metrics').insert({
-          user_id: user.id,
-          date: data.scanDate ? formatDateForDB(data.scanDate) : formatDateForDB(new Date()),
-          weight: weightInKg,
-          weight_unit: 'kg',
-          body_fat_percentage: data.bodyFatPercentage,
-          body_fat_method: 'dexa',
-          bone_mass: data.boneMass ? data.boneMass * 0.453592 : null, // Convert to kg if present
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+        const response = await fetch('/api/body-metrics', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            date: data.scanDate ? formatDateForDB(data.scanDate) : formatDateForDB(new Date()),
+            weight: weightInKg,
+            weightUnit: 'kg',
+            bodyFatPercentage: data.bodyFatPercentage,
+            bodyFatMethod: 'dexa',
+            dataSource: 'bodyspec_dexa',
+          }),
         });
-
-        if (metricsError) throw metricsError;
+        if (!response.ok) throw new Error('Failed to save body metric');
       }
 
       // Navigate to dashboard

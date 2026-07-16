@@ -28,8 +28,7 @@ import {
   checkBrowserSupport,
 } from '@/utils/photo-upload-utils';
 import { uploadToStorage } from '@/utils/storage-utils';
-import { createClient } from '@/lib/supabase/client';
-import { getProfile } from '@/lib/supabase/profile';
+import { getProfile } from '@/lib/profile';
 import dynamic from 'next/dynamic';
 import { useMediaQuery } from '@/hooks/use-media-query';
 // import { useSync } from '@/hooks/use-sync'
@@ -234,7 +233,6 @@ export default function LogWeightPage() {
 
     setIsSubmitting(true);
     try {
-      const supabase = createClient();
       let photoUrl = null;
 
       // Upload photo if present
@@ -263,28 +261,25 @@ export default function LogWeightPage() {
       // Save body metrics through sync manager for offline support
       const metrics = await syncManager.logWeight(weightInKg, 'kg', formData.notes || undefined);
 
-      // Also save to Supabase directly for immediate sync if online
-      const { error } = await supabase.from('body_metrics').upsert({
-        id: metrics.id,
-        user_id: user.id,
-        date: format(new Date(), 'yyyy-MM-dd'),
-        weight: weightInKg,
-        weight_unit: 'kg', // Always store in kg
-        body_fat_percentage: formData.body_fat_percentage,
-        body_fat_method: formData.method === 'simple' ? 'manual' : formData.method,
-        waist: formData.waist ? parseFloat(formData.waist) : null,
-        neck: formData.neck ? parseFloat(formData.neck) : null,
-        hip: formData.hip ? parseFloat(formData.hip) : null,
-        notes: formData.notes || null,
-        photo_url: photoUrl,
-        created_at: new Date(metrics.created_at).toISOString(),
-        updated_at: new Date(metrics.updated_at).toISOString(),
+      const response = await fetch('/api/body-metrics', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          date: format(new Date(), 'yyyy-MM-dd'),
+          weight: weightInKg,
+          weightUnit: 'kg',
+          bodyFatPercentage: formData.body_fat_percentage,
+          bodyFatMethod: formData.method === 'simple' ? 'manual' : formData.method,
+          waist: formData.waist ? parseFloat(formData.waist) : null,
+          neck: formData.neck ? parseFloat(formData.neck) : null,
+          hip: formData.hip ? parseFloat(formData.hip) : null,
+          notes: formData.notes || null,
+          photoUrl,
+          dataSource: 'manual',
+        }),
       });
-
-      // If online sync succeeded, mark as synced in IndexedDB
-      if (!error) {
-        await indexedDB.markAsSynced('bodyMetrics', metrics.id);
-      }
+      if (!response.ok) throw new Error('Failed to save metrics');
+      await indexedDB.markAsSynced('bodyMetrics', metrics.id);
 
       toast({
         title: 'Success!',
