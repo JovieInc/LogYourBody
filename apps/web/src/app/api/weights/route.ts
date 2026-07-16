@@ -1,28 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerAuthSession } from '@/lib/ports/server-auth-runtime';
-import { createAuthenticatedDataClient } from '@/lib/ports/server-data-client';
+import { neonBodyMetrics } from '@/lib/neon/body-metrics-adapter';
 
 export async function GET(_request: NextRequest) {
   try {
-    const { userId, getToken } = await getServerAuthSession();
+    const { userId } = await getServerAuthSession();
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createAuthenticatedDataClient(getToken);
-
-    // Fetch latest body metrics with weight entries
-    const { data: weights, error } = await supabase
-      .from('body_metrics')
-      .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: false })
-      .limit(30);
-
-    if (error) {
-      throw error;
-    }
+    const weights = await neonBodyMetrics.list(userId);
 
     return NextResponse.json({
       weights: weights || [],
@@ -35,13 +23,11 @@ export async function GET(_request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, getToken } = await getServerAuthSession();
+    const { userId } = await getServerAuthSession();
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const supabase = await createAuthenticatedDataClient(getToken);
 
     const { weight, unit, notes } = await request.json();
 
@@ -55,26 +41,25 @@ export async function POST(request: NextRequest) {
       weightInKg = weightInKg * 0.453592;
     }
 
-    // Insert body metrics weight entry
-    const { data, error } = await supabase
-      .from('body_metrics')
-      .insert({
-        user_id: userId,
-        date: new Date().toISOString(),
-        weight: weightInKg,
-        weight_unit: 'kg',
-        notes,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
+    const weightEntry = await neonBodyMetrics.upsert(userId, {
+      date: new Date().toISOString().slice(0, 10),
+      weight: weightInKg,
+      weight_unit: 'kg',
+      body_fat_percentage: null,
+      body_fat_method: null,
+      muscle_mass: null,
+      waist: null,
+      neck: null,
+      hip: null,
+      notes: typeof notes === 'string' ? notes : null,
+      photo_url: null,
+      data_source: 'manual',
+      source_metadata: {},
+    });
 
     return NextResponse.json({
       success: true,
-      weight: data,
+      weight: weightEntry,
     });
   } catch (error) {
     console.error('Error logging weight:', error);
