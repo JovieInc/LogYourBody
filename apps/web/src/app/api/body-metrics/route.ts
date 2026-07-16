@@ -47,3 +47,15 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ metric }, { status: 201 });
 }
+
+export async function GET() {
+  const { userId } = await getServerAuthSession();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const metrics = await neonBodyMetrics.list(userId, 100);
+  return NextResponse.json(
+    {
+      metrics: metrics.map(({ user_subject, ...metric }) => ({ ...metric, user_id: user_subject })),
+    },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
+}

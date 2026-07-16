@@ -175,12 +175,8 @@ export default function DashboardPage() {
 
         // Batch all server queries to run in parallel
         const supabase = createClient();
-        const [metricsResult, photosResult] = await Promise.all([
-          supabase
-            .from('body_metrics')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('date', { ascending: false }),
+        const [metricsResponse, photosResult] = await Promise.all([
+          fetch('/api/body-metrics', { cache: 'no-store' }),
           supabase
             .from('progress_photos')
             .select('*')
@@ -189,11 +185,13 @@ export default function DashboardPage() {
         ]);
 
         // Process metrics data
-        if (metricsResult.error) {
-          console.error('Error loading metrics:', metricsResult.error);
-        } else if (metricsResult.data && metricsResult.data.length > 0) {
+        if (!metricsResponse.ok) {
+          console.error('Error loading metrics:', metricsResponse.status);
+        } else {
+          const metricsPayload = (await metricsResponse.json()) as { metrics: BodyMetrics[] };
+          const metrics = metricsPayload.metrics || [];
           const metricsWithUrls = await Promise.all(
-            metricsResult.data.map(async (metric) => {
+            metrics.map(async (metric) => {
               if (!metric.photo_url) {
                 return metric;
               }
@@ -206,8 +204,10 @@ export default function DashboardPage() {
             }),
           );
 
-          setLatestMetrics(metricsWithUrls[0]);
-          setMetricsHistory(metricsWithUrls.slice().reverse()); // Reverse to have oldest first for timeline
+          if (metricsWithUrls.length > 0) {
+            setLatestMetrics(metricsWithUrls[0]);
+            setMetricsHistory(metricsWithUrls.slice().reverse()); // Reverse to have oldest first for timeline
+          }
 
           // Save to local storage
           metricsWithUrls.forEach((metric) => {
