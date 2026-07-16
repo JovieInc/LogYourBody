@@ -1,82 +1,45 @@
-# Environment Variables Configuration
+# Environment variables
 
-This document describes the environment variables required for LogYourBody.
+The canonical web architecture uses Jovie Better Auth for identity and Neon
+for server-side product data. Postgres URLs and all identity credentials are
+server-only; never prefix them with `NEXT_PUBLIC_`.
 
-## Required Environment Variables
-
-### Waitlist storage
+## Required
 
 ```bash
-# Server-only pooled Neon connection for pre-launch email capture.
-# Never expose this through a NEXT_PUBLIC_ variable.
+JOVIE_AUTH_ISSUER=https://jov.ie/api/auth
+JOVIE_AUTH_CLIENT_ID=logyourbody-web
+JOVIE_AUTH_REDIRECT_URI=http://localhost:3000/api/auth/callback
+DATABASE_URL=postgresql://...
+```
+
+`DATABASE_URL` is the LYB product Neon database. Apply the checked-in schema
+with `pnpm --filter logyourbody db:apply:neon` before exercising authenticated
+profile or metric flows.
+
+## Optional
+
+```bash
 WAITLIST_DATABASE_URL=postgresql://...
+OPENAI_API_KEY=...
+NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY=...
+NEXT_PUBLIC_VERSION=local-dev
 ```
 
-The waitlist database is isolated from Jovie's application database and from
-LogYourBody's future authenticated product data. Its schema lives in
-`apps/web/db/migrations` and is accessed only through the internal waitlist
-storage port.
+## Legacy migration variables
 
-### Supabase Configuration
-
-These variables are required for authentication and database functionality:
+The following variables are retained only while the remaining photo/storage,
+realtime-sync, and import compatibility code is migrated. They must not be
+added to new code, and they must not be used for authentication or new
+product-data writes:
 
 ```bash
-# Supabase API URL
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-
-# Supabase Anonymous Key (safe for client-side)
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-
-# Supabase Service Role Key (server-side only, DO NOT expose to client)
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-# Supabase JWT Secret (for webhook validation)
-SUPABASE_JWT_SECRET=your-jwt-secret
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+SUPABASE_JWT_SECRET=...
 ```
 
-### Database Configuration
-
-```bash
-# PostgreSQL Database URL
-POSTGRES_DATABASE=postgres
-```
-
-### AI Integration (Optional)
-
-```bash
-# OpenAI API Key (for PDF parsing of body composition reports)
-OPENAI_API_KEY=your-openai-api-key
-```
-
-## Deployment Platforms
-
-### Vercel
-
-1. Go to your project settings on Vercel
-2. Navigate to "Environment Variables"
-3. Add each variable listed above
-4. Make sure to set them for all environments (Production, Preview, Development)
-
-### Local Development
-
-1. Copy `.env.example` to `.env.local`
-2. Fill in your Supabase project details
-3. Never commit `.env.local` to version control
-
-## Getting Supabase Credentials
-
-1. Create a project at [supabase.com](https://supabase.com)
-2. Go to Project Settings > API
-3. Copy the Project URL and anon key
-4. The service role key is found in the same section (keep this secret!)
-
-## Build-Time Behavior
-
-The application is configured to build successfully even without Supabase credentials:
-
-- Missing credentials will show a warning banner
-- Authentication features will be disabled
-- The app will run in "demo mode"
-
-This allows for deployment previews and development without requiring database access.
+Production and preview should set the canonical variables first, run the Neon
+migrations, and only then remove legacy variables after storage/sync cutover
+verification passes.

@@ -19,6 +19,7 @@
     "check:all": "../../scripts/web/pre-push-check.sh --with-build",
     "prepush": "pnpm run check",
     "db:migrate": "../../scripts/web/create-migration.sh",
+    "db:apply:neon": "tsx scripts/apply-neon-migrations.ts",
     "db:push": "supabase --workdir ../../supabase db push",
     "db:push:local": "supabase --workdir ../../supabase db push --local",
     "db:status": "supabase --workdir ../../supabase db remote list",
