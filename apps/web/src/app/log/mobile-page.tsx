@@ -29,7 +29,6 @@ import {
   checkBrowserSupport,
 } from '@/utils/photo-upload-utils';
 import { uploadToStorage } from '@/utils/storage-utils';
-import { createClient } from '@/lib/supabase/client';
 import { getProfile } from '@/lib/profile';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -237,7 +236,6 @@ export default function MobileLogPage() {
 
     setIsSubmitting(true);
     try {
-      const supabase = createClient();
       let photoUrl = null;
 
       // Upload photo if present
@@ -263,19 +261,21 @@ export default function MobileLogPage() {
           ? parseFloat(formData.weight) / 2.20462
           : parseFloat(formData.weight);
 
-      // Save body metrics
-      const { error } = await supabase.from('body_metrics').insert({
-        user_id: user.id,
-        date: format(new Date(), 'yyyy-MM-dd'),
-        weight: weightInKg,
-        weight_unit: 'kg', // Always store in kg
-        body_fat_percentage: formData.body_fat_percentage,
-        body_fat_method: formData.method === 'simple' ? undefined : formData.method,
-        notes: formData.notes || null,
-        photo_url: photoUrl,
+      const response = await fetch('/api/body-metrics', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          date: format(new Date(), 'yyyy-MM-dd'),
+          weight: weightInKg,
+          weightUnit: 'kg',
+          bodyFatPercentage: formData.body_fat_percentage,
+          bodyFatMethod: formData.method === 'simple' ? 'manual' : formData.method,
+          notes: formData.notes || null,
+          photoUrl,
+          dataSource: 'manual',
+        }),
       });
-
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to save metrics');
 
       toast({
         title: 'Success!',
