@@ -40,7 +40,14 @@ jobs:
           if [[ "$BASE_SHA" =~ ^0+$ ]]; then
             changed_files=$(git diff-tree --no-commit-id --name-only -r "$HEAD_SHA")
           else
-            changed_files=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+            diff_base="$BASE_SHA"
+            if ! git cat-file -e "$diff_base^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=100 origin main
+            fi
+            if ! git cat-file -e "$diff_base^{commit}" 2>/dev/null; then
+              diff_base='origin/main'
+            fi
+            changed_files=$(git diff --name-only "$diff_base" "$HEAD_SHA")
           fi
 
           web_pattern='^(apps/web/|packages/|\.github/actions/|\.github/scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|scripts/(supabase|web)/|supabase/|turbo\.json$)'
