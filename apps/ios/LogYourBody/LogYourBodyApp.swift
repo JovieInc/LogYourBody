@@ -158,7 +158,6 @@ private struct PersistentStoreRecoveryView: View {
                 Button("Try Again", action: retry)
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("persistent_store_retry_button")
-
             }
             .padding(28)
         }
