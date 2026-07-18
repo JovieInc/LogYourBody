@@ -21,7 +21,7 @@ Native iOS app for LogYourBody - a fitness tracking application that helps users
 - **SwiftUI** - iOS 26 Liquid Glass design system
 - **Jovie Better Auth** - Shared phone-number identity through first-party OAuth/OIDC
 - **Neon** - Server-side identity projection and onboarding profile
-- **Core Data** - Local data persistence
+- **Core Data** - Local data persistence with versioned lightweight migration and explicit recovery when a store cannot be opened
 - **HealthKit** - Weight and step data integration
 
 ## Features

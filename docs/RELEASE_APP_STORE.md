@@ -6,6 +6,7 @@ The engineering pipeline is fully automated. **One human step** stands between t
 
 - App Store version **1.2.0** is stuck in `PREPARE_FOR_SUBMISSION` — nothing has been submitted. The poller `ios-app-store-approved-release.yml` (every 30 min) will auto-release it once Apple approves, but Apple can't approve what was never submitted.
 - `ios-release-loop.yml` auto-builds and deploys to **TestFlight** on every push to `main` touching `apps/ios/**`. This is the build you verify against.
+- TestFlight upload waits for Apple to finish processing the build before assigning tester groups. The deploy job allows up to 60 minutes for that provider-controlled step.
 - App Store submission is gated behind `paywall_testflight_verified: true` — a deliberate manual gate so no build ships without a proven purchase/restore.
 
 ## Preconditions (machine-verified, no action needed)
@@ -20,7 +21,7 @@ These run inside `ios-release-loop.yml`'s `build-release` job and fail the lane 
 
 ## The one human step
 
-1. **Wait for a fresh TestFlight build** from the latest `main` (the one carrying the Clerk/RevenueCat credential fix — see [ios-config-isplaceholder-bug]). Confirm it processed in App Store Connect → TestFlight.
+1. **Wait for a fresh TestFlight build** from the latest `main`. Confirm it finished processing and appears in the intended tester group in App Store Connect → TestFlight.
 2. On a real device, install that TestFlight build and run the paid path end to end:
    - Sign in with email OTP → complete onboarding → reach the paywall.
    - **Purchase** the monthly (or annual) subscription with a sandbox account. Confirm the app unlocks (entitlement active, weight logging reachable).
