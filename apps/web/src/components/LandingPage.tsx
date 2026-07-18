@@ -9,22 +9,25 @@ import { Header } from './Header';
 import { Prefooter } from './Prefooter';
 import { LandingPageFeatureSections } from './LandingPageFeatureSections';
 import { LandingPageConversionSections } from './LandingPageConversionSections';
+import { logYourBody } from '@jovieinc/product-registry';
+import { APP_CONFIG } from '@/constants/app';
 
 export function LandingPage() {
   const [isAnnual, setIsAnnual] = useState(true); // Default to annual for savings
 
+  const proPlan = logYourBody.plans[0];
   const pricing = {
     monthly: {
-      price: 9.99,
+      price: proPlan.pricing.monthly.amount,
       period: 'month',
-      yearlyTotal: 119.88,
+      yearlyTotal: APP_CONFIG.pricing.monthly.yearlyTotal,
     },
     annual: {
-      price: 69.99,
+      price: proPlan.pricing.annual.amount,
       period: 'year',
-      monthlyEquivalent: 5.83,
-      savings: 49.89,
-      savingsPercent: 42,
+      monthlyEquivalent: APP_CONFIG.pricing.annual.monthlyEquivalent,
+      savings: APP_CONFIG.pricing.annual.savings,
+      savingsPercent: APP_CONFIG.pricing.annual.savingsPercent,
     },
   };
 
@@ -32,7 +35,8 @@ export function LandingPage() {
     {
       icon: BarChart3,
       title: 'Body Fat % Tracking',
-      description: 'Navy, 3-site, and 7-site methods. Accurate to ±2% when done correctly.',
+      description: logYourBody.features.find((feature) => feature.id === 'body-metrics')!
+        .description,
     },
     {
       icon: TrendingUp,
@@ -149,9 +153,9 @@ export function LandingPage() {
                 <div className="text-linear-text-tertiary flex flex-wrap items-center justify-center gap-6 text-sm">
                   <span>No credit card required</span>
                   <span>•</span>
-                  <span>10,000+ active users</span>
+                  <span>Private by default</span>
                   <span>•</span>
-                  <span>4.9★ App Store</span>
+                  <span>Built for iPhone</span>
                 </div>
               </div>
 

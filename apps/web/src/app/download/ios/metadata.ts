@@ -1,8 +1,9 @@
-import type { Metadata } from 'next'
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Download LogYourBody for iOS - Body Composition Tracker',
-  description: 'Download LogYourBody on iPhone. Track FFMI, body fat percentage, and progress photos with scientific accuracy. 4.9★ on App Store.',
+  description:
+    'Download LogYourBody on iPhone. Track FFMI, body fat percentage, and progress photos in one private timeline.',
   keywords: [
     'LogYourBody iOS',
     'body composition app iPhone',
@@ -14,7 +15,8 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     title: 'LogYourBody for iOS - Your Body. Decoded.',
-    description: 'The only app that tracks FFMI, body fat percentage, and progress photos with scientific accuracy. Download free on App Store.',
+    description:
+      'The only app that tracks FFMI, body fat percentage, and progress photos with scientific accuracy. Download free on App Store.',
     url: 'https://logyourbody.com/download/ios',
     siteName: 'LogYourBody',
     images: [
@@ -23,7 +25,7 @@ export const metadata: Metadata = {
         width: 1200,
         height: 630,
         alt: 'LogYourBody iOS App - Body Composition Tracking',
-      }
+      },
     ],
     locale: 'en_US',
     type: 'website',
@@ -42,4 +44,4 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-}
+};

@@ -1,11 +1,13 @@
-'use client'
+'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Download, Copy, Check } from 'lucide-react';
 import { useState } from 'react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { logYourBody } from '@jovieinc/product-registry';
 
 export default function BrandPage() {
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
@@ -18,12 +20,22 @@ export default function BrandPage() {
 
   const colors = {
     primary: [
-      { name: 'Purple', hex: '#5E6AD2', rgb: 'rgb(94, 106, 210)', usage: 'Primary actions, links' },
+      {
+        name: 'Accent',
+        hex: logYourBody.brand.colors.accent,
+        rgb: 'rgb(94, 106, 210)',
+        usage: 'Metric meaning and state',
+      },
       { name: 'Purple Light', hex: '#8B92E8', rgb: 'rgb(139, 146, 232)', usage: 'Hover states' },
       { name: 'Purple Dark', hex: '#4752C4', rgb: 'rgb(71, 82, 196)', usage: 'Active states' },
     ],
     neutral: [
-      { name: 'Background', hex: '#09090B', rgb: 'rgb(9, 9, 11)', usage: 'Main background' },
+      {
+        name: 'Background',
+        hex: logYourBody.brand.colors.background,
+        rgb: 'rgb(8, 9, 10)',
+        usage: 'Main background',
+      },
       { name: 'Card', hex: '#18181B', rgb: 'rgb(24, 24, 27)', usage: 'Card backgrounds' },
       { name: 'Border', hex: '#27272A', rgb: 'rgb(39, 39, 42)', usage: 'Borders, dividers' },
     ],
@@ -41,17 +53,17 @@ export default function BrandPage() {
 
   const typography = {
     fonts: [
-      { 
-        name: 'Inter', 
+      {
+        name: 'Inter',
         weights: ['400', '500', '600', '700'],
         usage: 'Primary font for all UI elements',
-        sample: 'The quick brown fox jumps over the lazy dog'
+        sample: 'The quick brown fox jumps over the lazy dog',
       },
-      { 
-        name: 'SF Mono', 
+      {
+        name: 'SF Mono',
         weights: ['400', '500'],
         usage: 'Monospace font for code and numbers',
-        sample: '0123456789 {code: "example"}'
+        sample: '0123456789 {code: "example"}',
       },
     ],
     scale: [
@@ -67,54 +79,67 @@ export default function BrandPage() {
   };
 
   const logos = [
-    { name: 'Full Logo', description: 'Primary logo with wordmark' },
-    { name: 'Icon Only', description: 'Standalone icon for small spaces' },
-    { name: 'Dark Background', description: 'Light version for dark backgrounds' },
-    { name: 'Light Background', description: 'Dark version for light backgrounds' },
-  ];
+    {
+      name: 'App icon',
+      description: 'Canonical product mark for app and compact product surfaces.',
+      src: logYourBody.brand.logos.appIcon,
+    },
+    logYourBody.brand.logos.wordmark
+      ? {
+          name: 'Wordmark',
+          description: 'Canonical horizontal wordmark.',
+          src: logYourBody.brand.logos.wordmark,
+        }
+      : null,
+  ].filter((logo): logo is { name: string; description: string; src: string } => logo !== null);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background min-h-screen">
       <Header />
 
-      <main className="container mx-auto px-4 sm:px-6 py-12">
+      <main className="container mx-auto px-4 py-12 sm:px-6">
         {/* Hero Section */}
-        <section className="max-w-4xl mx-auto mb-24">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-linear-text mb-6">
-              LogYourBody Brand
+        <section className="mx-auto mb-24 max-w-4xl">
+          <div className="mb-12 text-center">
+            <h1 className="text-linear-text mb-6 text-4xl font-bold sm:text-5xl md:text-6xl">
+              {logYourBody.identity.name} Brand
             </h1>
-            <p className="text-xl text-linear-text-secondary max-w-2xl mx-auto">
-              Our brand represents precision, progress, and the pursuit of physical excellence. 
-              These guidelines ensure consistency across all touchpoints.
+            <p className="text-linear-text-secondary mx-auto max-w-2xl text-xl">
+              {logYourBody.brand.promise}
             </p>
           </div>
         </section>
 
         {/* Logo Section */}
-        <section className="max-w-6xl mx-auto mb-24">
+        <section className="mx-auto mb-24 max-w-6xl">
           <div className="mb-12">
-            <h2 className="text-3xl font-bold text-linear-text mb-4">Logo</h2>
+            <h2 className="text-linear-text mb-4 text-3xl font-bold">Logo</h2>
             <p className="text-linear-text-secondary max-w-3xl">
-              Our logo embodies strength and progress. Use it consistently to maintain brand recognition.
+              Our logo embodies strength and progress. Use it consistently to maintain brand
+              recognition.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             {logos.map((logo) => (
               <div key={logo.name} className="group">
-                <div className="bg-linear-card border border-linear-border rounded-xl p-8 h-48 flex items-center justify-center mb-4 transition-all group-hover:border-linear-purple/30">
-                  <div className="text-2xl font-bold text-linear-text">LogYourBody</div>
+                <div className="bg-linear-card border-linear-border group-hover:border-linear-purple/30 mb-4 flex h-48 items-center justify-center rounded-xl border p-8 transition-all">
+                  <Image
+                    src={logo.src}
+                    alt={`${logo.name} for ${logYourBody.identity.name}`}
+                    width={96}
+                    height={96}
+                  />
                 </div>
-                <h3 className="text-lg font-semibold text-linear-text mb-1">{logo.name}</h3>
-                <p className="text-sm text-linear-text-secondary">{logo.description}</p>
+                <h3 className="text-linear-text mb-1 text-lg font-semibold">{logo.name}</h3>
+                <p className="text-linear-text-secondary text-sm">{logo.description}</p>
               </div>
             ))}
           </div>
 
-          <div className="mt-12 p-6 bg-linear-card/50 border border-linear-border rounded-xl">
-            <h3 className="text-lg font-semibold text-linear-text mb-4">Usage Guidelines</h3>
-            <ul className="space-y-2 text-sm text-linear-text-secondary">
+          <div className="bg-linear-card/50 border-linear-border mt-12 rounded-xl border p-6">
+            <h3 className="text-linear-text mb-4 text-lg font-semibold">Usage Guidelines</h3>
+            <ul className="text-linear-text-secondary space-y-2 text-sm">
               <li>• Maintain clear space equal to the height of the "L" around the logo</li>
               <li>• Never stretch, rotate, or distort the logo</li>
               <li>• Ensure sufficient contrast between logo and background</li>
@@ -124,28 +149,29 @@ export default function BrandPage() {
         </section>
 
         {/* Colors Section */}
-        <section className="max-w-6xl mx-auto mb-24">
+        <section className="mx-auto mb-24 max-w-6xl">
           <div className="mb-12">
-            <h2 className="text-3xl font-bold text-linear-text mb-4">Colors</h2>
+            <h2 className="text-linear-text mb-4 text-3xl font-bold">Colors</h2>
             <p className="text-linear-text-secondary max-w-3xl">
-              Our color palette reflects the precision and sophistication of body transformation tracking.
+              Our color palette reflects the precision and sophistication of body transformation
+              tracking.
             </p>
           </div>
 
           {Object.entries(colors).map(([category, colorSet]) => (
             <div key={category} className="mb-12">
-              <h3 className="text-xl font-semibold text-linear-text mb-6 capitalize">{category}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <h3 className="text-linear-text mb-6 text-xl font-semibold capitalize">{category}</h3>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {colorSet.map((color) => (
                   <div key={color.name} className="group">
-                    <div 
-                      className="h-32 rounded-xl mb-4 transition-transform group-hover:scale-105 cursor-pointer relative overflow-hidden"
+                    <div
+                      className="relative mb-4 h-32 cursor-pointer overflow-hidden rounded-xl transition-transform group-hover:scale-105"
                       style={{ backgroundColor: color.hex }}
                       onClick={() => copyToClipboard(color.hex, color.name)}
                     >
                       {copiedItem === color.name && (
-                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                          <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1.5 flex items-center gap-2">
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <div className="flex items-center gap-2 rounded-lg bg-white/20 px-3 py-1.5 backdrop-blur-sm">
                             <Check className="h-4 w-4 text-white" />
                             <span className="text-sm font-medium text-white">Copied</span>
                           </div>
@@ -153,17 +179,17 @@ export default function BrandPage() {
                       )}
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-semibold text-linear-text">{color.name}</h4>
-                      <div className="flex items-center gap-2 text-sm text-linear-text-secondary">
+                      <h4 className="text-linear-text font-semibold">{color.name}</h4>
+                      <div className="text-linear-text-secondary flex items-center gap-2 text-sm">
                         <code className="font-mono">{color.hex}</code>
-                        <button 
+                        <button
                           onClick={() => copyToClipboard(color.hex, color.name)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="opacity-0 transition-opacity group-hover:opacity-100"
                         >
                           <Copy className="h-3 w-3" />
                         </button>
                       </div>
-                      <p className="text-sm text-linear-text-tertiary">{color.usage}</p>
+                      <p className="text-linear-text-tertiary text-sm">{color.usage}</p>
                     </div>
                   </div>
                 ))}
@@ -173,9 +199,9 @@ export default function BrandPage() {
         </section>
 
         {/* Typography Section */}
-        <section className="max-w-6xl mx-auto mb-24">
+        <section className="mx-auto mb-24 max-w-6xl">
           <div className="mb-12">
-            <h2 className="text-3xl font-bold text-linear-text mb-4">Typography</h2>
+            <h2 className="text-linear-text mb-4 text-3xl font-bold">Typography</h2>
             <p className="text-linear-text-secondary max-w-3xl">
               Clean, modern typography that enhances readability and conveys professionalism.
             </p>
@@ -183,25 +209,31 @@ export default function BrandPage() {
 
           {/* Font Families */}
           <div className="mb-16">
-            <h3 className="text-xl font-semibold text-linear-text mb-6">Font Families</h3>
+            <h3 className="text-linear-text mb-6 text-xl font-semibold">Font Families</h3>
             <div className="space-y-8">
               {typography.fonts.map((font) => (
-                <div key={font.name} className="p-6 bg-linear-card border border-linear-border rounded-xl">
-                  <div className="flex items-start justify-between mb-4">
+                <div
+                  key={font.name}
+                  className="bg-linear-card border-linear-border rounded-xl border p-6"
+                >
+                  <div className="mb-4 flex items-start justify-between">
                     <div>
-                      <h4 className="text-lg font-semibold text-linear-text mb-1">{font.name}</h4>
-                      <p className="text-sm text-linear-text-secondary">{font.usage}</p>
+                      <h4 className="text-linear-text mb-1 text-lg font-semibold">{font.name}</h4>
+                      <p className="text-linear-text-secondary text-sm">{font.usage}</p>
                     </div>
                     <div className="flex gap-2">
                       {font.weights.map((weight) => (
-                        <span key={weight} className="text-xs px-2 py-1 bg-linear-bg rounded-md text-linear-text-secondary">
+                        <span
+                          key={weight}
+                          className="bg-linear-bg text-linear-text-secondary rounded-md px-2 py-1 text-xs"
+                        >
                           {weight}
                         </span>
                       ))}
                     </div>
                   </div>
-                  <p 
-                    className="text-2xl text-linear-text"
+                  <p
+                    className="text-linear-text text-2xl"
                     style={{ fontFamily: font.name === 'SF Mono' ? 'monospace' : 'Inter' }}
                   >
                     {font.sample}
@@ -213,26 +245,29 @@ export default function BrandPage() {
 
           {/* Type Scale */}
           <div>
-            <h3 className="text-xl font-semibold text-linear-text mb-6">Type Scale</h3>
+            <h3 className="text-linear-text mb-6 text-xl font-semibold">Type Scale</h3>
             <div className="space-y-6">
               {typography.scale.map((style) => (
-                <div key={style.name} className="flex items-baseline gap-8 p-4 rounded-lg hover:bg-linear-card/50 transition-colors">
+                <div
+                  key={style.name}
+                  className="hover:bg-linear-card/50 flex items-baseline gap-8 rounded-lg p-4 transition-colors"
+                >
                   <div className="w-32 flex-shrink-0">
-                    <span className="text-sm text-linear-text-secondary">{style.name}</span>
+                    <span className="text-linear-text-secondary text-sm">{style.name}</span>
                   </div>
                   <div className="flex-1">
-                    <p 
+                    <p
                       className="text-linear-text"
-                      style={{ 
-                        fontSize: style.size, 
+                      style={{
+                        fontSize: style.size,
                         lineHeight: style.lineHeight,
-                        fontWeight: style.weight 
+                        fontWeight: style.weight,
                       }}
                     >
                       The quick brown fox jumps over the lazy dog
                     </p>
                   </div>
-                  <div className="text-sm text-linear-text-tertiary font-mono">
+                  <div className="text-linear-text-tertiary font-mono text-sm">
                     {style.size} / {style.lineHeight}
                   </div>
                 </div>
@@ -242,18 +277,18 @@ export default function BrandPage() {
         </section>
 
         {/* Voice & Tone Section */}
-        <section className="max-w-4xl mx-auto mb-24">
+        <section className="mx-auto mb-24 max-w-4xl">
           <div className="mb-12">
-            <h2 className="text-3xl font-bold text-linear-text mb-4">Voice & Tone</h2>
+            <h2 className="text-linear-text mb-4 text-3xl font-bold">Voice & Tone</h2>
             <p className="text-linear-text-secondary max-w-3xl">
               We speak with confidence and clarity, focusing on results and transformation.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="p-6 bg-linear-card border border-linear-border rounded-xl">
-              <h3 className="text-lg font-semibold text-linear-text mb-4">We are</h3>
-              <ul className="space-y-2 text-linear-text-secondary">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+            <div className="bg-linear-card border-linear-border rounded-xl border p-6">
+              <h3 className="text-linear-text mb-4 text-lg font-semibold">We are</h3>
+              <ul className="text-linear-text-secondary space-y-2">
                 <li>✓ Direct and honest</li>
                 <li>✓ Results-focused</li>
                 <li>✓ Encouraging but realistic</li>
@@ -261,9 +296,9 @@ export default function BrandPage() {
                 <li>✓ Data-driven</li>
               </ul>
             </div>
-            <div className="p-6 bg-linear-card border border-linear-border rounded-xl">
-              <h3 className="text-lg font-semibold text-linear-text mb-4">We are not</h3>
-              <ul className="space-y-2 text-linear-text-secondary">
+            <div className="bg-linear-card border-linear-border rounded-xl border p-6">
+              <h3 className="text-linear-text mb-4 text-lg font-semibold">We are not</h3>
+              <ul className="text-linear-text-secondary space-y-2">
                 <li>✗ Preachy or judgmental</li>
                 <li>✗ Overly technical</li>
                 <li>✗ Making false promises</li>
@@ -273,19 +308,19 @@ export default function BrandPage() {
             </div>
           </div>
 
-          <div className="mt-8 p-6 bg-linear-purple/10 border border-linear-purple/20 rounded-xl">
-            <h3 className="text-lg font-semibold text-linear-text mb-3">Example messaging</h3>
+          <div className="bg-linear-purple/10 border-linear-purple/20 mt-8 rounded-xl border p-6">
+            <h3 className="text-linear-text mb-3 text-lg font-semibold">Example messaging</h3>
             <p className="text-linear-text-secondary italic">
-              "Track what matters. See real progress. Professional body composition tracking 
-              that shows you exactly how you're transforming."
+              "Track what matters. See real progress. Professional body composition tracking that
+              shows you exactly how you're transforming."
             </p>
           </div>
         </section>
 
         {/* Download Section */}
-        <section className="max-w-4xl mx-auto text-center py-12">
-          <div className="p-8 bg-linear-card border border-linear-border rounded-xl">
-            <h2 className="text-2xl font-bold text-linear-text mb-4">Need our brand assets?</h2>
+        <section className="mx-auto max-w-4xl py-12 text-center">
+          <div className="bg-linear-card border-linear-border rounded-xl border p-8">
+            <h2 className="text-linear-text mb-4 text-2xl font-bold">Need our brand assets?</h2>
             <p className="text-linear-text-secondary mb-6">
               Download logos, colors, and guidelines in various formats.
             </p>
@@ -293,7 +328,7 @@ export default function BrandPage() {
               <Download className="h-5 w-5" />
               Download Brand Package
             </Button>
-            <p className="text-sm text-linear-text-tertiary mt-4">Coming soon</p>
+            <p className="text-linear-text-tertiary mt-4 text-sm">Coming soon</p>
           </div>
         </section>
       </main>

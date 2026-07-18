@@ -167,14 +167,16 @@ export function LandingPageFeatureSections({ appFeatures }: LandingPageFeatureSe
           {/* Companies/Users trust badge */}
           <div className="mb-12 text-center">
             <p className="text-linear-text-tertiary mb-6 text-sm">
-              Trusted by fitness professionals worldwide
+              Built for clear, private body-composition tracking
             </p>
             <div className="flex items-center justify-center gap-8 opacity-60">
-              <div className="text-linear-text-secondary text-lg font-semibold">10K+ Users</div>
+              <div className="text-linear-text-secondary text-lg font-semibold">Native iOS</div>
               <div className="bg-linear-text-tertiary h-1 w-1 rounded-full"></div>
-              <div className="text-linear-text-secondary text-lg font-semibold">2M+ Logs</div>
+              <div className="text-linear-text-secondary text-lg font-semibold">HealthKit</div>
               <div className="bg-linear-text-tertiary h-1 w-1 rounded-full"></div>
-              <div className="text-linear-text-secondary text-lg font-semibold">4.9★ Rating</div>
+              <div className="text-linear-text-secondary text-lg font-semibold">
+                Private timeline
+              </div>
             </div>
           </div>
 
@@ -182,21 +184,21 @@ export function LandingPageFeatureSections({ appFeatures }: LandingPageFeatureSe
           <div className="grid grid-cols-2 gap-8 text-center md:grid-cols-4">
             <div className="group">
               <div className="from-linear-text via-linear-text to-linear-text-secondary mb-2 bg-gradient-to-br bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
-                10,000+
+                Weight
               </div>
-              <div className="text-linear-text-secondary text-sm">Active users</div>
+              <div className="text-linear-text-secondary text-sm">Trend</div>
             </div>
             <div className="group">
               <div className="from-linear-text via-linear-text to-linear-text-secondary mb-2 bg-gradient-to-br bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
-                2M+
+                Body fat
               </div>
-              <div className="text-linear-text-secondary text-sm">Measurements logged</div>
+              <div className="text-linear-text-secondary text-sm">Composition</div>
             </div>
             <div className="group">
               <div className="from-linear-text via-linear-text to-linear-text-secondary mb-2 bg-gradient-to-br bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
-                4.9/5
+                Photos
               </div>
-              <div className="text-linear-text-secondary text-sm">App Store rating</div>
+              <div className="text-linear-text-secondary text-sm">Visual progress</div>
             </div>
             <div className="group">
               <div className="from-linear-text via-linear-text to-linear-text-secondary mb-2 bg-gradient-to-br bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
@@ -304,7 +306,7 @@ export function LandingPageFeatureSections({ appFeatures }: LandingPageFeatureSe
         <div className="container mx-auto px-4 sm:px-6">
           <div className="mb-4 text-center">
             <Badge className="bg-linear-purple/10 border-linear-purple/20 mb-4 inline-block text-white">
-              Used by 10,000+ users
+              One private timeline
             </Badge>
           </div>
           <h2 className="text-linear-text mb-8 text-center text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl">

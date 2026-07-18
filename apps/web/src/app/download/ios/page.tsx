@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { logYourBody } from '@jovieinc/product-registry';
 
 export default function IOSDownloadPage() {
   const [isIOS, setIsIOS] = useState(false);
@@ -47,27 +48,27 @@ export default function IOSDownloadPage() {
       icon: Target,
       title: 'FFMI Tracking',
       description: 'Know your genetic potential. Track lean muscle without the guesswork.',
-      stat: '±0.1 accuracy',
+      stat: 'Trend-aware',
     },
     {
       icon: Camera,
       title: 'Progress Photos',
       description: 'AI-powered background removal. Consistent angles. See real changes.',
-      stat: '92% stick to it',
+      stat: 'Private by default',
     },
     {
       icon: Clock,
       title: '30-Second Logging',
       description: 'Navy method calculations. Apple Health sync. Done before your coffee cools.',
-      stat: '10x faster',
+      stat: 'HealthKit connected',
     },
   ];
 
   const trustSignals = [
-    { value: '4.9★', label: 'App Store Rating' },
-    { value: '10K+', label: 'Active Users' },
-    { value: '500K+', label: 'Measurements Logged' },
-    { value: '99.9%', label: 'Uptime' },
+    { value: 'Private', label: 'Body Timeline' },
+    { value: 'HealthKit', label: 'Connected Data' },
+    { value: 'iOS', label: 'Native Product' },
+    { value: 'Export', label: 'Portable Data' },
   ];
 
   const comparisonData = [
@@ -123,16 +124,11 @@ export default function IOSDownloadPage() {
 
             {/* Main Headline - Apple copywriting style */}
             <h1 className="mb-6 text-5xl font-bold tracking-tight text-gray-900 sm:text-6xl md:text-7xl">
-              Your body.
-              <br />
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Decoded.
-              </span>
+              {logYourBody.messages.landing.headline}
             </h1>
 
             <p className="mx-auto mb-10 max-w-2xl text-xl leading-relaxed text-gray-600">
-              The only app that tracks FFMI, body fat percentage, and progress photos with
-              scientific accuracy. Know exactly where you stand.
+              {logYourBody.messages.landing.subheading}
             </p>
 
             {/* Primary CTA */}
@@ -148,7 +144,7 @@ export default function IOSDownloadPage() {
                   onClick={handleDownload}
                 >
                   <Apple className="mr-3 h-6 w-6" />
-                  Download on the App Store
+                  {logYourBody.messages.landing.primaryCta}
                   <ArrowRight className="ml-3 h-5 w-5" />
                 </a>
               </Button>
@@ -159,14 +155,12 @@ export default function IOSDownloadPage() {
             {/* Trust Signals */}
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-600">
               <div className="flex items-center gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                ))}
-                <span className="ml-2 font-medium">4.9 on App Store</span>
+                <Star className="h-4 w-4 text-gray-400" />
+                <span className="ml-2 font-medium">Built for clarity</span>
               </div>
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-gray-400" />
-                <span>10K+ active users</span>
+                <span>Private by default</span>
               </div>
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-gray-400" />

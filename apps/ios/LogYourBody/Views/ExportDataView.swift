@@ -315,7 +315,7 @@ struct ExportDataView: View {
     }
 
     private func requestExportViaEmail() {
-        let recipient = "support@logyourbody.com"
+        let recipient = ProductRegistry.supportEmail
         let subject = "LogYourBody Data Export Request"
         let body = """
         Hello LogYourBody Support,

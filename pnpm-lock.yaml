@@ -69,6 +69,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.1.1
         version: 5.2.2(react-hook-form@7.66.1(react@19.2.0))
+      '@jovieinc/product-registry':
+        specifier: workspace:*
+        version: link:../../packages/product-registry
       '@neondatabase/serverless':
         specifier: 1.0.2
         version: 1.0.2
@@ -389,6 +392,24 @@ importers:
       nodemon:
         specifier: ^3.1.7
         version: 3.1.11
+
+  packages/product-registry:
+    devDependencies:
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.16.0
+        version: 8.48.0(@typescript-eslint/parser@8.48.0(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: ^8.16.0
+        version: 8.48.0(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3)
+      eslint:
+        specifier: ^9.31.0
+        version: 9.39.1(jiti@2.6.1)
+      prettier:
+        specifier: ^3.4.0
+        version: 3.6.2
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
 
   packages/shared-lib:
     devDependencies:

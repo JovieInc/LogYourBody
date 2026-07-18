@@ -1,13 +1,13 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { Mail, MessageCircle, FileText, ExternalLink } from 'lucide-react';
+import { Mail, FileText, ExternalLink } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { getPublicSupportOptions, logYourBody } from '@jovieinc/product-registry';
 
 export const metadata: Metadata = {
-  title: 'Support - LogYourBody',
-  description:
-    'Get help with LogYourBody. Contact our support team, browse FAQs, or find resources.',
+  title: `Support - ${logYourBody.identity.name}`,
+  description: `Get help with ${logYourBody.identity.name}, your account, subscription, or data.`,
 };
 
 export default function SupportPage() {
@@ -20,69 +20,35 @@ export default function SupportPage() {
           <div className="mb-12 text-center">
             <h1 className="mb-4 text-4xl font-semibold text-white">How can we help?</h1>
             <p className="text-lg text-gray-400">
-              We're here to help you get the most out of LogYourBody
+              Get help with {logYourBody.identity.name}, your account, subscription, or data.
             </p>
           </div>
 
           {/* Support Options */}
           <div className="mb-12 grid gap-6 md:grid-cols-2">
-            {/* Email Support */}
-            <div className="rounded-lg border border-gray-800 bg-gray-900 p-6">
-              <div className="mb-4 flex items-center">
-                <Mail className="mr-3 h-6 w-6 text-white" />
-                <h2 className="text-xl font-medium text-white">Email Support</h2>
-              </div>
-              <p className="mb-4 text-gray-400">
-                Get help from our support team. We typically respond within 24 hours.
-              </p>
-              <a
-                href="mailto:support@logyourbody.com"
-                className="inline-flex items-center text-white transition-colors hover:text-gray-300"
-              >
-                support@logyourbody.com
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </a>
-              <p className="mt-3 text-sm text-gray-400">
-                Want a copy of your data?{' '}
+            {getPublicSupportOptions().map((option) => (
+              <div key={option.id} className="rounded-lg border border-gray-800 bg-gray-900 p-6">
+                <div className="mb-4 flex items-center">
+                  {option.kind === 'email' ? (
+                    <Mail className="mr-3 h-6 w-6 text-white" />
+                  ) : (
+                    <FileText className="mr-3 h-6 w-6 text-white" />
+                  )}
+                  <h2 className="text-xl font-medium text-white">{option.label}</h2>
+                </div>
+                <p className="mb-4 text-gray-400">{option.description}</p>
                 <a
-                  href={
-                    'mailto:support@logyourbody.com' +
-                    '?subject=' +
-                    encodeURIComponent('LogYourBody Data Export Request') +
-                    '&body=' +
-                    encodeURIComponent(
-                      'Hello LogYourBody Support,\n\n' +
-                        'I would like to request an export of my LogYourBody account data associated with this email address.\n\n' +
-                        'Thank you,',
-                    )
-                  }
-                  className="text-white underline hover:text-gray-300"
+                  href={option.href}
+                  className="inline-flex items-center text-white transition-colors hover:text-gray-300"
                 >
-                  Request a data export by email
+                  {option.kind === 'email' ? logYourBody.contacts.support : option.label}
+                  <ExternalLink className="ml-2 h-4 w-4" />
                 </a>
-                .
-              </p>
-            </div>
-
-            {/* Community */}
-            <div className="rounded-lg border border-gray-800 bg-gray-900 p-6">
-              <div className="mb-4 flex items-center">
-                <MessageCircle className="mr-3 h-6 w-6 text-white" />
-                <h2 className="text-xl font-medium text-white">Community</h2>
+                {'responseTime' in option && option.responseTime ? (
+                  <p className="mt-3 text-sm text-gray-500">{option.responseTime}</p>
+                ) : null}
               </div>
-              <p className="mb-4 text-gray-400">
-                Join our community to connect with other users and get tips.
-              </p>
-              <a
-                href="https://reddit.com/r/logyourbody"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center text-white transition-colors hover:text-gray-300"
-              >
-                Visit Community
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </a>
-            </div>
+            ))}
           </div>
 
           {/* Quick Links */}
@@ -183,8 +149,11 @@ export default function SupportPage() {
             <h2 className="mb-4 text-2xl font-medium text-white">Need more help?</h2>
             <p className="mb-6 text-gray-400">
               If you couldn't find what you're looking for, please email us at{' '}
-              <a href="mailto:support@logyourbody.com" className="text-white hover:text-gray-300">
-                support@logyourbody.com
+              <a
+                href={`mailto:${logYourBody.contacts.support}`}
+                className="text-white hover:text-gray-300"
+              >
+                {logYourBody.contacts.support}
               </a>{' '}
               and we'll get back to you as soon as possible.
             </p>

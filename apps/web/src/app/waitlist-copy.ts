@@ -1,12 +1,13 @@
+import { logYourBody } from '@jovieinc/product-registry';
+
 export const waitlistLandingCopy = {
-  headline: 'Know if the work is working.',
-  subheading:
-    'Weight, body fat, lean mass, and progress photos in one private timeline that shows the trend.',
+  headline: logYourBody.messages.landing.headline,
+  subheading: logYourBody.messages.landing.subheading,
   emailLabel: 'Email',
   emailPlaceholder: 'you@example.com',
   submitLabel: 'Request early access',
-  successMessage: "You're on the list. We'll email you when a TestFlight spot opens.",
-  duplicateMessage: "You're on the list. We'll email you when a TestFlight spot opens.",
-  errorMessage: 'Something went wrong. Please try again.',
-  invalidEmailMessage: 'Enter a valid email address.',
+  successMessage: logYourBody.messages.waitlist.success,
+  duplicateMessage: logYourBody.messages.waitlist.duplicate,
+  errorMessage: logYourBody.messages.waitlist.error,
+  invalidEmailMessage: logYourBody.messages.waitlist.invalidEmail,
 } as const;
