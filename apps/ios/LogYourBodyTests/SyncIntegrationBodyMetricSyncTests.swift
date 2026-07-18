@@ -375,6 +375,99 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertTrue(hasActiveUserPendingOperations)
     }
 
+    func testSyncAllRequeuesPendingOperationsWhenTokenIsUnavailable() async throws {
+        UserDefaults.standard.removeObject(forKey: "pendingSyncOperations")
+        defer {
+            UserDefaults.standard.removeObject(forKey: "pendingSyncOperations")
+        }
+
+        let userId = "retry_pending_operation_\(UUID().uuidString)"
+        let authManager = AuthManager()
+        authManager.currentUser = LocalUser(
+            id: userId,
+            email: "retry@example.com",
+            name: "Retry User",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+        authManager.isAuthenticated = true
+
+        let manager = RealtimeSyncManager(
+            coreDataManager: CoreDataManager.shared,
+            authManager: authManager,
+            supabaseManager: StubSupabaseManager()
+        )
+        manager.isOnline = false
+        let operation = RealtimeSyncManager.SyncOperation(
+            id: UUID().uuidString,
+            userId: userId,
+            type: .delete,
+            data: Data(),
+            tableName: "body_metrics",
+            timestamp: Date()
+        )
+        let unidentifiedOperation = RealtimeSyncManager.SyncOperation(
+            id: UUID().uuidString,
+            userId: nil,
+            type: .delete,
+            data: Data(),
+            tableName: "body_metrics",
+            timestamp: Date()
+        )
+        manager.queueOperation(operation)
+        manager.queueOperation(unidentifiedOperation)
+        manager.isOnline = true
+
+        await manager.syncAllAwaitingCompletion()
+
+        XCTAssertFalse(manager.isSyncing)
+        guard case .error = manager.syncStatus else {
+            XCTFail("Expected sync to report an authentication error")
+            return
+        }
+        XCTAssertEqual(
+            Set(manager.pendingOperations.map(\.id)),
+            Set([operation.id, unidentifiedOperation.id])
+        )
+        XCTAssertEqual(manager.pendingOperations.first?.retryCount, 0)
+
+        let persistedData = try XCTUnwrap(
+            UserDefaults.standard.data(forKey: "pendingSyncOperations")
+        )
+        let persistedOperations = try JSONDecoder().decode(
+            [RealtimeSyncManager.SyncOperation].self,
+            from: persistedData
+        )
+        XCTAssertEqual(
+            Set(persistedOperations.map(\.id)),
+            Set([operation.id, unidentifiedOperation.id])
+        )
+        XCTAssertTrue(persistedOperations.allSatisfy { $0.retryCount == 0 })
+    }
+
+    func testDeleteBodyMetricWithoutIdentifiedUserFailsBeforeQueuing() async {
+        UserDefaults.standard.removeObject(forKey: "pendingSyncOperations")
+        defer {
+            UserDefaults.standard.removeObject(forKey: "pendingSyncOperations")
+        }
+
+        let authManager = AuthManager()
+        authManager.currentUser = nil
+        authManager.isAuthenticated = false
+        let manager = RealtimeSyncManager(
+            coreDataManager: CoreDataManager.shared,
+            authManager: authManager,
+            supabaseManager: StubSupabaseManager()
+        )
+
+        let deleted = await manager.deleteBodyMetric(id: UUID().uuidString)
+
+        XCTAssertFalse(deleted)
+        XCTAssertTrue(manager.pendingOperations.isEmpty)
+        XCTAssertNil(UserDefaults.standard.data(forKey: "pendingSyncOperations"))
+    }
+
     func testSyncLocalChangesDeletesMarkedBodyMetricInsteadOfUpserting() async throws {
         let coreData = CoreDataManager.shared
 

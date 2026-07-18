@@ -57,7 +57,8 @@ jobs:
   deploy-testflight:
     name: Deploy to TestFlight (${{ inputs.distribution_group }})
     runs-on: macos-26
-    timeout-minutes: 30
+    # App Store Connect processing is variable; Pilot waits before assigning external groups.
+    timeout-minutes: 60
     permissions:
       contents: write
     environment:

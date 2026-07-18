@@ -397,7 +397,7 @@ func updateSyncStatus(entityName: String, id: String, status: String, error: Str
 
 func fetchOrCreateSyncMetadata(entityName: String, entityId: String) -> SyncMetadata {
         let fetchRequest: NSFetchRequest<SyncMetadata> = SyncMetadata.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "entityName == %@ AND entityId == %@", entityName, entityId)
+        fetchRequest.predicate = NSPredicate(format: "syncEntityName == %@ AND entityId == %@", entityName, entityId)
         fetchRequest.fetchLimit = 1
 
         if let existing = try? viewContext.fetch(fetchRequest).first {
@@ -405,7 +405,7 @@ func fetchOrCreateSyncMetadata(entityName: String, entityId: String) -> SyncMeta
         }
 
         let metadata = SyncMetadata(context: viewContext)
-        metadata.entityName = entityName
+        metadata.syncEntityName = entityName
         metadata.entityId = entityId
         metadata.syncRetryCount = 0
 

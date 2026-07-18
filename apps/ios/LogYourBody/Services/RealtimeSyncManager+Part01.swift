@@ -173,7 +173,9 @@ func syncAll(onCompletion: (() -> Void)? = nil) {
         error = nil
 
         let operationsToProcess = pendingOperations.filter { $0.userId == userIdSnapshot }
-        pendingOperations.removeAll { $0.userId == userIdSnapshot || $0.userId == nil }
+        // Never assign legacy/unowned work to whichever account happens to be active.
+        // Preserve it for an explicit reconciliation path instead of silently dropping it.
+        pendingOperations.removeAll { $0.userId == userIdSnapshot }
         savePendingOperations()
 
         let lastSyncSnapshot = lastSyncDate
@@ -217,13 +219,16 @@ func syncAll(onCompletion: (() -> Void)? = nil) {
                     }
                 }
 
-                await MainActor.run {
-                    if !operationsNeedingRetry.isEmpty {
-                        self.pendingOperations.insert(contentsOf: operationsNeedingRetry, at: 0)
+                let retryOperations = operationsNeedingRetry
+                let errorDescription = error.localizedDescription
+
+                await MainActor.run { [retryOperations, errorDescription] in
+                    if !retryOperations.isEmpty {
+                        self.pendingOperations.insert(contentsOf: retryOperations, at: 0)
                     }
                     self.isSyncing = false
-                    self.syncStatus = .error(error.localizedDescription)
-                    self.error = error.localizedDescription
+                    self.syncStatus = .error(errorDescription)
+                    self.error = errorDescription
                     self.consecutiveFailures += 1
 
                     if self.consecutiveFailures >= self.maxConsecutiveFailures {

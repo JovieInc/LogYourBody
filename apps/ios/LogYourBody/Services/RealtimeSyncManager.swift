@@ -57,7 +57,7 @@ class RealtimeSyncManager: ObservableObject {
         case offline
     }
 
-    struct SyncOperation: Codable {
+    struct SyncOperation: Codable, Sendable {
         let id: String
         let userId: String?
         let type: OperationType
@@ -66,7 +66,7 @@ class RealtimeSyncManager: ObservableObject {
         let timestamp: Date
         var retryCount: Int = 0
 
-        enum OperationType: String, Codable {
+        enum OperationType: String, Codable, Sendable {
             case insert, update, delete
         }
     }

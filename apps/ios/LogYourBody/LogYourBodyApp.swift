@@ -121,6 +121,51 @@ enum EntryDeepLinkRoutingPolicy {
     }
 }
 
+private struct PersistentStoreLoadingView: View {
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            ProgressView("Preparing your data…")
+                .tint(.white)
+                .foregroundStyle(.white)
+        }
+        .accessibilityIdentifier("persistent_store_loading_view")
+    }
+}
+
+private struct PersistentStoreRecoveryView: View {
+    let retry: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                Image(systemName: "externaldrive.badge.exclamationmark")
+                    .font(.system(size: 42))
+                    .foregroundStyle(.yellow)
+                    .accessibilityHidden(true)
+
+                Text("Your data couldn’t be opened")
+                    .font(.title2.weight(.semibold))
+                    .multilineTextAlignment(.center)
+
+                Text("Your existing data has not been changed. Try again, then contact support if the problem continues.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Button("Try Again", action: retry)
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("persistent_store_retry_button")
+            }
+            .padding(28)
+        }
+        .foregroundStyle(.white)
+        .accessibilityIdentifier("persistent_store_recovery_view")
+    }
+}
+
 @main
 struct LogYourBodyApp: App {
     @StateObject private var authManager = AuthManager.shared
@@ -132,7 +177,7 @@ struct LogYourBodyApp: App {
     @State private var selectedEntryTab = 0
     @State private var pendingEntryDeepLinkDestination: EntryDeepLinkRoutingPolicy.PendingDestination?
 
-    let persistenceController = CoreDataManager.shared
+    @StateObject private var persistenceController = CoreDataManager.shared
 
     init() {
         LaunchMetrics.begin()
@@ -144,7 +189,9 @@ struct LogYourBodyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            switch persistenceController.persistentStoreLoadState {
+            case .ready:
+                ContentView()
                 .environment(\.managedObjectContext, persistenceController.viewContext)
                 .environmentObject(authManager)
                 .environmentObject(realtimeSyncManager)
@@ -208,6 +255,13 @@ struct LogYourBodyApp: App {
                         }
                     }
                 }
+            case .loading:
+                PersistentStoreLoadingView()
+            case .failed:
+                PersistentStoreRecoveryView(
+                    retry: persistenceController.retryPersistentStoreLoad
+                )
+            }
         }
     }
 

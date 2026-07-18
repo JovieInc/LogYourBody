@@ -9,6 +9,7 @@
 // All Core Data operations are now thread-safe and prevent data corruption and crashes.
 //
 import Foundation
+import Combine
 import CoreData
 import HealthKit
 
@@ -178,15 +179,54 @@ struct PendingDexaResultSyncItem {
 }
 
 class CoreDataManager: ObservableObject {
+    typealias PersistentStoreLoader = (
+        NSPersistentContainer,
+        @escaping (NSPersistentStoreDescription, Error?) -> Void
+    ) -> Void
+
+    enum PersistentStoreLoadState: Equatable {
+        case loading
+        case ready
+        case failed(message: String)
+    }
+
     static let shared = CoreDataManager()
     static let photoUploadInFlightSyncStatus = "photo_upload_in_flight"
     static let photoUploadStorageCommittedSyncStatus = "photo_upload_storage_committed"
 
+    static func makeManagedObjectModel(
+        in bundle: Bundle = Bundle(for: CoreDataManager.self)
+    ) -> NSManagedObjectModel {
+        guard let modelURL = bundle.url(forResource: "LogYourBody", withExtension: "momd"),
+              let model = NSManagedObjectModel(contentsOf: modelURL),
+              let syncEntityName = model.entitiesByName["SyncMetadata"]?
+                .attributesByName["syncEntityName"] else {
+            preconditionFailure("LogYourBody Core Data model is unavailable")
+        }
+
+        // Preserve the legacy `entityName` column while avoiding its collision
+        // with NSManagedObject.entity.name in generated Objective-C accessors.
+        syncEntityName.renamingIdentifier = "entityName"
+        return model
+    }
+
+    private static let managedObjectModel = makeManagedObjectModel()
+
     let saveQueue = DispatchQueue(label: "com.logyourbody.coredata.save", qos: .utility)
+    @Published private(set) var persistentStoreLoadState: PersistentStoreLoadState = .loading
     var isSaving = false
+    private let persistentStoreDescriptionsOverride: [NSPersistentStoreDescription]?
+    private let persistentStoreLoader: PersistentStoreLoader?
 
     lazy var persistentContainer: NSPersistentContainer = {
-        let container = NSPersistentContainer(name: "LogYourBody")
+        let container = NSPersistentContainer(
+            name: "LogYourBody",
+            managedObjectModel: Self.managedObjectModel
+        )
+
+        if let persistentStoreDescriptionsOverride {
+            container.persistentStoreDescriptions = persistentStoreDescriptionsOverride
+        }
 
         for description in container.persistentStoreDescriptions {
             description.setOption(
@@ -197,7 +237,34 @@ class CoreDataManager: ObservableObject {
             description.shouldInferMappingModelAutomatically = true
         }
 
-        container.loadPersistentStores { description, error in
+        loadPersistentStores(in: container)
+
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        return container
+    }()
+
+    init(
+        persistentStoreDescriptions: [NSPersistentStoreDescription]? = nil,
+        persistentStoreLoader: PersistentStoreLoader? = nil
+    ) {
+        persistentStoreDescriptionsOverride = persistentStoreDescriptions
+        self.persistentStoreLoader = persistentStoreLoader
+        _ = persistentContainer
+    }
+
+    func retryPersistentStoreLoad() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, case .failed = persistentStoreLoadState else { return }
+
+            persistentStoreLoadState = .loading
+            loadPersistentStores(in: persistentContainer)
+        }
+    }
+
+    private func loadPersistentStores(in container: NSPersistentContainer) {
+        let completion: (NSPersistentStoreDescription, Error?) -> Void = { [weak self] description, error in
+            guard let self else { return }
+
             if let error = error {
                 let appError = AppError.coreData(operation: "loadPersistentStores", underlying: error)
                 let contextInfo = ErrorContext(
@@ -207,43 +274,27 @@ class CoreDataManager: ObservableObject {
                     userId: nil
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
-                // Log the error but don't crash - fallback to in-memory store
-                // print("⚠️ CoreData Error: Unable to load persistent stores: \(error)")
-                // print("⚠️ Falling back to in-memory store. Data will not persist.")
-
-                // Create an in-memory store as fallback
-                let inMemoryDescription = NSPersistentStoreDescription()
-                inMemoryDescription.type = NSInMemoryStoreType
-                container.persistentStoreDescriptions = [inMemoryDescription]
-
-                // Attempt to load in-memory store
-                container.loadPersistentStores { _, inMemoryError in
-                    if let inMemoryError = inMemoryError {
-                        let criticalError = AppError.coreData(operation: "loadInMemoryStore", underlying: inMemoryError)
-                        let criticalContext = ErrorContext(
-                            feature: "coreData",
-                            operation: "loadInMemoryStore",
-                            screen: nil,
-                            userId: nil
-                        )
-                        ErrorReporter.shared.capture(criticalError, context: criticalContext)
-                        // print("❌ CoreData Critical: Even in-memory store failed: \(inMemoryError)")
-                    }
-                }
+                updatePersistentStoreLoadState(.failed(message: error.localizedDescription))
+                return
             }
 
-            // Enable automatic lightweight migration
             description.shouldMigrateStoreAutomatically = true
             description.shouldInferMappingModelAutomatically = true
+            updatePersistentStoreLoadState(.ready)
         }
 
-        container.viewContext.automaticallyMergesChangesFromParent = true
-        return container
-    }()
+        if let persistentStoreLoader {
+            persistentStoreLoader(container, completion)
+        } else {
+            container.loadPersistentStores(completionHandler: completion)
+        }
+    }
 
-
-    init() {}
-
+    private func updatePersistentStoreLoadState(_ state: PersistentStoreLoadState) {
+        DispatchQueue.main.async { [weak self] in
+            self?.persistentStoreLoadState = state
+        }
+    }
 
     // Async save for critical operations
 

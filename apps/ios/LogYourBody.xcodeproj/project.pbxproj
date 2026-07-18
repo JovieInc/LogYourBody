@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		022D79AC5B1840BC58FB7D70 /* BodyMetricContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB121088934BE398599BE39A /* BodyMetricContractTests.swift */; };
-		04BF4BAC82CF6B37F817592F /* CoreDataAndPhotoPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA050E7DCEBA5BAF62341363 /* CoreDataAndPhotoPolicyTests.swift */; };
+		04BF4BAC82CF6B37F817592F /* CoreDataModelMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA050E7DCEBA5BAF62341363 /* CoreDataModelMigrationTests.swift */; };
 		04EB1D7AD1947D32BDE7AD70 /* BodyMetricSourceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EBD5BF3F1671BC8D17ABE5D /* BodyMetricSourceContractTests.swift */; };
 		050A49949BCAA09D23C66035 /* DashboardViewModelHealthSyncWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1C56EE58FC0F4BEFDA1345 /* DashboardViewModelHealthSyncWiringTests.swift */; };
 		0922CA98E79021C4CB2595A5 /* SupabaseProfilePayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA82A71E77423D56A70AA46 /* SupabaseProfilePayloadTests.swift */; };
@@ -18,7 +18,6 @@
 		1076FA3654BE00406F8AE052 /* Glp1DoseCoreDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D800638256D10A5ACB992 /* Glp1DoseCoreDataTests.swift */; };
 		1564F129E1D9BAAC5F85C703 /* BodyMetricLocalDateContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 776620205152E0A15A875703 /* BodyMetricLocalDateContractTests.swift */; };
 		16AD66AC6E3FF4FB4B8E33B3 /* SyncIntegrationTestDoubles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45999DF3001C2F424CBB44DB /* SyncIntegrationTestDoubles.swift */; };
-		1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */; };
 		18EBE5224556DDF573EE3E12 /* RevenueCatManager+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7148912B179107B65580E27E /* RevenueCatManager+Part02.swift */; };
 		18ED1A86B416E8821C250840 /* GlobalTimelineServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 620823F9E8905856BB1B666D /* GlobalTimelineServiceTests.swift */; };
 		1CCAD9C764D3D35B5BF0522B /* HealthKitAuthorizationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84A7C68943959BD45325D9B /* HealthKitAuthorizationPolicyTests.swift */; };
@@ -393,20 +392,6 @@
 		};
 /* End PBXContainerItemProxy section */
 
-/* Begin PBXCopyFilesBuildPhase section */
-		ADF5C1DB2E1DFE7A00E3FB4D /* Embed Foundation Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
-			files = (
-				1712C6892B3B43FDA6E4453E /* LiquidGlassCTAButton.swift in Embed Foundation Extensions */,
-			);
-			name = "Embed Foundation Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
 /* Begin PBXFileReference section */
 		012FFE30028F04055FFF6538 /* DSTrendIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSTrendIndicator.swift; path = DesignSystem/Atoms/DSTrendIndicator.swift; sourceTree = "<group>"; };
 		0401CF23AE214F20C7EB5886 /* DeveloperTapHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeveloperTapHandler.swift; path = DesignSystem/Molecules/DeveloperTapHandler.swift; sourceTree = "<group>"; };
@@ -453,7 +438,6 @@
 		4CD612A21566CB070FFC0086 /* CoreDataManager+Part05.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "CoreDataManager+Part05.swift"; path = "CoreDataManager+Part05.swift"; sourceTree = "<group>"; };
 		4FE602CA4F092CAB186EE952 /* RevenueCatFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RevenueCatFlowTests.swift; sourceTree = "<group>"; };
 		50EBF62AD8F9F25BB301D998 /* ProgressPhotoAttachPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProgressPhotoAttachPolicyTests.swift; sourceTree = "<group>"; };
-		53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiquidGlassCTAButton.swift; path = DesignSystem/Molecules/LiquidGlassCTAButton.swift; sourceTree = "<group>"; };
 		55090E3269B8A8F8E45E46D0 /* SecondaryMetricsRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SecondaryMetricsRow.swift; path = DesignSystem/Organisms/SecondaryMetricsRow.swift; sourceTree = "<group>"; };
 		5586EC0657B1F9E652068FBA /* OnboardingFlowViewModel+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "OnboardingFlowViewModel+Part02.swift"; path = "OnboardingFlowViewModel+Part02.swift"; sourceTree = "<group>"; };
 		5D15E6A333FABD14CA6405A4 /* LaunchAndBodyCompositionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchAndBodyCompositionTests.swift; sourceTree = "<group>"; };
@@ -591,6 +575,7 @@
 		AD723B112E15FA5C002376C6 /* LogYourBody.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = LogYourBody.entitlements; sourceTree = "<group>"; };
 		AD723B122E15FA5C002376C6 /* LogYourBodyApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogYourBodyApp.swift; sourceTree = "<group>"; };
 		AD723B142E15FA5C002376C6 /* LogYourBody.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBody.xcdatamodel; sourceTree = "<group>"; };
+		F7A2B3C4D5E6F70809101112 /* LogYourBodyV2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV2.xcdatamodel; sourceTree = "<group>"; };
 		AD7B8C992E1CE56600789012 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		AD7D30922E14907F0072AA5B /* LogYourBody.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LogYourBody.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AD7D30952E14907F0072AA5B /* LogYourBodyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyApp.swift; sourceTree = "<group>"; };
@@ -761,6 +746,7 @@
 		ADBD69322E14A7B900921A30 /* SignUpView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		ADBD693C2E14A7B900921A30 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = LogYourBody/Assets.xcassets; sourceTree = "<group>"; };
 		ADDC48652E2D8A33003C97E7 /* LogYourBody.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBody.xcdatamodel; sourceTree = "<group>"; };
+		F7A2B3C4D5E6F70809101113 /* LogYourBodyV2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV2.xcdatamodel; sourceTree = "<group>"; };
 		ADDC48672E2D8A4C003C97E7 /* ccpa-compliance.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "ccpa-compliance.md"; sourceTree = "<group>"; };
 		ADDC48682E2D8A4C003C97E7 /* gdpr-compliance.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "gdpr-compliance.md"; sourceTree = "<group>"; };
 		ADDC48692E2D8A4C003C97E7 /* open-source-licenses.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "open-source-licenses.md"; sourceTree = "<group>"; };
@@ -825,7 +811,7 @@
 		C639B8116483011892C95543 /* BodyMetricLoggingServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricLoggingServiceTests.swift; sourceTree = "<group>"; };
 		C7E0D5025A2839599F4E281D /* PhotoMetadataAndImportPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoMetadataAndImportPolicyTests.swift; sourceTree = "<group>"; };
 		C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SkeletonLoaders.swift; path = Components/SkeletonLoaders.swift; sourceTree = "<group>"; };
-		CA050E7DCEBA5BAF62341363 /* CoreDataAndPhotoPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoreDataAndPhotoPolicyTests.swift; sourceTree = "<group>"; };
+		CA050E7DCEBA5BAF62341363 /* CoreDataModelMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoreDataModelMigrationTests.swift; sourceTree = "<group>"; };
 		CA338579090538FBCCA21785 /* SyncIntegrationImportAndMappingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncIntegrationImportAndMappingTests.swift; sourceTree = "<group>"; };
 		CCD81BE70A7B449921973AEA /* LegalDocumentRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LegalDocumentRow.swift; path = DesignSystem/Molecules/LegalDocumentRow.swift; sourceTree = "<group>"; };
 		CD667EA50710CE217FD95E4C /* Color+Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "Color+Theme.swift"; path = "Color+Theme.swift"; sourceTree = "<group>"; };
@@ -986,7 +972,6 @@
 				E2AC3C23E6923176F103B414 /* StepsIndicator.swift */,
 				D03041E8A638B1A252407398 /* UserGreeting.swift */,
 				28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */,
-				53180EFADBC849DD6B26B28E /* LiquidGlassCTAButton.swift */,
 			);
 			name = Molecules;
 			sourceTree = "<group>";
@@ -1073,7 +1058,7 @@
 				AD9E00102F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift */,
 				AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */,
 				07AFDB2060EF2522DE93E10D /* CachedPaywallOfferingDisplayTests.swift */,
-				CA050E7DCEBA5BAF62341363 /* CoreDataAndPhotoPolicyTests.swift */,
+				CA050E7DCEBA5BAF62341363 /* CoreDataModelMigrationTests.swift */,
 				095D9694F1EA5B5091B0AE8B /* DailyReminderPolicyTests.swift */,
 				D0211D1493A398942561196F /* DashboardDataVizPolicyTests.swift */,
 				2B95EB9919EA722470321074 /* DashboardTimelineAndPolicyTests.swift */,
@@ -1705,7 +1690,6 @@
 			buildPhases = (
 				AD7D308F2E14907F0072AA5B /* Frameworks */,
 				AD7D30902E14907F0072AA5B /* Resources */,
-				ADF5C1DB2E1DFE7A00E3FB4D /* Embed Foundation Extensions */,
 				ADDC479C2E2D89E5003C97E7 /* Sources */,
 			);
 			buildRules = (
@@ -1890,7 +1874,7 @@
 				AD9E00112F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift in Sources */,
 				AD9E00132F20001100ABCDEF /* BulkImportManagerBoundsTests.swift in Sources */,
 				BC360577C7E72F397010D7B1 /* CachedPaywallOfferingDisplayTests.swift in Sources */,
-				04BF4BAC82CF6B37F817592F /* CoreDataAndPhotoPolicyTests.swift in Sources */,
+				04BF4BAC82CF6B37F817592F /* CoreDataModelMigrationTests.swift in Sources */,
 				42B0784EAF04F40C031D0186 /* DailyReminderPolicyTests.swift in Sources */,
 				CC4917DEC8E46FACECDF3424 /* DashboardDataVizPolicyTests.swift in Sources */,
 				98DAEAD9993013F8C7C81764 /* DashboardTimelineAndPolicyTests.swift in Sources */,
@@ -2634,8 +2618,9 @@
 			isa = XCVersionGroup;
 			children = (
 				AD723B142E15FA5C002376C6 /* LogYourBody.xcdatamodel */,
+				F7A2B3C4D5E6F70809101112 /* LogYourBodyV2.xcdatamodel */,
 			);
-			currentVersion = AD723B142E15FA5C002376C6 /* LogYourBody.xcdatamodel */;
+			currentVersion = F7A2B3C4D5E6F70809101112 /* LogYourBodyV2.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
@@ -2644,8 +2629,9 @@
 			isa = XCVersionGroup;
 			children = (
 				ADDC48652E2D8A33003C97E7 /* LogYourBody.xcdatamodel */,
+				F7A2B3C4D5E6F70809101113 /* LogYourBodyV2.xcdatamodel */,
 			);
-			currentVersion = ADDC48652E2D8A33003C97E7 /* LogYourBody.xcdatamodel */;
+			currentVersion = F7A2B3C4D5E6F70809101113 /* LogYourBodyV2.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;

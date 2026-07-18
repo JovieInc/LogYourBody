@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22225" systemVersion="23B92" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="CachedBodyMetrics" representedClassName="CachedBodyMetrics" syncable="YES" codeGenerationType="class">
+        <attribute name="bodyFatMethod" optional="YES" attributeType="String"/>
+        <attribute name="bodyFatPercentage" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="boneMass" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="isMarkedDeleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="isSynced" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="lastModified" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="localDate" optional="YES" attributeType="String"/>
+        <attribute name="muscleMass" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="originalPhotoUrl" optional="YES" attributeType="String"/>
+        <attribute name="photoProcessedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="photoUrl" optional="YES" attributeType="String"/>
+        <attribute name="dataSource" optional="YES" attributeType="String" defaultValueString="Manual"/>
+        <attribute name="sourceMetadataJSON" optional="YES" attributeType="String"/>
+        <attribute name="syncStatus" attributeType="String" defaultValueString="pending"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="userId" attributeType="String"/>
+        <attribute name="weight" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="weightUnit" optional="YES" attributeType="String"/>
+        <attribute name="waistCircumference" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="hipCircumference" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="waistUnit" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="CachedDailyMetrics" representedClassName="CachedDailyMetrics" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="isMarkedDeleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="isSynced" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="lastModified" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="steps" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="syncStatus" attributeType="String" defaultValueString="pending"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="userId" attributeType="String"/>
+    </entity>
+    <entity name="CachedProfile" representedClassName="CachedProfile" syncable="YES" codeGenerationType="class">
+        <attribute name="activityLevel" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="dateOfBirth" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="email" attributeType="String"/>
+        <attribute name="fullName" optional="YES" attributeType="String"/>
+        <attribute name="gender" optional="YES" attributeType="String"/>
+        <attribute name="goalWeight" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="goalWeightUnit" optional="YES" attributeType="String"/>
+        <attribute name="height" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="heightUnit" optional="YES" attributeType="String"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="isMarkedDeleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="isSynced" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="lastModified" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" attributeType="String" defaultValueString="pending"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="username" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="CachedGlp1DoseLog" representedClassName="CachedGlp1DoseLog" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="String"/>
+        <attribute name="userId" attributeType="String"/>
+        <attribute name="takenAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="medicationId" optional="YES" attributeType="String"/>
+        <attribute name="doseAmount" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="doseUnit" optional="YES" attributeType="String"/>
+        <attribute name="drugClass" optional="YES" attributeType="String"/>
+        <attribute name="brand" optional="YES" attributeType="String"/>
+        <attribute name="isCompounded" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="supplierType" optional="YES" attributeType="String"/>
+        <attribute name="supplierName" optional="YES" attributeType="String"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isMarkedDeleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="isSynced" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="syncStatus" attributeType="String" defaultValueString="synced"/>
+    </entity>
+    <entity name="CachedGlp1Medication" representedClassName="CachedGlp1Medication" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="String"/>
+        <attribute name="userId" attributeType="String"/>
+        <attribute name="displayName" attributeType="String"/>
+        <attribute name="genericName" optional="YES" attributeType="String"/>
+        <attribute name="drugClass" optional="YES" attributeType="String"/>
+        <attribute name="brand" optional="YES" attributeType="String"/>
+        <attribute name="route" optional="YES" attributeType="String"/>
+        <attribute name="frequency" optional="YES" attributeType="String"/>
+        <attribute name="doseUnit" optional="YES" attributeType="String"/>
+        <attribute name="isCompounded" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="hkIdentifier" optional="YES" attributeType="String"/>
+        <attribute name="startedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="endedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isSynced" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="syncStatus" attributeType="String" defaultValueString="pending"/>
+    </entity>
+    <entity name="CachedDexaResult" representedClassName="CachedDexaResult" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="String"/>
+        <attribute name="userId" attributeType="String"/>
+        <attribute name="bodyMetricsId" optional="YES" attributeType="String"/>
+        <attribute name="externalSource" attributeType="String"/>
+        <attribute name="externalResultId" attributeType="String"/>
+        <attribute name="externalUpdateTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="scannerModel" optional="YES" attributeType="String"/>
+        <attribute name="locationId" optional="YES" attributeType="String"/>
+        <attribute name="locationName" optional="YES" attributeType="String"/>
+        <attribute name="acquireTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="analyzeTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="vatMassKg" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="vatVolumeCm3" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="resultPdfUrl" optional="YES" attributeType="String"/>
+        <attribute name="resultPdfName" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isSynced" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="syncStatus" attributeType="String" defaultValueString="pending"/>
+    </entity>
+    <entity name="SyncMetadata" representedClassName="SyncMetadata" syncable="YES" codeGenerationType="class">
+        <attribute name="syncEntityName" attributeType="String" renamingIdentifier="entityName"/>
+        <attribute name="entityId" attributeType="String"/>
+        <attribute name="lastSyncAttempt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lastSyncError" optional="YES" attributeType="String"/>
+        <attribute name="lastSyncSuccess" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncRetryCount" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+    </entity>
+    <entity name="CachedHKSample" representedClassName="CachedHKSample" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceFirmwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="deviceHardwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="deviceLocalIdentifier" optional="YES" attributeType="String"/>
+        <attribute name="deviceManufacturer" optional="YES" attributeType="String"/>
+        <attribute name="deviceModel" optional="YES" attributeType="String"/>
+        <attribute name="deviceSoftwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="deviceUDI" optional="YES" attributeType="String"/>
+        <attribute name="endDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="hkUUID" attributeType="String"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="metadataJSON" optional="YES" attributeType="Binary"/>
+        <attribute name="quantityType" attributeType="String"/>
+        <attribute name="sourceBundleId" optional="YES" attributeType="String"/>
+        <attribute name="sourceName" optional="YES" attributeType="String"/>
+        <attribute name="startDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="unit" attributeType="String"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="userId" attributeType="String"/>
+        <attribute name="value" attributeType="Double" usesScalarValueType="YES"/>
+    </entity>
+    <entity name="CachedDevice" representedClassName="CachedDevice" syncable="YES" codeGenerationType="class">
+        <attribute name="confidence" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceFirmwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="deviceHardwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="deviceLocalIdentifier" optional="YES" attributeType="String"/>
+        <attribute name="deviceManufacturer" optional="YES" attributeType="String"/>
+        <attribute name="deviceModel" optional="YES" attributeType="String"/>
+        <attribute name="deviceSoftwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="firmwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="hardwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="inferredMethod" optional="YES" attributeType="String"/>
+        <attribute name="manufacturer" optional="YES" attributeType="String"/>
+        <attribute name="model" optional="YES" attributeType="String"/>
+        <attribute name="softwareVersion" optional="YES" attributeType="String"/>
+        <attribute name="sourceBundleId" optional="YES" attributeType="String"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
+    <entity name="CachedUserDevice" representedClassName="CachedUserDevice" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deviceId" attributeType="String"/>
+        <attribute name="firstSeenAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="inferredMethod" optional="YES" attributeType="String"/>
+        <attribute name="isPrimary" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="lastSeenAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="nickname" optional="YES" attributeType="String"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="userId" attributeType="String"/>
+    </entity>
+</model>
