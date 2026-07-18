@@ -264,7 +264,7 @@ struct BugReportFormView: View {
     }
 
     private func openSupport() {
-        guard let url = URL(string: "mailto:support@logyourbody.com") else {
+        guard let url = URL(string: "mailto:\(ProductRegistry.supportEmail)") else {
             return
         }
 

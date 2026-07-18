@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { FeaturesFlyout } from './FeaturesFlyout';
 import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logYourBody } from '@jovieinc/product-registry';
 
 interface HeaderProps {
   onFeatureClick?: (featureId: string) => void;
@@ -41,7 +42,9 @@ export function Header({ onFeatureClick, showFeatures = false }: HeaderProps) {
         <nav className="flex h-16 items-center justify-between px-6 lg:px-8" aria-label="Global">
           <div className="flex items-center gap-x-12">
             <Link href="/" className="flex items-center">
-              <span className="text-base font-semibold text-white">LogYourBody</span>
+              <span className="text-base font-semibold text-white">
+                {logYourBody.identity.name}
+              </span>
             </Link>
             {/* Desktop navigation */}
             <div className="hidden lg:flex lg:gap-x-8">

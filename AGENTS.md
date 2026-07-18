@@ -292,6 +292,19 @@ Runs on **pushes to `main`** (after merge). Jobs:
 
 ---
 
+## Canonical Product Registry
+
+`packages/product-registry/src/products/logyourbody.mjs` is the source of truth for product identity, brand messaging, features, entitlements, reference prices, support options, canonical surfaces, and landing-page recipes.
+
+- Web and documentation code import `@jovieinc/product-registry`.
+- iOS uses `GeneratedProductRegistry.swift`, produced by `pnpm product:generate`.
+- Never hand-edit generated registry outputs.
+- Never hard-code canonical contacts, RevenueCat entitlement/product IDs, or unsupported social-proof claims in product code.
+- Run `pnpm product:check` after registry or public-copy changes.
+- For cross-repo reuse, publish/extract a versioned Jovie-owned package. Do not use local symlinks or copy the registry into another repository.
+
+See `docs/architecture/shared-product-platform.md` for the architecture and extraction path.
+
 ## Feature Flags & Safety (Statsig)
 
 ### Core Principle

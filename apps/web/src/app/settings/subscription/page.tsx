@@ -13,6 +13,13 @@ import { toast } from '@/hooks/use-toast';
 import { APP_CONFIG } from '@/constants/app';
 import { Loader2, ArrowLeft, Crown, Check, X, Zap } from 'lucide-react';
 import Link from 'next/link';
+import { logYourBody } from '@jovieinc/product-registry';
+
+const proPlan = logYourBody.plans[0];
+const planFeatureNames = proPlan.featureIds.map(
+  (featureId) =>
+    logYourBody.features.find((feature) => feature.id === featureId)?.name ?? featureId,
+);
 
 export default function SubscriptionSettingsPage() {
   const { user, loading } = useAuth();
@@ -59,32 +66,17 @@ export default function SubscriptionSettingsPage() {
 
   const plans = {
     monthly: {
-      price: 9.99,
+      price: APP_CONFIG.pricing.monthly.price,
       period: 'month',
-      features: [
-        'Unlimited body metrics tracking',
-        'All body fat calculation methods',
-        'Progress photos with comparison',
-        'Advanced analytics & trends',
-        'Export your data anytime',
-        'Priority support',
-        'Early access to new features',
-      ],
+      features: planFeatureNames,
     },
     annual: {
-      price: 69.99,
+      price: APP_CONFIG.pricing.annual.price,
       period: 'year',
-      monthlyPrice: 5.83,
-      savings: 49.89,
-      savingsPercent: 42,
-      features: [
-        'Everything in monthly plan',
-        'Save 42% compared to monthly',
-        'Annual progress report',
-        'Custom goal setting',
-        'Nutrition tracking (coming soon)',
-        'Workout logging (coming soon)',
-      ],
+      monthlyPrice: APP_CONFIG.pricing.annual.monthlyEquivalent,
+      savings: APP_CONFIG.pricing.annual.savings,
+      savingsPercent: APP_CONFIG.pricing.annual.savingsPercent,
+      features: planFeatureNames,
     },
   };
 
@@ -214,7 +206,7 @@ export default function SubscriptionSettingsPage() {
               >
                 Annual
                 <Badge variant="secondary" className="ml-2 text-xs">
-                  Save 42%
+                  Save {plans.annual.savingsPercent}%
                 </Badge>
               </button>
             </div>
@@ -241,7 +233,9 @@ export default function SubscriptionSettingsPage() {
                   )}
                 </div>
                 <div className="mt-4">
-                  <span className="text-linear-text text-3xl font-bold">$9.99</span>
+                  <span className="text-linear-text text-3xl font-bold">
+                    ${plans.monthly.price}
+                  </span>
                   <span className="text-linear-text-secondary">/month</span>
                 </div>
               </CardHeader>
@@ -279,7 +273,7 @@ export default function SubscriptionSettingsPage() {
                   )}
                 </div>
                 <div className="mt-4">
-                  <span className="text-linear-text text-3xl font-bold">$69.99</span>
+                  <span className="text-linear-text text-3xl font-bold">${plans.annual.price}</span>
                   <span className="text-linear-text-secondary">/year</span>
                 </div>
                 <p className="mt-1 text-sm text-green-500">
@@ -407,8 +401,8 @@ export default function SubscriptionSettingsPage() {
             <div>
               <h4 className="text-linear-text mb-1 font-medium">Do you offer refunds?</h4>
               <p className="text-linear-text-secondary text-sm">
-                We offer a 30-day money-back guarantee for annual plans. Monthly plans can be
-                cancelled at any time.
+                Purchases, cancellations, and refund requests are managed through your Apple ID and
+                follow Apple&apos;s subscription terms.
               </p>
             </div>
           </CardContent>

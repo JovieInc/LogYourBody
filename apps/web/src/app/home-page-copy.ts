@@ -1,7 +1,8 @@
 import { APP_CONFIG } from '@/constants/app';
+import { logYourBody } from '@jovieinc/product-registry';
 
 export const landingSectionHeadings = {
-  hero: 'LogYourBody',
+  hero: logYourBody.identity.name,
   photos: 'The mirror gets a memory.',
   features: 'Everything important. Nothing noisy.',
   timeline: 'Your body over time.',

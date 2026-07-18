@@ -128,8 +128,8 @@ extension LegalSectionItem where Destination == EmptyView {
                     LegalSectionItem(
                         icon: "envelope",
                         title: "Legal Inquiries",
-                        subtitle: "legal@logyourbody.com",
-                        externalURL: URL(string: "mailto:legal@logyourbody.com")
+                        subtitle: ProductRegistry.Contacts.legal,
+                        externalURL: URL(string: "mailto:\(ProductRegistry.Contacts.legal)")
                     )
                 ]
             )

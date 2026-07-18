@@ -6,6 +6,7 @@ import { Providers } from './providers';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { ServiceWorkerUpdater } from '@/components/ServiceWorkerUpdater';
 import './globals.css';
+import { logYourBody } from '@jovieinc/product-registry';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -14,11 +15,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'LogYourBody — Know if the work is working',
-    template: '%s | LogYourBody',
+    default: `${logYourBody.identity.name} — ${logYourBody.brand.slogan}`,
+    template: `%s | ${logYourBody.identity.name}`,
   },
-  description:
-    'Weight, body fat, lean mass, and progress photos in one private iPhone timeline that shows the trend.',
+  description: logYourBody.brand.description,
   keywords: [
     'body composition',
     'fitness tracking',
@@ -30,8 +30,8 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'Tim White' }],
   creator: 'Tim White',
-  publisher: 'LogYourBody',
-  applicationName: 'LogYourBody',
+  publisher: logYourBody.identity.legalName,
+  applicationName: logYourBody.identity.name,
   category: 'Health & Fitness',
   classification: 'Health',
   generator: 'Next.js',
@@ -41,18 +41,17 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL('https://logyourbody.com'),
+  metadataBase: new URL(logYourBody.links.home),
   alternates: {
     canonical: '/',
   },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://logyourbody.com',
-    siteName: 'LogYourBody',
-    title: 'LogYourBody — Know if the work is working',
-    description:
-      'Weight, body fat, lean mass, and progress photos in one private iPhone timeline that shows the trend.',
+    url: logYourBody.links.home,
+    siteName: logYourBody.identity.name,
+    title: `${logYourBody.identity.name} — ${logYourBody.brand.slogan}`,
+    description: logYourBody.brand.description,
     images: [
       {
         url: '/marketing/landing/hero-men-v1.png',
@@ -67,9 +66,8 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     site: '@logyourbody',
     creator: '@itstimwhite',
-    title: 'LogYourBody — Know if the work is working',
-    description:
-      'Weight, body fat, lean mass, and progress photos in one private iPhone timeline that shows the trend.',
+    title: `${logYourBody.identity.name} — ${logYourBody.brand.slogan}`,
+    description: logYourBody.brand.description,
     images: ['/marketing/landing/hero-men-v1.png'],
   },
   robots: {

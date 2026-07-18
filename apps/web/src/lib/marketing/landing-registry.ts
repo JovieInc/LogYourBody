@@ -1,4 +1,5 @@
 import productAssets from '@/generated/marketing-product-assets.json';
+import { logYourBody } from '@jovieinc/product-registry';
 
 export const LANDING_AUDIENCES = ['men', 'women'] as const;
 export const LANDING_GOALS = ['recomposition', 'fat-loss', 'muscle-gain'] as const;
@@ -56,10 +57,9 @@ export const LANDING_GOAL_COPY: Record<
   Pick<LandingVariant, 'headline' | 'subheading' | 'framingLine'>
 > = {
   recomposition: {
-    headline: 'Know if the work is working.',
-    subheading:
-      'Weight, body fat, lean mass, and progress photos—one private timeline that shows the trend.',
-    framingLine: 'One timeline. The signal, without the noise.',
+    headline: logYourBody.messages.landing.headline,
+    subheading: logYourBody.messages.landing.subheading,
+    framingLine: logYourBody.messages.landing.framingLine,
   },
   'fat-loss': {
     headline: 'Know if the cut is working.',
@@ -77,7 +77,7 @@ export const LANDING_GOAL_COPY: Record<
 
 export const LANDING_PRODUCT_PROOF = {
   src: productAssets.weightLog.publicUrl,
-  alt: 'Real LogYourBody iPhone weight log showing the latest synced weight and recent entries',
+  alt: `Real ${logYourBody.identity.name} iPhone weight log showing the latest synced weight and recent entries`,
   width: productAssets.weightLog.width,
   height: productAssets.weightLog.height,
   sourceKind: productAssets.weightLog.sourceKind,
@@ -89,7 +89,7 @@ export const LANDING_BRAND_ASSET = {
   src: productAssets.appIcon.publicUrl,
   width: productAssets.appIcon.width,
   height: productAssets.appIcon.height,
-  alt: 'LogYourBody app icon',
+  alt: `${logYourBody.identity.name} app icon`,
 } as const;
 
 export const LANDING_EXPERIMENTS = {

@@ -1,0 +1,34 @@
+{
+  "name": "@jovieinc/product-registry",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm generate && tsc -p tsconfig.json",
+    "generate": "node scripts/generate.mjs",
+    "generate:check": "node scripts/generate.mjs --check",
+    "lint": "eslint src scripts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node scripts/registry.test.mjs && node scripts/brand-integrity.test.mjs && pnpm generate:check"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.16.0",
+    "@typescript-eslint/parser": "^8.16.0",
+    "eslint": "^9.31.0",
+    "prettier": "^3.4.0",
+    "typescript": "^5.8.3"
+  }
+}

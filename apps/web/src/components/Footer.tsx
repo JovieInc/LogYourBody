@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { APP_CONFIG } from '@/constants/app';
+import { logYourBody } from '@jovieinc/product-registry';
 
 export function Footer() {
   return (
@@ -31,9 +32,7 @@ export function Footer() {
                 <span className="text-lg font-medium text-white">{APP_CONFIG.appName}</span>
               </Link>
               <p className="mt-4 text-sm leading-relaxed text-gray-400">
-                Track real progress.
-                <br />
-                Not just weight.
+                {logYourBody.brand.slogan}
               </p>
 
               {/* GitHub link */}
@@ -120,7 +119,7 @@ export function Footer() {
                 </li>
                 <li>
                   <a
-                    href="https://status.logyourbody.com"
+                    href={logYourBody.links.status}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-gray-400 transition hover:text-white"

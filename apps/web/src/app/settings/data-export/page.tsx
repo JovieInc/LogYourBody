@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { MobileNavbar } from '@/components/MobileNavbar';
+import { logYourBody } from '@jovieinc/product-registry';
 
 export default function DataExportPage() {
   const { user, session } = useAuth();
@@ -27,7 +28,7 @@ export default function DataExportPage() {
   const [statusMessage, setStatusMessage] = useState('');
 
   const dataExportMailto =
-    'mailto:support@logyourbody.com' +
+    `mailto:${logYourBody.contacts.support}` +
     '?subject=' +
     encodeURIComponent('LogYourBody Data Export Request') +
     '&body=' +

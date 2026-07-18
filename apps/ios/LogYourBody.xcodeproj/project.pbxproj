@@ -78,6 +78,7 @@
 		AD050C452EBFFEF60082A313 /* MetricChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD050C442EBFFEF60082A313 /* MetricChartView.swift */; };
 		AD050C492EC12E390082A313 /* RevenueCatManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD050C482EC12E390082A313 /* RevenueCatManager.swift */; };
 		AD050C4B2EC12E590082A313 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD050C4A2EC12E590082A313 /* PaywallView.swift */; };
+		C0D300012F30000100ABCDEF /* GeneratedProductRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D300022F30000100ABCDEF /* GeneratedProductRegistry.swift */; };
 		AD050C4D2EC135360082A313 /* ReceiptParser in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C4C2EC135360082A313 /* ReceiptParser */; };
 		AD050C4F2EC135360082A313 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C4E2EC135360082A313 /* RevenueCat */; };
 		AD050C512EC135360082A313 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = AD050C502EC135360082A313 /* RevenueCatUI */; };
@@ -507,6 +508,7 @@
 		AD050C442EBFFEF60082A313 /* MetricChartView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricChartView.swift; path = Components/MetricChartView.swift; sourceTree = "<group>"; };
 		AD050C482EC12E390082A313 /* RevenueCatManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueCatManager.swift; sourceTree = "<group>"; };
 		AD050C4A2EC12E590082A313 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		C0D300022F30000100ABCDEF /* GeneratedProductRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedProductRegistry.swift; sourceTree = "<group>"; };
 		AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = LogYourBody.storekit; sourceTree = "<group>"; };
 		AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricChartDataHelper.swift; sourceTree = "<group>"; };
 		AD9E00202F20002000ABCDEF /* HeroMetricInterpolationCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroMetricInterpolationCache.swift; sourceTree = "<group>"; };
@@ -1331,6 +1333,7 @@
 		AD723B132E15FA5C002376C6 /* LogYourBody */ = {
 			isa = PBXGroup;
 			children = (
+				C0D300022F30000100ABCDEF /* GeneratedProductRegistry.swift */,
 				ADBAF04D2ECAD88A00A95F98 /* Features */,
 				AD8872922EB946BE0041C426 /* DesignSystem */,
 				ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */,
@@ -2057,6 +2060,7 @@
 				ADDC47E82E2D89F3003C97E7 /* LoadingView.swift in Sources */,
 				ADDC47E92E2D89F3003C97E7 /* LoginView.swift in Sources */,
 				AD050C4B2EC12E590082A313 /* PaywallView.swift in Sources */,
+				C0D300012F30000100ABCDEF /* GeneratedProductRegistry.swift in Sources */,
 				ADE146442EBF05E000B64DA0 /* TimelineMode.swift in Sources */,
 				ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */,
 				272AFFF5324345C4B93608F8 /* MainTabViewPolicies.swift in Sources */,

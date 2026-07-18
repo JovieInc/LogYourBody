@@ -12,7 +12,7 @@ extension Notification.Name {
 
 struct Constants {
     // MARK: - App Info
-    static let appName = "LogYourBody"
+    static let appName = ProductRegistry.appName
     static let appVersion = "1.0.0"
     static let buildNumber = "1"
 
@@ -49,7 +49,7 @@ struct Constants {
     }
 
     // RevenueCat Entitlement ID (must match RevenueCat dashboard)
-    static let proEntitlementID = "Premium"
+    static let proEntitlementID = ProductRegistry.Paywall.entitlementID
 
     // MARK: - UserDefaults Keys
     static let authTokenKey = "authToken"

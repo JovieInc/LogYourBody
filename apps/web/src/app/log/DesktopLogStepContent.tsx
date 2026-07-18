@@ -228,9 +228,7 @@ export function DesktopLogStepContent({
                 <RadioGroupItem value="3-site" id="method-3site" />
                 <div className="flex-1">
                   <p className="text-linear-text font-medium">3-Site Skinfold</p>
-                  <p className="text-linear-text-secondary text-sm">
-                    Caliper measurements (±2% accuracy)
-                  </p>
+                  <p className="text-linear-text-secondary text-sm">Caliper measurements</p>
                 </div>
               </label>
             </RadioGroup>

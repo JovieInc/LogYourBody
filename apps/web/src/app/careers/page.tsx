@@ -1,10 +1,11 @@
-'use client'
+'use client';
 
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Header } from '@/components/Header'
-import { Footer } from '@/components/Footer'
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
+import { logYourBody } from '@jovieinc/product-registry';
 import {
   Users,
   Heart,
@@ -16,63 +17,71 @@ import {
   Coffee,
   Home,
   Globe,
-} from 'lucide-react'
+} from 'lucide-react';
 
 export default function CareersPage() {
   const coreValues = [
     {
       icon: Heart,
-      title: "Health First",
-      description: "We're passionate about helping people understand their bodies and achieve their fitness goals through data-driven insights.",
+      title: 'Health First',
+      description:
+        "We're passionate about helping people understand their bodies and achieve their fitness goals through data-driven insights.",
     },
     {
       icon: Target,
-      title: "Precision & Accuracy",
-      description: "Every metric matters. We build tools that provide accurate, reliable data people can trust to make important health decisions.",
+      title: 'Precision & Accuracy',
+      description:
+        'Every metric matters. We build tools that provide accurate, reliable data people can trust to make important health decisions.',
     },
     {
       icon: Users,
-      title: "User-Centric Design",
-      description: "Our users' success is our success. We design every feature with real people and real use cases in mind.",
+      title: 'User-Centric Design',
+      description:
+        "Our users' success is our success. We design every feature with real people and real use cases in mind.",
     },
     {
       icon: Lightbulb,
-      title: "Innovation & Growth",
-      description: "We're always learning, experimenting, and pushing the boundaries of what's possible in fitness technology.",
+      title: 'Innovation & Growth',
+      description:
+        "We're always learning, experimenting, and pushing the boundaries of what's possible in fitness technology.",
     },
   ];
-
 
   const benefits = [
     {
       icon: Home,
-      title: "Remote-First Culture",
-      description: "Work from anywhere in the world. We believe great work happens when people have the flexibility they need.",
+      title: 'Remote-First Culture',
+      description:
+        'Work from anywhere in the world. We believe great work happens when people have the flexibility they need.',
     },
     {
       icon: Heart,
-      title: "Health & Wellness",
-      description: "Comprehensive health insurance, mental health support, and a $500 annual fitness stipend.",
+      title: 'Health & Wellness',
+      description:
+        'Comprehensive health insurance, mental health support, and a $500 annual fitness stipend.',
     },
     {
       icon: Coffee,
-      title: "Learning & Growth",
-      description: "$2,000 annual learning budget for courses, conferences, and books. We invest in your professional development.",
+      title: 'Learning & Growth',
+      description:
+        '$2,000 annual learning budget for courses, conferences, and books. We invest in your professional development.',
     },
     {
       icon: Clock,
-      title: "Flexible Schedule",
-      description: "Flexible working hours and unlimited PTO. We trust you to manage your time and deliver great work.",
+      title: 'Flexible Schedule',
+      description:
+        'Flexible working hours and unlimited PTO. We trust you to manage your time and deliver great work.',
     },
     {
       icon: Globe,
-      title: "Equity & Ownership",
-      description: "Every team member gets equity. When LogYourBody succeeds, everyone succeeds.",
+      title: 'Equity & Ownership',
+      description: 'Every team member gets equity. When LogYourBody succeeds, everyone succeeds.',
     },
     {
       icon: Users,
-      title: "Amazing Team",
-      description: "Work with passionate, talented people who care about making a real impact on people's health.",
+      title: 'Amazing Team',
+      description:
+        "Work with passionate, talented people who care about making a real impact on people's health.",
     },
   ];
 
@@ -86,12 +95,12 @@ Please find my resume attached, and I'd love to discuss how I can contribute to 
 
 Best regards,
 [Your Name]`);
-    
-    window.open(`mailto:careers@logyourbody.com?subject=${subject}&body=${body}`, '_blank');
+
+    window.open(`mailto:${logYourBody.contacts.careers}?subject=${subject}&body=${body}`, '_blank');
   };
 
   return (
-    <div className="min-h-screen bg-linear-bg font-inter">
+    <div className="bg-linear-bg font-inter min-h-screen">
       <Header />
 
       <main>
@@ -99,32 +108,36 @@ Best regards,
         <section className="py-16 md:py-24">
           <div className="container mx-auto px-4 sm:px-6">
             <div className="mx-auto max-w-4xl text-center">
-              <Badge className="mb-6 bg-linear-purple/10 text-linear-purple border-linear-purple/20 inline-block">
+              <Badge className="bg-linear-purple/10 text-linear-purple border-linear-purple/20 mb-6 inline-block">
                 Join Our Mission
               </Badge>
-              <h1 className="mb-6 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-linear-text">
+              <h1 className="text-linear-text mb-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
                 Help people track what
                 <br />
-                <span className="bg-gradient-to-r from-linear-purple via-linear-text to-linear-purple bg-clip-text text-transparent">
+                <span className="from-linear-purple via-linear-text to-linear-purple bg-gradient-to-r bg-clip-text text-transparent">
                   really matters
                 </span>
               </h1>
-              <p className="mx-auto mb-8 max-w-2xl text-lg text-linear-text-secondary">
-                We&apos;re building the future of body composition tracking. Join our remote-first team 
-                and help millions of people understand their bodies better.
+              <p className="text-linear-text-secondary mx-auto mb-8 max-w-2xl text-lg">
+                We&apos;re building the future of body composition tracking. Join our remote-first
+                team and help millions of people understand their bodies better.
               </p>
-              
-              <div className="flex flex-col sm:flex-row justify-center gap-4">
+
+              <div className="flex flex-col justify-center gap-4 sm:flex-row">
                 <Button
-                  className="bg-linear-text text-linear-bg px-8 py-4 text-base font-medium rounded-xl hover:bg-linear-text-secondary transition-all duration-200 hover:scale-105 shadow-lg"
-                  onClick={() => document.getElementById('open-positions')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="bg-linear-text text-linear-bg hover:bg-linear-text-secondary rounded-xl px-8 py-4 text-base font-medium shadow-lg transition-all duration-200 hover:scale-105"
+                  onClick={() =>
+                    document
+                      .getElementById('open-positions')
+                      ?.scrollIntoView({ behavior: 'smooth' })
+                  }
                 >
                   View Open Positions
                 </Button>
                 <Button
                   variant="ghost"
-                  className="border border-linear-border/50 text-linear-text-secondary hover:bg-linear-border/30 hover:text-linear-text px-8 py-4 text-base rounded-xl transition-all backdrop-blur-sm"
-                  onClick={() => handleApply("General Application")}
+                  className="border-linear-border/50 text-linear-text-secondary hover:bg-linear-border/30 hover:text-linear-text rounded-xl border px-8 py-4 text-base backdrop-blur-sm transition-all"
+                  onClick={() => handleApply('General Application')}
                 >
                   Apply Generally
                 </Button>
@@ -134,13 +147,13 @@ Best regards,
         </section>
 
         {/* Our Values */}
-        <section className="py-20 bg-linear-card/30">
+        <section className="bg-linear-card/30 py-20">
           <div className="container mx-auto px-4 sm:px-6">
             <div className="mb-16 text-center">
-              <h2 className="mb-4 text-3xl sm:text-4xl font-bold text-linear-text">
+              <h2 className="text-linear-text mb-4 text-3xl font-bold sm:text-4xl">
                 Our Core Values
               </h2>
-              <p className="mx-auto max-w-2xl text-lg text-linear-text-secondary">
+              <p className="text-linear-text-secondary mx-auto max-w-2xl text-lg">
                 These values guide everything we do, from product decisions to how we work together.
               </p>
             </div>
@@ -151,15 +164,13 @@ Best regards,
                 return (
                   <div
                     key={index}
-                    className="rounded-lg border border-linear-border bg-linear-bg p-6 text-center"
+                    className="border-linear-border bg-linear-bg rounded-lg border p-6 text-center"
                   >
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-linear-purple/10">
-                      <IconComponent className="h-6 w-6 text-linear-purple" />
+                    <div className="bg-linear-purple/10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg">
+                      <IconComponent className="text-linear-purple h-6 w-6" />
                     </div>
-                    <h3 className="mb-2 text-lg font-semibold text-linear-text">
-                      {value.title}
-                    </h3>
-                    <p className="text-sm text-linear-text-secondary leading-relaxed">
+                    <h3 className="text-linear-text mb-2 text-lg font-semibold">{value.title}</h3>
+                    <p className="text-linear-text-secondary text-sm leading-relaxed">
                       {value.description}
                     </p>
                   </div>
@@ -173,31 +184,32 @@ Best regards,
         <section id="open-positions" className="py-20">
           <div className="container mx-auto px-4 sm:px-6">
             <div className="mb-16 text-center">
-              <h2 className="mb-4 text-3xl sm:text-4xl font-bold text-linear-text">
+              <h2 className="text-linear-text mb-4 text-3xl font-bold sm:text-4xl">
                 Open Positions
               </h2>
-              <p className="mx-auto max-w-2xl text-lg text-linear-text-secondary">
-                We&apos;re looking for passionate people to join our mission. All positions are remote-first.
+              <p className="text-linear-text-secondary mx-auto max-w-2xl text-lg">
+                We&apos;re looking for passionate people to join our mission. All positions are
+                remote-first.
               </p>
             </div>
 
             <Card className="border-linear-border bg-linear-card">
-              <CardContent className="text-center py-16">
-                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-linear-purple/10">
-                  <Briefcase className="h-8 w-8 text-linear-purple/60" />
+              <CardContent className="py-16 text-center">
+                <div className="bg-linear-purple/10 mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full">
+                  <Briefcase className="text-linear-purple/60 h-8 w-8" />
                 </div>
-                <h3 className="mb-3 text-xl font-semibold text-linear-text">
-                  No Open Positions
-                </h3>
-                <p className="mb-6 text-linear-text-secondary max-w-md mx-auto">
-                  We don&apos;t have any open positions at the moment, but we&apos;re always interested in hearing from talented people who share our passion for health technology.
+                <h3 className="text-linear-text mb-3 text-xl font-semibold">No Open Positions</h3>
+                <p className="text-linear-text-secondary mx-auto mb-6 max-w-md">
+                  We don&apos;t have any open positions at the moment, but we&apos;re always
+                  interested in hearing from talented people who share our passion for health
+                  technology.
                 </p>
                 <Button
-                  onClick={() => handleApply("General Application")}
+                  onClick={() => handleApply('General Application')}
                   variant="outline"
                   className="border-linear-border text-linear-text hover:bg-linear-border/30"
                 >
-                  <Mail className="h-4 w-4 mr-2" />
+                  <Mail className="mr-2 h-4 w-4" />
                   Send General Application
                 </Button>
               </CardContent>
@@ -207,21 +219,21 @@ Best regards,
             <div className="mt-16 text-center">
               <Card className="border-linear-border bg-linear-card/50">
                 <CardHeader>
-                  <CardTitle className="text-xl text-linear-text">
+                  <CardTitle className="text-linear-text text-xl">
                     Don&apos;t see a perfect match?
                   </CardTitle>
                   <CardDescription className="text-linear-text-secondary">
-                    We&apos;re always looking for talented people who share our passion for health technology.
-                    Send us your resume and tell us how you&apos;d like to contribute.
+                    We&apos;re always looking for talented people who share our passion for health
+                    technology. Send us your resume and tell us how you&apos;d like to contribute.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Button
-                    onClick={() => handleApply("General Application")}
+                    onClick={() => handleApply('General Application')}
                     variant="outline"
                     className="border-linear-border text-linear-text hover:bg-linear-border/30"
                   >
-                    <Mail className="h-4 w-4 mr-2" />
+                    <Mail className="mr-2 h-4 w-4" />
                     Send General Application
                   </Button>
                 </CardContent>
@@ -231,13 +243,13 @@ Best regards,
         </section>
 
         {/* Benefits & Perks */}
-        <section className="py-20 bg-linear-card/30">
+        <section className="bg-linear-card/30 py-20">
           <div className="container mx-auto px-4 sm:px-6">
             <div className="mb-16 text-center">
-              <h2 className="mb-4 text-3xl sm:text-4xl font-bold text-linear-text">
+              <h2 className="text-linear-text mb-4 text-3xl font-bold sm:text-4xl">
                 Benefits & Perks
               </h2>
-              <p className="mx-auto max-w-2xl text-lg text-linear-text-secondary">
+              <p className="text-linear-text-secondary mx-auto max-w-2xl text-lg">
                 We believe in taking care of our team so they can do their best work.
               </p>
             </div>
@@ -248,15 +260,13 @@ Best regards,
                 return (
                   <div
                     key={index}
-                    className="rounded-lg border border-linear-border bg-linear-bg p-6"
+                    className="border-linear-border bg-linear-bg rounded-lg border p-6"
                   >
-                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-linear-purple/10">
-                      <IconComponent className="h-6 w-6 text-linear-purple" />
+                    <div className="bg-linear-purple/10 mb-4 flex h-12 w-12 items-center justify-center rounded-lg">
+                      <IconComponent className="text-linear-purple h-6 w-6" />
                     </div>
-                    <h3 className="mb-2 text-lg font-semibold text-linear-text">
-                      {benefit.title}
-                    </h3>
-                    <p className="text-sm text-linear-text-secondary leading-relaxed">
+                    <h3 className="text-linear-text mb-2 text-lg font-semibold">{benefit.title}</h3>
+                    <p className="text-linear-text-secondary text-sm leading-relaxed">
                       {benefit.description}
                     </p>
                   </div>
@@ -270,27 +280,31 @@ Best regards,
         <section className="py-20">
           <div className="container mx-auto px-4 sm:px-6">
             <div className="mx-auto max-w-4xl text-center">
-              <h2 className="mb-6 text-4xl sm:text-5xl font-bold tracking-tight text-linear-text">
+              <h2 className="text-linear-text mb-6 text-4xl font-bold tracking-tight sm:text-5xl">
                 Ready to make an impact?
               </h2>
-              <p className="mx-auto mb-8 max-w-2xl text-lg text-linear-text-secondary">
-                Join us in building the future of health tracking. Help millions of people 
+              <p className="text-linear-text-secondary mx-auto mb-8 max-w-2xl text-lg">
+                Join us in building the future of health tracking. Help millions of people
                 understand their bodies and achieve their fitness goals.
               </p>
-              
-              <div className="flex flex-col sm:flex-row justify-center gap-4">
+
+              <div className="flex flex-col justify-center gap-4 sm:flex-row">
                 <Button
-                  className="bg-linear-text text-linear-bg px-8 py-4 text-base font-medium rounded-xl hover:bg-linear-text-secondary transition-all duration-200 hover:scale-105 shadow-lg"
-                  onClick={() => document.getElementById('open-positions')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="bg-linear-text text-linear-bg hover:bg-linear-text-secondary rounded-xl px-8 py-4 text-base font-medium shadow-lg transition-all duration-200 hover:scale-105"
+                  onClick={() =>
+                    document
+                      .getElementById('open-positions')
+                      ?.scrollIntoView({ behavior: 'smooth' })
+                  }
                 >
                   Browse Positions
                 </Button>
                 <Button
                   variant="ghost"
-                  className="border border-linear-border/50 text-linear-text-secondary hover:bg-linear-border/30 hover:text-linear-text px-8 py-4 text-base rounded-xl transition-all backdrop-blur-sm"
-                  onClick={() => window.open("mailto:careers@logyourbody.com", '_blank')}
+                  className="border-linear-border/50 text-linear-text-secondary hover:bg-linear-border/30 hover:text-linear-text rounded-xl border px-8 py-4 text-base backdrop-blur-sm transition-all"
+                  onClick={() => window.open(`mailto:${logYourBody.contacts.careers}`, '_blank')}
                 >
-                  <Mail className="h-4 w-4 mr-2" />
+                  <Mail className="mr-2 h-4 w-4" />
                   Get in Touch
                 </Button>
               </div>
@@ -301,5 +315,5 @@ Best regards,
 
       <Footer />
     </div>
-  )
+  );
 }

@@ -21,7 +21,7 @@ struct PaywallView: View {
     @State private var showTermsSheet = false
     @State private var showPrivacySheet = false
     @State private var showLogoutConfirmation = false
-    @State private var selectedPackageIdentifier = "$rc_annual"
+    @State private var selectedPackageIdentifier = ProductRegistry.Paywall.annualPackageID
 
     var body: some View {
         ZStack {
@@ -77,7 +77,7 @@ struct PaywallView: View {
             Text(subscriptionManager.errorMessage ?? "No active subscription found")
         }
         .confirmationDialog(
-            "Log out of LogYourBody?",
+            "Log out of \(ProductRegistry.appName)?",
             isPresented: $showLogoutConfirmation,
             titleVisibility: .visible
         ) {
@@ -113,7 +113,9 @@ struct PaywallView: View {
 
     private var selectedPackage: PaywallPackageDisplay? {
         availablePrimaryPackages.first { $0.packageIdentifier == selectedPackageIdentifier }
-            ?? availablePrimaryPackages.first { $0.packageIdentifier == "$rc_annual" }
+            ?? availablePrimaryPackages.first {
+                $0.packageIdentifier == ProductRegistry.Paywall.annualPackageID
+            }
             ?? availablePrimaryPackages.first
     }
 
@@ -125,12 +127,12 @@ struct PaywallView: View {
                 .frame(width: 52, height: 52)
                 .background(Circle().fill(theme.colors.text.opacity(0.08)))
 
-            Text("LogYourBody Pro")
+            Text(ProductRegistry.Paywall.title)
                 .font(theme.typography.headlineLarge)
                 .foregroundStyle(theme.colors.text)
                 .accessibilityIdentifier("paywall_title")
 
-            Text("A clear, private view of your progress.")
+            Text(ProductRegistry.Paywall.subtitle)
                 .font(theme.typography.bodySmall)
                 .foregroundStyle(theme.colors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -139,7 +141,7 @@ struct PaywallView: View {
     }
 
     private var valueProposition: some View {
-        Text("Log quickly. See weight, body fat, FFMI, and your trend in one place.")
+        Text(ProductRegistry.Paywall.valueProposition)
             .font(theme.typography.bodyMedium)
             .foregroundStyle(theme.colors.textSecondary)
             .multilineTextAlignment(.center)
@@ -420,7 +422,9 @@ struct PaywallView: View {
             .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Subscription%20plans%20unavailable"
         let body = "I cannot load subscription plans in the iOS app."
             .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        guard let url = URL(string: "mailto:support@logyourbody.com?subject=\(subject)&body=\(body)") else {
+        guard let url = URL(
+            string: "mailto:\(ProductRegistry.supportEmail)?subject=\(subject)&body=\(body)"
+        ) else {
             return
         }
         openURL(url)

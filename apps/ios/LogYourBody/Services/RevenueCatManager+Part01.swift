@@ -178,8 +178,8 @@ var primaryPaywallPackages: [Package] {
             return []
         }
 
-        let monthly = offering.package(identifier: "$rc_monthly")
-        let annual = offering.package(identifier: "$rc_annual")
+        let monthly = offering.package(identifier: ProductRegistry.Paywall.monthlyPackageID)
+        let annual = offering.package(identifier: ProductRegistry.Paywall.annualPackageID)
         let primaryPackages = [monthly, annual].compactMap { $0 }
 
         if !primaryPackages.isEmpty {
@@ -429,7 +429,7 @@ func makePaywallPackageDisplay(
         let trialText = getTrialDurationText(package: package)
         let savingsText: String?
 
-        if package.identifier == "$rc_annual",
+        if package.identifier == ProductRegistry.Paywall.annualPackageID,
            let monthlyPackage,
            let savingsPercent = PaywallSavingsPolicy.savingsPercent(
             monthlyPrice: monthlyPackage.storeProduct.price,
@@ -512,7 +512,7 @@ func planIdentifierSuffix(for package: Package) -> String {
     }
 
 func annualMonthlyEquivalentText(for package: Package) -> String? {
-        guard package.identifier == "$rc_annual",
+        guard package.identifier == ProductRegistry.Paywall.annualPackageID,
               let monthlyEquivalent = PaywallSavingsPolicy.monthlyEquivalent(annualPrice: package.storeProduct.price),
               let formatter = package.storeProduct.priceFormatter else {
             return nil
@@ -555,16 +555,16 @@ func applyCachedPaywallOfferingUITestFixture() {
                 generatedAt: Date(),
                 packages: [
                     CachedPaywallOfferingDisplay.PackageDisplay(
-                        packageIdentifier: "$rc_annual",
-                        productIdentifier: "com.logyourbody.app.pro1.annual.3daytrial",
-                        localizedPrice: "$79.99",
+                        packageIdentifier: ProductRegistry.Paywall.annualPackageID,
+                        productIdentifier: ProductRegistry.Paywall.annualProductID,
+                        localizedPrice: ProductRegistry.Paywall.annualReferenceLocalizedPrice,
                         billingPeriod: "year",
                         trialText: "3 days free"
                     ),
                     CachedPaywallOfferingDisplay.PackageDisplay(
-                        packageIdentifier: "$rc_monthly",
-                        productIdentifier: "com.logyourbody.app.pro1.monthly.3daytrial",
-                        localizedPrice: "$9.99",
+                        packageIdentifier: ProductRegistry.Paywall.monthlyPackageID,
+                        productIdentifier: ProductRegistry.Paywall.monthlyProductID,
+                        localizedPrice: ProductRegistry.Paywall.monthlyReferenceLocalizedPrice,
                         billingPeriod: "month",
                         trialText: "3 days free"
                     )
@@ -579,9 +579,9 @@ func applyPaywallPlansUITestFixture() {
 
         let monthlyProduct = TestStoreProduct(
             localizedTitle: "LogYourBody Pro Monthly",
-            price: fixtureDecimal("9.99"),
-            localizedPriceString: "$9.99",
-            productIdentifier: "com.logyourbody.app.pro1.monthly.3daytrial",
+            price: fixtureDecimal(ProductRegistry.Paywall.monthlyReferencePrice),
+            localizedPriceString: ProductRegistry.Paywall.monthlyReferenceLocalizedPrice,
+            productIdentifier: ProductRegistry.Paywall.monthlyProductID,
             productType: .autoRenewableSubscription,
             localizedDescription: "Monthly LogYourBody Pro subscription",
             subscriptionGroupIdentifier: "logyourbody_pro",
@@ -590,9 +590,9 @@ func applyPaywallPlansUITestFixture() {
         ).toStoreProduct()
         let annualProduct = TestStoreProduct(
             localizedTitle: "LogYourBody Pro Annual",
-            price: fixtureDecimal("69.99"),
-            localizedPriceString: "$69.99",
-            productIdentifier: "com.logyourbody.app.pro1.annual.3daytrial",
+            price: fixtureDecimal(ProductRegistry.Paywall.annualReferencePrice),
+            localizedPriceString: ProductRegistry.Paywall.annualReferenceLocalizedPrice,
+            productIdentifier: ProductRegistry.Paywall.annualProductID,
             productType: .autoRenewableSubscription,
             localizedDescription: "Annual LogYourBody Pro subscription",
             subscriptionGroupIdentifier: "logyourbody_pro",
@@ -601,14 +601,14 @@ func applyPaywallPlansUITestFixture() {
         ).toStoreProduct()
         let packages = [
             Package(
-                identifier: "$rc_monthly",
+                identifier: ProductRegistry.Paywall.monthlyPackageID,
                 packageType: .monthly,
                 storeProduct: monthlyProduct,
                 offeringIdentifier: "ui_test_paywall",
                 webCheckoutUrl: nil
             ),
             Package(
-                identifier: "$rc_annual",
+                identifier: ProductRegistry.Paywall.annualPackageID,
                 packageType: .annual,
                 storeProduct: annualProduct,
                 offeringIdentifier: "ui_test_paywall",

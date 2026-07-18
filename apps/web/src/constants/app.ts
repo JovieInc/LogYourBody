@@ -1,50 +1,55 @@
-// Central constants file for LogYourBody
-// These values should be kept in sync with iOS app constants
+import { logYourBody } from '@jovieinc/product-registry';
+
+const proPlan = logYourBody.plans[0];
+const monthlyEquivalent = Number((proPlan.pricing.annual.amount / 12).toFixed(2));
+const annualAtMonthlyPrice = proPlan.pricing.monthly.amount * 12;
+const annualSavings = Number((annualAtMonthlyPrice - proPlan.pricing.annual.amount).toFixed(2));
+const annualSavingsPercent = Math.round((annualSavings / annualAtMonthlyPrice) * 100);
 
 export const APP_CONFIG = {
   // App Identity
-  appName: 'LogYourBody',
-  appNameShort: 'LYB',
-  companyName: 'LogYourBody, Inc.',
+  appName: logYourBody.identity.name,
+  appNameShort: logYourBody.identity.shortName,
+  companyName: logYourBody.identity.legalName,
 
   // App Store Links
-  appStoreUrl: 'https://apps.apple.com/us/app/logyourbody/id6755209876',
+  appStoreUrl: logYourBody.links.appStore,
   playStoreUrl: 'https://play.google.com/store/apps/details?id=com.logyourbody.app', // Coming soon
 
   // Trial & Subscription
-  trialLengthDays: 3,
-  trialLengthText: '3-day free trial',
+  trialLengthDays: proPlan.trialDays,
+  trialLengthText: `${proPlan.trialDays}-day free trial`,
 
   // Pricing (in USD)
   pricing: {
     monthly: {
-      price: 9.99,
+      price: proPlan.pricing.monthly.amount,
       period: 'month',
-      yearlyTotal: 119.88,
+      yearlyTotal: annualAtMonthlyPrice,
     },
     annual: {
-      price: 69.99,
+      price: proPlan.pricing.annual.amount,
       period: 'year',
-      monthlyEquivalent: 5.83,
-      savings: 49.89,
-      savingsPercent: 42,
+      monthlyEquivalent,
+      savings: annualSavings,
+      savingsPercent: annualSavingsPercent,
     },
   },
 
   // Social Media URLs
   social: {
     twitter: 'https://twitter.com/logyourbody',
-    github: 'https://github.com/JovieInc/LogYourBody',
+    github: logYourBody.links.github,
     instagram: 'https://instagram.com/logyourbody',
     youtube: 'https://youtube.com/@logyourbody',
   },
 
   // Contact
   contact: {
-    support: 'support@logyourbody.com',
-    privacy: 'privacy@logyourbody.com',
-    legal: 'legal@logyourbody.com',
-    careers: 'careers@logyourbody.com',
+    support: logYourBody.contacts.support,
+    privacy: logYourBody.contacts.privacy,
+    legal: logYourBody.contacts.legal,
+    careers: logYourBody.contacts.careers,
   },
 
   // Company Info
@@ -70,9 +75,6 @@ export const APP_CONFIG = {
   metadata: {
     currentVersion: '2.0.0',
     minimumIOSVersion: '15.0',
-    appStoreRating: 4.9,
-    totalUsers: '10,000+',
-    successRate: '93%',
   },
 
   // API & Backend

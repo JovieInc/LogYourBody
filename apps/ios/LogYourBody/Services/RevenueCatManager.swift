@@ -22,9 +22,9 @@ struct CachedPaywallOfferingDisplay: Codable, Equatable {
     let packages: [PackageDisplay]
 
     var preferredPackage: PackageDisplay? {
-        packages.first { $0.packageIdentifier == "$rc_annual" }
+        packages.first { $0.packageIdentifier == ProductRegistry.Paywall.annualPackageID }
             ?? packages.first { $0.billingPeriod == "year" }
-            ?? packages.first { $0.packageIdentifier == "$rc_monthly" }
+            ?? packages.first { $0.packageIdentifier == ProductRegistry.Paywall.monthlyPackageID }
             ?? packages.first
     }
 

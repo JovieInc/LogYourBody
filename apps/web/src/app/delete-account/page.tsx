@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { Download, Mail, ShieldCheck, Smartphone } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
+import { logYourBody } from '@jovieinc/product-registry';
 
 const deletionRequestHref =
-  'mailto:support@logyourbody.com' +
+  `mailto:${logYourBody.contacts.support}` +
   '?subject=' +
   encodeURIComponent('LogYourBody Account Deletion Request') +
   '&body=' +

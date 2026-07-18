@@ -210,7 +210,9 @@ export function LandingPageConversionSections({
             Less than your protein powder
           </h2>
           <p className="text-linear-text-secondary text-lg sm:text-xl">
-            3 days free. Then $5.83/month. Cancel anytime.
+            {APP_CONFIG.trialLengthDays} days free. Then $
+            {APP_CONFIG.pricing.annual.monthlyEquivalent}/month when billed annually. Cancel
+            anytime.
           </p>
         </div>
 
@@ -419,8 +421,8 @@ export function LandingPageConversionSections({
               </span>
             </h2>
             <p className="text-linear-text-secondary mx-auto mb-12 max-w-2xl text-lg leading-relaxed sm:text-xl">
-              Join 10,000+ people who&apos;ve discovered the difference accurate body composition
-              tracking makes. Stop guessing, start measuring.
+              Put weight, body composition, HealthKit, and progress photos on one private timeline.
+              Stop guessing and see the trend.
             </p>
 
             <div className="mb-8 flex flex-col justify-center gap-4 sm:flex-row">

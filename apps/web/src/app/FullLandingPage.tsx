@@ -26,11 +26,12 @@ import { APP_CONFIG } from '@/constants/app';
 import { analytics } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { getPricingPlanNote, landingSectionHeadings } from './home-page-copy';
+import { logYourBody } from '@jovieinc/product-registry';
 
 const proofStats = [
   { value: '30 sec', label: 'average log time' },
   { value: '3', label: 'body fat methods' },
-  { value: '4.9/5', label: 'App Store rating' },
+  { value: '1', label: 'private timeline' },
   { value: APP_CONFIG.trialLengthText, label: 'before billing' },
 ];
 
@@ -109,9 +110,9 @@ const timeline = [
 ];
 
 const socialStats = [
-  { value: '10k+', label: 'people tracking' },
-  { value: '500k+', label: 'measurements logged' },
-  { value: '93%', label: 'goal follow-through' },
+  { value: 'iOS', label: 'native by default' },
+  { value: 'HealthKit', label: 'data connection' },
+  { value: '1', label: 'private timeline' },
   { value: '0', label: 'ads or feeds' },
 ];
 
@@ -139,13 +140,9 @@ const deepDives = [
   },
 ];
 
-const planFeatures = [
-  'Body fat, FFMI, lean mass, and weight trends',
-  'Progress photo reminders and comparisons',
-  'Apple Health weight and step sync',
-  'Private export whenever you want it',
-  'Short weekly progress summaries',
-];
+const planFeatures = logYourBody.features
+  .filter((feature) => feature.marketing)
+  .map((feature) => feature.name);
 
 export function FullLandingPage() {
   const [isAnnual, setIsAnnual] = useState(true);
@@ -484,7 +481,7 @@ export function FullLandingPage() {
                 <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-6">
                   <div>
                     <div className="text-white/46 text-sm font-medium uppercase">
-                      LogYourBody Pro
+                      {logYourBody.messages.paywall.title}
                     </div>
                     <div className="mt-3 flex items-end gap-2">
                       <span className="text-5xl font-semibold text-white">
