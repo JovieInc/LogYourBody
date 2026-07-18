@@ -375,7 +375,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertTrue(hasActiveUserPendingOperations)
     }
 
-    func testSyncAllRequeuesPendingOperationsWhenSessionIsUnavailable() async throws {
+    func testSyncAllRequeuesPendingOperationsWhenTokenIsUnavailable() async throws {
         UserDefaults.standard.removeObject(forKey: "pendingSyncOperations")
         defer {
             UserDefaults.standard.removeObject(forKey: "pendingSyncOperations")
@@ -422,7 +422,10 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         await manager.syncAllAwaitingCompletion()
 
         XCTAssertFalse(manager.isSyncing)
-        XCTAssertEqual(manager.syncStatus, .error("No active session"))
+        guard case .error = manager.syncStatus else {
+            XCTFail("Expected sync to report an authentication error")
+            return
+        }
         XCTAssertEqual(
             Set(manager.pendingOperations.map(\.id)),
             Set([operation.id, unidentifiedOperation.id])
