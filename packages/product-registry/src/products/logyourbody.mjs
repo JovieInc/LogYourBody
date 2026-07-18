@@ -14,7 +14,7 @@ export const logYourBody = {
     promise: 'Answer “How am I doing?” with one private body-composition timeline.',
     slogan: 'Know if the work is working.',
     description:
-      'Weight, body fat, lean mass, HealthKit data, and progress photos in one private timeline that shows the trend.',
+      'Weight, body fat, lean mass, HealthKit, and progress photos in one private timeline.',
     voice: ['clear', 'concise', 'evidence-based', 'non-judgmental', 'private'],
     colors: { background: '#08090A', foreground: '#F7F8F8', accent: '#5E6AD2' },
     logos: {

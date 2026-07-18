@@ -9,7 +9,7 @@ Canonical source: `packages/product-registry/src/products/logyourbody.mjs`. Web 
 ## Brand and messaging
 
 - Slogan: **Know if the work is working.**
-- Description: Weight, body fat, lean mass, HealthKit data, and progress photos in one private timeline that shows the trend.
+- Description: Weight, body fat, lean mass, HealthKit, and progress photos in one private timeline.
 - Voice: clear, concise, evidence-based, non-judgmental, private
 - Support: support@logyourbody.com
 
