@@ -469,9 +469,9 @@ func cleanInvalidBodyMetrics() -> Int {
 
 func repairCorruptedEntries() async -> Int {
         let context = persistentContainer.viewContext
-        let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-
         return await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+
             do {
                 let allMetrics = try context.fetch(request)
                 var repairedCount = 0
