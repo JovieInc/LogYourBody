@@ -91,6 +91,13 @@ struct LegalDocumentView: View {
         }
         .navigationTitle(documentType.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
         .onAppear {
             loadDocument()
         }
@@ -102,7 +109,7 @@ struct LegalDocumentView: View {
 
         // Try to load from Resources/Legal directory in bundle
         if let bundlePath = Bundle.main.path(forResource: "Legal/\(documentType.filename)", ofType: "md"),
-           let content = try? String(contentsOfFile: bundlePath) {
+           let content = try? String(contentsOfFile: bundlePath, encoding: .utf8) {
             documentContent = content
             isLoading = false
             return
@@ -110,7 +117,7 @@ struct LegalDocumentView: View {
 
         // Try alternate path without subfolder
         if let bundlePath = Bundle.main.path(forResource: documentType.filename, ofType: "md", inDirectory: "Legal"),
-           let content = try? String(contentsOfFile: bundlePath) {
+           let content = try? String(contentsOfFile: bundlePath, encoding: .utf8) {
             documentContent = content
             isLoading = false
             return
@@ -118,7 +125,7 @@ struct LegalDocumentView: View {
 
         // Try without any directory
         if let bundlePath = Bundle.main.path(forResource: documentType.filename, ofType: "md"),
-           let content = try? String(contentsOfFile: bundlePath) {
+           let content = try? String(contentsOfFile: bundlePath, encoding: .utf8) {
             documentContent = content
             isLoading = false
             return

@@ -48,7 +48,7 @@ class TimelineDataProvider: ObservableObject {
 
         // Find nearest photo within window
         var nearest: BodyMetrics?
-        var smallestDiff: TimeInterval = window
+        var smallestDiff: TimeInterval = .infinity
 
         for metric in metricsWithPhotos {
             let diff = abs(metric.date.timeIntervalSince(date))
@@ -67,7 +67,7 @@ class TimelineDataProvider: ObservableObject {
     private func findNearestMetrics(to date: Date, within window: TimeInterval) -> TimelineDataResult.MetricsResult? {
         // First try to find exact or nearest metric date
         var nearest: BodyMetrics?
-        var smallestDiff: TimeInterval = window
+        var smallestDiff: TimeInterval = .infinity
 
         for metric in bodyMetrics {
             let hasData = metric.weight != nil || metric.bodyFatPercentage != nil
@@ -185,7 +185,7 @@ class TimelineDataProvider: ObservableObject {
 
         // Convert to anchors with time-weighted positions
         return sampledMetrics.map { metric in
-            let position = calculateTimeWeightedPosition(
+            let position = position(
                 for: metric.date,
                 from: firstDate,
                 to: lastDate
@@ -220,7 +220,7 @@ class TimelineDataProvider: ObservableObject {
 
     /// Calculate time-weighted position (0.0 to 1.0)
     /// Last 30 days get 70% of space, next 11 months get 20%, older gets 10%
-    private func calculateTimeWeightedPosition(for date: Date, from startDate: Date, to endDate: Date) -> Double {
+    func position(for date: Date, from startDate: Date, to endDate: Date) -> Double {
         let totalRange = endDate.timeIntervalSince(startDate)
         guard totalRange > 0 else { return 0.5 }
 
@@ -230,7 +230,6 @@ class TimelineDataProvider: ObservableObject {
 
         if date >= thirtyDaysAgo {
             // Last 30 days: 0.3 to 1.0 (70% of space)
-            let rangeStart = thirtyDaysAgo.timeIntervalSince(startDate)
             let rangeSize = now.timeIntervalSince(thirtyDaysAgo)
             let offset = date.timeIntervalSince(thirtyDaysAgo)
             return 0.3 + (offset / rangeSize) * 0.7
@@ -267,25 +266,31 @@ class TimelineDataProvider: ObservableObject {
 
     /// Convert timeline position (0.0-1.0) back to date using time weighting
     func dateFromPosition(_ position: Double, from startDate: Date, to endDate: Date) -> Date {
+        guard startDate <= endDate else { return startDate }
+
+        let clampedPosition = min(max(position, 0), 1)
         let now = endDate
         let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: now) ?? now
         let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: now) ?? now
+        let resolvedDate: Date
 
-        if position >= 0.3 {
+        if clampedPosition >= 0.3 {
             // Last 30 days zone
-            let normalized = (position - 0.3) / 0.7
+            let normalized = (clampedPosition - 0.3) / 0.7
             let interval = now.timeIntervalSince(thirtyDaysAgo)
-            return thirtyDaysAgo.addingTimeInterval(normalized * interval)
-        } else if position >= 0.1 {
+            resolvedDate = thirtyDaysAgo.addingTimeInterval(normalized * interval)
+        } else if clampedPosition >= 0.1 {
             // 30 days to 1 year zone
-            let normalized = (position - 0.1) / 0.2
+            let normalized = (clampedPosition - 0.1) / 0.2
             let interval = thirtyDaysAgo.timeIntervalSince(oneYearAgo)
-            return oneYearAgo.addingTimeInterval(normalized * interval)
+            resolvedDate = oneYearAgo.addingTimeInterval(normalized * interval)
         } else {
             // Older than 1 year zone
-            let normalized = position / 0.1
+            let normalized = clampedPosition / 0.1
             let interval = oneYearAgo.timeIntervalSince(startDate)
-            return startDate.addingTimeInterval(normalized * interval)
+            resolvedDate = startDate.addingTimeInterval(normalized * interval)
         }
+
+        return min(max(resolvedDate, startDate), endDate)
     }
 }

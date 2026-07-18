@@ -2,7 +2,8 @@ import SwiftUI
 import UIKit
 import Photos
 
-struct BodyScoreSharePayload {
+struct BodyScoreSharePayload: Identifiable {
+    let id = UUID()
     let score: Int
     let scoreText: String
     let tagline: String
@@ -106,6 +107,7 @@ struct BodyScoreShareCardView: View {
 
 struct BodyScoreShareSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.displayScale) private var displayScale
 
     let payload: BodyScoreSharePayload
 
@@ -203,7 +205,7 @@ struct BodyScoreShareSheet: View {
                 .frame(width: size.width, height: size.height)
                 .environment(\.colorScheme, .dark)
         )
-        renderer.scale = UIScreen.main.scale
+        renderer.scale = displayScale
         renderedImage = renderer.uiImage
     }
 

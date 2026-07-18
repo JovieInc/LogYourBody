@@ -2,7 +2,6 @@ import SwiftUI
 
 struct BodyScoreEmailCaptureView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
-    @FocusState private var emailFieldFocused: Bool
     @State private var emailError: String?
     @State private var showWhyEmail = false
 
@@ -21,13 +20,12 @@ struct BodyScoreEmailCaptureView: View {
                             text: Binding(
                                 get: { viewModel.emailAddress },
                                 set: { viewModel.emailAddress = $0 }
-                            ),
-                            keyboardType: .emailAddress
-                        )
-                        .focused($emailFieldFocused)
-                        .onChange(of: viewModel.emailAddress) { _, _ in
-                            updateEmailError()
-                        }
+                        ),
+                        keyboardType: .emailAddress
+                    )
+                    .onChange(of: viewModel.emailAddress) { _, _ in
+                        updateEmailError()
+                    }
 
                         if let error = emailError {
                             Text(error)
@@ -72,22 +70,7 @@ struct BodyScoreEmailCaptureView: View {
                 .opacity(continueButtonOpacity)
             }
         )
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                self.emailFieldFocused = true
-            }
-            updateEmailError()
-        }
-        .toolbar {
-            ToolbarItem(placement: .keyboard) {
-                HStack {
-                    Spacer()
-                    Button("Done") {
-                        emailFieldFocused = false
-                    }
-                }
-            }
-        }
+        .onAppear(perform: updateEmailError)
     }
 }
 

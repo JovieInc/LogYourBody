@@ -4,11 +4,15 @@ final class PreAuthOnboardingStore {
     static let shared = PreAuthOnboardingStore()
 
     private let userDefaults: UserDefaults
-    private let storageKey = "preAuthOnboarding.bodyScore"
+    private let storageKey: String
     private let queue = DispatchQueue(label: "com.logyourbody.onboarding.preAuthStore", qos: .utility)
 
-    private init(userDefaults: UserDefaults = .standard) {
+    init(
+        userDefaults: UserDefaults = .standard,
+        storageKey: String = "preAuthOnboarding.bodyScore"
+    ) {
         self.userDefaults = userDefaults
+        self.storageKey = storageKey
     }
 
     func save(input: BodyScoreInput, result: BodyScoreResult) {

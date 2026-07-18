@@ -7,7 +7,7 @@ import SwiftUI
 // MARK: - BiometricAuthView Organism
 
 struct BiometricAuthView: View {
-    enum BiometricType {
+    enum BiometricType: Equatable {
         case faceID
         case touchID
 
@@ -26,6 +26,15 @@ struct BiometricAuthView: View {
                 return "Face ID"
             case .touchID:
                 return "Touch ID"
+            }
+        }
+
+        var troubleshootingHint: String {
+            switch self {
+            case .faceID:
+                return "Make sure the TrueDepth camera is clean and visible."
+            case .touchID:
+                return "Make sure your finger covers the Touch ID sensor."
             }
         }
     }
@@ -80,7 +89,7 @@ struct BiometricAuthView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.linearText)
 
-                    Text("Make sure the TrueDepth camera is clean and visible.")
+                    Text(biometricType.troubleshootingHint)
                         .font(.system(size: 15))
                         .foregroundColor(.linearTextSecondary)
                         .multilineTextAlignment(.center)
@@ -113,13 +122,13 @@ struct BiometricAuthView: View {
             )
 
             VStack(spacing: 8) {
-                Text("If \(biometricType.title) keeps failing, you can continue without it.")
+                Text("If \(biometricType.title) keeps failing, use your device passcode.")
                     .font(.system(size: 13))
                     .foregroundColor(.linearTextTertiary)
                     .multilineTextAlignment(.center)
 
                 DSAuthLink(
-                    title: "Continue without \(biometricType.title)",
+                    title: "Use device passcode",
                     action: onUsePassword
                 )
             }

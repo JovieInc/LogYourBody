@@ -105,14 +105,14 @@ struct BaseTextField: View {
                 .onSubmit {
                     onSubmit?()
                 }
-                .onChange(of: text) { newValue in
+                .onChange(of: text) { _, newValue in
                     if let limit = configuration.characterLimit, newValue.count > limit {
                         text = String(newValue.prefix(limit))
                     }
                     onChange?(newValue)
                 }
                 .focused($isFocused)
-                .onChange(of: isFocused) { isFocused in
+                .onChange(of: isFocused) { _, isFocused in
                     onEditingChanged?(isFocused)
                 }
 

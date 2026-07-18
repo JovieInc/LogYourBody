@@ -219,20 +219,6 @@ class RevenueCatManager: NSObject, ObservableObject {
             let offerings = try await Purchases.shared.offerings()
             await MainActor.run {
                 self.currentOffering = offerings.current
-                // print("💰 Fetched \(offerings.all.count) offerings")
-
-                // Debug: Print details about current offering
-                if let current = offerings.current {
-                    // print("💰 Current offering: \(current.identifier)")
-                    // print("💰 Available packages: \(current.availablePackages.count)")
-                    for package in current.availablePackages {
-                        // print("  📦 Package: \(package.identifier)")
-                        // print("     Price: \(package.localizedPriceString)")
-                        // print("     Product: \(package.storeProduct.productIdentifier)")
-                    }
-                } else {
-                    // print("⚠️ No current offering available")
-                }
             }
         } catch {
             let appError = AppError.billing(operation: "fetchOfferings", underlying: error)

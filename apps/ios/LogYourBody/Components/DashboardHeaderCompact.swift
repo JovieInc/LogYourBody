@@ -189,6 +189,7 @@ struct DashboardHeaderCompact: View {
 
     private func handleSyncIndicatorStatusChange() {
         guard isSyncError else {
+            guard isSyncIndicatorExpanded else { return }
             withAnimation(.easeOut(duration: 0.25)) {
                 isSyncIndicatorExpanded = false
             }

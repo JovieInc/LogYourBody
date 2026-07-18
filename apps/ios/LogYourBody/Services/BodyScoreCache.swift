@@ -6,11 +6,15 @@ final class BodyScoreCache {
     static let shared = BodyScoreCache()
 
     private let userDefaults: UserDefaults
-    private let storageKey = "bodyScoreCache.latestResults"
+    private let storageKey: String
     private var cache: [String: BodyScoreResult] = [:]
 
-    private init(userDefaults: UserDefaults = .standard) {
+    init(
+        userDefaults: UserDefaults = .standard,
+        storageKey: String = "bodyScoreCache.latestResults"
+    ) {
         self.userDefaults = userDefaults
+        self.storageKey = storageKey
         loadFromDisk()
     }
 

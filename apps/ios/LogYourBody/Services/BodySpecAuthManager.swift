@@ -252,6 +252,12 @@ final class BodySpecAuthManager: NSObject, ASWebAuthenticationPresentationContex
             }
         }
 
-        return UIWindow()
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first else {
+            preconditionFailure("Web authentication requires an active window scene.")
+        }
+
+        return UIWindow(windowScene: windowScene)
     }
 }

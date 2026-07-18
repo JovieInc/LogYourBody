@@ -3,7 +3,6 @@ import SwiftUI
 struct BodyScoreRevealView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @State private var animateScore = false
-    @State private var isSharePresented = false
     @State private var sharePayload: BodyScoreSharePayload?
 
     private var percentileGroupLabel: String {
@@ -56,7 +55,6 @@ struct BodyScoreRevealView: View {
 
                         OnboardingTextButton(title: "Share my score") {
                             sharePayload = makeSharePayload(from: result)
-                            isSharePresented = sharePayload != nil
                         }
                     }
                 }
@@ -75,10 +73,8 @@ struct BodyScoreRevealView: View {
                 animateScore = false
             }
         }
-        .sheet(isPresented: $isSharePresented) {
-            if let payload = sharePayload {
-                BodyScoreShareSheet(payload: payload)
-            }
+        .sheet(item: $sharePayload) { payload in
+            BodyScoreShareSheet(payload: payload)
         }
     }
 

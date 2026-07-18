@@ -4,6 +4,7 @@ import Foundation
 /// Simple test double for HealthSyncCoordinating, allowing tests to assert
 /// which HealthKit-related operations were invoked without touching real
 /// HealthKit or background delivery.
+@MainActor
 final class MockHealthSyncCoordinator: HealthSyncCoordinating {
     private(set) var didCallBootstrapIfNeeded = false
     private(set) var lastBootstrapSyncEnabled: Bool?

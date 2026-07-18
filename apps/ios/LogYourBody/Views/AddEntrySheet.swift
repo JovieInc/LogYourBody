@@ -55,6 +55,8 @@ struct AddEntrySheet: View {
     @State private var isPresentingGlp1AddMedication = false
     @State private var glp1UseCustomDose = false
     @State private var glp1UserId: String?
+    @State private var hasStartedLoadingGlp1Medications = false
+    @State private var glp1MedicationLoadError: String?
 
     @State private var showError = false
     @State private var errorMessage = ""
@@ -164,13 +166,12 @@ struct AddEntrySheet: View {
                 }
 
                 glp1UserId = authManager.currentUser?.id
-                if let userId = glp1UserId {
-                    Task {
-                        await loadGlp1Medications(userId: userId)
-                    }
-                }
+                loadGlp1MedicationsIfNeeded()
 
                 AnalyticsService.shared.track(event: "add_entry_view")
+            }
+            .onChange(of: selectedTab) { _, _ in
+                loadGlp1MedicationsIfNeeded()
             }
         }
     }
@@ -259,7 +260,7 @@ struct AddEntrySheet: View {
                         .padding(.vertical, 4)
                     }
 
-                    if let medication = glp1SelectedMedication {
+                    if glp1SelectedMedication != nil {
                         let options = glp1DoseOptions
                         let unit = glp1UnitForSelectedMedication ?? glp1DoseUnit
 
@@ -337,6 +338,23 @@ struct AddEntrySheet: View {
                             glp1DoseUnit = unit
                         }
                     }
+                }
+            }
+
+            if let loadError = glp1MedicationLoadError {
+                HStack(spacing: 12) {
+                    Text(loadError)
+                        .font(.appBodySmall)
+                        .foregroundColor(.appTextSecondary)
+
+                    Spacer()
+
+                    Button("Try again") {
+                        hasStartedLoadingGlp1Medications = false
+                        loadGlp1MedicationsIfNeeded()
+                    }
+                    .font(.appBodySmall.weight(.semibold))
+                    .accessibilityIdentifier("retry-glp1-medications")
                 }
             }
 
@@ -886,8 +904,25 @@ struct AddEntrySheet: View {
     }
 
     @MainActor
+    private func loadGlp1MedicationsIfNeeded() {
+        guard selectedTab == 3,
+              let userId = glp1UserId,
+              !hasStartedLoadingGlp1Medications else {
+            return
+        }
+
+        hasStartedLoadingGlp1Medications = true
+        Task {
+            await loadGlp1Medications(userId: userId)
+        }
+    }
+
+    @MainActor
     private func loadGlp1Medications(userId: String) async {
         glp1IsLoadingMedications = true
+        glp1MedicationLoadError = nil
+        defer { glp1IsLoadingMedications = false }
+
         let cached = await CoreDataManager.shared.fetchGlp1Medications(for: userId)
         if !cached.isEmpty {
             glp1Medications = cached.sorted { $0.startedAt < $1.startedAt }
@@ -909,10 +944,12 @@ struct AddEntrySheet: View {
                 selectedGlp1MedicationId = active.id
                 applyDefaultDoseConfig(for: active)
             }
+        } catch is CancellationError {
+            hasStartedLoadingGlp1Medications = false
         } catch {
+            hasStartedLoadingGlp1Medications = false
+            glp1MedicationLoadError = "Couldn’t load medications. Try again."
         }
-
-        glp1IsLoadingMedications = false
     }
 
     private func applyDefaultDoseConfig(for medication: Glp1Medication) {

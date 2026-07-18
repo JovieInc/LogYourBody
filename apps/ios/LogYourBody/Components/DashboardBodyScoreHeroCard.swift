@@ -6,7 +6,10 @@ struct BodyScoreGaugeView: View {
     var body: some View {
         GeometryReader { geometry in
             let width = geometry.size.width
-            let radius = width * 0.45
+            // The dashboard card expands on iPad, but the score ring should retain
+            // its phone-scale visual weight instead of overflowing the card.
+            let diameter = min(width * 0.9, 320)
+            let radius = diameter / 2
             let lineWidth: CGFloat = 10
             let progress = max(0, min(Double(score) / 100.0, 1.0))
 

@@ -170,6 +170,7 @@ private struct TaskRow: View {
                         .foregroundColor(.appTextTertiary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Cancel \(task.type.rawValue)")
             }
         }
         .padding()

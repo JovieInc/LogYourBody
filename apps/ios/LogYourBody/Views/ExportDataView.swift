@@ -13,7 +13,7 @@ struct ExportDataView: View {
     @State private var isExporting = false
     @State private var exportProgress: Double = 0
     @State private var showShareSheet = false
-    @State private var exportedFileURL: URL?
+    @State private var exportedFileURLs: [URL] = []
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var selectedFormats: Set<ExportFormat> = [.json]
@@ -114,6 +114,7 @@ struct ExportDataView: View {
                                             }
                                         )
                                         .buttonStyle(PlainButtonStyle())
+                                        .accessibilityIdentifier("export-method-\(method == .download ? "download" : "email")")
 
                                         if method != ExportMethod.allCases.last {
                                             Divider()
@@ -178,6 +179,7 @@ struct ExportDataView: View {
                                                     .background(Color.appCard)
                                                 }
                                             )
+                                            .accessibilityIdentifier("export-format-\(format.rawValue.lowercased())")
                                             .buttonStyle(PlainButtonStyle())
 
                                             if format != ExportFormat.allCases.last {
@@ -222,6 +224,7 @@ struct ExportDataView: View {
                                     }
                                 )
                                 .buttonStyle(PlainButtonStyle())
+                                .accessibilityIdentifier("export-include-photos")
                                 .padding(.horizontal)
                             }
                         }
@@ -288,6 +291,7 @@ struct ExportDataView: View {
                             .cornerRadius(25)
                         }
                         .disabled((exportMethod == .download && selectedFormats.isEmpty) || isExporting)
+                        .accessibilityIdentifier("export-data")
                         .padding(.horizontal)
                         .padding(.top, 8)
 
@@ -360,8 +364,8 @@ struct ExportDataView: View {
                 Text(successMessage)
             }
             .sheet(isPresented: $showShareSheet) {
-                if let url = exportedFileURL {
-                    ShareSheet(items: [url])
+                if !exportedFileURLs.isEmpty {
+                    ShareSheet(items: exportedFileURLs.map { $0 as Any }, accessibilityIdentifier: "export-share-sheet")
                         .ignoresSafeArea()
                 }
             }
@@ -405,18 +409,12 @@ struct ExportDataView: View {
         isExporting = true
         exportProgress = 0
 
-        do {
-            if exportMethod == .email {
-                // Use edge function for email export
-                await performEmailExport()
-            } else {
-                // Use local export for direct download
-                await performLocalExport()
-            }
-        } catch {
-            isExporting = false
-            errorMessage = error.localizedDescription
-            showError = true
+        if exportMethod == .email {
+            // Use edge function for email export
+            await performEmailExport()
+        } else {
+            // Use local export for direct download
+            await performLocalExport()
         }
     }
 
@@ -538,19 +536,15 @@ struct ExportDataView: View {
             // Progress: 90%
             exportProgress = 0.9
 
-            // Create zip file if multiple files
-            let finalExportURL: URL
-            if exportedFiles.count > 1 {
-                finalExportURL = try createZipArchive(from: exportDir, files: exportedFiles)
-            } else {
-                finalExportURL = exportedFiles.first!
+            guard !exportedFiles.isEmpty else {
+                throw ExportError.exportFailed("No files were generated")
             }
 
             // Progress: 100%
             exportProgress = 1.0
 
-            // Show share sheet
-            exportedFileURL = finalExportURL
+            // Share every generated file so CSV, JSON, daily logs, and photo manifests are all preserved.
+            exportedFileURLs = exportedFiles
 
             // Small delay for visual feedback
             try await Task.sleep(nanoseconds: 500_000_000)
@@ -661,15 +655,6 @@ struct ExportDataView: View {
         return csv
     }
 
-    private func createZipArchive(from directory: URL, files: [URL]) throws -> URL {
-        let zipFileName = "LogYourBody_Export_\(formatDate(Date())).zip"
-        let zipURL = FileManager.default.temporaryDirectory.appendingPathComponent(zipFileName)
-
-        // Note: In a real implementation, you would use a zip library here
-        // For now, we'll just return the first file
-        return files.first!
-    }
-
     private func extractPhotoURLs(from metrics: [BodyMetrics]) -> [String] {
         return metrics.compactMap { $0.photoUrl }
     }
@@ -737,9 +722,11 @@ struct DataTypeRow: View {
 
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
+    var accessibilityIdentifier: String?
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        controller.view.accessibilityIdentifier = accessibilityIdentifier
         return controller
     }
 

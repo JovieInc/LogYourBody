@@ -19,8 +19,7 @@ final class DSCircularProgressTests: XCTestCase {
         ]
 
         for testCase in testCases {
-            let progress = DSCircularProgress(progress: testCase.input)
-            let normalizedValue = min(1.0, max(0.0, testCase.input))
+            let normalizedValue = DSCircularProgress.normalizedProgress(for: testCase.input)
             XCTAssertEqual(normalizedValue, testCase.expected,
                            "Progress \(testCase.input) should normalize to \(testCase.expected)")
         }
@@ -74,8 +73,7 @@ final class DSCircularProgressTests: XCTestCase {
         ]
 
         for testCase in testCases {
-            let normalizedProgress = min(1.0, max(0.0, testCase.progress))
-            let percentage = Int(normalizedProgress * 100)
+            let percentage = DSCircularProgress.percentage(for: testCase.progress)
             XCTAssertEqual(percentage, testCase.expectedPercentage,
                            "Progress \(testCase.progress) should show \(testCase.expectedPercentage)%")
         }

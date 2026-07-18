@@ -214,6 +214,7 @@ struct ProfileSettingsViewV2: View {
                 .accessibilityLabel("Height")
                 .accessibilityValue(formattedHeight)
                 .accessibilityHint("Double-tap to edit your height.")
+                .accessibilityIdentifier("profile-editor-height")
 
                 Divider()
                     .padding(.leading, 16)
@@ -244,6 +245,7 @@ struct ProfileSettingsViewV2: View {
                 .accessibilityLabel("Age")
                 .accessibilityValue(formattedAge)
                 .accessibilityHint("Double-tap to edit your date of birth.")
+                .accessibilityIdentifier("profile-editor-age")
             }
         }
     }

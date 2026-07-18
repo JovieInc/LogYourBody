@@ -20,14 +20,20 @@ enum Configuration {
         }
 
         switch object {
-        case let value as T:
-            return value
         case let string as String:
-            if let value = T(string) {
+            let normalized = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !normalized.isEmpty,
+                  !(normalized.hasPrefix("$(") && normalized.hasSuffix(")")) else {
+                throw Error.invalidValue
+            }
+
+            if let value = T(normalized) {
                 return value
             } else {
                 throw Error.invalidValue
             }
+        case let value as T:
+            return value
         default:
             throw Error.invalidValue
         }

@@ -13,6 +13,19 @@ struct EmailVerificationView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var successMessage: String?
+    private let verifyHandler: ((String) async throws -> Void)?
+    private let resendHandler: (() async throws -> Void)?
+    private let resendCooldown: Int
+
+    init(
+        verifyHandler: ((String) async throws -> Void)? = nil,
+        resendHandler: (() async throws -> Void)? = nil,
+        resendCooldown: Int = 60
+    ) {
+        self.verifyHandler = verifyHandler
+        self.resendHandler = resendHandler
+        self.resendCooldown = resendCooldown
+    }
 
     var body: some View {
         ZStack {
@@ -48,7 +61,8 @@ struct EmailVerificationView: View {
                         isLoading: $isLoading,
                         email: authManager.pendingVerificationEmail ?? "your email",
                         onVerify: verifyCode,
-                        onResend: resendCode
+                        onResend: resendCode,
+                        resendCooldown: resendCooldown
                     )
                     .padding(.horizontal, 24)
 
@@ -86,7 +100,11 @@ struct EmailVerificationView: View {
 
         Task { @MainActor in
             do {
-                try await authManager.verifyEmail(code: verificationCode)
+                if let verifyHandler {
+                    try await verifyHandler(verificationCode)
+                } else {
+                    try await authManager.verifyEmail(code: verificationCode)
+                }
                 successMessage = "Email verified successfully!"
                 // Navigation will be handled by AuthManager
                 AnalyticsService.shared.track(event: "email_verified")
@@ -105,7 +123,11 @@ struct EmailVerificationView: View {
 
         Task { @MainActor in
             do {
-                try await authManager.resendVerificationEmail()
+                if let resendHandler {
+                    try await resendHandler()
+                } else {
+                    try await authManager.resendVerificationEmail()
+                }
                 successMessage = "A new verification code has been sent to your email."
                 AnalyticsService.shared.track(event: "email_verification_resent")
             } catch {

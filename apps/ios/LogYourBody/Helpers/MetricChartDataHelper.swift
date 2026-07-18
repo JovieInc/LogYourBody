@@ -365,9 +365,10 @@ struct MetricChartDataHelper {
     ///   - targetCount: Target number of points (default: 150)
     /// - Returns: Downsampled array of data points
     private static func downsampleData(_ data: [SparklineDataPoint], targetCount: Int = 150) -> [SparklineDataPoint] {
-        guard data.count > targetCount else { return data }
+        guard targetCount > 0, data.count > targetCount else { return data }
+        guard targetCount > 1 else { return [data[0]] }
 
-        let step = Double(data.count) / Double(targetCount)
+        let step = Double(data.count - 1) / Double(targetCount - 1)
         var downsampled: [SparklineDataPoint] = []
 
         for i in 0..<targetCount {

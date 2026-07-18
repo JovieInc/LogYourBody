@@ -3,10 +3,16 @@ import Foundation
 final class EntryVisibilityManager {
     static let shared = EntryVisibilityManager()
 
-    private let defaults = UserDefaults.standard
-    private let storageKey = "hiddenMetricEntries"
+    private let defaults: UserDefaults
+    private let storageKey: String
 
-    private init() {}
+    init(
+        userDefaults: UserDefaults = .standard,
+        storageKey: String = "hiddenMetricEntries"
+    ) {
+        defaults = userDefaults
+        self.storageKey = storageKey
+    }
 
     private func key(for userId: String) -> String {
         "\(storageKey)_\(userId)"

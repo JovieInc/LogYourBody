@@ -7,6 +7,16 @@ import SwiftUI
 @testable import LogYourBody
 
 final class UserGreetingTests: XCTestCase {
+    private var utcCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    private func date(atHour hour: Int) -> Date {
+        utcCalendar.date(from: DateComponents(year: 2_026, month: 1, day: 1, hour: hour))!
+    }
+
     func testFirstNameExtraction() {
         let testCases: [(fullName: String?, expectedFirstName: String)] = [
             ("John Doe", "John"),
@@ -19,52 +29,51 @@ final class UserGreetingTests: XCTestCase {
         ]
 
         for testCase in testCases {
-            let greeting = UserGreeting(fullName: testCase.fullName)
-            // Since firstName is private, we would need to make it internal for testing
-            // or test the actual rendered output
+            XCTAssertEqual(UserGreeting.firstName(from: testCase.fullName), testCase.expectedFirstName)
         }
     }
 
     func testGreetingTimeBasedLogic() {
-        // This would require mocking the current time
-        // For now, we can test that the greeting property exists
-        let greeting = UserGreeting(fullName: "Test User")
+        let testCases: [(hour: Int, expected: String)] = [
+            (0, "Good morning"),
+            (11, "Good morning"),
+            (12, "Good afternoon"),
+            (16, "Good afternoon"),
+            (17, "Good evening"),
+            (23, "Good evening")
+        ]
 
-        // The actual greeting depends on the current hour
-        let hour = Calendar.current.component(.hour, from: Date())
-        let expectedPrefix: String
-
-        switch hour {
-        case 0..<12:
-            expectedPrefix = "Good morning"
-        case 12..<17:
-            expectedPrefix = "Good afternoon"
-        default:
-            expectedPrefix = "Good evening"
+        for testCase in testCases {
+            XCTAssertEqual(
+                UserGreeting.greeting(
+                    at: date(atHour: testCase.hour),
+                    showEmoji: false,
+                    customGreeting: nil,
+                    calendar: utcCalendar
+                ),
+                testCase.expected
+            )
         }
-
-        // Would need to access the greeting property to verify
     }
 
     func testEmojiGreeting() {
-        let greeting = UserGreeting(fullName: "Test User", showEmoji: true)
+        let testCases: [(hour: Int, expected: String)] = [
+            (0, "Good morning ☀️"),
+            (12, "Good afternoon 🌤"),
+            (17, "Good evening 🌅"),
+            (21, "Good evening 🌙")
+        ]
 
-        // Test that emoji mode is enabled
-        XCTAssertTrue(greeting.showEmoji)
-
-        // Verify emoji mapping based on time
-        let hour = Calendar.current.component(.hour, from: Date())
-        let expectedEmoji: String
-
-        switch hour {
-        case 0..<12:
-            expectedEmoji = "☀️"
-        case 12..<17:
-            expectedEmoji = "🌤"
-        case 17..<21:
-            expectedEmoji = "🌅"
-        default:
-            expectedEmoji = "🌙"
+        for testCase in testCases {
+            XCTAssertEqual(
+                UserGreeting.greeting(
+                    at: date(atHour: testCase.hour),
+                    showEmoji: true,
+                    customGreeting: nil,
+                    calendar: utcCalendar
+                ),
+                testCase.expected
+            )
         }
     }
 
@@ -77,12 +86,15 @@ final class UserGreetingTests: XCTestCase {
     }
 
     func testCustomGreeting() {
-        let customGreeting = UserGreeting(
-            fullName: "John Doe",
-            customGreeting: "Welcome back"
+        XCTAssertEqual(
+            UserGreeting.greeting(
+                at: date(atHour: 9),
+                showEmoji: true,
+                customGreeting: "Welcome back",
+                calendar: utcCalendar
+            ),
+            "Welcome back"
         )
-
-        XCTAssertEqual(customGreeting.customGreeting, "Welcome back")
     }
 
     func testEdgeCases() {
@@ -98,10 +110,9 @@ final class UserGreetingTests: XCTestCase {
         // Unicode characters
         let unicode = UserGreeting(fullName: "José García")
 
-        // All should create valid greeting views
-        XCTAssertNotNil(multiSpace)
-        XCTAssertNotNil(specialChars)
-        XCTAssertNotNil(longName)
-        XCTAssertNotNil(unicode)
+        XCTAssertEqual(UserGreeting.firstName(from: multiSpace.fullName), "John")
+        XCTAssertEqual(UserGreeting.firstName(from: specialChars.fullName), "John-Doe")
+        XCTAssertEqual(UserGreeting.firstName(from: longName.fullName), "John")
+        XCTAssertEqual(UserGreeting.firstName(from: unicode.fullName), "José")
     }
 }

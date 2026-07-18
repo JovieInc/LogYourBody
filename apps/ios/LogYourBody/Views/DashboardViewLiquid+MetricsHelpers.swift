@@ -2,63 +2,6 @@ import SwiftUI
 import Foundation
 
 extension DashboardViewLiquid {
-    // MARK: - Animation Helpers
-
-    /// Update animated metric values with 180ms ease-out animation
-    func updateAnimatedValues(for index: Int) {
-        let metrics = viewModel.bodyMetrics
-        guard index >= 0 && index < metrics.count else { return }
-        let metric = metrics[index]
-
-        withAnimation(.easeOut(duration: 0.18)) {
-            // Weight
-            if let weightResult = metric.weight != nil ?
-                InterpolatedMetric(
-                    value: metric.weight!,
-                    isInterpolated: false,
-                    isLastKnown: false,
-                    confidenceLevel: nil
-                ) :
-                MetricsInterpolationService.shared.estimateWeight(
-                    for: metric.date,
-                    metrics: viewModel.bodyMetrics
-                ) {
-                let system = currentMeasurementSystem
-                animatedWeight = convertWeight(weightResult.value, to: system) ?? weightResult.value
-            }
-
-            // Body Fat
-            if let bodyFatResult = metric.bodyFatPercentage != nil ?
-                InterpolatedMetric(
-                    value: metric.bodyFatPercentage!,
-                    isInterpolated: false,
-                    isLastKnown: false,
-                    confidenceLevel: nil
-                ) :
-                MetricsInterpolationService.shared.estimateBodyFat(
-                    for: metric.date,
-                    metrics: viewModel.bodyMetrics
-                ) {
-                animatedBodyFat = bodyFatResult.value
-            }
-
-            // FFMI
-            let heightInches = convertHeightToInches(
-                height: authManager.currentUser?.profile?.height,
-                heightUnit: authManager.currentUser?.profile?.heightUnit
-            )
-
-            if let heightInches,
-               let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                   for: metric.date,
-                   metrics: viewModel.bodyMetrics,
-                   heightInches: heightInches
-               ) {
-                animatedFFMI = ffmiResult.value
-            }
-        }
-    }
-
     // MARK: - Metrics View Helpers
 
     func formatSteps(_ steps: Int?) -> String {
@@ -436,7 +379,7 @@ extension DashboardViewLiquid {
             guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
             let stepsValue = lookup[date]?.steps ?? 0
             chartData.append(
-                MetricDataPoint(index: 6 - offset, value: Double(max(stepsValue ?? 0, 0)))
+                MetricDataPoint(index: 6 - offset, value: Double(max(stepsValue, 0)))
             )
         }
 
@@ -445,7 +388,7 @@ extension DashboardViewLiquid {
 
     func latestStepsSnapshot() -> (value: Int?, date: Date?) {
         // Prefer Core Data so we can fall back to the most recent day with data
-        guard let userId = authManager.currentUser?.id else {
+        guard authManager.currentUser?.id != nil else {
             return (dailyMetrics?.steps, dailyMetrics?.date)
         }
 
@@ -478,7 +421,9 @@ extension DashboardViewLiquid {
     }
 
     func rebuildDailyMetricsLookupCache() {
-        var lookup = Dictionary<Date, DailyMetrics>(minimumCapacity: recentDailyMetrics.count)
+        guard !recentDailyMetrics.isEmpty || !dailyMetricsLookupCache.isEmpty else { return }
+
+        var lookup = [Date: DailyMetrics](minimumCapacity: recentDailyMetrics.count)
         let calendar = Calendar.current
 
         for metric in recentDailyMetrics {
@@ -568,21 +513,19 @@ extension DashboardViewLiquid {
         if let cached = metricEntriesCache[type] {
             return cached
         }
-        let payload = metricEntriesPayload(for: type)
-        metricEntriesCache[type] = payload
-        return payload
+        return metricEntriesPayload(for: type)
     }
 
     func cachedChartData(
         for type: MetricType,
         generator: () -> [MetricChartDataPoint]
     ) -> [MetricChartDataPoint] {
+        // Cache updates are scheduled when the underlying data changes so this
+        // render path remains free of state mutation.
         if let cached = fullChartCache[type] {
             return cached
         }
-        let data = generator()
-        fullChartCache[type] = data
-        return data
+        return generator()
     }
 
     func weightRangeStats() -> MetricRangeStats? {
@@ -660,17 +603,7 @@ extension DashboardViewLiquid {
     }
 
     func generateFullScreenGlp1ChartData() -> [MetricChartDataPoint] {
-        guard !glp1DoseLogs.isEmpty else { return [] }
-
-        return glp1DoseLogs
-            .sorted { $0.takenAt < $1.takenAt }
-            .compactMap { log in
-                guard let dose = log.doseAmount else { return nil }
-                return MetricChartDataPoint(
-                    date: log.takenAt,
-                    value: dose
-                )
-            }
+        buildFullScreenGlp1ChartData(from: glp1DoseLogs)
     }
 
     func generateFullScreenBodyScoreChartData() -> [MetricChartDataPoint] {
@@ -718,6 +651,7 @@ extension DashboardViewLiquid {
         let sortedMetrics = sortedBodyMetricsAscending
         let bodyMetricsSnapshot = bodyMetrics
         let recentDailySnapshot = recentDailyMetrics
+        let glp1DoseLogsSnapshot = glp1DoseLogs
         let measurementSystemSnapshot = currentMeasurementSystem
         let profileSnapshot = authManager.currentUser?.profile
         let heightSnapshot = authManager.currentUser?.profile?.height
@@ -733,26 +667,19 @@ extension DashboardViewLiquid {
             var cache: [MetricType: [MetricChartDataPoint]] = [:]
             var bodyScoreEntries: MetricEntriesPayload?
 
-            let stepsData = buildFullScreenStepsChartData(from: recentDailySnapshot)
-            if !stepsData.isEmpty {
-                cache[.steps] = stepsData
-            }
+            cache[.steps] = buildFullScreenStepsChartData(from: recentDailySnapshot)
 
             let weightData = buildFullScreenWeightChartData(
                 from: sortedMetrics,
                 measurementSystem: measurementSystemSnapshot
             )
-            if !weightData.isEmpty {
-                cache[.weight] = weightData
-            }
+            cache[.weight] = weightData
 
             let bodyFatData = buildFullScreenBodyFatChartData(
                 sortedBodyMetrics: sortedMetrics,
                 bodyMetrics: bodyMetricsSnapshot
             )
-            if !bodyFatData.isEmpty {
-                cache[.bodyFat] = bodyFatData
-            }
+            cache[.bodyFat] = bodyFatData
 
             if let heightInchesSnapshot {
                 let ffmiData = buildFullScreenFFMIChartData(
@@ -760,9 +687,9 @@ extension DashboardViewLiquid {
                     bodyMetrics: bodyMetricsSnapshot,
                     heightInches: heightInchesSnapshot
                 )
-                if !ffmiData.isEmpty {
-                    cache[.ffmi] = ffmiData
-                }
+                cache[.ffmi] = ffmiData
+            } else {
+                cache[.ffmi] = []
             }
 
             if let profileSnapshot {
@@ -773,20 +700,33 @@ extension DashboardViewLiquid {
                     measurementSystem: measurementSystemSnapshot
                 )
 
-                if !bodyScoreResult.chartPoints.isEmpty {
-                    cache[.bodyScore] = bodyScoreResult.chartPoints
-                }
+                cache[.bodyScore] = bodyScoreResult.chartPoints
 
                 bodyScoreEntries = bodyScoreResult.entriesPayload
+            } else {
+                cache[.bodyScore] = []
             }
+
+            cache[.glp1] = buildFullScreenGlp1ChartData(from: glp1DoseLogsSnapshot)
 
             return (cache, bodyScoreEntries)
         }.value
 
+        guard !Task.isCancelled else { return }
         fullChartCache = chartCache
 
         if let bodyScoreEntries {
             metricEntriesCache[.bodyScore] = bodyScoreEntries
+        }
+    }
+
+    @MainActor
+    func scheduleMetricCachePrewarm() {
+        metricCachePrewarmTask?.cancel()
+        metricCachePrewarmTask = Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            await prewarmMetricCaches()
         }
     }
 
@@ -828,6 +768,18 @@ private func buildFullScreenStepsChartData(from recentDailyMetrics: [DailyMetric
                 date: metric.date,
                 value: Double(max(steps, 0)),
                 isEstimated: false
+            )
+        }
+}
+
+private func buildFullScreenGlp1ChartData(from glp1DoseLogs: [Glp1DoseLog]) -> [MetricChartDataPoint] {
+    glp1DoseLogs
+        .sorted { $0.takenAt < $1.takenAt }
+        .compactMap { log in
+            guard let dose = log.doseAmount else { return nil }
+            return MetricChartDataPoint(
+                date: log.takenAt,
+                value: dose
             )
         }
 }

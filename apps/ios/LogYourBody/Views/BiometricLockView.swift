@@ -9,13 +9,32 @@ import LocalAuthentication
 
 struct BiometricLockView: View {
     @Binding var isUnlocked: Bool
+    private let biometricTypeOverride: BiometricAuthView.BiometricType?
+    private let authenticationAttempt: (() async -> Bool)?
+    private let deviceOwnerAuthenticationAttempt: (() async -> Bool)?
     @State private var isAuthenticating = false
     @State private var hasAttemptedOnce = false
     @State private var authenticationTimer: Timer?
     @State private var haloRotation: Double = 0
     @State private var haloPulse = false
 
+    init(
+        isUnlocked: Binding<Bool>,
+        biometricTypeOverride: BiometricAuthView.BiometricType? = nil,
+        authenticationAttempt: (() async -> Bool)? = nil,
+        deviceOwnerAuthenticationAttempt: (() async -> Bool)? = nil
+    ) {
+        _isUnlocked = isUnlocked
+        self.biometricTypeOverride = biometricTypeOverride
+        self.authenticationAttempt = authenticationAttempt
+        self.deviceOwnerAuthenticationAttempt = deviceOwnerAuthenticationAttempt
+    }
+
     private var biometricType: BiometricAuthView.BiometricType {
+        if let biometricTypeOverride {
+            return biometricTypeOverride
+        }
+
         let context = LAContext()
         var error: NSError?
 
@@ -80,11 +99,7 @@ struct BiometricLockView: View {
                 BiometricAuthView(
                     biometricType: biometricType,
                     onAuthenticate: authenticate,
-                    onUsePassword: {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            isUnlocked = true
-                        }
-                    }
+                    onUsePassword: authenticateWithDeviceOwnerAuthentication
                 )
                 .padding(.horizontal, 16)
             } else {
@@ -154,11 +169,11 @@ struct BiometricLockView: View {
             }
 
             VStack(spacing: 6) {
-                Text(isAuthenticating ? "Scanning your face…" : "Face ID is ready")
+                Text(isAuthenticating ? "Scanning \(biometricType.title)…" : "\(biometricType.title) is ready")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.linearText)
 
-                Text("Look at your iPhone to continue")
+                Text(biometricType == .faceID ? "Look at your iPhone to continue" : "Rest your finger on the sensor to continue")
                     .font(.system(size: 15))
                     .foregroundColor(.linearTextSecondary)
             }
@@ -206,7 +221,7 @@ struct BiometricLockView: View {
                     Image(systemName: "lock.shield")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.linearTextSecondary)
-                    Text("Protected by Face ID")
+                    Text("Protected by \(biometricType.title)")
                         .font(.system(size: 14))
                         .foregroundColor(.linearTextSecondary)
                 }
@@ -216,6 +231,16 @@ struct BiometricLockView: View {
     }
 
     private func authenticate() {
+        if let authenticationAttempt {
+            authenticationTimer?.invalidate()
+            isAuthenticating = true
+
+            Task { @MainActor in
+                completeAuthentication(await authenticationAttempt())
+            }
+            return
+        }
+
         let context = LAContext()
         var error: NSError?
 
@@ -234,8 +259,7 @@ struct BiometricLockView: View {
                     if self.isAuthenticating {
                         // Timeout reached, cancel authentication
                         context.invalidate()
-                        self.isAuthenticating = false
-                        self.hasAttemptedOnce = true
+                        self.completeAuthentication(false)
                     }
                 }
             }
@@ -244,22 +268,53 @@ struct BiometricLockView: View {
 
             context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, _ in
                 DispatchQueue.main.async {
-                    self.authenticationTimer?.invalidate()
-                    self.isAuthenticating = false
-
-                    if success {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            self.isUnlocked = true
-                        }
-                    } else {
-                        // Show the retry UI
-                        self.hasAttemptedOnce = true
-                    }
+                    self.completeAuthentication(success)
                 }
             }
         } else {
-            // No biometric available, just unlock
-            isUnlocked = true
+            completeAuthentication(false)
+        }
+    }
+
+    private func authenticateWithDeviceOwnerAuthentication() {
+        if let deviceOwnerAuthenticationAttempt {
+            authenticationTimer?.invalidate()
+            isAuthenticating = true
+
+            Task { @MainActor in
+                completeAuthentication(await deviceOwnerAuthenticationAttempt())
+            }
+            return
+        }
+
+        let context = LAContext()
+        var error: NSError?
+
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            completeAuthentication(false)
+            return
+        }
+
+        authenticationTimer?.invalidate()
+        isAuthenticating = true
+
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock LogYourBody") { success, _ in
+            DispatchQueue.main.async {
+                self.completeAuthentication(success)
+            }
+        }
+    }
+
+    private func completeAuthentication(_ succeeded: Bool) {
+        authenticationTimer?.invalidate()
+        isAuthenticating = false
+
+        if succeeded {
+            withAnimation(.easeOut(duration: 0.3)) {
+                isUnlocked = true
+            }
+        } else {
+            hasAttemptedOnce = true
         }
     }
 }

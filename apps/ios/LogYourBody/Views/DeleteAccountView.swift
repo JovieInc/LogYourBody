@@ -33,7 +33,8 @@ struct DeleteAccountView: View {
                             .font(.title2)
                             .fontWeight(.bold)
 
-                        Text("This action cannot be undone. Your LogYourBody data will be permanently deleted. Data in Apple Health stays in the Health app.")
+                        Text("This action cannot be undone. Your LogYourBody data will be permanently deleted. " +
+                             "Data in Apple Health stays in the Health app.")
                             .font(.body)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)

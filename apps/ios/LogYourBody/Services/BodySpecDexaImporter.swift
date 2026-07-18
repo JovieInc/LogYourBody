@@ -1,16 +1,21 @@
 import Foundation
 
-actor BodySpecDexaImporter {
-    static let shared = BodySpecDexaImporter()
+@MainActor
+final class BodySpecDexaImporter {
+    static let shared = BodySpecDexaImporter(
+        api: .shared,
+        authManager: .shared,
+        coreDataManager: .shared
+    )
 
     private let api: BodySpecAPI
     private let authManager: AuthManager
     private let coreDataManager: CoreDataManager
 
     init(
-        api: BodySpecAPI = .shared,
-        authManager: AuthManager = .shared,
-        coreDataManager: CoreDataManager = .shared
+        api: BodySpecAPI,
+        authManager: AuthManager,
+        coreDataManager: CoreDataManager
     ) {
         self.api = api
         self.authManager = authManager

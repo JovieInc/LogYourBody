@@ -8,6 +8,7 @@ import Foundation
 /// Protocol abstraction for coordinating HealthKit-related sync operations.
 /// This enables easier unit testing for components that depend on
 /// HealthSyncCoordinator by allowing mock implementations.
+@MainActor
 protocol HealthSyncCoordinating {
     func bootstrapIfNeeded(syncEnabled: Bool)
     func resetForCurrentUser() async
@@ -31,7 +32,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
     private let healthKitManager: HealthKitManager
     private var hasBootstrappedObservers = false
 
-    private init(healthKitManager: HealthKitManager = .shared) {
+    init(healthKitManager: HealthKitManager = .shared) {
         self.healthKitManager = healthKitManager
     }
 
@@ -91,9 +92,10 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
 
         bootstrapIfNeeded(syncEnabled: true)
 
-        Task.detached(priority: .background) { [healthKitManager] in
+        let initialSync = Task.detached(priority: .background) { [healthKitManager] in
             try? await healthKitManager.syncWeightFromHealthKit()
         }
+        await initialSync.value
     }
 
     /// Similar to `configureSyncPipelineAfterAuthorizationAndRunInitialWeightSync`,
@@ -110,7 +112,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
 
         bootstrapIfNeeded(syncEnabled: true)
 
-        Task.detached(priority: .background) { [healthKitManager] in
+        let initialSync = Task.detached(priority: .background) { [healthKitManager] in
             do {
                 try await healthKitManager.syncWeightFromHealthKit()
                 try await healthKitManager.syncStepsFromHealthKit()
@@ -118,6 +120,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
                 // Best-effort initial sync; errors are intentionally swallowed here.
             }
         }
+        await initialSync.value
     }
 
     /// Lightweight HealthKit warm-up used after login/on startup to ensure
@@ -132,10 +135,10 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
 
         guard healthKitManager.isAuthorized else { return }
 
-        let manager = healthKitManager
-        Task.detached {
-            try? await manager.fetchTodayStepCount()
+        let warmUp = Task.detached(priority: .background) { [healthKitManager] in
+            try? await healthKitManager.fetchTodayStepCount()
         }
+        _ = await warmUp.value
     }
 
     /// Used by the HealthKit connect prompt to perform the initial

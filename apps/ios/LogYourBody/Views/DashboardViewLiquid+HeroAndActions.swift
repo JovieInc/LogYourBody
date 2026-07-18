@@ -530,7 +530,6 @@ extension DashboardViewLiquid {
             GlassPillButton(icon: "square.and.arrow.up.fill", title: "Share Score") {
                 if let payload = makeBodyScoreSharePayload() {
                     bodyScoreSharePayload = payload
-                    isBodyScoreSharePresented = true
                 }
             }
 

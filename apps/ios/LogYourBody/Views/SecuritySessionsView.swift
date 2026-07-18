@@ -23,6 +23,17 @@ struct SecuritySessionsView: View {
     // Pull to refresh
     @State private var refreshing = false
 
+    private let sessionLoader: (() async throws -> [SessionInfo])?
+    private let sessionRevoker: ((String) async throws -> Void)?
+
+    init(
+        sessionLoader: (() async throws -> [SessionInfo])? = nil,
+        sessionRevoker: ((String) async throws -> Void)? = nil
+    ) {
+        self.sessionLoader = sessionLoader
+        self.sessionRevoker = sessionRevoker
+    }
+
     var body: some View {
         ZStack {
             if isLoading && sessions.isEmpty {
@@ -120,7 +131,7 @@ struct SecuritySessionsView: View {
                 }
             }
         } message: {
-            if let session = sessionToRevoke {
+            if sessionToRevoke != nil {
                 Text("Are you sure you want to revoke this session? The device will be signed out immediately.")
             }
         }
@@ -143,7 +154,12 @@ struct SecuritySessionsView: View {
         }
 
         do {
-            let fetchedSessions = try await AuthManager.shared.fetchActiveSessions()
+            let fetchedSessions: [SessionInfo]
+            if let sessionLoader {
+                fetchedSessions = try await sessionLoader()
+            } else {
+                fetchedSessions = try await authManager.fetchActiveSessions()
+            }
             await MainActor.run {
                 self.sessions = fetchedSessions.sorted { session1, session2 in
                     // Current session first, then by last active
@@ -169,7 +185,11 @@ struct SecuritySessionsView: View {
         isRevokingSession = true
 
         do {
-            try await authManager.revokeSession(sessionId: session.id)
+            if let sessionRevoker {
+                try await sessionRevoker(session.id)
+            } else {
+                try await authManager.revokeSession(sessionId: session.id)
+            }
             await MainActor.run {
                 // Remove from list with animation
                 withAnimation(.easeOut(duration: 0.3)) {
@@ -266,6 +286,8 @@ struct SessionRowView: View {
                                     .foregroundColor(.red)
                             }
                             .buttonStyle(PlainButtonStyle())
+                            .accessibilityLabel("Revoke \(session.deviceName)")
+                            .accessibilityIdentifier("revoke-session-\(session.id)")
                         } else if !session.ipAddress.isEmpty {
                             Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                                 .font(SettingsDesign.chevronSize)
@@ -278,6 +300,7 @@ struct SessionRowView: View {
                 }
             )
             .buttonStyle(PlainButtonStyle())
+            .accessibilityIdentifier("session-details-\(session.id)")
 
             // Additional Details (expandable)
             if isExpanded {

@@ -127,7 +127,7 @@ class ImageProcessingService: ObservableObject {
         var detectedBox: CGRect?
 
         let request = VNDetectHumanRectanglesRequest { request, error in
-            if let error = error {
+            if error != nil {
                 // print("Human detection error: \(error)")
                 return
             }

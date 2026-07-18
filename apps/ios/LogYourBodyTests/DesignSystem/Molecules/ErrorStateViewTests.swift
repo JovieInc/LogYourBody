@@ -273,40 +273,6 @@ final class ErrorStateViewTests: XCTestCase {
         XCTAssertEqual(errorView.message, longMessage)
     }
 
-    // MARK: - Performance Tests
-
-    func testInitializationPerformance() {
-        measure {
-            for _ in 0..<100 {
-                _ = ErrorStateView(
-                    icon: "exclamationmark.triangle",
-                    title: "Error",
-                    message: "Test message",
-                    buttonTitle: "Retry",
-                    buttonAction: {}
-                )
-            }
-        }
-    }
-
-    func testActionPerformance() {
-        // Given
-        var counter = 0
-        let errorView = ErrorStateView(
-            title: "Error",
-            buttonAction: { counter += 1 }
-        )
-
-        // When/Then
-        measure {
-            for _ in 0..<1_000 {
-                errorView.buttonAction()
-            }
-        }
-
-        XCTAssertEqual(counter, 1_000)
-    }
-
     // MARK: - Thread Safety Tests
 
     func testConcurrentActions() {

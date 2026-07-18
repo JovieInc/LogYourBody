@@ -15,11 +15,21 @@ import HealthKit
 class CoreDataManager: ObservableObject {
     static let shared = CoreDataManager()
 
+    private static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     private let saveQueue = DispatchQueue(label: "com.logyourbody.coredata.save", qos: .utility)
     private var isSaving = false
 
     lazy var persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "LogYourBody")
+
+        if Self.isRunningTests {
+            let inMemoryDescription = NSPersistentStoreDescription()
+            inMemoryDescription.type = NSInMemoryStoreType
+            container.persistentStoreDescriptions = [inMemoryDescription]
+        }
 
         for description in container.persistentStoreDescriptions {
             description.setOption(
@@ -250,12 +260,16 @@ class CoreDataManager: ObservableObject {
         }
     }
 
-    func fetchUnsyncedDexaResults() async -> [CachedDexaResult] {
+    func fetchUnsyncedDexaResults(for userId: String? = nil) async -> [CachedDexaResult] {
         let context = viewContext
 
         return await context.perform {
             let request: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
-            request.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+            var predicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            if let userId {
+                predicates.append(NSPredicate(format: "userId == %@", userId))
+            }
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
 
             do {
                 return try context.fetch(request)
@@ -875,7 +889,7 @@ class CoreDataManager: ObservableObject {
     // MARK: - Sync Operations
 
     /// Async version - does NOT block the main thread
-    func fetchUnsyncedEntries() async -> (
+    func fetchUnsyncedEntries(for userId: String? = nil) async -> (
         bodyMetrics: [CachedBodyMetrics],
         dailyMetrics: [CachedDailyMetrics],
         profiles: [CachedProfile]
@@ -884,13 +898,22 @@ class CoreDataManager: ObservableObject {
 
         return await context.perform {
             let bodyMetricsFetch: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-            bodyMetricsFetch.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
-
             let dailyMetricsFetch: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
-            dailyMetricsFetch.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
-
             let profilesFetch: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
-            profilesFetch.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+
+            var bodyMetricsPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            var dailyMetricsPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            var profilePredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+
+            if let userId {
+                bodyMetricsPredicates.append(NSPredicate(format: "userId == %@", userId))
+                dailyMetricsPredicates.append(NSPredicate(format: "userId == %@", userId))
+                profilePredicates.append(NSPredicate(format: "id == %@", userId))
+            }
+
+            bodyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: bodyMetricsPredicates)
+            dailyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: dailyMetricsPredicates)
+            profilesFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: profilePredicates)
 
             do {
                 let bodyMetrics = try context.fetch(bodyMetricsFetch)
@@ -915,12 +938,16 @@ class CoreDataManager: ObservableObject {
         }
     }
 
-    func fetchUnsyncedGlp1DoseLogs() async -> [CachedGlp1DoseLog] {
+    func fetchUnsyncedGlp1DoseLogs(for userId: String? = nil) async -> [CachedGlp1DoseLog] {
         let context = viewContext
 
         return await context.perform {
             let request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
-            request.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+            var predicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            if let userId {
+                predicates.append(NSPredicate(format: "userId == %@", userId))
+            }
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
 
             do {
                 return try context.fetch(request)
@@ -940,12 +967,16 @@ class CoreDataManager: ObservableObject {
         }
     }
 
-    func fetchUnsyncedGlp1Medications() async -> [CachedGlp1Medication] {
+    func fetchUnsyncedGlp1Medications(for userId: String? = nil) async -> [CachedGlp1Medication] {
         let context = viewContext
 
         return await context.perform {
             let request: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
-            request.predicate = NSPredicate(format: "isSynced == %@", NSNumber(value: false))
+            var predicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            if let userId {
+                predicates.append(NSPredicate(format: "userId == %@", userId))
+            }
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
 
             do {
                 return try context.fetch(request)
@@ -1052,22 +1083,56 @@ class CoreDataManager: ObservableObject {
     func cleanupDeletedEntries(olderThan date: Date) {
         let context = viewContext
 
-        context.perform {
-            let bodyMetricsFetch: NSFetchRequest<NSFetchRequestResult> = CachedBodyMetrics.fetchRequest()
-            bodyMetricsFetch.predicate = NSPredicate(format: "isMarkedDeleted == %@ AND lastModified < %@",
-                                                     NSNumber(value: true), date as NSDate)
+        context.perform { [weak self] in
+            guard let self else { return }
 
-            let dailyMetricsFetch: NSFetchRequest<NSFetchRequestResult> = CachedDailyMetrics.fetchRequest()
-            dailyMetricsFetch.predicate = NSPredicate(format: "isMarkedDeleted == %@ AND lastModified < %@",
-                                                      NSNumber(value: true), date as NSDate)
-
-            let deleteBodyMetrics = NSBatchDeleteRequest(fetchRequest: bodyMetricsFetch)
-            let deleteDailyMetrics = NSBatchDeleteRequest(fetchRequest: dailyMetricsFetch)
+            let predicate = NSPredicate(
+                format: "isMarkedDeleted == %@ AND lastModified < %@",
+                NSNumber(value: true),
+                date as NSDate
+            )
 
             do {
-                try context.execute(deleteBodyMetrics)
-                try context.execute(deleteDailyMetrics)
-                self.save()
+                let usesSQLiteStore = self.persistentContainer.persistentStoreCoordinator.persistentStores.contains {
+                    $0.type == NSSQLiteStoreType
+                }
+
+                if usesSQLiteStore {
+                    let bodyMetricsFetch: NSFetchRequest<NSFetchRequestResult> = CachedBodyMetrics.fetchRequest()
+                    bodyMetricsFetch.predicate = predicate
+                    let deleteBodyMetrics = NSBatchDeleteRequest(fetchRequest: bodyMetricsFetch)
+                    deleteBodyMetrics.resultType = .resultTypeObjectIDs
+
+                    let dailyMetricsFetch: NSFetchRequest<NSFetchRequestResult> = CachedDailyMetrics.fetchRequest()
+                    dailyMetricsFetch.predicate = predicate
+                    let deleteDailyMetrics = NSBatchDeleteRequest(fetchRequest: dailyMetricsFetch)
+                    deleteDailyMetrics.resultType = .resultTypeObjectIDs
+
+                    let bodyResult = try context.execute(deleteBodyMetrics) as? NSBatchDeleteResult
+                    let dailyResult = try context.execute(deleteDailyMetrics) as? NSBatchDeleteResult
+                    let deletedObjectIDs =
+                        (bodyResult?.result as? [NSManagedObjectID] ?? []) +
+                        (dailyResult?.result as? [NSManagedObjectID] ?? [])
+
+                    if !deletedObjectIDs.isEmpty {
+                        NSManagedObjectContext.mergeChanges(
+                            fromRemoteContextSave: [NSDeletedObjectsKey: deletedObjectIDs],
+                            into: [context]
+                        )
+                    }
+                } else {
+                    let bodyMetricsFetch: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+                    bodyMetricsFetch.predicate = predicate
+                    try context.fetch(bodyMetricsFetch).forEach(context.delete)
+
+                    let dailyMetricsFetch: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+                    dailyMetricsFetch.predicate = predicate
+                    try context.fetch(dailyMetricsFetch).forEach(context.delete)
+
+                    if context.hasChanges {
+                        try context.save()
+                    }
+                }
             } catch {
                 let appError = AppError.coreData(operation: "cleanupDeletedEntries", underlying: error)
                 let contextInfo = ErrorContext(
@@ -1227,14 +1292,22 @@ class CoreDataManager: ObservableObject {
                     metric.date = formatter.date(from: dateString)
                 }
 
+                if metric.date == nil {
+                    metric.date = Date()
+                }
+
                 if let createdString = data["created_at"] as? String,
                    let createdAt = formatter.date(from: createdString) {
                     metric.createdAt = createdAt
+                } else if metric.createdAt == nil {
+                    metric.createdAt = metric.date
                 }
 
                 if let updatedString = data["updated_at"] as? String,
                    let updatedAt = formatter.date(from: updatedString) {
                     metric.updatedAt = updatedAt
+                } else if metric.updatedAt == nil {
+                    metric.updatedAt = metric.createdAt
                 }
 
                 metric.syncStatus = "synced"
@@ -1282,14 +1355,22 @@ class CoreDataManager: ObservableObject {
                     metric.date = formatter.date(from: dateString)
                 }
 
+                if metric.date == nil {
+                    metric.date = Date()
+                }
+
                 if let createdString = data["created_at"] as? String,
                    let createdAt = formatter.date(from: createdString) {
                     metric.createdAt = createdAt
+                } else if metric.createdAt == nil {
+                    metric.createdAt = metric.date
                 }
 
                 if let updatedString = data["updated_at"] as? String,
                    let updatedAt = formatter.date(from: updatedString) {
                     metric.updatedAt = updatedAt
+                } else if metric.updatedAt == nil {
+                    metric.updatedAt = metric.createdAt
                 }
 
                 metric.syncStatus = "synced"
@@ -1318,7 +1399,7 @@ class CoreDataManager: ObservableObject {
             let userId = data["id"] as? String ?? ""
 
             let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
-            request.predicate = NSPredicate(format: "userId == %@", userId)
+            request.predicate = NSPredicate(format: "id == %@", userId)
             request.fetchLimit = 1
 
             do {
@@ -1328,6 +1409,7 @@ class CoreDataManager: ObservableObject {
                 // Update fields
                 // profile.userId = userId // Using id field instead
                 profile.id = userId
+                profile.email = data["email"] as? String ?? profile.email ?? ""
                 profile.fullName = data["full_name"] as? String
                 profile.username = data["username"] as? String
                 // profile.avatarUrl = data["avatar_url"] as? String // avatarUrl field not in Core Data model
@@ -1338,6 +1420,21 @@ class CoreDataManager: ObservableObject {
 
                 if let dateString = data["date_of_birth"] as? String {
                     profile.dateOfBirth = ISO8601DateFormatter().date(from: dateString)
+                }
+
+                let formatter = ISO8601DateFormatter()
+                if let createdString = data["created_at"] as? String,
+                   let createdAt = formatter.date(from: createdString) {
+                    profile.createdAt = createdAt
+                } else if profile.createdAt == nil {
+                    profile.createdAt = Date()
+                }
+
+                if let updatedString = data["updated_at"] as? String,
+                   let updatedAt = formatter.date(from: updatedString) {
+                    profile.updatedAt = updatedAt
+                } else if profile.updatedAt == nil {
+                    profile.updatedAt = profile.createdAt
                 }
 
                 profile.syncStatus = "synced"
@@ -1403,7 +1500,7 @@ class CoreDataManager: ObservableObject {
                     let logId: String = log.id ?? UUID().uuidString
                     let logUserId: String = log.userId ?? ""
                     let logDate: Date = log.date ?? Date()
-                    let logStepCount: Int? = log.steps != nil ? Int(log.steps) : nil
+                    let logStepCount: Int? = log.steps > 0 ? Int(log.steps) : nil
                     let logCreatedAt: Date = log.createdAt ?? Date()
                     let logUpdatedAt: Date = log.updatedAt ?? Date()
 
@@ -1449,7 +1546,7 @@ class CoreDataManager: ObservableObject {
         do {
             let allMetrics = try viewContext.fetch(fetchRequest)
             // print("🔍 DEBUG: Total body metrics in Core Data: \(allMetrics.count)")
-            for (index, metric) in allMetrics.enumerated() {
+            for index in allMetrics.indices {
                 // print("  [\(index)] ID: \(metric.id ?? "nil"), UserId: \(metric.userId ?? "nil"), Weight: \(metric.weight), Date: \(metric.date ?? Date()), isSynced: \(metric.isSynced), syncStatus: \(metric.syncStatus ?? "nil")")
                 if index >= 5 {
                     // print("  ... and \(allMetrics.count - 5) more")
@@ -1464,20 +1561,52 @@ class CoreDataManager: ObservableObject {
     // MARK: - Cleanup
 
     func cleanupOldData() {
-        // Delete body metrics older than 1 year
-        let oneYearAgo = Date().addingTimeInterval(-365 * 24 * 60 * 60)
+        let context = viewContext
+        context.perform { [weak self] in
+            guard let self else { return }
 
-        let bodyMetricsRequest: NSFetchRequest<NSFetchRequestResult> = CachedBodyMetrics.fetchRequest()
-        bodyMetricsRequest.predicate = NSPredicate(format: "date < %@ AND isMarkedDeleted == true", oneYearAgo as NSDate)
+            let oneYearAgo = Date().addingTimeInterval(-365 * 24 * 60 * 60)
+            let predicate = NSPredicate(
+                format: "date < %@ AND isMarkedDeleted == true",
+                oneYearAgo as NSDate
+            )
 
-        let deleteRequest = NSBatchDeleteRequest(fetchRequest: bodyMetricsRequest)
-        deleteRequest.resultType = .resultTypeCount
+            do {
+                let usesSQLiteStore = self.persistentContainer.persistentStoreCoordinator.persistentStores.contains {
+                    $0.type == NSSQLiteStoreType
+                }
 
-        do {
-            let result = try viewContext.execute(deleteRequest) as? NSBatchDeleteResult
-            // print("Deleted \(result?.result ?? 0) old body metrics")
-        } catch {
-            // print("Error cleaning up old data: \(error)")
+                if usesSQLiteStore {
+                    let request: NSFetchRequest<NSFetchRequestResult> = CachedBodyMetrics.fetchRequest()
+                    request.predicate = predicate
+
+                    let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
+                    deleteRequest.resultType = .resultTypeObjectIDs
+                    let result = try context.execute(deleteRequest) as? NSBatchDeleteResult
+                    if let objectIDs = result?.result as? [NSManagedObjectID] {
+                        NSManagedObjectContext.mergeChanges(
+                            fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                            into: [context]
+                        )
+                    }
+                } else {
+                    let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+                    request.predicate = predicate
+                    try context.fetch(request).forEach(context.delete)
+                    if context.hasChanges {
+                        try context.save()
+                    }
+                }
+            } catch {
+                let appError = AppError.coreData(operation: "cleanupOldData", underlying: error)
+                let contextInfo = ErrorContext(
+                    feature: "coreData",
+                    operation: "cleanupOldData",
+                    screen: nil,
+                    userId: nil
+                )
+                ErrorReporter.shared.capture(appError, context: contextInfo)
+            }
         }
     }
 
@@ -1583,9 +1712,10 @@ class CoreDataManager: ObservableObject {
 
     func repairCorruptedEntries() async -> Int {
         let context = persistentContainer.viewContext
-        let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
 
         return await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+
             do {
                 let allMetrics = try context.fetch(request)
                 var repairedCount = 0

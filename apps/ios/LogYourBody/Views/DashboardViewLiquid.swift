@@ -15,7 +15,8 @@ import CoreData
 struct DashboardViewLiquid: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
-    @StateObject var viewModel = DashboardViewModel()
+    @StateObject var viewModel: DashboardViewModel
+    private let performsInitialRefresh: Bool
 
     // Core data / selection
     @State var selectedIndex: Int = 0
@@ -34,17 +35,12 @@ struct DashboardViewLiquid: View {
     @State var showSyncDetails = false
     @State var syncBannerState: SyncBannerState?
     @State var syncBannerDismissTask: Task<Void, Never>?
-    @State private var previousSyncStatus: RealtimeSyncManager.SyncStatus = .idle
     @State private var coreDataReloadTask: Task<Void, Never>?
+    @State var metricCachePrewarmTask: Task<Void, Never>?
     @State var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
     @State var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
     @State var glp1DoseLogs: [Glp1DoseLog] = []
     @State var dailyMetricsLookupCache: [Date: DailyMetrics] = [:]
-
-    // Animated metric values for tweening
-    @State var animatedWeight: Double = 0
-    @State var animatedBodyFat: Double = 0
-    @State var animatedFFMI: Double = 0
 
     // Goals - Optional values, nil means use gender-based default
     @AppStorage("stepGoal") var stepGoal: Int = 10_000
@@ -70,7 +66,6 @@ struct DashboardViewLiquid: View {
     @State var selectedMetricType: MetricType = .weight
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
-    @State var isBodyScoreSharePresented = false
     @State var bodyScoreSharePayload: BodyScoreSharePayload?
     @State private var hasPerformedInitialRefresh = false
 
@@ -106,6 +101,14 @@ struct DashboardViewLiquid: View {
         var id: String { rawValue }
     }
 
+    init(
+        viewModel: DashboardViewModel? = nil,
+        performsInitialRefresh: Bool = true
+    ) {
+        _viewModel = StateObject(wrappedValue: viewModel ?? DashboardViewModel())
+        self.performsInitialRefresh = performsInitialRefresh
+    }
+
     var body: some View {
         let base = ZStack {
             dashboardBackground
@@ -119,24 +122,34 @@ struct DashboardViewLiquid: View {
             }
             .onDisappear {
                 syncBannerDismissTask?.cancel()
+                metricCachePrewarmTask?.cancel()
             }
 
         let withSyncAndState = withLifecycle
             .onChange(of: realtimeSyncManager.syncStatus) { oldStatus, newStatus in
-                previousSyncStatus = oldStatus
                 handleSyncStatusChange(from: oldStatus, to: newStatus)
             }
             .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)) { notification in
-                handleCoreDataContextChange(notification)
+                Task { @MainActor in
+                    // Core Data can publish while SwiftUI is reconciling a
+                    // view. Deferring the debounce setup keeps its @State
+                    // mutation out of that render pass.
+                    await Task.yield()
+                    handleCoreDataContextChange(notification)
+                }
             }
             .onReceive(viewModel.$recentDailyMetrics) { _ in
-                rebuildDailyMetricsLookupCache()
+                Task { @MainActor in
+                    await Task.yield()
+                    rebuildDailyMetricsLookupCache()
+                    scheduleMetricCachePrewarm()
+                }
+            }
+            .onChange(of: viewModel.bodyMetrics) { _, _ in
+                scheduleMetricCachePrewarm()
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
-            }
-            .onChange(of: selectedIndex) { _, newIndex in
-                updateAnimatedValues(for: newIndex)
             }
             .onChange(of: selectedTab) { _, newTab in
                 if newTab == .photos {
@@ -158,31 +171,19 @@ struct DashboardViewLiquid: View {
                     syncManager: realtimeSyncManager
                 )
             }
-            .background(
-                NavigationLink(
-                    isActive: $isMetricDetailActive,
-                    destination: {
-                        fullMetricChartView
-                    },
-                    label: {
-                        EmptyView()
-                    }
-                )
-                .hidden()
-            )
+            .navigationDestination(isPresented: $isMetricDetailActive) {
+                fullMetricChartView
+            }
             .toolbarBackground(Material.ultraThinMaterial, for: ToolbarPlacement.tabBar)
             .toolbarBackground(Visibility.visible, for: ToolbarPlacement.tabBar)
-            .sheet(isPresented: $isBodyScoreSharePresented) {
-                if let payload = bodyScoreSharePayload {
-                    BodyScoreShareSheet(payload: payload)
-                }
+            .sheet(item: $bodyScoreSharePayload) { payload in
+                BodyScoreShareSheet(payload: payload)
             }
             .onScreenshot {
                 guard selectedTab == .home else { return }
                 guard !isMetricDetailActive else { return }
                 guard let payload = makeBodyScoreSharePayload() else { return }
                 bodyScoreSharePayload = payload
-                isBodyScoreSharePresented = true
             }
 
         return withSheetsAndNavigation
@@ -208,9 +209,6 @@ struct DashboardViewLiquid: View {
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
                 await loadGlp1DoseLogs()
             }
         )
@@ -219,40 +217,37 @@ struct DashboardViewLiquid: View {
     private func handleOnAppear() {
         loadMetricsOrder()
 
-        selectedRange = TimeRange(rawValue: storedTimeRangeRawValue) ?? .month1
+        let storedRange = TimeRange(rawValue: storedTimeRangeRawValue) ?? .month1
+        if selectedRange != storedRange {
+            selectedRange = storedRange
+        }
         if !viewModel.hasLoadedInitialData {
             Task {
+                await Task.yield()
                 await viewModel.loadData(
                     authManager: authManager,
                     loadOnlyNewest: true,
                     selectedIndex: selectedIndex
                 )
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
             }
         }
 
         // Then refresh async (loads all data in background) once per dashboard lifecycle
-        if !hasPerformedInitialRefresh {
-            hasPerformedInitialRefresh = true
+        if performsInitialRefresh && !hasPerformedInitialRefresh {
             Task {
+                await Task.yield()
+                guard !hasPerformedInitialRefresh else { return }
+                hasPerformedInitialRefresh = true
+
                 await viewModel.refreshData(
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
                 await loadGlp1DoseLogs()
             }
         }
 
-        previousSyncStatus = realtimeSyncManager.syncStatus
-        handleSyncStatusChange(from: realtimeSyncManager.syncStatus, to: realtimeSyncManager.syncStatus)
-
         _ = AnalyticsService.shared.isFeatureEnabled(flagKey: Constants.photosTabFlagKey)
-        isPhotosTabEnabled = true
     }
 
     private func handleCoreDataContextChange(_ notification: Notification) {
@@ -285,9 +280,6 @@ struct DashboardViewLiquid: View {
                 loadOnlyNewest: true,
                 selectedIndex: selectedIndex
             )
-            if !viewModel.bodyMetrics.isEmpty {
-                updateAnimatedValues(for: selectedIndex)
-            }
         }
     }
 
@@ -334,9 +326,6 @@ struct DashboardViewLiquid: View {
                     authManager: authManager,
                     realtimeSyncManager: realtimeSyncManager
                 )
-                if !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: selectedIndex)
-                }
             }
         )
     }

@@ -163,7 +163,7 @@ class AuthManager: NSObject, ObservableObject {
     }
 
     func handleSupabaseUnauthorized() async {
-        await logout()
+        await logout(reason: .sessionExpired)
     }
 
     func initializeClerk() async {
@@ -208,10 +208,7 @@ class AuthManager: NSObject, ObservableObject {
         // Load Clerk
         do {
             // print("🔧 Attempting to load Clerk...")
-            let startTime = Date()
             try await clerk.load()
-            let duration = Date().timeIntervalSince(startTime)
-            // print("✅ Clerk SDK loaded successfully in \(String(format: "%.2f", duration))s")
 
             await MainActor.run {
                 self.isClerkLoaded = true
@@ -389,8 +386,6 @@ class AuthManager: NSObject, ObservableObject {
         // Extract properties using Mirror
         var userId = ""
         var emailAddresses: [Any] = []
-        var firstName: String?
-        var lastName: String?
         var username: String?
         var imageUrl: String?
 
@@ -400,10 +395,6 @@ class AuthManager: NSObject, ObservableObject {
                 userId = child.value as? String ?? ""
             case "emailAddresses":
                 emailAddresses = child.value as? [Any] ?? []
-            case "firstName":
-                firstName = child.value as? String
-            case "lastName":
-                lastName = child.value as? String
             case "username":
                 username = child.value as? String
             case "imageUrl":
@@ -681,6 +672,10 @@ class AuthManager: NSObject, ObservableObject {
     // MARK: - Session Termination
 
     func logout() async {
+        await logout(reason: .userInitiated)
+    }
+
+    private func logout(reason: AuthExitReason) async {
         do {
             try await clerk.signOut()
         } catch {
@@ -689,15 +684,7 @@ class AuthManager: NSObject, ObservableObject {
 
         AnalyticsService.shared.track(event: "logout")
 
-        await MainActor.run {
-            self.lastExitReason = .userInitiated
-            self.clerkSession = nil
-            self.currentUser = nil
-            self.isAuthenticated = false
-            self.currentSignUp = nil
-            self.pendingSignUpCredentials = nil
-            self.needsEmailVerification = false
-        }
+        clearLocalSession(reason: reason)
 
         await RevenueCatManager.shared.logoutUser()
 
@@ -709,6 +696,16 @@ class AuthManager: NSObject, ObservableObject {
         UserDefaults.standard.removeObject(forKey: "HasSyncedHistoricalSteps")
         UserDefaults.standard.removeObject(forKey: "lastSupabaseSyncDate")
         UserDefaults.standard.removeObject(forKey: "lastHealthKitWeightSyncDate")
+    }
+
+    func clearLocalSession(reason: AuthExitReason) {
+        lastExitReason = reason
+        clerkSession = nil
+        currentUser = nil
+        isAuthenticated = false
+        currentSignUp = nil
+        pendingSignUpCredentials = nil
+        needsEmailVerification = false
     }
 
     func loginErrorMessage(for error: Error) -> String {
@@ -1002,15 +999,13 @@ private class AppleSignInDelegate: NSObject,
             return window
         }
 
-        // Last resort: create a new window for the first available scene
-        // This prevents crashes but may not show UI properly
-        // print("⚠️ No active window found for Apple Sign In - creating fallback window")
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+        // Last resort: create a window for an available scene.
+        if let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first {
             return UIWindow(windowScene: windowScene)
         }
 
-        // Absolute fallback: return a basic window (sign in won't work but won't crash)
-        // print("❌ Critical: No window scene available - Apple Sign In will likely fail")
-        return UIWindow(frame: UIScreen.main.bounds)
+        preconditionFailure("Apple Sign In requires an active window scene.")
     }
 }
