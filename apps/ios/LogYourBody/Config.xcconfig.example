@@ -1,16 +1,33 @@
 // Configuration settings file format documentation can be found at:
 // https://help.apple.com/xcode/#/dev745c5c974
 // 
-// Copy this file to Config.xcconfig and fill in your actual values
+// This is the safe base configuration. A local, ignored Config.xcconfig is
+// optionally included below and overrides these values when present.
 
-// Supabase Configuration
-SUPABASE_URL = https:/$()/your-project.supabase.co
-SUPABASE_ANON_KEY = your-anon-key-here
+// API and authentication configuration
+API_BASE_URL = https:/$()/www.logyourbody.com
+CLERK_PUBLISHABLE_KEY =
+CLERK_FRONTEND_API = https:/$()/clerk.logyourbody.com
 
-// API Base URL - Change this for different environments
-API_BASE_URL_DEBUG = http:/$()/localhost:3000
-API_BASE_URL_RELEASE = https:/$()/your-production-url.com
+// Supabase configuration
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
 
-// Statsig Analytics
-STATSIG_CLIENT_SDK_KEY = your-statsig-ios-client-sdk-key-here
+// RevenueCat
+REVENUE_CAT_API_KEY =
+
+// Statsig analytics
+STATSIG_CLIENT_SDK_KEY =
 STATSIG_ENVIRONMENT_TIER = development
+
+// Sentry error reporting
+SENTRY_DSN =
+SENTRY_ENVIRONMENT = development
+SENTRY_TRACES_SAMPLE_RATE = 0
+
+// BodySpec integration (optional)
+BODYSPEC_CLIENT_ID =
+BODYSPEC_REDIRECT_URI = logyourbody:/$()/bodyspec-callback
+
+// Local secrets and environment-specific values belong in this ignored file.
+#include? "Config.xcconfig"

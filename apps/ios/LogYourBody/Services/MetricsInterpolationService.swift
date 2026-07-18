@@ -42,7 +42,8 @@ class MetricsInterpolationService {
     final class WeightInterpolationContext {
         private let metrics: [BodyMetrics]
         private let maxGapDays: Int
-        private let calendar = Calendar.current
+        private let calendar: Calendar
+        private let latestMetricByDay: [Date: BodyMetrics]
 
         // Cached trend-weight series for efficiency when querying multiple dates
         private var trendWeightCache: [Date: InterpolatedMetric] = [:]
@@ -53,8 +54,18 @@ class MetricsInterpolationService {
         private let trendAlpha: Double = 0.25
 
         init(metrics: [BodyMetrics], maxGapDays: Int) {
+            let calendar = Calendar.current
             self.metrics = metrics
             self.maxGapDays = maxGapDays
+            self.calendar = calendar
+            self.latestMetricByDay = metrics.reduce(into: [:]) { latestMetricByDay, metric in
+                let day = calendar.startOfDay(for: metric.date)
+                guard let existingMetric = latestMetricByDay[day],
+                      existingMetric.date > metric.date else {
+                    latestMetricByDay[day] = metric
+                    return
+                }
+            }
         }
 
         /// Returns a recency-weighted "trend" weight using an exponential moving average
@@ -131,6 +142,16 @@ class MetricsInterpolationService {
                 return nil
             }
 
+            if let sameDayMetric = latestMetricByDay[calendar.startOfDay(for: date)],
+               let weight = sameDayMetric.weight {
+                return InterpolatedMetric(
+                    value: round(weight * 10) / 10,
+                    isInterpolated: false,
+                    isLastKnown: false,
+                    confidenceLevel: nil
+                )
+            }
+
             if date < firstMetric.date {
                 return nil
             }
@@ -150,16 +171,6 @@ class MetricsInterpolationService {
             }
 
             let beforeMetric = metrics[beforeIndex]
-
-            if calendar.isDate(beforeMetric.date, inSameDayAs: date) {
-                guard let weight = beforeMetric.weight else { return nil }
-                return InterpolatedMetric(
-                    value: round(weight * 10) / 10,
-                    isInterpolated: false,
-                    isLastKnown: false,
-                    confidenceLevel: nil
-                )
-            }
 
             let afterIndex = beforeIndex + 1
             guard afterIndex < metrics.count else {
@@ -219,17 +230,38 @@ class MetricsInterpolationService {
     final class BodyFatInterpolationContext {
         private let metrics: [BodyMetrics]
         private let maxGapDays: Int
-        private let calendar = Calendar.current
+        private let calendar: Calendar
+        private let latestMetricByDay: [Date: BodyMetrics]
 
         init(metrics: [BodyMetrics], maxGapDays: Int) {
+            let calendar = Calendar.current
             self.metrics = metrics
             self.maxGapDays = maxGapDays
+            self.calendar = calendar
+            self.latestMetricByDay = metrics.reduce(into: [:]) { latestMetricByDay, metric in
+                let day = calendar.startOfDay(for: metric.date)
+                guard let existingMetric = latestMetricByDay[day],
+                      existingMetric.date > metric.date else {
+                    latestMetricByDay[day] = metric
+                    return
+                }
+            }
         }
 
         func estimate(for date: Date) -> InterpolatedMetric? {
             guard let firstMetric = metrics.first,
                   let lastMetric = metrics.last else {
                 return nil
+            }
+
+            if let sameDayMetric = latestMetricByDay[calendar.startOfDay(for: date)],
+               let bodyFat = sameDayMetric.bodyFatPercentage {
+                return InterpolatedMetric(
+                    value: round(bodyFat * 10) / 10,
+                    isInterpolated: false,
+                    isLastKnown: false,
+                    confidenceLevel: nil
+                )
             }
 
             if date < firstMetric.date {
@@ -251,16 +283,6 @@ class MetricsInterpolationService {
             }
 
             let beforeMetric = metrics[beforeIndex]
-
-            if calendar.isDate(beforeMetric.date, inSameDayAs: date) {
-                guard let bf = beforeMetric.bodyFatPercentage else { return nil }
-                return InterpolatedMetric(
-                    value: round(bf * 10) / 10,
-                    isInterpolated: false,
-                    isLastKnown: false,
-                    confidenceLevel: nil
-                )
-            }
 
             let afterIndex = beforeIndex + 1
             guard afterIndex < metrics.count else {
@@ -329,6 +351,10 @@ class MetricsInterpolationService {
         }
 
         func estimate(for date: Date) -> InterpolatedMetric? {
+            guard heightInches.isFinite, heightInches > 0 else {
+                return nil
+            }
+
             guard let leanMassResult = estimateLeanMass(for: date) else {
                 return nil
             }
@@ -390,7 +416,9 @@ class MetricsInterpolationService {
     }
 
     func makeFFMIInterpolationContext(for metrics: [BodyMetrics], heightInches: Double) -> FFMIInterpolationContext? {
-        guard let weightContext = makeWeightInterpolationContext(for: metrics),
+        guard heightInches.isFinite,
+              heightInches > 0,
+              let weightContext = makeWeightInterpolationContext(for: metrics),
               let bodyFatContext = makeBodyFatInterpolationContext(for: metrics) else {
             return nil
         }
@@ -408,6 +436,16 @@ class MetricsInterpolationService {
     func estimateWeight(for date: Date, metrics: [BodyMetrics]) -> InterpolatedMetric? {
         let sortedMetrics = metrics.filter { $0.weight != nil }.sorted { $0.date < $1.date }
         guard !sortedMetrics.isEmpty else { return nil }
+
+        if let sameDayMetric = sortedMetrics.last(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }),
+           let weight = sameDayMetric.weight {
+            return InterpolatedMetric(
+                value: round(weight * 10) / 10,
+                isInterpolated: false,
+                isLastKnown: false,
+                confidenceLevel: nil
+            )
+        }
 
         // Check if date is before first entry
         if date < sortedMetrics[0].date {
@@ -428,17 +466,6 @@ class MetricsInterpolationService {
         // Find metrics before and after the date
         let before = sortedMetrics.last { $0.date <= date }
         let after = sortedMetrics.first { $0.date > date }
-
-        // Exact match - return actual value
-        if let exactMatch = before, Calendar.current.isDate(exactMatch.date, inSameDayAs: date) {
-            guard let weight = exactMatch.weight else { return nil }
-            return InterpolatedMetric(
-                value: round(weight * 10) / 10,
-                isInterpolated: false,
-                isLastKnown: false,
-                confidenceLevel: nil
-            )
-        }
 
         // Interpolate between two points
         if let beforeMetric = before, let afterMetric = after,
@@ -474,6 +501,16 @@ class MetricsInterpolationService {
         let sortedMetrics = metrics.filter { $0.bodyFatPercentage != nil }.sorted { $0.date < $1.date }
         guard !sortedMetrics.isEmpty else { return nil }
 
+        if let sameDayMetric = sortedMetrics.last(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }),
+           let bodyFat = sameDayMetric.bodyFatPercentage {
+            return InterpolatedMetric(
+                value: round(bodyFat * 10) / 10,
+                isInterpolated: false,
+                isLastKnown: false,
+                confidenceLevel: nil
+            )
+        }
+
         // Check if date is before first entry
         if date < sortedMetrics[0].date {
             return nil
@@ -493,17 +530,6 @@ class MetricsInterpolationService {
         // Find metrics before and after the date
         let before = sortedMetrics.last { $0.date <= date }
         let after = sortedMetrics.first { $0.date > date }
-
-        // Exact match - return actual value
-        if let exactMatch = before, Calendar.current.isDate(exactMatch.date, inSameDayAs: date) {
-            guard let bf = exactMatch.bodyFatPercentage else { return nil }
-            return InterpolatedMetric(
-                value: round(bf * 10) / 10,
-                isInterpolated: false,
-                isLastKnown: false,
-                confidenceLevel: nil
-            )
-        }
 
         // Interpolate between two points
         if let beforeMetric = before, let afterMetric = after,
@@ -588,7 +614,9 @@ class MetricsInterpolationService {
     /// FFMI = lean_mass_kg / (height_meters^2)
     /// Requires height to be provided
     func estimateFFMI(for date: Date, metrics: [BodyMetrics], heightInches: Double?) -> InterpolatedMetric? {
-        guard let heightInches = heightInches, heightInches > 0 else { return nil }
+        guard let heightInches = heightInches,
+              heightInches.isFinite,
+              heightInches > 0 else { return nil }
 
         // Get lean mass (actual or interpolated)
         guard let leanMassResult = estimateLeanMass(for: date, metrics: metrics) else {

@@ -26,10 +26,7 @@ struct BodyScoreHeightView: View {
                 }
             },
             footer: {
-                Button {
-                    viewModel.persistHeightEntry()
-                    viewModel.goToNextStep()
-                } label: {
+                Button(action: continueToHealthConnect) {
                     Text("Continue")
                         .font(.system(size: 18, weight: .semibold))
                 }
@@ -38,16 +35,6 @@ struct BodyScoreHeightView: View {
                 .opacity(continueButtonOpacity)
             }
         )
-        .toolbar {
-            ToolbarItem(placement: .keyboard) {
-                HStack {
-                    Spacer()
-                    Button("Done") {
-                        centimetersFocused = false
-                    }
-                }
-            }
-        }
     }
 
     private var heightUnitBinding: Binding<HeightUnit> {
@@ -59,6 +46,12 @@ struct BodyScoreHeightView: View {
 
     private var continueButtonOpacity: Double {
         viewModel.canContinueHeight ? 1 : 0.4
+    }
+
+    private func continueToHealthConnect() {
+        centimetersFocused = false
+        viewModel.persistHeightEntry()
+        viewModel.goToNextStep()
     }
 
     private func validateHeightCentimeters(_ value: String) {
@@ -86,6 +79,8 @@ struct BodyScoreHeightView: View {
                 set: { viewModel.updateHeightCentimetersText($0) }
             ))
             .keyboardType(.decimalPad)
+            .accessibilityLabel("Height in centimeters")
+            .accessibilityHint("Enter your height in centimeters")
             .focused($centimetersFocused)
             .submitLabel(.done)
             .onSubmit {
@@ -94,12 +89,25 @@ struct BodyScoreHeightView: View {
             .onChange(of: viewModel.heightCentimetersText) { _, newValue in
                 validateHeightCentimeters(newValue)
             }
-            .padding(.horizontal, 18)
+            .padding(.leading, 18)
+            .padding(.trailing, centimetersFocused ? 72 : 18)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.appCard.opacity(0.7))
             )
+            .overlay(alignment: .trailing) {
+                if centimetersFocused {
+                    Button("Done") {
+                        centimetersFocused = false
+                    }
+                    .font(.system(.callout, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color.appPrimary)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss keyboard")
+                    .padding(.trailing, 16)
+                }
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(centimetersFocused ? Color.appPrimary : Color.appBorder.opacity(0.5))
@@ -135,7 +143,7 @@ struct BodyScoreHeightView: View {
                 }
                 .pickerStyle(.wheel)
                 .frame(maxWidth: .infinity)
-                .onChange(of: viewModel.heightFeet) { _ in
+                .onChange(of: viewModel.heightFeet) { _, _ in
                     HapticManager.shared.selection()
                 }
 
@@ -149,7 +157,7 @@ struct BodyScoreHeightView: View {
                 }
                 .pickerStyle(.wheel)
                 .frame(maxWidth: .infinity)
-                .onChange(of: viewModel.heightInches) { _ in
+                .onChange(of: viewModel.heightInches) { _, _ in
                     HapticManager.shared.selection()
                 }
             }

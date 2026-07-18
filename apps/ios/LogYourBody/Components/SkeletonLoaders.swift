@@ -24,7 +24,8 @@ struct ShimmerEffect: ViewModifier {
                 .offset(x: phase * 400 - 200)
                 .mask(content)
             )
-            .onAppear {
+            .task {
+                await Task.yield()
                 withAnimation(animation) {
                     phase = 1
                 }

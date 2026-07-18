@@ -83,7 +83,7 @@ class PhotoLibraryScanner: ObservableObject {
     private let imageManager = PHCachingImageManager()
     private var scanTask: Task<Void, Never>?
 
-    private init() {
+    init() {
         checkAuthorizationStatus()
     }
 

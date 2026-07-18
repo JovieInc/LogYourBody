@@ -43,7 +43,7 @@ struct DSProgressBar: View {
         .onAppear {
             animatedProgress = normalizedProgress
         }
-        .onChange(of: normalizedProgress) { newValue in
+        .onChange(of: normalizedProgress) { _, newValue in
             animatedProgress = newValue
         }
     }

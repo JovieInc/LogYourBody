@@ -58,7 +58,7 @@ class RealtimeSyncManager: ObservableObject {
         case offline
     }
 
-    struct SyncOperation: Codable {
+    struct SyncOperation: Codable, Sendable {
         let id: String
         let type: OperationType
         let data: Data
@@ -66,7 +66,7 @@ class RealtimeSyncManager: ObservableObject {
         let timestamp: Date
         var retryCount: Int = 0
 
-        enum OperationType: String, Codable {
+        enum OperationType: String, Codable, Sendable {
             case insert, update, delete
         }
     }
@@ -283,21 +283,30 @@ class RealtimeSyncManager: ObservableObject {
         Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
             var operationsNeedingRetry = operationsToProcess
+            var sessionIdSnapshot: String?
 
             do {
                 guard let userId = userIdSnapshot else {
                     throw SyncError.noAuthSession
                 }
 
+                try await self.ensureCurrentUser(userId)
+
                 let session = await MainActor.run { self.authManager.clerkSession }
                 guard let session else {
                     throw SyncError.noAuthSession
                 }
+                let sessionId = session.id
+                sessionIdSnapshot = sessionId
+
+                try await self.ensureCurrentSession(userId: userId, sessionId: sessionId)
 
                 let tokenResource = try await session.getToken()
                 guard let token = tokenResource?.jwt else {
                     throw SyncError.tokenGenerationFailed
                 }
+
+                try await self.ensureCurrentSession(userId: userId, sessionId: sessionId)
 
                 if !operationsNeedingRetry.isEmpty {
                     let failedOperations = await self.processPendingOperations(operationsNeedingRetry, token: token)
@@ -309,11 +318,23 @@ class RealtimeSyncManager: ObservableObject {
                     }
                 }
 
-                try await self.syncLocalChanges(token: token)
+                try await self.ensureCurrentSession(userId: userId, sessionId: sessionId)
+                try await self.syncLocalChanges(for: userId, token: token)
+                try await self.ensureCurrentSession(userId: userId, sessionId: sessionId)
                 try await self.pullLatestData(userId: userId, lastSync: lastSyncSnapshot, token: token)
+                try await self.ensureCurrentSession(userId: userId, sessionId: sessionId)
                 self.coreDataManager.cleanupOldData()
 
                 await MainActor.run {
+                    guard self.authManager.isAuthenticated,
+                          self.authManager.currentUser?.id == userId,
+                          self.authManager.clerkSession?.id == sessionId else {
+                        self.isSyncing = false
+                        self.syncStatus = .idle
+                        onCompletion?()
+                        return
+                    }
+
                     self.isSyncing = false
                     self.syncStatus = .success
                     self.lastSyncDate = Date()
@@ -323,19 +344,38 @@ class RealtimeSyncManager: ObservableObject {
                     onCompletion?()
                 }
             } catch {
-                if let supabaseError = error as? SupabaseError {
+                let sessionIsCurrent: Bool
+                if let userId = userIdSnapshot,
+                   let sessionId = sessionIdSnapshot {
+                    sessionIsCurrent = await self.isCurrentSession(userId: userId, sessionId: sessionId)
+                } else {
+                    sessionIsCurrent = false
+                }
+
+                if sessionIsCurrent,
+                   let supabaseError = error as? SupabaseError {
                     if case .unauthorized = supabaseError {
                         await self.authManager.handleSupabaseUnauthorized()
                     }
                 }
 
+                let retryOperations = operationsNeedingRetry
+                let errorDescription = error.localizedDescription
+
                 await MainActor.run {
-                    if !operationsNeedingRetry.isEmpty {
-                        self.pendingOperations.insert(contentsOf: operationsNeedingRetry, at: 0)
+                    guard sessionIsCurrent else {
+                        self.isSyncing = false
+                        self.syncStatus = .idle
+                        onCompletion?()
+                        return
+                    }
+
+                    if !retryOperations.isEmpty {
+                        self.pendingOperations.insert(contentsOf: retryOperations, at: 0)
                     }
                     self.isSyncing = false
-                    self.syncStatus = .error(error.localizedDescription)
-                    self.error = error.localizedDescription
+                    self.syncStatus = .error(errorDescription)
+                    self.error = errorDescription
                     self.consecutiveFailures += 1
 
                     if self.consecutiveFailures >= self.maxConsecutiveFailures {
@@ -359,35 +399,69 @@ class RealtimeSyncManager: ObservableObject {
         }
     }
 
-    nonisolated func syncLocalChanges(token: String) async throws {
-        let unsynced = await coreDataManager.fetchUnsyncedEntries()
-        let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs()
-        let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications()
-        let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults()
+    nonisolated func syncLocalChanges(for userId: String, token: String) async throws {
+        try await ensureCurrentUser(userId)
+
+        let unsynced = await coreDataManager.fetchUnsyncedEntries(for: userId)
+        let unsyncedGlp1 = await coreDataManager.fetchUnsyncedGlp1DoseLogs(for: userId)
+        let unsyncedMedications = await coreDataManager.fetchUnsyncedGlp1Medications(for: userId)
+        let unsyncedDexa = await coreDataManager.fetchUnsyncedDexaResults(for: userId)
 
         // Batch sync for efficiency
         if !unsynced.bodyMetrics.isEmpty {
             try await syncBodyMetricsBatch(unsynced.bodyMetrics, token: token)
+            try await ensureCurrentUser(userId)
         }
 
         if !unsynced.dailyMetrics.isEmpty {
             try await syncDailyMetricsBatch(unsynced.dailyMetrics, token: token)
+            try await ensureCurrentUser(userId)
         }
 
         if !unsynced.profiles.isEmpty {
             try await syncProfilesBatch(unsynced.profiles, token: token)
+            try await ensureCurrentUser(userId)
         }
 
         if !unsyncedGlp1.isEmpty {
             try await syncGlp1DoseLogsBatch(unsyncedGlp1, token: token)
+            try await ensureCurrentUser(userId)
         }
 
         if !unsyncedMedications.isEmpty {
             try await syncGlp1MedicationsBatch(unsyncedMedications, token: token)
+            try await ensureCurrentUser(userId)
         }
 
         if !unsyncedDexa.isEmpty {
             try await syncDexaResultsBatch(unsyncedDexa, token: token)
+            try await ensureCurrentUser(userId)
+        }
+    }
+
+    nonisolated private func ensureCurrentUser(_ userId: String) async throws {
+        guard await isCurrentUser(userId) else {
+            throw SyncError.noAuthSession
+        }
+    }
+
+    nonisolated private func ensureCurrentSession(userId: String, sessionId: String) async throws {
+        guard await isCurrentSession(userId: userId, sessionId: sessionId) else {
+            throw SyncError.noAuthSession
+        }
+    }
+
+    nonisolated private func isCurrentUser(_ userId: String) async -> Bool {
+        await MainActor.run {
+            authManager.isAuthenticated && authManager.currentUser?.id == userId
+        }
+    }
+
+    nonisolated private func isCurrentSession(userId: String, sessionId: String) async -> Bool {
+        await MainActor.run {
+            authManager.isAuthenticated &&
+                authManager.currentUser?.id == userId &&
+                authManager.clerkSession?.id == sessionId
         }
     }
 

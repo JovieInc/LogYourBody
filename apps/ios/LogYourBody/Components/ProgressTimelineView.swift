@@ -6,6 +6,7 @@
 // Inspired by iOS Photos timeline scrubber with time-weighted positioning
 //
 
+import Foundation
 import SwiftUI
 
 struct ProgressTimelineView: View {
@@ -21,6 +22,8 @@ struct ProgressTimelineView: View {
     @State private var isDragging: Bool = false
     @State private var dragPosition: Double = 0.5
     @State private var currentDateLabel: String = ""
+    @State private var timelineStartDate: Date?
+    @State private var timelineEndDate: Date?
 
     private let timelineHeight: CGFloat = 50
     private let scrubberHandleSize: CGFloat = 44
@@ -184,6 +187,10 @@ struct ProgressTimelineView: View {
                 .frame(width: scrubberHandleSize, height: scrubberHandleSize)
         }
         .frame(width: scrubberHandleSize, height: scrubberHandleSize)
+        .accessibilityElement()
+        .accessibilityLabel("Progress timeline")
+        .accessibilityValue(String(format: "%.3f", dragPosition))
+        .accessibilityIdentifier("progress-timeline-scrubber")
     }
 
     // MARK: - Logic
@@ -193,14 +200,21 @@ struct ProgressTimelineView: View {
 
         guard !bodyMetrics.isEmpty else {
             anchors = []
+            timelineStartDate = nil
+            timelineEndDate = nil
             return
         }
 
         let sortedMetrics = bodyMetrics.sorted { $0.date < $1.date }
         guard let firstDate = sortedMetrics.first?.date,
               let lastDate = sortedMetrics.last?.date else {
+            timelineStartDate = nil
+            timelineEndDate = nil
             return
         }
+
+        timelineStartDate = firstDate
+        timelineEndDate = lastDate
 
         // Calculate zoom level
         zoomLevel = TimelineZoomLevel.calculate(from: firstDate, to: lastDate)
@@ -218,12 +232,15 @@ struct ProgressTimelineView: View {
 
         guard let anchor = anchors.first(where: { $0.bodyMetrics.id == metric.id }) else {
             // If not an anchor, calculate position manually
-            guard let firstDate = bodyMetrics.first?.date,
-                  let lastDate = bodyMetrics.last?.date else {
+            guard let firstDate = timelineStartDate,
+                  let lastDate = timelineEndDate else {
                 return
             }
-            let midpointDate = dataProvider.dateFromPosition(0.5, from: firstDate, to: lastDate)
-            dragPosition = midpointDate.timeIntervalSince1970 / metric.date.timeIntervalSince1970
+            dragPosition = dataProvider.position(
+                for: metric.date,
+                from: firstDate,
+                to: lastDate
+            )
             return
         }
 
@@ -238,9 +255,8 @@ struct ProgressTimelineView: View {
         dragPosition = position
 
         // Convert position to date
-        guard !bodyMetrics.isEmpty,
-              let firstDate = bodyMetrics.first?.date,
-              let lastDate = bodyMetrics.last?.date else {
+        guard let firstDate = timelineStartDate,
+              let lastDate = timelineEndDate else {
             return
         }
 

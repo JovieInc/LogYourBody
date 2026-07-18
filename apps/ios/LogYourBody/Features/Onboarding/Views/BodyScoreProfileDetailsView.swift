@@ -281,7 +281,7 @@ struct BodyScoreProfileDetailsView: View {
                     try await authManager.consolidateNameUpdate(fullName)
                 }
 
-                var updates: [String: Any] = [
+                let updates: [String: Any] = [
                     "dateOfBirth": dateOfBirth,
                     "onboardingCompleted": true
                 ]

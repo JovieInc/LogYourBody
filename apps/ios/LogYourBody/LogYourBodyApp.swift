@@ -7,6 +7,23 @@ import Clerk
 
 @main
 struct LogYourBodyApp: App {
+    static var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    static var uiTestScenario: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let scenarioFlagIndex = arguments.firstIndex(of: "-uiTestScenario"),
+              scenarioFlagIndex < arguments.index(before: arguments.endIndex) else {
+            return nil
+        }
+        return arguments[arguments.index(after: scenarioFlagIndex)]
+    }
+
+    static var isRunningTestHost: Bool {
+        isRunningUnitTests || uiTestScenario != nil
+    }
+
     @StateObject private var authManager = AuthManager.shared
     @StateObject private var revenueCatManager = RevenueCatManager.shared
     @StateObject private var healthKitManager = HealthKitManager.shared
@@ -20,46 +37,50 @@ struct LogYourBodyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(\.managedObjectContext, persistenceController.viewContext)
-                .environmentObject(authManager)
-                .environmentObject(realtimeSyncManager)
-                .environmentObject(revenueCatManager)
-                .environment(clerk)
-                .sheet(isPresented: $showAddEntrySheet) {
-                    AddEntrySheet(isPresented: $showAddEntrySheet)
-                        .environmentObject(authManager)
-                        .onAppear {
-                            // Set the selected tab based on deep link
-                            if let tab = UserDefaults.standard.object(forKey: "pendingEntryTab") as? Int {
-                                selectedEntryTab = tab
-                                UserDefaults.standard.removeObject(forKey: "pendingEntryTab")
+            if let scenario = Self.uiTestScenario {
+                UITestRootView(scenario: scenario)
+            } else {
+                ContentView()
+                    .environment(\.managedObjectContext, persistenceController.viewContext)
+                    .environmentObject(authManager)
+                    .environmentObject(realtimeSyncManager)
+                    .environmentObject(revenueCatManager)
+                    .environment(clerk)
+                    .sheet(isPresented: $showAddEntrySheet) {
+                        AddEntrySheet(isPresented: $showAddEntrySheet)
+                            .environmentObject(authManager)
+                            .onAppear {
+                                // Set the selected tab based on deep link
+                                if let tab = UserDefaults.standard.object(forKey: "pendingEntryTab") as? Int {
+                                    selectedEntryTab = tab
+                                    UserDefaults.standard.removeObject(forKey: "pendingEntryTab")
+                                }
                             }
-                        }
-                }
-                .onOpenURL { url in
-                    handleDeepLink(url)
-                }
-                .task {
-                    await performStartupSequence()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-                    // App entering background - ensure sync is complete
-                    realtimeSyncManager.syncIfNeeded()
-
-                    // Update widget data
-                    Task {
-                        await widgetDataManager.updateWidgetData()
                     }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-                    // App entering foreground - refresh data
-                    Task {
-                        if healthKitManager.isAuthorized {
-                            try? await HealthSyncCoordinator.shared.syncStepsFromHealthKit()
+                    .onOpenURL { url in
+                        handleDeepLink(url)
+                    }
+                    .task {
+                        await performStartupSequence()
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                        // App entering background - ensure sync is complete
+                        realtimeSyncManager.syncIfNeeded()
+
+                        // Update widget data
+                        Task {
+                            await widgetDataManager.updateWidgetData()
                         }
-                        // Update widget with latest data
-                        await widgetDataManager.updateWidgetData()
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                        // App entering foreground - refresh data
+                        Task {
+                            if healthKitManager.isAuthorized {
+                                try? await HealthSyncCoordinator.shared.syncStepsFromHealthKit()
+                            }
+                            // Update widget with latest data
+                            await widgetDataManager.updateWidgetData()
+                        }
                     }
                 }
         }
@@ -69,6 +90,10 @@ struct LogYourBodyApp: App {
 
     @MainActor
     private func performStartupSequence() async {
+        guard !Self.isRunningTestHost else {
+            return
+        }
+
         scheduleDeferredMaintenance()
 
         ErrorTrackingService.shared.start()

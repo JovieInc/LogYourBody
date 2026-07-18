@@ -30,8 +30,8 @@ final class BaseButtonTests: XCTestCase {
         XCTAssertNil(ButtonConfiguration.ButtonStyleVariant.primary.borderColor)
 
         // Secondary
-        XCTAssertEqual(ButtonConfiguration.ButtonStyleVariant.secondary.backgroundColor, .appPrimary.opacity(0.1))
-        XCTAssertEqual(ButtonConfiguration.ButtonStyleVariant.secondary.foregroundColor, .appPrimary)
+        XCTAssertEqual(ButtonConfiguration.ButtonStyleVariant.secondary.backgroundColor, .appCard)
+        XCTAssertEqual(ButtonConfiguration.ButtonStyleVariant.secondary.foregroundColor, .appText)
         XCTAssertNotNil(ButtonConfiguration.ButtonStyleVariant.secondary.borderColor)
 
         // Tertiary
@@ -45,7 +45,7 @@ final class BaseButtonTests: XCTestCase {
 
         // Ghost
         XCTAssertEqual(ButtonConfiguration.ButtonStyleVariant.ghost.backgroundColor, .clear)
-        XCTAssertEqual(ButtonConfiguration.ButtonStyleVariant.ghost.foregroundColor, .appPrimary)
+        XCTAssertEqual(ButtonConfiguration.ButtonStyleVariant.ghost.foregroundColor, .appTextSecondary)
 
         // Social
         XCTAssertEqual(ButtonConfiguration.ButtonStyleVariant.social.backgroundColor, .white)

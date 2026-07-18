@@ -24,7 +24,7 @@ struct LegalConsentView: View {
             // Background
             Color.black.opacity(0.8)
                 .ignoresSafeArea()
-                .onTapGesture { } // Prevent dismissal by tapping background
+                .allowsHitTesting(false)
 
             VStack(spacing: 0) {
                 // Content
@@ -133,29 +133,19 @@ struct ConsentCheckbox: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             // Custom checkbox
-            Button(
-                action: {
-                    isChecked.toggle()
-                },
-                label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 2)
-                            .frame(width: 24, height: 24)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(isChecked ? Color.white : Color.clear)
-                            )
-
-                        if isChecked {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.black)
-                        }
-                    }
-                }
-            )
+            Button {
+                isChecked.toggle()
+            } label: {
+                Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(isChecked ? .white : .white.opacity(0.3))
+                    .frame(width: 24, height: 24)
+                    .padding(10)
+            }
             .buttonStyle(PlainButtonStyle())
+            .accessibilityIdentifier("legal-consent-\(linkText)")
+            .accessibilityLabel("Accept \(linkText)")
+            .accessibilityValue(isChecked ? "Selected" : "Not selected")
 
             // Text with link
             HStack(spacing: 0) {

@@ -116,6 +116,10 @@ struct ProgressPhotoCarouselView: View {
         // Cancel previous preload task to prevent accumulation
         preloadTask?.cancel()
 
+        // The carousel is also used for the empty state. Avoid constructing
+        // a closed range whose upper bound is -1 before there are metrics.
+        guard !displayMetrics.isEmpty else { return }
+
         // Debounce: Create new task with delay
         preloadTask = Task {
             // 500ms debounce to avoid excessive preloading on rapid scrolling
@@ -150,7 +154,7 @@ struct PhotoCard: View {
                 Color.appBackground
 
                 // Photo content
-                if let photoUrl = metric.photoUrl {
+                if let photoUrl = metric.photoUrl, !photoUrl.isEmpty {
                     CachedAsyncImage(urlString: photoUrl) { image in
                         image
                             .resizable()
@@ -162,6 +166,25 @@ struct PhotoCard: View {
                             .frame(width: geometry.size.width, height: geometry.size.height)
                     }
                     .id(photoUrl) // Stable ID prevents unnecessary reloads
+                } else {
+                    VStack(spacing: 10) {
+                        Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 44))
+                            .foregroundColor(.white.opacity(0.45))
+
+                        Text("No progress photo")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+
+                        Text(metric.date.formatted(date: .abbreviated, time: .omitted))
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    .multilineTextAlignment(.center)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(
+                        "No progress photo for \(metric.date.formatted(date: .abbreviated, time: .omitted))"
+                    )
                 }
             }
         }

@@ -24,6 +24,7 @@ struct BodyScoreBodyFatNumericView: View {
                             set: { viewModel.bodyFatPercentageText = $0 }
                         ))
                         .keyboardType(.decimalPad)
+                        .accessibilityIdentifier("onboarding-body-fat")
                         .focused($percentageFieldFocused)
                         .submitLabel(.done)
                         .onSubmit {
@@ -32,7 +33,8 @@ struct BodyScoreBodyFatNumericView: View {
                         .onChange(of: viewModel.bodyFatPercentageText) { _, newValue in
                             validateBodyFat(newValue)
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.leading, 20)
+                        .padding(.trailing, percentageFieldFocused ? 88 : 20)
                         .padding(.vertical, 16)
                         .background(
                             RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -42,6 +44,18 @@ struct BodyScoreBodyFatNumericView: View {
                             RoundedRectangle(cornerRadius: 20, style: .continuous)
                                 .stroke(percentageFieldStrokeColor)
                         )
+                        .overlay(alignment: .trailing) {
+                            if percentageFieldFocused {
+                                Button("Done") {
+                                    percentageFieldFocused = false
+                                }
+                                .font(.system(.callout, design: .rounded).weight(.semibold))
+                                .foregroundStyle(Color.appPrimary)
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Dismiss keyboard")
+                                .padding(.trailing, 16)
+                            }
+                        }
 
                         if let error = bodyFatError {
                             Text(error)
@@ -82,6 +96,7 @@ struct BodyScoreBodyFatNumericView: View {
             },
             footer: {
                 Button {
+                    percentageFieldFocused = false
                     viewModel.persistBodyFatPercentageEntry()
                     viewModel.goToNextStep()
                 } label: {
@@ -93,21 +108,6 @@ struct BodyScoreBodyFatNumericView: View {
                 .opacity(continueButtonOpacity)
             }
         )
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                self.percentageFieldFocused = true
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .keyboard) {
-                HStack {
-                    Spacer()
-                    Button("Done") {
-                        percentageFieldFocused = false
-                    }
-                }
-            }
-        }
     }
 }
 

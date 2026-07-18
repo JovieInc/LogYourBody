@@ -13,11 +13,30 @@ struct VerificationForm: View {
     let email: String
     let onVerify: () -> Void
     let onResend: () -> Void
+    let resendCooldown: Int
 
-    @State private var timeRemaining: Int = 60
+    @State private var timeRemaining: Int
     @State private var timerActive = true
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    init(
+        verificationCode: Binding<String>,
+        isLoading: Binding<Bool>,
+        email: String,
+        onVerify: @escaping () -> Void,
+        onResend: @escaping () -> Void,
+        resendCooldown: Int = 60
+    ) {
+        let normalizedCooldown = max(0, resendCooldown)
+        _verificationCode = verificationCode
+        _isLoading = isLoading
+        self.email = email
+        self.onVerify = onVerify
+        self.onResend = onResend
+        self.resendCooldown = normalizedCooldown
+        _timeRemaining = State(initialValue: normalizedCooldown)
+    }
 
     var body: some View {
         VStack(spacing: 32) {
@@ -41,7 +60,8 @@ struct VerificationForm: View {
                     if !isLoading {
                         onVerify()
                     }
-                }
+                },
+                accessibilityIdentifier: "email-verification-code"
             )
 
             // Verify Button
@@ -86,7 +106,7 @@ struct VerificationForm: View {
     }
 
     private func resetTimer() {
-        timeRemaining = 60
+        timeRemaining = resendCooldown
         timerActive = true
     }
 }

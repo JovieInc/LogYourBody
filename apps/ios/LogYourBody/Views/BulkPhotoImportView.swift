@@ -7,8 +7,8 @@ import Photos
 
 struct BulkPhotoImportView: View {
     @EnvironmentObject var authManager: AuthManager
-    @StateObject private var scanner = PhotoLibraryScanner.shared
-    @StateObject private var importManager = BulkImportManager.shared
+    @StateObject private var scanner: PhotoLibraryScanner
+    @StateObject private var importManager: BulkImportManager
     @Environment(\.dismiss)
     var dismiss
     @State private var selectedPhotos: Set<UUID> = []
@@ -17,6 +17,18 @@ struct BulkPhotoImportView: View {
     @State private var isImporting = false
     @State private var showWelcomeScreen = true
     @State private var hasStartedScan = false
+
+    init(
+        scanner: PhotoLibraryScanner = .shared,
+        importManager: BulkImportManager = .shared,
+        startsOnWelcomeScreen: Bool = true,
+        hasStartedScan: Bool = false
+    ) {
+        _scanner = StateObject(wrappedValue: scanner)
+        _importManager = StateObject(wrappedValue: importManager)
+        _showWelcomeScreen = State(initialValue: startsOnWelcomeScreen)
+        _hasStartedScan = State(initialValue: hasStartedScan)
+    }
 
     private var selectedCount: Int {
         selectedPhotos.count

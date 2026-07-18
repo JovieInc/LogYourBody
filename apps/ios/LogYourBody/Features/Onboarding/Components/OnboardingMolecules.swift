@@ -134,6 +134,10 @@ struct OnboardingTextFieldRow: View {
                 .autocorrectionDisabled(true)
                 .textInputAutocapitalization(.never)
                 .focused($isFocused)
+                .submitLabel(.done)
+                .onSubmit {
+                    isFocused = false
+                }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .background(
@@ -257,16 +261,26 @@ struct OnboardingProgressIndicator: View {
 
                     Capsule()
                         .fill(Color.appPrimary)
-                        .frame(
-                            width: min(
-                                max(geometry.size.width * context.fractionComplete, 12),
-                                geometry.size.width
-                            )
-                        )
+                        .frame(width: Self.fillWidth(
+                            containerWidth: geometry.size.width,
+                            fraction: context.fractionComplete
+                        ))
                 }
             }
             .frame(height: 3)
         }
+    }
+
+    static func fillWidth(containerWidth: CGFloat, fraction: Double) -> CGFloat {
+        guard containerWidth.isFinite, containerWidth > 0, fraction.isFinite else {
+            return 0
+        }
+
+        let clampedFraction = min(max(fraction, 0), 1)
+        let minimumWidth = min(12, containerWidth)
+        let requestedWidth = containerWidth * CGFloat(clampedFraction)
+
+        return min(max(requestedWidth, minimumWidth), containerWidth)
     }
 }
 

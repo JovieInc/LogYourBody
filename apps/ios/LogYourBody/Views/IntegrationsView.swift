@@ -33,15 +33,10 @@ struct IntegrationsView: View {
         }
         .navigationTitle("Integrations")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showHealthKitConnect) {
-            // HealthKit authorization handled inline
-            Text("")
-                .onAppear {
-                    Task {
-                        await healthKitManager.requestAuthorization()
-                        showHealthKitConnect = false
-                    }
-                }
+        .alert("Apple Health Access Needed", isPresented: $showHealthKitConnect) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Allow access to Apple Health, then try connecting again.")
         }
         .onAppear {
             // Check HealthKit authorization status
@@ -107,7 +102,8 @@ struct IntegrationsView: View {
                                 Task {
                                     let authorized = await healthKitManager.requestAuthorization()
                                     if authorized {
-                                        await HealthSyncCoordinator.shared.configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
+                                        await HealthSyncCoordinator.shared
+                                            .configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
                                     } else {
                                         await MainActor.run {
                                             healthKitSyncEnabled = false

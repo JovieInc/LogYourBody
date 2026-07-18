@@ -301,33 +301,6 @@ platform :ios do
     return new_build_number
   end
   
-  desc "Run snapshot tests for UI regression"
-  lane :ui_snapshot do |options|
-    # Use absolute path from iOS directory
-    ios_dir = File.expand_path("..", Dir.pwd)
-    proj_path = File.join(ios_dir, "LogYourBody.xcodeproj")
-    
-    # Configure test options
-    test_scheme = options[:scheme] || scheme
-    test_device = options[:device] || "iPhone 16"
-    test_configuration = options[:configuration] || "Debug"
-    
-    # Run snapshot tests specifically
-    run_tests(
-      project: proj_path,
-      scheme: test_scheme,
-      device: test_device,
-      configuration: test_configuration,
-      clean: false,
-      skip_build: options[:skip_build] || false,
-      test_without_building: options[:test_without_building] || true,
-      only_testing: "LogYourBodyUITests/SnapshotTests",
-      output_types: "junit",
-      output_directory: "./snapshot_output",
-      result_bundle: true
-    )
-  end
-  
   desc "Run tests with sanitizers enabled"
   lane :test_sanitizers do |options|
     # Use absolute path from iOS directory
@@ -372,7 +345,7 @@ platform :ios do
       output_directory: "./sanitizer_output",
       result_bundle: true,
       disable_concurrent_testing: true,  # Sanitizers work better with serial execution
-      fail_build: false # Don't fail the build on sanitizer issues
+      fail_build: true
     )
   end
   
@@ -545,7 +518,7 @@ platform :ios do
     swiftlint(
       mode: :lint,
       strict: true,
-      raise_if_swiftlint_error: false, # Don't fail on lint errors
+      raise_if_swiftlint_error: true,
       reporter: "github-actions-logging"
     )
     
@@ -560,7 +533,7 @@ platform :ios do
       code_coverage: false,
       derived_data_path: "build",
       xcargs: "CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO -quiet",
-      fail_build: false, # Don't fail the whole lane on test failures
+      fail_build: true,
       xcodebuild_formatter: "xcbeautify --renderer github-actions"
     )
   end

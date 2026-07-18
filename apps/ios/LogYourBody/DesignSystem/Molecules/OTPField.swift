@@ -10,17 +10,20 @@ struct OTPField: View {
     @Binding var code: String
     let length: Int
     let onComplete: ((String) -> Void)?
+    let accessibilityIdentifier: String
 
     @FocusState private var isFieldFocused: Bool
 
     init(
         code: Binding<String>,
         length: Int = 6,
-        onComplete: ((String) -> Void)? = nil
+        onComplete: ((String) -> Void)? = nil,
+        accessibilityIdentifier: String = "otp-input"
     ) {
         self._code = code
         self.length = length
         self.onComplete = onComplete
+        self.accessibilityIdentifier = accessibilityIdentifier
     }
 
     var body: some View {
@@ -29,9 +32,16 @@ struct OTPField: View {
             TextField("", text: $code)
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)
+                .accessibilityLabel("Verification code")
+                .accessibilityIdentifier(accessibilityIdentifier)
+                .accessibilityHint("Enter the \(length)-digit verification code")
+                .accessibilityValue(code)
                 .focused($isFieldFocused)
-                .opacity(0)
-                .onChange(of: code) { newValue in
+                // Keep the input effectively invisible behind the custom
+                // digit boxes without removing it from VoiceOver and UI test
+                // accessibility discovery.
+                .opacity(0.01)
+                .onChange(of: code) { _, newValue in
                     // Limit to specified length
                     if newValue.count > length {
                         code = String(newValue.prefix(length))

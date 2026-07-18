@@ -14,11 +14,24 @@ struct UserGreeting: View {
     var customGreeting: String?
 
     private var greeting: String {
-        if let custom = customGreeting {
-            return custom
+        Self.greeting(at: Date(), showEmoji: showEmoji, customGreeting: customGreeting)
+    }
+
+    private var firstName: String {
+        Self.firstName(from: fullName)
+    }
+
+    static func greeting(
+        at date: Date,
+        showEmoji: Bool,
+        customGreeting: String?,
+        calendar: Calendar = .current
+    ) -> String {
+        if let customGreeting {
+            return customGreeting
         }
 
-        let hour = Calendar.current.component(.hour, from: Date())
+        let hour = calendar.component(.hour, from: date)
         let baseGreeting: String
         switch hour {
         case 0..<12: baseGreeting = "Good morning"
@@ -40,7 +53,7 @@ struct UserGreeting: View {
         return baseGreeting
     }
 
-    private var firstName: String {
+    static func firstName(from fullName: String?) -> String {
         guard let fullName = fullName, !fullName.isEmpty else { return "there" }
         let trimmedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
         let components = trimmedName.components(separatedBy: " ").filter { !$0.isEmpty }

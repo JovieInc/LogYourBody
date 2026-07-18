@@ -54,10 +54,10 @@ class LoadingManager: ObservableObject {
 
     init(
         authManager: AuthManager,
-        healthSyncCoordinator: HealthSyncCoordinating = HealthSyncCoordinator.shared
+        healthSyncCoordinator: HealthSyncCoordinating? = nil
     ) {
         self.authManager = authManager
-        self.healthSyncCoordinator = healthSyncCoordinator
+        self.healthSyncCoordinator = healthSyncCoordinator ?? HealthSyncCoordinator.shared
     }
 
     func startLoading() async {
@@ -97,18 +97,10 @@ class LoadingManager: ObservableObject {
         if !Constants.useMockAuth {
             let clerkTask = authManager.ensureClerkInitializationTask()
             let maxWaitTimeNanoseconds: UInt64 = 500_000_000 // 0.5 seconds
-            let clerkReady = await waitForClerkInitialization(
+            _ = await waitForClerkInitialization(
                 task: clerkTask,
                 timeoutNanoseconds: maxWaitTimeNanoseconds
             )
-
-            if clerkReady {
-                // print("✅ LoadingManager: Clerk loaded successfully")
-            } else if let error = authManager.clerkInitError {
-                // print("⚠️ LoadingManager: Clerk failed to load: \(error)")
-            } else {
-                // print("⚠️ LoadingManager: Clerk loading timed out after \(Double(maxWaitTimeNanoseconds) / 1_000_000_000)s")
-            }
         }
 
         await updateProgress(for: .checkAuth)

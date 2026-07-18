@@ -104,17 +104,22 @@ struct BodySpecDexaCompositionResponse: Decodable {
     }
 }
 
+@MainActor
 final class BodySpecAPI {
-    static let shared = BodySpecAPI()
+    static let shared = BodySpecAPI(
+        baseURL: URL(string: "https://app.bodyspec.com")!,
+        urlSession: .shared,
+        authManager: .shared
+    )
 
     private let baseURL: URL
     private let urlSession: URLSession
     private let authManager: BodySpecAuthManager
 
     init(
-        baseURL: URL = URL(string: "https://app.bodyspec.com")!,
-        urlSession: URLSession = .shared,
-        authManager: BodySpecAuthManager = .shared
+        baseURL: URL,
+        urlSession: URLSession,
+        authManager: BodySpecAuthManager
     ) {
         self.baseURL = baseURL
         self.urlSession = urlSession

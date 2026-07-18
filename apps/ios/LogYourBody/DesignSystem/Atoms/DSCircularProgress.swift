@@ -20,7 +20,15 @@ struct DSCircularProgress: View {
     @State private var animatedProgress: Double = 0
 
     private var normalizedProgress: Double {
+        Self.normalizedProgress(for: progress)
+    }
+
+    static func normalizedProgress(for progress: Double) -> Double {
         min(1.0, max(0.0, progress))
+    }
+
+    static func percentage(for progress: Double) -> Int {
+        Int(normalizedProgress(for: progress) * 100)
     }
 
     var body: some View {
@@ -49,7 +57,7 @@ struct DSCircularProgress: View {
 
             // Optional percentage display
             if showPercentage {
-                Text("\(Int(animatedProgress * 100))%")
+                Text("\(Self.percentage(for: animatedProgress))%")
                     .font(.system(size: percentageFontSize, weight: .semibold))
                     .foregroundColor(foregroundColor)
             }
@@ -57,7 +65,7 @@ struct DSCircularProgress: View {
         .onAppear {
             animatedProgress = normalizedProgress
         }
-        .onChange(of: normalizedProgress) { newValue in
+        .onChange(of: normalizedProgress) { _, newValue in
             animatedProgress = newValue
         }
     }

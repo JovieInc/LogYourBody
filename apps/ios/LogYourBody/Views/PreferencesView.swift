@@ -893,6 +893,9 @@ struct PreferencesView: View {
             .background(Color.clear)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(
+            "profile-\(title.lowercased().replacingOccurrences(of: " ", with: "-"))"
+        )
     }
 
     @ViewBuilder
@@ -1022,7 +1025,12 @@ struct PreferencesView: View {
     }
 
     private var topSafeArea: CGFloat {
-        UIApplication.shared.windows.first?.safeAreaInsets.top ?? 0
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }?
+            .windows
+            .first { $0.isKeyWindow }?
+            .safeAreaInsets.top ?? 0
     }
 
     private func handleHealthSyncToggle(to newValue: Bool) {

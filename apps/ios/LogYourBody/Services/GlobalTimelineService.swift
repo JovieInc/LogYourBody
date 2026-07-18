@@ -40,7 +40,7 @@ final class GlobalTimelineService {
         )
     }
 
-    // MARK: - Bucket builders (stubs)
+    // MARK: - Bucket builders
 
     private func makeWeeklyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
         let sortedMetrics = metrics.sorted { $0.date < $1.date }
@@ -135,15 +135,182 @@ final class GlobalTimelineService {
     }
 
     private func makeMonthlyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
-        // TODO: Implement monthly aggregation rules.
-        _ = metrics
-        return []
+        guard let zoneStart = monthlyZoneStart(for: metrics) else {
+            return []
+        }
+
+        let intervals = (1...6).reversed().compactMap { offset -> DateInterval? in
+            guard let start = calendar.date(byAdding: .month, value: -offset, to: zoneStart),
+                  let end = calendar.date(byAdding: .month, value: 1, to: start) else {
+                return nil
+            }
+            return DateInterval(start: start, end: end)
+        }
+
+        return makeAggregateBuckets(
+            intervals: intervals,
+            scale: .month,
+            metrics: metrics,
+            identifier: makeMonthIdentifier,
+            maximumInterpolatedGap: 2
+        )
     }
 
     private func makeYearlyBuckets(from metrics: [BodyMetrics]) -> [GlobalTimelineBucket] {
-        // TODO: Implement yearly aggregation rules.
-        _ = metrics
-        return []
+        guard let zoneStart = monthlyZoneStart(for: metrics),
+              let earliestDate = metrics.map(\.date).min() else {
+            return []
+        }
+
+        let earliestYear = calendar.component(.year, from: earliestDate)
+        let firstYearOutsideTheMonthlyZone = calendar.component(.year, from: zoneStart)
+        guard earliestYear < firstYearOutsideTheMonthlyZone else {
+            return []
+        }
+
+        let intervals = (earliestYear..<firstYearOutsideTheMonthlyZone).compactMap { year -> DateInterval? in
+            guard let start = calendar.date(from: DateComponents(year: year, month: 1, day: 1)),
+                  let end = calendar.date(byAdding: .year, value: 1, to: start) else {
+                return nil
+            }
+            return DateInterval(start: start, end: end)
+        }
+
+        return makeAggregateBuckets(
+            intervals: intervals,
+            scale: .year,
+            metrics: metrics,
+            identifier: makeYearIdentifier,
+            maximumInterpolatedGap: 2
+        )
+    }
+
+    private func monthlyZoneStart(for metrics: [BodyMetrics]) -> Date? {
+        guard let oldestWeeklyBucket = makeWeeklyBuckets(from: metrics).first,
+              let monthInterval = calendar.dateInterval(of: .month, for: oldestWeeklyBucket.startDate) else {
+            return nil
+        }
+        return monthInterval.start
+    }
+
+    private struct AggregateBucketDraft {
+        let id: String
+        let scale: GlobalTimelineScale
+        let startDate: Date
+        let endDate: Date
+        var weight: GlobalTimelineMetricValue
+        var bodyFat: GlobalTimelineMetricValue
+        let canonicalPhotoId: String?
+        let hasPhotosInRange: Bool
+
+        var hasMeaningfulData: Bool {
+            weight.value != nil || bodyFat.value != nil || hasPhotosInRange
+        }
+
+        var bucket: GlobalTimelineBucket {
+            GlobalTimelineBucket(
+                id: id,
+                scale: scale,
+                startDate: startDate,
+                endDate: endDate,
+                metrics: GlobalTimelineMetricsSnapshot(
+                    weight: weight,
+                    bodyFat: bodyFat,
+                    ffmi: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                    steps: GlobalTimelineMetricValue(value: nil, presence: .missing),
+                    canonicalPhotoId: canonicalPhotoId,
+                    hasPhotosInRange: hasPhotosInRange,
+                    bodyScore: nil,
+                    bodyScoreCompleteness: .none
+                )
+            )
+        }
+    }
+
+    private func makeAggregateBuckets(
+        intervals: [DateInterval],
+        scale: GlobalTimelineScale,
+        metrics: [BodyMetrics],
+        identifier: (Date) -> String,
+        maximumInterpolatedGap: Int
+    ) -> [GlobalTimelineBucket] {
+        guard !intervals.isEmpty else { return [] }
+
+        var drafts = intervals.map { interval in
+            let intervalMetrics = metrics.filter { metric in
+                metric.date >= interval.start && metric.date < interval.end
+            }
+            let midpoint = interval.start.addingTimeInterval(interval.duration / 2)
+            let photoSelection = makeWeeklyPhotoSelection(weekMetrics: intervalMetrics, midpoint: midpoint)
+
+            return AggregateBucketDraft(
+                id: identifier(interval.start),
+                scale: scale,
+                startDate: interval.start,
+                endDate: interval.end,
+                weight: aggregateMetricValue(intervalMetrics.compactMap(\.weight)),
+                bodyFat: aggregateMetricValue(intervalMetrics.compactMap(\.bodyFatPercentage)),
+                canonicalPhotoId: photoSelection.canonicalPhotoId,
+                hasPhotosInRange: photoSelection.hasPhotosInRange
+            )
+        }
+
+        interpolateMissingValues(
+            in: &drafts,
+            keyPath: \.weight,
+            maximumGap: maximumInterpolatedGap
+        )
+        interpolateMissingValues(
+            in: &drafts,
+            keyPath: \.bodyFat,
+            maximumGap: maximumInterpolatedGap
+        )
+
+        return drafts
+            .filter(\.hasMeaningfulData)
+            .map(\.bucket)
+    }
+
+    private func aggregateMetricValue(_ values: [Double]) -> GlobalTimelineMetricValue {
+        guard let value = median(values) else {
+            return GlobalTimelineMetricValue(value: nil, presence: .missing)
+        }
+        return GlobalTimelineMetricValue(value: value, presence: .present)
+    }
+
+    private func interpolateMissingValues(
+        in drafts: inout [AggregateBucketDraft],
+        keyPath: WritableKeyPath<AggregateBucketDraft, GlobalTimelineMetricValue>,
+        maximumGap: Int
+    ) {
+        let knownIndexes = drafts.indices.filter { index in
+            let metric = drafts[index][keyPath: keyPath]
+            guard metric.value != nil else { return false }
+            if case .present = metric.presence {
+                return true
+            }
+            return false
+        }
+
+        guard knownIndexes.count > 1 else { return }
+
+        for (leftIndex, rightIndex) in zip(knownIndexes, knownIndexes.dropFirst()) {
+            let gap = rightIndex - leftIndex - 1
+            guard gap > 0, gap <= maximumGap,
+                  let leftValue = drafts[leftIndex][keyPath: keyPath].value,
+                  let rightValue = drafts[rightIndex][keyPath: keyPath].value else {
+                continue
+            }
+
+            for index in (leftIndex + 1)..<rightIndex where drafts[index][keyPath: keyPath].value == nil {
+                let progress = Double(index - leftIndex) / Double(rightIndex - leftIndex)
+                let value = leftValue + (rightValue - leftValue) * progress
+                drafts[index][keyPath: keyPath] = GlobalTimelineMetricValue(
+                    value: value,
+                    presence: .estimated
+                )
+            }
+        }
     }
 
     // MARK: - Weekly helpers
@@ -209,6 +376,9 @@ final class GlobalTimelineService {
         let selected = photoCandidates.min { lhs, rhs in
             let lhsDiff = abs(lhs.date.timeIntervalSince(midpoint))
             let rhsDiff = abs(rhs.date.timeIntervalSince(midpoint))
+            if lhsDiff == rhsDiff {
+                return lhs.id < rhs.id
+            }
             return lhsDiff < rhsDiff
         }
 
@@ -225,6 +395,17 @@ final class GlobalTimelineService {
         let week = components.weekOfYear ?? calendar.component(.weekOfYear, from: startDate)
 
         return String(format: "%04d-W%02d", year, week)
+    }
+
+    private func makeMonthIdentifier(startDate: Date) -> String {
+        let components = calendar.dateComponents([.year, .month], from: startDate)
+        let year = components.year ?? calendar.component(.year, from: startDate)
+        let month = components.month ?? calendar.component(.month, from: startDate)
+        return String(format: "%04d-%02d", year, month)
+    }
+
+    private func makeYearIdentifier(startDate: Date) -> String {
+        String(calendar.component(.year, from: startDate))
     }
 
     private func median(_ values: [Double]) -> Double? {

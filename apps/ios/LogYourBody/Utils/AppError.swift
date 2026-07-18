@@ -6,7 +6,6 @@ enum AppErrorSeverity {
     case error
     case critical
 }
-
 enum AppError: LocalizedError {
     case auth(AuthError)
     case supabase(SupabaseError)
@@ -74,4 +73,3 @@ enum AppError: LocalizedError {
         }
     }
 }
-

@@ -88,6 +88,8 @@ struct LogWeightView: View {
                                             .multilineTextAlignment(.center)
                                             .keyboardType(.decimalPad)
                                             .focused($focusedField, equals: .weight)
+                                            .accessibilityLabel("Weight value")
+                                            .accessibilityIdentifier("log-weight-value")
                                             .frame(maxWidth: 150)
 
                                         Text(currentSystem.weightUnit)
@@ -136,6 +138,8 @@ struct LogWeightView: View {
                                             .multilineTextAlignment(.center)
                                             .keyboardType(.decimalPad)
                                             .focused($focusedField, equals: .bodyFat)
+                                            .accessibilityLabel("Body fat value")
+                                            .accessibilityIdentifier("log-body-fat-value")
                                             .frame(maxWidth: 150)
 
                                         Text("%")

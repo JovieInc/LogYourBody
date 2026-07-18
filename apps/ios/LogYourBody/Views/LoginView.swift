@@ -16,7 +16,6 @@ struct LoginView: View {
     @State private var errorMessage = ""
     @State private var isRetrying = false
     @State private var showPreAuthOnboarding = false
-    @State private var navigateToSignUp = false
 
     var body: some View {
         ZStack {
@@ -97,14 +96,6 @@ struct LoginView: View {
                     )
                 }
                 .padding(.top, 20)
-
-                NavigationLink(
-                    destination: SignUpView(),
-                    isActive: $navigateToSignUp
-                ) {
-                    EmptyView()
-                }
-                .hidden()
 
                 Spacer(minLength: 40)
             }

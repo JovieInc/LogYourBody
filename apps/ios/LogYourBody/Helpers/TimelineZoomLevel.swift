@@ -99,7 +99,7 @@ class TimelineBucketCalculator {
         let daysPerBucket = zoomLevel.daysPerBucket
 
         var currentDate = startDate
-        while currentDate < endDate {
+        while currentDate <= endDate {
             let bucket = TimelineBucket(startDate: currentDate, days: daysPerBucket)
             buckets.append(bucket)
 

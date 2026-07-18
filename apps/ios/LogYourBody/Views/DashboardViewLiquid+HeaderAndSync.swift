@@ -182,13 +182,54 @@ extension DashboardViewLiquid {
     }
 
     func handleSyncStatusChange(
-        from _: RealtimeSyncManager.SyncStatus,
-        to _: RealtimeSyncManager.SyncStatus
+        from previousStatus: RealtimeSyncManager.SyncStatus,
+        to newStatus: RealtimeSyncManager.SyncStatus
     ) {
         syncBannerDismissTask?.cancel()
 
-        withAnimation(.easeOut(duration: 0.2)) {
-            syncBannerState = nil
+        switch newStatus {
+        case .error(let message):
+            withAnimation(.easeOut(duration: 0.2)) {
+                syncBannerState = SyncBannerState(
+                    style: .error,
+                    detail: message.isEmpty ? realtimeSyncManager.error : message
+                )
+            }
+        case .success:
+            let recoveredFromFailure: Bool
+            switch previousStatus {
+            case .error, .offline:
+                recoveredFromFailure = true
+            default:
+                recoveredFromFailure = false
+            }
+
+            guard recoveredFromFailure else {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    syncBannerState = nil
+                }
+                return
+            }
+
+            withAnimation(.easeOut(duration: 0.2)) {
+                syncBannerState = SyncBannerState(style: .success, detail: nil)
+            }
+            dismissSyncBannerAfterRecovery()
+        default:
+            withAnimation(.easeOut(duration: 0.2)) {
+                syncBannerState = nil
+            }
+        }
+    }
+
+    private func dismissSyncBannerAfterRecovery() {
+        syncBannerDismissTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+
+            withAnimation(.easeOut(duration: 0.2)) {
+                syncBannerState = nil
+            }
         }
     }
 

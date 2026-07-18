@@ -11,6 +11,7 @@ struct OptimizedProgressPhotoView: View {
     @State private var isLoading = true
     @State private var loadedImage: UIImage?
     @State private var loadError = false
+    @Environment(\.displayScale) private var displayScale
 
     // Shared image cache
     private static let imageCache: NSCache<NSString, UIImage> = {
@@ -51,6 +52,20 @@ struct OptimizedProgressPhotoView: View {
                                 .foregroundColor(.appTextTertiary)
                         }
                     )
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.appCard)
+                    .frame(height: maxHeight)
+                    .overlay {
+                        VStack(spacing: 8) {
+                            Image(systemName: "photo")
+                                .font(.system(size: 24))
+                                .foregroundColor(.appTextTertiary)
+                            Text("No image available")
+                                .font(.appCaption)
+                                .foregroundColor(.appTextTertiary)
+                        }
+                    }
             }
         }
         .onAppear {
@@ -118,8 +133,9 @@ struct OptimizedProgressPhotoView: View {
             }
 
             // Process image on background queue
+            let maximumDimension = max(maxHeight * displayScale, 1)
             let processedImage = await Task.detached(priority: .userInitiated) {
-                return optimizeImage(image)
+                Self.optimizeImage(image, maxDimension: maximumDimension)
             }.value
 
             // Cache the processed image
@@ -149,8 +165,9 @@ struct OptimizedProgressPhotoView: View {
             }
 
             // Process image on background queue
+            let maximumDimension = max(maxHeight * displayScale, 1)
             let processedImage = await Task.detached(priority: .userInitiated) {
-                return optimizeImage(image)
+                Self.optimizeImage(image, maxDimension: maximumDimension)
             }.value
 
             // Cache the processed image
@@ -169,12 +186,14 @@ struct OptimizedProgressPhotoView: View {
         }
     }
 
-    private func optimizeImage(_ image: UIImage) -> UIImage {
+    nonisolated private static func optimizeImage(
+        _ image: UIImage,
+        maxDimension: CGFloat
+    ) -> UIImage {
         // First fix orientation if needed
         let orientedImage = image.fixedOrientation()
 
         // Optimize for display
-        let maxDimension: CGFloat = UIScreen.main.bounds.width * UIScreen.main.scale
         let size = orientedImage.size
 
         guard size.width > maxDimension || size.height > maxDimension else {

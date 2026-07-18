@@ -27,6 +27,7 @@ struct BodyScoreManualWeightView: View {
                                 set: { viewModel.updateManualWeightText($0) }
                             ))
                             .keyboardType(.decimalPad)
+                            .accessibilityIdentifier("onboarding-manual-weight")
                             .focused($weightFieldFocused)
                             .submitLabel(.done)
                             .onSubmit {
@@ -35,7 +36,8 @@ struct BodyScoreManualWeightView: View {
                             .onChange(of: viewModel.manualWeightText) { _, newValue in
                                 validateWeight(newValue)
                             }
-                            .padding(.horizontal, 18)
+                            .padding(.leading, 18)
+                            .padding(.trailing, weightFieldFocused ? 112 : 60)
                             .padding(.vertical, 14)
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -45,15 +47,24 @@ struct BodyScoreManualWeightView: View {
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .stroke(weightFieldBorderColor)
                             )
-                            .overlay(
-                                HStack {
-                                    Spacer()
+                            .overlay(alignment: .trailing) {
+                                HStack(spacing: 12) {
                                     Text(viewModel.weightUnit == .kilograms ? "kg" : "lb")
                                         .font(OnboardingTypography.caption)
                                         .foregroundStyle(Color.appTextSecondary)
-                                        .padding(.trailing, 20)
+
+                                    if weightFieldFocused {
+                                        Button("Done") {
+                                            weightFieldFocused = false
+                                        }
+                                        .font(.system(.callout, design: .rounded).weight(.semibold))
+                                        .foregroundStyle(Color.appPrimary)
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel("Dismiss keyboard")
+                                    }
                                 }
-                            )
+                                .padding(.trailing, 16)
+                            }
 
                             HStack(spacing: 12) {
                                 Button {
@@ -123,6 +134,7 @@ struct BodyScoreManualWeightView: View {
             },
             footer: {
                 Button {
+                    weightFieldFocused = false
                     viewModel.persistManualWeightEntry()
                     viewModel.goToNextStep()
                 } label: {
@@ -134,21 +146,6 @@ struct BodyScoreManualWeightView: View {
                 .opacity(continueButtonOpacity)
             }
         )
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                self.weightFieldFocused = true
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .keyboard) {
-                HStack {
-                    Spacer()
-                    Button("Done") {
-                        weightFieldFocused = false
-                    }
-                }
-            }
-        }
     }
 
     private var weightUnitBinding: Binding<WeightUnit> {

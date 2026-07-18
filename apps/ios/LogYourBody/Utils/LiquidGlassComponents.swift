@@ -13,4 +13,3 @@
 // The actual Liquid Glass components are in the Components folder:
 // - Components/LiquidGlassTimelineSlider.swift
 // - Components/LiquidGlassTabBar.swift
-// - Components/LiquidGlassCTAButton.swift

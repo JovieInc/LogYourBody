@@ -57,23 +57,13 @@ class SupabaseManager: ObservableObject {
         let jsonData = try JSONSerialization.data(withJSONObject: metrics)
         request.httpBody = jsonData
 
-        // print("📤 Sending \(metrics.count) body metrics to Supabase")
-        if let jsonString = String(data: jsonData, encoding: .utf8) {
-            // print("📄 Request body preview: \(String(jsonString.prefix(500)))")
-        }
-
         let (data, response) = try await self.session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SupabaseError.requestFailed
         }
 
-        // print("📡 Supabase body_metrics response: Status \(httpResponse.statusCode)")
-
         if !(200...299).contains(httpResponse.statusCode) {
-            if let errorData = String(data: data, encoding: .utf8) {
-                // print("❌ Supabase body_metrics error: \(errorData)")
-            }
             throw SupabaseError.requestFailed
         }
 
@@ -93,16 +83,6 @@ class SupabaseManager: ObservableObject {
 
         let jsonData = try JSONSerialization.data(withJSONObject: metrics)
         request.httpBody = jsonData
-
-        // Debug: Print exactly what we're sending
-        if let jsonString = String(data: jsonData, encoding: .utf8) {
-            // print("📤 Sending to Supabase body_metrics:")
-            // print("   URL: \(url)")
-            // print("   Method: POST")
-            // print("   Headers: apikey=***, Authorization=Bearer ***, Content-Type=application/json")
-            // print("   Prefer: \(request.value(forHTTPHeaderField: "Prefer") ?? "none")")
-            // print("   Body: \(jsonString)")
-        }
 
         let (data, response) = try await self.session.data(for: request)
 

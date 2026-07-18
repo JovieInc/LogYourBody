@@ -73,6 +73,10 @@
 	</array>
 	<key>API_BASE_URL</key>
 	<string>$(API_BASE_URL)</string>
+	<key>BODYSPEC_CLIENT_ID</key>
+	<string>$(BODYSPEC_CLIENT_ID)</string>
+	<key>BODYSPEC_REDIRECT_URI</key>
+	<string>$(BODYSPEC_REDIRECT_URI)</string>
 	<key>CLERK_PUBLISHABLE_KEY</key>
 	<string>$(CLERK_PUBLISHABLE_KEY)</string>
 	<key>CLERK_FRONTEND_API</key>

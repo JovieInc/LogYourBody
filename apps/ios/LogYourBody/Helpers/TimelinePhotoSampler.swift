@@ -85,7 +85,7 @@ class TimelinePhotoSampler {
         sortedMetrics: [BodyMetrics]
     ) -> [BodyMetrics] {
         var sampled: [BodyMetrics] = []
-        var bucketsWithCandidates = buckets.filter { !$0.candidates.isEmpty }
+        let bucketsWithCandidates = buckets.filter { !$0.candidates.isEmpty }
 
         // If fewer buckets than max, take one from each
         if bucketsWithCandidates.count <= maxThumbnails {

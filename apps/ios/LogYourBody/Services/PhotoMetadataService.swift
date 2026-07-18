@@ -88,7 +88,15 @@ class PhotoMetadataService {
 
         // Return the closest one
         return closeMetrics.min { metric1, metric2 in
-            abs(metric1.date.timeIntervalSince(date)) < abs(metric2.date.timeIntervalSince(date))
+            let firstDifference = abs(metric1.date.timeIntervalSince(date))
+            let secondDifference = abs(metric2.date.timeIntervalSince(date))
+            if firstDifference == secondDifference {
+                if metric1.date == metric2.date {
+                    return metric1.id < metric2.id
+                }
+                return metric1.date < metric2.date
+            }
+            return firstDifference < secondDifference
         }
     }
 
@@ -185,7 +193,11 @@ class PhotoMetadataService {
     /// Estimate body fat percentage based on nearby entries (with caching for performance)
     func estimateBodyFat(for date: Date, metrics: [BodyMetrics]) -> (value: Double, isEstimated: Bool)? {
         // Create cache key from date and metrics IDs
-        let cacheKey = "\(date.timeIntervalSince1970)-\(metrics.map { $0.id }.joined(separator: ","))"
+        let metricFingerprint = metrics.map { metric in
+            "\(metric.id):\(metric.updatedAt.timeIntervalSinceReferenceDate):\(metric.bodyFatPercentage ?? -1)"
+        }
+        .joined(separator: ",")
+        let cacheKey = "\(date.timeIntervalSince1970)-\(metricFingerprint)"
 
         // Check cache first
         if let cached = estimationCache[cacheKey] {

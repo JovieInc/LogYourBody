@@ -264,7 +264,16 @@ public struct MetricSummaryCard: View {
     }
 
     private func valueBlock(for content: Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let valueText = Text(content.value)
+            .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
+            .foregroundStyle(primaryTextColor)
+            .monospacedDigit()
+            .tracking(-0.5)
+        let unitText = Text(" \(content.unit)")
+            .font(.system(size: unitFontSize, weight: .medium, design: .rounded))
+            .foregroundStyle(secondaryTextColor)
+
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 if content.unit.isEmpty {
                     Text(content.value)
@@ -278,17 +287,7 @@ public struct MetricSummaryCard: View {
                 } else {
                     // Render value + unit as a single Text so they stay on one line
                     // and scale together, preventing vertical stacking of the unit.
-                    (
-                        Text(content.value)
-                            .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
-                            .foregroundStyle(primaryTextColor)
-                            .monospacedDigit()
-                            .tracking(-0.5)
-                            +
-                            Text(" \(content.unit)")
-                            .font(.system(size: unitFontSize, weight: .medium, design: .rounded))
-                            .foregroundStyle(secondaryTextColor)
-                    )
+                    Text("\(valueText)\(unitText)")
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
                     .layoutPriority(2)

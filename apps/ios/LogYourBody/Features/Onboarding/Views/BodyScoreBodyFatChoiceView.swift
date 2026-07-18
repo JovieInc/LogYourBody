@@ -53,6 +53,11 @@ struct BodyScoreBodyFatChoiceView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier(
+                            option.source == .manualValue
+                                ? "body-fat-source-manual"
+                                : "body-fat-source-visual"
+                        )
                     }
 
                     Button("Skip for now") {

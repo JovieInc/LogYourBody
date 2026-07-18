@@ -154,16 +154,15 @@ class HealthKitManager: ObservableObject {
         }
     }
 
-    private func persistHealthKitSamples(_ samples: [HKQuantitySample], unit: HKUnit) {
+    private static func persistHealthKitSamples(_ samples: [HKQuantitySample], unit: HKUnit) {
         guard !samples.isEmpty else { return }
 
-        Task.detached(priority: .background) { [weak self] in
-            guard let self = self else { return }
+        Task.detached(priority: .background) {
             guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else { return }
             var rawSamples: [HKRawSample] = []
 
             for sample in samples {
-                let metadata = self.metadataDictionary(from: sample.metadata)
+                let metadata = metadataDictionary(from: sample.metadata)
                 let hkSample = HKRawSample(
                     id: UUID().uuidString,
                     userId: userId,
@@ -194,7 +193,7 @@ class HealthKitManager: ObservableObject {
         }
     }
 
-    private func metadataDictionary(from metadata: [String: Any]?) -> [String: String]? {
+    private static func metadataDictionary(from metadata: [String: Any]?) -> [String: String]? {
         guard let metadata = metadata else { return nil }
         var result: [String: String] = [:]
 
@@ -289,15 +288,14 @@ class HealthKitManager: ObservableObject {
                 if let sample = samples?.first as? HKQuantitySample {
                     let weightInKg = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
                     let weightInLbs = weightInKg.kgToLbs
+                    let sampleDate = sample.startDate
 
-                    Task {
-                        await MainActor.run {
-                            self.latestWeight = weightInLbs
-                            self.latestWeightDate = sample.startDate
-                        }
+                    Task { @MainActor [weak self] in
+                        self?.latestWeight = weightInLbs
+                        self?.latestWeightDate = sampleDate
                     }
 
-                    continuation.resume(returning: (weightInLbs, sample.startDate))
+                    continuation.resume(returning: (weightInLbs, sampleDate))
                 } else {
                     continuation.resume(returning: (nil, nil))
                 }
@@ -352,7 +350,7 @@ class HealthKitManager: ObservableObject {
                 }
 
                 let hkSamples = samples as? [HKQuantitySample] ?? []
-                self.persistHealthKitSamples(hkSamples, unit: HKUnit.gramUnit(with: .kilo))
+                Self.persistHealthKitSamples(hkSamples, unit: HKUnit.gramUnit(with: .kilo))
 
                 let results = hkSamples.map { sample in
                     let weightInKg = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
@@ -391,7 +389,7 @@ class HealthKitManager: ObservableObject {
                 }
 
                 if let sample = samples?.first as? HKQuantitySample {
-                    self.persistHealthKitSamples([sample], unit: HKUnit.percent())
+                    Self.persistHealthKitSamples([sample], unit: HKUnit.percent())
                     let percentage = sample.quantity.doubleValue(for: HKUnit.percent()) * 100 // Convert to percentage
                     continuation.resume(returning: (percentage, sample.startDate))
                 } else {
@@ -434,7 +432,7 @@ class HealthKitManager: ObservableObject {
                 }
 
                 let hkSamples = samples as? [HKQuantitySample] ?? []
-                self.persistHealthKitSamples(hkSamples, unit: HKUnit.percent())
+                Self.persistHealthKitSamples(hkSamples, unit: HKUnit.percent())
 
                 let results = hkSamples.map { sample in
                     let percentage = sample.quantity.doubleValue(for: HKUnit.percent()) * 100
@@ -538,7 +536,6 @@ class HealthKitManager: ObservableObject {
             self.importedCount = 0
             self.totalToImport = 0
         }
-
     }
 
     // Fetch user's height from HealthKit
@@ -636,16 +633,15 @@ class HealthKitManager: ObservableObject {
                 }
 
                 let stepCount = statistics?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
+                let integerStepCount = Int(stepCount)
 
-                Task {
-                    await MainActor.run {
-                        self.todayStepCount = Int(stepCount)
-                        self.latestStepCount = Int(stepCount)
-                        self.latestStepCountDate = now
-                    }
+                Task { @MainActor in
+                    HealthKitManager.shared.todayStepCount = integerStepCount
+                    HealthKitManager.shared.latestStepCount = integerStepCount
+                    HealthKitManager.shared.latestStepCountDate = now
                 }
 
-                continuation.resume(returning: Int(stepCount))
+                continuation.resume(returning: integerStepCount)
             }
 
             healthStore.execute(query)
@@ -708,17 +704,8 @@ class HealthKitManager: ObservableObject {
 
         // print("📈 Found \(recentWeightHistory.count) weight entries and \(recentBodyFatHistory.count) body fat entries")
 
-        if !recentWeightHistory.isEmpty {
-            // print("  📅 Weight entries date range: \(recentWeightHistory.first?.date ?? Date()) to \(recentWeightHistory.last?.date ?? Date())")
-            for (index, (weight, date)) in recentWeightHistory.enumerated() {
-                if index < 5 {  // Show first 5 entries
-                    // print("    - \(date): \(weight)kg")
-                }
-            }
-        }
-
         // Process recent data for immediate UI update
-        let (imported, skipped) = await processBatchHealthKitData(
+        let (imported, _) = await processBatchHealthKitData(
             weightHistory: recentWeightHistory,
             bodyFatHistory: recentBodyFatHistory
         )
@@ -804,15 +791,6 @@ class HealthKitManager: ObservableObject {
             .filter { $0.date <= endDate }
 
         // print("📈 Found \(weightHistory.count) weight entries and \(bodyFatHistory.count) body fat entries")
-
-        if !weightHistory.isEmpty {
-            // print("  📅 Weight entries date range: \(weightHistory.first?.date ?? Date()) to \(weightHistory.last?.date ?? Date())")
-            for (index, (weight, date)) in weightHistory.enumerated() {
-                if index < 5 {  // Show first 5 entries
-                    // print("    - \(date): \(weight)kg")
-                }
-            }
-        }
 
         // Create a dictionary of body fat data by date for easy lookup
         var bodyFatByDate: [Date: Double] = [:]
@@ -950,12 +928,13 @@ class HealthKitManager: ObservableObject {
             // Update progress
             processedMonths += Double(batchSizeMonths)
             let progress = totalMonths > 0 ? min(processedMonths / totalMonths, 1.0) : 1.0
+            let importedCountSnapshot = totalImported
+            let remainingMonths = max(0, Int(totalMonths - processedMonths))
             await MainActor.run {
                 importProgress = progress
-                importedCount = totalImported
+                importedCount = importedCountSnapshot
                 if totalMonths > 0 {
-                    let remaining = max(0, Int(totalMonths - processedMonths))
-                    importStatus = remaining > 0 ? "Importing... \(remaining) months remaining" : "Finalizing..."
+                    importStatus = remainingMonths > 0 ? "Importing... \(remainingMonths) months remaining" : "Finalizing..."
                 }
             }
 
@@ -1003,7 +982,9 @@ class HealthKitManager: ObservableObject {
     // Process a batch of HealthKit data and return (imported, skipped) counts
     func processBatchHealthKitData(
         weightHistory: [(weight: Double, date: Date)],
-        bodyFatHistory: [(percentage: Double, date: Date)]
+        bodyFatHistory: [(percentage: Double, date: Date)],
+        userIdOverride: String? = nil,
+        synchronizesAfterSaving: Bool = true
     ) async -> (imported: Int, skipped: Int) {
         var imported = 0
         var skipped = 0
@@ -1016,15 +997,33 @@ class HealthKitManager: ObservableObject {
         }
 
         // Get existing entries for this date range to check for duplicates
-        guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else {
-            return (0, 0)
+        let userId: String
+        if let userIdOverride {
+            userId = userIdOverride
+        } else {
+            guard let currentUserId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else {
+                return (0, 0)
+            }
+            userId = currentUserId
         }
 
         let dateRange = weightHistory.map { $0.date } + bodyFatHistory.map { $0.date }
         let minDate = dateRange.min() ?? Date()
         let maxDate = dateRange.max() ?? Date()
+        let calendar = Calendar.current
+        let minimumHour = calendar.date(
+            from: calendar.dateComponents([.year, .month, .day, .hour], from: minDate)
+        ) ?? minDate
+        let maximumHour = calendar.date(
+            from: calendar.dateComponents([.year, .month, .day, .hour], from: maxDate)
+        ) ?? maxDate
+        let rangeEnd = calendar.date(byAdding: .hour, value: 1, to: maximumHour) ?? maxDate
 
-        let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId, from: minDate, to: maxDate)
+        let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(
+            for: userId,
+            from: minimumHour,
+            to: rangeEnd
+        )
 
         // Create a set of existing entries by date and hour for efficient lookup
         var existingEntriesByHour = Set<String>()
@@ -1068,7 +1067,11 @@ class HealthKitManager: ObservableObject {
                 )
 
                 do {
-                    try await saveBodyMetrics(metrics)
+                    try await saveBodyMetrics(
+                        metrics,
+                        userIdOverride: userId,
+                        synchronizesAfterSaving: synchronizesAfterSaving
+                    )
                     imported += 1
                     existingEntriesByHour.insert(hourKey) // Add to set to prevent duplicates in same batch
                 } catch {
@@ -1092,9 +1095,19 @@ class HealthKitManager: ObservableObject {
     }
 
     // Helper function to save body metrics
-    private func saveBodyMetrics(_ metrics: BodyMetrics) async throws {
-        guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else {
-            throw HealthKitError.notAuthorized
+    private func saveBodyMetrics(
+        _ metrics: BodyMetrics,
+        userIdOverride: String? = nil,
+        synchronizesAfterSaving: Bool = true
+    ) async throws {
+        let userId: String
+        if let userIdOverride {
+            userId = userIdOverride
+        } else {
+            guard let currentUserId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else {
+                throw HealthKitError.notAuthorized
+            }
+            userId = currentUserId
         }
 
         // Create a new metrics instance with the correct user ID
@@ -1119,7 +1132,9 @@ class HealthKitManager: ObservableObject {
         await MainActor.run {
             CoreDataManager.shared.saveBodyMetrics(metricsWithUserId, userId: userId, markAsSynced: false)
         }
-        await RealtimeSyncManager.shared.syncIfNeeded()
+        if synchronizesAfterSaving {
+            await RealtimeSyncManager.shared.syncIfNeeded()
+        }
     }
 
     // Sync step count data from HealthKit to app
@@ -1141,6 +1156,19 @@ class HealthKitManager: ObservableObject {
         }
     }
 
+    @MainActor
+    func scheduleObserverWeightSync(userId: String?, delay: TimeInterval = 5) {
+        let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: userId)
+        syncDebounceTimer?.invalidate()
+        syncDebounceTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            UserDefaults.standard.set(Date(), forKey: lastSyncKey)
+            Task { [weak self] in
+                guard let self else { return }
+                try? await self.syncWeightFromHealthKitIncremental(days: 7)
+            }
+        }
+    }
+
     // Setup observer for new weight entries in HealthKit
     func observeWeightChanges() {
         guard isAuthorized else { return }
@@ -1151,7 +1179,14 @@ class HealthKitManager: ObservableObject {
         }
 
         let query = HKObserverQuery(sampleType: weightType, predicate: nil) { [weak self] _, completionHandler, error in
-            if error == nil {
+            guard error == nil else {
+                completionHandler()
+                return
+            }
+
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+
                 // Check if we should sync (not more than once per hour)
                 let currentUserId = AuthManager.shared.currentUser?.id
                 let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: currentUserId)
@@ -1164,17 +1199,7 @@ class HealthKitManager: ObservableObject {
                 }()
 
                 if shouldSync {
-                    // Debounce sync requests to prevent multiple concurrent syncs
-                    DispatchQueue.main.async { [weak self] in
-                        self?.syncDebounceTimer?.invalidate()
-                        self?.syncDebounceTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
-                            UserDefaults.standard.set(Date(), forKey: lastSyncKey)
-                            Task { [weak self] in
-                                // Only sync recent data (last 7 days) when observer triggers
-                                try? await self?.syncWeightFromHealthKitIncremental(days: 7)
-                            }
-                        }
-                    }
+                    self.scheduleObserverWeightSync(userId: currentUserId)
                 }
             }
             completionHandler()
@@ -1192,13 +1217,9 @@ class HealthKitManager: ObservableObject {
         // Stop any existing step observer queries
         if let existingQuery = stepObserverQuery {
             healthStore.stop(existingQuery)
+            activeQueries.removeAll { $0 === existingQuery }
             stepObserverQuery = nil
         }
-
-        activeQueries.filter { $0 is HKObserverQuery && ($0 as? HKObserverQuery)?.sampleType == stepCountType }.forEach {
-            healthStore.stop($0)
-        }
-        activeQueries.removeAll { $0 is HKObserverQuery && ($0 as? HKObserverQuery)?.sampleType == stepCountType }
 
         let query = HKObserverQuery(sampleType: stepCountType, predicate: nil) { [weak self] _, completionHandler, error in
             if error == nil {

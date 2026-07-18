@@ -104,6 +104,7 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
             }
             .coordinateSpace(name: "dashboardHomeScroll")
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                guard value != scrollOffset else { return }
                 scrollOffset = value
             }
             .refreshable {
@@ -121,14 +122,16 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
             .background(
                 GeometryReader { geo in
                     Color.clear
-                        .onAppear {
-                            headerStackHeight = geo.size.height
-                        }
-                        .onChange(of: geo.size.height) { newValue in
-                            headerStackHeight = newValue
-                        }
+                        .preference(
+                            key: DashboardHeaderHeightPreferenceKey.self,
+                            value: geo.size.height
+                        )
                 }
             )
+            .onPreferenceChange(DashboardHeaderHeightPreferenceKey.self) { newHeight in
+                guard newHeight.isFinite, newHeight > 0, newHeight != headerStackHeight else { return }
+                headerStackHeight = newHeight
+            }
             .background(
                 Color.black.opacity(0.9)
                     .ignoresSafeArea(edges: .top)
@@ -146,6 +149,14 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
                 y: 10
             )
         }
+    }
+}
+
+private struct DashboardHeaderHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

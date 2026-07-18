@@ -55,14 +55,6 @@ Run tests with configurable options
 
 Run UI tests
 
-### ios ui_snapshot
-
-```sh
-[bundle exec] fastlane ios ui_snapshot
-```
-
-Run snapshot tests for UI regression
-
 ### ios test_sanitizers
 
 ```sh
