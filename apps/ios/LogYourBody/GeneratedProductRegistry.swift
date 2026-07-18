@@ -5,7 +5,8 @@ enum ProductRegistry {
     static let appName = "LogYourBody"
     static let legalName = "LogYourBody, Inc."
     static let slogan = "Know if the work is working."
-    static let productDescription = "Weight, body fat, lean mass, HealthKit data, and progress photos in one private timeline that shows the trend."
+    static let productDescription =
+        "Weight, body fat, lean mass, HealthKit data, and progress photos in one private timeline that shows the trend."
     static let supportEmail = "support@logyourbody.com"
     static let appStoreURL = "https://apps.apple.com/us/app/logyourbody/id6755209876"
 
@@ -30,6 +31,11 @@ enum ProductRegistry {
         static let annualReferencePrice = "69.99"
         static let monthlyReferenceLocalizedPrice = "$9.99"
         static let annualReferenceLocalizedPrice = "$69.99"
-        static let featureNames = ["Body metrics", "HealthKit sync", "Progress photos", "Private timeline"]
+        static let featureNames = [
+            "Body metrics",
+            "HealthKit sync",
+            "Progress photos",
+            "Private timeline"
+        ]
     }
 }
