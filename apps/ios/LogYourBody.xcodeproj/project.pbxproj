@@ -28,6 +28,7 @@
 		2EEA145D3CD52D5D72ECB544 /* Collection+Safe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E7F3F0A162AA751785D876A /* Collection+Safe.swift */; };
 		327C8C9174FEC7C23E350270 /* OnboardingFlowViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED6868B1C7F6167E2A9AE0A1 /* OnboardingFlowViewModelTests.swift */; };
 		3892032426C339D69DEF73EE /* LaunchSurfacePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E47A7741CF9BBCD0F5DC0D5C /* LaunchSurfacePolicyTests.swift */; };
+		3FA11453ACB47EEEFEAFF581 /* PhotoUploadManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A98EF222E91570CB37F44C0 /* PhotoUploadManagerTests.swift */; };
 		42B0784EAF04F40C031D0186 /* DailyReminderPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 095D9694F1EA5B5091B0AE8B /* DailyReminderPolicyTests.swift */; };
 		43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */; };
 		46D2D60CC0C168272E5B0A14 /* BulkProgressPhotoImportPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 060DD24271B0B2120CB0AA33 /* BulkProgressPhotoImportPolicyTests.swift */; };
@@ -458,6 +459,7 @@
 		77CA7B3D87EC0BFA00AC6A9F /* Font+Custom.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "Font+Custom.swift"; path = "Font+Custom.swift"; sourceTree = "<group>"; };
 		7899ADA31AC216735A9FE299 /* RevenueCatProductConfigurationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RevenueCatProductConfigurationTests.swift; sourceTree = "<group>"; };
 		7A1DE682AE51BF7A3EFF75FF /* HealthKitManager+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "HealthKitManager+Part02.swift"; path = "HealthKitManager+Part02.swift"; sourceTree = "<group>"; };
+		7A98EF222E91570CB37F44C0 /* PhotoUploadManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoUploadManagerTests.swift; sourceTree = "<group>"; };
 		7B5A5D6BAAD9FB2F7B8AFACB /* BaseButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BaseButton.swift; path = DesignSystem/Atoms/BaseButton.swift; sourceTree = "<group>"; };
 		7CEFB36F814C3D7E8AE709B4 /* DSCircularProgress.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSCircularProgress.swift; path = DesignSystem/Atoms/DSCircularProgress.swift; sourceTree = "<group>"; };
 		7EF9F0EEBB2D999F7FEEF7D0 /* DSAuthLink.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAuthLink.swift; path = DesignSystem/Atoms/DSAuthLink.swift; sourceTree = "<group>"; };
@@ -1110,6 +1112,7 @@
 				4C3BCDDCDB314367722653A8 /* ValidationServiceTests.swift */,
 				3CD03E6E0BF889812FE27D44 /* LegalConsentPolicyTests.swift */,
 				89E358ECC97E3F08357502AC /* LegalDocumentLoaderTests.swift */,
+				7A98EF222E91570CB37F44C0 /* PhotoUploadManagerTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1932,6 +1935,7 @@
 				E740BE7171B6D98EEC5796B5 /* ErrorStateViewTests.swift in Sources */,
 				1E182FE84F374514F7F31F17 /* LegalConsentPolicyTests.swift in Sources */,
 				CEA13DB06DA2A2D160A48D1D /* LegalDocumentLoaderTests.swift in Sources */,
+				3FA11453ACB47EEEFEAFF581 /* PhotoUploadManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

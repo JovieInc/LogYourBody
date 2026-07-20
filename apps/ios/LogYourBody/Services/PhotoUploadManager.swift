@@ -18,6 +18,10 @@ class PhotoUploadManager: ObservableObject {
     private let authManager = AuthManager.shared
     private let supabaseManager = SupabaseManager.shared
     private let coreDataManager = CoreDataManager.shared
+    private let supabaseTokenProvider: () async -> String?
+    private let supabaseBaseURL: String
+    private let storageSessionProvider: () -> URLSession
+    private let functionSessionProvider: () -> URLSession
     private var uploadCancellables = Set<AnyCancellable>()
 
     struct UploadTask {
@@ -59,7 +63,36 @@ class PhotoUploadManager: ObservableObject {
         }
     }
 
-    private init() {}
+    private init() {
+        supabaseTokenProvider = { await AuthManager.shared.getSupabaseToken() }
+        supabaseBaseURL = Constants.supabaseURL
+        storageSessionProvider = {
+            let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = 60.0 // 60 seconds
+            configuration.timeoutIntervalForResource = 120.0 // 2 minutes
+            return URLSession(configuration: configuration)
+        }
+        functionSessionProvider = { .shared }
+    }
+
+    /// Test seam: injects the Supabase token provider, base URL, and URL
+    /// sessions so the upload pipeline can be exercised without a live auth
+    /// session or Info.plist Supabase configuration. URLSession only honors
+    /// custom URLProtocols via configuration.protocolClasses, so stubbing
+    /// the network boundary requires session injection. Production code uses
+    /// `.shared`, which wires `AuthManager`, `Constants.supabaseURL`, and the
+    /// production sessions.
+    init(
+        supabaseTokenProvider: @escaping () async -> String?,
+        supabaseBaseURL: String,
+        storageSession: URLSession,
+        functionSession: URLSession
+    ) {
+        self.supabaseTokenProvider = supabaseTokenProvider
+        self.supabaseBaseURL = supabaseBaseURL
+        storageSessionProvider = { storageSession }
+        functionSessionProvider = { functionSession }
+    }
 
     private func mapUploadEndpointError(_ error: Error, action: String) -> PhotoError {
         if error is SupabaseError {
@@ -103,7 +136,7 @@ class PhotoUploadManager: ObservableObject {
     }
 
     private func authenticatedJWT() async throws -> String {
-        guard let token = await authManager.getSupabaseToken() else {
+        guard let token = await supabaseTokenProvider() else {
             throw PhotoError.notAuthenticated
         }
 
@@ -419,7 +452,7 @@ class PhotoUploadManager: ObservableObject {
 
         let url: URL
         do {
-            url = try SupabaseURLBuilder.storageURL(bucket: "photos", path: fileName)
+            url = try SupabaseURLBuilder.storageURL(bucket: "photos", path: fileName, baseURL: supabaseBaseURL)
         } catch {
             throw mapUploadEndpointError(error, action: "Photo upload")
         }
@@ -432,10 +465,7 @@ class PhotoUploadManager: ObservableObject {
         request.httpBody = imageData
 
         // Configure URLSession with longer timeout for photo uploads
-        let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 60.0 // 60 seconds
-        configuration.timeoutIntervalForResource = 120.0 // 2 minutes
-        let uploadSession = URLSession(configuration: configuration)
+        let uploadSession = storageSessionProvider()
 
         let data: Data
         let response: URLResponse
@@ -467,7 +497,7 @@ class PhotoUploadManager: ObservableObject {
 
         let url: URL
         do {
-            url = try SupabaseURLBuilder.functionURL("process-progress-photo")
+            url = try SupabaseURLBuilder.functionURL("process-progress-photo", baseURL: supabaseBaseURL)
         } catch {
             if error is SupabaseError {
                 throw PhotoError.processingFailed("Photo processing is temporarily unavailable. Please try again.")
@@ -493,7 +523,7 @@ class PhotoUploadManager: ObservableObject {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await functionSessionProvider().data(for: request)
         } catch {
             if let networkError = mapNetworkError(error) {
                 throw networkError

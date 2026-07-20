@@ -22,6 +22,7 @@
         "HealthSyncCoordinatorPipelineTests",
         "LoadingManagerHealthSyncTests",
         "PhotoMetadataServiceTests",
+        "PhotoUploadManagerTests",
         "ProgressPhotoImagePipelineTests",
         "RevenueCatProductConfigurationTests",
         "SyncIntegrationBodyMetricSyncTests",
