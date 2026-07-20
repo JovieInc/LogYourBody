@@ -220,7 +220,8 @@ final class BodySpecAuthManager: NSObject, ASWebAuthenticationPresentationContex
         )
     }
 
-    private func generateCodeVerifier() -> String {
+    // Internal (not private) so deterministic PKCE behavior is unit-testable.
+    func generateCodeVerifier() -> String {
         let length = 64
         let characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"
         var result = ""
@@ -235,7 +236,8 @@ final class BodySpecAuthManager: NSObject, ASWebAuthenticationPresentationContex
         return result
     }
 
-    private func codeChallenge(for verifier: String) -> String {
+    // Internal (not private) so deterministic PKCE behavior is unit-testable.
+    func codeChallenge(for verifier: String) -> String {
         let data = Data(verifier.utf8)
         let hash = SHA256.hash(data: data)
         return Data(hash)
