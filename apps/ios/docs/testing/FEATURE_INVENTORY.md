@@ -327,6 +327,11 @@ Progress tracker: mark batches here as PRs merge.
   `BackgroundRemovalService.removeBackground` double-continuation-resume crash
   on simulator as a known app bug — not fixed here)
 - Batch 12 — NotificationManager scheduling + B.3 audit sweep: in review (#495)
+- Batch 11b follow-up — batch-test determinism: this PR. Batch items now fail
+  at the pipeline's step-0 `invalidImage` guard (CIImage-backed inputs):
+  three concurrent first-time Vision model setups deadlock on fresh CI
+  simulators (simulator-only framework hazard; serialized setups and
+  production devices are unaffected). No app-code change.
 - Dead-code deletion (section C sweep): this PR — ~4,068 app-target lines
   removed against the 92,243-line baseline denominator (coverage % rises
   accordingly)
