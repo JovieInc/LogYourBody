@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "50F15879-E110-449B-BEEF-B659A756965F",
+      "name" : "Debug",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:LogYourBody.xcodeproj",
+        "identifier" : "AD7D30AB2E1490810072AA5B",
+        "name" : "LogYourBodyUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
