@@ -62,6 +62,7 @@
 		93AEA1AF2FA4E6E91E7B482A /* LoadingManagerHealthSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36A9ED1D5319B495A194EE88 /* LoadingManagerHealthSyncTests.swift */; };
 		948778D2A40C5957E42E40CF /* PhaseInsightPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76E40D3BC9C969629954E803 /* PhaseInsightPolicyTests.swift */; };
 		9528AB022858D682E801AC01 /* AuthProfileBootstrapPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBDA30F8A24DC3754F3CD216 /* AuthProfileBootstrapPolicyTests.swift */; };
+		96EA9790381A5BEC62D7C902 /* KeychainAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = E67A23519F10FC4172C1E4FD /* KeychainAvailability.swift */; };
 		98DAEAD9993013F8C7C81764 /* DashboardTimelineAndPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B95EB9919EA722470321074 /* DashboardTimelineAndPolicyTests.swift */; };
 		9B5611E2F8314E22A5BF7889 /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75034CADEA1D4697BDCB5555 /* ImageCacheService.swift */; };
 		9BCEB21BE7B69676BCA5C211 /* HealthSyncCoordinatorPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */; };
@@ -835,6 +836,7 @@
 		E2AC3C23E6923176F103B414 /* StepsIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StepsIndicator.swift; path = DesignSystem/Molecules/StepsIndicator.swift; sourceTree = "<group>"; };
 		E47A7741CF9BBCD0F5DC0D5C /* LaunchSurfacePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchSurfacePolicyTests.swift; sourceTree = "<group>"; };
 		E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAvatar.swift; path = DesignSystem/Atoms/DSAvatar.swift; sourceTree = "<group>"; };
+		E67A23519F10FC4172C1E4FD /* KeychainAvailability.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainAvailability.swift; sourceTree = "<group>"; };
 		E83248F0638FB24D0201A0C1 /* FullMetricChartView+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "FullMetricChartView+Part01.swift"; path = "Components/FullMetricChartView+Part01.swift"; sourceTree = "<group>"; };
 		E84A7C68943959BD45325D9B /* HealthKitAuthorizationPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitAuthorizationPolicyTests.swift; sourceTree = "<group>"; };
 		EA91A028C261AEBF383794D0 /* KeychainManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManagerTests.swift; sourceTree = "<group>"; };
@@ -1113,6 +1115,7 @@
 				EA91A028C261AEBF383794D0 /* KeychainManagerTests.swift */,
 				F8E9499CD258290C5363D52A /* AuthManagerSessionTests.swift */,
 				3FF03916F06E4F2537E89838 /* BiometricLockPolicyTests.swift */,
+				E67A23519F10FC4172C1E4FD /* KeychainAvailability.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1936,6 +1939,7 @@
 				57EE5D3DE35D32DFC0A60E02 /* KeychainManagerTests.swift in Sources */,
 				0EC249B0ED61CDC66976258E /* AuthManagerSessionTests.swift in Sources */,
 				475B6676DE2161CF4BB8861E /* BiometricLockPolicyTests.swift in Sources */,
+				96EA9790381A5BEC62D7C902 /* KeychainAvailability.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
