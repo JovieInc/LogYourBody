@@ -30,7 +30,7 @@ export function oauthClientId() {
 export function oauthRedirectUri(request?: NextRequest) {
   if (process.env.JOVIE_AUTH_REDIRECT_URI) return process.env.JOVIE_AUTH_REDIRECT_URI;
   if (process.env.NODE_ENV === 'production') {
-    return 'https://logyourbody.com/api/auth/callback';
+    return 'https://www.logyourbody.com/api/auth/callback';
   }
   return `${request?.nextUrl.origin || 'http://localhost:3000'}/api/auth/callback`;
 }

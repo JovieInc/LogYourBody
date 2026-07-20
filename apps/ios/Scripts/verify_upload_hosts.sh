@@ -43,7 +43,7 @@ require_https_service_url() {
   fi
 }
 
-API_BASE_URL="${API_BASE_URL:-https://logyourbody.com}"
+API_BASE_URL="${API_BASE_URL:-https://www.logyourbody.com}"
 
 require_https_service_url "API_BASE_URL" "$API_BASE_URL"
 

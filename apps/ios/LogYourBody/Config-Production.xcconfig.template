@@ -11,7 +11,7 @@ AUTH_REDIRECT_URI = logyourbody:/$()/oauth
 
 // Production API.
 API_BASE_URL = https:/$()/www.logyourbody.com
-API_EXPECTED_HOST = logyourbody.com
+API_EXPECTED_HOST = www.logyourbody.com
 
 // Production paid/analytics/error reporting providers.
 REVENUE_CAT_API_KEY = replace_with_prod_revenuecat_public_key

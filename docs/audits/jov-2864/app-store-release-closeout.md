@@ -129,7 +129,7 @@ MVP path evidence:
 
 Public App Store URL checked on 2026-06-07:
 
-- https://apps.apple.com/us/app/logyourbody/id6739360530 -> HTTP 404
+- https://apps.apple.com/us/app/logyourbody/id6755209876 -> HTTP 404
 
 Follow-up public App Store URL check on 2026-06-23 after PR `#442` and
 release-loop run `28008976044`:
