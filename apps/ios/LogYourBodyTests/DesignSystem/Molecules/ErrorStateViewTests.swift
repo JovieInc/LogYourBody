@@ -289,7 +289,7 @@ final class ErrorStateViewTests: XCTestCase {
         }
     }
 
-    func testActionPerformance() {
+    func testActionCanBeInvokedRepeatedly() {
         // Given
         var counter = 0
         let errorView = ErrorStateView(
@@ -297,11 +297,12 @@ final class ErrorStateViewTests: XCTestCase {
             buttonAction: { counter += 1 }
         )
 
-        // When/Then
-        measure {
-            for _ in 0..<1_000 {
-                errorView.buttonAction()
-            }
+        // When/Then: the stored action stays invocable across many calls.
+        // (Was a measure {} block asserting an exact count; measure iterates
+        // 10x by default, which made the count assertion nondeterministic and
+        // only measured the test's own closure, not app code.)
+        for _ in 0..<1_000 {
+            errorView.buttonAction()
         }
 
         XCTAssertEqual(counter, 1_000)
