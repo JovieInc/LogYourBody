@@ -327,6 +327,7 @@
 		ADF1F6BE2ED58E3F00745F33 /* HealthSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */; };
 		ADFC6A2D2E188FD5004FCE40 /* HKRawSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */; };
 		ADFF001E313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF001D313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift */; };
+		B0BCDE6BE3E9D61B8CF9F3B5 /* BackgroundPhotoUploadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C616D3012947DD91D1BEF39 /* BackgroundPhotoUploadServiceTests.swift */; };
 		B11404E6ED2FB64ADE0E0EAE /* EditEntrySavePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51C80EB60F2EA0D7AFA62AB /* EditEntrySavePolicyTests.swift */; };
 		B12671012F16000100ABCDEF /* BodyScoreEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B12671002F16000100ABCDEF /* BodyScoreEngineTests.swift */; };
 		B12671032F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B12671022F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift */; };
@@ -406,6 +407,7 @@
 		095D9694F1EA5B5091B0AE8B /* DailyReminderPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DailyReminderPolicyTests.swift; sourceTree = "<group>"; };
 		0AB2ACF16AEA86A36EDAD936 /* BiometricAuthView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BiometricAuthView.swift; path = DesignSystem/Organisms/BiometricAuthView.swift; sourceTree = "<group>"; };
 		0B3ECAB100575E759C5A3D7A /* LogWeightFormValidatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogWeightFormValidatorTests.swift; sourceTree = "<group>"; };
+		0C616D3012947DD91D1BEF39 /* BackgroundPhotoUploadServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackgroundPhotoUploadServiceTests.swift; sourceTree = "<group>"; };
 		0D90F6DA60C58AF02CF23737 /* DSLoadingIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLoadingIndicator.swift; path = DesignSystem/Atoms/DSLoadingIndicator.swift; sourceTree = "<group>"; };
 		0DBA8FB9B9980A35A865BCAA /* Glp1DoseHistoryFormatterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Glp1DoseHistoryFormatterTests.swift; sourceTree = "<group>"; };
 		118D0C354059446D0FDC1EDA /* AuthConfigurationValidationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthConfigurationValidationTests.swift; sourceTree = "<group>"; };
@@ -1113,6 +1115,7 @@
 				3CD03E6E0BF889812FE27D44 /* LegalConsentPolicyTests.swift */,
 				89E358ECC97E3F08357502AC /* LegalDocumentLoaderTests.swift */,
 				7A98EF222E91570CB37F44C0 /* PhotoUploadManagerTests.swift */,
+				0C616D3012947DD91D1BEF39 /* BackgroundPhotoUploadServiceTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1936,6 +1939,7 @@
 				1E182FE84F374514F7F31F17 /* LegalConsentPolicyTests.swift in Sources */,
 				CEA13DB06DA2A2D160A48D1D /* LegalDocumentLoaderTests.swift in Sources */,
 				3FA11453ACB47EEEFEAFF581 /* PhotoUploadManagerTests.swift in Sources */,
+				B0BCDE6BE3E9D61B8CF9F3B5 /* BackgroundPhotoUploadServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
