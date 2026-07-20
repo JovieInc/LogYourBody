@@ -4,6 +4,16 @@
 //
 import SwiftUI
 
+enum LegalConsentPolicy {
+    static func canContinue(
+        acceptedTerms: Bool,
+        acceptedPrivacy: Bool,
+        isLoading: Bool
+    ) -> Bool {
+        acceptedTerms && acceptedPrivacy && !isLoading
+    }
+}
+
 struct LegalConsentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -18,7 +28,11 @@ struct LegalConsentView: View {
     @State private var showPrivacySheet = false
 
     private var canContinue: Bool {
-        acceptedTerms && acceptedPrivacy && !isLoading
+        LegalConsentPolicy.canContinue(
+            acceptedTerms: acceptedTerms,
+            acceptedPrivacy: acceptedPrivacy,
+            isLoading: isLoading
+        )
     }
 
     var body: some View {
