@@ -80,7 +80,11 @@ final class AuthManagerSessionTests: XCTestCase {
     override func tearDown() {
         AuthStubURLProtocol.reset()
         try? keychain.delete(forKey: storedSessionKey)
-        defaults.removePersistentDomain(forName: suiteName)
+        // setUpWithError may have thrown XCTSkip before the fixtures were
+        // initialized; XCTest still runs tearDown, so guard the IUOs.
+        if let defaults = defaults {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
         defaults = nil
         super.tearDown()
     }
