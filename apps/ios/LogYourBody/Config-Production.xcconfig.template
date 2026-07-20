@@ -10,7 +10,7 @@ AUTH_CLIENT_ID = logyourbody-ios
 AUTH_REDIRECT_URI = logyourbody:/$()/oauth
 
 // Production API.
-API_BASE_URL = https:/$()/logyourbody.com
+API_BASE_URL = https:/$()/www.logyourbody.com
 API_EXPECTED_HOST = logyourbody.com
 
 // Production paid/analytics/error reporting providers.

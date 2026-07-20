@@ -140,7 +140,10 @@ enum Configuration {
     // MARK: - API Configuration
 
     static var apiBaseURL: String {
-        stringValue(for: "API_BASE_URL", default: "https://logyourbody.com")
+        // www: the apex domain 307-redirects to www, and URLSession strips the
+        // Authorization header on cross-host redirects, which breaks session
+        // registration ("account could not be initialized").
+        stringValue(for: "API_BASE_URL", default: "https://www.logyourbody.com")
     }
 
     static var apiExpectedHost: String {
