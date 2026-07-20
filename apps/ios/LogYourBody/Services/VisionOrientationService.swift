@@ -164,7 +164,7 @@ class VisionOrientationService {
     }
 
     /// Rotates image by specified degrees
-    private func rotateImage(_ image: UIImage, byDegrees degrees: CGFloat) -> UIImage {
+    func rotateImage(_ image: UIImage, byDegrees degrees: CGFloat) -> UIImage {
         let radians = degrees * .pi / 180
 
         // Calculate new size after rotation

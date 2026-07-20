@@ -235,7 +235,7 @@ class ImageProcessingService: ObservableObject {
         return detectedBox
     }
 
-    private func cropToHuman(cgImage: CGImage, boundingBox: CGRect) throws -> UIImage {
+    func cropToHuman(cgImage: CGImage, boundingBox: CGRect) throws -> UIImage {
         // Convert normalized coordinates to pixel coordinates
         let width = CGFloat(cgImage.width)
         let height = CGFloat(cgImage.height)
@@ -254,7 +254,7 @@ class ImageProcessingService: ObservableObject {
         return UIImage(cgImage: croppedCGImage)
     }
 
-    private func aspectFillToSize(_ image: UIImage, targetSize: CGSize, centerOnPerson: Bool = true) throws -> UIImage {
+    func aspectFillToSize(_ image: UIImage, targetSize: CGSize, centerOnPerson: Bool = true) throws -> UIImage {
         guard let cgImage = image.cgImage else {
             throw ProcessingError.invalidImage
         }
@@ -330,7 +330,7 @@ class ImageProcessingService: ObservableObject {
         return centerPoint
     }
 
-    private func createThumbnail(from image: UIImage, size: CGSize) throws -> UIImage {
+    func createThumbnail(from image: UIImage, size: CGSize) throws -> UIImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0
         format.opaque = false

@@ -158,7 +158,7 @@ class PhotoLibraryScanner: ObservableObject {
         scanProgress = 0
     }
 
-    private static func appAuthorizationState(from status: PHAuthorizationStatus) -> AppAuthorizationState {
+    static func appAuthorizationState(from status: PHAuthorizationStatus) -> AppAuthorizationState {
         switch status {
         case .authorized, .limited:
             return .authorized

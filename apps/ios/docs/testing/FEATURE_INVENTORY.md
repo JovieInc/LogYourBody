@@ -198,7 +198,9 @@ contracts, RevenueCat manager, RealtimeSyncManager + sync integration,
 CoreDataManager (+migration tests), HealthKitManager + coordinator,
 BodyScore engine/cache/recalc, OnboardingFlowViewModel, DashboardViewModel,
 TimelineDataProvider, interpolation + caches, image cache, bulk import
-manager, validation/logging services, launch/auth surface policies.
+manager, validation/logging services, launch/auth surface policies,
+Vision/photo pipeline (ImageProcessingService, BackgroundRemovalService,
+VisionOrientationService, PhotoLibraryScanner criteria/auth mapping).
 
 ### B.1 High-risk untested/partial (priority queue)
 
@@ -217,20 +219,19 @@ manager, validation/logging services, launch/auth surface policies.
 
 ### B.2 Medium-risk untested
 
-| File                                                                                                                                                | Responsibility                                | Layer                   |
-| --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ----------------------- |
-| `Services/AnalyticsService.swift`                                                                                                                   | Statsig event adapter                         | unit (fake client)      |
-| `Services/ErrorTrackingService.swift`, `Utils/ErrorReporter.swift`                                                                                  | Sentry wrappers                               | unit (fake client)      |
-| `Services/BugReportManager.swift`                                                                                                                   | Shake-to-report capture/submit                | unit                    |
-| `Services/DeviceNormalizationService.swift` + `Models/HKRawSample.swift`                                                                            | Device confidence inference                   | unit                    |
-| `Services/ImageProcessingService.swift`, `BackgroundRemovalService.swift`, `VisionOrientationService.swift`, `PhotoLibraryScanner.swift`            | Vision/photo pipeline                         | unit (synthetic images) |
-| `Services/BodyMetricSpotlightIndexer.swift`                                                                                                         | Spotlight indexing (document mapping covered) | unit                    |
-| `Helpers/TimelineCalculator.swift`, `LRUCache.swift`, `TimelinePhotoSampler.swift`, `MetricChartDataHelper.swift`, `TimelineBucketCalculator.swift` | Timeline/chart helpers                        | unit                    |
-| `Models/GlobalTimelineModels.swift` (bucket/cursor/scale)                                                                                           | Timeline models                               | unit                    |
-| `Utils/AppVersion.swift`, `Utils/AppError.swift`                                                                                                    | Semver + error taxonomy                       | unit                    |
-| `Utils/ShakeDetector.swift` (incl. `DebugResetManager` — data-loss risk)                                                                            | Shake/screenshot/debug reset                  | unit                    |
-| `Models/Changelog.swift`                                                                                                                            | What's-new tracking                           | unit                    |
-| `Models/TimelineMode.swift`                                                                                                                         | Timeline mode + formatter cache               | unit                    |
+| File                                                                                                                                                | Responsibility                                | Layer              |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------ |
+| `Services/AnalyticsService.swift`                                                                                                                   | Statsig event adapter                         | unit (fake client) |
+| `Services/ErrorTrackingService.swift`, `Utils/ErrorReporter.swift`                                                                                  | Sentry wrappers                               | unit (fake client) |
+| `Services/BugReportManager.swift`                                                                                                                   | Shake-to-report capture/submit                | unit               |
+| `Services/DeviceNormalizationService.swift` + `Models/HKRawSample.swift`                                                                            | Device confidence inference                   | unit               |
+| `Services/BodyMetricSpotlightIndexer.swift`                                                                                                         | Spotlight indexing (document mapping covered) | unit               |
+| `Helpers/TimelineCalculator.swift`, `LRUCache.swift`, `TimelinePhotoSampler.swift`, `MetricChartDataHelper.swift`, `TimelineBucketCalculator.swift` | Timeline/chart helpers                        | unit               |
+| `Models/GlobalTimelineModels.swift` (bucket/cursor/scale)                                                                                           | Timeline models                               | unit               |
+| `Utils/AppVersion.swift`, `Utils/AppError.swift`                                                                                                    | Semver + error taxonomy                       | unit               |
+| `Utils/ShakeDetector.swift` (incl. `DebugResetManager` — data-loss risk)                                                                            | Shake/screenshot/debug reset                  | unit               |
+| `Models/Changelog.swift`                                                                                                                            | What's-new tracking                           | unit               |
+| `Models/TimelineMode.swift`                                                                                                                         | Timeline mode + formatter cache               | unit               |
 
 ### B.3 Low-risk untested (sweep last)
 
@@ -317,7 +318,15 @@ Progress tracker: mark batches here as PRs merge.
   (`OnboardingStepEntryPolicyTests`, `OnboardingScoreDisplayPolicyTests`,
   `OnboardingFlowValidationTests`; hook→reveal XCUITest golden path deferred)
 - Batch 10 — settings cluster (ProfileSettingsViewV2, SecuritySessionsView,
-  DeleteAccountView gating, ExportDataView CSV): this PR
+  DeleteAccountView gating, ExportDataView CSV): ✅ #492
+- Batch 11a — vendor adapters + timeline helpers: ✅ #493
+- Batch 11b — Vision/photo pipeline: this PR (`ImageProcessingServiceTests`,
+  `BackgroundRemovalServiceTests`, `VisionOrientationServiceTests`,
+  `PhotoLibraryScannerTests` + `SyntheticImageFixtures`; pins
+  Vision-on-simulator setup failures, documents a
+  `BackgroundRemovalService.removeBackground` double-continuation-resume crash
+  on simulator as a known app bug — not fixed here)
+- Batch 12 — NotificationManager scheduling + B.3 audit sweep: in review (#495)
 - Dead-code deletion (section C sweep): this PR — ~4,068 app-target lines
   removed against the 92,243-line baseline denominator (coverage % rises
   accordingly)

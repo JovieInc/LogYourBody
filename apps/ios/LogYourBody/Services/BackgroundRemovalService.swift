@@ -73,7 +73,7 @@ class BackgroundRemovalService {
     }
 
     /// Apply the segmentation mask to create transparent background
-    private func applySegmentationMask(to cgImage: CGImage, mask: CVPixelBuffer, quality: Float) throws -> UIImage {
+    func applySegmentationMask(to cgImage: CGImage, mask: CVPixelBuffer, quality: Float) throws -> UIImage {
         let ciImage = CIImage(cgImage: cgImage)
         let maskImage = CIImage(cvPixelBuffer: mask)
 
