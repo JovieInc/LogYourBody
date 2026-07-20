@@ -54,6 +54,7 @@ struct BodyScoreHeightView: View {
                 } label: {
                     Text("Continue")
                 }
+                .accessibilityIdentifier("body_score_onboarding_height_continue_button")
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueHeight)
             }

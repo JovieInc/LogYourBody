@@ -122,6 +122,7 @@ struct BodyScoreHealthConnectView: View {
                     OnboardingTextButton(title: "Enter manually instead") {
                         viewModel.skipHealthKit()
                     }
+                    .accessibilityIdentifier("body_score_onboarding_enter_manually_button")
                 }
             }
         )

@@ -56,6 +56,7 @@ struct BodyScoreBodyFatChoiceView: View {
                                 borderOpacity: 0.6
                             )
                         }
+                        .accessibilityIdentifier("body_score_onboarding_body_fat_\(option.source == .manualValue ? "manual" : "visual")_button")
                         .buttonStyle(.plain)
                         .jovieTouchTarget()
                         .accessibilityLabel("\(option.title). \(option.subtitle)")
