@@ -133,14 +133,14 @@ candidate (propose deletion, not tests).
 
 ### A.7 Settings / preferences
 
-| Surface                                                                       | File                                | Risk | Layer           | Status / existing                                       |
-| ----------------------------------------------------------------------------- | ----------------------------------- | ---- | --------------- | ------------------------------------------------------- |
-| `PreferencesView` (hub)                                                       | `Views/PreferencesView.swift`       | M    | unit + XCUITest | 🔶 UI settings fixtures, `DailyReminderPolicyTests`     |
-| `ProfileSettingsViewV2` (+2 picker sheets)                                    | `Views/ProfileSettingsViewV2.swift` | M    | unit            | ❌                                                      |
-| `PreferenceGoalEditorSheet`                                                   | `Views/PreferenceGoalEditing.swift` | M    | unit            | 🔶 `PreferenceGoalValidatorTests`, UI goal-editor tests |
-| `SecuritySessionsView`                                                        | `Views/SecuritySessionsView.swift`  | M    | unit            | ❌                                                      |
-| `DeleteAccountView`                                                           | `Views/DeleteAccountView.swift`     | H    | integration     | 🔶 `AccountDeletionCleanupServiceTests` (service-level) |
-| `LegalView`, `WhatsNewView`, `SyncStatusView`/`SyncDetailsView`, `VersionRow` | `Views/`                            | —    | —               | 🗑 all orphaned                                         |
+| Surface                                                                       | File                                | Risk | Layer           | Status / existing                                                                                               |
+| ----------------------------------------------------------------------------- | ----------------------------------- | ---- | --------------- | --------------------------------------------------------------------------------------------------------------- |
+| `PreferencesView` (hub)                                                       | `Views/PreferencesView.swift`       | M    | unit + XCUITest | 🔶 UI settings fixtures, `DailyReminderPolicyTests`                                                             |
+| `ProfileSettingsViewV2` (+2 picker sheets)                                    | `Views/ProfileSettingsViewV2.swift` | M    | unit            | 🔶 `ProfileSettingsPolicyTests`                                                                                 |
+| `PreferenceGoalEditorSheet`                                                   | `Views/PreferenceGoalEditing.swift` | M    | unit            | 🔶 `PreferenceGoalValidatorTests`, UI goal-editor tests                                                         |
+| `SecuritySessionsView`                                                        | `Views/SecuritySessionsView.swift`  | M    | unit            | 🔶 `SessionListOrderingTests` (view states declarative; no HTTP boundary — sessions synthesized locally)        |
+| `DeleteAccountView`                                                           | `Views/DeleteAccountView.swift`     | H    | integration     | 🔶 `AccountDeletionCleanupServiceTests` (service-level), `AccountDeletionConfirmationPolicyTests` (view gating) |
+| `LegalView`, `WhatsNewView`, `SyncStatusView`/`SyncDetailsView`, `VersionRow` | `Views/`                            | —    | —               | 🗑 all orphaned                                                                                                 |
 
 ### A.8 HealthKit / integrations
 
@@ -152,10 +152,10 @@ candidate (propose deletion, not tests).
 
 ### A.9 Data export / import
 
-| Surface               | File                              | Risk | Layer              | Status / existing                                            |
-| --------------------- | --------------------------------- | ---- | ------------------ | ------------------------------------------------------------ |
-| `ExportDataView`      | `Views/ExportDataView.swift`      | M    | unit (CSV builder) | ❌                                                           |
-| `BulkPhotoImportView` | `Views/BulkPhotoImportView.swift` | M    | unit + XCUITest    | 🔶 `BulkImportManagerBoundsTests`, policy tests, UI fixtures |
+| Surface               | File                              | Risk | Layer              | Status / existing                                                         |
+| --------------------- | --------------------------------- | ---- | ------------------ | ------------------------------------------------------------------------- |
+| `ExportDataView`      | `Views/ExportDataView.swift`      | M    | unit (CSV builder) | 🔶 `ExportCSVBuilderTests` (CSV builder; email-export edge call untested) |
+| `BulkPhotoImportView` | `Views/BulkPhotoImportView.swift` | M    | unit + XCUITest    | 🔶 `BulkImportManagerBoundsTests`, policy tests, UI fixtures              |
 
 ### A.10 Legal / consent
 
@@ -310,9 +310,14 @@ Progress tracker: mark batches here as PRs merge.
 - Batch 3 — auth hardening: ✅ #483 (in review)
 - Batch 4 — legal consent gate: ✅ #485
 - Batch 5 — photo upload pipeline: ✅ #486
-- Batch 9 (unit part) — onboarding step-policy + VM validation gaps: this PR
+- Batch 6 — version migrations + debug reset: ✅ #488
+- Batch 7 — BodySpec API + OAuth: ✅ #489
+- Batch 8 — App Intents: ✅ #490
+- Batch 9 — onboarding step-policy + VM validation gaps: ✅ #491
   (`OnboardingStepEntryPolicyTests`, `OnboardingScoreDisplayPolicyTests`,
   `OnboardingFlowValidationTests`; hook→reveal XCUITest golden path deferred)
+- Batch 10 — settings cluster (ProfileSettingsViewV2, SecuritySessionsView,
+  DeleteAccountView gating, ExportDataView CSV): this PR
 - Dead-code deletion (section C sweep): this PR — ~4,068 app-target lines
   removed against the 92,243-line baseline denominator (coverage % rises
   accordingly)

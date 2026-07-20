@@ -5,6 +5,21 @@
 import SwiftUI
 import UIKit
 
+enum AccountDeletionConfirmationPolicy {
+    static let confirmationPhrase = "DELETE"
+
+    /// The delete action is armed only by an exact, case-sensitive match of the phrase.
+    static func isValidConfirmation(_ text: String) -> Bool {
+        text == confirmationPhrase
+    }
+
+    /// Guidance shown once the user has typed something that does not match the phrase.
+    static func validationMessage(for text: String) -> String? {
+        guard !text.isEmpty, !isValidConfirmation(text) else { return nil }
+        return "Type \(confirmationPhrase) exactly to enable account deletion."
+    }
+}
+
 struct DeleteAccountView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.theme)
@@ -16,15 +31,14 @@ struct DeleteAccountView: View {
     @State private var errorMessage = ""
     @FocusState private var isTextFieldFocused: Bool
 
-    private let confirmationPhrase = "DELETE"
+    private let confirmationPhrase = AccountDeletionConfirmationPolicy.confirmationPhrase
 
     private var hasValidConfirmation: Bool {
-        confirmationText == confirmationPhrase
+        AccountDeletionConfirmationPolicy.isValidConfirmation(confirmationText)
     }
 
     private var confirmationValidationMessage: String? {
-        guard !confirmationText.isEmpty, !hasValidConfirmation else { return nil }
-        return "Type DELETE exactly to enable account deletion."
+        AccountDeletionConfirmationPolicy.validationMessage(for: confirmationText)
     }
 
     var body: some View {

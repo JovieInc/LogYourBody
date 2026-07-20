@@ -509,11 +509,6 @@ struct ExportDataView: View {
     }
 
     private func createBodyMetricsCSV(from metrics: [BodyMetrics]) -> String {
-        var csv = "Date,Weight,Weight Unit,Body Fat %,FFMI,Muscle Mass,Bone Mass,Notes,Photo URL\n"
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .short
-
         let heightCm = authManager.currentUser?.profile?.height
         let heightInches: Double?
         if let heightCm, heightCm > 0 {
@@ -521,53 +516,11 @@ struct ExportDataView: View {
         } else {
             heightInches = nil
         }
-
-        let sortedMetrics = metrics.sorted { $0.date < $1.date }
-
-        for metric in sortedMetrics {
-            let date = dateFormatter.string(from: metric.date)
-            let weight = metric.weight ?? 0
-            let weightUnit = metric.weightUnit ?? "lbs"
-            let bodyFat = metric.bodyFatPercentage ?? 0
-            let ffmiValue: Double
-            if let heightInches,
-               let ffmiResult = MetricsInterpolationService.shared.estimateFFMI(
-                   for: metric.date,
-                   metrics: sortedMetrics,
-                   heightInches: heightInches
-               ) {
-                ffmiValue = ffmiResult.value
-            } else {
-                ffmiValue = 0
-            }
-            let muscleMass = metric.muscleMass ?? 0
-            let boneMass = metric.boneMass ?? 0
-            let notes = metric.notes ?? ""
-            let photoURL = metric.photoUrl ?? ""
-
-            csv += "\(date),\(weight),\(weightUnit),\(bodyFat),\(ffmiValue),\(muscleMass),\(boneMass),\"\(notes)\",\(photoURL)\n"
-        }
-
-        return csv
+        return ExportCSVBuilder.makeBodyMetricsCSV(metrics: metrics, heightInches: heightInches)
     }
 
     private func createDailyLogsCSV(from logs: [DailyLog]) -> String {
-        var csv = "Date,Weight,Weight Unit,Steps,Notes\n"
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .short
-
-        for log in logs.sorted(by: { $0.date < $1.date }) {
-            let date = dateFormatter.string(from: log.date)
-            let weight = log.weight ?? 0
-            let weightUnit = log.weightUnit ?? ""
-            let steps = log.stepCount ?? 0
-            let notes = log.notes ?? ""
-
-            csv += "\(date),\(weight),\(weightUnit),\(steps),\"\(notes)\"\n"
-        }
-
-        return csv
+        ExportCSVBuilder.makeDailyLogsCSV(logs: logs)
     }
 
     private func extractPhotoURLs(from metrics: [BodyMetrics]) -> [String] {
