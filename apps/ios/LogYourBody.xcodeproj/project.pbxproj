@@ -11,6 +11,7 @@
 		04BF4BAC82CF6B37F817592F /* CoreDataModelMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA050E7DCEBA5BAF62341363 /* CoreDataModelMigrationTests.swift */; };
 		04EB1D7AD1947D32BDE7AD70 /* BodyMetricSourceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EBD5BF3F1671BC8D17ABE5D /* BodyMetricSourceContractTests.swift */; };
 		050A49949BCAA09D23C66035 /* DashboardViewModelHealthSyncWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1C56EE58FC0F4BEFDA1345 /* DashboardViewModelHealthSyncWiringTests.swift */; };
+		08009BD8B382A4A3372C1D2D /* ExternalServicePortsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A58DAB61B2BBDF2D4EF761B /* ExternalServicePortsTests.swift */; };
 		0922CA98E79021C4CB2595A5 /* SupabaseProfilePayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA82A71E77423D56A70AA46 /* SupabaseProfilePayloadTests.swift */; };
 		099DD9F0055C4CFBF7190F4B /* PhotoMetadataAndImportPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E0D5025A2839599F4E281D /* PhotoMetadataAndImportPolicyTests.swift */; };
 		0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A5D6BAAD9FB2F7B8AFACB /* BaseButton.swift */; };
@@ -478,6 +479,7 @@
 		91C10C0E4F8B40568047DA88 /* AddEntrySheet+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AddEntrySheet+Part01.swift"; path = "AddEntrySheet+Part01.swift"; sourceTree = "<group>"; };
 		927B7D58E8E1756BB92364B6 /* BodyCompositionMathGoldenTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyCompositionMathGoldenTests.swift; sourceTree = "<group>"; };
 		95E35CCA2D3778DD47C8E104 /* ErrorStateViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorStateViewTests.swift; sourceTree = "<group>"; };
+		9A58DAB61B2BBDF2D4EF761B /* ExternalServicePortsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExternalServicePortsTests.swift; sourceTree = "<group>"; };
 		9C89CCE0BFAE9B2ACB9A017B /* UserHeaderSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserHeaderSection.swift; path = DesignSystem/Organisms/UserHeaderSection.swift; sourceTree = "<group>"; };
 		9ED9F05E697F00813F824903 /* LogoutButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogoutButton.swift; path = DesignSystem/Molecules/LogoutButton.swift; sourceTree = "<group>"; };
 		9F0DAD82BAAEB27B75923381 /* FullMetricChartView+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "FullMetricChartView+Part02.swift"; path = "Components/FullMetricChartView+Part02.swift"; sourceTree = "<group>"; };
@@ -1116,6 +1118,7 @@
 				89E358ECC97E3F08357502AC /* LegalDocumentLoaderTests.swift */,
 				7A98EF222E91570CB37F44C0 /* PhotoUploadManagerTests.swift */,
 				0C616D3012947DD91D1BEF39 /* BackgroundPhotoUploadServiceTests.swift */,
+				9A58DAB61B2BBDF2D4EF761B /* ExternalServicePortsTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1940,6 +1943,7 @@
 				CEA13DB06DA2A2D160A48D1D /* LegalDocumentLoaderTests.swift in Sources */,
 				3FA11453ACB47EEEFEAFF581 /* PhotoUploadManagerTests.swift in Sources */,
 				B0BCDE6BE3E9D61B8CF9F3B5 /* BackgroundPhotoUploadServiceTests.swift in Sources */,
+				08009BD8B382A4A3372C1D2D /* ExternalServicePortsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
