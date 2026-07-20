@@ -4,6 +4,30 @@
 //
 import SwiftUI
 
+enum BiometricLockPolicy {
+    /// A new authentication attempt only starts while no attempt is in flight.
+    static func canStartAuthentication(isAuthenticating: Bool) -> Bool {
+        !isAuthenticating
+    }
+
+    /// A successful scan unlocks; biometrics being unavailable on the device
+    /// must not lock the user out. An explicit failure keeps the lock.
+    static func shouldUnlock(after result: BiometricAuthenticationResult) -> Bool {
+        switch result {
+        case .success, .unavailable:
+            return true
+        case .failure:
+            return false
+        }
+    }
+
+    /// The retry/passcode fallback is offered only after a completed failed
+    /// attempt — never before the first attempt or while one is in flight.
+    static func showsFallbackOptions(hasAttemptedOnce: Bool, isAuthenticating: Bool) -> Bool {
+        hasAttemptedOnce && !isAuthenticating
+    }
+}
+
 struct BiometricLockView: View {
     @Binding var isUnlocked: Bool
 
@@ -57,7 +81,10 @@ struct BiometricLockView: View {
 
     @ViewBuilder
     private var lockContent: some View {
-        if hasAttemptedOnce && !isAuthenticating {
+        if BiometricLockPolicy.showsFallbackOptions(
+            hasAttemptedOnce: hasAttemptedOnce,
+            isAuthenticating: isAuthenticating
+        ) {
             BiometricAuthView(
                 biometricType: biometricType,
                 onAuthenticate: authenticate,
@@ -121,7 +148,7 @@ struct BiometricLockView: View {
     }
 
     private func authenticate() {
-        guard !isAuthenticating else { return }
+        guard BiometricLockPolicy.canStartAuthentication(isAuthenticating: isAuthenticating) else { return }
         isAuthenticating = true
 
         Task {
@@ -135,10 +162,9 @@ struct BiometricLockView: View {
             await MainActor.run {
                 isAuthenticating = false
 
-                switch result {
-                case .success, .unavailable:
+                if BiometricLockPolicy.shouldUnlock(after: result) {
                     unlock()
-                case .failure:
+                } else {
                     hasAttemptedOnce = true
                 }
             }
