@@ -1,4 +1,7 @@
 import type { MetadataRoute } from 'next';
+import { endpoints } from '@/lib/generated/endpoints.generated';
+
+const marketingUrl = endpoints.hosts.marketing.url;
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -16,7 +19,7 @@ export default function robots(): MetadataRoute.Robots {
         '/api/',
       ],
     },
-    sitemap: 'https://logyourbody.com/sitemap.xml',
-    host: 'https://logyourbody.com',
+    sitemap: `${marketingUrl}/sitemap.xml`,
+    host: marketingUrl,
   };
 }

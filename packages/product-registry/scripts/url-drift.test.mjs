@@ -5,7 +5,8 @@
 // (required CI `js` job). Register new endpoints in
 // packages/product-registry/src/products/logyourbody.mjs.
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, extname, join, relative, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import console from 'node:console';
 import process from 'node:process';
@@ -214,7 +215,30 @@ function normalize(raw) {
   return literal;
 }
 
-const files = await filesIn(repoRoot);
+// --staged: literal-scan only the files staged in git (pre-commit fast path).
+// The consistency assertions below always run against the full repo.
+const stagedOnly = process.argv.includes('--staged');
+
+function stagedFiles() {
+  const output = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  return output
+    .split('\n')
+    .filter(Boolean)
+    .map((path) => resolve(repoRoot, path))
+    .filter((path) => {
+      const name = basename(path);
+      if (excludedFiles.has(name)) return false;
+      if (name.startsWith('.env')) return false;
+      if (excludedExtensions.has(extname(name).toLowerCase())) return false;
+      if (excludedPaths.has(relative(repoRoot, path))) return false;
+      return true;
+    });
+}
+
+const files = stagedOnly ? stagedFiles() : await filesIn(repoRoot);
 const failures = [];
 let fileCount = 0;
 let literalCount = 0;
@@ -251,22 +275,49 @@ const consistencyTargets = [
     checks: [
       {
         name: 'API_BASE_URL default',
-        pattern: /stringValue\(for: "API_BASE_URL", default: "([^"]+)"\)/,
-        expected: endpoints.hosts.api.url,
+        pattern: /stringValue\(for: "API_BASE_URL", default: ([^)]+)\)/,
+        expected: 'ProductRegistry.Hosts.api',
       },
       {
         name: 'AUTH_ISSUER default',
-        pattern: /stringValue\(for: "AUTH_ISSUER", default: "([^"]+)"\)/,
-        expected: endpoints.auth.issuer,
+        pattern: /stringValue\(for: "AUTH_ISSUER", default: ([^)]+)\)/,
+        expected: 'ProductRegistry.Auth.issuer',
       },
       {
         name: 'AUTH_CLIENT_ID default',
-        pattern: /stringValue\(for: "AUTH_CLIENT_ID", default: "([^"]+)"\)/,
-        expected: endpoints.auth.clients.ios.id,
+        pattern: /stringValue\(for: "AUTH_CLIENT_ID", default: ([^)]+)\)/,
+        expected: 'ProductRegistry.Auth.iosClientID',
       },
       {
         name: 'AUTH_REDIRECT_URI default',
-        pattern: /stringValue\(for: "AUTH_REDIRECT_URI", default: "([^"]+)"\)/,
+        pattern: /stringValue\(for: "AUTH_REDIRECT_URI", default: ([^)]+)\)/,
+        expected: 'ProductRegistry.Auth.iosRedirectURI',
+      },
+    ],
+  },
+  // The ProductRegistry.* references above resolve through the generated Swift
+  // file; pin its values to the registry so the chain stays checked end to end.
+  {
+    file: 'apps/ios/LogYourBody/GeneratedProductRegistry.swift',
+    checks: [
+      {
+        name: 'Hosts.api',
+        pattern: /static let api = "([^"]+)"/,
+        expected: endpoints.hosts.api.url,
+      },
+      {
+        name: 'Auth.issuer',
+        pattern: /static let issuer = "([^"]+)"/,
+        expected: endpoints.auth.issuer,
+      },
+      {
+        name: 'Auth.iosClientID',
+        pattern: /static let iosClientID = "([^"]+)"/,
+        expected: endpoints.auth.clients.ios.id,
+      },
+      {
+        name: 'Auth.iosRedirectURI',
+        pattern: /static let iosRedirectURI = "([^"]+)"/,
         expected: endpoints.auth.clients.ios.redirectUri,
       },
     ],
@@ -352,17 +403,39 @@ const consistencyTargets = [
     checks: [
       {
         name: 'DEFAULT_ISSUER',
-        pattern: /const DEFAULT_ISSUER = '([^']+)';/,
-        expected: endpoints.auth.issuer,
+        pattern: /const DEFAULT_ISSUER = ([^;]+);/,
+        expected: 'endpoints.auth.issuer',
       },
       {
         name: 'DEFAULT_CLIENT_ID',
-        pattern: /const DEFAULT_CLIENT_ID = '([^']+)';/,
-        expected: endpoints.auth.clients.web.id,
+        pattern: /const DEFAULT_CLIENT_ID = ([^;]+);/,
+        expected: 'endpoints.auth.clients.web.id',
       },
       {
         name: 'production redirect URI',
-        pattern: /return '(https:\/\/[^']+\/api\/auth\/callback)';/,
+        pattern: /return (endpoints\.auth\.clients\.web\.redirectUri);/,
+        expected: 'endpoints.auth.clients.web.redirectUri',
+      },
+    ],
+  },
+  // Same chain-pinning as iOS: the endpoints.* references above resolve
+  // through the generated module, so pin its values to the registry.
+  {
+    file: 'apps/web/src/lib/generated/endpoints.generated.ts',
+    checks: [
+      {
+        name: 'auth.issuer',
+        pattern: /issuer: '([^']+)',/,
+        expected: endpoints.auth.issuer,
+      },
+      {
+        name: 'auth.clients.web.id',
+        pattern: /web: \{\s*id: '([^']+)',/,
+        expected: endpoints.auth.clients.web.id,
+      },
+      {
+        name: 'auth.clients.web.redirectUri',
+        pattern: /web: \{\s*id: '[^']+',\s*redirectUri: '([^']+)',/,
         expected: endpoints.auth.clients.web.redirectUri,
       },
     ],

@@ -1,34 +1,37 @@
 import { MinimalWaitlistLanding } from './MinimalWaitlistLanding';
 import { LegacyMinimalWaitlistLanding } from './LegacyMinimalWaitlistLanding';
 import { LANDING_FLAGS } from '@/lib/flags/landing';
+import { endpoints } from '@/lib/generated/endpoints.generated';
+
+const marketingUrl = endpoints.hosts.marketing.url;
 
 const landingStructuredData = {
   '@context': 'https://schema.org',
   '@graph': [
     {
       '@type': 'Organization',
-      '@id': 'https://logyourbody.com/#organization',
+      '@id': `${marketingUrl}/#organization`,
       name: 'LogYourBody',
-      url: 'https://logyourbody.com/',
-      logo: 'https://logyourbody.com/brand/logyourbody-app-icon.png',
+      url: `${marketingUrl}/`,
+      logo: `${marketingUrl}/brand/logyourbody-app-icon.png`,
     },
     {
       '@type': 'WebSite',
-      '@id': 'https://logyourbody.com/#website',
+      '@id': `${marketingUrl}/#website`,
       name: 'LogYourBody',
-      url: 'https://logyourbody.com/',
-      publisher: { '@id': 'https://logyourbody.com/#organization' },
+      url: `${marketingUrl}/`,
+      publisher: { '@id': `${marketingUrl}/#organization` },
     },
     {
       '@type': 'SoftwareApplication',
-      '@id': 'https://logyourbody.com/#app',
+      '@id': `${marketingUrl}/#app`,
       name: 'LogYourBody',
       applicationCategory: 'HealthApplication',
       operatingSystem: 'iOS',
       description:
         'A private iPhone timeline for weight, body fat, lean mass, and progress photos.',
-      url: 'https://logyourbody.com/',
-      publisher: { '@id': 'https://logyourbody.com/#organization' },
+      url: `${marketingUrl}/`,
+      publisher: { '@id': `${marketingUrl}/#organization` },
     },
   ],
 };

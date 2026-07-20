@@ -71,6 +71,9 @@
     ],
     "apps/ios/**/*.{swift}": [
       "cd apps/ios && swiftlint"
+    ],
+    "*.{ts,tsx,js,jsx,mjs,cjs,swift,sh,yml,yaml,json,md,html,css,scss,rb,py,toml,xml,plist,template,xcconfig}": [
+      "node packages/product-registry/scripts/url-drift.test.mjs --staged"
     ]
   }
 }

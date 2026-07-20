@@ -47,7 +47,19 @@ else
 fi
 echo ""
 
-# 4. Build check (optional, can be slow)
+# 4. URL drift guard
+echo "🔗 Running URL drift guard..."
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+node "$REPO_ROOT/packages/product-registry/scripts/url-drift.test.mjs"
+if [ $? -eq 0 ]; then
+    echo "✅ URL drift guard passed"
+else
+    echo "❌ URL drift guard failed"
+    exit 1
+fi
+echo ""
+
+# 5. Build check (optional, can be slow)
 if [[ "$1" == "--with-build" ]]; then
     echo "🏗️  Running build check..."
     pnpm run build

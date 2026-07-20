@@ -3,12 +3,13 @@ import 'server-only';
 import { createHash, randomBytes } from 'node:crypto';
 import type { NextRequest, NextResponse } from 'next/server';
 import { authCookies, type JovieUserInfo } from '@/lib/auth/constants';
+import { endpoints } from '@/lib/generated/endpoints.generated';
 
 export { authCookies } from '@/lib/auth/constants';
 export type { JovieUserInfo } from '@/lib/auth/constants';
 
-const DEFAULT_ISSUER = 'https://jov.ie/api/auth';
-const DEFAULT_CLIENT_ID = 'logyourbody-web';
+const DEFAULT_ISSUER = endpoints.auth.issuer;
+const DEFAULT_CLIENT_ID = endpoints.auth.clients.web.id;
 
 export type JovieTokenSet = {
   access_token: string;
@@ -30,7 +31,7 @@ export function oauthClientId() {
 export function oauthRedirectUri(request?: NextRequest) {
   if (process.env.JOVIE_AUTH_REDIRECT_URI) return process.env.JOVIE_AUTH_REDIRECT_URI;
   if (process.env.NODE_ENV === 'production') {
-    return 'https://www.logyourbody.com/api/auth/callback';
+    return endpoints.auth.clients.web.redirectUri;
   }
   return `${request?.nextUrl.origin || 'http://localhost:3000'}/api/auth/callback`;
 }
