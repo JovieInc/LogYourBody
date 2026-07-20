@@ -20,7 +20,6 @@ class BackgroundPhotoUploadService: ObservableObject {
     private let authManager = AuthManager.shared
     private let supabaseManager = SupabaseManager.shared
     private let coreDataManager = CoreDataManager.shared
-    private let photoMetadataService = PhotoMetadataService.shared
     private var uploadCancellables = Set<AnyCancellable>()
     private var uploadTask: Task<Void, Never>?
 
@@ -47,29 +46,6 @@ class BackgroundPhotoUploadService: ObservableObject {
     private init() {}
 
     // MARK: - Public Methods
-
-    func queuePhotosForUpload(_ photos: [PhotosPickerItem]) async {
-        // print("📸 BackgroundUploadService: Queuing \(photos.count) photos for upload")
-
-        // Extract dates and create tasks
-        for photo in photos {
-            // Load the photo data first
-            if let data = try? await photo.loadTransferable(type: Data.self),
-               let date = photoMetadataService.extractDate(from: data) {
-                let task = PhotoUploadTask(photoItem: photo, date: date)
-                uploadQueue.append(task)
-            } else {
-                // If no date metadata, use current date
-                let task = PhotoUploadTask(photoItem: photo, date: Date())
-                uploadQueue.append(task)
-            }
-        }
-
-        // Start processing if not already running
-        if !isUploading {
-            startProcessingQueue()
-        }
-    }
 
     func startProcessingQueue() {
         guard !isUploading && !uploadQueue.isEmpty else { return }

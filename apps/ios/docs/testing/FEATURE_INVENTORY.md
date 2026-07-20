@@ -254,12 +254,31 @@ details sheet duplicated in Components/), possible duplicate
 
 ## C. Dead/orphaned code candidates (delete rather than test — separate PRs)
 
+**Removed in this PR** (verified zero callers; deleted from disk and pbxproj):
 `SignUpView`, `OTPInputView`, `EnhancedOTPInputView`, `LegalView`,
-`HealthKitPromptView`, `HealthDisclaimerView`, `SyncStatusView` +
-`SyncDetailsView`, `DietPhaseHistoryView`, `WhatsNewView`, `VersionRow`,
-`EditEntrySheet`, `PreAuthBodyScoreOnboardingContainer`, `PhotoOptionsSheet`,
-`ImageProcessingStatusView`, `FaceIDEnableView.swift` (not in target),
-`DeveloperMenuSection`/`DeveloperToolsList`/`DeveloperTapHandler` (unused).
+`HealthKitPromptView`, `HealthDisclaimerView`, `SyncStatusView` (incl.
+`SyncDetailsView`/`CompactSyncIndicator`, defined in the same file),
+`DietPhaseHistoryView`, `WhatsNewView`, `WhatsNewRow`, `VersionRow`,
+`EditEntrySheet` (`EditEntrySavePolicy` extracted to
+`Utils/EditEntrySavePolicy.swift`; its tests are unchanged),
+`PreAuthBodyScoreOnboardingContainer`, `DashboardMetricCards.swift` (incl.
+`PhotoOptionsSheet`), `DeveloperToolsList`, `DeveloperTapHandler`,
+`DeveloperTapIndicator`, `ProcessingImagePlaceholder`,
+`Models/BackgroundTaskMonitor.swift`, `Models/BackgroundTaskDetailsSheet.swift`,
+`Models/BackgroundTaskType.swift`, `DesignSystem/Atoms/AnimatedTaskIcon.swift`,
+`BackgroundPhotoUploadService+Processing.swift`, and `queuePhotosForUpload`
+from `BackgroundPhotoUploadService.swift` (rest of the service stays).
+On-disk-only files removed with plain `rm` (never in the build target):
+`FaceIDEnableView.swift`, `ImageProcessingStatusView`, `DeveloperMenuSection`,
+`Models/DashboardTaskBanner.swift`, `Models/AnimatedTaskIcon.swift`,
+`Components/BackgroundTaskDetailsSheet.swift`, `Services/BackgroundTaskMonitor.swift`.
+
+**Deferred — product decision needed, not tests:**
+
+- `Models/Changelog.swift` — its only consumer was the deleted `WhatsNewView`.
+- `Services/BackgroundPhotoUploadService.swift` remainder — its only
+  observers were the deleted `BackgroundTaskMonitor` copies.
+
 Each deletion PR must verify no caller + remove from pbxproj.
 
 ---
@@ -288,3 +307,9 @@ Progress tracker: mark batches here as PRs merge.
 - Batch 2a — hygiene (I2/I3/I4): ✅ #481
 - Batch 2b — tier plans + report script (I6/I7): ✅ #482
 - Batch 2c — CI unit gate + report step (I1, I5 by design): this PR
+- Batch 3 — auth hardening: ✅ #483 (in review)
+- Batch 4 — legal consent gate: ✅ #485
+- Batch 5 — photo upload pipeline: ✅ #486
+- Dead-code deletion (section C sweep): this PR — ~4,068 app-target lines
+  removed against the 92,243-line baseline denominator (coverage % rises
+  accordingly)
