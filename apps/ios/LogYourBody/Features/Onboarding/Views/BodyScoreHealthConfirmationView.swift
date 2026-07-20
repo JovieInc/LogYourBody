@@ -1,5 +1,91 @@
 import SwiftUI
 
+enum HealthConfirmationDisplayPolicy {
+    /// Renders a centimeter height as feet/inches, e.g. 178 cm → 5' 10".
+    static func imperialHeightString(fromCentimeters centimeters: Double) -> String {
+        let inchesTotal = centimeters / 2.54
+        let feet = Int(inchesTotal) / 12
+        let inches = Int(round(inchesTotal)) % 12
+        return "\(feet)' \(inches)\""
+    }
+
+    /// Shows the preferred unit first with the converted value in parentheses.
+    static func formattedHeight(centimeters: Double, system: MeasurementSystem) -> String {
+        switch system {
+        case .metric:
+            return "\(Int(round(centimeters))) cm (\(imperialHeightString(fromCentimeters: centimeters)))"
+        case .imperial:
+            let imperial = imperialHeightString(fromCentimeters: centimeters)
+            return "\(imperial) (\(Int(round(centimeters))) cm)"
+        }
+    }
+
+    /// Whole-number weight display in the requested unit.
+    static func formatWeight(value: Double, unit: WeightUnit) -> String {
+        let rounded = value.rounded()
+        switch unit {
+        case .kilograms:
+            return String(format: "%.0f kg", rounded)
+        case .pounds:
+            return String(format: "%.0f lbs", rounded)
+        }
+    }
+
+    static func formatWeight(fromKilograms kilograms: Double, unit: WeightUnit) -> String {
+        switch unit {
+        case .kilograms:
+            return formatWeight(value: kilograms, unit: .kilograms)
+        case .pounds:
+            return formatWeight(value: kilograms * 2.2046226218, unit: .pounds)
+        }
+    }
+
+    /// Health-imported values win over the stored entry; nil when neither exists.
+    static func preferredWeightString(input: BodyScoreInput, preferredUnit: WeightUnit) -> String? {
+        if let kilograms = input.healthSnapshot.weightKg {
+            return formatWeight(fromKilograms: kilograms, unit: preferredUnit)
+        }
+
+        let stored: Double?
+        switch preferredUnit {
+        case .kilograms:
+            stored = input.weight.inKilograms
+        case .pounds:
+            stored = input.weight.inPounds
+        }
+
+        if let stored {
+            return formatWeight(value: stored, unit: preferredUnit)
+        }
+
+        if let fallbackKilograms = input.weight.inKilograms {
+            return formatWeight(fromKilograms: fallbackKilograms, unit: preferredUnit)
+        }
+
+        return nil
+    }
+
+    /// Health-imported height wins over the stored entry; nil when neither exists.
+    static func preferredHeightString(input: BodyScoreInput, system: MeasurementSystem) -> String? {
+        let centimeters = input.healthSnapshot.heightCm ?? input.height.inCentimeters
+        guard let centimeters else { return nil }
+        return formattedHeight(centimeters: centimeters, system: system)
+    }
+
+    /// Health-imported body fat wins over the manual estimate; nil when neither exists.
+    static func preferredBodyFatString(input: BodyScoreInput) -> String? {
+        if let percentage = input.healthSnapshot.bodyFatPercentage {
+            return String(format: "%.1f%%", percentage)
+        }
+
+        if let percentage = input.bodyFat.percentage {
+            return String(format: "%.1f%%", percentage)
+        }
+
+        return nil
+    }
+}
+
 struct BodyScoreHealthConfirmationView: View {
     @Environment(\.theme)
     private var theme
@@ -162,46 +248,21 @@ struct BodyScoreHealthConfirmationView: View {
     }
 
     private var formattedHeight: String? {
-        let centimeters = viewModel.bodyScoreInput.healthSnapshot.heightCm
-            ?? viewModel.bodyScoreInput.height.inCentimeters
-
-        guard let centimeters else { return nil }
-
-        switch preferredMeasurementSystem {
-        case .metric:
-            return "\(Int(round(centimeters))) cm (\(imperialHeightString(fromCentimeters: centimeters)))"
-        case .imperial:
-            let imperial = imperialHeightString(fromCentimeters: centimeters)
-            return "\(imperial) (\(Int(round(centimeters))) cm)"
-        }
+        HealthConfirmationDisplayPolicy.preferredHeightString(
+            input: viewModel.bodyScoreInput,
+            system: preferredMeasurementSystem
+        )
     }
 
     private var formattedWeight: String? {
-        if let kg = viewModel.bodyScoreInput.healthSnapshot.weightKg {
-            return formatWeight(fromKilograms: kg)
-        }
-
-        if let stored = storedWeightValue {
-            return formatWeight(value: stored, unit: preferredWeightUnit)
-        }
-
-        if let fallbackKg = viewModel.bodyScoreInput.weight.inKilograms {
-            return formatWeight(fromKilograms: fallbackKg)
-        }
-
-        return nil
+        HealthConfirmationDisplayPolicy.preferredWeightString(
+            input: viewModel.bodyScoreInput,
+            preferredUnit: preferredWeightUnit
+        )
     }
 
     private var formattedBodyFat: String? {
-        if let percentage = viewModel.bodyScoreInput.healthSnapshot.bodyFatPercentage {
-            return String(format: "%.1f%%", percentage)
-        }
-
-        if let percentage = viewModel.bodyScoreInput.bodyFat.percentage {
-            return String(format: "%.1f%%", percentage)
-        }
-
-        return nil
+        HealthConfirmationDisplayPolicy.preferredBodyFatString(input: viewModel.bodyScoreInput)
     }
 
     private var snapshotNote: String? {
@@ -218,15 +279,6 @@ struct BodyScoreHealthConfirmationView: View {
 
     private var preferredWeightUnit: WeightUnit {
         viewModel.weightUnit
-    }
-
-    private var storedWeightValue: Double? {
-        switch preferredWeightUnit {
-        case .kilograms:
-            return viewModel.bodyScoreInput.weight.inKilograms
-        case .pounds:
-            return viewModel.bodyScoreInput.weight.inPounds
-        }
     }
 
     private func edit(metric: Metric) {
@@ -276,32 +328,6 @@ struct BodyScoreHealthConfirmationView: View {
             return "Imported from Health"
         }
         return "From your estimate"
-    }
-
-    private func imperialHeightString(fromCentimeters centimeters: Double) -> String {
-        let inchesTotal = centimeters / 2.54
-        let feet = Int(inchesTotal) / 12
-        let inches = Int(round(inchesTotal)) % 12
-        return "\(feet)' \(inches)\""
-    }
-
-    private func formatWeight(fromKilograms kilograms: Double) -> String {
-        switch preferredWeightUnit {
-        case .kilograms:
-            return formatWeight(value: kilograms, unit: .kilograms)
-        case .pounds:
-            return formatWeight(value: kilograms * 2.2046226218, unit: .pounds)
-        }
-    }
-
-    private func formatWeight(value: Double, unit: WeightUnit) -> String {
-        let rounded = value.rounded()
-        switch unit {
-        case .kilograms:
-            return String(format: "%.0f kg", rounded)
-        case .pounds:
-            return String(format: "%.0f lbs", rounded)
-        }
     }
 }
 

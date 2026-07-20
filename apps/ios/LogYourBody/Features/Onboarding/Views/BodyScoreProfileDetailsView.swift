@@ -1,5 +1,80 @@
 import SwiftUI
 
+enum ProfileDetailsValidationPolicy {
+    /// The raw height fields as entered on the profile-details substep.
+    struct ProfileHeightInput {
+        let unit: HeightUnit
+        let centimetersText: String
+        let feet: Int
+        let inches: Int
+    }
+
+    /// Names count once they contain any non-whitespace character.
+    static func isNameValid(_ text: String) -> Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Onboarding restricts profile ages to the 16–80 band.
+    static func isDateOfBirthWithinValidRange(
+        _ dateOfBirth: Date,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        let components = calendar.dateComponents([.year], from: dateOfBirth, to: now)
+        guard let age = components.year else { return false }
+        return age >= 16 && age <= 80
+    }
+
+    /// Converts the active height field into centimeters; returns nil when the
+    /// field cannot produce a positive height.
+    static func heightInCentimeters(_ input: ProfileHeightInput) -> Double? {
+        switch input.unit {
+        case .centimeters:
+            return Double(input.centimetersText)
+        case .inches:
+            let totalInches = Double((input.feet * 12) + input.inches)
+            return totalInches > 0 ? totalInches * 2.54 : nil
+        }
+    }
+
+    /// Accepts 100–250 cm or 4'0"–8'0".
+    static func isHeightValid(_ input: ProfileHeightInput) -> Bool {
+        switch input.unit {
+        case .centimeters:
+            let value = Double(input.centimetersText) ?? 0
+            return value >= 100 && value <= 250
+        case .inches:
+            let totalInches = (input.feet * 12) + input.inches
+            return totalInches >= 48 && totalInches <= 96
+        }
+    }
+
+    /// Per-substep continue gate for the profile-details flow.
+    static func canContinue(
+        substep: OnboardingFlowViewModel.ProfileDetailsSubstep,
+        firstName: String,
+        lastName: String,
+        dateOfBirth: Date,
+        biologicalSex: BiologicalSex?,
+        height: ProfileHeightInput
+    ) -> Bool {
+        switch substep {
+        case .firstName:
+            return isNameValid(firstName)
+        case .lastName:
+            return isNameValid(lastName)
+        case .dateOfBirth:
+            return isNameValid(firstName) &&
+                isNameValid(lastName) &&
+                isDateOfBirthWithinValidRange(dateOfBirth)
+        case .sex:
+            return biologicalSex != nil
+        case .height:
+            return isHeightValid(height)
+        }
+    }
+}
+
 struct BodyScoreProfileDetailsView: View {
     @Environment(\.theme)
     private var theme
@@ -25,54 +100,35 @@ struct BodyScoreProfileDetailsView: View {
     }
 
     private var isFirstNameValid: Bool {
-        !trimmedFirstName.isEmpty
+        ProfileDetailsValidationPolicy.isNameValid(viewModel.profileFirstName)
     }
 
     private var isLastNameValid: Bool {
-        !trimmedLastName.isEmpty
+        ProfileDetailsValidationPolicy.isNameValid(viewModel.profileLastName)
+    }
+
+    private var profileHeightInput: ProfileDetailsValidationPolicy.ProfileHeightInput {
+        ProfileDetailsValidationPolicy.ProfileHeightInput(
+            unit: viewModel.profileHeightUnit,
+            centimetersText: viewModel.profileHeightCentimetersText,
+            feet: viewModel.profileHeightFeet,
+            inches: viewModel.profileHeightInches
+        )
     }
 
     private var canContinue: Bool {
-        switch viewModel.profileDetailsActiveSubstep {
-        case .firstName:
-            return isFirstNameValid
-        case .lastName:
-            return isLastNameValid
-        case .dateOfBirth:
-            return isFirstNameValid && isLastNameValid && isDateOfBirthWithinValidRange
-        case .sex:
-            return viewModel.profileBiologicalSex != nil
-        case .height:
-            return isHeightValid
-        }
-    }
-
-    private var isDateOfBirthWithinValidRange: Bool {
-        let calendar = Calendar.current
-        let components = calendar.dateComponents([.year], from: viewModel.profileDateOfBirth, to: Date())
-        guard let age = components.year else { return false }
-        return age >= 16 && age <= 80
+        ProfileDetailsValidationPolicy.canContinue(
+            substep: viewModel.profileDetailsActiveSubstep,
+            firstName: viewModel.profileFirstName,
+            lastName: viewModel.profileLastName,
+            dateOfBirth: viewModel.profileDateOfBirth,
+            biologicalSex: viewModel.profileBiologicalSex,
+            height: profileHeightInput
+        )
     }
 
     private var heightInCentimeters: Double? {
-        switch viewModel.profileHeightUnit {
-        case .centimeters:
-            return Double(viewModel.profileHeightCentimetersText)
-        case .inches:
-            let totalInches = Double((viewModel.profileHeightFeet * 12) + viewModel.profileHeightInches)
-            return totalInches > 0 ? totalInches * 2.54 : nil
-        }
-    }
-
-    private var isHeightValid: Bool {
-        switch viewModel.profileHeightUnit {
-        case .centimeters:
-            let value = Double(viewModel.profileHeightCentimetersText) ?? 0
-            return value >= 100 && value <= 250
-        case .inches:
-            let totalInches = (viewModel.profileHeightFeet * 12) + viewModel.profileHeightInches
-            return totalInches >= 48 && totalInches <= 96
-        }
+        ProfileDetailsValidationPolicy.heightInCentimeters(profileHeightInput)
     }
 
     private var heightUnitStorageValue: String {

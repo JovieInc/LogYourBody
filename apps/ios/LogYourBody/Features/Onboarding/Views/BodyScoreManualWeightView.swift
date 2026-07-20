@@ -1,5 +1,45 @@
 import SwiftUI
 
+enum ManualWeightEntryPolicy {
+    /// Inline validation for the weight field: empty input clears the error,
+    /// unparseable input asks for a number, and anything under the 70 lb
+    /// floor (converted for metric entry) shows a unit-specific message.
+    static func validationError(for text: String, unit: WeightUnit) -> String? {
+        guard !text.isEmpty else { return nil }
+
+        guard let numeric = Double(text) else {
+            return "Enter a valid number."
+        }
+
+        let poundsEquivalent = unit == .kilograms ? numeric * 2.2046226218 : numeric
+        guard poundsEquivalent < 70 else { return nil }
+
+        switch unit {
+        case .kilograms:
+            return "Enter at least 32 kg (about 70 lbs)."
+        case .pounds:
+            return "Enter at least 70 lbs (about 32 kg)."
+        }
+    }
+
+    /// Plus/minus buttons nudge by half a kilogram or a whole pound.
+    static func stepAmount(for unit: WeightUnit) -> Double {
+        unit == .kilograms ? 0.5 : 1
+    }
+
+    /// A nudge starts from the typed text, falls back to the stored value,
+    /// never goes below zero, and keeps whole numbers integer-formatted.
+    static func nudgeText(currentText: String, storedValue: Double?, amount: Double) -> String {
+        let baseline = Double(currentText) ?? storedValue ?? 0
+        let newValue = max(0, baseline + amount)
+
+        if newValue == floor(newValue) {
+            return String(format: "%.0f", newValue)
+        }
+        return String(format: "%.1f", newValue)
+    }
+}
+
 struct BodyScoreManualWeightView: View {
     @Environment(\.theme)
     private var theme
@@ -177,36 +217,11 @@ struct BodyScoreManualWeightView: View {
     }
 
     private var stepAmount: Double {
-        viewModel.weightUnit == .kilograms ? 0.5 : 1
+        ManualWeightEntryPolicy.stepAmount(for: viewModel.weightUnit)
     }
 
     private func validateWeight(_ value: String) {
-        guard !value.isEmpty else {
-            weightError = nil
-            return
-        }
-
-        guard let numeric = Double(value) else {
-            weightError = "Enter a valid number."
-            return
-        }
-
-        let poundsEquivalent: Double
-        if viewModel.weightUnit == .kilograms {
-            poundsEquivalent = numeric * 2.2046226218
-        } else {
-            poundsEquivalent = numeric
-        }
-
-        if poundsEquivalent < 70 {
-            if viewModel.weightUnit == .kilograms {
-                weightError = "Enter at least 32 kg (about 70 lbs)."
-            } else {
-                weightError = "Enter at least 70 lbs (about 32 kg)."
-            }
-        } else {
-            weightError = nil
-        }
+        weightError = ManualWeightEntryPolicy.validationError(for: value, unit: viewModel.weightUnit)
     }
 
     private var weightFieldBorderColor: Color {
@@ -235,24 +250,18 @@ struct BodyScoreManualWeightView: View {
     }
 
     private func nudgeWeight(by amount: Double) {
-        let currentText = viewModel.manualWeightText
-        let existingFromInput = Double(currentText)
-        let existingFromModel: Double?
+        let storedValue: Double?
         if viewModel.weightUnit == .kilograms {
-            existingFromModel = viewModel.bodyScoreInput.weight.inKilograms
+            storedValue = viewModel.bodyScoreInput.weight.inKilograms
         } else {
-            existingFromModel = viewModel.bodyScoreInput.weight.inPounds
+            storedValue = viewModel.bodyScoreInput.weight.inPounds
         }
 
-        let baseline = existingFromInput ?? existingFromModel ?? 0
-        let newValue = max(0, baseline + amount)
-
-        let formatted: String
-        if newValue == floor(newValue) {
-            formatted = String(format: "%.0f", newValue)
-        } else {
-            formatted = String(format: "%.1f", newValue)
-        }
+        let formatted = ManualWeightEntryPolicy.nudgeText(
+            currentText: viewModel.manualWeightText,
+            storedValue: storedValue,
+            amount: amount
+        )
 
         viewModel.updateManualWeightText(formatted)
         validateWeight(formatted)
