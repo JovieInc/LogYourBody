@@ -62,6 +62,7 @@ struct BodyScoreBasicsView: View {
                 } label: {
                     Text("Continue")
                 }
+                .accessibilityIdentifier("body_score_onboarding_basics_continue_button")
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueBasics)
             }

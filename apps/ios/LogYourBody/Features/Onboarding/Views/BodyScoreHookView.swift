@@ -27,8 +27,8 @@ struct BodyScoreHookView: View {
                 } label: {
                     Text("Start my 60-sec Body Score")
                 }
-                .buttonStyle(OnboardingPrimaryButtonStyle())
                 .accessibilityIdentifier("body_score_onboarding_start_button")
+                .buttonStyle(OnboardingPrimaryButtonStyle())
 
                 if viewModel.entryContext == .preAuth {
                     OnboardingTextButton(title: "I already have an account") {

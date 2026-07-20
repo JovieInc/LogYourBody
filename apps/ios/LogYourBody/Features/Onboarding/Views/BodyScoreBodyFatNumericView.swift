@@ -114,6 +114,7 @@ struct BodyScoreBodyFatNumericView: View {
                 } label: {
                     Text("Continue")
                 }
+                .accessibilityIdentifier("body_score_onboarding_body_fat_numeric_continue_button")
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueBodyFatNumeric)
             }

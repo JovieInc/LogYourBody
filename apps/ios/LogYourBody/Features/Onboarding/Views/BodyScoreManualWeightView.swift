@@ -185,6 +185,7 @@ struct BodyScoreManualWeightView: View {
                 } label: {
                     Text("Continue")
                 }
+                .accessibilityIdentifier("body_score_onboarding_manual_weight_continue_button")
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueWeight)
             }
