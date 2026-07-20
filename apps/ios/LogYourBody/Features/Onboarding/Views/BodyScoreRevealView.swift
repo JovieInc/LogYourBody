@@ -1,5 +1,90 @@
 import SwiftUI
 
+enum BodyScoreRevealPolicy {
+    /// Comparison-group copy follows the entered sex at birth, with a neutral
+    /// fallback when no sex was provided.
+    static func percentileGroupLabel(for sex: BiologicalSex?) -> String {
+        switch sex {
+        case .male:
+            return "men your age and height"
+        case .female:
+            return "women your age and height"
+        default:
+            return "people your age and height"
+        }
+    }
+
+    /// The body-fat range is framed as a "Target" until the individualized
+    /// aesthetic goals gate re-labels it as a "Reference".
+    static func referenceText(
+        range: BodyScoreResult.ReferenceRange,
+        usesIndividualizedAestheticGoals: Bool
+    ) -> String {
+        let label = usesIndividualizedAestheticGoals ? "Reference" : "Target"
+        let lowerBound = Int(range.lowerBound)
+        let upperBound = Int(range.upperBound)
+        return "\(label): \(lowerBound)–\(upperBound)% (\(range.label))"
+    }
+
+    static func referenceAccessibilityText(
+        range: BodyScoreResult.ReferenceRange,
+        usesIndividualizedAestheticGoals: Bool
+    ) -> String {
+        let label = usesIndividualizedAestheticGoals ? "Reference" : "Target"
+        let lowerBound = Int(range.lowerBound)
+        let upperBound = Int(range.upperBound)
+        return "\(label) body fat: \(lowerBound) to \(upperBound) percent. \(range.label)."
+    }
+
+    /// Builds the share-card payload from the onboarding input, converting
+    /// weight into the preferred measurement system and falling back to "--"
+    /// when a metric is missing.
+    static func makeSharePayload(input: BodyScoreInput, result: BodyScoreResult) -> BodyScoreSharePayload {
+        let system = input.measurementPreference
+
+        let weightValue: String
+        let weightUnit: String
+
+        if let weightKg = input.weight.inKilograms {
+            switch system {
+            case .metric:
+                weightValue = String(format: "%.1f", weightKg)
+                weightUnit = "kg"
+            case .imperial:
+                let pounds = weightKg * 2.20462
+                weightValue = String(format: "%.1f", pounds)
+                weightUnit = "lbs"
+            }
+        } else {
+            weightValue = "--"
+            weightUnit = system == .metric ? "kg" : "lbs"
+        }
+
+        let bodyFatValue: String
+        if let bodyFat = input.bodyFat.percentage {
+            bodyFatValue = String(format: "%.1f", bodyFat)
+        } else {
+            bodyFatValue = "--"
+        }
+
+        return BodyScoreSharePayload(
+            score: result.score,
+            scoreText: "\(result.score)",
+            tagline: result.statusTagline,
+            ffmiValue: String(format: "%.1f", result.ffmi),
+            ffmiCaption: result.ffmiStatus,
+            bodyFatValue: bodyFatValue,
+            bodyFatCaption: "%",
+            weightValue: weightValue,
+            weightCaption: weightUnit,
+            deltaText: nil,
+            bodyFatPercentage: input.bodyFat.percentage,
+            gender: input.sex?.rawValue,
+            photoImage: nil
+        )
+    }
+}
+
 struct BodyScoreRevealView: View {
     @Environment(\.theme)
     private var theme
@@ -15,15 +100,7 @@ struct BodyScoreRevealView: View {
     @AccessibilityFocusState private var scoreFocused: Bool
 
     private var percentileGroupLabel: String {
-        let sex = viewModel.bodyScoreInput.sex
-        switch sex {
-        case .male:
-            return "men your age and height"
-        case .female:
-            return "women your age and height"
-        default:
-            return "people your age and height"
-        }
+        BodyScoreRevealPolicy.percentileGroupLabel(for: viewModel.bodyScoreInput.sex)
     }
 
     private var usesIndividualizedAestheticGoals: Bool {
@@ -176,64 +253,21 @@ struct BodyScoreRevealView: View {
     }
 
     private func referenceText(result: BodyScoreResult) -> String {
-        let label = usesIndividualizedAestheticGoals ? "Reference" : "Target"
-        let lowerBound = Int(result.bodyFatReferenceRange.lowerBound)
-        let upperBound = Int(result.bodyFatReferenceRange.upperBound)
-        return "\(label): \(lowerBound)–\(upperBound)% (\(result.bodyFatReferenceRange.label))"
+        BodyScoreRevealPolicy.referenceText(
+            range: result.bodyFatReferenceRange,
+            usesIndividualizedAestheticGoals: usesIndividualizedAestheticGoals
+        )
     }
 
     private func referenceAccessibilityText(result: BodyScoreResult) -> String {
-        let label = usesIndividualizedAestheticGoals ? "Reference" : "Target"
-        let lowerBound = Int(result.bodyFatReferenceRange.lowerBound)
-        let upperBound = Int(result.bodyFatReferenceRange.upperBound)
-        return "\(label) body fat: \(lowerBound) to \(upperBound) percent. \(result.bodyFatReferenceRange.label)."
+        BodyScoreRevealPolicy.referenceAccessibilityText(
+            range: result.bodyFatReferenceRange,
+            usesIndividualizedAestheticGoals: usesIndividualizedAestheticGoals
+        )
     }
 
     private func makeSharePayload(from result: BodyScoreResult) -> BodyScoreSharePayload? {
-        let input = viewModel.bodyScoreInput
-
-        let system = input.measurementPreference
-
-        let weightValue: String
-        let weightUnit: String
-
-        if let weightKg = input.weight.inKilograms {
-            switch system {
-            case .metric:
-                weightValue = String(format: "%.1f", weightKg)
-                weightUnit = "kg"
-            case .imperial:
-                let pounds = weightKg * 2.20462
-                weightValue = String(format: "%.1f", pounds)
-                weightUnit = "lbs"
-            }
-        } else {
-            weightValue = "--"
-            weightUnit = system == .metric ? "kg" : "lbs"
-        }
-
-        let bodyFatValue: String
-        if let bf = input.bodyFat.percentage {
-            bodyFatValue = String(format: "%.1f", bf)
-        } else {
-            bodyFatValue = "--"
-        }
-
-        return BodyScoreSharePayload(
-            score: result.score,
-            scoreText: "\(result.score)",
-            tagline: result.statusTagline,
-            ffmiValue: String(format: "%.1f", result.ffmi),
-            ffmiCaption: result.ffmiStatus,
-            bodyFatValue: bodyFatValue,
-            bodyFatCaption: "%",
-            weightValue: weightValue,
-            weightCaption: weightUnit,
-            deltaText: nil,
-            bodyFatPercentage: input.bodyFat.percentage,
-            gender: input.sex?.rawValue,
-            photoImage: nil
-        )
+        BodyScoreRevealPolicy.makeSharePayload(input: viewModel.bodyScoreInput, result: result)
     }
 
     private func triggerRevealFeedback() {

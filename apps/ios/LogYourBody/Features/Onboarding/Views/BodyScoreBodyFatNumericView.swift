@@ -1,5 +1,23 @@
 import SwiftUI
 
+enum BodyFatEntryPolicy {
+    /// Inline validation for the body fat field: empty input clears the
+    /// error, unparseable input asks for a percentage, and values outside the
+    /// plausible 4–60% band show the range message.
+    static func validationError(for text: String) -> String? {
+        guard !text.isEmpty else { return nil }
+
+        guard let numeric = Double(text) else {
+            return "Enter a valid percentage."
+        }
+
+        if numeric < 4 || numeric > 60 {
+            return "Enter a body fat between 4–60%."
+        }
+        return nil
+    }
+}
+
 struct BodyScoreBodyFatNumericView: View {
     @Environment(\.theme)
     private var theme
@@ -145,20 +163,6 @@ private extension BodyScoreBodyFatNumericView {
     }
 
     private func validateBodyFat(_ value: String) {
-        guard !value.isEmpty else {
-            bodyFatError = nil
-            return
-        }
-
-        guard let numeric = Double(value) else {
-            bodyFatError = "Enter a valid percentage."
-            return
-        }
-
-        if numeric < 4 || numeric > 60 {
-            bodyFatError = "Enter a body fat between 4–60%."
-        } else {
-            bodyFatError = nil
-        }
+        bodyFatError = BodyFatEntryPolicy.validationError(for: value)
     }
 }

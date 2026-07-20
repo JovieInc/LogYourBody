@@ -1,5 +1,20 @@
 import SwiftUI
 
+enum HeightEntryPolicy {
+    /// Inline validation for the centimeters field: empty input clears the
+    /// error; anything below the 100 cm floor (including unparseable text,
+    /// which reads as 0) shows the floor message.
+    static func centimetersError(for text: String) -> String? {
+        guard !text.isEmpty else { return nil }
+
+        let numeric = Double(text) ?? 0
+        if numeric < 100 {
+            return "Enter at least 100 cm."
+        }
+        return nil
+    }
+}
+
 struct BodyScoreHeightView: View {
     @Environment(\.theme)
     private var theme
@@ -66,17 +81,7 @@ struct BodyScoreHeightView: View {
     }
 
     private func validateHeightCentimeters(_ value: String) {
-        guard !value.isEmpty else {
-            heightError = nil
-            return
-        }
-
-        let numeric = Double(value) ?? 0
-        if numeric < 100 {
-            heightError = "Enter at least 100 cm."
-        } else {
-            heightError = nil
-        }
+        heightError = HeightEntryPolicy.centimetersError(for: value)
     }
 
     private var centimetersInput: some View {
