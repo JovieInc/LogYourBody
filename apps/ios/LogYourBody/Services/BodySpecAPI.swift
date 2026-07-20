@@ -104,8 +104,16 @@ struct BodySpecDexaCompositionResponse: Decodable {
     }
 }
 
+/// Token source for `BodySpecAPI`. Mirrors the `BodySpecDexaAPIClient` seam so
+/// tests can inject a stub instead of the keychain-backed `BodySpecAuthManager`.
+protocol BodySpecAuthTokenProviding {
+    func ensureValidToken() async throws -> String?
+}
+
+extension BodySpecAuthManager: BodySpecAuthTokenProviding {}
+
 final class BodySpecAPI {
-    @MainActor static let shared = BodySpecAPI(authManager: .shared)
+    @MainActor static let shared = BodySpecAPI(authManager: BodySpecAuthManager.shared)
 
     private static var defaultBaseURL: URL {
         var components = URLComponents()
@@ -116,12 +124,12 @@ final class BodySpecAPI {
 
     private let baseURL: URL
     private let urlSession: URLSession
-    private let authManager: BodySpecAuthManager
+    private let authManager: BodySpecAuthTokenProviding
 
     init(
         baseURL: URL = BodySpecAPI.defaultBaseURL,
         urlSession: URLSession = .shared,
-        authManager: BodySpecAuthManager
+        authManager: BodySpecAuthTokenProviding
     ) {
         self.baseURL = baseURL
         self.urlSession = urlSession
