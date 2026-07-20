@@ -17,6 +17,7 @@
 		0922CA98E79021C4CB2595A5 /* SupabaseProfilePayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA82A71E77423D56A70AA46 /* SupabaseProfilePayloadTests.swift */; };
 		099DD9F0055C4CFBF7190F4B /* PhotoMetadataAndImportPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E0D5025A2839599F4E281D /* PhotoMetadataAndImportPolicyTests.swift */; };
 		0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A5D6BAAD9FB2F7B8AFACB /* BaseButton.swift */; };
+		0CBB5909E3CC64F747043DA7 /* NotificationManagerSchedulingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC0DDA700C8A4207B9EBC50 /* NotificationManagerSchedulingTests.swift */; };
 		0DAECF9694453077367DCB0E /* Font+Custom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CA7B3D87EC0BFA00AC6A9F /* Font+Custom.swift */; };
 		0EC249B0ED61CDC66976258E /* AuthManagerSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E9499CD258290C5363D52A /* AuthManagerSessionTests.swift */; };
 		1076FA3654BE00406F8AE052 /* Glp1DoseCoreDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D800638256D10A5ACB992 /* Glp1DoseCoreDataTests.swift */; };
@@ -451,6 +452,7 @@
 		3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "HealthKitManager+Part01.swift"; path = "HealthKitManager+Part01.swift"; sourceTree = "<group>"; };
 		3CBF4E377107434EA53A2F1B /* PaidWeightLoggerMVPPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaidWeightLoggerMVPPolicyTests.swift; sourceTree = "<group>"; };
 		3CD03E6E0BF889812FE27D44 /* LegalConsentPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LegalConsentPolicyTests.swift; sourceTree = "<group>"; };
+		3DC0DDA700C8A4207B9EBC50 /* NotificationManagerSchedulingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationManagerSchedulingTests.swift; sourceTree = "<group>"; };
 		3F2E34BC49376B87D43D81AD /* BodyMetricPhotoUpdateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricPhotoUpdateTests.swift; sourceTree = "<group>"; };
 		3FF03916F06E4F2537E89838 /* BiometricLockPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BiometricLockPolicyTests.swift; sourceTree = "<group>"; };
 		458AAF24645E3634CCF88E16 /* DSIcon.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSIcon.swift; path = DesignSystem/Atoms/DSIcon.swift; sourceTree = "<group>"; };
@@ -1164,6 +1166,7 @@
 				E2715F4BF0E82E86A99821E3 /* PhotoLibraryScannerTests.swift */,
 				7E5BB7F340376DECDD7ABC3A /* SyntheticImageFixtures.swift */,
 				B229942DB1DD4D204C5428A5 /* VisionOrientationServiceTests.swift */,
+				3DC0DDA700C8A4207B9EBC50 /* NotificationManagerSchedulingTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1990,6 +1993,7 @@
 				A3CFAB8A53F95BD9F8FA0B82 /* PhotoLibraryScannerTests.swift in Sources */,
 				A14230332A86E9780FEAB7F6 /* SyntheticImageFixtures.swift in Sources */,
 				DEB84964BAE75EA9D9090CF7 /* VisionOrientationServiceTests.swift in Sources */,
+				0CBB5909E3CC64F747043DA7 /* NotificationManagerSchedulingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
