@@ -602,6 +602,36 @@ platform :ios do
     )
   end
   
+  desc "Unit-tier gate: fast unit tests via the LogYourBodyTiers scheme + Unit test plan, with coverage"
+  lane :ci_test_unit do |options|
+    ios_dir = File.expand_path("..", Dir.pwd)
+    proj_path = File.join(ios_dir, "LogYourBody.xcodeproj")
+
+    # Hard gate: run_tests fails the lane (and CI) on any test failure.
+    # Prefer an explicit xcodebuild destination (resolved by
+    # scripts/ios/resolve-simulator-destination.sh in CI) over a device name,
+    # so the gate survives Xcode/simulator image changes on runners.
+    destination = options[:destination].to_s.strip
+    device = destination.empty? ? (options[:device] || "iPhone 16") : nil
+
+    run_tests(
+      project: proj_path,
+      scheme: "LogYourBodyTiers",
+      testplan: "Unit",
+      device: device,
+      destination: destination.empty? ? nil : destination,
+      configuration: "Debug",
+      clean: false,
+      code_coverage: true,
+      output_types: "junit",
+      output_directory: options[:output_directory] || "./test_results/unit-tier",
+      result_bundle: true,
+      disable_concurrent_testing: true,
+      xcargs: "CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO",
+      xcodebuild_formatter: ENV["CI"] ? "xcbeautify --renderer github-actions" : "xcbeautify"
+    )
+  end
+
   desc "PR verification - lint, build, and test"
   lane :pr_verify do |options|
     # Use absolute path from iOS directory
