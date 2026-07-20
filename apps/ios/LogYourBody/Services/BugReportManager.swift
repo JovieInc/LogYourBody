@@ -26,11 +26,13 @@ final class BugReportManager: ObservableObject {
     }
 
     private let userDefaults: UserDefaults
+    private let analyticsService: AnalyticsService
     private static let shakeToReportKey = "shakeToReportBugEnabled"
     private var isCapturingScreenshot = false
 
-    private init(userDefaults: UserDefaults = .standard) {
+    init(userDefaults: UserDefaults = .standard, analyticsService: AnalyticsService = .shared) {
         self.userDefaults = userDefaults
+        self.analyticsService = analyticsService
 
         if userDefaults.object(forKey: Self.shakeToReportKey) == nil {
             self.isShakeToReportEnabled = true
@@ -91,7 +93,7 @@ final class BugReportManager: ObservableObject {
             properties["user_id"] = id
         }
 
-        AnalyticsService.shared.track(
+        analyticsService.track(
             event: "bug_report_submitted",
             properties: properties
         )

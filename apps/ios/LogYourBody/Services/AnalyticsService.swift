@@ -29,7 +29,12 @@ final class AnalyticsService {
     private let client: AnalyticsClient
     private var hasStarted = false
 
-    private init(client: AnalyticsClient = StatsigAnalyticsClient()) {
+    private convenience init() {
+        self.init(client: StatsigAnalyticsClient())
+    }
+
+    /// Test seam: allows injecting a fake analytics client.
+    init(client: AnalyticsClient) {
         self.client = client
     }
 
