@@ -24,6 +24,7 @@
         "Glp1DoseCoreDataTests",
         "HealthSyncCoordinatorPipelineTests",
         "LoadingManagerHealthSyncTests",
+        "MetricChartDataHelperTests",
         "PhotoMetadataServiceTests",
         "PhotoUploadManagerTests",
         "ProgressPhotoImagePipelineTests",

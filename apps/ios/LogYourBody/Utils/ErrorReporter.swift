@@ -10,7 +10,15 @@ struct ErrorContext {
 final class ErrorReporter {
     static let shared = ErrorReporter()
 
-    private init() {}
+    private let errorTracking: ErrorTrackingService
+
+    private convenience init() {
+        self.init(errorTracking: .shared)
+    }
+
+    init(errorTracking: ErrorTrackingService) {
+        self.errorTracking = errorTracking
+    }
 
     func capture(_ error: AppError, context: ErrorContext) {
         log(error: error, context: context)
@@ -25,7 +33,7 @@ final class ErrorReporter {
         let logger = loggerForFeature(context.feature)
         let message = contextDescription(context: context)
         logger.error("Error: \(error.localizedDescription). \(message)")
-        ErrorTrackingService.shared.capture(appError: error, context: context)
+        errorTracking.capture(appError: error, context: context)
     }
 
     private func loggerForFeature(_ feature: String) -> AppLogger {
