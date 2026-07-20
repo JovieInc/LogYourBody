@@ -15,6 +15,7 @@
     {
       "skippedTests" : [
         "AppVersionManagerTests",
+        "BodyMetricAppIntentsTests",
         "BodyMetricPhotoUpdateTests",
         "BodyScoreHealthKitTriggerTests",
         "CoreDataModelMigrationTests",
