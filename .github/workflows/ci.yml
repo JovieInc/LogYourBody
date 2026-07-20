@@ -101,17 +101,17 @@ jobs:
 
   ios:
     name: iOS
-    runs-on: macos-14
+    runs-on: macos-15
     needs: detect-changes
     if: needs.detect-changes.outputs.ios == 'true'
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup iOS build environment
         uses: ./.github/actions/setup-ios-build
         with:
-          xcode-version: '16.1'
+          xcode-version: 'latest-stable'
           working-directory: apps/ios
           setup-ruby: 'true'
           create-config-files: 'true'
@@ -123,15 +123,31 @@ jobs:
             apps/ios/.build
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-spm-xcode-16.1-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
+          key: ${{ runner.os }}-spm-xcode-stable-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
           restore-keys: |
-            ${{ runner.os }}-spm-xcode-16.1-
+            ${{ runner.os }}-spm-xcode-stable-
             ${{ runner.os }}-spm-
 
       - name: Fastlane iOS CI
         run: |
           cd apps/ios
           bundle exec fastlane ci_ios
+
+      - name: Unit-tier tests
+        run: |
+          cd apps/ios
+          DESTINATION=$(SCHEME=LogYourBodyTiers bash ../../scripts/ios/resolve-simulator-destination.sh)
+          bundle exec fastlane ci_test_unit destination:"$DESTINATION"
+
+      - name: Unit test duration + coverage report
+        if: always()
+        run: |
+          BUNDLE=$(ls -d apps/ios/test_results/unit-tier/*.xcresult 2>/dev/null | head -1 || true)
+          if [[ -n "$BUNDLE" ]]; then
+            python3 scripts/ios/test-tier-report.py "$BUNDLE" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No unit-tier result bundle found to report on." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
 
   ios_quality:
     name: iOS Launch Quality Gate

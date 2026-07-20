@@ -1,0 +1,40 @@
+{
+  "configurations" : [
+    {
+      "id" : "31CB1F64-35EB-4596-B333-1FBF054A4029",
+      "name" : "Debug",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "skippedTests" : [
+        "BodyMetricPhotoUpdateTests",
+        "BodyScoreHealthKitTriggerTests",
+        "CoreDataModelMigrationTests",
+        "DashboardViewModelHealthSyncWiringTests",
+        "Glp1DoseCoreDataTests",
+        "HealthSyncCoordinatorPipelineTests",
+        "LoadingManagerHealthSyncTests",
+        "PhotoMetadataServiceTests",
+        "ProgressPhotoImagePipelineTests",
+        "RevenueCatProductConfigurationTests",
+        "SyncIntegrationBodyMetricSyncTests",
+        "SyncIntegrationImportAndMappingTests",
+        "SyncIntegrationRemotePayloadTests",
+        "SyncIntegrationSupplementalSyncTests"
+      ],
+      "target" : {
+        "containerPath" : "container:LogYourBody.xcodeproj",
+        "identifier" : "AD7D30A12E1490810072AA5B",
+        "name" : "LogYourBodyTests"
+      }
+    }
+  ],
+  "version" : 1
+}

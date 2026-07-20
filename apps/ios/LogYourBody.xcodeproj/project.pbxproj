@@ -22,6 +22,7 @@
 		18EBE5224556DDF573EE3E12 /* RevenueCatManager+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7148912B179107B65580E27E /* RevenueCatManager+Part02.swift */; };
 		18ED1A86B416E8821C250840 /* GlobalTimelineServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 620823F9E8905856BB1B666D /* GlobalTimelineServiceTests.swift */; };
 		1CCAD9C764D3D35B5BF0522B /* HealthKitAuthorizationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84A7C68943959BD45325D9B /* HealthKitAuthorizationPolicyTests.swift */; };
+		1E182FE84F374514F7F31F17 /* LegalConsentPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CD03E6E0BF889812FE27D44 /* LegalConsentPolicyTests.swift */; };
 		2117B18E82C133B5150AB357 /* CoreDataManager+Part03.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88D7AC2C7FF4E14A3BB8168 /* CoreDataManager+Part03.swift */; };
 		272AFFF5324345C4B93608F8 /* MainTabViewPolicies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E3A26E632164AACAA5D77FD /* MainTabViewPolicies.swift */; };
 		2B3C4D5E6F7890ABCDEF1234 /* LoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCDEF12 /* LoadingScreen.swift */; };
@@ -345,6 +346,7 @@
 		CC4917DEC8E46FACECDF3424 /* DashboardDataVizPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0211D1493A398942561196F /* DashboardDataVizPolicyTests.swift */; };
 		CCCD701F26CEB5C9F56AA8FB /* PaywallSavingsPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C87F359CE5509C2457AB583 /* PaywallSavingsPolicyTests.swift */; };
 		CCE3FEEC83AAC1B3F1F82BF6 /* DSProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18AA7A0EC7327CC6EB9725D /* DSProgressBar.swift */; };
+		CEA13DB06DA2A2D160A48D1D /* LegalDocumentLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E358ECC97E3F08357502AC /* LegalDocumentLoaderTests.swift */; };
 		D2184ADBFB25DEB92514F85D /* DSCircularProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C575F720A1D8D1DFDC4F1CEF /* DSCircularProgressTests.swift */; };
 		D47F9BD18CBEE2413DF244FC /* RevenueCatProductConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7899ADA31AC216735A9FE299 /* RevenueCatProductConfigurationTests.swift */; };
 		D5F71D2685408ED4D599FC28 /* BodyMetricPhotoUpdateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F2E34BC49376B87D43D81AD /* BodyMetricPhotoUpdateTests.swift */; };
@@ -433,6 +435,7 @@
 		36A9ED1D5319B495A194EE88 /* LoadingManagerHealthSyncTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoadingManagerHealthSyncTests.swift; sourceTree = "<group>"; };
 		3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "HealthKitManager+Part01.swift"; path = "HealthKitManager+Part01.swift"; sourceTree = "<group>"; };
 		3CBF4E377107434EA53A2F1B /* PaidWeightLoggerMVPPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaidWeightLoggerMVPPolicyTests.swift; sourceTree = "<group>"; };
+		3CD03E6E0BF889812FE27D44 /* LegalConsentPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LegalConsentPolicyTests.swift; sourceTree = "<group>"; };
 		3F2E34BC49376B87D43D81AD /* BodyMetricPhotoUpdateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricPhotoUpdateTests.swift; sourceTree = "<group>"; };
 		3FF03916F06E4F2537E89838 /* BiometricLockPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BiometricLockPolicyTests.swift; sourceTree = "<group>"; };
 		458AAF24645E3634CCF88E16 /* DSIcon.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSIcon.swift; path = DesignSystem/Atoms/DSIcon.swift; sourceTree = "<group>"; };
@@ -467,6 +470,7 @@
 		83531C42434F71BA31C75D89 /* RealtimeSyncManager+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "RealtimeSyncManager+Part02.swift"; path = "RealtimeSyncManager+Part02.swift"; sourceTree = "<group>"; };
 		8631504046C70A4EE432C9B8 /* AccountDeletionAndShareCardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccountDeletionAndShareCardTests.swift; sourceTree = "<group>"; };
 		898E428E2D5EE162E00B0BD7 /* DashboardHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DashboardHeader.swift; path = DesignSystem/Organisms/DashboardHeader.swift; sourceTree = "<group>"; };
+		89E358ECC97E3F08357502AC /* LegalDocumentLoaderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LegalDocumentLoaderTests.swift; sourceTree = "<group>"; };
 		8A593DE7333C6FAE0E20815A /* AuthLegacyStorageMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthLegacyStorageMigrationTests.swift; sourceTree = "<group>"; };
 		8B717977805C943E5BA1410B /* AddEntrySheet+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AddEntrySheet+Part02.swift"; path = "AddEntrySheet+Part02.swift"; sourceTree = "<group>"; };
 		8E3A26E632164AACAA5D77FD /* MainTabViewPolicies.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainTabViewPolicies.swift; sourceTree = "<group>"; };
@@ -1116,6 +1120,8 @@
 				F8E9499CD258290C5363D52A /* AuthManagerSessionTests.swift */,
 				3FF03916F06E4F2537E89838 /* BiometricLockPolicyTests.swift */,
 				E67A23519F10FC4172C1E4FD /* KeychainAvailability.swift */,
+				3CD03E6E0BF889812FE27D44 /* LegalConsentPolicyTests.swift */,
+				89E358ECC97E3F08357502AC /* LegalDocumentLoaderTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1940,6 +1946,8 @@
 				0EC249B0ED61CDC66976258E /* AuthManagerSessionTests.swift in Sources */,
 				475B6676DE2161CF4BB8861E /* BiometricLockPolicyTests.swift in Sources */,
 				96EA9790381A5BEC62D7C902 /* KeychainAvailability.swift in Sources */,
+				1E182FE84F374514F7F31F17 /* LegalConsentPolicyTests.swift in Sources */,
+				CEA13DB06DA2A2D160A48D1D /* LegalDocumentLoaderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

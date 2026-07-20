@@ -49,17 +49,17 @@
 
 ## Test-infrastructure findings (fix early — they gate everything else)
 
-| #   | Finding                                                                                                                                 | Evidence                                            | Fix                                                                                    |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| I1  | No CI job runs the unit suite as a merge gate; `ci_ios` lane is lint+build only. Tests execute only inside `ios_quality` audit scripts. | `fastlane/Fastfile:597`, `.github/workflows/ci.yml` | Extend the `ios` CI job (name stays stable) to run `LogYourBodyTests` via `run_tests`. |
-| I2  | 7 test files under `LogYourBodyTests/DesignSystem/` are **not in the pbxproj** — they never compile or run.                             | pbxproj has no references                           | Add to target if meaningful; delete if padding.                                        |
-| I3  | Duplicate `MockHealthSyncCoordinator` in `HealthSyncTestDoubles.swift` and `Mocks/MockHealthSyncCoordinator.swift`.                     | both on disk                                        | Keep one canonical double; delete the other.                                           |
-| I4  | `ui_snapshot` lane targets a `SnapshotTests` class that does not exist.                                                                 | `Fastfile:362`                                      | Remove or repoint the lane.                                                            |
-| I5  | `golden_path` lane exists but no workflow calls it.                                                                                     | `Fastfile:603`                                      | Wire into CI as the golden-path gate.                                                  |
-| I6  | No `.xctestplan`; scheme uses `shouldAutocreateTestPlan`. No formal tiering.                                                            | `LogYourBody.xcscheme`                              | Add test plans: `Unit`, `Integration`, `UITests`.                                      |
-| I7  | Coverage collected by fastlane but nothing reports/enforces it; AGENTS.md claims a 70% floor.                                           | no xccov parsing anywhere                           | Produce a coverage + duration report per run (report-only).                            |
-| I8  | Eight 14-line one-assertion test files each carry the full import preamble.                                                             | `LogYourBodyTests/`                                 | Consolidate during tiering.                                                            |
-| I9  | No `NSInMemoryStoreType` anywhere; Core Data tests use temp-dir SQLite (slower but realistic).                                          | `CoreDataModelMigrationTests`                       | Keep pattern (matches "realistic fixtures"); note in tier doc.                         |
+| #   | Finding                                                                                                                                 | Evidence                                            | Fix                                                                                                             |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| I1  | No CI job runs the unit suite as a merge gate; `ci_ios` lane is lint+build only. Tests execute only inside `ios_quality` audit scripts. | `fastlane/Fastfile:597`, `.github/workflows/ci.yml` | Extend the `ios` CI job (name stays stable) to run `LogYourBodyTests` via `run_tests`.                          |
+| I2  | 7 test files under `LogYourBodyTests/DesignSystem/` are **not in the pbxproj** — they never compile or run.                             | pbxproj has no references                           | Add to target if meaningful; delete if padding.                                                                 |
+| I3  | Duplicate `MockHealthSyncCoordinator` in `HealthSyncTestDoubles.swift` and `Mocks/MockHealthSyncCoordinator.swift`.                     | both on disk                                        | Keep one canonical double; delete the other.                                                                    |
+| I4  | `ui_snapshot` lane targets a `SnapshotTests` class that does not exist.                                                                 | `Fastfile:362`                                      | Remove or repoint the lane.                                                                                     |
+| I5  | `golden_path` lane exists but no workflow calls it.                                                                                     | `Fastfile:603`                                      | GoldenPathTests is Unit-tier (pure logic), so the CI unit gate covers it on every PR; lane kept for local runs. |
+| I6  | No `.xctestplan`; scheme uses `shouldAutocreateTestPlan`. No formal tiering.                                                            | `LogYourBody.xcscheme`                              | Add test plans: `Unit`, `Integration`, `UITests`.                                                               |
+| I7  | Coverage collected by fastlane but nothing reports/enforces it; AGENTS.md claims a 70% floor.                                           | no xccov parsing anywhere                           | Produce a coverage + duration report per run (report-only).                                                     |
+| I8  | Eight 14-line one-assertion test files each carry the full import preamble.                                                             | `LogYourBodyTests/`                                 | Consolidate during tiering.                                                                                     |
+| I9  | No `NSInMemoryStoreType` anywhere; Core Data tests use temp-dir SQLite (slower but realistic).                                          | `CoreDataModelMigrationTests`                       | Keep pattern (matches "realistic fixtures"); note in tier doc.                                                  |
 
 Tier definitions adopted here: **Unit** = pure logic/policies/math, no I/O,
 <200ms each. **Integration** = in-process Core Data (temp-dir SQLite), sync,
@@ -283,3 +283,8 @@ Each deletion PR must verify no caller + remove from pbxproj.
 | 13    | Final: duration report review, verify ≥70% overall / ≥80% patch floors, golden-path XCUITest gap-fill                                                                                               | verification     |
 
 Progress tracker: mark batches here as PRs merge.
+
+- Batch 1 — inventory + baseline: ✅ #480
+- Batch 2a — hygiene (I2/I3/I4): ✅ #481
+- Batch 2b — tier plans + report script (I6/I7): ✅ #482
+- Batch 2c — CI unit gate + report step (I1, I5 by design): this PR
