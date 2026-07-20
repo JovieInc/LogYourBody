@@ -181,7 +181,9 @@ final class BodySpecAPITests: XCTestCase {
 
         let request = try recordedRequest()
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertEqual(request.url?.path, "/api/v1/users/me/results/")
+        // URL.appendingPathComponent normalizes away the source literal's
+        // trailing slash; this pins the actual wire path.
+        XCTAssertEqual(request.url?.path, "/api/v1/users/me/results")
         let queryItems = try queryItems(of: request)
         XCTAssertEqual(queryItems.count, 2)
         XCTAssertEqual(queryItems.first(where: { $0.name == "page" })?.value, "3")
