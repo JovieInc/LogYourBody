@@ -113,7 +113,9 @@ class DebugResetManager {
         }
     }
 
-    private func clearUserDefaults() {
+    // MARK: - Reset steps (internal visibility as an integration-test seam)
+
+    func clearUserDefaults() {
         // print("🗑️ Clearing UserDefaults...")
         if let bundleID = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: bundleID)
@@ -140,17 +142,17 @@ class DebugResetManager {
         UserDefaults.standard.synchronize()
     }
 
-    private func clearCoreData() {
+    func clearCoreData() {
         // print("🗑️ Clearing Core Data...")
         CoreDataManager.shared.deleteAllData()
     }
 
-    private func clearKeychain() {
+    func clearKeychain() {
         // print("🗑️ Clearing Keychain...")
         try? KeychainManager.shared.clearAll()
     }
 
-    private func clearImageCache() {
+    func clearImageCache() {
         // print("🗑️ Clearing image cache...")
         // Clear URLCache
         URLCache.shared.removeAllCachedResponses()
@@ -174,7 +176,7 @@ class DebugResetManager {
         await AuthManager.shared.logout()
     }
 
-    private func clearDerivedDataCache() {
+    func clearDerivedDataCache() {
         // print("🗑️ Clearing derived data cache...")
         // Clear any app-specific caches
         if let cacheDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {

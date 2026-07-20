@@ -14,10 +14,12 @@
   "testTargets" : [
     {
       "skippedTests" : [
+        "AppVersionManagerTests",
         "BodyMetricPhotoUpdateTests",
         "BodyScoreHealthKitTriggerTests",
         "CoreDataModelMigrationTests",
         "DashboardViewModelHealthSyncWiringTests",
+        "DebugResetManagerTests",
         "Glp1DoseCoreDataTests",
         "HealthSyncCoordinatorPipelineTests",
         "LoadingManagerHealthSyncTests",
