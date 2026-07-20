@@ -50,3 +50,20 @@ The source of live purchase price display is App Store Connect through RevenueCa
 | `support`        | Support        | /support       | supporting | Public help, account, data, and subscription recovery.                        |
 | `docs`           | Product docs   | /docs          | deferred   | Shared docs-shell destination; generated repository docs are canonical today. |
 | `web-dashboard`  | Web dashboard  | /dashboard     | deferred   | Not a default product surface until the activation threshold is met.          |
+
+## Endpoints
+
+Canonical hosts and the auth contract. `scripts/url-drift.test.mjs` fails CI on any unregistered URL literal; register new endpoints in `packages/product-registry/src/products/logyourbody.mjs`.
+
+| Host      | URL                              | Value                    | Note                                                                    |
+| --------- | -------------------------------- | ------------------------ | ----------------------------------------------------------------------- |
+| api       | `https://www.logyourbody.com`    | `www.logyourbody.com`    |                                                                         |
+| marketing | `https://logyourbody.com`        | `logyourbody.com`        | Apex domain 307-redirects to www; never use it for API or auth traffic. |
+| status    | `https://status.logyourbody.com` | `status.logyourbody.com` |                                                                         |
+| dev       | `http://localhost:3000`          | `localhost:3000`         |                                                                         |
+
+- Auth issuer: `https://jov.ie/api/auth`
+- iOS client: `logyourbody-ios`, redirect `logyourbody://oauth`, scheme `logyourbody`
+- Web client: `logyourbody-web`, redirect `https://www.logyourbody.com/api/auth/callback`
+- Deep links: `applinks:logyourbody.com`, `applinks:www.logyourbody.com`, scheme `logyourbody`
+- Supabase project: `https://ihivupqpctpkrgqgxfjf.supabase.co`

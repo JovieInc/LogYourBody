@@ -77,12 +77,6 @@ export const APP_CONFIG = {
     minimumIOSVersion: '15.0',
   },
 
-  // API & Backend
-  api: {
-    baseUrl: process.env.NEXT_PUBLIC_API_URL || 'https://api.logyourbody.com',
-    websocketUrl: process.env.NEXT_PUBLIC_WS_URL || 'wss://api.logyourbody.com',
-  },
-
   // Analytics & Tracking
   analytics: {
     googleAnalyticsId: process.env.NEXT_PUBLIC_GA_ID,
