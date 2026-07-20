@@ -104,7 +104,7 @@ jobs:
     runs-on: macos-14
     needs: detect-changes
     if: needs.detect-changes.outputs.ios == 'true'
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -132,6 +132,22 @@ jobs:
         run: |
           cd apps/ios
           bundle exec fastlane ci_ios
+
+      - name: Unit-tier tests
+        run: |
+          cd apps/ios
+          DESTINATION=$(SCHEME=LogYourBodyTiers bash ../scripts/ios/resolve-simulator-destination.sh)
+          bundle exec fastlane ci_test_unit destination:"$DESTINATION"
+
+      - name: Unit test duration + coverage report
+        if: always()
+        run: |
+          BUNDLE=$(ls -d apps/ios/test_results/unit-tier/*.xcresult 2>/dev/null | head -1 || true)
+          if [[ -n "$BUNDLE" ]]; then
+            python3 scripts/ios/test-tier-report.py "$BUNDLE" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No unit-tier result bundle found to report on." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
 
   ios_quality:
     name: iOS Launch Quality Gate
