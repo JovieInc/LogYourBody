@@ -143,7 +143,7 @@ enum Configuration {
         // www: the apex domain 307-redirects to www, and URLSession strips the
         // Authorization header on cross-host redirects, which breaks session
         // registration ("account could not be initialized").
-        stringValue(for: "API_BASE_URL", default: "https://www.logyourbody.com")
+        stringValue(for: "API_BASE_URL", default: ProductRegistry.Hosts.api)
     }
 
     static var apiExpectedHost: String {
@@ -153,15 +153,15 @@ enum Configuration {
     // MARK: - First-party authentication
 
     static var authIssuer: String {
-        stringValue(for: "AUTH_ISSUER", default: "https://jov.ie/api/auth")
+        stringValue(for: "AUTH_ISSUER", default: ProductRegistry.Auth.issuer)
     }
 
     static var authClientID: String {
-        stringValue(for: "AUTH_CLIENT_ID", default: "logyourbody-ios")
+        stringValue(for: "AUTH_CLIENT_ID", default: ProductRegistry.Auth.iosClientID)
     }
 
     static var authRedirectURI: String {
-        stringValue(for: "AUTH_REDIRECT_URI", default: "logyourbody://oauth")
+        stringValue(for: "AUTH_REDIRECT_URI", default: ProductRegistry.Auth.iosRedirectURI)
     }
 
     static var authCallbackScheme: String {

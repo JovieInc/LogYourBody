@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { endpoints } from '@/lib/generated/endpoints.generated';
 
 export const metadata: Metadata = {
   title: 'Download LogYourBody for iOS - Body Composition Tracker',
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
     title: 'LogYourBody for iOS - Your Body. Decoded.',
     description:
       'The only app that tracks FFMI, body fat percentage, and progress photos with scientific accuracy. Download free on App Store.',
-    url: 'https://logyourbody.com/download/ios',
+    url: `${endpoints.hosts.marketing.url}/download/ios`,
     siteName: 'LogYourBody',
     images: [
       {

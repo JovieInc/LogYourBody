@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 import bundleAnalyzer from '@next/bundle-analyzer';
 import { version } from './package.json';
+import { cspReportOnlyDirectives } from './src/lib/generated/csp.generated';
 
 // Bundle analyzer configuration
 const withBundleAnalyzer = bundleAnalyzer({
@@ -79,6 +80,22 @@ const nextConfig: NextConfig = {
           {
             key: 'Content-Type',
             value: 'application/json',
+          },
+        ],
+      },
+      {
+        // Report-only CSP: violations are collected at /api/csp-report without
+        // blocking anything. The generated module has no report-uri directive,
+        // so the collector endpoint is appended here.
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy-Report-Only',
+            value: `${cspReportOnlyDirectives}; report-uri /api/csp-report; report-to csp-endpoint`,
+          },
+          {
+            key: 'Reporting-Endpoints',
+            value: 'csp-endpoint="/api/csp-report"',
           },
         ],
       },
