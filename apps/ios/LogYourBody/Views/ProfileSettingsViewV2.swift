@@ -6,6 +6,63 @@ import SwiftUI
 import OSLog
 import UIKit
 
+enum ProfileSettingsPolicy {
+    /// Joins first/last names into a display name, trimming blanks and dropping empty parts.
+    static func joinedDisplayName(first: String, last: String) -> String {
+        let trimmedFirst = first.trimmingCharacters(in: .whitespaces)
+        let trimmedLast = last.trimmingCharacters(in: .whitespaces)
+        return [trimmedFirst, trimmedLast]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    /// Base string used to prefill the name fields: the stored display name, or the email local-part.
+    static func displayNameBase(name: String, email: String) -> String {
+        if !name.isEmpty {
+            return name
+        }
+        return email.components(separatedBy: "@").first ?? ""
+    }
+
+    /// Splits a display name into (first, last); everything after the first word becomes the last name.
+    static func splitDisplayName(_ base: String) -> (first: String, last: String) {
+        let parts = base.split(separator: " ")
+        let first = parts.first.map { String($0) } ?? ""
+        let last = parts.count > 1 ? parts.dropFirst().joined(separator: " ") : ""
+        return (first, last)
+    }
+
+    /// Formats a height stored in cm for the profile row and picker sheet display.
+    static func formattedHeight(heightCm: Int, useMetric: Bool) -> String {
+        if useMetric {
+            return "\(heightCm) cm"
+        }
+        let totalInches = Int(Double(heightCm) / 2.54)
+        let feet = totalInches / 12
+        let inches = totalInches % 12
+        return "\(feet)'\(inches)\""
+    }
+
+    /// Formats the age row label from a date of birth.
+    static func formattedAge(dateOfBirth: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        let age = calendar.dateComponents([.year], from: dateOfBirth, to: now).year ?? 0
+        return age > 0 ? "\(age) years" : "Not set"
+    }
+
+    /// Imperial wheel components for a height stored in cm.
+    static func imperialHeightComponents(heightCm: Int) -> (feet: Int, inches: Int) {
+        let totalInches = Double(heightCm) / 2.54
+        let feet = Int(totalInches / 12)
+        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        return (feet, inches)
+    }
+
+    /// Height in cm from imperial wheel components.
+    static func heightCm(feet: Int, inches: Int) -> Int {
+        Int((Double(feet) * 12 + Double(inches)) * 2.54)
+    }
+}
+
 struct ProfileSettingsViewV2: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss)
@@ -305,29 +362,17 @@ struct ProfileSettingsViewV2: View {
     }
 
     private func updateEditableName() {
-        let first = editableFirstName.trimmingCharacters(in: .whitespaces)
-        let last = editableLastName.trimmingCharacters(in: .whitespaces)
-        editableName = [first, last]
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
+        editableName = ProfileSettingsPolicy.joinedDisplayName(first: editableFirstName, last: editableLastName)
     }
 
     // MARK: - Computed Properties
 
     private var formattedHeight: String {
-        if useMetricHeight {
-            return "\(editableHeightCm) cm"
-        } else {
-            let totalInches = Int(Double(editableHeightCm) / 2.54)
-            let feet = totalInches / 12
-            let inches = totalInches % 12
-            return "\(feet)'\(inches)\""
-        }
+        ProfileSettingsPolicy.formattedHeight(heightCm: editableHeightCm, useMetric: useMetricHeight)
     }
 
     private var formattedAge: String {
-        let age = Calendar.current.dateComponents([.year], from: editableDateOfBirth, to: Date()).year ?? 0
-        return age > 0 ? "\(age) years" : "Not set"
+        ProfileSettingsPolicy.formattedAge(dateOfBirth: editableDateOfBirth)
     }
 
     // MARK: - Methods
@@ -336,15 +381,10 @@ struct ProfileSettingsViewV2: View {
         guard let user = authManager.currentUser else { return }
 
         editableName = user.name ?? user.profile?.fullName ?? ""
-        let baseName: String
-        if !editableName.isEmpty {
-            baseName = editableName
-        } else {
-            baseName = user.email.components(separatedBy: "@").first ?? ""
-        }
-        let parts = baseName.split(separator: " ")
-        editableFirstName = parts.first.map { String($0) } ?? ""
-        editableLastName = parts.count > 1 ? parts.dropFirst().joined(separator: " ") : ""
+        let baseName = ProfileSettingsPolicy.displayNameBase(name: editableName, email: user.email)
+        let nameParts = ProfileSettingsPolicy.splitDisplayName(baseName)
+        editableFirstName = nameParts.first
+        editableLastName = nameParts.last
         editableDateOfBirth = user.profile?.dateOfBirth ?? Date()
 
         if let height = user.profile?.height {
@@ -516,23 +556,21 @@ struct ProfileHeightPickerSheet: View {
     }
 
     private var imperialHeightPicker: some View {
-        let totalInches = Double(heightCm) / 2.54
-        let feet = Int(totalInches / 12)
-        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        let components = ProfileSettingsPolicy.imperialHeightComponents(heightCm: heightCm)
+        let feet = components.feet
+        let inches = components.inches
 
         let feetBinding = Binding<Int>(
             get: { feet },
             set: { newFeet in
-                let newHeightCm = (Double(newFeet) * 12 + Double(inches)) * 2.54
-                heightCm = Int(newHeightCm)
+                heightCm = ProfileSettingsPolicy.heightCm(feet: newFeet, inches: inches)
             }
         )
 
         let inchesBinding = Binding<Int>(
             get: { inches },
             set: { newInches in
-                let newHeightCm = (Double(feet) * 12 + Double(newInches)) * 2.54
-                heightCm = Int(newHeightCm)
+                heightCm = ProfileSettingsPolicy.heightCm(feet: feet, inches: newInches)
             }
         )
 
@@ -556,22 +594,12 @@ struct ProfileHeightPickerSheet: View {
     }
 
     private var formattedHeight: String {
-        if useMetric {
-            return "\(heightCm) cm"
-        } else {
-            let totalInches = Int(Double(heightCm) / 2.54)
-            let feet = totalInches / 12
-            let inches = totalInches % 12
-            return "\(feet)'\(inches)\""
-        }
+        ProfileSettingsPolicy.formattedHeight(heightCm: heightCm, useMetric: useMetric)
     }
 
     private var alternateHeight: String {
         if useMetric {
-            let totalInches = Int(Double(heightCm) / 2.54)
-            let feet = totalInches / 12
-            let inches = totalInches % 12
-            return "\(feet)'\(inches)\" in imperial"
+            return ProfileSettingsPolicy.formattedHeight(heightCm: heightCm, useMetric: false) + " in imperial"
         } else {
             return "\(heightCm) cm in metric"
         }

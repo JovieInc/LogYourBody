@@ -4,6 +4,18 @@
 //
 import SwiftUI
 
+enum SessionListOrdering {
+    /// Orders sessions for display: the current session pinned first, then most-recently-active first.
+    static func sorted(_ sessions: [SessionInfo]) -> [SessionInfo] {
+        sessions.sorted { session1, session2 in
+            if session1.isCurrentSession != session2.isCurrentSession {
+                return session1.isCurrentSession
+            }
+            return session1.lastActiveAt > session2.lastActiveAt
+        }
+    }
+}
+
 struct SecuritySessionsView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss)
@@ -145,13 +157,7 @@ struct SecuritySessionsView: View {
         do {
             let fetchedSessions = try await AuthManager.shared.fetchActiveSessions()
             await MainActor.run {
-                self.sessions = fetchedSessions.sorted { session1, session2 in
-                    // Current session first, then by last active
-                    if session1.isCurrentSession != session2.isCurrentSession {
-                        return session1.isCurrentSession
-                    }
-                    return session1.lastActiveAt > session2.lastActiveAt
-                }
+                self.sessions = SessionListOrdering.sorted(fetchedSessions)
                 isLoading = false
                 refreshing = false
             }
