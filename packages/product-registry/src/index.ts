@@ -1,6 +1,9 @@
 export type {
   FeatureAvailability,
+  ProductAllowlistEntry,
   ProductDefinition,
+  ProductEndpointHost,
+  ProductEndpoints,
   ProductFeature,
   ProductPlan,
   ProductPlatform,

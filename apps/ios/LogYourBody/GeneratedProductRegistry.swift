@@ -38,4 +38,18 @@ enum ProductRegistry {
             "Private timeline"
         ]
     }
+
+    enum Hosts {
+        static let api = "https://www.logyourbody.com"
+        static let apiHost = "www.logyourbody.com"
+        static let marketing = "https://logyourbody.com"
+        static let status = "https://status.logyourbody.com"
+    }
+
+    enum Auth {
+        static let issuer = "https://jov.ie/api/auth"
+        static let iosClientID = "logyourbody-ios"
+        static let iosRedirectURI = "logyourbody://oauth"
+        static let callbackScheme = "logyourbody"
+    }
 }

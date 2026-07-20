@@ -2,6 +2,74 @@ export type ProductPlatform = 'ios' | 'web' | 'docs';
 export type FeatureAvailability = 'available' | 'beta' | 'planned' | 'not-planned';
 export type SupportKind = 'email' | 'self-service' | 'community' | 'status';
 
+export interface ProductEndpointHost {
+  readonly host: string;
+  readonly url: string;
+  readonly note?: string;
+}
+
+export interface ProductAllowlistEntry {
+  readonly value: string;
+  readonly reason: string;
+}
+
+export interface ProductEndpoints {
+  readonly hosts: {
+    readonly api: ProductEndpointHost;
+    readonly marketing: ProductEndpointHost;
+    readonly status: ProductEndpointHost;
+    readonly dev: ProductEndpointHost;
+  };
+  readonly auth: {
+    readonly issuer: string;
+    readonly clients: {
+      readonly ios: {
+        readonly id: string;
+        readonly redirectUri: string;
+        readonly scheme: string;
+      };
+      readonly web: {
+        readonly id: string;
+        readonly redirectUri: string;
+      };
+    };
+  };
+  readonly deepLinks: {
+    readonly applinksHosts: readonly string[];
+    readonly scheme: string;
+  };
+  readonly vendor: {
+    readonly supabaseProjectRef: string;
+    readonly cloudinary: {
+      readonly apiHost: string;
+      readonly deliveryHost: string;
+    };
+    readonly revenuecat: {
+      readonly apiHost: string;
+    };
+    readonly statsig: {
+      readonly apiHost: string;
+    };
+    readonly sentry: {
+      readonly ingestHost: string;
+    };
+    readonly bodyspec: {
+      readonly authHost: string;
+    };
+    readonly pravatar: {
+      readonly host: string;
+    };
+    readonly github: {
+      readonly repo: string;
+      readonly avatarsHost: string;
+    };
+    readonly apple: {
+      readonly appStore: string;
+    };
+  };
+  readonly allowlist: readonly ProductAllowlistEntry[];
+}
+
 export interface ProductFeature {
   readonly id: string;
   readonly name: string;
@@ -72,6 +140,7 @@ export interface ProductDefinition {
     readonly support: string;
     readonly status: string;
   };
+  readonly endpoints: ProductEndpoints;
   readonly contacts: {
     readonly support: string;
     readonly privacy: string;
