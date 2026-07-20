@@ -101,7 +101,7 @@ jobs:
 
   ios:
     name: iOS
-    runs-on: macos-14
+    runs-on: macos-15
     needs: detect-changes
     if: needs.detect-changes.outputs.ios == 'true'
     timeout-minutes: 40
@@ -111,7 +111,7 @@ jobs:
       - name: Setup iOS build environment
         uses: ./.github/actions/setup-ios-build
         with:
-          xcode-version: '16.1'
+          xcode-version: 'latest-stable'
           working-directory: apps/ios
           setup-ruby: 'true'
           create-config-files: 'true'
@@ -123,9 +123,9 @@ jobs:
             apps/ios/.build
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-spm-xcode-16.1-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
+          key: ${{ runner.os }}-spm-xcode-stable-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
           restore-keys: |
-            ${{ runner.os }}-spm-xcode-16.1-
+            ${{ runner.os }}-spm-xcode-stable-
             ${{ runner.os }}-spm-
 
       - name: Fastlane iOS CI
