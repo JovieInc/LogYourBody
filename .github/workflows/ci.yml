@@ -136,7 +136,7 @@ jobs:
       - name: Unit-tier tests
         run: |
           cd apps/ios
-          DESTINATION=$(SCHEME=LogYourBodyTiers bash ../scripts/ios/resolve-simulator-destination.sh)
+          DESTINATION=$(SCHEME=LogYourBodyTiers bash ../../scripts/ios/resolve-simulator-destination.sh)
           bundle exec fastlane ci_test_unit destination:"$DESTINATION"
 
       - name: Unit test duration + coverage report
