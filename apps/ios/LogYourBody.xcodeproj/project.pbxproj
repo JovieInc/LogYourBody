@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0183C845E0301D4B10100ACE /* BodyMetricAppIntentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */; };
 		022D79AC5B1840BC58FB7D70 /* BodyMetricContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB121088934BE398599BE39A /* BodyMetricContractTests.swift */; };
 		04BF4BAC82CF6B37F817592F /* CoreDataModelMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA050E7DCEBA5BAF62341363 /* CoreDataModelMigrationTests.swift */; };
 		04EB1D7AD1947D32BDE7AD70 /* BodyMetricSourceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EBD5BF3F1671BC8D17ABE5D /* BodyMetricSourceContractTests.swift */; };
@@ -775,6 +776,7 @@
 		B1CDBFA72287938694EB369D /* CoreMetricsRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CoreMetricsRow.swift; path = DesignSystem/Organisms/CoreMetricsRow.swift; sourceTree = "<group>"; };
 		B4BF04D15583E3AE1CA4A836 /* View+Styles.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "View+Styles.swift"; path = "View+Styles.swift"; sourceTree = "<group>"; };
 		BBB847A2050F3135D62950A1 /* AuthFormField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthFormField.swift; path = DesignSystem/Molecules/AuthFormField.swift; sourceTree = "<group>"; };
+		BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricAppIntentsTests.swift; sourceTree = "<group>"; };
 		BF02BFDD936CBA59B3704AA3 /* CoreDataManager+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "CoreDataManager+Part01.swift"; path = "CoreDataManager+Part01.swift"; sourceTree = "<group>"; };
 		C0AE830DA0CFDB1735F6894C /* SyncIntegrationBodyMetricSyncTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncIntegrationBodyMetricSyncTests.swift; sourceTree = "<group>"; };
 		C0D300022F30000100ABCDEF /* GeneratedProductRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedProductRegistry.swift; sourceTree = "<group>"; };
@@ -1090,6 +1092,7 @@
 				8A2D877BFA93E04F9E168FA7 /* BodySpecAPITests.swift */,
 				4F614C8BD21F414268DB7829 /* BodySpecAuthManagerPKCETests.swift */,
 				FE9C6D5CF67D9E4FA0995EC1 /* BodySpecAuthManagerTokenStateTests.swift */,
+				BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1892,6 +1895,7 @@
 				93335DCBFB7D09586F330149 /* BodySpecAPITests.swift in Sources */,
 				CD05B6509260D3FC351104B4 /* BodySpecAuthManagerPKCETests.swift in Sources */,
 				B13F1CC0CFEB9076519101DB /* BodySpecAuthManagerTokenStateTests.swift in Sources */,
+				0183C845E0301D4B10100ACE /* BodyMetricAppIntentsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
