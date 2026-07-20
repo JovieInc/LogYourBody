@@ -47,6 +47,56 @@
   the integration tier or inject clocks during tiering (batch 2).
 - Floors for this effort: **≥70% overall**, **≥80% patch on touched lines**.
 
+## Verification report (2026-07-20, post-batches)
+
+Measured on main after all batches merged (full unit target + coverage,
+`test_results/verification2.xcresult`, erased simulator, **TEST SUCCEEDED**):
+
+- **Suite: 691 test cases** (baseline 360, +92%), 0 failures. Tier split:
+  Unit plan ~580 (target <200ms each; 4 legitimately over, all perf-style
+  assertions), Integration plan ~110, XCUITest target 28 incl. the
+  onboarding hook→reveal golden path.
+- **App-target line coverage: 20.20%** (17,083 / 84,589; baseline 14.36%
+  of 92,243). Denominator −7,654 lines (dead-code removal).
+- **Per-area coverage** (the honest shape of the app):
+
+  | Area                  | Coverage  | Lines           |
+  | --------------------- | --------- | --------------- |
+  | Helpers               | **82.7%** | 1,096 / 1,326   |
+  | Models                | **58.5%** | 907 / 1,551     |
+  | Utils                 | **55.0%** | 572 / 1,040     |
+  | Services              | **53.4%** | 10,135 / 18,967 |
+  | Features (onboarding) | **42.6%** | 1,262 / 2,962   |
+  | DesignSystem          | 7.8%      | 530 / 6,817     |
+  | Components            | 6.1%      | 899 / 14,650    |
+  | Views                 | **2.8%**  | 952 / 33,902    |
+
+- **On the 70% overall floor:** the floor came from the company's web-app
+  standard (logic-dominated Next.js). In this app, **~64% of executable
+  lines are SwiftUI view-layer code** (Views+Components+DesignSystem =
+  54,469 lines) which a unit/integration strategy does not and should not
+  touch per the risk-based standard ("coverage on the right files", the
+  company's primary rule). Reaching 70% overall would require ~42,000
+  additional covered lines — almost entirely views — via either brittle
+  at-scale XCUITest suites or view-instantiation padding tests (explicitly
+  banned by this effort's quality bar). **Recommendation: adopt a per-layer
+  standard** (logic layers Services/Helpers/Models/Utils ≥70%, view layer
+  measured only through golden-path XCUITests) as the iOS adaptation of
+  the company rule, and track it in the risk register. Until then the
+  truthful reading is: **logic layers 42–83%, risk-register surfaces
+  covered, overall 20.2%**.
+- **Patch coverage ≥80% on touched lines:** held. Every production line
+  added by this effort (policy extractions, vendor seams) shipped with
+  direct behavior tests; the rest was test-only or deletions.
+- **Duration report (report-only):** 13 tests >200ms — 4 integration
+  store-retry/migration tests with real waits (≤2.2s), 2 intentional
+  `measure {}` perf tests, 7 image-render tests (0.24–0.35s). All in the
+  integration tier or intentional; unit tier has 4 perf-style assertions
+  at 0.2–0.5s. No action required; reviewed per the report-only policy.
+- **Determinism note:** OnboardingFlowValidationTests can fail on a
+  _dirty_ simulator (pre-existing app state; seen once locally, never on
+  CI's fresh simulators). Hardening its setUp is on the follow-up ledger.
+
 ## Test-infrastructure findings (fix early — they gate everything else)
 
 | #   | Finding                                                                                                                                 | Evidence                                            | Fix                                                                                                             |
@@ -335,6 +385,70 @@ Progress tracker: mark batches here as PRs merge.
   three concurrent first-time Vision model setups deadlock on fresh CI
   simulators (simulator-only framework hazard; serialized setups and
   production devices are unaffected). No app-code change.
+- Batch 13 — verification closeout: this PR (verification report above,
+  duration-report review, follow-up ledger below)
+
+## Follow-up ledger (findings from the batches, with evidence)
+
+**Real bugs — worth their own fix PRs (failing test first):**
+
+1. `BackgroundRemovalService.removeBackground` double-resumes a
+   `CheckedContinuation` → runtime trap (kills the test host on simulator;
+   structurally latent on device). Found by batch 11b with reproduction.
+   Fix = resume-once guard; then the error path becomes testable.
+2. CSV export escaping (`ExportCSVBuilder`, pre-existing): embedded quotes
+   aren't doubled and newlines aren't escaped → malformed CSV per RFC 4180
+   when notes contain them. Batch 10 pinned the behavior with tests.
+3. Session revocation UI is dead: `fetchActiveSessions()` can only return
+   the current session, and the view loads via `AuthManager.shared` but
+   revokes via the environment instance (batch 10).
+4. CSV export semantics: nil metrics export as literal `0`
+   (indistinguishable from a real measurement); weight-unit default
+   inconsistent between the two CSVs; FFMI column is an interpolated
+   estimate, not a stored value (batch 10).
+5. `AppVersionManager.optimizeCoreData` calls `replacePersistentStore` on
+   the live shared store — can silently fail or diverge the on-disk file
+   from the open handle (batch 6; tests assert the marker only).
+6. `BodyMetricLoggingService.log` wraps body-fat validation failures as
+   `ValidationError.invalidWeight` instead of `.invalidBodyFat` (batch 8,
+   pinned).
+
+**Product decisions needed (not bugs to simply fix):**
+
+7. **Legal consent gate is inert** (HIGH): `AuthManager.needsLegalConsent`
+   is only ever assigned `false` and `checkLegalConsent` has zero call
+   sites — no user is ever gated. Arming it is a user-visible compliance
+   change needing a product decision + Statsig gate. Secondary defect:
+   `LegalConsentView.accept()` dismisses unconditionally, so a failed
+   PATCH silently closes the gate for the session (batch 4).
+8. `Models/Changelog.swift` (164 lines): only consumer was the deleted
+   WhatsNewView — delete or revive as a What's New surface (product call).
+9. `BackgroundPhotoUploadService` remainder: only observed by the deleted
+   task-monitor cluster — keep for a future bulk-upload surface or delete.
+10. `processBatchImages` runs unbounded concurrency — cap for device
+    memory pressure during bulk import? (batch 11b note)
+11. BodySpec API trailing slash: client normalizes
+    `/api/v1/users/me/results/` → `/results`; verify the backend tolerates
+    it (batch 7 note).
+
+**Test-infra follow-ups:**
+
+12. OnboardingFlowValidationTests: harden setUp against dirty simulator
+    state (verification report note).
+13. Dead on-disk files for the next deletion PR:
+    `Services/DeviceNormalizationService.swift` (never compiled),
+    `DailyLog` computed props + mocks, `BodyCompMeasurement`,
+    `BodyCompMethod.infer`, `BodyCompSourceType.infer` (zero callers).
+14. `PhotoLibraryScanner` needs a fetcher seam to test grouping/dedup;
+    `BodyMetricSpotlightIndexer` needs a `CSSearchableIndex` seam (batch
+    11a/11b notes).
+15. Eight 14-line one-assertion test files could be consolidated (I8).
+16. Keychain tests skip on unsigned CI hosts; enable when CI signs the
+    test host (`KeychainAvailability` TODO).
+17. Behavior quirks pinned by tests (review for intent):
+    `inferMethod`'s `"dexa"` match is case-sensitive; chart data excludes
+    same-day entries; non-numeric height input reports the 100cm floor.
+
 - Dead-code deletion (section C sweep): this PR — ~4,068 app-target lines
   removed against the 92,243-line baseline denominator (coverage % rises
   accordingly)
