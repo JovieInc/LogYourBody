@@ -47,6 +47,35 @@
   the integration tier or inject clocks during tiering (batch 2).
 - Floors for this effort: **≥70% overall**, **≥80% patch on touched lines**.
 
+## Decision record (2026-07-20, owner: @itstimwhite)
+
+**Superseded the 70%-overall floor with the per-layer standard below as the
+iOS completion definition.** Rationale (measured in the verification report):
+64% of the app's executable lines are SwiftUI view layer, so a 70% overall
+floor is reachable only through view-instantiation padding (banned by this
+effort's quality bar) or brittle at-scale XCUITest suites. This matches the
+company's primary rule — coverage on the right files, by blast radius.
+
+Adopted standard:
+
+- **Logic layers** (Services, Helpers, Models, Utils, Features): target
+  **≥70% per layer**. Standing baseline at decision time: Helpers **82.7%**,
+  Models 58.5%, Utils 55.0%, Services 53.4%, Features 42.6%. The remaining
+  points are tracked as follow-up work in the queue (section D) — they do
+  not gate this effort's completion, which is defined by the risk-register
+  coverage below plus CI/tiering/validation gates.
+- **Risk-register surfaces** (auth, keychain, paywall, sync, migrations,
+  onboarding, photo pipeline, BodySpec, settings, notifications, App
+  Intents, Vision pipeline, vendor adapters): **required coverage — done**
+  (all batches merged; new critical surfaces join the register as they
+  appear).
+- **View layer** (Views, Components, DesignSystem): measured only through
+  golden-path XCUITests; **no line-coverage floor** (padding forbidden).
+- **Patch coverage** ≥80% on touched lines: unchanged, held.
+- **Duration/tiering/CI/validation gates** (unit <200ms target report-only,
+  separate suites, CI unit gate, swiftlint/xcodebuild/pnpm green):
+  unchanged, held and enforced on every PR.
+
 ## Verification report (2026-07-20, post-batches)
 
 Measured on main after all batches merged (full unit target + coverage,
@@ -79,12 +108,11 @@ Measured on main after all batches merged (full unit target + coverage,
   company's primary rule). Reaching 70% overall would require ~42,000
   additional covered lines — almost entirely views — via either brittle
   at-scale XCUITest suites or view-instantiation padding tests (explicitly
-  banned by this effort's quality bar). **Recommendation: adopt a per-layer
-  standard** (logic layers Services/Helpers/Models/Utils ≥70%, view layer
-  measured only through golden-path XCUITests) as the iOS adaptation of
-  the company rule, and track it in the risk register. Until then the
-  truthful reading is: **logic layers 42–83%, risk-register surfaces
-  covered, overall 20.2%**.
+  banned by this effort's quality bar). **Resolved: the per-layer standard
+  was adopted as the iOS completion definition — see the decision record
+  above.** Truthful reading under it: **logic layers 42–83% with ≥70%
+  targets tracked as follow-ups, risk-register surfaces covered, overall
+  20.2%**.
 - **Patch coverage ≥80% on touched lines:** held. Every production line
   added by this effort (policy extractions, vendor seams) shipped with
   direct behavior tests; the rest was test-only or deletions.
@@ -387,6 +415,9 @@ Progress tracker: mark batches here as PRs merge.
   production devices are unaffected). No app-code change.
 - Batch 13 — verification closeout: this PR (verification report above,
   duration-report review, follow-up ledger below)
+- Decision — per-layer standard adopted as the completion definition
+  (owner, 2026-07-20): see the decision record above; logic-layer ≥70%
+  targets tracked as follow-ups, risk-register coverage done
 
 ## Follow-up ledger (findings from the batches, with evidence)
 
