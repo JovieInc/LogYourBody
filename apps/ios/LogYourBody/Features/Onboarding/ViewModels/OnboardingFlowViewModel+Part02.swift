@@ -117,7 +117,7 @@ func applyFirstPhotoUITestFixtureIfNeeded() {
         clearPersistedProgress()
         PreAuthOnboardingStore.shared.clear()
 
-        if didRequestHealthSync, UserDefaults.standard.bool(forKey: "healthKitSyncEnabled") {
+        if didRequestHealthSync, UserDefaults.standard.bool(forKey: Constants.healthKitSyncEnabledKey) {
             scheduleDeferredHealthSync()
         }
 

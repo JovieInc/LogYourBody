@@ -151,14 +151,14 @@ class ChangelogManager {
 
     /// Check if there are new updates since last viewed version
     func hasNewUpdates() -> Bool {
-        let lastViewedVersion = UserDefaults.standard.string(forKey: "lastViewedChangelogVersion") ?? "0.0.0"
+        let lastViewedVersion = UserDefaults.standard.string(forKey: Constants.lastViewedChangelogVersionKey) ?? "0.0.0"
         return entries.first?.version != lastViewedVersion
     }
 
     /// Mark changelog as viewed
     func markAsViewed() {
         if let latestVersion = entries.first?.version {
-            UserDefaults.standard.set(latestVersion, forKey: "lastViewedChangelogVersion")
+            UserDefaults.standard.set(latestVersion, forKey: Constants.lastViewedChangelogVersionKey)
         }
     }
 }
