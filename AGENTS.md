@@ -106,7 +106,7 @@ gbrain query "what is the timeline scrubber convention?"   # hybrid
 1. **Agents and humans NEVER commit directly to `main`.**
 2. **All changes flow via PRs into `main`.**
 3. **Branches should be small and focused**, optimized for quick review and merge.
-4. **Delete branches after merge** to keep the repository clean.
+4. **Delete branches after merge** to keep the repository clean. GitHub auto-deletes head branches on merge; run `pnpm sync:main` locally to switch back to `main`, fast-forward, and prune the local copies.
 
 ---
 
@@ -168,9 +168,10 @@ When the user asks an agent to ship, land, deploy, or continue an active release
 4. Push the branch and wait for required checks and required deployments.
 5. Enqueue or merge through the configured PR/merge-queue path once gates are green.
 6. Watch `main` CI and deployment after merge.
-7. Trigger the appropriate release workflow from `main` when the release checklist says to do so.
-8. Verify the actual external state: TestFlight/App Store, Vercel, RevenueCat, Supabase, Clerk, or other provider state as applicable.
-9. Open follow-up PRs for non-blocking issues instead of holding the main PR when the product remains deployable.
+7. Run `pnpm sync:main` to fast-forward local `main`, prune remotes, and delete local branches whose upstream was auto-deleted on merge.
+8. Trigger the appropriate release workflow from `main` when the release checklist says to do so.
+9. Verify the actual external state: TestFlight/App Store, Vercel, RevenueCat, Supabase, Clerk, or other provider state as applicable.
+10. Open follow-up PRs for non-blocking issues instead of holding the main PR when the product remains deployable.
 
 Only stop before merge/release when there is a hard external blocker the agent cannot satisfy, such as missing credentials, account-owner approval, App Review rejection, provider outage, merge conflicts that cannot be resolved safely, or an unresolved failing required check.
 
