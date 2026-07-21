@@ -32,7 +32,8 @@
     "product:generate": "pnpm --filter @jovieinc/product-registry generate",
     "product:check": "pnpm --filter @jovieinc/product-registry test",
     "check:vendor-boundaries": "node scripts/check-vendor-boundaries.js",
-    "check:supabase-migrations": "node scripts/check-supabase-migration-drift.js"
+    "check:supabase-migrations": "node scripts/check-supabase-migration-drift.js",
+    "sync:main": "bash scripts/sync-main.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
