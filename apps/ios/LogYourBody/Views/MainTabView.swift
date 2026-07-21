@@ -6,7 +6,7 @@ import SwiftUI
 import CoreData
 
 struct MainTabView: View {
-    @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
+    @AppStorage(Constants.healthKitSyncEnabledKey) private var healthKitSyncEnabled = true
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     @State private var selectedSurface: PaidAppSurface = PaidAppSurfacePolicy.surface()

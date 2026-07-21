@@ -80,6 +80,19 @@ struct Constants {
     static let deletePhotosAfterImportKey = "deletePhotosAfterImportKey"
     static let hasPromptedDeletePhotosKey = "hasPromptedDeletePhotosKey"
 
+    // HealthKit Sync Keys
+    static let healthKitSyncEnabledKey = "healthKitSyncEnabled"
+    static let pendingSyncOperationsKey = "pendingSyncOperations"
+
+    // Navigation Keys
+    static let pendingEntryTabKey = "pendingEntryTab"
+
+    // Subscription Keys
+    static let revenueCatIsSubscribedKey = "revenuecat_isSubscribed"
+
+    // Changelog Keys
+    static let lastViewedChangelogVersionKey = "lastViewedChangelogVersion"
+
     // MARK: - Units
     static let weightUnits = ["kg", "lbs"]
     static let heightUnits = ["cm", "ft"]

@@ -210,9 +210,9 @@ struct LogYourBodyApp: App {
                         .environmentObject(authManager)
                         .onAppear {
                             // Set the selected tab based on deep link
-                            if let tab = UserDefaults.standard.object(forKey: "pendingEntryTab") as? Int {
+                            if let tab = UserDefaults.standard.object(forKey: Constants.pendingEntryTabKey) as? Int {
                                 selectedEntryTab = tab
-                                UserDefaults.standard.removeObject(forKey: "pendingEntryTab")
+                                UserDefaults.standard.removeObject(forKey: Constants.pendingEntryTabKey)
                             }
                         }
                 }
@@ -317,7 +317,7 @@ struct LogYourBodyApp: App {
 
     @MainActor
     private func bootstrapHealthKit() async {
-        let syncEnabled = UserDefaults.standard.bool(forKey: "healthKitSyncEnabled")
+        let syncEnabled = UserDefaults.standard.bool(forKey: Constants.healthKitSyncEnabledKey)
         HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: syncEnabled)
     }
 
@@ -453,7 +453,7 @@ struct LogYourBodyApp: App {
         } else if usesPaywallPlansFixture {
             subscriptionManager.applyPaywallPlansUITestFixture()
         }
-        UserDefaults.standard.set(isSubscribed, forKey: "revenuecat_isSubscribed")
+        UserDefaults.standard.set(isSubscribed, forKey: Constants.revenueCatIsSubscribedKey)
         if isSubscribed && !usesDailyReminderPromptFixture {
             NotificationManager.shared.skipDailyWeighInPrompt()
         }
@@ -639,7 +639,7 @@ struct LogYourBodyApp: App {
         switch destination {
         case .entry(let tab):
             selectedEntryTab = tab
-            UserDefaults.standard.set(tab, forKey: "pendingEntryTab")
+            UserDefaults.standard.set(tab, forKey: Constants.pendingEntryTabKey)
             showAddEntrySheet = true
         }
     }

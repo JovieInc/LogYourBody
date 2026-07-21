@@ -303,8 +303,8 @@ class AppVersionManager {
             UserDefaults.standard.set("lbs", forKey: Constants.preferredWeightUnitKey)
         }
 
-        if UserDefaults.standard.object(forKey: "healthKitSyncEnabled") == nil {
-            UserDefaults.standard.set(true, forKey: "healthKitSyncEnabled")
+        if UserDefaults.standard.object(forKey: Constants.healthKitSyncEnabledKey) == nil {
+            UserDefaults.standard.set(true, forKey: Constants.healthKitSyncEnabledKey)
         }
     }
 

@@ -37,6 +37,16 @@ export const endpoints = {
     applinksHosts: ['logyourbody.com', 'www.logyourbody.com'],
     scheme: 'logyourbody',
   },
+  tables: [
+    'profiles',
+    'body_metrics',
+    'daily_metrics',
+    'app_users',
+    'waitlist_entries',
+    'progress_photos',
+    'data_exports',
+  ],
+  buckets: ['photos'],
   vendor: {
     supabaseProjectRef: 'ihivupqpctpkrgqgxfjf',
     cloudinary: {

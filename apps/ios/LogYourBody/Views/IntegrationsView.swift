@@ -10,7 +10,7 @@ struct IntegrationsView: View {
     @Environment(\.theme)
     private var theme
     @StateObject private var healthKitManager = HealthKitManager.shared
-    @AppStorage("healthKitSyncEnabled") private var healthKitSyncEnabled = true
+    @AppStorage(Constants.healthKitSyncEnabledKey) private var healthKitSyncEnabled = true
     @State private var showHealthKitConnect = false
     @State private var isConnectingHealthKit = false
     @State private var isSyncingHealthKit = false

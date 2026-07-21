@@ -100,6 +100,16 @@
 	<string>$(STATSIG_CLIENT_SDK_KEY)</string>
 	<key>STATSIG_ENVIRONMENT_TIER</key>
 	<string>$(STATSIG_ENVIRONMENT_TIER)</string>
+	<key>BODYSPEC_CLIENT_ID</key>
+	<string>$(BODYSPEC_CLIENT_ID)</string>
+	<key>BODYSPEC_REDIRECT_URI</key>
+	<string>$(BODYSPEC_REDIRECT_URI)</string>
+	<key>SUPABASE_URL</key>
+	<string>$(SUPABASE_URL)</string>
+	<key>SUPABASE_EXPECTED_HOST</key>
+	<string>$(SUPABASE_EXPECTED_HOST)</string>
+	<key>SUPABASE_ANON_KEY</key>
+	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

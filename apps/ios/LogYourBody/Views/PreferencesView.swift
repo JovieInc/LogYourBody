@@ -13,7 +13,7 @@ struct PreferencesView: View {
     @StateObject var notificationManager = NotificationManager.shared
     @AppStorage(Constants.preferredMeasurementSystemKey) var measurementSystem = PreferencesView.defaultMeasurementSystem
     @AppStorage("biometricLockEnabled") var biometricLockEnabled = false
-    @AppStorage("healthKitSyncEnabled") var healthKitSyncEnabled = true
+    @AppStorage(Constants.healthKitSyncEnabledKey) var healthKitSyncEnabled = true
     @AppStorage(Constants.deletePhotosAfterImportKey) var deletePhotosAfterImport = false
     @AppStorage("stepGoal") var stepGoal = 10_000
     @AppStorage(Constants.goalWeightKilogramsKey) var customWeightGoalKilograms: Double?

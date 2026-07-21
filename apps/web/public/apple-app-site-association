@@ -3,12 +3,16 @@
     "apps": [],
     "details": [
       {
-        "appID": "G24T327LXT.LogYourBody.LogYourBody",
-        "paths": ["*"]
+        "appID": "G24T327LXT.com.logyourbody.app",
+        "paths": [
+          "*"
+        ]
       }
     ]
   },
   "webcredentials": {
-    "apps": ["G24T327LXT.LogYourBody.LogYourBody"]
+    "apps": [
+      "G24T327LXT.com.logyourbody.app"
+    ]
   }
 }

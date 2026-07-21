@@ -285,9 +285,9 @@ struct AccountDeletionCleanupService {
         "dashboard_selected_time_range",
         "dashboard_weight_uses_trend",
         "biometricLockEnabled",
-        "revenuecat_isSubscribed",
+        Constants.revenueCatIsSubscribedKey,
         "revenuecat_lastFetchTimestamp",
-        "healthKitSyncEnabled",
+        Constants.healthKitSyncEnabledKey,
         HealthKitDefaultsKey.authorizationConfirmed.rawValue,
         HealthKitDefaultsKey.lastObserverSyncDate.rawValue,
         HealthKitDefaultsKey.fullSyncCompleted.rawValue,
@@ -295,8 +295,7 @@ struct AccountDeletionCleanupService {
         "lastSupabaseSyncDate",
         "lastHealthKitWeightSyncDate",
         "appleSignInName",
-        "lastSyncDate",
-        "hasSeenWhatsNew"
+        "lastSyncDate"
     ]
 
     private let dependencies: Dependencies

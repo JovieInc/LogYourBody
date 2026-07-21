@@ -22,7 +22,7 @@
     "generate:check": "node scripts/generate.mjs --check",
     "lint": "eslint src scripts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node scripts/registry.test.mjs && node scripts/brand-integrity.test.mjs && pnpm generate:check && node scripts/url-drift.test.mjs"
+    "test": "node scripts/registry.test.mjs && node scripts/brand-integrity.test.mjs && pnpm generate:check && node scripts/url-drift.test.mjs && node scripts/legal-docs-sync.test.mjs && node scripts/env-surface.test.mjs && node scripts/db-entities.test.mjs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.16.0",

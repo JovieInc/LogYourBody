@@ -38,6 +38,8 @@ export interface ProductEndpoints {
     readonly applinksHosts: readonly string[];
     readonly scheme: string;
   };
+  readonly tables: readonly string[];
+  readonly buckets: readonly string[];
   readonly vendor: {
     readonly supabaseProjectRef: string;
     readonly cloudinary: {
@@ -113,6 +115,7 @@ export interface ProductDefinition {
     readonly legalName: string;
     readonly domain: string;
     readonly bundleId: string;
+    readonly teamId: string;
     readonly appStoreId: string;
   };
   readonly brand: {

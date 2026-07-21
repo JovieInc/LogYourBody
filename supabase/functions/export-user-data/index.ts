@@ -144,18 +144,13 @@ async function fetchUserData(supabase: any, userId: string): Promise<UserData> {
     .eq('user_id', userId)
     .order('taken_at', { ascending: false })
 
-  // Fetch goals
-  const { data: goals } = await supabase
-    .from('goals')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-
+  // Note: no `goals` table exists (goals live as columns on profiles), so the
+  // export payload keeps the historical empty array.
   return {
     profile: profile || {},
     bodyMetrics: bodyMetrics || [],
     progressPhotos: progressPhotos || [],
-    goals: goals || []
+    goals: []
   }
 }
 

@@ -24,3 +24,8 @@ SENTRY_TRACES_SAMPLE_RATE = 0
 // Optional BodySpec integration.
 BODYSPEC_CLIENT_ID =
 BODYSPEC_REDIRECT_URI =
+
+// Optional Supabase sync backend. Leave blank to run without cloud sync.
+SUPABASE_URL =
+SUPABASE_EXPECTED_HOST =
+SUPABASE_ANON_KEY =

@@ -8,6 +8,7 @@ export const logYourBody = {
     legalName: 'LogYourBody, Inc.',
     domain: 'logyourbody.com',
     bundleId: 'com.logyourbody.app',
+    teamId: 'G24T327LXT',
     appStoreId: '6755209876',
   },
   brand: {
@@ -61,6 +62,16 @@ export const logYourBody = {
       applinksHosts: ['logyourbody.com', 'www.logyourbody.com'],
       scheme: 'logyourbody',
     },
+    tables: [
+      'profiles',
+      'body_metrics',
+      'daily_metrics',
+      'app_users',
+      'waitlist_entries',
+      'progress_photos',
+      'data_exports',
+    ],
+    buckets: ['photos'],
     vendor: {
       supabaseProjectRef: 'ihivupqpctpkrgqgxfjf',
       cloudinary: { apiHost: 'api.cloudinary.com', deliveryHost: 'res.cloudinary.com' },

@@ -173,10 +173,9 @@ Sensitive information we collect:
 
 ### Service Providers We Share With
 
-- **Neon**: Account profile and onboarding data
-- **Supabase**: Body-metric data and progress-photo storage during migration
+- **Supabase**: Database and authentication
 - **AWS**: Cloud infrastructure
-- **Apple**: Authentication
+- **Clerk**: Authentication services
 - **RevenueCat**: Subscription and purchase entitlements
 - **Sentry**: Error tracking and crash reports
 

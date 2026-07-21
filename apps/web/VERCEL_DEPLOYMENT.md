@@ -29,9 +29,6 @@ POSTGRES_DATABASE=postgres
 ### Optional Variables:
 
 ```env
-# RevenueCat (for subscriptions)
-NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY=your-revenuecat-key
-
 # OpenAI (for avatar generation)
 OPENAI_API_KEY=your-openai-api-key-here
 

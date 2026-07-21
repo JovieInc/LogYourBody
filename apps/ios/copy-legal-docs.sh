@@ -10,28 +10,14 @@ IOS_RESOURCES_DIR="$SCRIPT_DIR/LogYourBody/Resources/Legal"
 # Create Resources/Legal directory if it doesn't exist
 mkdir -p "$IOS_RESOURCES_DIR"
 
-# Copy legal documents
+# Copy every shared legal document (packages/product-registry/scripts/legal-docs-sync.test.mjs
+# fails CI if the iOS copies drift from shared/legal)
 echo "Copying legal documents..."
 
-if [ -f "$SHARED_LEGAL_DIR/privacy-policy.md" ]; then
-    cp "$SHARED_LEGAL_DIR/privacy-policy.md" "$IOS_RESOURCES_DIR/"
-    echo "✓ Copied privacy-policy.md"
-else
-    echo "✗ privacy-policy.md not found"
-fi
-
-if [ -f "$SHARED_LEGAL_DIR/terms-of-service.md" ]; then
-    cp "$SHARED_LEGAL_DIR/terms-of-service.md" "$IOS_RESOURCES_DIR/"
-    echo "✓ Copied terms-of-service.md"
-else
-    echo "✗ terms-of-service.md not found"
-fi
-
-if [ -f "$SHARED_LEGAL_DIR/health-disclosure.md" ]; then
-    cp "$SHARED_LEGAL_DIR/health-disclosure.md" "$IOS_RESOURCES_DIR/"
-    echo "✓ Copied health-disclosure.md"
-else
-    echo "✗ health-disclosure.md not found"
-fi
+for doc in "$SHARED_LEGAL_DIR"/*.md; do
+    name="$(basename "$doc")"
+    cp "$doc" "$IOS_RESOURCES_DIR/$name"
+    echo "✓ Copied $name"
+done
 
 echo "Done!"

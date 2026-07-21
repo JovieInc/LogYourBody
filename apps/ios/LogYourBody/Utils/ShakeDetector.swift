@@ -127,12 +127,11 @@ class DebugResetManager {
             Constants.onboardingCompletedVersionKey,
             Constants.onboardingCompletedUserIdKey,
             Constants.preferredMeasurementSystemKey,
-            "healthKitSyncEnabled",
+            Constants.healthKitSyncEnabledKey,
             "biometricLockEnabled",
             "appleSignInName",
             "HasSyncedHistoricalSteps",
-            "lastSyncDate",
-            "hasSeenWhatsNew"
+            "lastSyncDate"
         ]
 
         for key in keysToRemove {

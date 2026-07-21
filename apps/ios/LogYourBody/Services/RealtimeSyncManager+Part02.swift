@@ -6,7 +6,7 @@ import UIKit
 extension RealtimeSyncManager {
 // MARK: - Pending Operations
     func loadPendingOperations() {
-        if let data = UserDefaults.standard.data(forKey: "pendingSyncOperations"),
+        if let data = UserDefaults.standard.data(forKey: Constants.pendingSyncOperationsKey),
            let operations = try? JSONDecoder().decode([SyncOperation].self, from: data) {
             pendingOperations = operations
             updatePendingSyncCount()
@@ -15,7 +15,7 @@ extension RealtimeSyncManager {
 
 func savePendingOperations() {
         if let data = try? JSONEncoder().encode(pendingOperations) {
-            UserDefaults.standard.set(data, forKey: "pendingSyncOperations")
+            UserDefaults.standard.set(data, forKey: Constants.pendingSyncOperationsKey)
         }
     }
 

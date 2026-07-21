@@ -11,6 +11,7 @@ LogYourBody respects the privacy rights of California residents under the Califo
 ### 1. Right to Know About Personal Information Collected, Disclosed, or Sold
 
 You have the right to request that we disclose:
+
 - Categories of personal information collected
 - Sources of personal information
 - Business purposes for collecting information
@@ -23,12 +24,14 @@ You have the right to request that we disclose:
 
 You can request deletion of personal information we collected from you, subject to certain exceptions.
 
-**How to Exercise:** 
+**How to Exercise:**
+
 - Use "Delete Account" in Settings → Account
 - Or email privacy@logyourbody.com with deletion request
- - For a copy of your data (export), you may also email support@logyourbody.com with a data export request
+- For a copy of your data (export), you may also email support@logyourbody.com with a data export request
 
 **Exceptions:** We may retain information for:
+
 - Completing transactions
 - Security and fraud prevention
 - Legal compliance
@@ -39,6 +42,7 @@ You can request deletion of personal information we collected from you, subject 
 **Important:** LogYourBody does NOT sell your personal information to third parties.
 
 We do not:
+
 - Sell your health data
 - Share data for cross-context behavioral advertising
 - Trade your information for monetary compensation
@@ -46,6 +50,7 @@ We do not:
 ### 4. Right to Non-Discrimination
 
 We will not discriminate against you for exercising your CCPA rights:
+
 - No denial of services
 - No different prices or rates
 - No different quality of services
@@ -55,18 +60,21 @@ We will not discriminate against you for exercising your CCPA rights:
 
 You can request correction of any inaccurate personal information.
 
-**How to Exercise:** 
+**How to Exercise:**
+
 - Update directly in Profile Settings
 - Contact privacy@logyourbody.com for assistance
 
 ### 6. Right to Limit Use and Disclosure of Sensitive Personal Information
 
 Sensitive information we collect:
+
 - Health and fitness data
 - Biometric information (photos)
 - Account credentials
 
 **Your Control:** You can limit use through:
+
 - In-app Settings (for example by disabling certain features or integrations)
 - Disabling specific features
 - Data export and deletion options
@@ -74,47 +82,58 @@ Sensitive information we collect:
 ## Categories of Personal Information We Collect
 
 ### A. Identifiers
+
 - Name
 - Email address
 - Account ID
 - Device identifiers
 
 ### B. Personal Information under Cal. Civ. Code § 1798.80
+
 - Name
 - Email address
 - Profile information
 
 ### C. Protected Classifications
+
 - Age (date of birth)
 - Gender (optional)
 
 ### D. Biometric Information
+
 - Progress photos
 - Body measurements
 
 ### E. Internet/Network Activity
+
 - App usage data
 - Session information
 - Crash reports (anonymous)
 
 ### F. Geolocation Data
+
 - None collected
 
 ### G. Sensory Information
+
 - Photos you upload
 
 ### H. Professional/Employment Information
+
 - None collected
 
 ### I. Education Information
+
 - None collected
 
 ### J. Inferences
+
 - Health and fitness trends
 - Progress analytics
 - Personalized insights
 
 ### K. Sensitive Personal Information
+
 - Health data (weight, body fat, etc.)
 - Biometric data (photos)
 - Account login credentials
@@ -122,6 +141,7 @@ Sensitive information we collect:
 ## How We Use Your Information
 
 ### Business Purposes
+
 1. **Service Delivery**
    - Account management
    - Data synchronization
@@ -143,6 +163,7 @@ Sensitive information we collect:
    - Performance optimization
 
 ### We DO NOT Use Your Information For
+
 - Selling to third parties
 - Behavioral advertising
 - Data brokering
@@ -151,18 +172,21 @@ Sensitive information we collect:
 ## Information Sharing
 
 ### Service Providers We Share With
+
 - **Supabase**: Database and authentication
 - **AWS**: Cloud infrastructure
 - **Clerk**: Authentication services
- - **RevenueCat**: Subscription and purchase entitlements
- - **Sentry**: Error tracking and crash reports
+- **RevenueCat**: Subscription and purchase entitlements
+- **Sentry**: Error tracking and crash reports
 
 ### What We Share
+
 - Only minimum necessary for service operation
 - Encrypted and secured
 - Under strict confidentiality agreements
 
 ### We Never Share
+
 - Raw health data with advertisers
 - Personal information for marketing
 - Identifiable data with data brokers
@@ -198,6 +222,7 @@ To protect your privacy, we verify identity for requests:
 Email privacy@logyourbody.com with "CCPA Request" in the subject line
 
 ### Response Timeline
+
 - Acknowledgment: Within 10 business days
 - Completion: Within 45 days (extendable to 90 days)
 
@@ -206,17 +231,19 @@ Email privacy@logyourbody.com with "CCPA Request" in the subject line
 For transparency, we publish annual metrics:
 
 ### 2024 Metrics (Example)
+
 - Know requests received: 0
 - Know requests completed: 0
 - Delete requests received: 0
 - Delete requests completed: 0
 - Average response time: N/A
 
-*Actual metrics updated annually*
+_Actual metrics updated annually_
 
 ## Financial Incentives
 
 We do not offer financial incentives for:
+
 - Collecting personal information
 - Selling personal information
 - Retention of personal information
@@ -224,21 +251,26 @@ We do not offer financial incentives for:
 ## Contact for More Information
 
 ### Privacy Team
+
 - Email: privacy@logyourbody.com
 - Response time: Within 48 hours
 
 ### Mailing Address
+
 LogYourBody Privacy Team
 [Address provided upon request]
 
 ### California Attorney General
+
 For more about CCPA rights:
+
 - Website: oag.ca.gov/privacy/ccpa
 - Phone: (916) 210-7300
 
 ## Accessibility
 
 This notice is available in:
+
 - Screen reader compatible format
 - Large print upon request
 - Alternative formats as needed
@@ -246,6 +278,7 @@ This notice is available in:
 ## Updates
 
 We update this notice when:
+
 - Laws change
 - Our practices change
 - New rights become available

@@ -254,7 +254,7 @@ class RevenueCatManager: NSObject, ObservableObject {
     static let shared = RevenueCatManager()
 
     enum DefaultsKey {
-        static let isSubscribed = "revenuecat_isSubscribed"
+        static let isSubscribed = Constants.revenueCatIsSubscribedKey
         static let lastFetchTimestamp = "revenuecat_lastFetchTimestamp"
         static let subscriptionAnalyticsPhase = "revenuecat_subscriptionAnalyticsPhase"
         static let subscriptionAnalyticsAppUserId = "revenuecat_subscriptionAnalyticsAppUserId"
