@@ -24,3 +24,8 @@ SENTRY_TRACES_SAMPLE_RATE = 0.1
 // Optional BodySpec integration.
 BODYSPEC_CLIENT_ID =
 BODYSPEC_REDIRECT_URI =
+
+// Supabase sync backend. Publishable anon key; required for cloud sync.
+SUPABASE_URL = https:/$()/ihivupqpctpkrgqgxfjf.supabase.co
+SUPABASE_EXPECTED_HOST = ihivupqpctpkrgqgxfjf.supabase.co
+SUPABASE_ANON_KEY = replace_with_prod_supabase_anon_key
