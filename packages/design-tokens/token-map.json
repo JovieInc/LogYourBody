@@ -1,0 +1,74 @@
+{
+  "comment": "Maps canonical token paths (packages/design-tokens/tokens/**) to platform token targets. iOS targets live in apps/ios/LogYourBody/DesignSystem/Theme.swift (colors.* / spacing.* / radius.*). Web targets are either CSS vars in apps/web/src/app/globals.css (:root, dark default) written as \"--var\", or Tailwind colors in apps/web/tailwind.config.ts written as \"tailwind:<key>\".",
+  "map": {
+    "color.semantic.background": {
+      "ios": "colors.background",
+      "web": ["--background", "tailwind:linear-bg"]
+    },
+    "color.semantic.card": {
+      "ios": "colors.surface",
+      "web": ["--card", "tailwind:linear-card"]
+    },
+    "color.semantic.border": {
+      "ios": "colors.border",
+      "web": ["--border", "tailwind:linear-border"]
+    },
+    "color.base.purple.500": {
+      "ios": "colors.primary",
+      "web": ["--primary", "tailwind:linear-purple", "tailwind:accent-purple"]
+    },
+    "color.semantic.primary": {
+      "ios": "colors.info",
+      "web": []
+    },
+    "color.semantic.error": {
+      "ios": "colors.error",
+      "web": ["--destructive"]
+    },
+    "color.semantic.success": {
+      "ios": "colors.success",
+      "web": ["tailwind:accent-green"]
+    },
+    "color.semantic.warning": {
+      "ios": "colors.warning",
+      "web": ["tailwind:accent-orange"]
+    },
+    "color.semantic.text.primary": {
+      "ios": "colors.text",
+      "web": ["tailwind:linear-text"]
+    },
+    "color.semantic.text.secondary": {
+      "ios": "colors.textSecondary",
+      "web": ["tailwind:linear-text-secondary"]
+    },
+    "color.semantic.text.tertiary": {
+      "ios": "colors.textTertiary",
+      "web": ["tailwind:linear-text-tertiary"]
+    },
+    "spacing.xxxs": { "ios": "spacing.xxxs", "web": [] },
+    "spacing.xxs": { "ios": "spacing.xxs", "web": [] },
+    "spacing.xs": { "ios": "spacing.xs", "web": [] },
+    "spacing.sm": { "ios": "spacing.sm", "web": [] },
+    "spacing.md": { "ios": "spacing.md", "web": [] },
+    "spacing.lg": { "ios": "spacing.lg", "web": [] },
+    "spacing.xl": { "ios": "spacing.xl", "web": [] },
+    "spacing.xxl": { "ios": "spacing.xxl", "web": [] },
+    "spacing.xxxl": { "ios": "spacing.xxxl", "web": [] },
+    "spacing.semantic.element": { "ios": "spacing.elementSpacing", "web": [] },
+    "spacing.semantic.section": { "ios": "spacing.sectionSpacing", "web": [] },
+    "spacing.semantic.screen": { "ios": "spacing.screenPadding", "web": [] },
+    "spacing.semantic.card": { "ios": "spacing.cardPadding", "web": [] },
+    "spacing.semantic.listItem": { "ios": "spacing.listItemSpacing", "web": [] },
+    "radius.xs": { "ios": "radius.xs", "web": [] },
+    "radius.sm": { "ios": "radius.sm", "web": [] },
+    "radius.md": { "ios": "radius.md", "web": ["--radius"] },
+    "radius.lg": { "ios": "radius.lg", "web": [] },
+    "radius.xl": { "ios": "radius.xl", "web": [] },
+    "radius.xxl": { "ios": "radius.xxl", "web": [] },
+    "radius.full": { "ios": "radius.full", "web": [] },
+    "radius.semantic.button": { "ios": "radius.button", "web": [] },
+    "radius.semantic.card": { "ios": "radius.card", "web": [] },
+    "radius.semantic.input": { "ios": "radius.input", "web": [] },
+    "radius.semantic.chip": { "ios": "radius.chip", "web": [] }
+  }
+}
