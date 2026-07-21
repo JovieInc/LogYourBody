@@ -8,6 +8,7 @@ export const logYourBody = {
     legalName: 'LogYourBody, Inc.',
     domain: 'logyourbody.com',
     bundleId: 'com.logyourbody.app',
+    teamId: 'G24T327LXT',
     appStoreId: '6755209876',
   },
   brand: {

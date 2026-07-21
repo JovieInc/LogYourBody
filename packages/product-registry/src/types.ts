@@ -113,6 +113,7 @@ export interface ProductDefinition {
     readonly legalName: string;
     readonly domain: string;
     readonly bundleId: string;
+    readonly teamId: string;
     readonly appStoreId: string;
   };
   readonly brand: {
