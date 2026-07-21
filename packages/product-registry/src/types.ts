@@ -38,6 +38,8 @@ export interface ProductEndpoints {
     readonly applinksHosts: readonly string[];
     readonly scheme: string;
   };
+  readonly tables: readonly string[];
+  readonly buckets: readonly string[];
   readonly vendor: {
     readonly supabaseProjectRef: string;
     readonly cloudinary: {
