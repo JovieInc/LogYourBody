@@ -26,13 +26,13 @@
     --background: 0 0% 0%;
     --foreground: 0 0% 100%;
 
-    --card: 0 0% 0%;
+    --card: 0 0% 4.3%; /* Canonical card #0B0B0B */
     --card-foreground: 0 0% 100%;
 
     --popover: 0 0% 0%;
     --popover-foreground: 0 0% 100%;
 
-    --primary: 233 54% 60%; /* Linear purple #5E6AD2 */
+    --primary: 233.8 56.3% 59.6%; /* Exact Linear purple #5E6AD2 */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 6%;
@@ -44,14 +44,14 @@
     --accent: 240 2% 12%; /* Linear hover state #1F2023 */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 352.8 90.4% 51.2%; /* Canonical error #F3122D */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 10%;
+    --border: 240 2.3% 16.9%; /* Canonical border #2A2A2C */
     --input: 0 0% 10%;
-    --ring: 233 54% 60%; /* Linear purple #5E6AD2 */
+    --ring: 233.8 56.3% 59.6%; /* Exact Linear purple #5E6AD2 */
 
-    --radius: 8px;
+    --radius: 12px;
   }
 
   /* Light mode colors */
@@ -65,7 +65,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
 
-    --primary: 233 54% 60%;
+    --primary: 233.8 56.3% 59.6%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 96.1%;
@@ -82,7 +82,7 @@
 
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 233 54% 60%;
+    --ring: 233.8 56.3% 59.6%;
   }
 
   /* Dark mode colors (explicit) */
@@ -90,13 +90,13 @@
     --background: 0 0% 0%;
     --foreground: 0 0% 100%;
 
-    --card: 0 0% 0%;
+    --card: 0 0% 4.3%; /* Canonical card #0B0B0B */
     --card-foreground: 0 0% 100%;
 
     --popover: 0 0% 0%;
     --popover-foreground: 0 0% 100%;
 
-    --primary: 233 54% 60%;
+    --primary: 233.8 56.3% 59.6%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 6%;
@@ -108,12 +108,12 @@
     --accent: 240 2% 12%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 352.8 90.4% 51.2%; /* Canonical error #F3122D */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 10%;
+    --border: 240 2.3% 16.9%; /* Canonical border #2A2A2C */
     --input: 0 0% 10%;
-    --ring: 233 54% 60%;
+    --ring: 233.8 56.3% 59.6%;
   }
 }
 
