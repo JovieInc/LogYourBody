@@ -30,9 +30,13 @@ if [ -n "$gone_branches" ]; then
   echo "Pruning local branches with gone upstreams:"
   while IFS= read -r branch; do
     # PRs squash-merge, so merged branches are not ancestors of main and
-    # `git branch -d` always refuses. `git cherry` compares patches instead:
-    # no '+' lines means every change is already in main and -D is safe.
-    if [ -z "$(git cherry main "$branch" 2>/dev/null | grep '^+' || true)" ]; then
+    # `git branch -d` always refuses. Simulate merging the branch into main:
+    # if the resulting tree equals main's tree, every change is already in
+    # main and -D is safe. This works for multi-commit branches too (unlike
+    # git cherry, which compares per-commit patch-ids). Conflicts or errors
+    # mean "keep".
+    merged_tree="$(git merge-tree --write-tree main "$branch" 2>/dev/null || true)"
+    if [ -n "$merged_tree" ] && [ "$merged_tree" = "$(git rev-parse 'main^{tree}')" ]; then
       echo "  deleting $branch (all changes are in main)"
       # A branch checked out in a linked worktree cannot be deleted; keep it.
       if ! git branch -D "$branch" 2>/dev/null; then
@@ -40,7 +44,7 @@ if [ -n "$gone_branches" ]; then
         skipped="$skipped $branch"
       fi
     else
-      echo "  keeping $branch (has commits not in main)"
+      echo "  keeping $branch (has changes not in main)"
       skipped="$skipped $branch"
     fi
   done <<< "$gone_branches"
