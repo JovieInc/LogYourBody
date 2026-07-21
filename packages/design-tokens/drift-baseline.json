@@ -3,121 +3,58 @@
   "drift": [
     {
       "token": "color.base.purple.500",
-      "platform": "ios",
-      "target": "colors.primary",
-      "canonical": "#5b63d3",
-      "actual": "#ffffff"
-    },
-    {
-      "token": "color.base.purple.500",
       "platform": "web",
       "target": "--primary",
-      "canonical": "#5b63d3",
+      "canonical": "#5e6ad2",
       "actual": "#626fd0"
-    },
-    {
-      "token": "color.base.purple.500",
-      "platform": "web",
-      "target": "tailwind:accent-purple",
-      "canonical": "#5b63d3",
-      "actual": "#5e6ad2"
-    },
-    {
-      "token": "color.base.purple.500",
-      "platform": "web",
-      "target": "tailwind:linear-purple",
-      "canonical": "#5b63d3",
-      "actual": "#5e6ad2"
-    },
-    {
-      "token": "color.semantic.background",
-      "platform": "ios",
-      "target": "colors.background",
-      "canonical": "#111111",
-      "actual": "#000000"
-    },
-    {
-      "token": "color.semantic.background",
-      "platform": "web",
-      "target": "--background",
-      "canonical": "#111111",
-      "actual": "#000000"
     },
     {
       "token": "color.semantic.background",
       "platform": "web",
       "target": "tailwind:linear-bg",
-      "canonical": "#111111",
+      "canonical": "#000000",
       "actual": "#0a0b0d"
-    },
-    {
-      "token": "color.semantic.border",
-      "platform": "ios",
-      "target": "colors.border",
-      "canonical": "#2a2a2a",
-      "actual": "#2a2a2c"
     },
     {
       "token": "color.semantic.border",
       "platform": "web",
       "target": "--border",
-      "canonical": "#2a2a2a",
+      "canonical": "#2a2a2c",
       "actual": "#1a1a1a"
     },
     {
       "token": "color.semantic.border",
       "platform": "web",
       "target": "tailwind:linear-border",
-      "canonical": "#2a2a2a",
+      "canonical": "#2a2a2c",
       "actual": "#1f2023"
-    },
-    {
-      "token": "color.semantic.card",
-      "platform": "ios",
-      "target": "colors.surface",
-      "canonical": "#1a1a1a",
-      "actual": "#0b0b0b"
     },
     {
       "token": "color.semantic.card",
       "platform": "web",
       "target": "--card",
-      "canonical": "#1a1a1a",
+      "canonical": "#0b0b0b",
       "actual": "#000000"
     },
     {
       "token": "color.semantic.card",
       "platform": "web",
       "target": "tailwind:linear-card",
-      "canonical": "#1a1a1a",
+      "canonical": "#0b0b0b",
       "actual": "#111113"
-    },
-    {
-      "token": "color.semantic.error",
-      "platform": "ios",
-      "target": "colors.error",
-      "canonical": "#f44336",
-      "actual": "#f3122d"
     },
     {
       "token": "color.semantic.error",
       "platform": "web",
       "target": "--destructive",
-      "canonical": "#f44336",
+      "canonical": "#f3122d",
       "actual": "#ef4343"
-    },
-    {
-      "token": "color.semantic.success",
-      "platform": "ios",
-      "target": "colors.success",
-      "canonical": "#4caf50",
-      "actual": "#2f9e44"
     },
     {
       "token": "color.semantic.success",
       "platform": "web",
       "target": "tailwind:accent-green",
-      "canonical": "#4caf50",
+      "canonical": "#2f9e44",
       "actual": "#10b981"
     },
     {
@@ -128,88 +65,11 @@
       "actual": "#f97316"
     },
     {
-      "token": "radius.full",
-      "platform": "ios",
-      "target": "radius.full",
-      "canonical": 9999,
-      "actual": 48
-    },
-    {
-      "token": "radius.lg",
-      "platform": "ios",
-      "target": "radius.lg",
-      "canonical": 12,
-      "actual": 16
-    },
-    {
       "token": "radius.md",
-      "platform": "ios",
-      "target": "radius.md",
-      "canonical": 8,
-      "actual": 12
-    },
-    {
-      "token": "radius.semantic.button",
-      "platform": "ios",
-      "target": "radius.button",
+      "platform": "web",
+      "target": "--radius",
       "canonical": 12,
-      "actual": 48
-    },
-    {
-      "token": "radius.semantic.card",
-      "platform": "ios",
-      "target": "radius.card",
-      "canonical": 12,
-      "actual": 20
-    },
-    {
-      "token": "radius.semantic.chip",
-      "platform": "ios",
-      "target": "radius.chip",
-      "canonical": 16,
-      "actual": 48
-    },
-    {
-      "token": "radius.semantic.input",
-      "platform": "ios",
-      "target": "radius.input",
-      "canonical": 8,
-      "actual": 16
-    },
-    {
-      "token": "radius.sm",
-      "platform": "ios",
-      "target": "radius.sm",
-      "canonical": 6,
-      "actual": 4
-    },
-    {
-      "token": "radius.xl",
-      "platform": "ios",
-      "target": "radius.xl",
-      "canonical": 16,
-      "actual": 48
-    },
-    {
-      "token": "radius.xs",
-      "platform": "ios",
-      "target": "radius.xs",
-      "canonical": 4,
-      "actual": 2
-    },
-    {
-      "token": "radius.xxl",
-      "platform": "ios",
-      "target": "radius.xxl",
-      "canonical": 24,
-      "actual": 48
-    },
-    {
-      "token": "spacing.semantic.screen",
-      "platform": "ios",
-      "target": "spacing.screenPadding",
-      "canonical": 16,
-      "actual": 20
+      "actual": 8
     }
   ]
 }

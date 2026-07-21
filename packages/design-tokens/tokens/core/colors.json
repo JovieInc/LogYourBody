@@ -48,8 +48,8 @@
           "value": "#6B73DD"
         },
         "500": {
-          "value": "#5B63D3",
-          "comment": "Primary brand purple"
+          "value": "#5E6AD2",
+          "comment": "Primary brand purple (as shipped on web)"
         },
         "600": {
           "value": "#4B52C3",
@@ -99,16 +99,20 @@
     },
     "semantic": {
       "background": {
-        "value": "#111111",
-        "comment": "Premium near-black background"
+        "value": "#000000",
+        "comment": "Premium true-black background (as shipped)"
       },
       "card": {
-        "value": "#1A1A1A",
-        "comment": "Card background (slightly lighter)"
+        "value": "#0B0B0B",
+        "comment": "Card background, slightly lighter (as shipped on iOS)"
       },
       "border": {
-        "value": "#2A2A2A",
-        "comment": "Subtle border color"
+        "value": "#2A2A2C",
+        "comment": "Subtle hairline border color (as shipped on iOS)"
+      },
+      "action": {
+        "value": "#FFFFFF",
+        "comment": "Primary action foreground (white-on-black action pair, as shipped on iOS)"
       },
       "primary": {
         "value": "{color.base.blue.500}",
@@ -118,13 +122,15 @@
         "value": "{color.base.blue.600}"
       },
       "error": {
-        "value": "{color.base.red.500}"
+        "value": "#F3122D",
+        "comment": "Error red (as shipped on iOS)"
       },
       "errorHover": {
         "value": "{color.base.red.600}"
       },
       "success": {
-        "value": "{color.base.green.500}"
+        "value": "#2F9E44",
+        "comment": "Success green (as shipped on iOS)"
       },
       "successHover": {
         "value": "{color.base.green.600}"

@@ -1,28 +1,28 @@
 {
   "radius": {
     "xs": {
-      "value": "4",
-      "comment": "Extra small corner radius - 4px"
+      "value": "2",
+      "comment": "Extra small corner radius - 2px"
     },
     "sm": {
-      "value": "6",
-      "comment": "Small corner radius - 6px"
+      "value": "4",
+      "comment": "Small corner radius - 4px"
     },
     "md": {
-      "value": "8",
-      "comment": "Medium corner radius - 8px"
+      "value": "12",
+      "comment": "Medium corner radius - 12px"
     },
     "lg": {
-      "value": "12",
-      "comment": "Large corner radius - 12px"
+      "value": "16",
+      "comment": "Large corner radius - 16px"
     },
     "xl": {
-      "value": "16",
-      "comment": "Extra large corner radius - 16px"
+      "value": "48",
+      "comment": "Extra large corner radius - 48px (pill on standard control height)"
     },
     "xxl": {
-      "value": "24",
-      "comment": "Extra extra large corner radius - 24px"
+      "value": "48",
+      "comment": "Extra extra large corner radius - 48px"
     },
     "full": {
       "value": "9999",
@@ -30,15 +30,15 @@
     },
     "semantic": {
       "button": {
-        "value": "{radius.lg}",
-        "comment": "Standard button radius"
+        "value": "{radius.xl}",
+        "comment": "Standard button radius (pill)"
       },
       "card": {
-        "value": "{radius.lg}",
-        "comment": "Card corner radius"
+        "value": "20",
+        "comment": "Card corner radius (as shipped on iOS)"
       },
       "input": {
-        "value": "{radius.md}",
+        "value": "{radius.lg}",
         "comment": "Input field radius"
       },
       "chip": {
