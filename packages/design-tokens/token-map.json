@@ -14,8 +14,12 @@
       "web": ["--border", "tailwind:linear-border"]
     },
     "color.base.purple.500": {
-      "ios": "colors.primary",
+      "ios": "",
       "web": ["--primary", "tailwind:linear-purple", "tailwind:accent-purple"]
+    },
+    "color.semantic.action": {
+      "ios": "colors.primary",
+      "web": []
     },
     "color.semantic.primary": {
       "ios": "colors.info",
@@ -65,7 +69,6 @@
     "radius.lg": { "ios": "radius.lg", "web": [] },
     "radius.xl": { "ios": "radius.xl", "web": [] },
     "radius.xxl": { "ios": "radius.xxl", "web": [] },
-    "radius.full": { "ios": "radius.full", "web": [] },
     "radius.semantic.button": { "ios": "radius.button", "web": [] },
     "radius.semantic.card": { "ios": "radius.card", "web": [] },
     "radius.semantic.input": { "ios": "radius.input", "web": [] },

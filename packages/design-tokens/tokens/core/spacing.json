@@ -46,8 +46,8 @@
         "comment": "Section spacing"
       },
       "screen": {
-        "value": "{spacing.md}",
-        "comment": "Screen edge padding"
+        "value": "20",
+        "comment": "Screen edge padding (as shipped on iOS)"
       },
       "card": {
         "value": "{spacing.md}",
