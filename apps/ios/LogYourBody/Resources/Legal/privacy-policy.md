@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: July 11, 2025**
+**Last Updated: July 14, 2026**
 
 ## Introduction
 
@@ -16,6 +16,7 @@ We collect personal information that you voluntarily provide when registering fo
 - **Profile Information**: Date of birth, gender, height, weight
 - **Health Information**: Body measurements, weight logs, body fat percentage, progress photos
 - **Health Data**: Step count, activity data (when you grant permission to access Apple Health or similar services)
+- **Waitlist Information**: Email address and non-identifying campaign attribution when you request early access
 
 ### Information Automatically Collected
 
@@ -49,6 +50,7 @@ We use the information we collect to:
    - Send account-related notifications
    - Respond to your inquiries and support requests
    - Send updates about new features (with your consent)
+   - Send early-access and TestFlight invitations you request through the waitlist
 
 4. **Ensure Security**
    - Detect and prevent fraud
@@ -59,20 +61,17 @@ We use the information we collect to:
 
 ### Where We Store Data
 
-- Account profile and onboarding data are stored in Neon Postgres; body metrics
-  and progress-photo storage may remain on Supabase while the product-data
-  migration is completed
+- Your data is stored on secure servers provided by Supabase (PostgreSQL database)
 - Progress photos are stored in encrypted cloud storage
 - We use industry-standard encryption for data in transit and at rest
 
 ### Security Measures
 
-- Phone ownership is verified with short-lived SMS codes; LogYourBody does not
-  collect or store account passwords
+- All passwords are hashed using bcrypt
 - HTTPS/TLS encryption for all data transmission
 - Regular security audits and updates
 - Limited access to personal data (need-to-know basis)
-- Jovie-hosted Better Auth identity service with short-lived OAuth sessions
+- Secure authentication via Clerk
 
 ### Data Retention
 
@@ -86,12 +85,13 @@ We do not sell, trade, or rent your personal information. We may share your info
 
 1. **With Your Consent**: When you explicitly agree to share
 2. **Service Providers**: Third-party services that help operate our Service:
-   - Neon (account profile and onboarding data)
-   - Supabase (body-metric data and progress-photo storage during migration)
-   - Apple (authentication)
+   - Clerk (authentication)
+   - Supabase (database hosting)
+   - Neon (waitlist database hosting)
    - Vercel (web hosting)
    - RevenueCat (subscription and purchase entitlements)
    - Sentry (error tracking and crash reporting)
+   - Statsig (feature experimentation and product analytics)
 3. **Legal Requirements**: If required by law or to protect rights and safety
 4. **Business Transfers**: In connection with a merger or acquisition (with notice)
 
@@ -111,6 +111,12 @@ You have the right to:
 
 - Opt out of marketing emails via unsubscribe link
 - Manage notification preferences in app settings
+
+### Waitlist Data
+
+- We retain waitlist email addresses until invitations are complete or you ask us to delete yours
+- You may unsubscribe from waitlist emails using the link in any message
+- You may request deletion of your waitlist entry by emailing privacy@logyourbody.com
 
 ### Health Data Permissions
 
@@ -146,14 +152,14 @@ We may update this Privacy Policy from time to time. We will notify you of any c
 
 If you have questions about this Privacy Policy or our privacy practices, please contact us:
 
-**Email**: privacy@logyourbody.app  
+**Email**: privacy@logyourbody.com  
 **Address**: LogYourBody, Inc.  
 San Francisco, CA 94103
 
 ## Data Protection Officer
 
 For privacy-related inquiries and requests:  
-**Email**: dpo@logyourbody.app
+**Email**: dpo@logyourbody.com
 
 ---
 

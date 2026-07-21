@@ -152,14 +152,14 @@ We may update this Privacy Policy from time to time. We will notify you of any c
 
 If you have questions about this Privacy Policy or our privacy practices, please contact us:
 
-**Email**: privacy@logyourbody.app  
+**Email**: privacy@logyourbody.com  
 **Address**: LogYourBody, Inc.  
 San Francisco, CA 94103
 
 ## Data Protection Officer
 
 For privacy-related inquiries and requests:  
-**Email**: dpo@logyourbody.app
+**Email**: dpo@logyourbody.com
 
 ---
 

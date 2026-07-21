@@ -45,6 +45,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+#### **Clerk iOS SDK**
+
+- **License:** MIT License
+- **Copyright:** © 2024 Clerk Inc.
+- **Repository:** https://github.com/clerk/clerk-ios
+- **Usage:** User authentication and session management
+
 #### **Factory**
 
 - **License:** MIT License
@@ -124,6 +131,13 @@ SOFTWARE.
 - **Copyright:** © 2024 Supabase
 - **Repository:** https://github.com/supabase/supabase-js
 - **Usage:** Database and authentication client
+
+#### **Clerk React**
+
+- **License:** MIT License
+- **Copyright:** © 2024 Clerk Inc.
+- **Repository:** https://github.com/clerk/javascript
+- **Usage:** Authentication components
 
 ---
 
