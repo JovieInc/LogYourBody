@@ -34,7 +34,11 @@ if [ -n "$gone_branches" ]; then
     # no '+' lines means every change is already in main and -D is safe.
     if [ -z "$(git cherry main "$branch" 2>/dev/null | grep '^+' || true)" ]; then
       echo "  deleting $branch (all changes are in main)"
-      git branch -D "$branch"
+      # A branch checked out in a linked worktree cannot be deleted; keep it.
+      if ! git branch -D "$branch" 2>/dev/null; then
+        echo "  keeping $branch (checked out in another worktree)"
+        skipped="$skipped $branch"
+      fi
     else
       echo "  keeping $branch (has commits not in main)"
       skipped="$skipped $branch"
