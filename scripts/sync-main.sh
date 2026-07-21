@@ -21,14 +21,35 @@ git fetch --prune origin
 git checkout main
 git pull --ff-only origin main
 
-gone_branches="$(git branch -vv | grep ': gone]' | awk '{print $1}' | grep -v '^main$' || true)"
+# Strip the leading '*'/'+ '/' column git branch -vv adds for current/worktree
+# branches, then keep only branches whose upstream is gone.
+gone_branches="$(git branch -vv | sed -e 's/^[*+] //' | awk '/: gone]/ {print $1}' | grep -v '^main$' || true)"
 
+skipped=""
 if [ -n "$gone_branches" ]; then
-  echo "Deleting local branches with gone upstreams:"
-  echo "$gone_branches"
-  echo "$gone_branches" | xargs git branch -d
+  echo "Pruning local branches with gone upstreams:"
+  while IFS= read -r branch; do
+    # PRs squash-merge, so merged branches are not ancestors of main and
+    # `git branch -d` always refuses. `git cherry` compares patches instead:
+    # no '+' lines means every change is already in main and -D is safe.
+    if [ -z "$(git cherry main "$branch" 2>/dev/null | grep '^+' || true)" ]; then
+      echo "  deleting $branch (all changes are in main)"
+      # A branch checked out in a linked worktree cannot be deleted; keep it.
+      if ! git branch -D "$branch" 2>/dev/null; then
+        echo "  keeping $branch (checked out in another worktree)"
+        skipped="$skipped $branch"
+      fi
+    else
+      echo "  keeping $branch (has commits not in main)"
+      skipped="$skipped $branch"
+    fi
+  done <<< "$gone_branches"
 else
   echo "No stale local branches to delete"
+fi
+
+if [ -n "$skipped" ]; then
+  echo "WARNING: branches with work not in main were left in place:$skipped" >&2
 fi
 
 if [ "$current_branch" != "main" ] && git show-ref --verify --quiet "refs/heads/$current_branch"; then
