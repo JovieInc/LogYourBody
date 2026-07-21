@@ -15,6 +15,7 @@ This document lists all third-party open source libraries used in LogYourBody, a
 ### Core Dependencies
 
 #### **Supabase iOS SDK**
+
 - **License:** MIT License
 - **Copyright:** © 2024 Supabase
 - **Repository:** https://github.com/supabase/supabase-swift
@@ -45,24 +46,28 @@ SOFTWARE.
 ```
 
 #### **Clerk iOS SDK**
+
 - **License:** MIT License
 - **Copyright:** © 2024 Clerk Inc.
 - **Repository:** https://github.com/clerk/clerk-ios
 - **Usage:** User authentication and session management
 
 #### **Factory**
+
 - **License:** MIT License
 - **Copyright:** © 2022 Michael Long
 - **Repository:** https://github.com/hmlongco/Factory
 - **Usage:** Dependency injection
 
 #### **SimpleKeychain**
+
 - **License:** MIT License
 - **Copyright:** © 2024 Auth0
 - **Repository:** https://github.com/auth0/SimpleKeychain
 - **Usage:** Secure credential storage
 
 #### **Get**
+
 - **License:** MIT License
 - **Copyright:** © 2021 Alexander Grebenyuk
 - **Repository:** https://github.com/kean/Get
@@ -75,18 +80,21 @@ SOFTWARE.
 ### Frontend Framework
 
 #### **Next.js**
+
 - **License:** MIT License
 - **Copyright:** © 2024 Vercel, Inc.
 - **Repository:** https://github.com/vercel/next.js
 - **Usage:** React framework for web application
 
 #### **React**
+
 - **License:** MIT License
 - **Copyright:** © Meta Platforms, Inc. and affiliates
 - **Repository:** https://github.com/facebook/react
 - **Usage:** UI library
 
 #### **TypeScript**
+
 - **License:** Apache License 2.0
 - **Copyright:** © Microsoft Corporation
 - **Repository:** https://github.com/microsoft/TypeScript
@@ -95,18 +103,21 @@ SOFTWARE.
 ### UI Components
 
 #### **Tailwind CSS**
+
 - **License:** MIT License
 - **Copyright:** © Tailwind Labs Inc.
 - **Repository:** https://github.com/tailwindlabs/tailwindcss
 - **Usage:** Utility-first CSS framework
 
 #### **Radix UI**
+
 - **License:** MIT License
 - **Copyright:** © 2022 WorkOS
 - **Repository:** https://github.com/radix-ui/primitives
 - **Usage:** Accessible UI components
 
 #### **Lucide Icons**
+
 - **License:** ISC License
 - **Copyright:** © 2020 Lucide Contributors
 - **Repository:** https://github.com/lucide-icons/lucide
@@ -115,12 +126,14 @@ SOFTWARE.
 ### Backend & Services
 
 #### **Supabase JS Client**
+
 - **License:** MIT License
 - **Copyright:** © 2024 Supabase
 - **Repository:** https://github.com/supabase/supabase-js
 - **Usage:** Database and authentication client
 
 #### **Clerk React**
+
 - **License:** MIT License
 - **Copyright:** © 2024 Clerk Inc.
 - **Repository:** https://github.com/clerk/javascript
@@ -133,18 +146,21 @@ SOFTWARE.
 ### Build Tools
 
 #### **Turbo**
+
 - **License:** MIT License
 - **Copyright:** © 2024 Vercel, Inc.
 - **Repository:** https://github.com/vercel/turbo
 - **Usage:** Monorepo build system
 
 #### **ESLint**
+
 - **License:** MIT License
 - **Copyright:** © OpenJS Foundation and contributors
 - **Repository:** https://github.com/eslint/eslint
 - **Usage:** JavaScript linting
 
 #### **Prettier**
+
 - **License:** MIT License
 - **Copyright:** © James Long and contributors
 - **Repository:** https://github.com/prettier/prettier
@@ -178,6 +194,7 @@ We use privacy-respecting analytics that don't require additional licensing as t
 ### Contributing Back
 
 We believe in giving back to the open source community:
+
 - Report bugs to upstream projects
 - Contribute improvements when possible
 - Sponsor maintainers of critical dependencies
@@ -191,6 +208,7 @@ If you have questions about our use of open source software:
 **Email:** opensource@logyourbody.com
 
 **For License Inquiries:**
+
 - Specific license questions
 - Compliance concerns
 - Attribution requests
@@ -200,6 +218,7 @@ If you have questions about our use of open source software:
 ## Updates
 
 This document is updated when:
+
 - New dependencies are added
 - Dependencies are updated or removed
 - License terms change
