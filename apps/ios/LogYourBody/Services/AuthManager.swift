@@ -116,6 +116,33 @@ struct OAuthUserInfo: Decodable {
     }
 }
 
+private struct BetterAuthUser: Decodable {
+    let id: String
+    let email: String?
+    let name: String?
+}
+
+private struct BetterAuthSession: Decodable {
+    let id: String?
+    let expiresAt: String?
+
+    var expiryDate: Date? {
+        guard let expiresAt else { return nil }
+        return ISO8601DateFormatter().date(from: expiresAt)
+    }
+}
+
+private struct BetterAuthResponse: Decodable {
+    let token: String?
+    let accessToken: String?
+    let refreshToken: String?
+    let expiresIn: TimeInterval?
+    let user: BetterAuthUser?
+    let session: BetterAuthSession?
+
+    var resolvedAccessToken: String? { accessToken ?? token }
+}
+
 private struct ProductProfileEnvelope: Decodable {
     let profile: ProductProfilePayload
 }
@@ -282,7 +309,11 @@ final class AuthManager: NSObject, ObservableObject {
             ) {
                 authSession = stored
                 if stored.expiresAt.timeIntervalSinceNow > 60 {
-                    applyAuthenticatedSession(stored)
+                    if await validateStoredSession(stored) {
+                        applyAuthenticatedSession(stored)
+                    } else {
+                        await performLogout(exitReason: .sessionExpired)
+                    }
                 } else {
                     _ = await refreshAccessToken()
                 }
@@ -293,6 +324,86 @@ final class AuthManager: NSObject, ObservableObject {
             authProviderInitError = "Secure sign-in storage could not be opened."
             isAuthProviderLoaded = false
         }
+    }
+
+    func signIn(email: String, password: String) async throws {
+        try await authenticate(
+            path: "sign-in/email",
+            body: ["email": email, "password": password]
+        )
+        AppServicePorts.analyticsTracker.track(event: "login_completed", properties: ["method": "email"])
+    }
+
+    func signUp(email: String, password: String, name: String? = nil) async throws {
+        var body: [String: Any] = ["email": email, "password": password]
+        if let name, !name.isEmpty { body["name"] = name }
+        try await authenticate(path: "sign-up/email", body: body)
+        AppServicePorts.analyticsTracker.track(event: "signup_completed", properties: ["method": "email"])
+    }
+
+    private func authenticate(path: String, body: [String: Any]) async throws {
+        let response = try await requestBetterAuth(path: path, method: "POST", body: body)
+        guard let accessToken = response.resolvedAccessToken,
+              let user = response.user else { throw AuthError.invalidToken }
+        let expiresAt = response.session?.expiryDate
+            ?? Date().addingTimeInterval(response.expiresIn ?? 86_400)
+        let session = ProductAuthSession(
+            accessToken: accessToken,
+            refreshToken: response.refreshToken ?? accessToken,
+            expiresAt: expiresAt,
+            subject: user.id,
+            email: user.email ?? Self.syntheticAuthEmail(userId: user.id),
+            name: user.name,
+            issuedAt: Date()
+        )
+        try keychain.save(session, forKey: storedSessionKey)
+        authSession = session
+        applyAuthenticatedSession(session)
+    }
+
+    private func requestBetterAuth(
+        path: String,
+        method: String,
+        body: [String: Any]? = nil,
+        accessToken: String? = nil
+    ) async throws -> BetterAuthResponse {
+        guard let baseURL = URL(string: Configuration.authIssuer) else {
+            throw AuthError.providerNotReady
+        }
+        let url = baseURL.appendingPathComponent(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let accessToken {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        let (data, response) = try await urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AuthError.networkError }
+        guard (200...299).contains(http.statusCode) else {
+            let payload = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            throw AuthError.server(
+                payload?["message"] as? String ?? payload?["error"] as? String
+                    ?? "Authentication request could not be completed."
+            )
+        }
+        let decoder = JSONDecoder()
+        return try decoder.decode(BetterAuthResponse.self, from: data)
+    }
+
+    private func fetchBetterAuthUser(accessToken: String) async throws -> BetterAuthUser? {
+        let response = try await requestBetterAuth(path: "user", method: "GET", accessToken: accessToken)
+        return response.user
+    }
+
+    private func validateStoredSession(_ stored: ProductAuthSession) async -> Bool {
+        guard let response = try? await requestBetterAuth(
+            path: "session", method: "GET", accessToken: stored.accessToken
+        ) else { return false }
+        return response.user != nil || response.session != nil
     }
 
     func retryAuthProviderInitialization() async {
@@ -514,6 +625,9 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func logout() async {
+        if let token = authSession?.accessToken {
+            try? await requestBetterAuth(path: "sign-out", method: "POST", accessToken: token)
+        }
         await performLogout(exitReason: .userInitiated)
     }
 

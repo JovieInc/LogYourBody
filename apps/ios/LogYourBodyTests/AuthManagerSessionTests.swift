@@ -115,14 +115,28 @@ final class AuthManagerSessionTests: XCTestCase {
         )
     }
 
-    private func stubRefreshSuccess(tokenBody: String) {
+    private func stubSessionSuccess(userBody: String = #"{"id":"user-123","email":"user@example.com","name":"Test User"}"#) {
         AuthStubURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             if path.contains("oauth2/token") {
-                return AuthStubURLProtocol.StubbedResponse(statusCode: 200, body: Data(tokenBody.utf8))
+                return AuthStubURLProtocol.StubbedResponse(
+                    statusCode: 200,
+                    body: Data(#"{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600}"#.utf8)
+                )
             }
             if path.contains("oauth2/userinfo") {
-                let body = #"{"sub":"user-123","email":"user@example.com","name":"Test User"}"#
+                return AuthStubURLProtocol.StubbedResponse(
+                    statusCode: 200,
+                    body: Data(#"{"sub":"user-123","email":"user@example.com","name":"Test User"}"#.utf8)
+                )
+            }
+            if path.hasSuffix("/session") {
+                let body = "{\"session\":{\"id\":\"session-123\",\"expiresAt\":\"2030-01-01T00:00:00Z\"},\"user\":"
+                    + userBody + "}"
+                return AuthStubURLProtocol.StubbedResponse(statusCode: 200, body: Data(body.utf8))
+            }
+            if path.hasSuffix("/user") {
+                let body = "{\"user\":" + userBody + "}"
                 return AuthStubURLProtocol.StubbedResponse(statusCode: 200, body: Data(body.utf8))
             }
             // Profile bootstrap and any other call: fail closed, tests don't depend on it.
@@ -147,9 +161,7 @@ final class AuthManagerSessionTests: XCTestCase {
             refreshToken: "old-refresh",
             expiresAt: Date().addingTimeInterval(-5)
         )
-        stubRefreshSuccess(
-            tokenBody: #"{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600}"#
-        )
+        stubSessionSuccess()
 
         let token = await manager.getAccessToken()
 
@@ -169,7 +181,7 @@ final class AuthManagerSessionTests: XCTestCase {
             refreshToken: "old-refresh",
             expiresAt: Date().addingTimeInterval(-5)
         )
-        stubRefreshSuccess(tokenBody: #"{"access_token":"new-access","expires_in":3600}"#)
+        stubSessionSuccess()
 
         let token = await manager.getAccessToken()
 

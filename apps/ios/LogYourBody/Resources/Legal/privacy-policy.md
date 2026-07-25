@@ -71,7 +71,7 @@ We use the information we collect to:
 - HTTPS/TLS encryption for all data transmission
 - Regular security audits and updates
 - Limited access to personal data (need-to-know basis)
-- Secure authentication via Clerk
+- Secure authentication via Jovie Better Auth
 
 ### Data Retention
 
@@ -85,7 +85,7 @@ We do not sell, trade, or rent your personal information. We may share your info
 
 1. **With Your Consent**: When you explicitly agree to share
 2. **Service Providers**: Third-party services that help operate our Service:
-   - Clerk (authentication)
+   - Jovie Better Auth (authentication)
    - Supabase (database hosting)
    - Neon (waitlist database hosting)
    - Vercel (web hosting)
