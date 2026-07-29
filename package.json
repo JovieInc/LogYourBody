@@ -33,7 +33,10 @@
     "product:check": "pnpm --filter @jovieinc/product-registry test",
     "check:vendor-boundaries": "node scripts/check-vendor-boundaries.js",
     "check:supabase-migrations": "node scripts/check-supabase-migration-drift.js",
-    "sync:main": "bash scripts/sync-main.sh"
+    "sync:main": "bash scripts/sync-main.sh",
+    "eve:info": "eve info",
+    "eve:build": "eve build",
+    "eve:dev": "eve dev"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
@@ -76,5 +79,10 @@
     "*.{ts,tsx,js,jsx,mjs,cjs,swift,sh,yml,yaml,json,md,html,css,scss,rb,py,toml,xml,plist,template,xcconfig}": [
       "node packages/product-registry/scripts/url-drift.test.mjs --staged"
     ]
+  },
+  "dependencies": {
+    "ai": "^7.0.42",
+    "eve": "0.27.13",
+    "zod": "^4.1.13"
   }
 }
