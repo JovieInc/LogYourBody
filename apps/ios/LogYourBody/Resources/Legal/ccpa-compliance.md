@@ -175,7 +175,7 @@ Sensitive information we collect:
 
 - **Supabase**: Database and authentication
 - **AWS**: Cloud infrastructure
-- **Jovie Better Auth**: Authentication services
+- **Clerk**: Authentication services
 - **RevenueCat**: Subscription and purchase entitlements
 - **Sentry**: Error tracking and crash reports
 
