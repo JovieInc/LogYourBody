@@ -18,11 +18,11 @@
   ],
   "scripts": {
     "build": "pnpm generate && tsc -p tsconfig.json",
-    "generate": "node scripts/generate.mjs",
-    "generate:check": "node scripts/generate.mjs --check",
+    "generate": "node scripts/generate.mjs && node scripts/generate-storefront.mjs",
+    "generate:check": "node scripts/generate.mjs --check && node scripts/generate-storefront.mjs --check",
     "lint": "eslint src scripts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node scripts/registry.test.mjs && node scripts/brand-integrity.test.mjs && pnpm generate:check && node scripts/url-drift.test.mjs && node scripts/legal-docs-sync.test.mjs && node scripts/env-surface.test.mjs && node scripts/db-entities.test.mjs"
+    "test": "node scripts/registry.test.mjs && node scripts/brand-integrity.test.mjs && node scripts/storefront.test.mjs && pnpm generate:check && node scripts/url-drift.test.mjs && node scripts/legal-docs-sync.test.mjs && node scripts/env-surface.test.mjs && node scripts/db-entities.test.mjs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.16.0",
