@@ -79,12 +79,18 @@ struct ContentView: View {
     @State private var isLoadingComplete = false
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
+    @State private var showWhatsNew = false
+    @AppStorage("lyb.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion: String?
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
 
     init() {
         // We need to initialize LoadingManager with a temporary AuthManager
         // The actual authManager will be injected from environment
         _loadingManager = StateObject(wrappedValue: LoadingManager(authManager: AuthManager.shared))
+    }
+
+    private func markWhatsNewPresented() {
+        lastPresentedWhatsNewVersion = AppVersion.current
     }
 
     private func applyProfileCompletionIfNeeded(_ completionFlag: Bool?) {
@@ -154,6 +160,9 @@ struct ContentView: View {
             )
             .interactiveDismissDisabled(true) // Prevent dismissing without accepting
         }
+        .sheet(isPresented: $showWhatsNew, onDismiss: markWhatsNewPresented) {
+            LogYourBodyWhatsNewView(version: AppVersion.current)
+        }
         .onAppear {
             // Initialize onboarding status
             currentUserId = authManager.currentUser?.id
@@ -169,6 +178,17 @@ struct ContentView: View {
                 await loadingManager.startLoading()
                 completeLaunchOverlayIfReady()
             }
+        }
+        .task(id: "\(authManager.isAuthenticated)-\(isLoadingComplete)-\(hasCompletedOnboarding)-\(isProfileComplete)") {
+            let isEligible = authManager.isAuthenticated &&
+                isLoadingComplete &&
+                hasCompletedOnboarding &&
+                !shouldShowProfileCompletion
+            showWhatsNew = WhatsNewPresentationPolicy.shouldPresent(
+                currentVersion: AppVersion.current,
+                lastPresentedVersion: lastPresentedWhatsNewVersion,
+                isEligible: isEligible
+            )
         }
         .onChange(of: loadingManager.isLoading) { _, _ in
             completeLaunchOverlayIfReady()
@@ -284,6 +304,62 @@ struct ContentView: View {
                 .transition(.opacity)
             }
         }
+    }
+}
+
+struct WhatsNewPresentationPolicy {
+    static func shouldPresent(
+        currentVersion: String,
+        lastPresentedVersion: String?,
+        isEligible: Bool
+    ) -> Bool {
+        isEligible && currentVersion != lastPresentedVersion
+    }
+}
+
+private struct LogYourBodyWhatsNewView: View {
+    let version: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
+            HStack {
+                VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+                    Text("What’s New")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(Color.appTextPrimary)
+                    Text("Version \(version)")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.appTextSecondary)
+                }
+                Spacer()
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundStyle(Color.appPrimary)
+                    .accessibilityHidden(true)
+            }
+
+            VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+                Label("This update is shown once for this app version.", systemImage: "checkmark.circle")
+                Label("Dismiss it anytime with Done.", systemImage: "hand.tap")
+            }
+            .font(.body)
+            .foregroundStyle(Color.appTextSecondary)
+
+            Spacer(minLength: 0)
+
+            StandardButton("Done") {
+                dismiss()
+            }
+            .accessibilityIdentifier("whats-new-done")
+        }
+        .padding(JovieTokens.screenInset)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.appBackground)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("What’s New, version \(version)")
     }
 }
 

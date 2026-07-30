@@ -33,4 +33,38 @@ final class AppVersionTests: XCTestCase {
         XCTAssertTrue(AppVersion.fullVersion.hasPrefix("Version "))
         XCTAssertTrue(AppVersion.fullVersion.hasSuffix("(\(AppVersion.build))"))
     }
+
+    func testWhatsNewPresentsOnlyForAnUnseenVersionWhenEligible() {
+        XCTAssertTrue(
+            WhatsNewPresentationPolicy.shouldPresent(
+                currentVersion: "2.4",
+                lastPresentedVersion: nil,
+                isEligible: true
+            )
+        )
+        XCTAssertTrue(
+            WhatsNewPresentationPolicy.shouldPresent(
+                currentVersion: "2.4",
+                lastPresentedVersion: "2.3",
+                isEligible: true
+            )
+        )
+        XCTAssertFalse(
+            WhatsNewPresentationPolicy.shouldPresent(
+                currentVersion: "2.4",
+                lastPresentedVersion: "2.4",
+                isEligible: true
+            )
+        )
+    }
+
+    func testWhatsNewDoesNotPresentUntilTheAppIsReady() {
+        XCTAssertFalse(
+            WhatsNewPresentationPolicy.shouldPresent(
+                currentVersion: "2.4",
+                lastPresentedVersion: nil,
+                isEligible: false
+            )
+        )
+    }
 }
