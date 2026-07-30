@@ -621,4 +621,20 @@ final class OnboardingFlowViewModelTests: XCTestCase {
 
         XCTAssertEqual(updates["onboardingCompleted"] as? Bool, true)
     }
+
+    func testFirstPhotoAddActionOnlyShowsItsOwnLoader() {
+        let state = OnboardingFirstPhotoActionState(isBusy: true, activeAction: .add)
+
+        XCTAssertTrue(state.disablesActions)
+        XCTAssertTrue(state.showsLoader(for: .add))
+        XCTAssertFalse(state.showsLoader(for: .skip))
+    }
+
+    func testFirstPhotoSkipActionOnlyShowsItsOwnLoader() {
+        let state = OnboardingFirstPhotoActionState(isBusy: true, activeAction: .skip)
+
+        XCTAssertTrue(state.disablesActions)
+        XCTAssertFalse(state.showsLoader(for: .add))
+        XCTAssertTrue(state.showsLoader(for: .skip))
+    }
 }
