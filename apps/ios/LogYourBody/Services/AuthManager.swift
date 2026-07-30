@@ -400,8 +400,11 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     private func validateStoredSession(_ stored: ProductAuthSession) async -> Bool {
+        // Better Auth exposes this operation as `get-session`. `session` is
+        // the legacy LogYourBody web route and returns 404 from the Jovie
+        // issuer used by native clients.
         guard let response = try? await requestBetterAuth(
-            path: "session", method: "GET", accessToken: stored.accessToken
+            path: "get-session", method: "GET", accessToken: stored.accessToken
         ) else { return false }
         return response.user != nil || response.session != nil
     }
