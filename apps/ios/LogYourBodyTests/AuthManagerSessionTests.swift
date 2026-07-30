@@ -130,7 +130,7 @@ final class AuthManagerSessionTests: XCTestCase {
                     body: Data(#"{"sub":"user-123","email":"user@example.com","name":"Test User"}"#.utf8)
                 )
             }
-            if path.hasSuffix("/session") {
+            if path.hasSuffix("/get-session") {
                 let body = "{\"session\":{\"id\":\"session-123\",\"expiresAt\":\"2030-01-01T00:00:00Z\"},\"user\":"
                     + userBody + "}"
                 return AuthStubURLProtocol.StubbedResponse(statusCode: 200, body: Data(body.utf8))
@@ -142,6 +142,21 @@ final class AuthManagerSessionTests: XCTestCase {
             // Profile bootstrap and any other call: fail closed, tests don't depend on it.
             return AuthStubURLProtocol.StubbedResponse(statusCode: 404, body: Data("{}".utf8))
         }
+    }
+
+    func testInitializeValidatesStoredSessionWithCanonicalBetterAuthRoute() async throws {
+        let stored = makeSession(expiresAt: Date().addingTimeInterval(3_600))
+        try keychain.save(stored, forKey: storedSessionKey)
+        stubSessionSuccess()
+        let manager = makeManager()
+
+        await manager.initialize()
+
+        XCTAssertTrue(manager.isAuthenticated)
+        XCTAssertEqual(
+            AuthStubURLProtocol.recordedRequests.first?.url?.path,
+            "/api/auth/get-session"
+        )
     }
 
     func testGetAccessTokenReturnsCachedTokenWithoutNetworkWhenSessionUnexpired() async {
