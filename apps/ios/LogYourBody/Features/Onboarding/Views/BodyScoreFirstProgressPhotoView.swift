@@ -1,5 +1,23 @@
 import SwiftUI
 
+enum OnboardingFirstPhotoAction: Equatable {
+    case add
+    case skip
+}
+
+struct OnboardingFirstPhotoActionState: Equatable {
+    let isBusy: Bool
+    let activeAction: OnboardingFirstPhotoAction?
+
+    var disablesActions: Bool {
+        isBusy || activeAction != nil
+    }
+
+    func showsLoader(for action: OnboardingFirstPhotoAction) -> Bool {
+        activeAction == action
+    }
+}
+
 struct BodyScoreFirstProgressPhotoView: View {
     @Environment(\.theme)
     private var theme
@@ -7,6 +25,14 @@ struct BodyScoreFirstProgressPhotoView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @EnvironmentObject private var authManager: AuthManager
     @State private var isAttachSheetPresented = false
+    @State private var activeAction: OnboardingFirstPhotoAction?
+
+    private var actionState: OnboardingFirstPhotoActionState {
+        OnboardingFirstPhotoActionState(
+            isBusy: viewModel.isPreparingFirstPhotoMetric || viewModel.isCompletingOnboarding,
+            activeAction: activeAction
+        )
+    }
 
     var body: some View {
         OnboardingPageTemplate(
@@ -29,7 +55,7 @@ struct BodyScoreFirstProgressPhotoView: View {
                 targetMetric: viewModel.onboardingFirstPhotoMetric,
                 fallbackDate: Date(),
                 onComplete: {
-                    await viewModel.completeFirstPhotoStep()
+                    await completeFirstPhotoStep(from: .add)
                 }
             )
             .environmentObject(authManager)
@@ -86,7 +112,7 @@ struct BodyScoreFirstProgressPhotoView: View {
             Button {
                 presentAttachSheet()
             } label: {
-                if viewModel.isPreparingFirstPhotoMetric || viewModel.isCompletingOnboarding {
+                if actionState.showsLoader(for: .add) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 } else {
@@ -94,15 +120,15 @@ struct BodyScoreFirstProgressPhotoView: View {
                 }
             }
             .buttonStyle(OnboardingPrimaryButtonStyle())
-            .disabled(viewModel.isPreparingFirstPhotoMetric || viewModel.isCompletingOnboarding)
+            .disabled(actionState.disablesActions)
             .accessibilityIdentifier("onboarding_first_photo_add_button")
 
             Button {
                 Task {
-                    await viewModel.completeFirstPhotoStep()
+                    await completeFirstPhotoStep(from: .skip)
                 }
             } label: {
-                if viewModel.isCompletingOnboarding {
+                if actionState.showsLoader(for: .skip) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: Color.appTextSecondary))
                 } else {
@@ -110,7 +136,7 @@ struct BodyScoreFirstProgressPhotoView: View {
                 }
             }
             .buttonStyle(OnboardingSecondaryButtonStyle())
-            .disabled(viewModel.isCompletingOnboarding)
+            .disabled(actionState.disablesActions)
             .accessibilityIdentifier("onboarding_first_photo_skip_button")
 
             Text("You can add progress photos later from Home.")
@@ -131,12 +157,20 @@ struct BodyScoreFirstProgressPhotoView: View {
 
     private func presentAttachSheet() {
         Task {
+            activeAction = .add
+            defer { activeAction = nil }
             guard await viewModel.prepareFirstPhotoBaselineMetric() != nil else { return }
             await MainActor.run {
                 HapticManager.shared.selection()
                 isAttachSheetPresented = true
             }
         }
+    }
+
+    private func completeFirstPhotoStep(from action: OnboardingFirstPhotoAction) async {
+        activeAction = action
+        defer { activeAction = nil }
+        await viewModel.completeFirstPhotoStep()
     }
 }
 
