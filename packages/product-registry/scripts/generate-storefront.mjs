@@ -1,7 +1,8 @@
+import console from 'node:console';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { expectedStorefrontFiles } from './storefront-files.mjs';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
