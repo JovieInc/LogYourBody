@@ -194,6 +194,11 @@ unique(storefront.measurement.guardrailMetrics, 'storefront guardrail metrics mu
 for (const [path, expected] of await expectedStorefrontFiles(repoRoot)) {
   const current = await readFile(path, 'utf8').catch(() => '');
   assert.equal(current, expected, `${path} is stale; run pnpm product:generate`);
+  if (path.endsWith('.txt')) {
+    assert.match(expected, /\n$/u, `${path} must end with a newline`);
+    assert.doesNotMatch(expected, /\r\n$/u, `${path} must use LF line endings`);
+    assert.doesNotMatch(expected, /\n\n$/u, `${path} must end with exactly one newline`);
+  }
 }
 
 const screenshotAssets = await collectScreenshotAssets(repoRoot);

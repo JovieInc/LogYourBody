@@ -14,7 +14,7 @@ const metadataFileNames = {
   privacyUrl: 'privacy_url.txt',
 };
 
-const normalizeMetadata = (value) => value.replace(/\s+$/u, '');
+const normalizeMetadata = (value) => `${value.replace(/\s+$/u, '')}\n`;
 
 export async function storefrontManifest(repoRoot) {
   return {
