@@ -34,6 +34,13 @@ if [ "$RELEASE_TYPE" = "app_store" ] && [ "$REF_NAME" != "main" ]; then
   fail "App Store releases must run from main."
 fi
 
+if ! command -v node >/dev/null 2>&1; then
+  fail "Node.js is required to validate the App Store storefront."
+fi
+
+echo "Validating generated App Store storefront..."
+node packages/product-registry/scripts/storefront.test.mjs
+
 STATUS_STATE="$(gh api "repos/$REPO/commits/$SHA/status" --jq '.state')"
 case "$STATUS_STATE" in
   success)
