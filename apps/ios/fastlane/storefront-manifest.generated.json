@@ -1,0 +1,262 @@
+{
+  "generatedBy": "packages/product-registry/scripts/generate-storefront.mjs",
+  "schemaVersion": 1,
+  "productId": "logyourbody",
+  "platform": "ios",
+  "defaultLocale": "en-US",
+  "metadataLimits": {
+    "nameCharacters": 30,
+    "subtitleCharacters": 30,
+    "promotionalTextCharacters": 170,
+    "descriptionCharacters": 4000,
+    "releaseNotesCharacters": 4000,
+    "keywordsBytes": 100
+  },
+  "locales": [
+    {
+      "id": "en-US",
+      "metadata": {
+        "name": "LogYourBody",
+        "subtitle": "Weight and body metrics",
+        "keywords": "progress,photos,composition,fat,lean,mass,private,timeline,ffmi,tracker,measurements,recomposition",
+        "promotionalText": "Track progress photos, weight, body fat, and Apple Health context from a private photo-first timeline.",
+        "description": "LogYourBody is a focused body-composition tracker for people who want a private progress-photo timeline with weight, body-fat, and Apple Health context.\n\nStart with the essentials:\n\n- Add progress photos to a swipeable body timeline\n- Log weight and body-fat context in pounds or kilograms\n- Review Stats for weight, body fat, FFMI, and steps\n- Optionally connect Apple Health for weight, body-fat, height, and step context\n- Sync entries to your account\n- Export your account data\n- Keep access managed through LogYourBody Pro\n\nLogYourBody is built for consistent body-composition tracking without noisy coaching. Your photos and entries stay available on device and sync to your account when you are signed in.\n\nLogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.",
+        "releaseNotes": "Photo-first MVP release with paid access, progress-photo timeline, weight and body-fat logging, optional HealthKit context, account sync, restore purchases, data export, and account deletion.",
+        "supportUrl": "https://logyourbody.com/support",
+        "marketingUrl": "https://logyourbody.com",
+        "privacyUrl": "https://logyourbody.com/privacy"
+      }
+    }
+  ],
+  "searchIntents": [
+    {
+      "id": "private-progress",
+      "label": "Private progress photos",
+      "audience": "People who want visual progress without a social feed.",
+      "priority": 1,
+      "terms": [
+        "progress photos",
+        "photo tracker",
+        "private timeline"
+      ],
+      "featureIds": [
+        "progress-photos",
+        "private-timeline"
+      ],
+      "customProductPageStatus": "candidate"
+    },
+    {
+      "id": "body-composition",
+      "label": "Body composition trends",
+      "audience": "People tracking body fat, lean mass, FFMI, or recomposition.",
+      "priority": 2,
+      "terms": [
+        "body composition",
+        "body fat",
+        "lean mass",
+        "ffmi"
+      ],
+      "featureIds": [
+        "body-metrics",
+        "private-timeline"
+      ],
+      "customProductPageStatus": "candidate"
+    },
+    {
+      "id": "apple-health-weight",
+      "label": "Weight and Apple Health context",
+      "audience": "People who want weight trends with supported Apple Health data.",
+      "priority": 3,
+      "terms": [
+        "weight tracker",
+        "apple health",
+        "healthkit"
+      ],
+      "featureIds": [
+        "body-metrics",
+        "healthkit-sync"
+      ],
+      "customProductPageStatus": "candidate"
+    }
+  ],
+  "screenshotPolicy": {
+    "minimumCount": 1,
+    "maximumCount": 10,
+    "preferredPortraitSize": {
+      "width": 1320,
+      "height": 2868
+    },
+    "acceptedPortraitSizes": [
+      {
+        "width": 1260,
+        "height": 2736
+      },
+      {
+        "width": 1290,
+        "height": 2796
+      },
+      {
+        "width": 1320,
+        "height": 2868
+      },
+      {
+        "width": 1284,
+        "height": 2778
+      },
+      {
+        "width": 1242,
+        "height": 2688
+      },
+      {
+        "width": 2048,
+        "height": 2732
+      }
+    ],
+    "alphaAllowed": false,
+    "finalProductUiSource": "real-app-capture",
+    "provenanceRequired": true
+  },
+  "screenshotSets": [
+    {
+      "id": "default",
+      "locale": "en-US",
+      "target": "iphone-6.9",
+      "status": "hypothesis",
+      "frames": [
+        {
+          "id": "know-if-it-is-working",
+          "order": 1,
+          "headline": "Know if the work is working.",
+          "supportingCopy": "One private timeline for the signal that matters.",
+          "captureStateId": "timeline-overview",
+          "featureIds": [
+            "progress-photos",
+            "private-timeline",
+            "body-metrics"
+          ]
+        },
+        {
+          "id": "trend-not-one-day",
+          "order": 2,
+          "headline": "See the trend, not one day.",
+          "supportingCopy": "Keep daily noise in the context of your longer-term direction.",
+          "captureStateId": "stats-trend",
+          "featureIds": [
+            "body-metrics",
+            "private-timeline"
+          ]
+        },
+        {
+          "id": "photos-and-metrics",
+          "order": 3,
+          "headline": "Photos and metrics, together.",
+          "supportingCopy": "See each photo beside the measurements from the same moment.",
+          "captureStateId": "timeline-photo-metrics",
+          "featureIds": [
+            "progress-photos",
+            "body-metrics",
+            "private-timeline"
+          ]
+        },
+        {
+          "id": "log-in-seconds",
+          "order": 4,
+          "headline": "Log weight in seconds.",
+          "supportingCopy": "Add the measurement and get back to the work.",
+          "captureStateId": "weight-entry",
+          "featureIds": [
+            "body-metrics"
+          ]
+        },
+        {
+          "id": "composition-in-context",
+          "order": 5,
+          "headline": "Body composition, in context.",
+          "supportingCopy": "Review supported body-fat, lean-mass, and derived metrics over time.",
+          "captureStateId": "stats-composition",
+          "featureIds": [
+            "body-metrics"
+          ]
+        },
+        {
+          "id": "apple-health",
+          "order": 6,
+          "headline": "Bring in Apple Health.",
+          "supportingCopy": "Add supported weight and activity context to your timeline.",
+          "captureStateId": "healthkit-context",
+          "featureIds": [
+            "healthkit-sync",
+            "private-timeline"
+          ]
+        },
+        {
+          "id": "private-by-design",
+          "order": 7,
+          "headline": "Private by design.",
+          "supportingCopy": "Track your body without a public feed or social comparison.",
+          "captureStateId": "timeline-private",
+          "featureIds": [
+            "progress-photos",
+            "private-timeline"
+          ]
+        }
+      ]
+    }
+  ],
+  "measurement": {
+    "primaryMetric": "first-time-download-conversion-rate",
+    "guardrailMetrics": [
+      "trial-starts-per-download",
+      "paid-conversion-per-download",
+      "d7-activation",
+      "d30-retention",
+      "refund-rate",
+      "crash-free-sessions"
+    ]
+  },
+  "experiments": [],
+  "creative": {
+    "imageModel": "gpt-image-2-2026-04-21",
+    "approvedDirection": null,
+    "allowedImageUses": [
+      "art-direction exploration",
+      "non-semantic editorial backgrounds",
+      "texture and lighting exploration",
+      "comparison-board variants"
+    ],
+    "prohibitedImageUses": [
+      "product UI",
+      "localized typography",
+      "device geometry",
+      "generated body transformations",
+      "before-and-after proof",
+      "fabricated measured outcomes"
+    ]
+  },
+  "assetProvenance": {
+    "screenshots": [
+      {
+        "locale": "en-US",
+        "path": "apps/ios/fastlane/screenshots/en-US/01_APP_IPHONE_65.png",
+        "filename": "01_APP_IPHONE_65.png",
+        "width": 1242,
+        "height": 2688,
+        "hasAlpha": false,
+        "gitBlobSha": "7d2db86054ab94902e8ed8e8fc46b58f5b109033",
+        "sourceKind": "ios-fastlane-capture",
+        "truthStatus": "real-app-capture"
+      },
+      {
+        "locale": "en-US",
+        "path": "apps/ios/fastlane/screenshots/en-US/01_IPAD_PRO_3GEN_129.png",
+        "filename": "01_IPAD_PRO_3GEN_129.png",
+        "width": 2048,
+        "height": 2732,
+        "hasAlpha": false,
+        "gitBlobSha": "26c4e2fad8b20a10a4aff3cba83c4349930eeb9a",
+        "sourceKind": "ios-fastlane-capture",
+        "truthStatus": "real-app-capture"
+      }
+    ]
+  }
+}

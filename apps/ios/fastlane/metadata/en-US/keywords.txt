@@ -1,1 +1,1 @@
-progress photos,body composition,weight tracker,body fat,fitness tracker,health log
+progress,photos,composition,fat,lean,mass,private,timeline,ffmi,tracker,measurements,recomposition
