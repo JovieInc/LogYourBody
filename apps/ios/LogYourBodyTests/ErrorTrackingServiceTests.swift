@@ -79,7 +79,7 @@ final class ErrorTrackingServiceTests: XCTestCase {
         XCTAssertEqual(tagValues(vendor, forKey: "feature"), ["sync"])
         XCTAssertEqual(tagValues(vendor, forKey: "operation"), ["push"])
         XCTAssertEqual(tagValues(vendor, forKey: "screen"), ["dashboard"])
-        XCTAssertEqual(tagValues(vendor, forKey: "userId"), ["user-1"])
+        XCTAssertEqual(tagValues(vendor, forKey: "userId"), ["[Filtered]"])
         XCTAssertEqual(vendor.extras.count, 1)
         XCTAssertEqual(vendor.extras.first?.key, "appError")
         XCTAssertEqual(vendor.extras.first?.value, String(describing: appError))
@@ -109,7 +109,7 @@ final class ErrorTrackingServiceTests: XCTestCase {
             message: "upload failed",
             category: "photos",
             level: .error,
-            data: ["photo_id": "abc"]
+            data: ["photo_id": "[Filtered]"]
         )
 
         XCTAssertEqual(vendor.breadcrumbLevels, [.error])
@@ -132,7 +132,7 @@ final class ErrorTrackingServiceTests: XCTestCase {
 
         service.updateUserId("user-9")
 
-        XCTAssertEqual(tagValues(vendor, forKey: "userId"), ["user-9"])
+        XCTAssertEqual(tagValues(vendor, forKey: "userId"), ["[Filtered]"])
     }
 
     func testUpdateUserIdFallsBackToNoneForNilOrEmpty() {
@@ -142,5 +142,20 @@ final class ErrorTrackingServiceTests: XCTestCase {
         service.updateUserId("")
 
         XCTAssertEqual(tagValues(vendor, forKey: "userId"), ["none", "none"])
+    }
+
+    func testRedactorFiltersEmailHealthValuesAndIdentifiers() {
+        XCTAssertEqual(
+            ErrorTrackingRedactor.sanitize("tim@example.com"),
+            ErrorTrackingRedactor.filteredValue
+        )
+        XCTAssertEqual(
+            ErrorTrackingRedactor.sanitize("72.5", key: "weight_kg"),
+            ErrorTrackingRedactor.filteredValue
+        )
+        XCTAssertEqual(
+            ErrorTrackingRedactor.sanitize("user-123", key: "user_id"),
+            ErrorTrackingRedactor.filteredValue
+        )
     }
 }

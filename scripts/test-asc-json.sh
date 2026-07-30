@@ -1,10 +1,13 @@
 #!/bin/bash
 
+set -euo pipefail
+
 echo "Testing ASC API Key JSON format..."
 
-# Create a test JSON file
+# This fixture intentionally uses a non-parseable placeholder. Real ASC keys
+# must only be supplied through CI/local secret storage.
 cat > test_asc.json << 'EOF'
-{"key_id":"A76CPV6UUL","issuer_id":"c195f569-ff16-40fa-aaff-4fe94e8139ad","key":"-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgX+9p5JYj1dqGLqLr\n8CB3UlnMs0BBi+qw8pDl0gLlNcigCgYIKoZIzj0DAQehRANCAATn8smgverE5wVl\nqLjMUKyabZRClj0dBSmWYRhZLlNRKDOT0K7joMOyBahlJts1oA6rZLATULdmr3BM\ndPqjz5sV\n-----END PRIVATE KEY-----","in_house":false}
+{"key_id":"TEST_KEY_ID","issuer_id":"00000000-0000-0000-0000-000000000000","key":"NOT_A_REAL_PRIVATE_KEY_FIXTURE","in_house":false}
 EOF
 
 # Check if JSON is valid
@@ -17,9 +20,10 @@ if jq . test_asc.json > /dev/null 2>&1; then
     echo "issuer_id: $(jq -r .issuer_id test_asc.json)"
     echo "in_house: $(jq -r .in_house test_asc.json)"
     echo ""
-    echo "Key (first 50 chars): $(jq -r .key test_asc.json | head -c 50)..."
+    echo "Key fixture is intentionally not a PEM/private key."
 else
     echo "❌ JSON is invalid"
+    exit 1
 fi
 
 # Test with ruby (what Fastlane uses)
@@ -27,14 +31,10 @@ echo ""
 echo "Testing with Ruby (Fastlane's language)..."
 ruby -e "
 require 'json'
-begin
-  data = JSON.parse(File.read('test_asc.json'))
-  puts '✅ Ruby can parse the JSON'
-  puts \"key_id: #{data['key_id']}\"
-  puts \"issuer_id: #{data['issuer_id']}\"
-rescue => e
-  puts '❌ Ruby error: ' + e.message
-end
+data = JSON.parse(File.read('test_asc.json'))
+puts '✅ Ruby can parse the JSON'
+puts \"key_id: #{data['key_id']}\"
+puts \"issuer_id: #{data['issuer_id']}\"
 "
 
 rm -f test_asc.json
