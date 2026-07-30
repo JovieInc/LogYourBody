@@ -43,7 +43,7 @@ concurrency:
 
 env:
   LOGYOURBODY_APP_IDENTIFIER: com.logyourbody.app
-  LOGYOURBODY_APP_STORE_APP_ID: "6755209876"
+  LOGYOURBODY_APP_STORE_APP_ID: '6755209876'
 
 jobs:
   validate-release:
@@ -68,6 +68,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TYPE: ${{ github.event.inputs.release_type || 'testflight' }}
         run: .github/scripts/validate-release-source.sh
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install auth contract dependencies
+        run: pnpm install --frozen-lockfile --filter logyourbody...
+
+      - name: Verify production Apple auth contract
+        env:
+          PLAYWRIGHT_BROWSER_CHANNEL: chrome
+        run: |
+          node --test .github/scripts/verify-ios-auth-contract.test.mjs
+          node .github/scripts/verify-ios-auth-contract.mjs
 
       - name: Extract version info
         id: version
