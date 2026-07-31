@@ -104,18 +104,16 @@ final class BugReportManager: ObservableObject {
         let emailToSend = email
         let screenshotToSend = currentScreenshot
 
-        Task.detached(priority: .userInitiated) {
-            let attachments = screenshotToSend.map { [$0] }
-            let feedback = SentryFeedback(
-                message: messageToSend,
-                name: nameToSend,
-                email: emailToSend,
-                source: .custom,
-                associatedEventId: nil,
-                attachments: attachments
-            )
-            SentrySDK.capture(feedback: feedback)
-        }
+        let attachments = screenshotToSend.map { [$0] }
+        let feedback = SentryFeedback(
+            message: messageToSend,
+            name: nameToSend,
+            email: emailToSend,
+            source: .custom,
+            associatedEventId: nil,
+            attachments: attachments
+        )
+        SentrySDK.capture(feedback: feedback)
         #endif
 
         isFormPresented = false

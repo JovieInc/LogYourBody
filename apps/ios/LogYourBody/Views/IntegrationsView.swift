@@ -15,18 +15,18 @@ struct IntegrationsView: View {
     @State private var isConnectingHealthKit = false
     @State private var isSyncingHealthKit = false
     @State private var healthSyncStatusMessage: String?
+    @State private var healthSyncStatusIsError = false
     @State private var bodySpecLastSyncedText: String?
     @State private var isLoadingBodySpecLastSynced = false
     @State private var progressPhotoCount = 0
     @State private var featureGateRefreshToken = UUID()
-    @Environment(\.dismiss)
-
-    var dismiss
     var body: some View {
         ScrollView {
             VStack(spacing: theme.spacing.sectionSpacing) {
                 healthAndFitnessSection
-                photoImportSection
+                if isBulkProgressPhotoImportEnabled {
+                    photoImportSection
+                }
                 dataExportSection
             }
             .padding(.horizontal, theme.spacing.screenPadding)
@@ -37,6 +37,14 @@ struct IntegrationsView: View {
         .settingsBackground()
         .navigationTitle("Integrations")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                SettingsBackButton()
+            }
+        }
         .alert("Apple Health access is needed", isPresented: $showHealthKitConnect) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -115,11 +123,13 @@ struct IntegrationsView: View {
                                 icon: "arrow.triangle.2.circlepath",
                                 title: isSyncingHealthKit ? "Syncing historical data" : "Sync all historical data",
                                 subtitle: healthSyncStatusMessage,
+                                subtitleColor: healthSyncStatusIsError ? theme.colors.error : nil,
                                 showChevron: false
                             )
                         }
                         .disabled(isSyncingHealthKit)
                         .accessibilityHint("Syncs your historical Apple Health data now.")
+                        .accessibilityIdentifier("integrations_health_sync_all_button")
                     }
                 } else {
                     DataInfoRow(
@@ -226,31 +236,19 @@ struct IntegrationsView: View {
         SettingsSection(
             header: "Photo Import",
             footer: BulkProgressPhotoImportPolicy.footerText(
-                isEnabled: isBulkProgressPhotoImportEnabled,
+                isEnabled: true,
                 existingProgressPhotoCount: progressPhotoCount
             )
         ) {
-            if isBulkProgressPhotoImportEnabled {
-                NavigationLink(destination: BulkPhotoImportView().environmentObject(authManager)) {
-                    SettingsRow(
-                        icon: "photo.stack",
-                        title: "Import Progress Photos",
-                        subtitle: "Choose photos from your library",
-                        value: "Scan library",
-                        showChevron: true
-                    )
-                    .accessibilityIdentifier("integrations_bulk_photo_import_link")
-                }
-            } else {
+            NavigationLink(destination: BulkPhotoImportView().environmentObject(authManager)) {
                 SettingsRow(
                     icon: "photo.stack",
                     title: "Import Progress Photos",
-                    subtitle: "Add progress photos to unlock",
-                    value: "Locked",
-                    tintColor: theme.colors.textSecondary
+                    subtitle: "Choose photos from your library",
+                    value: "Scan library",
+                    showChevron: true
                 )
-                .accessibilityIdentifier("integrations_bulk_photo_import_locked")
-                .accessibilityHint("Add progress photos or request migration access to unlock bulk import.")
+                .accessibilityIdentifier("integrations_bulk_photo_import_link")
             }
         }
     }
@@ -296,12 +294,13 @@ extension IntegrationsView {
 
         isConnectingHealthKit = true
         healthSyncStatusMessage = nil
+        healthSyncStatusIsError = false
 
         let authorized = await healthKitManager.requestAuthorization()
         if authorized {
             await HealthSyncCoordinator.shared
                 .configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
-            healthSyncStatusMessage = "Apple Health sync is set up"
+            healthSyncStatusMessage = "Apple Health sync is on"
         } else {
             showHealthKitConnect = true
         }
@@ -315,8 +314,12 @@ extension IntegrationsView {
 
         isSyncingHealthKit = true
         healthSyncStatusMessage = nil
-        await HealthSyncCoordinator.shared.forceFullHealthKitSync()
-        healthSyncStatusMessage = "Historical Apple Health data synced"
+        healthSyncStatusIsError = false
+        let didSucceed = await HealthSyncCoordinator.shared.forceFullHealthKitSync()
+        healthSyncStatusMessage = didSucceed
+            ? "Historical Apple Health data synced"
+            : "Historical sync failed. Try again."
+        healthSyncStatusIsError = !didSucceed
         isSyncingHealthKit = false
     }
 

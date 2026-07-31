@@ -59,7 +59,7 @@ struct SettingsSection<Content: View>: View {
             if let footer = footer {
                 Text(footer)
                     .font(theme.typography.captionMedium)
-                    .foregroundColor(theme.colors.textTertiary)
+                    .foregroundColor(theme.colors.textSecondary)
                     .padding(.horizontal, theme.spacing.md)
                     .padding(.top, theme.spacing.xs)
             }
@@ -78,6 +78,7 @@ struct SettingsRow: View {
     let icon: String?
     let title: String
     var subtitle: String?
+    var subtitleColor: Color?
     var value: String?
     var showChevron: Bool
     var isExternal: Bool
@@ -87,6 +88,7 @@ struct SettingsRow: View {
         icon: String? = nil,
         title: String,
         subtitle: String? = nil,
+        subtitleColor: Color? = nil,
         value: String? = nil,
         showChevron: Bool = false,
         isExternal: Bool = false,
@@ -95,6 +97,7 @@ struct SettingsRow: View {
         self.icon = icon
         self.title = title
         self.subtitle = subtitle
+        self.subtitleColor = subtitleColor
         self.value = value
         self.showChevron = showChevron
         self.isExternal = isExternal
@@ -170,7 +173,7 @@ struct SettingsRow: View {
                 if let subtitle {
                     Text(subtitle)
                         .font(theme.typography.captionLarge)
-                        .foregroundColor(theme.colors.textSecondary)
+                        .foregroundColor(subtitleColor ?? theme.colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -235,6 +238,36 @@ struct SettingsNavigationLink<Destination: View>: View {
 
 // MARK: - Detail Screen
 
+struct SettingsBackButton: View {
+    @Environment(\.dismiss)
+    private var dismiss
+    @Environment(\.theme)
+    private var theme
+
+    var body: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.body.weight(.semibold))
+                .foregroundColor(theme.colors.text)
+                .frame(
+                    width: JovieTokens.minimumHitTarget,
+                    height: JovieTokens.minimumHitTarget
+                )
+                .background(theme.colors.surfaceSecondary, in: Circle())
+                .overlay {
+                    Circle()
+                        .stroke(theme.colors.border.opacity(0.75), lineWidth: 1)
+                }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Settings")
+        .accessibilityHint("Returns to Settings")
+    }
+}
+
 struct SettingsDetailScreen<Content: View>: View {
     @Environment(\.theme)
     private var theme
@@ -262,6 +295,14 @@ struct SettingsDetailScreen<Content: View>: View {
         .settingsBackground()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                SettingsBackButton()
+            }
+        }
     }
 }
 
@@ -353,9 +394,11 @@ struct SettingsToggleRow: View {
     private var toggle: some View {
         Toggle(title, isOn: $isOn)
             .labelsHidden()
+            .toggleStyle(.switch)
             .accessibilityLabel(title)
+            .accessibilityValue(isOn ? "On" : "Off")
             .accessibilityHint(subtitle ?? "")
-            .tint(theme.colors.primary)
+            .tint(theme.colors.info)
     }
 
     private var resolvedTint: Color {

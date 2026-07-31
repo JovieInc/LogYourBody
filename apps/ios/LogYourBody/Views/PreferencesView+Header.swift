@@ -93,32 +93,24 @@ extension PreferencesView {
     }
 
     var heroHeader: some View {
-        VStack(spacing: theme.spacing.md) {
-            HStack(alignment: .center, spacing: theme.spacing.md) {
-                heroAvatar
-
-                VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                    Text(userDisplayName)
-                        .font(theme.typography.headlineMedium)
-                        .foregroundColor(theme.colors.text)
-
-                    Text(userEmail)
-                        .font(theme.typography.bodySmall)
-                        .foregroundColor(theme.colors.textSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-
-                    if let memberSinceText {
-                        Text(memberSinceText)
-                            .font(theme.typography.captionMedium)
-                            .foregroundColor(theme.colors.textSecondary)
-                    }
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: theme.spacing.md) {
+                    heroAvatar
+                    heroIdentityText
+                    statusBadge
                 }
+            } else {
+                VStack(spacing: theme.spacing.md) {
+                    HStack(alignment: .center, spacing: theme.spacing.md) {
+                        heroAvatar
+                        heroIdentityText
+                        Spacer()
+                    }
 
-                Spacer()
+                    statusBadge
+                }
             }
-
-            statusBadge
         }
         .padding(theme.spacing.md)
         .systemBGlassSurface(
@@ -128,6 +120,74 @@ extension PreferencesView {
             borderColor: theme.colors.border,
             borderOpacity: 0.75
         )
+    }
+
+    var heroIdentityText: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.xxs) {
+            Text(userDisplayName)
+                .font(theme.typography.headlineMedium)
+                .foregroundColor(theme.colors.text)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(userEmail)
+                .font(theme.typography.bodySmall)
+                .foregroundColor(theme.colors.textSecondary)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                .minimumScaleFactor(0.82)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let memberSinceText {
+                Text(memberSinceText)
+                    .font(theme.typography.captionMedium)
+                    .foregroundColor(theme.colors.textSecondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    var statusBadge: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: theme.spacing.xs) {
+                    HStack(spacing: theme.spacing.xs) {
+                        Circle()
+                            .fill(subscriptionManager.isSubscribed ? theme.colors.success : theme.colors.warning)
+                            .frame(width: 8, height: 8)
+
+                        Text(subscriptionStatusText)
+                            .font(theme.typography.captionLarge)
+                            .foregroundColor(theme.colors.textSecondary)
+                    }
+
+                    if let planDisplay = subscriptionPlanDisplay {
+                        Text(planDisplay)
+                            .font(theme.typography.captionLarge)
+                            .foregroundColor(theme.colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } else {
+                HStack(spacing: theme.spacing.xs) {
+                    Circle()
+                        .fill(subscriptionManager.isSubscribed ? theme.colors.success : theme.colors.warning)
+                        .frame(width: 8, height: 8)
+
+                    Text(subscriptionStatusText)
+                        .font(theme.typography.captionLarge)
+                        .foregroundColor(theme.colors.textSecondary)
+
+                    if let planDisplay = subscriptionPlanDisplay {
+                        Text("•")
+                            .foregroundColor(theme.colors.textTertiary)
+                        Text(planDisplay)
+                            .font(theme.typography.captionLarge)
+                            .foregroundColor(theme.colors.textSecondary)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     var compactHeader: some View {
@@ -144,10 +204,10 @@ extension PreferencesView {
             .padding(.top, topSafeArea + theme.spacing.xs)
             .padding(.bottom, theme.spacing.sm)
             .background(theme.colors.background.opacity(0.95))
-            .opacity(scrollOffset < -60 ? 1 : 0)
+            .opacity(isCompactHeaderVisible ? 1 : 0)
         }
         .ignoresSafeArea(edges: .top)
-        .animation(theme.animation.fast, value: scrollOffset)
+        .animation(theme.animation.fast, value: isCompactHeaderVisible)
     }
 
     var heroAvatar: some View {
@@ -198,28 +258,6 @@ extension PreferencesView {
                     .frame(width: 32, height: 32)
             }
         }
-    }
-
-    var statusBadge: some View {
-        HStack(spacing: theme.spacing.xs) {
-            Circle()
-                .fill(subscriptionManager.isSubscribed ? theme.colors.success : theme.colors.warning)
-                .frame(width: 8, height: 8)
-
-            Text(subscriptionStatusText)
-                .font(theme.typography.captionLarge)
-                .foregroundColor(theme.colors.textSecondary)
-
-            if let planDisplay = subscriptionPlanDisplay {
-                Text("•")
-                    .foregroundColor(theme.colors.textTertiary)
-                Text(planDisplay)
-                    .font(theme.typography.captionLarge)
-                    .foregroundColor(theme.colors.textSecondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
     }
 
     var avatarPlaceholder: some View {

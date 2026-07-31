@@ -41,7 +41,7 @@ struct OTPField: View {
                 .accessibilityValue("\(code.count) of \(length) digits entered")
                 .accessibilityHint("Enter the \(length)-digit code we emailed you.")
                 .accessibilityIdentifier(accessibilityIdentifier ?? "otp_field")
-                .onChange(of: code) { newValue in
+                .onChange(of: code) { _, newValue in
                     // Limit to specified length
                     if newValue.count > length {
                         code = String(newValue.prefix(length))

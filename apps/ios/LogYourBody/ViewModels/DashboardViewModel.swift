@@ -18,10 +18,17 @@ final class DashboardViewModel: ObservableObject {
 
     init(
         healthKitManager: HealthKitManager = .shared,
-        healthSyncCoordinator: HealthSyncCoordinating = HealthSyncCoordinator.shared
+        healthSyncCoordinator: HealthSyncCoordinating
     ) {
         self.healthKitManager = healthKitManager
         self.healthSyncCoordinator = healthSyncCoordinator
+    }
+
+    convenience init(healthKitManager: HealthKitManager = .shared) {
+        self.init(
+            healthKitManager: healthKitManager,
+            healthSyncCoordinator: HealthSyncCoordinator.shared
+        )
     }
 
     func loadData(

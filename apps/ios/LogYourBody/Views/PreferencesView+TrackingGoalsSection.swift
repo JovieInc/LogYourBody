@@ -8,9 +8,7 @@ extension PreferencesView {
     var trackingGoalsSection: some View {
         SettingsSection(
             header: "Tracking & goals",
-            footer: usesIndividualizedAestheticGoals
-                ? "Set targets that reflect your goals."
-                : "Set custom targets or use defaults."
+            footer: "Set targets that reflect your goals."
         ) {
             VStack(spacing: 0) {
                 measurementSystemSection
@@ -44,12 +42,8 @@ extension PreferencesView {
         PreferenceGoalRow(
             goal: goal,
             valueText: goalValueText(for: goal),
-            isCustom: isGoalCustom(goal),
             edit: {
                 activeGoalEditor = goal
-            },
-            reset: {
-                resetGoal(goal)
             }
         )
     }
@@ -58,61 +52,22 @@ extension PreferencesView {
         PreferenceGoalEditorSheet(
             goal: goal,
             initialText: initialGoalEditorText(for: goal),
-            unitLabel: goalUnitLabel(for: goal)
+            unitLabel: goalUnitLabel(for: goal),
+            resetTitle: isGoalCustom(goal) ? goal.resetActionTitle : nil,
+            reset: isGoalCustom(goal) ? {
+                resetGoal(goal)
+            } : nil
         ) { value in
             saveGoal(value, for: goal)
         }
     }
 
-    var userGender: String {
-        cachedUserGender
-    }
-
-    var isFemale: Bool {
-        cachedIsFemale
-    }
-
-    var usesIndividualizedAestheticGoals: Bool {
-        _ = featureGateRefreshToken
-
-        return AppServicePorts.analyticsTracker.isFeatureEnabled(
-            flagKey: AppFeatureGate.individualizedAestheticGoals
-        )
-    }
-
-    var legacyBodyFatReference: Double {
-        cachedLegacyBodyFatReference
-    }
-
-    var legacyFFMIReference: Double {
-        cachedLegacyFFMIReference
-    }
-
     var currentBodyFatGoal: Double? {
-        AestheticGoalPolicy.resolvedGoal(
-            explicitGoal: customBodyFatGoal,
-            legacyReferenceMidpoint: legacyBodyFatReference,
-            individualizedGoalsEnabled: usesIndividualizedAestheticGoals
-        )
+        AestheticGoalPolicy.resolvedGoal(explicitGoal: customBodyFatGoal)
     }
 
     var currentFFMIGoal: Double? {
-        AestheticGoalPolicy.resolvedGoal(
-            explicitGoal: customFFMIGoal,
-            legacyReferenceMidpoint: legacyFFMIReference,
-            individualizedGoalsEnabled: usesIndividualizedAestheticGoals
-        )
-    }
-
-    func updateCachedValues() {
-        cachedUserGender = authManager.currentUser?.profile?.gender?.lowercased() ?? ""
-        cachedIsFemale = cachedUserGender.contains("female") || cachedUserGender.contains("woman")
-        cachedLegacyBodyFatReference = cachedIsFemale ?
-            Constants.BodyComposition.BodyFat.femaleReferenceMidpoint :
-            Constants.BodyComposition.BodyFat.maleReferenceMidpoint
-        cachedLegacyFFMIReference = cachedIsFemale ?
-            Constants.BodyComposition.FFMI.femaleReferenceMidpoint :
-            Constants.BodyComposition.FFMI.maleReferenceMidpoint
+        AestheticGoalPolicy.resolvedGoal(explicitGoal: customFFMIGoal)
     }
 
     func resetToDefaults() {
@@ -128,12 +83,10 @@ extension PreferencesView {
             return currentWeightGoal?.displayText(in: currentSystem) ?? "Not set"
         case .bodyFat:
             guard let currentBodyFatGoal else { return "Not set" }
-            let suffix = customBodyFatGoal == nil ? " (default)" : ""
-            return String(format: "%.1f%%", currentBodyFatGoal) + suffix
+            return String(format: "%.1f%%", currentBodyFatGoal)
         case .ffmi:
             guard let currentFFMIGoal else { return "Not set" }
-            let suffix = customFFMIGoal == nil ? " (default)" : ""
-            return String(format: "%.1f", currentFFMIGoal) + suffix
+            return String(format: "%.1f", currentFFMIGoal)
         }
     }
 
@@ -167,15 +120,9 @@ extension PreferencesView {
                 String(format: "%.1f", $0.displayValue(in: currentSystem))
             } ?? ""
         case .bodyFat:
-            if let customBodyFatGoal {
-                return String(format: "%.1f", customBodyFatGoal)
-            }
-            return usesIndividualizedAestheticGoals ? "" : String(format: "%.1f", legacyBodyFatReference)
+            return customBodyFatGoal.map { String(format: "%.1f", $0) } ?? ""
         case .ffmi:
-            if let customFFMIGoal {
-                return String(format: "%.1f", customFFMIGoal)
-            }
-            return usesIndividualizedAestheticGoals ? "" : String(format: "%.1f", legacyFFMIReference)
+            return customFFMIGoal.map { String(format: "%.1f", $0) } ?? ""
         }
     }
 

@@ -139,7 +139,16 @@ extension PreferencesView {
                     await MainActor.run {
                         avatarUploadProgress = 0.0
                         isUploadingPhoto = false
+                        profilePhotoErrorMessage = "The photo could not be uploaded. Check your connection and try again."
+                        showingProfilePhotoError = true
                     }
+                }
+            } else if asset != nil {
+                await MainActor.run {
+                    avatarUploadProgress = 0.0
+                    isUploadingPhoto = false
+                    profilePhotoErrorMessage = "The selected photo could not be read. Choose another photo and try again."
+                    showingProfilePhotoError = true
                 }
             } else {
                 await MainActor.run {
@@ -151,6 +160,8 @@ extension PreferencesView {
             await MainActor.run {
                 avatarUploadProgress = 0.0
                 isUploadingPhoto = false
+                profilePhotoErrorMessage = "The photo could not be uploaded. Check your connection and try again."
+                showingProfilePhotoError = true
             }
         }
     }

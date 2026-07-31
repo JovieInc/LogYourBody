@@ -344,11 +344,13 @@ func processHistoricalHealthKitBatches(
             // Update progress
             processedMonths += Double(batchSizeMonths)
             let progress = totalMonths > 0 ? min(processedMonths / totalMonths, 1.0) : 1.0
+            let importedCountSnapshot = totalImported
+            let processedMonthsSnapshot = processedMonths
             await MainActor.run {
                 importProgress = progress
-                importedCount = totalImported
+                importedCount = importedCountSnapshot
                 if totalMonths > 0 {
-                    let remaining = max(0, Int(totalMonths - processedMonths))
+                    let remaining = max(0, Int(totalMonths - processedMonthsSnapshot))
                     importStatus = remaining > 0 ? "Importing... \(remaining) months remaining" : "Finalizing..."
                 }
             }
@@ -363,8 +365,8 @@ func processHistoricalHealthKitBatches(
         return (imported: totalImported, skipped: totalSkipped)
     }
 
-func forceFullHealthKitSync() async {
-        _ = await syncAllHistoricalHealthKitData()
+func forceFullHealthKitSync() async -> Bool {
+        await syncAllHistoricalHealthKitData()
     }
 
 func getEarliestWeightDate() async throws -> Date? {

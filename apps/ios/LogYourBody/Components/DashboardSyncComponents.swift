@@ -206,7 +206,7 @@ struct DashboardSyncDetailsSheet: View {
 
             Button {
                 Task {
-                    await HealthSyncCoordinator.shared.forceFullHealthKitSync()
+                    _ = await HealthSyncCoordinator.shared.forceFullHealthKitSync()
                 }
             } label: {
                 HStack {

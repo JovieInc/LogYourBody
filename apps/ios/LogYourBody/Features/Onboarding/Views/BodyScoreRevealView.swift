@@ -14,26 +14,17 @@ enum BodyScoreRevealPolicy {
         }
     }
 
-    /// The body-fat range is framed as a "Target" until the individualized
-    /// aesthetic goals gate re-labels it as a "Reference".
-    static func referenceText(
-        range: BodyScoreResult.ReferenceRange,
-        usesIndividualizedAestheticGoals: Bool
-    ) -> String {
-        let label = usesIndividualizedAestheticGoals ? "Reference" : "Target"
+    /// Population ranges describe a comparison reference, never a personal target.
+    static func referenceText(range: BodyScoreResult.ReferenceRange) -> String {
         let lowerBound = Int(range.lowerBound)
         let upperBound = Int(range.upperBound)
-        return "\(label): \(lowerBound)–\(upperBound)% (\(range.label))"
+        return "Reference: \(lowerBound)–\(upperBound)% (\(range.label))"
     }
 
-    static func referenceAccessibilityText(
-        range: BodyScoreResult.ReferenceRange,
-        usesIndividualizedAestheticGoals: Bool
-    ) -> String {
-        let label = usesIndividualizedAestheticGoals ? "Reference" : "Target"
+    static func referenceAccessibilityText(range: BodyScoreResult.ReferenceRange) -> String {
         let lowerBound = Int(range.lowerBound)
         let upperBound = Int(range.upperBound)
-        return "\(label) body fat: \(lowerBound) to \(upperBound) percent. \(range.label)."
+        return "Reference body fat: \(lowerBound) to \(upperBound) percent. \(range.label)."
     }
 
     /// Builds the share-card payload from the onboarding input, converting
@@ -96,19 +87,10 @@ struct BodyScoreRevealView: View {
     @State private var animateScore = false
     @State private var isSharePresented = false
     @State private var sharePayload: BodyScoreSharePayload?
-    @State private var featureGateRefreshToken = UUID()
     @AccessibilityFocusState private var scoreFocused: Bool
 
     private var percentileGroupLabel: String {
         BodyScoreRevealPolicy.percentileGroupLabel(for: viewModel.bodyScoreInput.sex)
-    }
-
-    private var usesIndividualizedAestheticGoals: Bool {
-        _ = featureGateRefreshToken
-
-        return AppServicePorts.analyticsTracker.isFeatureEnabled(
-            flagKey: AppFeatureGate.individualizedAestheticGoals
-        )
     }
 
     var body: some View {
@@ -174,9 +156,6 @@ struct BodyScoreRevealView: View {
             } else {
                 animateScore = false
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
-            featureGateRefreshToken = UUID()
         }
         .sheet(isPresented: $isSharePresented) {
             if let payload = sharePayload {
@@ -253,17 +232,11 @@ struct BodyScoreRevealView: View {
     }
 
     private func referenceText(result: BodyScoreResult) -> String {
-        BodyScoreRevealPolicy.referenceText(
-            range: result.bodyFatReferenceRange,
-            usesIndividualizedAestheticGoals: usesIndividualizedAestheticGoals
-        )
+        BodyScoreRevealPolicy.referenceText(range: result.bodyFatReferenceRange)
     }
 
     private func referenceAccessibilityText(result: BodyScoreResult) -> String {
-        BodyScoreRevealPolicy.referenceAccessibilityText(
-            range: result.bodyFatReferenceRange,
-            usesIndividualizedAestheticGoals: usesIndividualizedAestheticGoals
-        )
+        BodyScoreRevealPolicy.referenceAccessibilityText(range: result.bodyFatReferenceRange)
     }
 
     private func makeSharePayload(from result: BodyScoreResult) -> BodyScoreSharePayload? {

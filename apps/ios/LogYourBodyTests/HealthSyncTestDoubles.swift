@@ -28,6 +28,7 @@ final class MockHealthSyncCoordinator: HealthSyncCoordinating {
     var performInitialConnectSyncError: Error?
     var syncWeightError: Error?
     var syncStepsError: Error?
+    var forceFullHealthKitSyncResult = true
 
     func bootstrapIfNeeded(syncEnabled: Bool) {
         didCallBootstrapIfNeeded = true
@@ -75,8 +76,9 @@ final class MockHealthSyncCoordinator: HealthSyncCoordinating {
         }
     }
 
-    func forceFullHealthKitSync() async {
+    func forceFullHealthKitSync() async -> Bool {
         didCallForceFullHealthKitSync = true
+        return forceFullHealthKitSyncResult
     }
 }
 
@@ -95,6 +97,7 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
     private(set) var syncStepsFromHealthKitCallCount = 0
     private(set) var fetchTodayStepCountCallCount = 0
     private(set) var didCallForceFullHealthKitSync = false
+    var forceFullHealthKitSyncResult = true
 
     func checkAuthorizationStatus() {
         didCallCheckAuthorizationStatus = true
@@ -137,7 +140,8 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
         return 123
     }
 
-    func forceFullHealthKitSync() async {
+    func forceFullHealthKitSync() async -> Bool {
         didCallForceFullHealthKitSync = true
+        return forceFullHealthKitSyncResult
     }
 }

@@ -3,40 +3,15 @@ import SwiftUI
 extension DashboardViewLiquid {
     // MARK: - Goal Helpers
 
-    var usesIndividualizedAestheticGoals: Bool {
-        _ = featureGateRefreshToken
-
-        return AppServicePorts.analyticsTracker.isFeatureEnabled(
-            flagKey: AppFeatureGate.individualizedAestheticGoals
-        )
-    }
-
-    /// Returns an explicit FFMI goal, or the legacy reference fallback while the gate is disabled.
+    /// Returns the user-selected FFMI goal. Population references never become
+    /// personal targets without explicit user input.
     var ffmiGoal: Double? {
-        let gender = authManager.currentUser?.profile?.gender?.lowercased() ?? ""
-        let legacyReference = gender.contains("female") || gender.contains("woman") ?
-            Constants.BodyComposition.FFMI.femaleReferenceMidpoint :
-            Constants.BodyComposition.FFMI.maleReferenceMidpoint
-
-        return AestheticGoalPolicy.resolvedGoal(
-            explicitGoal: customFFMIGoal,
-            legacyReferenceMidpoint: legacyReference,
-            individualizedGoalsEnabled: usesIndividualizedAestheticGoals
-        )
+        AestheticGoalPolicy.resolvedGoal(explicitGoal: customFFMIGoal)
     }
 
-    /// Returns an explicit body-fat goal, or the legacy reference fallback while the gate is disabled.
+    /// Returns the user-selected body-fat goal.
     var bodyFatGoal: Double? {
-        let gender = authManager.currentUser?.profile?.gender?.lowercased() ?? ""
-        let legacyReference = gender.contains("female") || gender.contains("woman") ?
-            Constants.BodyComposition.BodyFat.femaleReferenceMidpoint :
-            Constants.BodyComposition.BodyFat.maleReferenceMidpoint
-
-        return AestheticGoalPolicy.resolvedGoal(
-            explicitGoal: customBodyFatGoal,
-            legacyReferenceMidpoint: legacyReference,
-            individualizedGoalsEnabled: usesIndividualizedAestheticGoals
-        )
+        AestheticGoalPolicy.resolvedGoal(explicitGoal: customBodyFatGoal)
     }
 
     /// Returns the weight goal (optional, nil if not set)

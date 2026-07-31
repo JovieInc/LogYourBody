@@ -43,6 +43,14 @@ final class AuthConfigurationValidationTests: XCTestCase {
         XCTAssertTrue(result.messages.contains("Authentication redirect URI must be logyourbody://oauth."))
     }
 
+    func testDevelopmentAllowsLocalhostAPIWithMatchingExpectedHost() {
+        let snapshot = makeSnapshot(apiBaseURL: "http" + "://localhost:3000")
+
+        let result = Configuration.validateAuthEnvironment(snapshot)
+
+        XCTAssertTrue(result.isValid, "Validation should pass: \(result.messages)")
+    }
+
     func testValidProductionSharedIdentityConfigurationPasses() {
         let result = Configuration.validateAuthEnvironment(makeSnapshot(environment: .production))
 

@@ -133,21 +133,11 @@ struct Constants {
     }
 }
 
-enum AppFeatureGate {
-    static let individualizedAestheticGoals = "individualized_aesthetic_goals"
-}
-
 enum AestheticGoalPolicy {
-    static func resolvedGoal(
-        explicitGoal: Double?,
-        legacyReferenceMidpoint: Double,
-        individualizedGoalsEnabled: Bool
-    ) -> Double? {
-        if individualizedGoalsEnabled {
-            return explicitGoal
-        }
-
-        return explicitGoal ?? legacyReferenceMidpoint
+    /// A population reference is not a personal target. Only a goal the user
+    /// explicitly selected may drive goal UI or dashboard progress.
+    static func resolvedGoal(explicitGoal: Double?) -> Double? {
+        explicitGoal
     }
 }
 
