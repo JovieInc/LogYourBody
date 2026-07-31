@@ -248,7 +248,7 @@ extension DashboardViewLiquid {
             }
 
             selectedIndex = index
-            updateAnimatedValues(for: index)
+            updateAnimatedValues(for: index, animate: false)
         }
     }
 

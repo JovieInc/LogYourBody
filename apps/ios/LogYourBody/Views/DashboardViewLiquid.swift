@@ -404,6 +404,18 @@ struct DashboardViewLiquid: View {
         rebuildDailyMetricsLookup: Bool = false,
         animatedIndex: Int? = nil
     ) {
+        // Scrub hot path: index-only updates must NOT rebuild weekly/monthly/yearly
+        // global timeline buckets (that is multi-ms main-thread work and causes jank).
+        if let animatedIndex, !rebuildDailyMetricsLookup {
+            Task { @MainActor in
+                guard !viewModel.bodyMetrics.isEmpty else { return }
+                PerfSignpost.measure("dashboard_scrub_refresh") {
+                    updateAnimatedValues(for: animatedIndex, animate: false)
+                }
+            }
+            return
+        }
+
         Task { @MainActor in
             await Task.yield()
 
@@ -415,7 +427,7 @@ struct DashboardViewLiquid: View {
                 refreshGlobalTimelineStore()
 
                 if let animatedIndex, !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: animatedIndex)
+                    updateAnimatedValues(for: animatedIndex, animate: true)
                 }
             }
         }
