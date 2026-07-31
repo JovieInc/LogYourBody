@@ -115,7 +115,7 @@ final class ErrorTrackingServiceTests: XCTestCase {
         XCTAssertEqual(vendor.breadcrumbLevels, [.error])
         XCTAssertEqual(vendor.breadcrumbCategories, ["photos"])
         XCTAssertEqual(vendor.breadcrumbMessages, ["upload failed"])
-        XCTAssertEqual(try XCTUnwrap(vendor.breadcrumbData.first), ["photo_id": "abc"])
+        XCTAssertEqual(try XCTUnwrap(vendor.breadcrumbData.first), ["photo_id": "[Filtered]"])
     }
 
     func testAddBreadcrumbDefaultsToInfoLevelWithNoData() throws {
