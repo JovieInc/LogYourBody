@@ -109,7 +109,7 @@ final class ErrorTrackingServiceTests: XCTestCase {
             message: "upload failed",
             category: "photos",
             level: .error,
-            data: ["photo_id": "[Filtered]"]
+            data: ["photo_id": "abc"]
         )
 
         XCTAssertEqual(vendor.breadcrumbLevels, [.error])
