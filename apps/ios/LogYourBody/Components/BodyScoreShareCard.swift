@@ -515,6 +515,10 @@ struct BodyScoreShareSheet: View {
     @State private var renderedImage: UIImage?
     @State private var isRendering = false
     @State private var showSystemShareSheet = false
+    @State private var dragOffsetY: CGFloat = 0
+
+    /// Minimum downward drag distance required to dismiss the overlay share sheet.
+    static let dismissDragThreshold: CGFloat = 120
 
     init(payload: BodyScoreSharePayload, onClose: (() -> Void)? = nil) {
         self.payload = payload
@@ -533,7 +537,13 @@ struct BodyScoreShareSheet: View {
                 shareSheetContent(previewHeight: nil)
             }
         }
+        // Keep content inside the safe area so Close stays tappable under Dynamic Island / notch.
+        .padding(.top, JovieTokens.compactInset)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.jovieCanvas.ignoresSafeArea())
+        .offset(y: max(0, dragOffsetY))
+        .opacity(dismissDragOpacity)
+        .gesture(dismissDragGesture)
         .overlay {
             if isRendering {
                 ZStack {
@@ -557,20 +567,81 @@ struct BodyScoreShareSheet: View {
         .onChange(of: shareOptions) { _, _ in
             renderedImage = nil
         }
+        // Hardware Escape / keyboard dismiss path for the full-screen overlay presentation.
+        .onKeyPress(.escape) {
+            closeShareSheet()
+            return .handled
+        }
+        .accessibilityAction(.escape) {
+            closeShareSheet()
+        }
+        // Keep child identifiers (card/close/actions) discoverable for UI tests.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("body_score_share_sheet")
+    }
+
+    private var dismissDragOpacity: Double {
+        guard dragOffsetY > 0 else { return 1 }
+        let progress = min(1, Double(dragOffsetY / (Self.dismissDragThreshold * 2)))
+        return max(0.45, 1 - progress * 0.55)
+    }
+
+    private var dismissDragGesture: some Gesture {
+        DragGesture(minimumDistance: 20, coordinateSpace: .local)
+            .onChanged { value in
+                // Only track downward dismiss drags; horizontal/upward should not fight controls.
+                guard !isRendering else { return }
+                let translationY = value.translation.height
+                dragOffsetY = translationY > 0 ? translationY : 0
+            }
+            .onEnded { value in
+                guard !isRendering else {
+                    dragOffsetY = 0
+                    return
+                }
+
+                if Self.shouldDismiss(
+                    afterDragTranslation: value.translation.height,
+                    predictedEndTranslation: value.predictedEndTranslation.height
+                ) {
+                    closeShareSheet()
+                } else {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                        dragOffsetY = 0
+                    }
+                }
+            }
+    }
+
+    /// Pure dismiss-threshold policy so unit tests can lock the escape path without UI harness.
+    static func shouldDismiss(
+        afterDragTranslation translationY: CGFloat,
+        predictedEndTranslation: CGFloat,
+        threshold: CGFloat = dismissDragThreshold
+    ) -> Bool {
+        translationY >= threshold || predictedEndTranslation >= threshold * 1.4
+    }
+
+    private func closeShareSheet() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
+        dragOffsetY = 0
     }
 
     private var sheetHeader: some View {
         HStack {
-            Button("Close") {
-                if let onClose {
-                    onClose()
-                } else {
-                    dismiss()
-                }
+            Button(action: closeShareSheet) {
+                Text("Close")
+                    .font(theme.typography.labelMedium)
+                    .foregroundColor(theme.colors.text)
             }
-            .font(theme.typography.labelMedium)
-            .foregroundColor(theme.colors.text)
             .jovieTouchTarget()
+            .accessibilityIdentifier("body_score_share_close_button")
+            .accessibilityLabel("Close share sheet")
+            .accessibilityHint("Dismisses the body score share view")
 
             Spacer()
 
@@ -583,6 +654,7 @@ struct BodyScoreShareSheet: View {
 
             Color.clear
                 .frame(width: 72, height: 1)
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, JovieTokens.screenInset)
     }
