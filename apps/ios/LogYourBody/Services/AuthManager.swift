@@ -678,7 +678,7 @@ final class AuthManager: NSObject, ObservableObject {
     func consolidateNameUpdate(_ fullName: String) async throws {
         let trimmed = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        try await updateProfileDurably(["full_name": trimmed])
+        try await updateProfileDurably(["fullName": trimmed])
         currentUser?.name = trimmed
     }
 
