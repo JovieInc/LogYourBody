@@ -179,6 +179,10 @@ struct LogYourBodyApp: App {
 
     @StateObject private var persistenceController = CoreDataManager.shared
 
+    private static var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     init() {
         LaunchMetrics.begin()
         LogYourBodyAppShortcuts.updateAppShortcutParameters()
@@ -220,6 +224,10 @@ struct LogYourBodyApp: App {
                     handleDeepLink(url)
                 }
                 .task {
+                    // Hosted unit tests launch the app process to load the test
+                    // bundle. Do not let real startup race test-owned Keychain
+                    // fixtures or external-service stubs in that environment.
+                    guard !Self.isRunningUnitTests else { return }
                     await performStartupSequence()
                     resolvePendingEntryDeepLinkIfPossible()
                 }

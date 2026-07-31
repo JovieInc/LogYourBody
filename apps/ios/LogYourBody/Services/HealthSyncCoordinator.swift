@@ -19,7 +19,7 @@ protocol HealthKitSyncManaging: AnyObject {
     func syncWeightFromHealthKit() async throws
     func syncStepsFromHealthKit() async throws
     func fetchTodayStepCount() async throws -> Int
-    func forceFullHealthKitSync() async
+    func forceFullHealthKitSync() async -> Bool
 }
 
 extension HealthKitManager: HealthKitSyncManaging {}
@@ -27,6 +27,7 @@ extension HealthKitManager: HealthKitSyncManaging {}
 /// Protocol abstraction for coordinating HealthKit-related sync operations.
 /// This enables easier unit testing for components that depend on
 /// HealthSyncCoordinator by allowing mock implementations.
+@MainActor
 protocol HealthSyncCoordinating {
     func bootstrapIfNeeded(syncEnabled: Bool)
     func resetForCurrentUser() async
@@ -37,7 +38,7 @@ protocol HealthSyncCoordinating {
     func runDeferredOnboardingWeightSync() async
     func syncWeightFromHealthKit() async throws
     func syncStepsFromHealthKit() async throws
-    func forceFullHealthKitSync() async
+    func forceFullHealthKitSync() async -> Bool
 }
 
 /// Central coordinator for HealthKit bootstrap and, over time, HealthKit-related
@@ -223,12 +224,12 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
     /// Trigger a full historical HealthKit import. This is used by manual
     /// "Sync All Historical Data" actions and the dashboard sync details
     /// sheet.
-    func forceFullHealthKitSync() async {
+    func forceFullHealthKitSync() async -> Bool {
         ErrorTrackingService.shared.addBreadcrumb(
             message: "HealthSyncCoordinator.forceFullHealthKitSync",
             category: "healthKitCoordinator"
         )
 
-        await healthKitManager.forceFullHealthKitSync()
+        return await healthKitManager.forceFullHealthKitSync()
     }
 }

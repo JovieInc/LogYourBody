@@ -133,8 +133,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testSubscribedMVPSettingsExposeSubscriptionEscapePaths() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
 
         try openSettings(in: app)
 
@@ -146,12 +145,15 @@ final class LogYourBodyUITests: XCTestCase {
         let logoutButton = app.descendants(matching: .any)["settings_logout_button"]
         XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
         XCTAssertTrue(logoutButton.isHittable)
+        attachScreenshot(named: "settings-profile-hardened", from: app)
 
         let settingsBackButton = app.navigationBars.buttons["Settings"]
         XCTAssertTrue(settingsBackButton.waitForExistence(timeout: 5))
         settingsBackButton.tap()
+        attachScreenshot(named: "settings-overview-hardened", from: app)
 
         let accountLink = app.descendants(matching: .any)["settings_account_subscription_link"]
+        scrollUntilHittable(accountLink, in: app)
         XCTAssertTrue(accountLink.waitForExistence(timeout: 5))
         XCTAssertTrue(accountLink.isHittable)
         accountLink.tap()
@@ -167,8 +169,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testSubscribedMVPSettingsWeightGoalUsesNativeValidatedEditor() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
 
         try openSettings(in: app)
 
@@ -201,6 +202,17 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(weightGoalButton.waitForExistence(timeout: 5))
         XCTAssertTrue(weightGoalButton.label.contains("180.0 lbs"))
+
+        weightGoalButton.tap()
+        let clearGoalButton = app.buttons["settings_weight_goal_reset_button"]
+        XCTAssertTrue(clearGoalButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(clearGoalButton.isHittable)
+        clearGoalButton.tap()
+
+        XCTAssertTrue(clearGoalButton.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(weightGoalButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(weightGoalButton.label.contains("Not set"))
+        attachScreenshot(named: "settings-tracking-hardened", from: app)
     }
 
     func testPaidMVPFixtureRoutesToDefaultTimelineSurface() throws {
@@ -499,31 +511,30 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Cancel"].exists)
     }
 
-    func testBulkPhotoImportLockedByDefaultInIntegrations() throws {
+    func testBulkPhotoImportHiddenByDefaultInIntegrations() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
 
         try openIntegrations(in: app)
 
         let lockedRow = app.descendants(matching: .any)["integrations_bulk_photo_import_locked"]
-        XCTAssertTrue(lockedRow.waitForExistence(timeout: 8))
-        XCTAssertTrue(app.staticTexts["Locked"].exists)
+        XCTAssertFalse(lockedRow.exists)
         XCTAssertFalse(app.descendants(matching: .any)["integrations_bulk_photo_import_link"].exists)
+        XCTAssertFalse(app.staticTexts["Photo Import"].exists)
         XCTAssertFalse(app.staticTexts["Bulk Photo Import"].exists)
         XCTAssertFalse(app.staticTexts["Google Fit"].exists)
         XCTAssertFalse(app.staticTexts["Export as JSON"].exists)
         XCTAssertFalse(app.staticTexts["API Access"].exists)
         XCTAssertFalse(app.staticTexts["Coming Soon"].exists)
+        attachScreenshot(named: "settings-integrations-hardened", from: app)
     }
 
     func testBulkPhotoImportActivationOpensScannerEntry() throws {
         let app = XCUIApplication()
-        app.launchArguments = [
+        launch(app, with: [
             "-lybUITestWeightLoggerMVPFixture",
             "-lybUITestBulkPhotoImportEnabledFixture"
-        ]
-        app.launch()
+        ])
 
         try openIntegrations(in: app)
 

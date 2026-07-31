@@ -68,10 +68,17 @@ class LoadingManager: ObservableObject {
 
     init(
         authManager: AuthManager,
-        healthSyncCoordinator: HealthSyncCoordinating = HealthSyncCoordinator.shared
+        healthSyncCoordinator: HealthSyncCoordinating
     ) {
         self.authManager = authManager
         self.healthSyncCoordinator = healthSyncCoordinator
+    }
+
+    convenience init(authManager: AuthManager) {
+        self.init(
+            authManager: authManager,
+            healthSyncCoordinator: HealthSyncCoordinator.shared
+        )
     }
 
     func startLoading() async {

@@ -108,56 +108,37 @@ struct PreferenceGoalRow: View {
 
     let goal: PreferenceGoalKind
     let valueText: String
-    let isCustom: Bool
     let edit: () -> Void
-    let reset: () -> Void
 
     var body: some View {
-        HStack(spacing: theme.spacing.sm) {
-            Button(action: edit) {
-                HStack(spacing: theme.spacing.sm) {
-                    Image(systemName: goal.icon)
-                        .font(theme.typography.headlineSmall)
+        Button(action: edit) {
+            HStack(spacing: theme.spacing.sm) {
+                Image(systemName: goal.icon)
+                    .font(theme.typography.headlineSmall)
+                    .foregroundColor(theme.colors.textSecondary)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: theme.spacing.xxs) {
+                    Text(goal.title)
+                        .font(theme.typography.labelLarge)
+                        .foregroundColor(theme.colors.text)
+
+                    Text(valueText)
+                        .font(theme.typography.captionLarge)
                         .foregroundColor(theme.colors.textSecondary)
-                        .frame(width: 24)
-
-                    VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                        Text(goal.title)
-                            .font(theme.typography.labelLarge)
-                            .foregroundColor(theme.colors.text)
-
-                        Text(valueText)
-                            .font(theme.typography.captionLarge)
-                            .foregroundColor(theme.colors.textSecondary)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(theme.colors.textTertiary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings_\(goal.rawValue)_goal_edit_button")
 
-            if isCustom {
-                Button(action: reset) {
-                    Image(systemName: "arrow.counterclockwise.circle.fill")
-                        .font(theme.typography.headlineSmall)
-                        .foregroundColor(theme.colors.textSecondary)
-                        .frame(
-                            width: JovieTokens.minimumHitTarget,
-                            height: JovieTokens.minimumHitTarget
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Reset \(goal.title)")
-                .accessibilityIdentifier("settings_\(goal.rawValue)_goal_reset_button")
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(theme.colors.textTertiary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("settings_\(goal.rawValue)_goal_edit_button")
         .padding(.horizontal, theme.spacing.md)
         .padding(.vertical, theme.spacing.sm)
         .frame(minHeight: JovieTokens.minimumHitTarget)

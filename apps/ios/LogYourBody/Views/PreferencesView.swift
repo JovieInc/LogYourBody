@@ -4,11 +4,13 @@
 //
 import SwiftUI
 import Foundation
+import UIKit
 
 struct PreferencesView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.openURL) var openURL
     @Environment(\.theme) var theme
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @StateObject var subscriptionManager = SubscriptionManager.shared
     @StateObject var notificationManager = NotificationManager.shared
     @AppStorage(Constants.preferredMeasurementSystemKey) var measurementSystem = PreferencesView.defaultMeasurementSystem
@@ -31,16 +33,14 @@ struct PreferencesView: View {
     @State var isUploadingPhoto = false
     @State var avatarUploadProgress = 0.0
     @State var profileImageURL: String?
-    @State var scrollOffset: CGFloat = 0
+    @State var profilePhotoErrorMessage = ""
+    @State var showingProfilePhotoError = false
+    @State var isCompactHeaderVisible = false
     @State var showingLogoutConfirmation = false
+    @State var showingNotificationSettingsAlert = false
     @State var isTriggeringHealthResync = false
     @State var isHealthSyncSetupInProgress = false
     @State var dailyReminderDate = Date()
-    @State var cachedUserGender = ""
-    @State var cachedIsFemale = false
-    @State var cachedLegacyBodyFatReference = Constants.BodyComposition.BodyFat.maleReferenceMidpoint
-    @State var cachedLegacyFFMIReference = Constants.BodyComposition.FFMI.maleReferenceMidpoint
-    @State var featureGateRefreshToken = UUID()
 
     static var defaultMeasurementSystem: String {
         MeasurementSystem.imperial.rawValue
@@ -68,7 +68,9 @@ struct PreferencesView: View {
             .coordinateSpace(name: "settingsScroll")
             .scrollBounceBehavior(.basedOnSize)
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                scrollOffset = value
+                let shouldShowCompactHeader = value < -60
+                guard shouldShowCompactHeader != isCompactHeaderVisible else { return }
+                isCompactHeaderVisible = shouldShowCompactHeader
             }
 
             compactHeader
@@ -78,6 +80,20 @@ struct PreferencesView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(restoreAlertMessage)
+        }
+        .alert("Profile photo couldn’t be updated", isPresented: $showingProfilePhotoError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(profilePhotoErrorMessage)
+        }
+        .alert("Notifications are off", isPresented: $showingNotificationSettingsAlert) {
+            Button("Open Settings") {
+                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                openURL(url)
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("Allow notifications in iOS Settings to receive your daily weigh-in reminder.")
         }
         .confirmationDialog("Log out of LogYourBody?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
             Button("Log Out", role: .destructive) {
@@ -102,14 +118,10 @@ struct PreferencesView: View {
         .onAppear {
             migrateLegacyWeightGoalIfNeeded()
             checkBiometricAvailability()
-            updateCachedValues()
             dailyReminderDate = notificationManager.dailyWeighInReminderDate
             Task {
                 await notificationManager.refreshAuthorizationStatus()
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
-            featureGateRefreshToken = UUID()
         }
     }
 

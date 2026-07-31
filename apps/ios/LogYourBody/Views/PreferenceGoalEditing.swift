@@ -54,6 +54,10 @@ enum PreferenceGoalKind: String, Identifiable, CaseIterable {
             return "Valid range: 10-30."
         }
     }
+
+    var resetActionTitle: String {
+        "Remove target"
+    }
 }
 
 struct PreferenceGoalValidationResult: Equatable {
@@ -107,6 +111,8 @@ struct PreferenceGoalEditorSheet: View {
     let goal: PreferenceGoalKind
     let initialText: String
     let unitLabel: String?
+    let resetTitle: String?
+    let reset: (() -> Void)?
     let save: (Double) -> Void
 
     @State private var draftText: String
@@ -117,11 +123,15 @@ struct PreferenceGoalEditorSheet: View {
         goal: PreferenceGoalKind,
         initialText: String,
         unitLabel: String? = nil,
+        resetTitle: String? = nil,
+        reset: (() -> Void)? = nil,
         save: @escaping (Double) -> Void
     ) {
         self.goal = goal
         self.initialText = initialText
         self.unitLabel = unitLabel
+        self.resetTitle = resetTitle
+        self.reset = reset
         self.save = save
         self._draftText = State(initialValue: initialText)
     }
@@ -148,7 +158,7 @@ struct PreferenceGoalEditorSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                saveAction
+                actions
                     .padding(.horizontal, JovieTokens.screenInset)
                     .padding(.top, JovieTokens.itemGap)
                     .padding(
@@ -183,7 +193,7 @@ struct PreferenceGoalEditorSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .onAppear {
             errorFocused = validation.errorMessage != nil
@@ -289,6 +299,34 @@ struct PreferenceGoalEditorSheet: View {
         .disabled(!validation.isValid)
         .accessibilityLabel("Save")
         .accessibilityHint(validation.isValid ? "Saves this goal" : validation.errorMessage ?? "Enter a valid goal")
+    }
+
+    private var actions: some View {
+        VStack(spacing: JovieTokens.itemGap) {
+            saveAction
+
+            if let resetTitle, let reset {
+                Button {
+                    reset()
+                    dismiss()
+                } label: {
+                    Label(resetTitle, systemImage: "arrow.counterclockwise")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.jovieText)
+                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(Color.jovieSurfaceElevated)
+                .clipShape(RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                        .stroke(Color.jovieHairline, lineWidth: 1)
+                }
+                .accessibilityHint("Removes the custom \(goal.title.lowercased())")
+                .accessibilityIdentifier("settings_\(goal.rawValue)_goal_reset_button")
+            }
+        }
     }
 
     private var accessibilityValue: String {

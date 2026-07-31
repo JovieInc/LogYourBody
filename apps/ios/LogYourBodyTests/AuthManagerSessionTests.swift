@@ -115,13 +115,19 @@ final class AuthManagerSessionTests: XCTestCase {
         )
     }
 
-    private func stubSessionSuccess(userBody: String = #"{"id":"user-123","email":"user@example.com","name":"Test User"}"#) {
+    private func stubSessionSuccess(
+        userBody: String = #"{"id":"user-123","email":"user@example.com","name":"Test User"}"#,
+        includesRotatedRefreshToken: Bool = true
+    ) {
         AuthStubURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             if path.contains("oauth2/token") {
+                let body = includesRotatedRefreshToken
+                    ? #"{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600}"#
+                    : #"{"access_token":"new-access","expires_in":3600}"#
                 return AuthStubURLProtocol.StubbedResponse(
                     statusCode: 200,
-                    body: Data(#"{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600}"#.utf8)
+                    body: Data(body.utf8)
                 )
             }
             if path.contains("oauth2/userinfo") {
@@ -196,7 +202,7 @@ final class AuthManagerSessionTests: XCTestCase {
             refreshToken: "old-refresh",
             expiresAt: Date().addingTimeInterval(-5)
         )
-        stubSessionSuccess()
+        stubSessionSuccess(includesRotatedRefreshToken: false)
 
         let token = await manager.getAccessToken()
 

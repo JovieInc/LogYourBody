@@ -74,4 +74,15 @@ final class HealthSyncCoordinatorPipelineTests: XCTestCase {
         XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 1)
         XCTAssertEqual(manager.fetchTodayStepCountCallCount, 1)
     }
+
+    func testFullHealthKitSyncForwardsFailureResultToCaller() async {
+        let manager = MockHealthKitSyncManager()
+        manager.forceFullHealthKitSyncResult = false
+        let coordinator = HealthSyncCoordinator(healthKitManager: manager)
+
+        let didSucceed = await coordinator.forceFullHealthKitSync()
+
+        XCTAssertFalse(didSucceed)
+        XCTAssertTrue(manager.didCallForceFullHealthKitSync)
+    }
 }

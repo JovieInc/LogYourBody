@@ -73,6 +73,7 @@ extension PreferencesView {
                         dailyReminderDate = notificationManager.dailyWeighInReminderDate
                         if isEnabled && !didApply {
                             HapticManager.shared.notification(type: .warning)
+                            showingNotificationSettingsAlert = true
                         }
                     }
                 }

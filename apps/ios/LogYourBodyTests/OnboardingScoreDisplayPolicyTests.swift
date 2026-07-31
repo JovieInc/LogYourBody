@@ -85,23 +85,15 @@ final class OnboardingScoreDisplayPolicyTests: XCTestCase {
         XCTAssertEqual(BodyScoreRevealPolicy.percentileGroupLabel(for: nil), "people your age and height")
     }
 
-    func testReferenceTextFollowsIndividualizedGoalsGate() {
+    func testPopulationRangeIsAlwaysLabeledAsReference() {
         let range = BodyScoreResult.ReferenceRange(lowerBound: 10, upperBound: 15, label: "Lean")
 
         XCTAssertEqual(
-            BodyScoreRevealPolicy.referenceText(range: range, usesIndividualizedAestheticGoals: false),
-            "Target: 10–15% (Lean)"
-        )
-        XCTAssertEqual(
-            BodyScoreRevealPolicy.referenceText(range: range, usesIndividualizedAestheticGoals: true),
+            BodyScoreRevealPolicy.referenceText(range: range),
             "Reference: 10–15% (Lean)"
         )
         XCTAssertEqual(
-            BodyScoreRevealPolicy.referenceAccessibilityText(range: range, usesIndividualizedAestheticGoals: false),
-            "Target body fat: 10 to 15 percent. Lean."
-        )
-        XCTAssertEqual(
-            BodyScoreRevealPolicy.referenceAccessibilityText(range: range, usesIndividualizedAestheticGoals: true),
+            BodyScoreRevealPolicy.referenceAccessibilityText(range: range),
             "Reference body fat: 10 to 15 percent. Lean."
         )
     }

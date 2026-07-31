@@ -280,7 +280,9 @@ enum Configuration {
         }
 
         let apiBaseURL = URL(string: snapshot.apiBaseURL)
-        if apiBaseURL == nil || isInvalidURLValue(snapshot.apiBaseURL) {
+        let isDevelopmentLocalhost = snapshot.environment == .development
+            && apiBaseURL?.host?.lowercased() == "localhost"
+        if apiBaseURL == nil || (!isDevelopmentLocalhost && isInvalidURLValue(snapshot.apiBaseURL)) {
             messages.append("API base URL must be configured.")
         }
 
