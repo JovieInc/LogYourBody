@@ -53,52 +53,52 @@ final class TimelineDataProvider {
     }
 
     private func findNearestPhoto(to date: Date, within window: TimeInterval) -> TimelineDataResult.PhotoResult? {
-        guard !metricsWithPhotos.isEmpty else { return nil }
-
-        // Find nearest photo within window
-        var nearest: BodyMetrics?
-        var smallestDiff: TimeInterval = window
-
-        for metric in metricsWithPhotos {
-            let diff = abs(metric.date.timeIntervalSince(date))
-            if diff <= window && diff < smallestDiff {
-                nearest = metric
-                smallestDiff = diff
-            }
-        }
-
-        guard let found = nearest else { return nil }
-
-        let days = Int(smallestDiff / (24 * 60 * 60))
+        guard let found = nearestMetric(in: metricsWithPhotos, to: date, within: window) else { return nil }
+        let days = Int(abs(found.date.timeIntervalSince(date)) / (24 * 60 * 60))
         return TimelineDataResult.PhotoResult(bodyMetrics: found, daysFromScrub: days)
     }
 
     private func findNearestMetrics(to date: Date, within window: TimeInterval) -> TimelineDataResult.MetricsResult? {
-        // First try to find exact or nearest metric date
-        var nearest: BodyMetrics?
-        var smallestDiff: TimeInterval = window
+        guard let found = nearestMetric(in: metricsWithWeightOrBodyFat, to: date, within: window) else {
+            return nil
+        }
+        let days = Int(abs(found.date.timeIntervalSince(date)) / (24 * 60 * 60))
+        return TimelineDataResult.MetricsResult(
+            bodyMetrics: found,
+            daysFromScrub: days,
+            isInterpolated: false
+        )
+    }
 
-        for metric in metricsWithWeightOrBodyFat {
-            let diff = abs(metric.date.timeIntervalSince(date))
-            if diff <= window && diff < smallestDiff {
-                nearest = metric
-                smallestDiff = diff
+    /// Binary-search nearest metric by date on a pre-sorted ascending array.
+    private func nearestMetric(
+        in metrics: [BodyMetrics],
+        to date: Date,
+        within window: TimeInterval
+    ) -> BodyMetrics? {
+        guard !metrics.isEmpty else { return nil }
+        var lo = 0
+        var hi = metrics.count - 1
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if metrics[mid].date < date {
+                lo = mid + 1
+            } else {
+                hi = mid
             }
         }
-
-        if let found = nearest {
-            let days = Int(smallestDiff / (24 * 60 * 60))
-            return TimelineDataResult.MetricsResult(
-                bodyMetrics: found,
-                daysFromScrub: days,
-                isInterpolated: false
-            )
+        var best = metrics[lo]
+        var bestDiff = abs(best.date.timeIntervalSince(date))
+        if lo > 0 {
+            let prev = metrics[lo - 1]
+            let prevDiff = abs(prev.date.timeIntervalSince(date))
+            if prevDiff < bestDiff {
+                best = prev
+                bestDiff = prevDiff
+            }
         }
-
-        // If no direct match, try interpolation
-        // (This would integrate with your existing MetricsInterpolationService)
-        // For now, return nil if no match found
-        return nil
+        guard bestDiff <= window else { return nil }
+        return best
     }
 
     // MARK: - Avatar Mode - Get All Data Dates

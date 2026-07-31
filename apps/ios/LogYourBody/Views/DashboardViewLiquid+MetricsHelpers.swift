@@ -10,7 +10,7 @@ extension DashboardViewLiquid {
     /// when the metrics/height change), so a scrub reads precomputed contexts instead
     /// of re-sorting and re-walking the EMA trend on every index change. The resulting
     /// values are identical to the previous per-call estimate path.
-    func updateAnimatedValues(for index: Int) {
+    func updateAnimatedValues(for index: Int, animate: Bool = true) {
         let metrics = viewModel.bodyMetrics
         guard index >= 0 && index < metrics.count else { return }
         let metric = metrics[index]
@@ -28,19 +28,28 @@ extension DashboardViewLiquid {
             heightInches: heightInches
         )
 
-        withAnimation(.easeOut(duration: 0.18)) {
+        let apply = {
             if let weight = values.weight {
-                let system = currentMeasurementSystem
-                animatedWeight = convertWeight(weight, to: system) ?? weight
+                let system = self.currentMeasurementSystem
+                self.animatedWeight = self.convertWeight(weight, to: system) ?? weight
             }
 
             if let bodyFat = values.bodyFat {
-                animatedBodyFat = bodyFat
+                self.animatedBodyFat = bodyFat
             }
 
             if let ffmi = values.ffmi {
-                animatedFFMI = ffmi
+                self.animatedFFMI = ffmi
             }
+        }
+
+        // Scrubbing must not run spring/ease animations every frame — that is a primary jank source.
+        if animate {
+            withAnimation(.easeOut(duration: 0.18), apply)
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction, apply)
         }
     }
 

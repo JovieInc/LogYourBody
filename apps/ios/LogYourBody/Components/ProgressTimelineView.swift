@@ -43,7 +43,6 @@ struct ProgressTimelineView: View {
     // MARK: - Body
 
     var body: some View {
-        let currentRenderSignature = TimelineRenderSignature(metrics: bodyMetrics, mode: mode)
         let handlePosition = isDragging ? dragPosition : selectedPosition(
             in: renderData,
             selectedIndex: selectedIndex
@@ -87,10 +86,30 @@ struct ProgressTimelineView: View {
         }
         .accessibilityIdentifier("dashboard_timeline_scrubber")
         .onAppear {
-            refreshRenderDataIfNeeded(for: currentRenderSignature)
+            refreshRenderDataIfNeeded(
+                for: TimelineRenderSignature(metrics: bodyMetrics, mode: mode)
+            )
         }
-        .onChange(of: currentRenderSignature) { _, newSignature in
-            refreshRenderDataIfNeeded(for: newSignature)
+        // Recompute expensive render data only when inputs change — never every drag frame.
+        .onChange(of: mode) { _, newMode in
+            refreshRenderDataIfNeeded(
+                for: TimelineRenderSignature(metrics: bodyMetrics, mode: newMode)
+            )
+        }
+        .onChange(of: bodyMetrics.count) { _, _ in
+            refreshRenderDataIfNeeded(
+                for: TimelineRenderSignature(metrics: bodyMetrics, mode: mode)
+            )
+        }
+        .onChange(of: bodyMetrics.last?.id) { _, _ in
+            refreshRenderDataIfNeeded(
+                for: TimelineRenderSignature(metrics: bodyMetrics, mode: mode)
+            )
+        }
+        .onChange(of: bodyMetrics.first?.updatedAt) { _, _ in
+            refreshRenderDataIfNeeded(
+                for: TimelineRenderSignature(metrics: bodyMetrics, mode: mode)
+            )
         }
     }
 
@@ -265,13 +284,13 @@ struct ProgressTimelineView: View {
         let result = provider.findDataForPhotoMode(scrubDate: scrubDate)
         currentDateLabel = result.formattedDateLabel()
 
-        // Update selected index to nearest entry
+        // O(1) index lookup — firstIndex during drag is a primary jank source on long histories.
         if let photo = result.photo {
-            if let index = bodyMetrics.firstIndex(where: { $0.id == photo.bodyMetrics.id }) {
+            if let index = renderData.indexById[photo.bodyMetrics.id] {
                 updateSelectedIndex(index)
             }
         } else if let metrics = result.metrics {
-            if let index = bodyMetrics.firstIndex(where: { $0.id == metrics.bodyMetrics.id }) {
+            if let index = renderData.indexById[metrics.bodyMetrics.id] {
                 updateSelectedIndex(index)
             }
         }
@@ -285,9 +304,8 @@ struct ProgressTimelineView: View {
 
         currentDateLabel = TimelineDateFormatterCache.string(from: nearestDate, style: .mediumDate)
 
-        // Update selected index
         if let metric = provider.getMetric(for: nearestDate),
-           let index = bodyMetrics.firstIndex(where: { $0.id == metric.id }) {
+           let index = renderData.indexById[metric.id] {
             updateSelectedIndex(index)
         }
     }
@@ -391,18 +409,28 @@ struct TimelineRenderData {
     let provider: TimelineDataProvider
     let anchors: [TimelineAnchor]
     let zoomLevel: TimelineZoomLevel
+    /// id -> index in `metrics` for O(1) scrub selection.
+    let indexById: [String: Int]
 
     static func make(metrics: [BodyMetrics], mode: TimelineMode) -> TimelineRenderData {
         let provider = TimelineDataProvider()
         provider.loadMetrics(metrics)
-        guard !metrics.isEmpty,
-              let firstDate = provider.bodyMetrics.first?.date,
-              let lastDate = provider.bodyMetrics.last?.date else {
+        let sorted = provider.bodyMetrics
+        var indexById: [String: Int] = [:]
+        indexById.reserveCapacity(sorted.count)
+        for (idx, metric) in sorted.enumerated() {
+            indexById[metric.id] = idx
+        }
+
+        guard !sorted.isEmpty,
+              let firstDate = sorted.first?.date,
+              let lastDate = sorted.last?.date else {
             return TimelineRenderData(
                 metrics: [],
                 provider: provider,
                 anchors: [],
-                zoomLevel: .month
+                zoomLevel: .month,
+                indexById: [:]
             )
         }
 
@@ -410,10 +438,11 @@ struct TimelineRenderData {
         let anchors = provider.generateAnchors(mode: mode, zoomLevel: zoomLevel)
 
         return TimelineRenderData(
-            metrics: provider.bodyMetrics,
+            metrics: sorted,
             provider: provider,
             anchors: anchors,
-            zoomLevel: zoomLevel
+            zoomLevel: zoomLevel,
+            indexById: indexById
         )
     }
 }
