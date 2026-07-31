@@ -678,7 +678,7 @@ final class LogYourBodyUITests: XCTestCase {
             app.terminate()
         }
 
-        app.launchArguments = arguments
+        app.launchArguments = arguments + ["-lyb.whatsNew.lastPresentedVersion", "1.2.0"]
         app.launch()
     }
 
