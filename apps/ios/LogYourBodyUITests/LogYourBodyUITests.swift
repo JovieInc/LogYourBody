@@ -742,12 +742,21 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(shareButton.isHittable)
         shareButton.tap()
 
+        let shareSheet = app.descendants(matching: .any)["body_score_share_sheet"]
         let shareCard = app.descendants(matching: .any)["body_score_share_card"]
-        XCTAssertTrue(shareCard.waitForExistence(timeout: 8))
+        // Sheet identifier is preferred; card must remain discoverable for launch quality.
+        let sheetVisible = shareSheet.waitForExistence(timeout: 8)
+        let cardVisible = shareCard.waitForExistence(timeout: sheetVisible ? 4 : 8)
+        XCTAssertTrue(sheetVisible || cardVisible, "Share overlay must appear after tapping share")
+        XCTAssertTrue(cardVisible, "Share card must remain accessibility-discoverable inside the overlay")
         XCTAssertTrue(app.descendants(matching: .any)["body_score_share_content_controls"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["body_score_share_avatar_visual"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["body_score_share_save_button"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["body_score_share_system_button"].exists)
+
+        let closeButton = app.descendants(matching: .any)["body_score_share_close_button"]
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(closeButton.isHittable, "Close must stay tappable outside the safe-area notch")
 
         let cardFrame = shareCard.frame
         let windowFrame = app.windows.firstMatch.frame
@@ -756,6 +765,17 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertGreaterThan(cardFrame.minY, windowFrame.minY + 72)
         XCTAssertLessThanOrEqual(cardFrame.maxY, windowFrame.maxY - 72)
         attachScreenshot(named: "launch-quality-body-score-share", from: app)
+
+        // Escape path: Close must actually dismiss the full-screen overlay.
+        closeButton.tap()
+        XCTAssertFalse(
+            shareSheet.waitForExistence(timeout: 3),
+            "Share sheet must dismiss when Close is tapped"
+        )
+        XCTAssertTrue(
+            shareButton.waitForExistence(timeout: 5),
+            "Home share control must return after dismissing share sheet"
+        )
     }
 
     private func assertAndCaptureTimelineAnalytics(in app: XCUIApplication) throws {

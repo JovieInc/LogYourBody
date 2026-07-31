@@ -19,6 +19,34 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertEqual(BodyScoreShareAspect.preferredExportAspect(for: nil), .portrait)
     }
 
+    func testShareSheetDismissesOnDownwardDragPastThreshold() {
+        XCTAssertFalse(
+            BodyScoreShareSheet.shouldDismiss(
+                afterDragTranslation: 40,
+                predictedEndTranslation: 60
+            )
+        )
+        XCTAssertTrue(
+            BodyScoreShareSheet.shouldDismiss(
+                afterDragTranslation: BodyScoreShareSheet.dismissDragThreshold,
+                predictedEndTranslation: 0
+            )
+        )
+        XCTAssertTrue(
+            BodyScoreShareSheet.shouldDismiss(
+                afterDragTranslation: 30,
+                predictedEndTranslation: BodyScoreShareSheet.dismissDragThreshold * 1.4
+            )
+        )
+        // Upward / sideways motion must never dismiss.
+        XCTAssertFalse(
+            BodyScoreShareSheet.shouldDismiss(
+                afterDragTranslation: -180,
+                predictedEndTranslation: -300
+            )
+        )
+    }
+
     func testPhotoShareAspectTracksNativeImageShape() {
         XCTAssertEqual(
             BodyScoreShareAspect.preferredExportAspect(
