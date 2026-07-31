@@ -199,7 +199,7 @@ enum ErrorTrackingRedactor {
         event.tags = event.tags?.reduce(into: [String: String]()) { result, entry in
             result[entry.key] = sanitize(entry.value, key: entry.key)
         }
-        event.message = event.message.map { sanitize($0) }
+        event.message = event.message.map { SentryMessage(formatted: sanitize($0.formatted)) }
         event.user = nil
         event.breadcrumbs = event.breadcrumbs?.compactMap { redact(breadcrumb: $0) }
         return event
