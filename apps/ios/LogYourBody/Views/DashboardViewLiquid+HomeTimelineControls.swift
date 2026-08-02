@@ -41,6 +41,13 @@ extension DashboardViewLiquid {
             unselectedForeground: theme.colors.textSecondary,
             onSelection: { _ in HapticManager.shared.selection() }
         )
+        .systemBGlassSurface(
+            cornerRadius: theme.radius.full,
+            tint: theme.colors.text,
+            tintOpacity: 0.025,
+            borderColor: theme.colors.border,
+            borderOpacity: 0.85
+        )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home_mode_switch")
     }

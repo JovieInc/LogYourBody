@@ -107,7 +107,7 @@ def write_outputs(artifact_dir: Path, violations: list[AuditViolation]) -> None:
                 "- Body Score share cards expose layout anchors for UI assertions.",
                 "- Body Score share cards preserve actual photo aspect defaults instead of forcing one crop.",
                 "- Body Score sharing resolves the actual progress photo before presenting the sheet.",
-                "- The dashboard avatar visual fills a full-width black stage with transparent assets.",
+                "- The dashboard avatar visual fills a full-width black stage while preserving each transparent asset's native aspect ratio.",
                 "- Dashboard/HUD launch surfaces stay on System B theme colors and real glass material.",
                 "- Timeline/Stats swipe navigation changes page on release, not during drag updates.",
                 "- Paid users default directly into the timeline HUD without a Statsig or legacy fallback gate.",
@@ -179,14 +179,14 @@ def main() -> int:
         ".background(theme.colors.background)",
         "padding: 0,",
         "horizontalFillScale: 1.0",
-        "renderMode: .fillWidth",
+        "renderMode: .fit",
     ]:
         require_token(
             root=root,
             path=dashboard_components,
             token=token,
             check="avatar.full_width_transparent_stage",
-            detail=f"Missing avatar full-width hero-stage contract `{token}`.",
+            detail=f"Missing avatar full-width, native-aspect hero-stage contract `{token}`.",
             violations=violations,
         )
 
