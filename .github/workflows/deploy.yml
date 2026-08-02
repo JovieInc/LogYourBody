@@ -67,17 +67,25 @@ jobs:
         run: |
           test -n "$SUPABASE_ACCESS_TOKEN"
           test -n "$SUPABASE_PROJECT_REF"
-          configured_secrets=$(supabase secrets list \
+          if ! configured_secrets=$(supabase secrets list \
             --project-ref "$SUPABASE_PROJECT_REF" \
-            --output-format json)
+            --output-format json); then
+            echo "::error::Unable to list Supabase function secrets"
+            exit 1
+          fi
+          missing_secrets=0
           for required_secret in \
             CLOUDINARY_CLOUD_NAME \
             CLOUDINARY_API_KEY \
             CLOUDINARY_API_SECRET; do
-            printf '%s' "$configured_secrets" | jq -e \
+            if ! printf '%s' "$configured_secrets" | jq -e \
               --arg name "$required_secret" \
-              '.[] | select(.name == $name)' > /dev/null
+              'map(.name) | index($name) != null' > /dev/null; then
+              echo "::error::Missing required Supabase function secret: $required_secret"
+              missing_secrets=1
+            fi
           done
+          test "$missing_secrets" -eq 0
           for function_name in delete-user-assets process-progress-photo; do
             supabase functions deploy "$function_name" \
               --project-ref "$SUPABASE_PROJECT_REF"
