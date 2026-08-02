@@ -8,15 +8,15 @@ var body: some View {
 
             ScrollViewReader { proxy in
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 16) {
                         headlineBlock
                         chartCard
                         relatedMetricsRow
                         historyBlock
                     }
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 32)
-                    .padding(.top, 12)
+                    .padding(.bottom, 24)
+                    .padding(.top, 8)
                 }
                 .overlay(alignment: .trailing) {
                     historyScrubber(proxy: proxy)
@@ -76,7 +76,7 @@ var body: some View {
     }
 
 var headlineBlock: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .semibold))
@@ -167,7 +167,7 @@ var headlineBlock: some View {
         }
         .frame(maxWidth: .infinity, alignment: alignRight ? .trailing : .leading)
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color.white.opacity(0.06))
@@ -206,50 +206,23 @@ var displayedHistorySections: [HistorySection] {
     }
 
 var timeRangeSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack {
-                HStack(spacing: 4) {
-                    ForEach(TimeRange.allCases, id: \.self) { range in
-                        let isSelected = selectedTimeRange == range
-
-                        Button {
-                            selectedTimeRange = range
-                        } label: {
-                            Text(range.rawValue)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundColor(
-                                    isSelected ? Color.black : Color.metricTextPrimary
-                                )
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 14)
-                                .frame(minWidth: 44, minHeight: 44)
-                                .background(
-                                    Capsule()
-                                        .fill(isSelected ? Color.white : Color.clear)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(range.accessibilityLabel)
-                        .accessibilityValue(isSelected ? "Selected" : "Not selected")
-                        .accessibilityHint("Shows \(range.accessibilityLabel.lowercased()) of data")
-                        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-                        .accessibilityIdentifier("metric_detail_range_\(range.rawValue)")
-                    }
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color.white.opacity(0.08))
-                )
-            }
-            .padding(.vertical, 6)
-        }
+        JovieSegmentedControl(
+            selection: $selectedTimeRange,
+            items: Array(TimeRange.allCases),
+            title: { $0.rawValue },
+            accessibilityLabel: { $0.accessibilityLabel },
+            accessibilityHint: { "Shows \($0.accessibilityLabel.lowercased()) of data" },
+            accessibilityIdentifier: { "metric_detail_range_\($0.rawValue)" },
+            selectedTint: .white,
+            selectedForeground: .black,
+            unselectedForeground: .metricTextPrimary
+        )
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("metric_detail_range_selector")
     }
 
 var chartCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             chartHeader
             if isLoadingData {
                 chartSkeleton
@@ -384,7 +357,7 @@ var chartSkeleton: some View {
     }
 
 var chartHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             timeRangeSelector
                 .fixedSize(horizontal: false, vertical: true)
 

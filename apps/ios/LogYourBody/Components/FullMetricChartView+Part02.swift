@@ -133,7 +133,7 @@ func historyRow(for entry: MetricHistoryEntry, config: MetricEntriesConfiguratio
                 }
             }
         }
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
     }
 
 func primaryHistoryValue(_ entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> String {

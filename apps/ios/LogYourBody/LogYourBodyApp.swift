@@ -166,6 +166,38 @@ private struct PersistentStoreRecoveryView: View {
     }
 }
 
+#if DEBUG
+/// Test-only viewport constraint used to exercise layouts narrower than the
+/// iOS 26 simulator device catalog exposes. It is activated only by a UI-test
+/// launch argument and never changes a production build or user layout.
+private struct UITestViewportModifier: ViewModifier {
+    private var requestedWidth: CGFloat? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-lybUITestViewportWidth"),
+              arguments.indices.contains(index + 1),
+              let value = Double(arguments[index + 1]),
+              value > 0 else {
+            return nil
+        }
+
+        return CGFloat(value)
+    }
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let requestedWidth {
+            content
+                .frame(width: requestedWidth)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("lyb_ui_test_viewport")
+                .frame(maxWidth: .infinity)
+        } else {
+            content
+        }
+    }
+}
+#endif
+
 @main
 struct LogYourBodyApp: App {
     @StateObject private var authManager = AuthManager.shared
@@ -196,6 +228,9 @@ struct LogYourBodyApp: App {
             switch persistenceController.persistentStoreLoadState {
             case .ready:
                 ContentView()
+#if DEBUG
+                .modifier(UITestViewportModifier())
+#endif
                 .environment(\.managedObjectContext, persistenceController.viewContext)
                 .environmentObject(authManager)
                 .environmentObject(realtimeSyncManager)
