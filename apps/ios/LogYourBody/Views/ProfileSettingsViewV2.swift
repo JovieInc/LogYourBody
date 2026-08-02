@@ -500,7 +500,7 @@ struct ProfileHeightPickerSheet: View {
     var dismiss
     @Environment(\.theme)
     private var theme
-    var onCommit: (() -> Void)? = nil
+    var onCommit: (() -> Void)?
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -638,7 +638,7 @@ struct DatePickerSheet: View {
     var dismiss
     @Environment(\.theme)
     private var theme
-    var onCommit: (() -> Void)? = nil
+    var onCommit: (() -> Void)?
     var body: some View {
         NavigationStack {
             VStack(spacing: theme.spacing.md) {

@@ -135,9 +135,19 @@ export const neonUserDirectory: UserDirectoryPort = {
   async deleteUser(subject) {
     const database = getDatabase();
 
-    // Product health rows do not have a database cascade to app_users yet.
+    // User-owned product rows do not have a database cascade to app_users yet.
     // Delete them first so a failed cleanup never removes the identity record
-    // while leaving health data orphaned and unreachable by the user.
+    // while leaving private data orphaned and unreachable by the user.
+    await database`
+      delete from public.chat_usage_limits
+      where user_subject = ${subject}
+    `;
+
+    await database`
+      delete from public.chat_conversations
+      where user_subject = ${subject}
+    `;
+
     await database`
       delete from public.body_metrics
       where user_subject = ${subject}

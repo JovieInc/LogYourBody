@@ -341,6 +341,103 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "chat-first-timeline-destination", from: app)
     }
 
+    func testChatStreamsFixtureAnswer() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture"
+        ])
+
+        XCTAssertTrue(app.descendants(matching: .any)["chat_first_root"].waitForExistence(timeout: 12))
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        XCTAssertTrue(prompt.isHittable)
+        prompt.tap()
+
+        let answer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Your fixture trend is stable")
+        ).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 8))
+        XCTAssertTrue(answer.label.contains("Open Timeline to inspect the selected day."))
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_error_state"].exists)
+        attachScreenshot(named: "chat-stream-success", from: app)
+    }
+
+    func testChatProviderFailureShowsRetry() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatErrorFixture"
+        ])
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 12))
+        prompt.tap()
+
+        let error = app.staticTexts["The answer could not be completed."]
+        XCTAssertTrue(error.waitForExistence(timeout: 8))
+        let retry = app.buttons["chat_retry_button"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5))
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        attachScreenshot(named: "chat-provider-retry", from: app)
+    }
+
+    func testChatOfflineStateIsVisibleAndRetryable() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatOfflineFixture"
+        ])
+
+        let offlineCopy = app.staticTexts["You’re offline. Reconnect, then try again."]
+        XCTAssertTrue(offlineCopy.waitForExistence(timeout: 12))
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5))
+        prompt.tap()
+
+        let retry = app.buttons["chat_retry_button"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 8))
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        attachScreenshot(named: "chat-offline-retry", from: app)
+    }
+
+    func testChatCanCancelStreamingAnswer() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatSlowFixture"
+        ])
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 12))
+        prompt.tap()
+
+        let partialAnswer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Reviewing your authorized trend")
+        ).firstMatch
+        XCTAssertTrue(partialAnswer.waitForExistence(timeout: 5))
+
+        let stopButton = app.buttons["Stop answer"]
+        XCTAssertTrue(stopButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(stopButton.isHittable)
+        stopButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Answer stopped. Retry when you’re ready."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Stopped"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["chat_retry_button"].isHittable)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        attachScreenshot(named: "chat-stream-cancelled", from: app)
+    }
+
     func testSettingsProfileFieldsOpenDirectEditors() throws {
         let app = XCUIApplication()
         launch(app, with: [

@@ -49,6 +49,10 @@ const swiftAllowedBoundaries = [
 
 const typescriptAllowedBoundaries = [
   {
+    label: 'apps/web/src/lib/adapters/**',
+    test: (relativePath) => relativePath.startsWith('apps/web/src/lib/adapters/'),
+  },
+  {
     label: 'apps/web/src/lib/ports/**',
     test: (relativePath) => relativePath.startsWith('apps/web/src/lib/ports/'),
   },

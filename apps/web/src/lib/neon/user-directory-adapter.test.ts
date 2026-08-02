@@ -21,22 +21,30 @@ describe('neonUserDirectory.deleteUser', () => {
     process.env.DATABASE_URL = 'postgresql://example.test/logyourbody';
   });
 
-  it('deletes health rows before the identity projection', async () => {
+  it('deletes chat state and health rows before the identity projection', async () => {
     await neonUserDirectory.deleteUser('jovie-subject');
 
-    expect(normalizedStatement(0)).toBe('delete from public.body_metrics where user_subject = ?');
+    expect(normalizedStatement(0)).toBe(
+      'delete from public.chat_usage_limits where user_subject = ?',
+    );
     expect(mockSql.mock.calls[0]?.[1]).toBe('jovie-subject');
     expect(normalizedStatement(1)).toBe(
-      "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ?",
+      'delete from public.chat_conversations where user_subject = ?',
     );
     expect(mockSql.mock.calls[1]?.[1]).toBe('jovie-subject');
+    expect(normalizedStatement(2)).toBe('delete from public.body_metrics where user_subject = ?');
+    expect(mockSql.mock.calls[2]?.[1]).toBe('jovie-subject');
+    expect(normalizedStatement(3)).toBe(
+      "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ?",
+    );
+    expect(mockSql.mock.calls[3]?.[1]).toBe('jovie-subject');
   });
 
   it('keeps the identity projection when health-row deletion fails', async () => {
-    mockSql.mockRejectedValueOnce(new Error('health deletion unavailable'));
+    mockSql.mockRejectedValueOnce(new Error('chat cleanup unavailable'));
 
     await expect(neonUserDirectory.deleteUser('jovie-subject')).rejects.toThrow(
-      'health deletion unavailable',
+      'chat cleanup unavailable',
     );
 
     expect(mockSql).toHaveBeenCalledTimes(1);

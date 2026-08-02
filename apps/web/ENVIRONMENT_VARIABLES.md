@@ -11,17 +11,23 @@ JOVIE_AUTH_ISSUER=https://jov.ie/api/auth
 JOVIE_AUTH_CLIENT_ID=logyourbody-web
 JOVIE_AUTH_REDIRECT_URI=http://localhost:3000/api/auth/callback
 DATABASE_URL=postgresql://...
+CRON_SECRET=long-random-server-secret
 ```
 
 `DATABASE_URL` is the LYB product Neon database. Apply the checked-in schema
 with `pnpm --filter logyourbody db:apply:neon` before exercising authenticated
 profile or metric flows.
 
+`CRON_SECRET` protects the daily conversation-retention cleanup route. Vercel
+sends it only as an authorization header; it must never use a `NEXT_PUBLIC_`
+name or be exposed to iOS.
+
 ## Optional
 
 ```bash
 WAITLIST_DATABASE_URL=postgresql://...
 OPENAI_API_KEY=...
+LYB_CHAT_MODEL=gpt-4o-mini
 NEXT_PUBLIC_VERSION=local-dev
 ```
 

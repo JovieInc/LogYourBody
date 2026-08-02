@@ -244,6 +244,8 @@
 		ADA600482ED375EE00088042 /* Glp1Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600462ED375EE00088042 /* Glp1Medication.swift */; };
 		ADA600502ED401000088042 /* BodyScoreFirstProgressPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6004F2ED401000088042 /* BodyScoreFirstProgressPhotoView.swift */; };
 		ADAD00022F10000000ABCDEF /* ExternalServicePorts.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAD00012F10000000ABCDEF /* ExternalServicePorts.swift */; };
+		C7A700022F20000000C0A702 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A700012F20000000C0A701 /* ChatService.swift */; };
+		C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A700032F20000000C0A703 /* ChatServiceTests.swift */; };
 		ADBAF04E2ECAD88A00A95F98 /* BodyScoreHeightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF0442ECAD88A00A95F98 /* BodyScoreHeightView.swift */; };
 		ADBAF04F2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF03B2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift */; };
 		ADBAF0502ECAD88A00A95F98 /* BodyScoreCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBAF04A2ECAD88A00A95F98 /* BodyScoreCalculator.swift */; };
@@ -743,6 +745,8 @@
 		ADA922F32E22EE9D00B82C49 /* CommonComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonComponents.swift; sourceTree = "<group>"; };
 		ADA923002E22EF4600B82C49 /* UIComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIComponents.swift; sourceTree = "<group>"; };
 		ADAD00012F10000000ABCDEF /* ExternalServicePorts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalServicePorts.swift; sourceTree = "<group>"; };
+		C7A700012F20000000C0A701 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
+		C7A700032F20000000C0A703 /* ChatServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatServiceTests.swift; sourceTree = "<group>"; };
 		ADBAF0382ECAD88A00A95F98 /* OnboardingAtoms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAtoms.swift; sourceTree = "<group>"; };
 		ADBAF0392ECAD88A00A95F98 /* OnboardingMolecules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingMolecules.swift; sourceTree = "<group>"; };
 		ADBAF03B2ECAD88A00A95F98 /* OnboardingFlowViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowViewModel.swift; sourceTree = "<group>"; };
@@ -1224,6 +1228,7 @@
 		AD723AED2E15FA5C002376C6 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				C7A700012F20000000C0A701 /* ChatService.swift */,
 				AD8F12F42ED7C987003C4559 /* BugReportManager.swift */,
 				ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */,
 				ADF1F6B52ED4C61400745F33 /* GlobalTimelineService.swift */,
@@ -1454,6 +1459,7 @@
 		AD7D30A52E1490810072AA5B /* LogYourBodyTests */ = {
 			isa = PBXGroup;
 			children = (
+				C7A700032F20000000C0A703 /* ChatServiceTests.swift */,
 				AD7D30A62E1490810072AA5B /* LogYourBodyTests.swift */,
 				FE06A6A600000000000000F6 /* Glp1CardAndCatalogTests.swift */,
 				FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */,
@@ -1881,6 +1887,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
 				AD7D30A72E1490810072AA5B /* LogYourBodyTests.swift in Sources */,
 				FE06A6A600000000000000B6 /* Glp1CardAndCatalogTests.swift in Sources */,
 				FE04A4A400000000000000B4 /* SyncIntervalAndChunkingTests.swift in Sources */,
@@ -2030,6 +2037,7 @@
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
 				ADAD00022F10000000ABCDEF /* ExternalServicePorts.swift in Sources */,
+				C7A700022F20000000C0A702 /* ChatService.swift in Sources */,
 				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,
 				AD3145C12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift in Sources */,
 				AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */,

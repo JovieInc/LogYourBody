@@ -752,27 +752,39 @@ struct LaunchTimelineSurface: View {
         GeometryReader { geometry in
             let stageHeight = min(248, max(160, geometry.size.height * 0.35))
 
-            VStack(alignment: .leading, spacing: 0) {
-                timelineStage
-                    .frame(height: stageHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: theme.radius.card))
+            ZStack(alignment: .topLeading) {
+                launchAccessibilityMarker(id: "launch_timeline_surface", label: "Timeline")
 
-                scoreAndMetrics
-                    .padding(.top, 14)
+                VStack(alignment: .leading, spacing: 0) {
+                    timelineStage
+                        .frame(height: stageHeight)
+                        .clipShape(RoundedRectangle(cornerRadius: theme.radius.card))
 
-                stripHeader
-                    .padding(.top, 18)
-                    .padding(.bottom, 8)
+                    scoreAndMetrics
+                        .padding(.top, 14)
 
-                timelineStrip
-                    .frame(height: 98)
+                    stripHeader
+                        .padding(.top, 18)
+                        .padding(.bottom, 8)
+
+                    timelineStrip
+                        .frame(height: 98)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 12)
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .padding(.bottom, 12)
-            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
         }
-        .accessibilityIdentifier("launch_timeline_surface")
+    }
+
+    private func launchAccessibilityMarker(id: String, label: String) -> some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .accessibilityElement()
+            .accessibilityLabel(label)
+            .accessibilityIdentifier(id)
+            .allowsHitTesting(false)
     }
 
     private var timelineStage: some View {
@@ -832,7 +844,11 @@ struct LaunchTimelineSurface: View {
         .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card))
         .clipped()
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(metric.photoUrl?.isEmpty == false ? "Selected progress photo, (dateText)" : "No progress photo for (dateText)")
+        .accessibilityLabel(
+            metric.photoUrl?.isEmpty == false
+                ? "Selected progress photo, \(dateText)"
+                : "No progress photo for \(dateText)"
+        )
         .accessibilityIdentifier("launch_timeline_stage")
     }
 
@@ -935,7 +951,7 @@ struct LaunchTimelineSurface: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Body Score (bodyScoreText), (bodyScoreTagline)")
+        .accessibilityLabel("Body Score \(bodyScoreText), \(bodyScoreTagline)")
     }
 
     private func launchMetricCell(
@@ -978,7 +994,7 @@ struct LaunchTimelineSurface: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("(title) (value), (caption)")
+        .accessibilityLabel("\(title) \(value), \(caption)")
     }
 
     private var stripHeader: some View {
@@ -1011,7 +1027,9 @@ struct LaunchTimelineSurface: View {
                         }
                         .buttonStyle(.plain)
                         .id(index)
-                        .accessibilityLabel("Timeline entry (metric.date.formatted(date: .abbreviated, time: .omitted))")
+                        .accessibilityLabel(
+                            "Timeline entry \(metric.date.formatted(date: .abbreviated, time: .omitted))"
+                        )
                         .accessibilityValue(index == selectedIndex ? "Selected" : "Not selected")
                         .accessibilityIdentifier("launch_timeline_entry_\(index)")
                     }
