@@ -104,6 +104,7 @@ class PhotoMetadataService {
         photoUrl: String? = nil,
         weight: Double? = nil,
         bodyFatPercentage: Double? = nil,
+        bodyFatMethod: String? = nil,
         userId: String,
         dataSource: String? = nil,
         preserveExistingMeasurements: Bool = false
@@ -113,6 +114,7 @@ class PhotoMetadataService {
             photoUrl: photoUrl,
             weight: weight,
             bodyFatPercentage: bodyFatPercentage,
+            bodyFatMethod: bodyFatMethod,
             userId: userId,
             dataSource: dataSource,
             preserveExistingMeasurements: preserveExistingMeasurements
@@ -125,6 +127,7 @@ class PhotoMetadataService {
         photoUrl: String? = nil,
         weight: Double? = nil,
         bodyFatPercentage: Double? = nil,
+        bodyFatMethod: String? = nil,
         userId: String,
         dataSource: String? = nil,
         preserveExistingMeasurements: Bool = false
@@ -145,6 +148,14 @@ class PhotoMetadataService {
             let updatedBodyFat = preserveExistingMeasurements
                 ? existing.bodyFatPercentage ?? bodyFatPercentage
                 : bodyFatPercentage ?? existing.bodyFatPercentage
+            let updatedBodyFatMethod = if preserveExistingMeasurements,
+                                          existing.bodyFatPercentage != nil {
+                existing.bodyFatMethod
+            } else if bodyFatPercentage != nil {
+                bodyFatMethod ?? existing.bodyFatMethod
+            } else {
+                existing.bodyFatMethod
+            }
 
             // Update existing metrics
             let updated = BodyMetrics(
@@ -155,7 +166,7 @@ class PhotoMetadataService {
                 weight: updatedWeight,
                 weightUnit: existing.weightUnit ?? "kg",
                 bodyFatPercentage: updatedBodyFat,
-                bodyFatMethod: existing.bodyFatMethod,
+                bodyFatMethod: updatedBodyFatMethod,
                 muscleMass: existing.muscleMass,
                 boneMass: existing.boneMass,
                 notes: existing.notes,
@@ -178,7 +189,7 @@ class PhotoMetadataService {
                 weight: weight,
                 weightUnit: "kg",
                 bodyFatPercentage: bodyFatPercentage,
-                bodyFatMethod: nil,
+                bodyFatMethod: bodyFatMethod,
                 muscleMass: nil,
                 boneMass: nil,
                 notes: nil,

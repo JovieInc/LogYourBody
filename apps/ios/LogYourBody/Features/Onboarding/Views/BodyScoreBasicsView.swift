@@ -12,10 +12,11 @@ struct BodyScoreBasicsView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Sex at birth",
-            subtitle: "For accurate comparisons only.",
+            title: "Which reference should we use?",
+            subtitle: "Sex at birth changes validated body-composition ranges. It never sets your goals.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .basics),
+            screen: .sexAtBirth,
             content: {
                 VStack(spacing: JovieTokens.sectionGap) {
                     OnboardingFormSection {

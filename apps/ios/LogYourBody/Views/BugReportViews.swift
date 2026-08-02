@@ -11,11 +11,11 @@ struct BugReportPromptSheet: View {
                 .frame(width: 40, height: 4)
                 .padding(.top, 8)
 
-            Text("Report a bug?")
+            Text("Report a problem")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(.appText)
 
-            Text("If something isn't working correctly, you can report it to help improve LogYourBody for everyone.")
+            Text("Tell us what happened. A screenshot is optional and may include whatever is visible on screen.")
                 .font(.subheadline)
                 .foregroundColor(.appTextSecondary)
                 .multilineTextAlignment(.center)
@@ -26,7 +26,7 @@ struct BugReportPromptSheet: View {
                     bugReportManager.presentFormFromPrompt()
                 },
                 label: {
-                    Text("Report bug")
+                    Text("Report a problem")
                         .font(.system(size: 17, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
@@ -83,7 +83,7 @@ struct BugReportFormView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("What happened?")
+                        Text("Tell us what happened")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(.appText)
 
@@ -110,13 +110,14 @@ struct BugReportFormView: View {
                 ]
             )
         }
+        .worldClassScreen(.bugReport)
     }
 
     private var header: some View {
         HStack {
             Spacer()
 
-            Text("Report bug")
+            Text("Report a problem")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.appText)
 
@@ -163,7 +164,7 @@ struct BugReportFormView: View {
                 }
 
             if bugReportManager.message.isEmpty {
-                Text("Tell us about the issue you encountered")
+                Text("What did you expect, and what happened instead?")
                     .font(.body)
                     .foregroundColor(.appTextSecondary)
                     .padding(.horizontal, 18)
@@ -187,11 +188,12 @@ struct BugReportFormView: View {
     }
 
     private var infoText: some View {
-        let combined = Text(
-            "Any information you share may be reviewed to help improve LogYourBody. " +
-                "If you have additional questions, "
-        ) + Text("contact support.")
+        let supportLink = Text("contact support.")
             .foregroundColor(.appPrimary)
+        let combined = Text(
+            "Reports include your description and basic app and device details. Screenshots are optional. " +
+                "If you have additional questions, \(supportLink)"
+        )
 
         return combined
             .font(.footnote)

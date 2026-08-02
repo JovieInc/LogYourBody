@@ -24,6 +24,7 @@ var body: some View {
             }
         }
         .accessibilityIdentifier("metric_detail_screen")
+        .worldClassScreen(.metricDetail)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(false)

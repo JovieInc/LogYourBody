@@ -17,9 +17,12 @@ struct BodyScoreLoadingView: View {
                     .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
                     .accessibilityHidden(true)
 
-                OnboardingTitleText(text: "Crunching your numbers…", alignment: .center)
+                OnboardingTitleText(text: "Building your Body Score", alignment: .center)
 
-                OnboardingSubtitleText(text: "Pulling lean mass, FFMI, and percentile bands.", alignment: .center)
+                OnboardingSubtitleText(
+                    text: "Combining lean mass, body fat, and validated reference ranges.",
+                    alignment: .center
+                )
             }
             .padding(JovieTokens.screenInset)
             .accessibilityElement(children: .combine)
@@ -29,6 +32,7 @@ struct BodyScoreLoadingView: View {
         .task {
             await viewModel.calculateScoreIfNeeded()
         }
+        .worldClassScreen(.calculation)
     }
 }
 

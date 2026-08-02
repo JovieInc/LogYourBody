@@ -18,9 +18,9 @@ enum ProductRegistry {
     }
 
     enum Paywall {
-        static let title = "LogYourBody Pro"
-        static let subtitle = "A clear, private view of your progress."
-        static let valueProposition = "Log quickly. See weight, body fat, FFMI, and your trend in one place."
+        static let title = "Keep the answer current."
+        static let subtitle = "Your first score is ready. Pro keeps it updated as new measurements and photos arrive."
+        static let valueProposition = "Track weight, body fat, FFMI, and honest visual change with one private history."
         static let entitlementID = "Premium"
         static let trialDays = 3
         static let monthlyProductID = "com.logyourbody.app.pro1.monthly.3daytrial"

@@ -77,6 +77,7 @@ struct BiometricLockView: View {
         .onDisappear {
             biometricAuthenticator.cancelCurrentAuthentication()
         }
+        .worldClassScreen(.biometricLock)
     }
 
     @ViewBuilder
@@ -87,8 +88,7 @@ struct BiometricLockView: View {
         ) {
             BiometricAuthView(
                 biometricType: biometricType,
-                onAuthenticate: authenticate,
-                onUsePassword: unlock
+                onAuthenticate: authenticate
             )
         } else {
             lockSurface
@@ -98,13 +98,14 @@ struct BiometricLockView: View {
     private var lockSurface: some View {
         VStack(spacing: JovieTokens.sectionGap) {
             VStack(spacing: 8) {
-                Text("Secure access")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.jovieTextSecondary)
-
-                Text("Unlock with \(biometricType.title)")
+                Text("Unlock LogYourBody")
                     .font(.title.weight(.bold))
                     .foregroundStyle(Color.jovieText)
+                    .multilineTextAlignment(.center)
+
+                Text("Confirm it’s you with \(biometricType.title) or your device passcode.")
+                    .font(.body)
+                    .foregroundStyle(Color.jovieTextSecondary)
                     .multilineTextAlignment(.center)
             }
 
@@ -129,7 +130,7 @@ struct BiometricLockView: View {
             }
             .accessibilityElement(children: .combine)
 
-            Label("Your data stays encrypted on this device.", systemImage: "lock.fill")
+            Label("This lock blocks access until device-owner authentication succeeds.", systemImage: "lock.fill")
                 .font(.footnote)
                 .foregroundStyle(Color.jovieTextSecondary)
                 .multilineTextAlignment(.center)
@@ -138,12 +139,6 @@ struct BiometricLockView: View {
         }
         .padding(JovieTokens.sectionGap)
         .frame(maxWidth: 440)
-        .systemBGlassSurface(
-            cornerRadius: JovieTokens.cardRadius,
-            tint: .white,
-            tintOpacity: 0.025,
-            borderColor: .jovieHairline
-        )
         .accessibilityElement(children: .contain)
     }
 
@@ -155,8 +150,9 @@ struct BiometricLockView: View {
             let result = await biometricAuthenticator.authenticate(
                 reason: "Unlock LogYourBody",
                 cancelTitle: nil,
-                fallbackTitle: "",
-                timeout: 5
+                fallbackTitle: "Use Passcode",
+                timeout: 15,
+                allowsDevicePasscode: true
             )
 
             await MainActor.run {

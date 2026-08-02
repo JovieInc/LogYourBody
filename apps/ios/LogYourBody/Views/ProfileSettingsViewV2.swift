@@ -174,6 +174,7 @@ struct ProfileSettingsViewV2: View {
         } message: {
             Text(saveErrorMessage ?? "Check your connection and try again.")
         }
+        .worldClassScreen(.editProfile)
     }
 
     // MARK: - View Components

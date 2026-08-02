@@ -68,6 +68,28 @@ def require_token(
     )
 
 
+def require_one_of_tokens(
+    *,
+    root: Path,
+    path: Path,
+    tokens: tuple[str, ...],
+    check: str,
+    detail: str,
+    violations: list[AuditViolation],
+) -> None:
+    text = path.read_text(errors="replace")
+    if any(token in text for token in tokens):
+        return
+    violations.append(
+        AuditViolation(
+            check=check,
+            file=str(path.relative_to(root)),
+            line=1,
+            detail=detail,
+        )
+    )
+
+
 def write_outputs(artifact_dir: Path, violations: list[AuditViolation]) -> None:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     status = "failed" if violations else "passed"
@@ -108,7 +130,7 @@ def write_outputs(artifact_dir: Path, violations: list[AuditViolation]) -> None:
                 "- Body Score share cards preserve actual photo aspect defaults instead of forcing one crop.",
                 "- Body Score sharing resolves the actual progress photo before presenting the sheet.",
                 "- The dashboard avatar visual fills a full-width black stage while preserving each transparent asset's native aspect ratio.",
-                "- Dashboard/HUD launch surfaces stay on System B theme colors and real glass material.",
+                "- Dashboard/HUD launch surfaces stay on theme-backed glass or flat surface treatments.",
                 "- Timeline/Stats swipe navigation changes page on release, not during drag updates.",
                 "- Paid users default directly into the timeline HUD without a Statsig or legacy fallback gate.",
             ]
@@ -198,12 +220,12 @@ def main() -> int:
         app_dir / "DesignSystem/Organisms/MetricSummaryCard.swift",
     ]
     for path in system_b_surface_files:
-        require_token(
+        require_one_of_tokens(
             root=root,
             path=path,
-            token=".systemBGlassSurface(",
-            check="dashboard.system_b_glass_surface",
-            detail="Dashboard/HUD cards must use the theme-backed System B glass surface.",
+            tokens=(".systemBGlassSurface(", ".background(theme.colors.surface"),
+            check="dashboard.theme_backed_surface",
+            detail="Dashboard/HUD cards must use a theme-backed glass or flat surface treatment.",
             violations=violations,
         )
 

@@ -102,10 +102,11 @@ struct BodyScoreHealthConfirmationView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Health data synced",
-            subtitle: "Review what we imported from Apple Health.",
+            title: "Here’s what we found.",
+            subtitle: "Review the measurements we’ll use for your first score.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .healthConfirmation),
+            screen: .confirmImportedData,
             content: {
                 VStack(spacing: JovieTokens.sectionGap) {
                     OnboardingCard {

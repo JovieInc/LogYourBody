@@ -73,6 +73,7 @@ final class PhotoMetadataServiceTests: XCTestCase {
             for: date,
             weight: 79.5,
             bodyFatPercentage: 16.5,
+            bodyFatMethod: "visual_estimate",
             userId: userId,
             dataSource: BodyMetricSource.manual.rawValue,
             preserveExistingMeasurements: true
@@ -80,6 +81,7 @@ final class PhotoMetadataServiceTests: XCTestCase {
 
         XCTAssertEqual(created.weight, 79.5)
         XCTAssertEqual(created.bodyFatPercentage, 16.5)
+        XCTAssertEqual(created.bodyFatMethod, "visual_estimate")
         XCTAssertEqual(created.dataSource, BodyMetricSource.manual.rawValue)
         XCTAssertNil(created.photoUrl)
     }

@@ -20,18 +20,34 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testSignedOutAppleIsTheOnlyAuthAction() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestSignedOutFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestSignedOutFixture"])
 
-        XCTAssertTrue(app.staticTexts["LogYourBody"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Your body, over time."].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_signIn"].exists)
         XCTAssertTrue(app.buttons["continueWithAppleButton"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["login_email_field"].exists)
     }
 
+    func testWhatsNewFixtureRendersTheRedesignedReleaseSurface() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lyb.whatsNew.lastPresentedVersion",
+            "0"
+        ]
+        app.launch()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_whatsNew"]
+                .waitForExistence(timeout: 20)
+        )
+        XCTAssertTrue(app.staticTexts["A clearer view of progress."].exists)
+        XCTAssertTrue(app.buttons["Done"].isHittable)
+    }
+
     func testPaidMVPWeightEntrySavesWithKeyboardOpen() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
 
         XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
 
@@ -58,8 +74,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPaidMVPWeightEntryRejectsImplausibleWeight() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestWeightLoggerMVPFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
 
         XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 10))
 
@@ -79,8 +94,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPaywallFixtureShowsRestoreAndLogoutEscapePaths() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPaywallFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestPaywallFixture"])
 
         XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 10))
         XCTAssertTrue(
@@ -108,8 +122,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPaywallPlansFixtureShowsMonthlyAnnualAndSavings() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPaywallPlansFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestPaywallPlansFixture"])
 
         XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 10))
 
@@ -242,8 +255,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPaidMVPFixtureRoutesToDefaultTimelineSurface() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPaidMVPFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestPaidMVPFixture"])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 10))
         XCTAssertTrue(app.staticTexts["Start with a photo"].waitForExistence(timeout: 5))
@@ -253,8 +265,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testLegacyDashboardFixtureRoutesOnlyToLegacyBetaSurface() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestFullDashboardFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestFullDashboardFixture"])
 
         XCTAssertTrue(
             app.descendants(matching: .any)["legacy_full_dashboard_beta"].waitForExistence(timeout: 10)
@@ -266,8 +277,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPhotoHUDFixtureRoutesToIntendedPostMVPDashboard() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
@@ -279,12 +289,10 @@ final class LogYourBodyUITests: XCTestCase {
 
         let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
         if !analyticsPage.waitForExistence(timeout: 6) {
-            app.terminate()
-            app.launchArguments = [
+            launch(app, with: [
                 "-lybUITestPhotoTimelineHUDFixture",
                 "-lybUITestPhotoTimelineAnalyticsFixture"
-            ]
-            app.launch()
+            ])
         }
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 10))
@@ -297,14 +305,49 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
 
-    func testPhotoHUDFixtureDefaultsToAvatarHeroWhenNoPhotoExists() throws {
+    func testPhotoHUDFixtureDefaultsToQuickAnswerWhenNoPhotoExists() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
         XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_avatar"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_quick_answer"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["dashboard_home_timeline_avatar"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["dashboard_home_timeline_photo_stage"].exists)
+    }
+
+    func testAccessibilityDynamicTypeQuickAnswerReservesExpandedHeight() throws {
+        let app = XCUIApplication()
+        launch(
+            app,
+            with: [
+                "-lybUITestPhotoTimelineHUDFixture",
+                "-UIPreferredContentSizeCategoryName",
+                "UICTContentSizeCategoryAccessibilityXXL"
+            ]
+        )
+
+        let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
+        let quickAnswer = app.descendants(matching: .any)["dashboard_home_quick_answer"]
+        XCTAssertTrue(
+            hero.waitForExistence(timeout: 45),
+            "The accessibility fixture can take longer to settle because every loading label expands"
+        )
+        XCTAssertTrue(quickAnswer.waitForExistence(timeout: 5))
+
+        XCTAssertGreaterThan(
+            quickAnswer.frame.height,
+            quickAnswer.frame.width * 0.85,
+            "Accessibility Dynamic Type must switch the quick-answer hero to its taller layout"
+        )
+        XCTAssertTrue(quickAnswer.label.contains("Quick answer"))
+        XCTAssertGreaterThanOrEqual(
+            quickAnswer.label.components(separatedBy: ". ").count,
+            4,
+            "The combined accessibility label must include the field name, headline, detail, and date"
+        )
+        XCTAssertGreaterThanOrEqual(quickAnswer.frame.minY, hero.frame.minY - 1)
+        XCTAssertLessThanOrEqual(quickAnswer.frame.maxY, hero.frame.maxY + 1)
+        attachScreenshot(named: "launch-quality-home-quick-answer-axxxl", from: app)
     }
 
     func testNarrowIPhoneSegmentedControlsKeepNativeHitTargets() throws {
@@ -376,7 +419,10 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(weightCard.isHittable)
         weightCard.tap()
 
-        XCTAssertTrue(app.descendants(matching: .any)["metric_detail_screen"].waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_metricDetail"]
+                .waitForExistence(timeout: 8)
+        )
 
         let detailViewportFrame = assertViewport(
             in: app,
@@ -417,8 +463,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testHorizontalSwipeOnTimelineHeroDoesNotOpenStatsPage() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
         let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
         XCTAssertTrue(hero.waitForExistence(timeout: 12))
@@ -438,11 +483,10 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testMetricDetailOpensFromStatsAndShowsSharedTimelineContext() throws {
         let app = XCUIApplication()
-        app.launchArguments = [
+        launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhaseInsightFixture"
-        ]
-        app.launch()
+        ])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
 
@@ -467,7 +511,7 @@ final class LogYourBodyUITests: XCTestCase {
         )
         weightCard.tap()
 
-        let detail = app.descendants(matching: .any)["metric_detail_screen"]
+        let detail = app.descendants(matching: .any)["world_class_screen_metricDetail"]
         XCTAssertTrue(detail.waitForExistence(timeout: 8))
         let detailHeadline = app.descendants(matching: .any)["metric_detail_headline"]
         XCTAssertTrue(detailHeadline.waitForExistence(timeout: 5))
@@ -494,13 +538,11 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testLaunchQualityGateCapturesTimelineHomeSurface() throws {
         let app = XCUIApplication()
-        app.launchArguments = [
+        launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhaseInsightFixture",
             "-lybUITestGlp1WeeklyCheckInFixture"
-        ]
-
-        app.launch()
+        ])
 
         let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
         XCTAssertTrue(hero.waitForExistence(timeout: 10))
@@ -544,39 +586,38 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testLaunchQualityGateCapturesBodyScoreShareSheet() throws {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "-lybUITestPhotoTimelineHUDFixture",
-            "-lybUITestPhaseInsightFixture",
-            "-lybUITestGlp1WeeklyCheckInFixture"
-        ]
-        app.launch()
+        launch(
+            app,
+            with: [
+                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestPhaseInsightFixture",
+                "-lybUITestGlp1WeeklyCheckInFixture"
+            ]
+        )
 
         try assertAndCaptureBodyScoreShareSheet(in: app)
     }
 
     func testLaunchQualityGateCapturesOnboardingFixedCTA() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
 
         try assertAndCaptureOnboardingFixedCTA(in: app)
     }
 
     func testLaunchQualityGateCapturesOnboardingFirstPhotoCTA() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestBodyScoreFirstPhotoFixture"]
-        app.launch()
+        launch(app, with: ["-lybUITestBodyScoreFirstPhotoFixture"])
 
         try assertAndCaptureOnboardingFirstPhotoCTA(in: app)
     }
 
     func testPhaseInsightFixtureShowsDeterministicCuttingInsight() throws {
         let app = XCUIApplication()
-        app.launchArguments = [
+        launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhaseInsightFixture"
-        ]
-        app.launch()
+        ])
 
         XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
 
@@ -594,11 +635,10 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testGlp1WeeklyCheckInFixtureShowsPromptAndOpensDoseFlow() throws {
         let app = XCUIApplication()
-        app.launchArguments = [
+        launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestGlp1WeeklyCheckInFixture"
-        ]
-        app.launch()
+        ])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
 
@@ -628,12 +668,11 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testGlp1WeeklyCheckInFixtureOpensMedicationSelectorWhenEmpty() throws {
         let app = XCUIApplication()
-        app.launchArguments = [
+        launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestGlp1WeeklyCheckInFixture",
             "-lybUITestGlp1EmptyMedicationFixture"
-        ]
-        app.launch()
+        ])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
 
@@ -696,7 +735,8 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(importButton.isHittable)
         importButton.tap()
 
-        XCTAssertTrue(app.staticTexts["Bulk Photo Import"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.navigationBars["Import Photos"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_importPhotos"].exists)
         XCTAssertTrue(app.buttons["Start Scanning"].exists)
     }
 
@@ -711,13 +751,12 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testTimelinePerformanceTraceWorkflow() throws {
         let app = XCUIApplication()
-        app.launchArguments = [
+        launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestTimelinePerformanceTraceFixture",
             "-lybUITestPhaseInsightFixture",
             "-lybUITestGlp1WeeklyCheckInFixture"
-        ]
-        app.launch()
+        ])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
 
@@ -836,14 +875,14 @@ final class LogYourBodyUITests: XCTestCase {
             app.terminate()
         }
 
-        app.launchArguments = arguments + ["-lyb.whatsNew.lastPresentedVersion", "1.2.0"]
+        app.launchArguments = arguments + ["-lybUITestSuppressWhatsNew"]
         app.launch()
     }
 
     private func assertAndCaptureOnboardingFixedCTA(in app: XCUIApplication) throws {
-        XCTAssertTrue(app.staticTexts["Get your Body Score in 60 seconds."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["See what’s changing."].waitForExistence(timeout: 10))
 
-        let startButton = app.buttons["Start my 60-sec Body Score"]
+        let startButton = app.buttons["Build my Body Score"]
         XCTAssertTrue(startButton.waitForExistence(timeout: 5))
         XCTAssertTrue(startButton.isHittable)
 
@@ -854,7 +893,7 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func assertAndCaptureOnboardingFirstPhotoCTA(in app: XCUIApplication) throws {
-        XCTAssertTrue(app.staticTexts["Start your visual timeline."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Start a visual timeline?"].waitForExistence(timeout: 10))
 
         let addPhotoButton = app.buttons["Add first photo"]
         let skipButton = app.buttons["Skip for now"]
@@ -889,6 +928,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
         XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
+        scrollUntilHittable(shareButton, in: app)
         XCTAssertTrue(shareButton.isHittable)
         shareButton.tap()
 

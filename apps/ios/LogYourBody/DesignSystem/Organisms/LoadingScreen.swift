@@ -6,7 +6,8 @@ import SwiftUI
 
 // MARK: - LoadingScreen Organism
 
-/// A full-screen loading view with logo, progress bar, and status text
+/// A quiet continuity surface. Launch should feel like returning to data, not
+/// waiting through branded progress theatre.
 struct LoadingScreen: View {
     @Binding var progress: Double
     @Binding var loadingStatus: String
@@ -14,65 +15,51 @@ struct LoadingScreen: View {
     @State private var didScheduleCompletion = false
 
     var backgroundColor = Color("LaunchScreenBackground")
-    var showPercentage: Bool = true
+    var showPercentage: Bool = false
     private var clampedProgress: Double {
         min(max(progress, 0), 1)
     }
 
     var body: some View {
         ZStack {
-            // Background
             backgroundColor
                 .ignoresSafeArea()
 
-            VStack(spacing: 32) {
+            VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
                 Spacer()
 
-                // Animated Logo
-                DSLogoAnimated(
-                    size: 80,
-                    color: .white,
-                    textSize: 28,
-                    animationDuration: 0.6
+                Text("Loading your latest data")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(Color.jovieText)
+
+                Text(loadingStatus.isEmpty ? "Your last view is ready first. Sync continues quietly." : loadingStatus)
+                    .font(.body)
+                    .foregroundStyle(Color.jovieTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                DSProgressBar(
+                    progress: clampedProgress,
+                    height: 2,
+                    backgroundColor: .jovieHairline,
+                    foregroundColor: .jovieText,
+                    animationDuration: JovieTokens.cinematicDuration
                 )
+                .padding(.top, 8)
+
+                if showPercentage {
+                    Text("\(Int(clampedProgress * 100))%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(Color.jovieTextSecondary)
+                }
 
                 Spacer()
-
-                // Progress section
-                VStack(spacing: 16) {
-                    // Status text
-                    DSText(
-                        loadingStatus,
-                        style: .footnote,
-                        color: .white.opacity(0.7)
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-                    .multilineTextAlignment(.center)
-                    .frame(minHeight: 20)
-
-                    // Progress bar
-                    DSProgressBar(
-                        progress: clampedProgress,
-                        height: 8,
-                        backgroundColor: .white.opacity(0.2),
-                        foregroundColor: .white,
-                        animationDuration: 0.4
-                    )
-                    .padding(.horizontal, 60)
-
-                    // Percentage
-                    if showPercentage {
-                        DSText(
-                            "\(Int(clampedProgress * 100))%",
-                            style: .caption,
-                            weight: .medium,
-                            color: .white.opacity(0.5)
-                        )
-                    }
-                }
-                .padding(.bottom, 100)
             }
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.vertical, 64)
+            .frame(maxWidth: 440, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Loading your latest data")
+            .accessibilityValue(loadingStatus)
         }
         .onAppear {
             checkCompletion()
@@ -80,6 +67,7 @@ struct LoadingScreen: View {
         .onChange(of: clampedProgress) { _, _ in
             checkCompletion()
         }
+        .worldClassScreen(.launch)
     }
 
     private func checkCompletion() {

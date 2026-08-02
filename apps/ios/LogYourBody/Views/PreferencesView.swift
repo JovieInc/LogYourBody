@@ -123,6 +123,7 @@ struct PreferencesView: View {
                 await notificationManager.refreshAuthorizationStatus()
             }
         }
+        .worldClassScreen(.settings)
     }
 
     func checkBiometricAvailability() {

@@ -55,10 +55,11 @@ struct BodyScoreManualWeightView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "What’s your most recent weight?",
-            subtitle: "Helps us calculate lean mass and Body Score.",
+            title: "What’s your current weight?",
+            subtitle: "A recent value is enough. You can refine it later.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .manualWeight),
+            screen: .weight,
             content: {
                 VStack(spacing: JovieTokens.sectionGap) {
                     VStack(alignment: .leading, spacing: 16) {

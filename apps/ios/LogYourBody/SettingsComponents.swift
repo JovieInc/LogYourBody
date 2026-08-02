@@ -41,20 +41,18 @@ struct SettingsSection<Content: View>: View {
                         .tracking(0.5)
                     Spacer()
                 }
-                .padding(.horizontal, theme.spacing.md)
+                .padding(.horizontal, 2)
                 .padding(.bottom, theme.spacing.xs)
             }
 
             VStack(spacing: 0) {
                 content
             }
-            .systemBGlassSurface(
-                cornerRadius: theme.radius.card,
-                tint: theme.colors.text,
-                tintOpacity: 0.045,
-                borderColor: theme.colors.border,
-                borderOpacity: 0.75
-            )
+            .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
+                    .stroke(theme.colors.border.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
+            }
 
             if let footer = footer {
                 Text(footer)
@@ -255,11 +253,6 @@ struct SettingsBackButton: View {
                     width: JovieTokens.minimumHitTarget,
                     height: JovieTokens.minimumHitTarget
                 )
-                .background(theme.colors.surfaceSecondary, in: Circle())
-                .overlay {
-                    Circle()
-                        .stroke(theme.colors.border.opacity(0.75), lineWidth: 1)
-                }
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

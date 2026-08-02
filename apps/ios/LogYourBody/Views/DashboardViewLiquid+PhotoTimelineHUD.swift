@@ -53,6 +53,7 @@ extension DashboardViewLiquid {
             }
         }
         .accessibilityIdentifier("photo_timeline_hud")
+        .worldClassScreen(.home)
     }
 
     var photoTimelineRoot: some View {
@@ -83,6 +84,7 @@ extension DashboardViewLiquid {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
         }
+        .worldClassScreen(selectedPhotoTimelineRootPage == .timeline ? .photoTimeline : .stats)
     }
 
     private var photoTimelineRootNavigation: some View {

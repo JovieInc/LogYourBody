@@ -94,6 +94,7 @@ struct BulkPhotoImportView: View {
                 hasStartedScan = true
             }
         }
+        .worldClassScreen(.importPhotos)
     }
 
     @ViewBuilder
@@ -135,10 +136,10 @@ struct BulkPhotoImportView: View {
             }
 
             VStack(spacing: 12) {
-                Text("Bulk Photo Import")
+                Text("Import progress photos")
                     .font(theme.typography.displaySmall)
 
-                Text("Find likely progress photos and choose exactly which ones to add, keeping their original dates.")
+                Text("Scan on this iPhone, then choose exactly what to add. Nothing uploads until you confirm.")
                     .font(theme.typography.bodyLarge)
                     .foregroundColor(theme.colors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -195,10 +196,13 @@ struct BulkPhotoImportView: View {
             }
 
             VStack(spacing: 12) {
-                Text("Access Your Photos")
+                Text("Scan on this iPhone")
                     .font(theme.typography.displaySmall)
 
-                Text("Allow access to find likely progress photos on this iPhone. No photo is added until you choose it.")
+                Text(
+                    "We scan locally for likely progress photos. " +
+                        "Original dates stay attached and no photo is added until you choose it."
+                )
                     .font(theme.typography.bodyLarge)
                     .foregroundColor(theme.colors.textSecondary)
                     .multilineTextAlignment(.center)

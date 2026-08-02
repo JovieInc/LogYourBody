@@ -97,10 +97,11 @@ struct BodyScoreRevealView: View {
         Group {
             if let result = viewModel.bodyScoreResult {
                 OnboardingPageTemplate(
-                    title: "Your Body Score",
-                    subtitle: result.statusTagline,
+                    title: "You’re building from a strong base.",
+                    subtitle: "Your score is a starting point, with source quality and context kept visible.",
                     showsBackButton: false,
-                    progress: viewModel.progress(for: .bodyScore)
+                    progress: viewModel.progress(for: .bodyScore),
+                    screen: .bodyScoreReveal
                 ) {
                     VStack(spacing: 20) {
                         scoreHero(result: result)
@@ -127,7 +128,7 @@ struct BodyScoreRevealView: View {
                     }
                 } footer: {
                     VStack(spacing: 12) {
-                        Button("See my next steps") {
+                        Button("See my plan") {
                             viewModel.goToNextStep()
                         }
                         .buttonStyle(OnboardingPrimaryButtonStyle())

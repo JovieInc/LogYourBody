@@ -8,6 +8,7 @@ extension DashboardViewLiquid {
             .navigationTitle("Stats")
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier("photo_timeline_stats_destination")
+            .worldClassScreen(.stats)
     }
 
     var photoTimelineAnalyticsPage: some View {
@@ -38,7 +39,7 @@ extension DashboardViewLiquid {
                 .foregroundColor(theme.colors.text)
                 .accessibilityAddTraits(.isHeader)
 
-            Text("Open a metric for chart and history.")
+            Text("Four measurements. One direction. Open any metric for source, chart, and history.")
                 .font(.body)
                 .foregroundColor(theme.colors.textSecondary)
         }
@@ -66,13 +67,11 @@ extension DashboardViewLiquid {
                 .accessibilityIdentifier("photo_timeline_stats_presence_legend")
         }
         .padding(JovieTokens.compactInset)
-        .systemBGlassSurface(
-            cornerRadius: theme.radius.card,
-            tint: theme.colors.text,
-            tintOpacity: 0.025,
-            borderColor: theme.colors.border,
-            borderOpacity: 0.85
-        )
+        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
+                .stroke(theme.colors.border.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Timeline data. \(photoTimelinePresenceLegendText). \(timelinePresenceValueCount) values.")
         .accessibilityIdentifier("photo_timeline_stats_presence_summary")

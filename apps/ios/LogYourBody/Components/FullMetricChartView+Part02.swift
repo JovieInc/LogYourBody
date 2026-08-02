@@ -521,9 +521,13 @@ func computeSeriesStats(
     }
 
 func combinedPresence(for presences: [MetricPresence]) -> MetricPresence {
-        if presences.contains(.interpolated) {
-            return .interpolated
-        }
+    if presences.contains(.interpolated) {
+        return .interpolated
+    }
+
+    if presences.contains(.estimated) {
+        return .estimated
+    }
 
         if presences.contains(.lastKnown) {
             return .lastKnown
@@ -540,6 +544,8 @@ func presenceLabel(for presence: MetricPresence) -> String {
         switch presence {
         case .present:
             return "Measured"
+        case .estimated:
+            return "Estimated"
         case .interpolated:
             return "Interpolated"
         case .lastKnown:
@@ -553,6 +559,8 @@ func chartPointColor(for presence: MetricPresence) -> Color {
         switch presence {
         case .present:
             return Color.metricChartLine
+        case .estimated:
+            return Color.metricAccentBodyFat
         case .interpolated:
             return Color.metricAccentBodyFat
         case .lastKnown:
@@ -566,6 +574,8 @@ func chartPointSymbolSize(for presence: MetricPresence) -> CGFloat {
         switch presence {
         case .present:
             return 22
+        case .estimated:
+            return 38
         case .interpolated:
             return 42
         case .lastKnown:
@@ -579,6 +589,8 @@ func chartPointOpacity(for presence: MetricPresence) -> Double {
         switch presence {
         case .present:
             return 0.78
+        case .estimated:
+            return 0.82
         case .interpolated:
             return 0.86
         case .lastKnown:

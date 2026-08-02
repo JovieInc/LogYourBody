@@ -19,7 +19,10 @@ jest.mock('@/lib/supabase/account-deletion', () => ({
 describe('DELETE /api/auth/delete-account', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getServerAuthSession as jest.Mock).mockResolvedValue({ userId: 'user_123' });
+    (getServerAuthSession as jest.Mock).mockResolvedValue({
+      userId: 'user_123',
+      getToken: async () => 'web-access-token',
+    });
   });
 
   it('rejects an unauthenticated request', async () => {

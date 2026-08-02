@@ -10,14 +10,14 @@ struct BodyScoreHealthConnectView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
     private var pageTitle: String {
-        viewModel.isHealthKitConnected ? "Apple Health is connected" : "Pull from Apple Health?"
+        viewModel.isHealthKitConnected ? "Apple Health is connected" : "Use what your iPhone already knows."
     }
 
     private var pageSubtitle: String {
         if viewModel.isHealthKitConnected {
             return "Using your latest height, weight, and body fat from Apple Health."
         }
-        return "Pull recent height, weight, and body fat from Apple Health."
+        return "Import recent height, weight, and body-fat data to skip manual setup."
     }
 
     private var cardTitle: String {
@@ -47,6 +47,7 @@ struct BodyScoreHealthConnectView: View {
             subtitle: pageSubtitle,
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .healthConnect),
+            screen: .appleHealth,
             content: {
                 VStack(spacing: JovieTokens.sectionGap) {
                     OnboardingCard {

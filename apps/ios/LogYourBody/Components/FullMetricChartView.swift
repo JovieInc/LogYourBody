@@ -109,7 +109,7 @@ struct MetricChartDataPoint: Identifiable, Sendable {
         self.init(
             date: date,
             value: value,
-            presence: isEstimated ? .interpolated : .present
+            presence: isEstimated ? .estimated : .present
         )
     }
 }

@@ -166,6 +166,27 @@ final class GlobalTimelineServiceTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(february.metrics.steps.value), 9_000, accuracy: 0.001)
     }
 
+    func testVisualBodyFatEstimateStaysEstimatedInTimelineAndDerivedFFMI() throws {
+        let date = makeDate(year: 2_026, month: 4, day: 8)
+        let metric = makeTimelineMetric(
+            date: date,
+            weight: 80,
+            bodyFatPercentage: 19,
+            bodyFatMethod: "visual_estimate"
+        )
+
+        let monthlyBuckets = service.makeBuckets(
+            for: .month,
+            metrics: [metric],
+            dailyMetrics: [],
+            heightInches: 70
+        )
+
+        let april = try XCTUnwrap(monthlyBuckets.first { $0.id == "2026-M04" })
+        XCTAssertEqual(april.metrics.bodyFat.presence, .estimated)
+        XCTAssertEqual(april.metrics.ffmi.presence, .estimated)
+    }
+
     private func makeDate(year: Int, month: Int, day: Int) -> Date {
         calendar.date(from: DateComponents(
             timeZone: calendar.timeZone,
@@ -180,6 +201,7 @@ final class GlobalTimelineServiceTests: XCTestCase {
         date: Date,
         weight: Double? = nil,
         bodyFatPercentage: Double? = nil,
+        bodyFatMethod: String? = nil,
         photoUrl: String? = nil
     ) -> BodyMetrics {
         BodyMetrics(
@@ -189,7 +211,7 @@ final class GlobalTimelineServiceTests: XCTestCase {
             weight: weight,
             weightUnit: weight == nil ? nil : "kg",
             bodyFatPercentage: bodyFatPercentage,
-            bodyFatMethod: bodyFatPercentage == nil ? nil : "manual",
+            bodyFatMethod: bodyFatMethod ?? (bodyFatPercentage == nil ? nil : "manual"),
             muscleMass: nil,
             boneMass: nil,
             notes: nil,

@@ -181,6 +181,7 @@ func prepareFirstPhotoBaselineMetric() async -> BodyMetrics? {
             for: Date(),
             weight: bodyScoreInput.weight.inKilograms,
             bodyFatPercentage: bodyScoreInput.bodyFat.percentage,
+            bodyFatMethod: firstPhotoBaselineBodyFatMethod,
             userId: userId,
             dataSource: firstPhotoBaselineDataSource,
             preserveExistingMeasurements: true
@@ -195,6 +196,10 @@ var firstPhotoBaselineDataSource: String {
         }
 
         return BodyMetricSource.manual.rawValue
+    }
+
+var firstPhotoBaselineBodyFatMethod: String? {
+        bodyScoreInput.bodyFat.source == .visualEstimate ? "visual_estimate" : nil
     }
 
 func scheduleDeferredHealthSync() {

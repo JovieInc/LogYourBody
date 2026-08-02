@@ -15,10 +15,11 @@ struct BodyScoreEmailCaptureView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Save your score?",
-            subtitle: "Enter email to sync across devices.",
+            title: "Add a recovery email.",
+            subtitle: "We’ll associate this address with your profile before secure sign-in.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .emailCapture),
+            screen: .email,
             content: {
                 VStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 12) {
@@ -48,7 +49,7 @@ struct BodyScoreEmailCaptureView: View {
                                 HStack(spacing: 6) {
                                     Image(systemName: "info.circle")
                                         .font(.system(.footnote, design: .default).weight(.semibold))
-                                    Text("No spam. Only to save your progress.")
+                                    Text("Used for account recovery and essential service messages.")
                                         .font(OnboardingTypography.caption)
                                 }
                                 .foregroundStyle(theme.colors.textSecondary)
@@ -58,7 +59,7 @@ struct BodyScoreEmailCaptureView: View {
                             .accessibilityValue(showWhyEmail ? "Expanded" : "Collapsed")
 
                             if showWhyEmail {
-                                Text("We'll only use this email to save your Body Score and keep progress in sync.")
+                                Text("Email does not change your score. You can review the address before account creation.")
                                     .font(OnboardingTypography.body)
                                     .foregroundStyle(theme.colors.textSecondary)
                                     .transition(.opacity.combined(with: .move(edge: .top)))

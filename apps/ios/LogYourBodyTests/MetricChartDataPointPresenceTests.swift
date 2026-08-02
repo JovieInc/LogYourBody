@@ -13,14 +13,14 @@ import UIKit
 
 
 final class MetricChartDataPointPresenceTests: XCTestCase {
-    func testEstimatedInitializerMapsToInterpolatedPresence() {
+    func testEstimatedInitializerKeepsEstimatedDistinctFromInterpolatedPresence() {
         let point = MetricChartDataPoint(
             date: Date(timeIntervalSince1970: 100),
             value: 15.2,
             isEstimated: true
         )
 
-        XCTAssertEqual(point.presence, .interpolated)
+        XCTAssertEqual(point.presence, .estimated)
         XCTAssertTrue(point.isEstimated)
     }
 
@@ -63,5 +63,37 @@ final class MetricChartDataPointPresenceTests: XCTestCase {
                 "\(range.rawValue) should retain room for readable accessibility labels"
             )
         }
+    }
+
+    func testFullScreenFFMIProvenanceUsesOnlyThePointDirectBodyFatMethod() {
+        XCTAssertEqual(BodyFatEntryMethod.visualEstimate.rawValue, "visual_estimate")
+        XCTAssertEqual(
+            fullScreenFFMIPresence(
+                isLastKnown: false,
+                isInterpolated: false,
+                hasDirectBodyFat: true,
+                directBodyFatMethod: "visual_estimate"
+            ),
+            .estimated
+        )
+        XCTAssertEqual(
+            fullScreenFFMIPresence(
+                isLastKnown: false,
+                isInterpolated: false,
+                hasDirectBodyFat: true,
+                directBodyFatMethod: "manual"
+            ),
+            .present,
+            "A different visual estimate on the same day must not relabel a manual point"
+        )
+        XCTAssertEqual(
+            fullScreenFFMIPresence(
+                isLastKnown: false,
+                isInterpolated: true,
+                hasDirectBodyFat: false,
+                directBodyFatMethod: nil
+            ),
+            .interpolated
+        )
     }
 }

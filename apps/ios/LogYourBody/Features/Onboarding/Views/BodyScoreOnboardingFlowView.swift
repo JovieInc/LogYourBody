@@ -75,10 +75,11 @@ private struct BodyScoreDefaultHomeModeView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Choose your home view",
-            subtitle: "You can switch anytime.",
+            title: "What should Home answer first?",
+            subtitle: "Choose a quick answer or visual timeline. You can switch anytime in Settings.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .defaultHomeMode),
+            screen: .chooseHomeView,
             content: {
                 VStack(spacing: 12) {
                     ForEach(DefaultHomeMode.allCases) { mode in

@@ -433,7 +433,7 @@ private func buildFullScreenBodyFatChartData(
                 return MetricChartDataPoint(
                     date: metric.date,
                     value: bf,
-                    isEstimated: false
+                    isEstimated: metric.bodyFatMethod == "visual_estimate"
                 )
             }
 
@@ -441,7 +441,7 @@ private func buildFullScreenBodyFatChartData(
                 return MetricChartDataPoint(
                     date: metric.date,
                     value: estimated.value,
-                    isEstimated: true
+                    presence: estimated.isLastKnown ? .lastKnown : .interpolated
                 )
             }
 
@@ -465,12 +465,31 @@ private func buildFullScreenFFMIChartData(
                 return nil
             }
 
+            let presence = fullScreenFFMIPresence(
+                isLastKnown: ffmiResult.isLastKnown,
+                isInterpolated: ffmiResult.isInterpolated,
+                hasDirectBodyFat: metric.bodyFatPercentage != nil,
+                directBodyFatMethod: metric.bodyFatMethod
+            )
+
             return MetricChartDataPoint(
                 date: metric.date,
                 value: ffmiResult.value,
-                isEstimated: ffmiResult.isInterpolated
+                presence: presence
             )
         }
+}
+
+func fullScreenFFMIPresence(
+    isLastKnown: Bool,
+    isInterpolated: Bool,
+    hasDirectBodyFat: Bool,
+    directBodyFatMethod: String?
+) -> MetricPresence {
+    if isLastKnown { return .lastKnown }
+    if isInterpolated { return .interpolated }
+    if hasDirectBodyFat, directBodyFatMethod == "visual_estimate" { return .estimated }
+    return .present
 }
 
 private func buildBodyScoreChartAndEntriesData(

@@ -4,6 +4,24 @@
 //
 import SwiftUI
 
+enum BodyFatEntryMethod: String, CaseIterable {
+    case visualEstimate = "visual_estimate"
+    case bodyScan = "body_scan"
+    case calipers = "caliper"
+    case bioelectrical = "bia_scale"
+    case dexa
+
+    var title: String {
+        switch self {
+        case .visualEstimate: "Visual Estimate"
+        case .bodyScan: "Body Scan"
+        case .calipers: "Calipers"
+        case .bioelectrical: "Bioelectrical"
+        case .dexa: "DEXA"
+        }
+    }
+}
+
 struct PhotoUploadBatchPolicy {
     static func progress(completedCount: Int, totalCount: Int) -> Double {
         guard totalCount > 0 else { return 0 }
@@ -68,7 +86,7 @@ struct AddEntrySheet: View {
 
     // Body fat entry
     @State var bodyFat: String = ""
-    @State var bodyFatMethod = "Visual"
+    @State var bodyFatMethod = BodyFatEntryMethod.visualEstimate.rawValue
     @State var bodyFatError: String?
 
     // Photo entry

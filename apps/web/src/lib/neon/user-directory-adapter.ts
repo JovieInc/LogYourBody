@@ -133,7 +133,17 @@ export const neonUserDirectory: UserDirectoryPort = {
   },
 
   async deleteUser(subject) {
-    await getDatabase()`
+    const database = getDatabase();
+
+    // Product health rows do not have a database cascade to app_users yet.
+    // Delete them first so a failed cleanup never removes the identity record
+    // while leaving health data orphaned and unreachable by the user.
+    await database`
+      delete from public.body_metrics
+      where user_subject = ${subject}
+    `;
+
+    await database`
       delete from public.app_users
       where identity_provider = 'jovie' and identity_subject = ${subject}
     `;

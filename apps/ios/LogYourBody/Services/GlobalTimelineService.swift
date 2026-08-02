@@ -131,8 +131,8 @@ final class GlobalTimelineService {
             directValues: bucketMetrics.compactMap { $0.weight },
             interpolated: contexts.weight?.estimate(for: midpoint)
         )
-        let bodyFat = makeBodyMetricValue(
-            directValues: bucketMetrics.compactMap { $0.bodyFatPercentage },
+        let bodyFat = makeBodyFatMetricValue(
+            bucketMetrics: bucketMetrics,
             interpolated: contexts.bodyFat?.estimate(for: midpoint)
         )
         let ffmi = makeFFMIValue(
@@ -169,6 +169,24 @@ final class GlobalTimelineService {
         return makeInterpolatedValue(interpolated)
     }
 
+    private func makeBodyFatMetricValue(
+        bucketMetrics: [BodyMetrics],
+        interpolated: InterpolatedMetric?
+    ) -> GlobalTimelineMetricValue {
+        let directMetrics = bucketMetrics.filter { $0.bodyFatPercentage != nil }
+        if let directValue = median(directMetrics.compactMap { $0.bodyFatPercentage }) {
+            let includesVisualEstimate = directMetrics.contains {
+                $0.bodyFatMethod == "visual_estimate"
+            }
+            return GlobalTimelineMetricValue(
+                value: directValue,
+                presence: includesVisualEstimate ? .estimated : .present
+            )
+        }
+
+        return makeInterpolatedValue(interpolated)
+    }
+
     private func makeFFMIValue(
         weight: GlobalTimelineMetricValue,
         bodyFat: GlobalTimelineMetricValue,
@@ -180,7 +198,7 @@ final class GlobalTimelineService {
         }
 
         if weight.presence == .present,
-           bodyFat.presence == .present,
+           bodyFat.presence == .present || bodyFat.presence == .estimated,
            let weightKg = weight.value,
            let bodyFatPercentage = bodyFat.value {
             let heightMeters = heightInches * 0.0254
@@ -189,7 +207,7 @@ final class GlobalTimelineService {
 
             return GlobalTimelineMetricValue(
                 value: roundedOneDecimal(ffmi),
-                presence: .present
+                presence: bodyFat.presence
             )
         }
 

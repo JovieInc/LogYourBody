@@ -511,7 +511,7 @@ struct BodyScoreShareSheet: View {
 
     @State private var selectedAspect: BodyScoreShareAspect
     @State private var shareOptions = BodyScoreShareOptions()
-    @State private var areContentControlsExpanded = true
+    @State private var areContentControlsExpanded = false
     @State private var renderedImage: UIImage?
     @State private var isRendering = false
     @State private var showSystemShareSheet = false
@@ -530,7 +530,7 @@ struct BodyScoreShareSheet: View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 ScrollView(showsIndicators: false) {
-                    shareSheetContent(previewHeight: 360)
+                    shareSheetContent(previewHeight: 420)
                         .padding(.vertical, JovieTokens.itemGap)
                 }
             } else {
@@ -578,6 +578,7 @@ struct BodyScoreShareSheet: View {
         // Keep child identifiers (card/close/actions) discoverable for UI tests.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("body_score_share_sheet")
+        .worldClassScreen(.shareBodyScore)
     }
 
     private var dismissDragOpacity: Double {
@@ -659,7 +660,7 @@ struct BodyScoreShareSheet: View {
         .padding(.horizontal, JovieTokens.screenInset)
     }
 
-    private var previewVerticalInset: CGFloat { 8 }
+    private var previewVerticalInset: CGFloat { 4 }
 
     private func shareSheetContent(previewHeight: CGFloat?) -> some View {
         VStack(spacing: JovieTokens.itemGap) {

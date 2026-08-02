@@ -126,6 +126,7 @@ struct ExportDataView: View {
                 UIAccessibility.post(notification: .announcement, argument: errorMessage)
             }
         }
+        .worldClassScreen(.exportData)
     }
 
     private var exportHeader: some View {
@@ -138,7 +139,7 @@ struct ExportDataView: View {
                 .font(.title2.weight(.bold))
                 .foregroundColor(.jovieText)
 
-            Text("Create a portable copy of your LogYourBody records.")
+            Text("Download a copy anytime. Nothing is removed from LogYourBody, and the included data is shown before export.")
                 .font(.body)
                 .foregroundColor(.jovieTextSecondary)
         }

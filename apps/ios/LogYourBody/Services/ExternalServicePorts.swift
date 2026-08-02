@@ -108,7 +108,8 @@ protocol BiometricAuthenticating: AnyObject {
         reason: String,
         cancelTitle: String?,
         fallbackTitle: String?,
-        timeout: TimeInterval?
+        timeout: TimeInterval?,
+        allowsDevicePasscode: Bool
     ) async -> BiometricAuthenticationResult
     func cancelCurrentAuthentication()
 }
@@ -139,7 +140,8 @@ final class LocalBiometricAuthenticationAdapter: BiometricAuthenticating {
         reason: String,
         cancelTitle: String? = nil,
         fallbackTitle: String? = "",
-        timeout: TimeInterval? = nil
+        timeout: TimeInterval? = nil,
+        allowsDevicePasscode: Bool = false
     ) async -> BiometricAuthenticationResult {
         let context = LAContext()
         context.localizedCancelTitle = cancelTitle
@@ -148,8 +150,11 @@ final class LocalBiometricAuthenticationAdapter: BiometricAuthenticating {
         currentContext?.invalidate()
         currentContext = context
 
+        let policy: LAPolicy = allowsDevicePasscode
+            ? .deviceOwnerAuthentication
+            : .deviceOwnerAuthenticationWithBiometrics
         var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+        guard context.canEvaluatePolicy(policy, error: &error) else {
             currentContext = nil
             return .unavailable
         }
@@ -169,7 +174,7 @@ final class LocalBiometricAuthenticationAdapter: BiometricAuthenticating {
         }
 
         let success = await withCheckedContinuation { continuation in
-            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, _ in
+            context.evaluatePolicy(policy, localizedReason: reason) { success, _ in
                 continuation.resume(returning: success)
             }
         }
