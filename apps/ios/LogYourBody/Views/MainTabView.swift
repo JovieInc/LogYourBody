@@ -12,19 +12,42 @@ struct MainTabView: View {
     @State private var selectedSurface: PaidAppSurface = PaidAppSurfacePolicy.surface()
 
     var body: some View {
-        NavigationStack {
-            switch selectedSurface {
-            case .photoTimelineHUD:
-                DashboardViewLiquid(layoutMode: .photoTimelineHUD)
-            case .legacyFullDashboardBeta:
-                DashboardViewLiquid(layoutMode: .legacyTabbed)
-            case .weightLoggerMVP:
-                PaidWeightLoggerMVPView()
+        Group {
+            if shouldOpenChatFirst {
+                ChatFirstRootView()
+            } else {
+                NavigationStack {
+                    switch selectedSurface {
+                    case .chatFirst:
+                        ChatFirstRootView()
+                    case .photoTimelineHUD:
+                        DashboardViewLiquid(layoutMode: .photoTimelineHUD)
+                    case .legacyFullDashboardBeta:
+                        DashboardViewLiquid(layoutMode: .legacyTabbed)
+                    case .weightLoggerMVP:
+                        PaidWeightLoggerMVPView()
+                    }
+                }
             }
         }
         .onAppear {
             updateSelectedSurface()
         }
+    }
+
+    private var shouldOpenChatFirst: Bool {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-lybUITestChatFirstFixture") {
+            return true
+        }
+
+        if arguments.contains(where: { $0.hasPrefix("-lybUITest") }) {
+            return false
+        }
+        #endif
+
+        return true
     }
 
     private func updateSelectedSurface() {
@@ -633,5 +656,449 @@ private struct PaidWeightLoggerMVPView: View {
         MainTabView()
             .environmentObject(AuthManager())
             .environmentObject(RealtimeSyncManager.shared)
+    }
+}
+
+private struct ChatMessage: Identifiable, Equatable {
+    enum Role {
+        case assistant
+        case user
+    }
+
+    let id = UUID()
+    let role: Role
+    let text: String
+}
+
+private enum ChatDestination: Hashable {
+    case timeline
+    case settings
+}
+
+private struct ChatFirstRootView: View {
+    @EnvironmentObject private var authManager: AuthManager
+    @Environment(\.theme) private var theme
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var path: [ChatDestination] = []
+    @State private var isSidebarPresented = false
+    @State private var draft = ""
+    @State private var isResponding = false
+    @State private var messages: [ChatMessage] = [
+        ChatMessage(
+            role: .assistant,
+            text: "I’m here to help you read your body data. Ask about your Body Score, metrics, or progress photos."
+        )
+    ]
+    @FocusState private var isComposerFocused: Bool
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            ZStack(alignment: .leading) {
+                chatSurface
+
+                if isSidebarPresented {
+                    Color.black.opacity(0.42)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeOut(duration: 0.22)) {
+                                isSidebarPresented = false
+                            }
+                        }
+
+                    chatSidebar
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
+            }
+            .background(theme.colors.background.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: ChatDestination.self) { destination in
+                switch destination {
+                case .timeline:
+                    DashboardViewLiquid(layoutMode: .photoTimelineHUD)
+                        .toolbar(.hidden, for: .tabBar)
+                case .settings:
+                    PreferencesView()
+                        .environmentObject(authManager)
+                        .toolbar(.hidden, for: .tabBar)
+                }
+            }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 24, coordinateSpace: .local)
+                    .onEnded(handleSidebarGesture)
+            )
+            .accessibilityIdentifier("chat_first_root")
+        }
+    }
+
+    private var chatSurface: some View {
+        VStack(spacing: 0) {
+            chatMessages
+            starterPrompts
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            chatHeader
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            composer
+        }
+        .background(theme.colors.background.ignoresSafeArea())
+    }
+
+    private var chatHeader: some View {
+        HStack(spacing: 12) {
+            Button {
+                withAnimation(.easeOut(duration: 0.22)) {
+                    isSidebarPresented = true
+                }
+            } label: {
+                Image(systemName: "sidebar.leading")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(theme.colors.text)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open sidebar")
+            .accessibilityHint("Shows Timeline, Settings, and profile controls")
+            .accessibilityIdentifier("chat_sidebar_button")
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("LogYourBody")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(theme.colors.text)
+
+                Text("Body insights")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(theme.colors.textSecondary)
+            }
+
+            Spacer(minLength: 0)
+
+            Circle()
+                .fill(theme.colors.accentTeal)
+                .frame(width: 8, height: 8)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(theme.colors.border.opacity(0.55))
+                .frame(height: 1)
+        }
+        .accessibilityIdentifier("chat_header")
+    }
+
+    private var chatMessages: some View {
+        ScrollViewReader { proxy in
+            ScrollView(showsIndicators: false) {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    ForEach(messages) { message in
+                        ChatBubble(message: message)
+                            .id(message.id)
+                    }
+
+                    if isResponding {
+                        HStack(spacing: 6) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                Circle()
+                                    .fill(theme.colors.textSecondary)
+                                    .frame(width: 5, height: 5)
+                            }
+                        }
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 13)
+                        .background(theme.colors.surface, in: Capsule())
+                        .accessibilityLabel("Thinking")
+                        .accessibilityIdentifier("chat_thinking_indicator")
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 12)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: messages.count) { _, _ in
+                guard let lastID = messages.last?.id else { return }
+                withAnimation(.easeOut(duration: 0.24)) {
+                    proxy.scrollTo(lastID, anchor: .bottom)
+                }
+            }
+            .onChange(of: isResponding) { _, responding in
+                guard responding else { return }
+                if let lastID = messages.last?.id {
+                    withAnimation(.easeOut(duration: 0.24)) {
+                        proxy.scrollTo(lastID, anchor: .bottom)
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("chat_messages")
+    }
+
+    private var starterPrompts: some View {
+        Group {
+            if messages.count == 1 && !isComposerFocused {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        starterPrompt("How am I doing?")
+                        starterPrompt("Open my Timeline")
+                        starterPrompt("What is Body Score?")
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                }
+                .transition(.opacity)
+                .accessibilityIdentifier("chat_starter_prompts")
+            }
+        }
+    }
+
+    private func starterPrompt(_ text: String) -> some View {
+        Button(text) {
+            send(text)
+        }
+        .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(theme.colors.text)
+        .padding(.horizontal, 13)
+        .frame(minHeight: 38)
+        .background(theme.colors.surface, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(theme.colors.border, lineWidth: 1)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var composer: some View {
+        HStack(spacing: 10) {
+            TextField("Message LogYourBody", text: $draft, axis: .vertical)
+                .lineLimit(1...4)
+                .focused($isComposerFocused)
+                .font(.system(size: 16))
+                .foregroundStyle(theme.colors.text)
+                .tint(theme.colors.primary)
+                .submitLabel(.send)
+                .onSubmit {
+                    send(draft)
+                }
+                .accessibilityIdentifier("chat_composer")
+
+            Button {
+                send(draft)
+            } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(canSend ? theme.colors.background : theme.colors.textTertiary)
+                    .frame(width: 34, height: 34)
+                    .background(canSend ? theme.colors.text : theme.colors.surface, in: Circle())
+            }
+            .disabled(!canSend || isResponding)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Send message")
+            .accessibilityIdentifier("chat_send_button")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(theme.colors.border.opacity(0.55))
+                .frame(height: 1)
+        }
+        .animation(.easeOut(duration: 0.18), value: canSend)
+    }
+
+    private var chatSidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Text("LogYourBody")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(theme.colors.text)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    withAnimation(.easeOut(duration: 0.22)) {
+                        isSidebarPresented = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close sidebar")
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
+            .padding(.bottom, 18)
+
+            Text("Workspace")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(theme.colors.textSecondary)
+                .textCase(.uppercase)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 7)
+
+            sidebarButton(title: "Chat", icon: "bubble.left.and.bubble.right.fill") {
+                closeSidebar()
+            }
+
+            sidebarButton(title: "Timeline", icon: "photo.on.rectangle.angled") {
+                closeSidebar()
+                path.append(.timeline)
+            }
+            .accessibilityIdentifier("chat_timeline_link")
+
+            sidebarButton(title: "Settings", icon: "gearshape.fill") {
+                closeSidebar()
+                path.append(.settings)
+            }
+            .accessibilityIdentifier("chat_settings_link")
+
+            Spacer(minLength: 0)
+
+            Text("Your data stays in the existing LogYourBody sync and profile flows.")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+        }
+        .frame(maxWidth: 306, maxHeight: .infinity, alignment: .topLeading)
+        .background(.regularMaterial)
+        .overlay(alignment: .trailing) {
+            Rectangle()
+                .fill(theme.colors.border.opacity(0.7))
+                .frame(width: 1)
+        }
+        .accessibilityIdentifier("chat_sidebar")
+    }
+
+    private func sidebarButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 13) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 22)
+
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(theme.colors.text)
+            .padding(.horizontal, 20)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func closeSidebar() {
+        withAnimation(.easeOut(duration: 0.22)) {
+            isSidebarPresented = false
+        }
+    }
+
+    private func handleSidebarGesture(_ value: DragGesture.Value) {
+        let horizontalDistance = value.translation.width
+        guard abs(horizontalDistance) > 60 else { return }
+
+        if isSidebarPresented {
+            if horizontalDistance < 0 {
+                closeSidebar()
+            }
+        } else {
+            // Support the existing left-swipe muscle memory while also
+            // accepting the conventional leading-edge reveal gesture.
+            withAnimation(.easeOut(duration: 0.22)) {
+                isSidebarPresented = true
+            }
+        }
+    }
+
+    private func send(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !isResponding else { return }
+
+        messages.append(ChatMessage(role: .user, text: trimmed))
+        draft = ""
+        isComposerFocused = false
+        isResponding = true
+        AppServicePorts.analyticsTracker.track(event: "chat_first_message_sent")
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 280_000_000)
+            guard !Task.isCancelled else { return }
+            messages.append(ChatMessage(role: .assistant, text: response(for: trimmed)))
+            isResponding = false
+        }
+    }
+
+    private func response(for text: String) -> String {
+        let normalized = text.lowercased()
+        if normalized.contains("how") || normalized.contains("score") || normalized.contains("doing") {
+            if let score = BodyScoreCache.shared.latestResult(for: authManager.currentUser?.id)?.score {
+                return "Your latest Body Score is \(score). Open Timeline from the sidebar to see the selected day, essential metrics, and your photo history together."
+            }
+            return "Open Timeline from the sidebar to see your current Body Score and the measurements behind it."
+        }
+
+        if normalized.contains("timeline") || normalized.contains("photo") {
+            return "Timeline is the clearest place to read change over time. Use the photo strip to move day by day, then tap a metric for detail."
+        }
+
+        if normalized.contains("height") || normalized.contains("profile") {
+            return "Open Settings from the sidebar, choose Profile, then tap Height. The field editor opens directly."
+        }
+
+        return "I can help you read your Body Score, metrics, and progress photos. Try asking how you’re doing or open Timeline."
+    }
+}
+
+private struct ChatBubble: View {
+    @Environment(\.theme) private var theme
+    let message: ChatMessage
+
+    var body: some View {
+        HStack {
+            if message.role == .user {
+                Spacer(minLength: 36)
+            }
+
+            Text(message.text)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(message.role == .user ? theme.colors.background : theme.colors.text)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 15)
+                .padding(.vertical, 12)
+                .background(
+                    message.role == .user
+                        ? theme.colors.text
+                        : theme.colors.surface,
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
+                .overlay {
+                    if message.role == .assistant {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(theme.colors.border, lineWidth: 1)
+                    }
+                }
+
+            if message.role == .assistant {
+                Spacer(minLength: 36)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(message.role == .user ? "You: (message.text)" : "LogYourBody: (message.text)")
     }
 }

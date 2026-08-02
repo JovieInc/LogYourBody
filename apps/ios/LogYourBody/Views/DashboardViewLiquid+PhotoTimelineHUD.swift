@@ -4,52 +4,44 @@ extension DashboardViewLiquid {
     // MARK: - Photo Timeline HUD
 
     var photoTimelineHUD: some View {
-        GeometryReader { geometry in
-            let viewportWidth = max(1, geometry.size.width)
-            let heroHorizontalInset: CGFloat = 10
-            let heroWidth = max(1, viewportWidth - heroHorizontalInset * 2)
+        Group {
+            if let metric = currentMetric {
+                let bodyScore = bodyScoreText()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 12) {
-                    compactHeader
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-
-                    syncStatusBanner
-                        .padding(.horizontal, 20)
-
-                    homeModeSwitch
-                        .padding(.horizontal, 20)
-
-                    if let metric = currentMetric {
-                        homeTimelineHero(metric: metric)
-                            .frame(width: heroWidth, alignment: .top)
-                            .clipped()
-                    }
-
-                    hudTimelineSection
-                        .padding(.horizontal, 20)
-
-                    if isGlp1WeeklyCheckInEnabled {
-                        hudGlp1WeeklyCheckIn
-                            .padding(.horizontal, 20)
-                    }
-
-                    if isPhaseInsightEnabled {
-                        hudPhaseInsight
-                            .padding(.horizontal, 20)
-                    }
-                }
-                .frame(width: viewportWidth, alignment: .top)
-                .padding(.bottom, 28)
-            }
-            .scrollBounceBehavior(.basedOnSize)
-            .refreshable {
-                await viewModel.refreshData(
-                    authManager: authManager,
-                    realtimeSyncManager: realtimeSyncManager
+                LaunchTimelineSurface(
+                    metric: metric,
+                    bodyMetrics: bodyMetrics,
+                    selectedIndex: $selectedIndex,
+                    dateText: formatHUDDate(metric.date),
+                    bodyScoreText: bodyScore.scoreText,
+                    bodyScoreTagline: bodyScore.tagline,
+                    bodyScoreDeltaText: heroBodyScoreDeltaText(),
+                    weightValue: heroWeightValue(),
+                    weightCaption: heroWeightCaption(),
+                    bodyFatValue: heroBodyFatValue(),
+                    bodyFatCaption: heroBodyFatCaption(),
+                    ffmiValue: heroFFMIValue(),
+                    ffmiCaption: heroFFMICaption(),
+                    onTapBodyScore: bodyScore.score > 0 ? {
+                        selectedMetricType = .bodyScore
+                        isMetricDetailActive = true
+                    } : nil,
+                    onTapWeight: {
+                        selectedMetricType = .weight
+                        isMetricDetailActive = true
+                    },
+                    onTapBodyFat: {
+                        selectedMetricType = .bodyFat
+                        isMetricDetailActive = true
+                    },
+                    onTapFFMI: {
+                        selectedMetricType = .ffmi
+                        isMetricDetailActive = true
+                    },
+                    onShareBodyScore: makeBodyScoreShareAction(metric: metric, score: bodyScore.score)
                 )
-                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
+            } else {
+                photoTimelineHUDEmptyState
             }
         }
         .accessibilityIdentifier("photo_timeline_hud")

@@ -212,7 +212,10 @@ struct LogYourBodyApp: App {
     @StateObject private var persistenceController = CoreDataManager.shared
 
     private static var isRunningUnitTests: Bool {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let arguments = ProcessInfo.processInfo.arguments
+        let isUITestFixture = arguments.contains { $0.hasPrefix("-lybUITest") }
+        return !isUITestFixture &&
+            ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
     init() {

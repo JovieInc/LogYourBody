@@ -716,3 +716,364 @@ struct DashboardStepsCard<ProgressView: View>: View {
         }
     }
 }
+
+// MARK: - Launch Timeline
+
+/// The focused timeline surface used by the launch experience.
+///
+/// This intentionally has no vertical scroll container. The only scrolling
+/// gesture on the page is the photo strip, so a user can move through time
+/// directly without losing the score and essential metrics above it.
+struct LaunchTimelineSurface: View {
+    @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .largeTitle) private var scoreFontSize: CGFloat = 58
+
+    let metric: BodyMetrics
+    let bodyMetrics: [BodyMetrics]
+    @Binding var selectedIndex: Int
+    let dateText: String
+    let bodyScoreText: String
+    let bodyScoreTagline: String
+    let bodyScoreDeltaText: String?
+    let weightValue: String
+    let weightCaption: String
+    let bodyFatValue: String
+    let bodyFatCaption: String
+    let ffmiValue: String
+    let ffmiCaption: String
+    let onTapBodyScore: (() -> Void)?
+    let onTapWeight: () -> Void
+    let onTapBodyFat: () -> Void
+    let onTapFFMI: () -> Void
+    let onShareBodyScore: (() -> Void)?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let stageHeight = min(248, max(160, geometry.size.height * 0.35))
+
+            VStack(alignment: .leading, spacing: 0) {
+                timelineStage
+                    .frame(height: stageHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: theme.radius.card))
+
+                scoreAndMetrics
+                    .padding(.top, 14)
+
+                stripHeader
+                    .padding(.top, 18)
+                    .padding(.bottom, 8)
+
+                timelineStrip
+                    .frame(height: 98)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 12)
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+        }
+        .accessibilityIdentifier("launch_timeline_surface")
+    }
+
+    private var timelineStage: some View {
+        ZStack(alignment: .bottomLeading) {
+            if let photoURL = metric.photoUrl, !photoURL.isEmpty {
+                CachedAsyncImage(urlString: photoURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    stagePlaceholder
+                }
+            } else {
+                stagePlaceholder
+            }
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.04),
+                    Color.black.opacity(0.68)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .allowsHitTesting(false)
+
+            HStack(alignment: .bottom, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Selected day")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.72))
+
+                    Text(dateText)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+
+                if let onShareBodyScore {
+                    Button(action: onShareBodyScore) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(.black.opacity(0.32), in: Circle())
+                    }
+                    .frame(width: 44, height: 44)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Share Body Score")
+                    .accessibilityIdentifier("body_score_hero_share_button")
+                }
+            }
+            .padding(14)
+        }
+        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card))
+        .clipped()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(metric.photoUrl?.isEmpty == false ? "Selected progress photo, (dateText)" : "No progress photo for (dateText)")
+        .accessibilityIdentifier("launch_timeline_stage")
+    }
+
+    private var stagePlaceholder: some View {
+        ZStack {
+            LinearGradient(
+                colors: [theme.colors.surface, theme.colors.backgroundSecondary],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(spacing: 7) {
+                Image(systemName: "camera.metering.center.weighted")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(theme.colors.textSecondary)
+
+                Text("No progress photo")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.colors.text)
+
+                Text("Your Body Score stays front and center")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(theme.colors.textSecondary)
+            }
+        }
+    }
+
+    private var scoreAndMetrics: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Group {
+                if let onTapBodyScore {
+                    Button(action: onTapBodyScore) {
+                        scoreContent
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    scoreContent
+                }
+            }
+            .accessibilityIdentifier("launch_timeline_body_score")
+
+            HStack(spacing: 8) {
+                launchMetricCell(
+                    title: "Weight",
+                    value: weightValue,
+                    caption: weightCaption,
+                    accent: theme.colors.accentViolet,
+                    action: onTapWeight
+                )
+
+                launchMetricCell(
+                    title: "Body Fat",
+                    value: bodyFatValue,
+                    caption: bodyFatCaption,
+                    accent: theme.colors.accentPink,
+                    action: onTapBodyFat
+                )
+
+                launchMetricCell(
+                    title: "FFMI",
+                    value: ffmiValue,
+                    caption: ffmiCaption,
+                    accent: theme.colors.accentTeal,
+                    action: onTapFFMI
+                )
+            }
+        }
+    }
+
+    private var scoreContent: some View {
+        HStack(alignment: .lastTextBaseline, spacing: 12) {
+            Text(bodyScoreText)
+                .font(.system(size: scoreFontSize, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(theme.colors.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Body Score")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .textCase(.uppercase)
+
+                Text(bodyScoreTagline)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.colors.text)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                    .minimumScaleFactor(0.78)
+
+                if let bodyScoreDeltaText {
+                    Text(bodyScoreDeltaText)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Body Score (bodyScoreText), (bodyScoreTagline)")
+    }
+
+    private func launchMetricCell(
+        title: String,
+        value: String,
+        caption: String,
+        accent: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 3) {
+                Capsule()
+                    .fill(accent)
+                    .frame(width: 22, height: 2)
+
+                Text(title)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .lineLimit(1)
+
+                Text(value)
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(theme.colors.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+
+                Text(caption)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(theme.colors.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(theme.colors.border.opacity(0.8), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("(title) (value), (caption)")
+    }
+
+    private var stripHeader: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("Timeline")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(theme.colors.text)
+
+            Spacer(minLength: 0)
+
+            Text("Swipe through entries")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(theme.colors.textSecondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var timelineStrip: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(bodyMetrics.enumerated()), id: \.element.id) { index, metric in
+                        Button {
+                            HapticManager.shared.selection()
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                selectedIndex = index
+                            }
+                        } label: {
+                            timelineThumbnail(metric: metric, isSelected: index == selectedIndex)
+                        }
+                        .buttonStyle(.plain)
+                        .id(index)
+                        .accessibilityLabel("Timeline entry (metric.date.formatted(date: .abbreviated, time: .omitted))")
+                        .accessibilityValue(index == selectedIndex ? "Selected" : "Not selected")
+                        .accessibilityIdentifier("launch_timeline_entry_\(index)")
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+            .accessibilityIdentifier("launch_timeline_photo_strip")
+            .onAppear {
+                proxy.scrollTo(selectedIndex, anchor: .center)
+            }
+            .onChange(of: selectedIndex) { _, newIndex in
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(newIndex, anchor: .center)
+                }
+            }
+        }
+    }
+
+    private func timelineThumbnail(metric: BodyMetrics, isSelected: Bool) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            if let photoURL = metric.photoUrl, !photoURL.isEmpty {
+                CachedAsyncImage(urlString: photoURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    thumbnailPlaceholder
+                }
+            } else {
+                thumbnailPlaceholder
+            }
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.58)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            Text(metric.date.formatted(.dateTime.month(.abbreviated).day()))
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(6)
+        }
+        .frame(width: 76, height: 96)
+        .clipShape(RoundedRectangle(cornerRadius: 11))
+        .overlay {
+            RoundedRectangle(cornerRadius: 11)
+                .stroke(isSelected ? theme.colors.text : theme.colors.border, lineWidth: isSelected ? 2 : 1)
+        }
+        .scaleEffect(isSelected ? 1.02 : 1)
+    }
+
+    private var thumbnailPlaceholder: some View {
+        LinearGradient(
+            colors: [theme.colors.surface, theme.colors.backgroundSecondary],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay {
+            Image(systemName: "circle.dashed")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(theme.colors.textTertiary)
+        }
+    }
+}

@@ -500,6 +500,7 @@ struct ProfileHeightPickerSheet: View {
     var dismiss
     @Environment(\.theme)
     private var theme
+    var onCommit: (() -> Void)? = nil
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -512,21 +513,27 @@ struct ProfileHeightPickerSheet: View {
             .navigationTitle("Set Height")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
                         dismiss()
+                    } label: {
+                        Text("Cancel")
+                            .frame(width: 68, height: JovieTokens.minimumHitTarget)
                     }
-                    .jovieTouchTarget()
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         hasChanges = true
+                        onCommit?()
                         dismiss()
                     }
                     .fontWeight(.medium)
                     .jovieTouchTarget()
                 }
             }
+            .accessibilityIdentifier("profile_height_editor")
         }
     }
 
@@ -631,6 +638,7 @@ struct DatePickerSheet: View {
     var dismiss
     @Environment(\.theme)
     private var theme
+    var onCommit: (() -> Void)? = nil
     var body: some View {
         NavigationStack {
             VStack(spacing: theme.spacing.md) {
@@ -650,15 +658,20 @@ struct DatePickerSheet: View {
             .navigationTitle("Date of Birth")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
                         dismiss()
+                    } label: {
+                        Text("Cancel")
+                            .frame(width: 68, height: JovieTokens.minimumHitTarget)
                     }
-                    .jovieTouchTarget()
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         hasChanges = true
+                        onCommit?()
                         dismiss()
                     }
                     .fontWeight(.medium)
