@@ -27,8 +27,8 @@ struct OnboardingOptionButton: View {
 
     var body: some View {
         Button(action: action, label: {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: theme.spacing.sm) {
+                VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                     Text(title)
                         .font(OnboardingTypography.headline)
                         .foregroundStyle(theme.colors.text)
@@ -51,9 +51,9 @@ struct OnboardingOptionButton: View {
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(isSelected ? theme.colors.primary : theme.colors.textSecondary.opacity(0.6))
             }
-            .padding(20)
+            .padding(theme.spacing.md)
             .systemBGlassSurface(
-                cornerRadius: 20,
+                cornerRadius: theme.radius.card,
                 tint: isSelected ? theme.colors.primary : theme.colors.text,
                 tintOpacity: isSelected ? 0.16 : 0.035,
                 borderColor: isSelected ? theme.colors.primary : theme.colors.border,
@@ -79,7 +79,7 @@ struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: V
     @Binding var selection: Option
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: theme.spacing.xs) {
             ForEach(options, id: \.self) { option in
                 Button(action: { selection = option }, label: {
                     Text(option.description)
@@ -88,7 +88,7 @@ struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: V
                         .frame(minHeight: JovieTokens.compactControlHeight)
                         .foregroundStyle(selection == option ? theme.colors.text : theme.colors.textSecondary)
                         .systemBGlassSurface(
-                            cornerRadius: 14,
+                            cornerRadius: theme.radius.input,
                             tint: selection == option ? theme.colors.primary : theme.colors.text,
                             tintOpacity: selection == option ? 0.28 : 0.02,
                             borderColor: selection == option ? theme.colors.primary : theme.colors.border,
@@ -100,9 +100,9 @@ struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: V
                 .accessibilityAddTraits(selection == option ? .isSelected : [])
             }
         }
-        .padding(4)
+        .padding(theme.spacing.xxs)
         .systemBGlassSurface(
-            cornerRadius: 18,
+            cornerRadius: theme.radius.input,
             tint: theme.colors.text,
             tintOpacity: 0.02,
             borderColor: theme.colors.border,
@@ -118,7 +118,7 @@ struct OnboardingInfoRow: View {
     let text: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: theme.spacing.xs) {
             Image(systemName: "questionmark.circle")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(theme.colors.textSecondary)
@@ -146,7 +146,7 @@ struct OnboardingTextFieldRow: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: theme.spacing.xs) {
             Text(title)
                 .font(OnboardingTypography.caption)
                 .foregroundStyle(theme.colors.textSecondary)
@@ -156,7 +156,7 @@ struct OnboardingTextFieldRow: View {
                 .autocorrectionDisabled(true)
                 .textInputAutocapitalization(.never)
                 .focused($isFocused)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, theme.spacing.sm)
                 .frame(minHeight: JovieTokens.compactControlHeight)
                 .systemBGlassSurface(
                     cornerRadius: theme.radius.input,
@@ -180,8 +180,8 @@ struct OnboardingValueRow: View {
     let action: (() -> Void)?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .top, spacing: theme.spacing.md) {
+            VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                 Text(label.uppercased())
                     .font(theme.typography.labelSmall)
                     .foregroundStyle(theme.colors.textSecondary)
@@ -209,9 +209,9 @@ struct OnboardingValueRow: View {
                 .jovieTouchTarget()
             }
         }
-        .padding(20)
+        .padding(theme.spacing.md)
         .systemBGlassSurface(
-            cornerRadius: 20,
+            cornerRadius: theme.radius.card,
             tint: theme.colors.text,
             tintOpacity: 0.035,
             borderColor: theme.colors.border,
@@ -237,7 +237,7 @@ struct OnboardingFormSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: theme.spacing.sm) {
             if let title {
                 Text(title)
                     .font(OnboardingTypography.headline)
@@ -250,12 +250,12 @@ struct OnboardingFormSection<Content: View>: View {
                     .foregroundStyle(theme.colors.textSecondary)
             }
 
-            VStack(spacing: 16) {
+            VStack(spacing: theme.spacing.md) {
                 content
             }
-            .padding(20)
+            .padding(theme.spacing.md)
             .systemBGlassSurface(
-                cornerRadius: 24,
+                cornerRadius: theme.radius.card,
                 tint: theme.colors.text,
                 tintOpacity: 0.035,
                 borderColor: theme.colors.border,
@@ -274,8 +274,8 @@ struct OnboardingProgressIndicator: View {
     let context: OnboardingFlowViewModel.ProgressContext
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("\(context.label) · \(Int((context.fractionComplete * 100).rounded()))% complete")
+        VStack(alignment: .leading, spacing: theme.spacing.xs) {
+            Text("\(context.label) · \(Int((context.fractionComplete * 100).rounded()))%")
                 .font(theme.typography.labelSmall)
                 .foregroundStyle(theme.colors.textSecondary)
 
@@ -332,8 +332,8 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
                 content
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(.horizontal, JovieTokens.screenInset)
-                    .padding(.top, 16)
-                    .padding(.bottom, showsCTA ? 24 : 40)
+                    .padding(.top, JovieTokens.compactInset)
+                    .padding(.bottom, showsCTA ? theme.spacing.lg : theme.spacing.xl)
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .vertical)
@@ -355,8 +355,7 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
 
             cta
                 .padding(.horizontal, JovieTokens.screenInset)
-                .padding(.top, 14)
-                .padding(.bottom, 12)
+                .padding(.vertical, theme.spacing.sm)
         }
         .background(
             theme.colors.background
@@ -407,7 +406,7 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
     }
 
     private var contentStack: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: theme.spacing.lg) {
             header
 
             content
@@ -416,17 +415,17 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: theme.spacing.md) {
             if showsBackButton {
                 Button(action: {
                     onBack?()
                 }, label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(theme.typography.labelLarge)
                         .foregroundStyle(theme.colors.text)
-                        .padding(10)
+                        .padding(theme.spacing.xs)
                         .systemBGlassSurface(
-                            cornerRadius: 14,
+                            cornerRadius: theme.radius.input,
                             tint: theme.colors.text,
                             tintOpacity: 0.05,
                             borderColor: theme.colors.border,

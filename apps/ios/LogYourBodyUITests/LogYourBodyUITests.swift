@@ -167,6 +167,31 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(restoreButton.exists)
     }
 
+    func testProfileEditorProvidesAnEscapeRoute() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+
+        try openSettings(in: app)
+
+        let profileLink = app.descendants(matching: .any)["settings_profile_link"]
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 5))
+        profileLink.tap()
+
+        let fullNameRow = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Full name")
+        ).firstMatch
+        XCTAssertTrue(fullNameRow.waitForExistence(timeout: 5))
+        fullNameRow.tap()
+
+        let cancelButton = app.buttons["profile_editor_cancel_button"]
+        XCTAssertTrue(cancelButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(cancelButton.isHittable)
+        cancelButton.tap()
+
+        XCTAssertFalse(app.staticTexts["Edit Profile"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 5))
+    }
+
     func testSubscribedMVPSettingsWeightGoalUsesNativeValidatedEditor() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
@@ -282,6 +307,114 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["dashboard_home_timeline_photo_stage"].exists)
     }
 
+    func testNarrowIPhoneSegmentedControlsKeepNativeHitTargets() throws {
+        try assertNarrowSegmentedControls(
+            launchArguments: ["-lybUITestPhotoTimelineHUDFixture"],
+            expectedViewportWidth: nil,
+            screenshotPrefix: "narrow-segmented-controls"
+        )
+    }
+
+    func test320PointViewportSegmentedControlsKeepNativeHitTargets() throws {
+        try assertNarrowSegmentedControls(
+            launchArguments: [
+                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestViewportWidth",
+                "320"
+            ],
+            expectedViewportWidth: 320,
+            screenshotPrefix: "narrow-segmented-controls-320"
+        )
+    }
+
+    private func assertNarrowSegmentedControls(
+        launchArguments: [String],
+        expectedViewportWidth: CGFloat?,
+        screenshotPrefix: String
+    ) throws {
+        let app = XCUIApplication()
+        launch(app, with: launchArguments)
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+        let home = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
+        XCTAssertTrue(home.waitForExistence(timeout: 10))
+
+        let windowFrame = app.windows.firstMatch.frame
+        let homeViewportFrame = assertViewport(
+            in: app,
+            expectedWidth: expectedViewportWidth,
+            fallback: windowFrame
+        )
+        let homeModeSwitch = app.descendants(matching: .any)["home_mode_switch"]
+        XCTAssertTrue(homeModeSwitch.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(homeModeSwitch.frame.minX, homeViewportFrame.minX - 1)
+        XCTAssertLessThanOrEqual(homeModeSwitch.frame.maxX, homeViewportFrame.maxX + 1)
+
+        for mode in ["avatar", "photo"] {
+            let button = app.buttons["home_mode_\(mode)_button"]
+            XCTAssertTrue(button.waitForExistence(timeout: 5))
+            XCTAssertTrue(button.isHittable)
+            XCTAssertGreaterThanOrEqual(button.frame.height + 0.1, 44)
+            XCTAssertGreaterThanOrEqual(button.frame.minX, homeViewportFrame.minX - 1)
+            XCTAssertLessThanOrEqual(button.frame.maxX, homeViewportFrame.maxX + 1)
+        }
+        attachScreenshot(named: "\(screenshotPrefix)-home", from: app)
+
+        // Start the detail surface from its deterministic analytics fixture so
+        // this geometry check does not depend on the root-page transition.
+        launch(app, with: launchArguments + [
+            "-lybUITestPhaseInsightFixture",
+            "-lybUITestPhotoTimelineAnalyticsFixture"
+        ])
+
+        let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
+        XCTAssertTrue(analyticsPage.waitForExistence(timeout: 10))
+
+        let weightCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"]
+        scrollUntilHittable(weightCard, in: app)
+        XCTAssertTrue(weightCard.waitForExistence(timeout: 8))
+        XCTAssertTrue(weightCard.isHittable)
+        weightCard.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["metric_detail_screen"].waitForExistence(timeout: 8))
+
+        let detailViewportFrame = assertViewport(
+            in: app,
+            expectedWidth: expectedViewportWidth,
+            fallback: windowFrame
+        )
+        let rangeIDs = ["1W", "1M", "3M", "6M", "1Y", "All"]
+        let rangeButtons = rangeIDs.map { app.buttons["metric_detail_range_\($0)"] }
+        for button in rangeButtons {
+            XCTAssertTrue(button.waitForExistence(timeout: 5))
+            XCTAssertTrue(button.isHittable)
+            XCTAssertGreaterThanOrEqual(button.frame.height + 0.1, 44)
+            XCTAssertGreaterThanOrEqual(button.frame.minX, detailViewportFrame.minX - 1)
+            XCTAssertLessThanOrEqual(button.frame.maxX, detailViewportFrame.maxX + 1)
+        }
+
+        let orderedFrames = rangeButtons.map(\.frame).sorted { $0.minX < $1.minX }
+        for pair in zip(orderedFrames, orderedFrames.dropFirst()) {
+            XCTAssertGreaterThanOrEqual(pair.1.minX, pair.0.maxX - 1)
+        }
+
+        attachScreenshot(named: "\(screenshotPrefix)-detail", from: app)
+    }
+
+    @discardableResult
+    private func assertViewport(
+        in app: XCUIApplication,
+        expectedWidth: CGFloat?,
+        fallback: CGRect
+    ) -> CGRect {
+        guard let expectedWidth else { return fallback }
+
+        let viewport = app.descendants(matching: .any)["lyb_ui_test_viewport"]
+        XCTAssertTrue(viewport.waitForExistence(timeout: 5))
+        XCTAssertEqual(viewport.frame.width, expectedWidth, accuracy: 1)
+        return viewport.frame
+    }
+
     func testHorizontalSwipeOnTimelineHeroDoesNotOpenStatsPage() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
@@ -324,11 +457,25 @@ final class LogYourBodyUITests: XCTestCase {
         scrollUntilHittable(weightCard, in: app)
         XCTAssertTrue(weightCard.waitForExistence(timeout: 8))
         XCTAssertTrue(weightCard.isHittable)
+        let weightValue = try XCTUnwrap(
+            weightCard.label
+                .split(separator: ",", maxSplits: 2, omittingEmptySubsequences: true)
+                .dropFirst()
+                .first?
+                .split(separator: " ")
+                .first
+        )
         weightCard.tap()
 
         let detail = app.descendants(matching: .any)["metric_detail_screen"]
         XCTAssertTrue(detail.waitForExistence(timeout: 8))
-        XCTAssertTrue(app.descendants(matching: .any)["metric_detail_headline"].waitForExistence(timeout: 5))
+        let detailHeadline = app.descendants(matching: .any)["metric_detail_headline"]
+        XCTAssertTrue(detailHeadline.waitForExistence(timeout: 5))
+        let trendHeadlineExpectation = expectation(
+            for: NSPredicate(format: "label == %@", String(weightValue)),
+            evaluatedWith: detailHeadline
+        )
+        wait(for: [trendHeadlineExpectation], timeout: 8)
         XCTAssertTrue(app.descendants(matching: .any)["metric_detail_chart"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["metric_detail_related_metrics"].exists)
         let relatedMetricIds = ["steps", "weight", "body_fat", "ffmi", "body_score"]
@@ -735,7 +882,10 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func assertAndCaptureBodyScoreShareSheet(in app: XCUIApplication) throws {
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+
+        let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 20))
 
         let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
         XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
@@ -760,7 +910,10 @@ final class LogYourBodyUITests: XCTestCase {
 
         let cardFrame = shareCard.frame
         let windowFrame = app.windows.firstMatch.frame
-        XCTAssertGreaterThan(cardFrame.width, windowFrame.width * 0.88)
+        // The portrait preview is fitted into the remaining vertical space
+        // below the controls, so its width is intentionally below the full
+        // sheet width on compact iPhones.
+        XCTAssertGreaterThan(cardFrame.width, windowFrame.width * 0.80)
         XCTAssertGreaterThan(cardFrame.height, cardFrame.width * 1.18)
         XCTAssertGreaterThan(cardFrame.minY, windowFrame.minY + 72)
         XCTAssertLessThanOrEqual(cardFrame.maxY, windowFrame.maxY - 72)

@@ -406,7 +406,10 @@ private struct DashboardHomeTimelineAvatarPlaceholder: View {
                     verticalPadding: 0,
                     horizontalFillScale: 1.0,
                     alignment: .bottom,
-                    renderMode: .fillWidth
+                    // Avatar assets do not share one aspect ratio. Fit the
+                    // native asset inside the hero so narrow screens never
+                    // crop the head, feet, or side silhouette.
+                    renderMode: .fit
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
                 .accessibilityHidden(true)

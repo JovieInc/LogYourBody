@@ -25,12 +25,22 @@ extension DashboardViewLiquid {
     }
 
     var homeModeSwitch: some View {
-        HStack(spacing: 4) {
-            ForEach(DefaultHomeMode.allCases) { mode in
-                homeModeButton(mode)
-            }
-        }
-        .padding(4)
+        JovieSegmentedControl(
+            selection: Binding(
+                get: { selectedDefaultHomeMode },
+                set: { defaultHomeModeRawValue = $0.rawValue }
+            ),
+            items: Array(DefaultHomeMode.allCases),
+            title: { $0.title },
+            systemImage: { $0.iconName },
+            accessibilityLabel: { $0.title },
+            accessibilityHint: { "Shows the \($0.title.lowercased()) home timeline" },
+            accessibilityIdentifier: { "home_mode_\($0.rawValue)_button" },
+            selectedTint: theme.colors.text,
+            selectedForeground: theme.colors.background,
+            unselectedForeground: theme.colors.textSecondary,
+            onSelection: { _ in HapticManager.shared.selection() }
+        )
         .systemBGlassSurface(
             cornerRadius: theme.radius.full,
             tint: theme.colors.text,
@@ -40,32 +50,6 @@ extension DashboardViewLiquid {
         )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home_mode_switch")
-    }
-
-    func homeModeButton(_ mode: DefaultHomeMode) -> some View {
-        let isSelected = selectedDefaultHomeMode == mode
-
-        return Button {
-            defaultHomeModeRawValue = mode.rawValue
-            HapticManager.shared.selection()
-        } label: {
-            Label(mode.title, systemImage: mode.iconName)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-                .foregroundColor(isSelected ? theme.colors.background : theme.colors.textSecondary)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(isSelected ? theme.colors.text : Color.clear)
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(mode.title)
-        .accessibilityValue(isSelected ? "Selected" : "Not selected")
-        .accessibilityHint("Shows the \(mode.title.lowercased()) home timeline")
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-        .accessibilityIdentifier("home_mode_\(mode.rawValue)_button")
     }
 
     func homeTimelineHero(metric: BodyMetrics) -> some View {

@@ -149,20 +149,11 @@ struct BodyScoreManualWeightView: View {
                                 .accessibilityFocused($weightErrorFocused)
                         }
 
-                        Button {
-                            toggleWhyWeAsk()
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "questionmark.circle")
-                                    .font(.system(.footnote, design: .default).weight(.semibold))
-                                Text("Why we ask")
-                                    .font(OnboardingTypography.caption)
-                            }
-                            .foregroundStyle(theme.colors.primary)
-                        }
-                        .buttonStyle(.plain)
-                        .jovieTouchTarget()
-                        .accessibilityValue(showWhyWeAsk ? "Expanded" : "Collapsed")
+                        OnboardingDisclosureLink(
+                            title: "Why we ask",
+                            isExpanded: showWhyWeAsk,
+                            action: toggleWhyWeAsk
+                        )
 
                         if showWhyWeAsk {
                             VStack(alignment: .leading, spacing: 8) {

@@ -83,23 +83,14 @@ struct BodyScoreBodyFatNumericView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Button {
-                            toggleHelp()
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "questionmark.circle")
-                                    .font(.system(.footnote, design: .default).weight(.semibold))
-                                Text("Not sure your %?")
-                                    .font(OnboardingTypography.caption)
-                            }
-                            .foregroundStyle(theme.colors.primary)
-                        }
-                        .buttonStyle(.plain)
-                        .jovieTouchTarget()
-                        .accessibilityValue(showHelp ? "Expanded" : "Collapsed")
+                        OnboardingDisclosureLink(
+                            title: "Need an estimate?",
+                            isExpanded: showHelp,
+                            action: toggleHelp
+                        )
 
                         if showHelp {
-                            Text("You can go back and choose visual estimate instead. We’ll guide you with reference photos.")
+                            Text("Go back to use reference photos instead.")
                                 .font(OnboardingTypography.body)
                                 .foregroundStyle(theme.colors.textSecondary)
                                 .transition(.opacity.combined(with: .move(edge: .top)))

@@ -151,7 +151,9 @@ extension DashboardViewLiquid {
     }
 
     func heroWeightValue() -> String {
-        let base = formatWeightValue(currentMetric?.weight)
+        let base = currentMetric.map {
+            formatTrendWeightHeadline($0, usesTrend: weightUsesTrend)
+        } ?? "–"
         guard base != "–" else { return base }
         return "\(base) \(weightUnit)"
     }

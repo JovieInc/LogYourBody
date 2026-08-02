@@ -306,11 +306,21 @@ struct UnitConversion {
 // MARK: - Extensions for Convenience
 
 extension MeasurementSystem {
+    /// The locale is only used when a user has not explicitly chosen a
+    /// measurement system. Persisted preferences always take precedence.
+    static func measurementSystem(for locale: Locale) -> MeasurementSystem {
+        locale.measurementSystem == .metric ? .metric : .imperial
+    }
+
+    static var localeDefault: MeasurementSystem {
+        measurementSystem(for: .current)
+    }
+
     static func fromStored(rawValue: String?) -> MeasurementSystem {
         if let rawValue, let system = MeasurementSystem(rawValue: rawValue) {
             return system
         }
-        return .imperial
+        return .localeDefault
     }
 
     static var preferredFromDefaults: MeasurementSystem {

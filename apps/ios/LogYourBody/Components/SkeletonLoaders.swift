@@ -106,24 +106,32 @@ struct TimelineSliderSkeleton: View {
 // MARK: - Core Metrics Row Skeleton
 
 struct CoreMetricsRowSkeleton: View {
+    let measurementSystem: MeasurementSystem
+
+    init(measurementSystem: MeasurementSystem = .localeDefault) {
+        self.measurementSystem = measurementSystem
+    }
+
     var body: some View {
         HStack(spacing: 16) {
             // Weight metric skeleton
             metricCardSkeleton(
                 icon: "scalemass",
-                title: "Weight"
+                title: "Weight",
+                unit: measurementSystem.weightUnit
             )
 
             // Body fat metric skeleton
             metricCardSkeleton(
                 icon: "percent",
-                title: "Body Fat"
+                title: "Body Fat",
+                unit: nil
             )
         }
         .padding(.horizontal, 20)
     }
 
-    private func metricCardSkeleton(icon: String, title: String) -> some View {
+    private func metricCardSkeleton(icon: String, title: String, unit: String?) -> some View {
         VStack(spacing: 0) {
             // Value placeholder
             HStack(alignment: .bottom, spacing: 6) {
@@ -132,9 +140,11 @@ struct CoreMetricsRowSkeleton: View {
                     .frame(width: 80, height: 36)
                     .shimmer()
 
-                Text("lbs")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white.opacity(0.3))
+                if let unit {
+                    Text(unit)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.3))
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -261,6 +271,12 @@ struct SecondaryMetricsRowSkeleton: View {
 // MARK: - Full Dashboard Skeleton
 
 struct DashboardSkeleton: View {
+    let measurementSystem: MeasurementSystem
+
+    init(measurementSystem: MeasurementSystem = .localeDefault) {
+        self.measurementSystem = measurementSystem
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Progress photo skeleton
@@ -274,7 +290,7 @@ struct DashboardSkeleton: View {
                 TimelineSliderSkeleton()
 
                 // Core metrics row
-                CoreMetricsRowSkeleton()
+                CoreMetricsRowSkeleton(measurementSystem: measurementSystem)
 
                 // Secondary metrics row
                 SecondaryMetricsRowSkeleton()

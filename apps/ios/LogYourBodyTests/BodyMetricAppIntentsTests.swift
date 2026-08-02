@@ -250,6 +250,20 @@ final class BodyMetricAppIntentsTests: XCTestCase {
         XCTAssertEqual(BodyMetricIntentWeightUnit.kilograms.storageUnit, "kg")
     }
 
+    func testLogWeightIntentDefaultsToPreferredMeasurementSystem() {
+        UserDefaults.standard.set(
+            MeasurementSystem.metric.rawValue,
+            forKey: Constants.preferredMeasurementSystemKey
+        )
+        XCTAssertEqual(LogWeightIntent().unit, .kilograms)
+
+        UserDefaults.standard.set(
+            MeasurementSystem.imperial.rawValue,
+            forKey: Constants.preferredMeasurementSystemKey
+        )
+        XCTAssertEqual(LogWeightIntent().unit, .pounds)
+    }
+
     // MARK: - Helpers
 
     @discardableResult

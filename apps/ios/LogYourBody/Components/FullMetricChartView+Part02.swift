@@ -133,7 +133,7 @@ func historyRow(for entry: MetricHistoryEntry, config: MetricEntriesConfiguratio
                 }
             }
         }
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
     }
 
 func primaryHistoryValue(_ entry: MetricHistoryEntry, config: MetricEntriesConfiguration) -> String {
@@ -271,7 +271,13 @@ func historyScrubber(proxy: ScrollViewProxy) -> some View {
     }
 
 var smoothedSeries: [MetricChartDataPoint] {
-        movingAverage(for: displayedSeries, windowSize: 7)
+        if trendChartData != nil,
+           let cached = cachedTrendSeries[selectedTimeRange],
+           !cached.isEmpty {
+            return cached
+        }
+
+        return movingAverage(for: displayedSeries, windowSize: 7)
     }
 
 var activeSeries: [MetricChartDataPoint] {
@@ -364,9 +370,9 @@ var headlineDateText: String {
 
 var chartDataFingerprint: String {
         guard let first = chartData.first, let last = chartData.last else {
-            return "empty-\(chartData.count)"
+            return "empty-\(chartData.count)-trend-\(trendChartData?.count ?? 0)"
         }
-        return [
+        let rawFingerprint = [
             "\(chartData.count)",
             "\(first.date.timeIntervalSince1970)",
             "\(last.date.timeIntervalSince1970)",
@@ -375,6 +381,25 @@ var chartDataFingerprint: String {
             first.presence.rawValue,
             last.presence.rawValue
         ].joined(separator: "-")
+
+        let trendFingerprint: String
+        if let trendChartData,
+           let trendFirst = trendChartData.first,
+           let trendLast = trendChartData.last {
+            trendFingerprint = [
+                "\(trendChartData.count)",
+                "\(trendFirst.date.timeIntervalSince1970)",
+                "\(trendLast.date.timeIntervalSince1970)",
+                "\(trendFirst.value)",
+                "\(trendLast.value)",
+                trendFirst.presence.rawValue,
+                trendLast.presence.rawValue
+            ].joined(separator: "-")
+        } else {
+            trendFingerprint = "none"
+        }
+
+        return "\(rawFingerprint)|trend-\(trendFingerprint)"
     }
 
 // MARK: - Helpers
@@ -636,26 +661,39 @@ var isStepsMetric: Bool {
     func preprocessChartDataIfNeeded() async {
         guard !chartData.isEmpty else {
             cachedSeries = [:]
+            cachedTrendSeries = [:]
             lastFingerprint = chartDataFingerprint
             return
         }
 
         let fingerprint = chartDataFingerprint
-        if fingerprint == lastFingerprint, !cachedSeries.isEmpty {
+        if fingerprint == lastFingerprint,
+           !cachedSeries.isEmpty,
+           trendChartData == nil || !cachedTrendSeries.isEmpty {
             return
         }
 
         isLoadingData = true
         let data = chartData
+        let trendData = trendChartData
         let referenceDate = data.last?.date ?? Date()
 
-        let newSeries = await Task.detached(priority: .userInitiated) {
+        let (newSeries, newTrendSeries) = await Task.detached(priority: .userInitiated) {
             let preprocessor = ChartSeriesPreprocessor(referenceDate: referenceDate)
-            return preprocessor.seriesByRange(from: data)
+            let rawSeries = preprocessor.seriesByRange(from: data)
+
+            guard let trendData, !trendData.isEmpty else {
+                return (rawSeries, [TimeRange: [MetricChartDataPoint]]())
+            }
+
+            let trendReferenceDate = trendData.last?.date ?? referenceDate
+            let trendPreprocessor = ChartSeriesPreprocessor(referenceDate: trendReferenceDate)
+            return (rawSeries, trendPreprocessor.seriesByRange(from: trendData))
         }.value
 
         if fingerprint == chartDataFingerprint {
             cachedSeries = newSeries
+            cachedTrendSeries = newTrendSeries
             lastFingerprint = fingerprint
         }
 

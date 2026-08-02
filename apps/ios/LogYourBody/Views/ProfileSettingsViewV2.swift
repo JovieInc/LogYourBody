@@ -106,6 +106,18 @@ struct ProfileSettingsViewV2: View {
         .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Cancel")
+                        .fixedSize()
+                }
+                .frame(minWidth: 64, minHeight: JovieTokens.minimumHitTarget)
+                .contentShape(Rectangle())
+                .accessibilityIdentifier("profile_editor_cancel_button")
+            }
+
             ToolbarItem(placement: .navigationBarTrailing) {
                 if isSaving {
                     ProgressView()
@@ -204,34 +216,37 @@ struct ProfileSettingsViewV2: View {
     }
 
     private var genderSelector: some View {
-        Picker(selection: $editableGender) {
-            ForEach(BiologicalSex.allCases, id: \.self) { gender in
-                Text(gender.description).tag(gender)
+        HStack(spacing: 0) {
+            Text("Biological sex")
+                .foregroundColor(theme.colors.text)
+                .font(theme.typography.labelLarge)
+                .accessibilityHidden(true)
+
+            Spacer(minLength: theme.spacing.sm)
+
+            Picker(selection: $editableGender) {
+                ForEach(BiologicalSex.allCases, id: \.self) { gender in
+                    Text(gender.description).tag(gender)
+                }
+            } label: {
+                HStack(spacing: theme.spacing.xs) {
+                    Text(editableGender.description)
+                        .font(theme.typography.labelMedium)
+                        .foregroundColor(theme.colors.textSecondary)
+                        .lineLimit(1)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(theme.typography.captionMedium.weight(.semibold))
+                        .foregroundColor(theme.colors.textTertiary)
+                }
             }
-        } label: {
-            HStack(spacing: theme.spacing.xs) {
-                Text("Biological sex")
-                    .foregroundColor(theme.colors.text)
-                    .font(theme.typography.labelLarge)
-
-                Spacer(minLength: theme.spacing.sm)
-
-                Text(editableGender.description)
-                    .font(theme.typography.labelMedium)
-                    .foregroundColor(theme.colors.textSecondary)
-                    .lineLimit(1)
-
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(theme.typography.captionMedium.weight(.semibold))
-                    .foregroundColor(theme.colors.textTertiary)
-            }
+            .pickerStyle(.menu)
+            .tint(theme.colors.text)
+            .accessibilityLabel("Biological sex")
+            .accessibilityValue(editableGender.description)
         }
-        .pickerStyle(.menu)
-        .tint(theme.colors.text)
         .padding(.horizontal, theme.spacing.md)
         .frame(minHeight: JovieTokens.minimumHitTarget)
-        .accessibilityLabel("Biological sex")
-        .accessibilityValue(editableGender.description)
         .onChange(of: editableGender) { _, _ in
             hasChanges = true
         }

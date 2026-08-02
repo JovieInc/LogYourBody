@@ -37,11 +37,11 @@ struct BodyScoreFirstProgressPhotoView: View {
     var body: some View {
         OnboardingPageTemplate(
             title: "Start your visual timeline.",
-            subtitle: "Add a first progress photo now, or skip and add one from Home.",
+            subtitle: "Add a photo now, or do it later from Home.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .firstPhoto),
             content: {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: theme.spacing.lg) {
                     previewCard
                     actionStack
                 }
@@ -63,39 +63,37 @@ struct BodyScoreFirstProgressPhotoView: View {
     }
 
     private var previewCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: theme.spacing.md) {
             Image(systemName: "camera.metering.center.weighted")
-                .font(.system(.title, design: .rounded).weight(.semibold))
+                .font(theme.typography.headlineMedium)
                 .foregroundStyle(theme.colors.text.opacity(0.82))
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Photos make the timeline useful.")
+            VStack(alignment: .leading, spacing: theme.spacing.xxs) {
+                Text("Start with a photo.")
                     .font(theme.typography.headlineSmall)
                     .foregroundStyle(theme.colors.text)
 
-                Text(
-                    "We attach the photo to the baseline metrics you just entered, so Home opens with your first visual check-in."
-                )
+                Text("We’ll pair it with the baseline metrics you just entered, so Home starts with a visual check-in.")
                     .font(OnboardingTypography.body)
                     .foregroundStyle(theme.colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: theme.spacing.sm) {
                 Image(systemName: "lock.shield")
                     .font(.system(.footnote, design: .default).weight(.semibold))
                     .foregroundStyle(theme.colors.text)
 
-                Text("Camera and photo library access are optional. You choose what to add, and can skip this for now.")
+                Text("Camera and photo library access are optional.")
                     .font(OnboardingTypography.caption)
                     .foregroundStyle(theme.colors.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(20)
+        .padding(theme.spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .systemBGlassSurface(
-            cornerRadius: 22,
+            cornerRadius: theme.radius.card,
             tint: theme.colors.text,
             tintOpacity: 0.04,
             borderColor: theme.colors.border,
@@ -108,7 +106,7 @@ struct BodyScoreFirstProgressPhotoView: View {
     }
 
     private var actionStack: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: theme.spacing.sm) {
             Button {
                 presentAttachSheet()
             } label: {
@@ -138,12 +136,6 @@ struct BodyScoreFirstProgressPhotoView: View {
             .buttonStyle(OnboardingSecondaryButtonStyle())
             .disabled(actionState.disablesActions)
             .accessibilityIdentifier("onboarding_first_photo_skip_button")
-
-                Text("You can add progress photos later from Home.")
-                    .font(OnboardingTypography.caption)
-                .foregroundStyle(theme.colors.textTertiary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
 
             if let errorMessage = viewModel.firstPhotoErrorMessage {
                 Text(errorMessage)

@@ -10,7 +10,7 @@ extension DashboardViewLiquid {
             let heroWidth = max(1, viewportWidth - heroHorizontalInset * 2)
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     compactHeader
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
@@ -161,7 +161,7 @@ extension DashboardViewLiquid {
                 timelineMode: homeTimelineModeBinding
             )
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
         .systemBGlassSurface(
             cornerRadius: theme.radius.card,
             tint: theme.colors.text,

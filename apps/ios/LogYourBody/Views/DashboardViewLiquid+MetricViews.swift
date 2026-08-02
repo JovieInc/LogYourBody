@@ -106,10 +106,16 @@ extension DashboardViewLiquid {
                 title: "Weight",
                 icon: "figure.stand",
                 iconColor: theme.colors.accentViolet,
-                currentValue: currentMetric.flatMap { formatWeightValue($0.weight) } ?? "–",
+                currentValue: currentMetric.map {
+                    formatTrendWeightHeadline($0, usesTrend: weightUsesTrend)
+                } ?? "–",
                 unit: weightUnit,
                 currentDate: formatDate(currentMetric?.date ?? Date()),
                 chartData: cachedChartData(for: .weight, generator: generateFullScreenWeightChartData),
+                trendChartData: cachedTrendChartData(
+                    for: .weight,
+                    generator: generateFullScreenWeightTrendChartData
+                ),
                 onAdd: {
                     presentAddEntrySheet(initialTab: 0)
                 },
@@ -117,7 +123,8 @@ extension DashboardViewLiquid {
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .weight),
                 goalValue: weightGoal.flatMap { convertWeight($0, to: currentMeasurementSystem) },
                 selectedTimeRange: $selectedRange,
-                selectedTimelineDate: metricDetailSelectedDateBinding
+                selectedTimelineDate: metricDetailSelectedDateBinding,
+                initialChartMode: weightUsesTrend ? .trend : .raw
             )
 
         case .bodyFat:

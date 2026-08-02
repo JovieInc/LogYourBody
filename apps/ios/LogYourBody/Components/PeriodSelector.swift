@@ -40,6 +40,150 @@ enum TimePeriod: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Shared Liquid Glass Segmented Control
+
+/// A compact, equal-width segmented control for narrow iPhone layouts.
+///
+/// iOS 26 gets the native Liquid Glass treatment while earlier OS versions use
+/// the app's existing material fallback. Keeping both selectors on this
+/// primitive prevents mobile spacing and accessibility behavior from drifting
+/// between screens.
+struct JovieSegmentedControl<Selection: Hashable>: View {
+    @Binding var selection: Selection
+
+    let items: [Selection]
+    let title: (Selection) -> String
+    let systemImage: (Selection) -> String?
+    let accessibilityLabel: (Selection) -> String
+    let accessibilityHint: (Selection) -> String
+    let accessibilityIdentifier: (Selection) -> String
+    let selectedTint: Color
+    let selectedForeground: Color
+    let unselectedForeground: Color
+    let onSelection: ((Selection) -> Void)?
+
+    init(
+        selection: Binding<Selection>,
+        items: [Selection],
+        title: @escaping (Selection) -> String,
+        systemImage: @escaping (Selection) -> String? = { _ in nil },
+        accessibilityLabel: @escaping (Selection) -> String,
+        accessibilityHint: @escaping (Selection) -> String,
+        accessibilityIdentifier: @escaping (Selection) -> String,
+        selectedTint: Color,
+        selectedForeground: Color,
+        unselectedForeground: Color,
+        onSelection: ((Selection) -> Void)? = nil
+    ) {
+        _selection = selection
+        self.items = items
+        self.title = title
+        self.systemImage = systemImage
+        self.accessibilityLabel = accessibilityLabel
+        self.accessibilityHint = accessibilityHint
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.selectedTint = selectedTint
+        self.selectedForeground = selectedForeground
+        self.unselectedForeground = unselectedForeground
+        self.onSelection = onSelection
+    }
+
+    var body: some View {
+        Group {
+            if #available(iOS 26.0, *) {
+                GlassEffectContainer(spacing: 4) {
+                    HStack(spacing: 4) {
+                        ForEach(items, id: \.self) { item in
+                            nativeSegment(for: item)
+                        }
+                    }
+                    .padding(4)
+                }
+            } else {
+                fallbackSegments
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    @available(iOS 26.0, *)
+    private func nativeSegment(for item: Selection) -> some View {
+        segmentButton(for: item)
+            // Apply glass after sizing and content modifiers so the material
+            // follows the actual 44pt hit target rather than clipping it.
+            .glassEffect(
+                selectedGlass(for: item),
+                in: Capsule(style: .continuous)
+            )
+    }
+
+    @available(iOS 26.0, *)
+    private func selectedGlass(for item: Selection) -> Glass {
+        if selection == item {
+            return .regular
+                .tint(selectedTint.opacity(0.2))
+                .interactive()
+        }
+
+        return .regular.interactive()
+    }
+
+    private var fallbackSegments: some View {
+        HStack(spacing: 4) {
+            ForEach(items, id: \.self) { item in
+                fallbackSegment(for: item)
+            }
+        }
+        .padding(4)
+        .systemBGlassSurface(
+            cornerRadius: JovieTokens.controlRadius,
+            tint: selectedTint,
+            tintOpacity: 0.025,
+            borderColor: Color.white.opacity(0.12),
+            borderOpacity: 1
+        )
+    }
+
+    private func fallbackSegment(for item: Selection) -> some View {
+        segmentButton(for: item)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(selection == item ? selectedTint : Color.clear)
+            )
+    }
+
+    private func segmentButton(for item: Selection) -> some View {
+        let isSelected = selection == item
+
+        return Button {
+            withAnimation(.easeInOut(duration: JovieTokens.subtleDuration)) {
+                selection = item
+            }
+            onSelection?(item)
+        } label: {
+            Group {
+                if let systemImageName = systemImage(item) {
+                    Label(title(item), systemImage: systemImageName)
+                } else {
+                    Text(title(item))
+                }
+            }
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .frame(maxWidth: .infinity, minHeight: JovieTokens.compactControlHeight)
+            .foregroundStyle(isSelected ? selectedForeground : unselectedForeground)
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel(item))
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityHint(accessibilityHint(item))
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityIdentifier(accessibilityIdentifier(item))
+    }
+}
+
 // MARK: - Period Selector Component
 
 struct PeriodSelector: View {

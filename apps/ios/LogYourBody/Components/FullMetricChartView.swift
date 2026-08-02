@@ -321,6 +321,10 @@ struct FullMetricChartView: View {
     let unit: String
     let currentDate: String
     let chartData: [MetricChartDataPoint]
+    /// Optional canonical trend series. Raw data remains the source for the
+    /// Raw mode while the default Smoothed mode can use the same series as the
+    /// dashboard headline.
+    let trendChartData: [MetricChartDataPoint]?
     let onAdd: (() -> Void)?
     let metricEntries: MetricEntriesPayload?
     let relatedMetrics: [MetricDetailRelatedMetric]
@@ -330,6 +334,7 @@ struct FullMetricChartView: View {
     @Binding var selectedTimeRange: TimeRange
     @Binding var selectedTimelineDate: Date?
     @State var cachedSeries: [TimeRange: [MetricChartDataPoint]] = [:]
+    @State var cachedTrendSeries: [TimeRange: [MetricChartDataPoint]] = [:]
     @State var isLoadingData = false
     @State var lastFingerprint: String = ""
     @State var chartMode: ChartMode = .trend
@@ -356,12 +361,14 @@ struct FullMetricChartView: View {
         unit: String,
         currentDate: String,
         chartData: [MetricChartDataPoint],
+        trendChartData: [MetricChartDataPoint]? = nil,
         onAdd: (() -> Void)?,
         metricEntries: MetricEntriesPayload?,
         relatedMetrics: [MetricDetailRelatedMetric] = [],
         goalValue: Double?,
         selectedTimeRange: Binding<TimeRange>,
-        selectedTimelineDate: Binding<Date?> = .constant(nil)
+        selectedTimelineDate: Binding<Date?> = .constant(nil),
+        initialChartMode: ChartMode = .trend
     ) {
         self.title = title
         self.icon = icon
@@ -370,12 +377,14 @@ struct FullMetricChartView: View {
         self.unit = unit
         self.currentDate = currentDate
         self.chartData = chartData
+        self.trendChartData = trendChartData
         self.onAdd = onAdd
         self.metricEntries = metricEntries
         self.relatedMetrics = relatedMetrics
         self.goalValue = goalValue
         _selectedTimeRange = selectedTimeRange
         _selectedTimelineDate = selectedTimelineDate
+        _chartMode = State(initialValue: initialChartMode)
     }
 }
 

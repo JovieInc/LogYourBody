@@ -47,6 +47,7 @@ struct DashboardViewLiquid: View {
     @State private var coreDataReloadTask: Task<Void, Never>?
     @State var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
     @State var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
+    @State var fullTrendChartCache: [MetricType: [MetricChartDataPoint]] = [:]
     @State var glp1DoseLogs: [Glp1DoseLog] = []
     @State var glp1Medications: [Glp1Medication] = []
     @State var dailyMetricsLookupCache: [Date: DailyMetrics] = [:]
@@ -205,6 +206,18 @@ struct DashboardViewLiquid: View {
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
+            }
+            .onChange(of: measurementSystem) { _, _ in
+                // Full-screen chart and entry caches contain display-unit values;
+                // discard them immediately when Settings changes units so a
+                // returning user cannot see a mixed kg/lbs detail screen while
+                // the next cache build completes.
+                fullChartCache = [:]
+                fullTrendChartCache = [:]
+                metricEntriesCache = [:]
+                Task { @MainActor in
+                    await prewarmMetricCaches()
+                }
             }
             .onChange(of: selectedIndex) { _, newIndex in
                 scheduleDashboardDerivedStateRefresh(animatedIndex: newIndex)
@@ -565,7 +578,7 @@ struct DashboardViewLiquid: View {
     @ViewBuilder
     private var dashboardContent: some View {
         if viewModel.bodyMetrics.isEmpty && !viewModel.hasLoadedInitialData {
-            DashboardSkeleton()
+            DashboardSkeleton(measurementSystem: currentMeasurementSystem)
         } else if layoutMode == .photoTimelineHUD {
             photoTimelineRoot
         } else if viewModel.bodyMetrics.isEmpty {
