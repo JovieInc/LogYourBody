@@ -23,7 +23,7 @@ These run inside `ios-release-loop.yml`'s `build-release` job and fail the lane 
 
 1. **Wait for a fresh TestFlight build** from the latest `main`. Confirm it finished processing and appears in the intended tester group in App Store Connect → TestFlight.
 2. On a real device, install that TestFlight build and run the paid path end to end:
-   - Sign in with email OTP → complete onboarding → reach the paywall.
+   - Continue with Apple → complete onboarding → reach the paywall.
    - **Purchase** the monthly (or annual) subscription with a sandbox account. Confirm the app unlocks (entitlement active, weight logging reachable).
    - Delete + reinstall (or sign out/in), tap **Restore Purchases**, confirm the subscription restores and the app unlocks.
 3. Only if both purchase and restore succeed, dispatch the App Store release:

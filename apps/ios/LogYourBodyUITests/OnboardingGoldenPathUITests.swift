@@ -33,7 +33,8 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     // MARK: - Steps
 
     private func assertHookStep(in app: XCUIApplication) {
-        XCTAssertTrue(app.staticTexts["Get your Body Score in 60 seconds."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["See what’s changing."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_bodyScoreIntro"].exists)
 
         let startButton = app.buttons["body_score_onboarding_start_button"]
         XCTAssertTrue(startButton.waitForExistence(timeout: 5))
@@ -42,7 +43,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     }
 
     private func completeBasicsStep(in app: XCUIApplication) {
-        XCTAssertTrue(app.staticTexts["Sex at birth"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Which reference should we use?"].waitForExistence(timeout: 5))
 
         let continueButton = app.buttons["body_score_onboarding_basics_continue_button"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 3))
@@ -81,7 +82,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     }
 
     private func completeHealthConnectStep(in app: XCUIApplication) {
-        XCTAssertTrue(app.staticTexts["Pull from Apple Health?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Use what your iPhone already knows."].waitForExistence(timeout: 5))
 
         // Synchronous path: skips the HealthKit permission sheet entirely.
         let manualEntryButton = app.buttons["body_score_onboarding_enter_manually_button"]
@@ -91,7 +92,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     }
 
     private func completeManualWeightStep(in app: XCUIApplication) {
-        XCTAssertTrue(app.staticTexts["What’s your most recent weight?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["What’s your current weight?"].waitForExistence(timeout: 5))
 
         // Switching the height step to centimeters also flips the preferred
         // measurement system to metric; return the weight unit to pounds.
@@ -115,7 +116,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     }
 
     private func completeBodyFatChoiceStep(in app: XCUIApplication) {
-        XCTAssertTrue(app.staticTexts["How do you want to estimate body fat?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["How do you know your body fat?"].waitForExistence(timeout: 5))
 
         // Selecting an option advances to the matching input step directly.
         let manualButton = app.buttons["body_score_onboarding_body_fat_manual_button"]
@@ -125,7 +126,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     }
 
     private func completeBodyFatNumericStep(in app: XCUIApplication) {
-        XCTAssertTrue(app.staticTexts["Enter your body fat %"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Enter your body fat."].waitForExistence(timeout: 5))
 
         let bodyFatField = app.textFields["Body fat percentage"]
         XCTAssertTrue(bodyFatField.waitForExistence(timeout: 3))
@@ -146,8 +147,8 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         // The loading step ("Calculating your Body Score") runs a fully local
         // score calculation; waiting for the reveal is the deterministic way
         // to observe that transition without racing the spinner.
-        XCTAssertTrue(app.staticTexts["Your Body Score"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.staticTexts["Crunching your numbers…"].exists)
+        XCTAssertTrue(app.staticTexts["You’re building from a strong base."].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Building your Body Score"].exists)
 
         // The score hero is a combined accessibility element labelled
         // "Body Score <score>. <tagline>". Only the numeric structure is
@@ -159,7 +160,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Starting point"].waitForExistence(timeout: 3))
 
-        let nextStepsButton = app.buttons["See my next steps"]
+        let nextStepsButton = app.buttons["See my plan"]
         XCTAssertTrue(nextStepsButton.waitForExistence(timeout: 3))
         XCTAssertTrue(nextStepsButton.isHittable)
     }

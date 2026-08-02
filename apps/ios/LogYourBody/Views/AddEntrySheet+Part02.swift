@@ -198,6 +198,7 @@ func saveBodyFat(userId: String) {
                 _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
                     for: selectedDate,
                     bodyFatPercentage: validatedBodyFat,
+                    bodyFatMethod: bodyFatMethod,
                     userId: userId
                 )
                 RealtimeSyncManager.shared.syncIfNeeded()

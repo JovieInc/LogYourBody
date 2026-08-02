@@ -47,7 +47,8 @@ struct SecuritySessionsView: View {
                             DataInfoRow(
                                 icon: "lock.shield.fill",
                                 title: "Signed-in devices",
-                                description: "Review the devices currently using your account.",
+                                description: "Current device is marked. Locations are approximate, " +
+                                    "and revoked devices can sign in again.",
                                 iconColor: theme.colors.info
                             )
                         }
@@ -143,6 +144,7 @@ struct SecuritySessionsView: View {
                 message: successMessage
             )
         )
+        .worldClassScreen(.activeSessions)
     }
 
     // MARK: - View Components

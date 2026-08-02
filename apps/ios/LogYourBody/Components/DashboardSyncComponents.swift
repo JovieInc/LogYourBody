@@ -83,6 +83,8 @@ struct DashboardSyncDetailsSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                syncSummarySection
+
                 statusSection
 
                 unsyncedSection
@@ -97,21 +99,39 @@ struct DashboardSyncDetailsSheet: View {
                     }
                 }
             }
-            .navigationTitle("Sync Details")
+            .navigationTitle("Sync")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
                         isPresented = false
                     }
                 }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Retry") {
-                        syncManager.syncAll()
-                    }
-                    .disabled(!syncManager.isOnline)
-                }
             }
+        }
+        .worldClassScreen(.syncDetails)
+    }
+
+    private var syncSummarySection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(statusHeadline, systemImage: statusIcon)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(statusColor)
+
+                Text(statusSummary)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button(syncManager.isSyncing ? "Syncing…" : "Sync now") {
+                    syncManager.syncAll()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.white)
+                .foregroundStyle(.black)
+                .disabled(!syncManager.isOnline || syncManager.isSyncing)
+            }
+            .padding(.vertical, 8)
         }
     }
 
@@ -234,6 +254,45 @@ struct DashboardSyncDetailsSheet: View {
             return "Syncing…"
         case .idle:
             return syncManager.pendingSyncCount > 0 ? "Pending sync" : "Synced"
+        }
+    }
+
+    private var statusHeadline: String {
+        switch syncManager.syncStatus {
+        case .offline:
+            return "Saved on this iPhone."
+        case .error:
+            return "Sync needs attention."
+        case .syncing:
+            return "Syncing your data."
+        case .success:
+            return "Your data is synced."
+        case .idle:
+            return syncManager.pendingSyncCount > 0 ? "Changes are waiting to sync." : "Your data is synced."
+        }
+    }
+
+    private var statusSummary: String {
+        if let last = syncManager.lastSyncDate {
+            return "Last completed \(last.formatted(date: .abbreviated, time: .shortened)). \(syncManager.pendingSyncCount) changes pending."
+        }
+        return "Your latest measurements remain safely stored on this iPhone while sync finishes."
+    }
+
+    private var statusIcon: String {
+        switch syncManager.syncStatus {
+        case .offline: "iphone"
+        case .error: "exclamationmark.triangle.fill"
+        case .syncing: "arrow.triangle.2.circlepath"
+        case .success, .idle: "checkmark.circle.fill"
+        }
+    }
+
+    private var statusColor: Color {
+        switch syncManager.syncStatus {
+        case .error: .red
+        case .offline: .orange
+        case .success, .syncing, .idle: .primary
         }
     }
 }

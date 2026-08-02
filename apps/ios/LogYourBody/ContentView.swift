@@ -83,6 +83,10 @@ struct ContentView: View {
     @AppStorage("lyb.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion: String?
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
 
+    private var suppressWhatsNewForUITests: Bool {
+        ProcessInfo.processInfo.arguments.contains("-lybUITestSuppressWhatsNew")
+    }
+
     init() {
         // We need to initialize LoadingManager with a temporary AuthManager
         // The actual authManager will be injected from environment
@@ -183,7 +187,8 @@ struct ContentView: View {
             let isEligible = authManager.isAuthenticated &&
                 isLoadingComplete &&
                 hasCompletedOnboarding &&
-                !shouldShowProfileCompletion
+                !shouldShowProfileCompletion &&
+                !suppressWhatsNewForUITests
             showWhatsNew = WhatsNewPresentationPolicy.shouldPresent(
                 currentVersion: AppVersion.current,
                 lastPresentedVersion: lastPresentedWhatsNewVersion,
@@ -325,7 +330,7 @@ private struct LogYourBodyWhatsNewView: View {
         VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
             HStack {
                 VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
-                    Text("What’s New")
+                    Text("A clearer view of progress.")
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(Color.appTextPrimary)
                     Text("Version \(version)")
@@ -340,8 +345,9 @@ private struct LogYourBodyWhatsNewView: View {
             }
 
             VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
-                Label("This update is shown once for this app version.", systemImage: "checkmark.circle")
-                Label("Dismiss it anytime with Done.", systemImage: "hand.tap")
+                Label("Body Score now explains what changed and why it matters.", systemImage: "chart.line.uptrend.xyaxis")
+                Label("Metric detail separates measured and interpolated values.", systemImage: "waveform.path.ecg")
+                Label("Settings puts privacy, exports, and recovery in one scan.", systemImage: "hand.raised")
             }
             .font(.body)
             .foregroundStyle(Color.appTextSecondary)
@@ -360,6 +366,7 @@ private struct LogYourBodyWhatsNewView: View {
         .presentationDragIndicator(.visible)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("What’s New, version \(version)")
+        .worldClassScreen(.whatsNew)
     }
 }
 

@@ -105,6 +105,7 @@ struct PaywallView: View {
         .sheet(isPresented: $showPrivacySheet) {
             NavigationStack { LegalDocumentView(documentType: .privacy) }
         }
+        .worldClassScreen(.paywall)
     }
 
     private var availablePrimaryPackages: [PaywallPackageDisplay] {
@@ -122,7 +123,7 @@ struct PaywallView: View {
     private var header: some View {
         VStack(spacing: 10) {
             Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(.title, design: .rounded).weight(.semibold))
+                .font(.system(.title, design: .default).weight(.semibold))
                 .foregroundStyle(theme.colors.text)
                 .frame(width: 52, height: 52)
                 .background(Circle().fill(theme.colors.text.opacity(0.08)))
@@ -258,12 +259,12 @@ struct PaywallView: View {
 
     private var plansUnavailableState: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Plans are temporarily unavailable", systemImage: "wifi.exclamationmark")
+            Label("Plans aren’t loading.", systemImage: "wifi.exclamationmark")
                 .font(theme.typography.labelLarge)
                 .foregroundStyle(theme.colors.text)
                 .accessibilityIdentifier("paywall_plans_unavailable_state")
 
-            Text("Check your connection and try again. You can still restore a previous purchase or switch accounts.")
+            Text("Your Body Score and data are safe. Check your connection and try again, or restore a previous purchase.")
                 .font(theme.typography.bodySmall)
                 .foregroundStyle(theme.colors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -281,6 +282,7 @@ struct PaywallView: View {
             shadowRadius: 10,
             shadowY: 4
         )
+        .worldClassScreen(.planUnavailable)
     }
 
     private var unavailablePlanActions: some View {

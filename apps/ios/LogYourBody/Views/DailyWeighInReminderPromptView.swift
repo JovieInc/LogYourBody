@@ -31,15 +31,15 @@ struct DailyWeighInReminderPromptView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Set a daily weigh-in reminder",
-            subtitle: "Choose a time that works for you. You can change or turn it off anytime in Settings.",
+            title: "Want a quiet reminder?",
+            subtitle: "Choose a time that keeps trends useful. No streaks. No guilt. Change or turn it off anytime.",
             showsBackButton: false,
             content: {
                 VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
                     reminderIcon
                     reminderTimePicker
 
-                    Text("One reminder per day helps keep your weight trend useful.")
+                    Text("One quiet reminder per day. Never a streak or a judgment.")
                         .font(.subheadline)
                         .foregroundColor(.jovieTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -58,7 +58,7 @@ struct DailyWeighInReminderPromptView: View {
                             ProgressView()
                                 .tint(.jovieActionText)
                         } else {
-                            Text("Enable reminder")
+                            Text("Remind me at \(reminderTime.formatted(date: .omitted, time: .shortened))")
                         }
                     }
                     .buttonStyle(OnboardingPrimaryButtonStyle())
@@ -96,6 +96,7 @@ struct DailyWeighInReminderPromptView: View {
                     : "LogYourBody could not schedule your reminder. You can try again or continue without one."
             )
         }
+        .worldClassScreen(.dailyReminder)
     }
 
     private var reminderTimePicker: some View {

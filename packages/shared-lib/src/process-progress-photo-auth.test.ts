@@ -5,6 +5,7 @@ const functionSource = readFileSync(
   new URL('../../../supabase/functions/process-progress-photo/index.ts', import.meta.url),
   'utf8',
 );
+const canonicalFunctionSource = functionSource.replaceAll('"', "'").replace(/\s+/g, ' ');
 
 const functionConfig = readFileSync(
   new URL('../../../supabase/functions/process-progress-photo/config.toml', import.meta.url),
@@ -24,30 +25,32 @@ const iosPhotoUploadManager = readFileSync(
 describe('process-progress-photo auth boundary', () => {
   it('requires a verified user token before processing photos', () => {
     expect(functionConfig).toContain('verify_jwt = true');
-    expect(functionSource).toContain("req.headers.get('Authorization')");
-    expect(functionSource).toContain('supabase.auth.getUser(token)');
-    expect(functionSource).toContain(
-      "return jsonResponse({ error: 'Missing or invalid authorization header' }, 401)",
+    expect(canonicalFunctionSource).toContain("req.headers.get('Authorization')");
+    expect(canonicalFunctionSource).toContain('supabase.auth.getUser(token)');
+    expect(canonicalFunctionSource).toMatch(
+      /return jsonResponse\( \{ error: 'Missing or invalid authorization header' \}, 401,? \)/,
     );
-    expect(functionSource).toContain("return jsonResponse({ error: 'Invalid token' }, 401)");
+    expect(canonicalFunctionSource).toContain(
+      "return jsonResponse({ error: 'Invalid token' }, 401)",
+    );
   });
 
   it('checks metric and storage ownership before signing or uploading the photo', () => {
-    expect(functionSource).toContain('!normalizedStoragePath.startsWith(`${user.id}/`)');
-    expect(functionSource).toContain(".select('id, user_id')");
-    expect(functionSource).toContain('metric.user_id !== user.id');
+    expect(canonicalFunctionSource).toContain('!normalizedStoragePath.startsWith(`${user.id}/`)');
+    expect(canonicalFunctionSource).toContain(".select('id, user_id')");
+    expect(canonicalFunctionSource).toContain('metric.user_id !== user.id');
 
-    expect(functionSource.indexOf(".select('id, user_id')")).toBeLessThan(
-      functionSource.indexOf('.createSignedUrl(normalizedStoragePath'),
+    expect(canonicalFunctionSource.indexOf(".select('id, user_id')")).toBeLessThan(
+      canonicalFunctionSource.indexOf('.createSignedUrl(normalizedStoragePath'),
     );
-    expect(functionSource.indexOf('metric.user_id !== user.id')).toBeLessThan(
-      functionSource.indexOf('fetch(\n      `https://api.cloudinary.com'),
+    expect(canonicalFunctionSource.indexOf('metric.user_id !== user.id')).toBeLessThan(
+      canonicalFunctionSource.indexOf('fetch( `https://api.cloudinary.com'),
     );
   });
 
   it('keeps the user predicate on the final service-role update', () => {
-    expect(functionSource).toContain(".eq('id', metricsId)\n      .eq('user_id', user.id)");
-    expect(functionSource).toContain(
+    expect(canonicalFunctionSource).toContain(".eq('id', metricsId) .eq('user_id', user.id)");
+    expect(canonicalFunctionSource).toContain(
       "return jsonResponse({ error: 'Failed to update metrics photo' }, 500)",
     );
   });

@@ -10,10 +10,11 @@ struct BodyScoreAccountCreationView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Create your account",
-            subtitle: "Use your email to create your account. We'll send a verification code to confirm it's you.",
+            title: "Create your account.",
+            subtitle: "Continue with Apple to protect your Body Score and sync it across devices.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .account),
+            screen: .verifyAccount,
             content: {
                 VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
                     OnboardingTextFieldRow(
@@ -27,7 +28,7 @@ struct BodyScoreAccountCreationView: View {
                     )
 
                     OnboardingCaptionText(
-                        text: "We’ll send a verification code to this address.",
+                        text: "Apple confirms your identity. You can review this email later in your profile.",
                         alignment: .leading
                     )
 
@@ -46,7 +47,7 @@ struct BodyScoreAccountCreationView: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.background))
                         }
-                        Text(viewModel.isCreatingAccount ? "Creating account…" : "Create account")
+                        Text(viewModel.isCreatingAccount ? "Opening Apple…" : "Continue with Apple")
                     }
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())

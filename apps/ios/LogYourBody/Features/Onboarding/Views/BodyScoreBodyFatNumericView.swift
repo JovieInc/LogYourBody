@@ -33,10 +33,11 @@ struct BodyScoreBodyFatNumericView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Enter your body fat %",
-            subtitle: "You can update this anytime.",
+            title: "Enter your body fat.",
+            subtitle: "Use the latest reading from your chosen method.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .bodyFatNumeric),
+            screen: .bodyFatValue,
             content: {
                 VStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 16) {

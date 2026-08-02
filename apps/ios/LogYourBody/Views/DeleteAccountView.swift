@@ -87,19 +87,19 @@ struct DeleteAccountView: View {
                 UIAccessibility.post(notification: .announcement, argument: errorMessage)
             }
         }
+        .worldClassScreen(.deleteAccount)
     }
 
     private var deletionHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Permanent action", systemImage: "exclamationmark.triangle.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(theme.colors.error)
-
-            Text("Delete your account")
+            Text("Delete account?")
                 .font(.title2.weight(.bold))
                 .foregroundColor(.jovieText)
 
-            Text("This cannot be undone. Your LogYourBody data will be permanently deleted.")
+            Text(
+                "This permanently deletes your LogYourBody account, measurements, and uploaded photos. " +
+                    "Apple Health remains separate."
+            )
                 .font(.body)
                 .foregroundColor(.jovieTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)

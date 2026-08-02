@@ -22,8 +22,8 @@ struct LoginView: View {
                 Spacer()
 
                 AuthHeader(
-                    title: "LogYourBody",
-                    subtitle: "Your body, clearly tracked."
+                    title: "Your body, over time.",
+                    subtitle: "Private body-composition tracking that takes seconds, not another habit to manage."
                 )
 
                 VStack(spacing: 14) {
@@ -48,7 +48,7 @@ struct LoginView: View {
                     .disabled(isLoading || !authManager.isAuthProviderReady)
                     .accessibilityIdentifier("continueWithAppleButton")
 
-                    Text("Fast, private sign in with your Apple ID.")
+                    Text("Apple is the fastest way back to your private history.")
                         .font(theme.typography.captionLarge)
                         .foregroundColor(theme.colors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -95,6 +95,7 @@ struct LoginView: View {
         .onAppear {
             AppServicePorts.analyticsTracker.track(event: "login_view")
         }
+        .worldClassScreen(.signIn)
     }
 
     private func authenticate() {

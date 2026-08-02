@@ -31,9 +31,10 @@ struct BodyScoreHeightView: View {
     var body: some View {
         OnboardingPageTemplate(
             title: "How tall are you?",
-            subtitle: "Height helps us normalize your Body Score.",
+            subtitle: "Height lets us compare lean mass across different frames.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .height),
+            screen: .height,
             content: {
                 VStack(spacing: 24) {
                     OnboardingSegmentedControl(options: HeightUnit.allCases, selection: heightUnitBinding)

@@ -38,6 +38,7 @@ extension PreferencesView {
                                 remindersSection
                             }
                         }
+                        .worldClassScreen(.trackingAndGoals)
                     }
                     .accessibilityIdentifier("settings_tracking_link")
 
@@ -78,6 +79,7 @@ extension PreferencesView {
                                 dangerSection
                             }
                         }
+                        .worldClassScreen(.privacyAndData)
                     }
                     .accessibilityIdentifier("settings_privacy_data_link")
                 }
@@ -112,14 +114,7 @@ extension PreferencesView {
                 }
             }
         }
-        .padding(theme.spacing.md)
-        .systemBGlassSurface(
-            cornerRadius: theme.radius.card,
-            tint: theme.colors.text,
-            tintOpacity: 0.05,
-            borderColor: theme.colors.border,
-            borderOpacity: 0.75
-        )
+        .padding(.vertical, theme.spacing.xs)
     }
 
     var heroIdentityText: some View {

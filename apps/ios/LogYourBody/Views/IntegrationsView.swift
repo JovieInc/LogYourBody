@@ -68,6 +68,7 @@ struct IntegrationsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
             featureGateRefreshToken = UUID()
         }
+        .worldClassScreen(.integrations)
     }
 
     private var healthAndFitnessSection: some View {

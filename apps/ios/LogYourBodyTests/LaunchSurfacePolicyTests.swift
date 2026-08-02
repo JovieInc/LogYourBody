@@ -362,6 +362,33 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertTrue(ProfileCompletionPolicy.isComplete(profile: blankNameProfile, fallbackName: "Fallback User"))
     }
 
+    func testWorldClassScreenCatalogCoversAllFortyFiveApprovedStates() {
+        XCTAssertEqual(WorldClassScreen.allCases.count, 45)
+
+        let counts = Dictionary(grouping: WorldClassScreen.allCases, by: \.flow)
+            .mapValues(\.count)
+
+        XCTAssertEqual(counts[.entry], 5)
+        XCTAssertEqual(counts[.onboarding], 17)
+        XCTAssertEqual(counts[.core], 10)
+        XCTAssertEqual(counts[.subscription], 3)
+        XCTAssertEqual(counts[.account], 10)
+    }
+
+    func testWorldClassScreenIdentifiersAreStableUniqueAccessibilityAnchors() {
+        let identifiers = WorldClassScreen.allCases.map(\.accessibilityIdentifier)
+
+        XCTAssertEqual(Set(identifiers).count, WorldClassScreen.allCases.count)
+        XCTAssertTrue(identifiers.allSatisfy { $0.hasPrefix("world_class_screen_") })
+        XCTAssertTrue(identifiers.allSatisfy { !$0.contains(" ") })
+    }
+
+    func testWorldClassSharedControlTokensStayAtLeastFortyFourPoints() {
+        XCTAssertGreaterThanOrEqual(JovieTokens.minimumHitTarget, 44)
+        XCTAssertGreaterThanOrEqual(JovieTokens.compactControlHeight, JovieTokens.minimumHitTarget)
+        XCTAssertGreaterThanOrEqual(JovieTokens.controlHeight, JovieTokens.minimumHitTarget)
+    }
+
     private func makeLaunchPolicyUser(
         id: String,
         name: String = "Launch User",

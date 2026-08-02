@@ -165,6 +165,7 @@ struct ProgressPhotoAttachSheet: View {
             }
         }
         .accessibilityIdentifier("progress_photo_attach_sheet")
+        .worldClassScreen(.addProgressPhoto)
     }
 
     private var header: some View {

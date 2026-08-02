@@ -1,26 +1,13 @@
 import 'server-only';
 
-import { createClient } from '@supabase/supabase-js';
-
 /**
- * Every table in the Supabase health-data schema that is owned by one account.
- * Keep this list in dependency-safe order and update the migration guard test
- * whenever a new user-owned table is added.
+ * Delete the authenticated user's Supabase rows and photo assets through the
+ * canonical edge-function boundary. The first-party web runtime validates the
+ * Jovie session, then uses its server-only service credential to request
+ * deletion for that exact subject. Jovie credentials never leave LYB.
  */
-export const accountDeletionTargets = [
-  { table: 'data_exports', column: 'user_id' },
-  { table: 'progress_photos', column: 'user_id' },
-  { table: 'dexa_results', column: 'user_id' },
-  { table: 'glp1_dose_logs', column: 'user_id' },
-  { table: 'glp1_medications', column: 'user_id' },
-  { table: 'daily_metrics', column: 'user_id' },
-  { table: 'body_metrics', column: 'user_id' },
-  { table: 'email_subscriptions', column: 'user_id' },
-  { table: 'profiles', column: 'id' },
-] as const;
-
 export async function deleteUserHealthData(userId: string): Promise<void> {
-  if (!userId.trim()) throw new Error('Cannot delete health data without a user id');
+  if (!userId.trim()) throw new Error('Cannot delete account data without a user id');
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -28,16 +15,18 @@ export async function deleteUserHealthData(userId: string): Promise<void> {
     throw new Error('Supabase account-deletion service is not configured');
   }
 
-  // This module is server-only. The service role is used only for this
-  // authenticated, exact-user deletion chain; clients never receive it.
-  const supabase = createClient(url, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
+  const response = await fetch(`${url.replace(/\/$/, '')}/functions/v1/delete-user-assets`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ userId }),
+    cache: 'no-store',
   });
 
-  for (const target of accountDeletionTargets) {
-    const { error } = await supabase.from(target.table).delete().eq(target.column, userId);
-    if (error) {
-      throw new Error(`Failed to delete ${target.table}: ${error.message}`);
-    }
+  if (!response.ok) {
+    throw new Error(`Account data deletion failed with status ${response.status}`);
   }
 }

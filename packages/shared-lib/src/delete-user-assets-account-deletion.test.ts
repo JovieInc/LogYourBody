@@ -3,9 +3,14 @@ import { describe, expect, it } from 'vitest';
 import {
   UserDataDeletionError,
   accountDeletionTargets,
+  deleteLegacyUserDatabaseRows,
   deleteProductAuthUser,
   deleteUserDatabaseRows,
+  legacyAccountDeletionTargets,
+  ownedCloudinaryPublicIdFromUrl,
+  ownedStoragePathFromValue,
 } from '../../../supabase/functions/delete-user-assets/account-deletion';
+import { cloudinaryPublicIdForOwner } from '../../../supabase/functions/process-progress-photo/asset-identity';
 
 class MockDeleteBuilder {
   constructor(
@@ -142,5 +147,104 @@ describe('deleteProductAuthUser', () => {
     await expect(deleteProductAuthUser(client, 'user_123')).rejects.toThrow(
       'Failed to delete product auth user: provider unavailable',
     );
+  });
+});
+
+describe('deleteLegacyUserDatabaseRows', () => {
+  it('deletes every retained UUID-era table before the legacy profile', async () => {
+    const mock = createMockSupabase();
+
+    const results = await deleteLegacyUserDatabaseRows(mock.client, 'legacy-uuid', {
+      error: () => undefined,
+    });
+
+    expect(results.every((result) => result.success)).toBe(true);
+    expect(mock.calls).toEqual([
+      'progress_photos_old.user_id=legacy-uuid',
+      'weight_logs_old.user_id=legacy-uuid',
+      'daily_metrics_old.user_id=legacy-uuid',
+      'body_metrics_old.user_id=legacy-uuid',
+      'email_subscriptions_old.user_id=legacy-uuid',
+      'profiles_old.id=legacy-uuid',
+    ]);
+    expect(legacyAccountDeletionTargets.at(-1)?.table).toBe('profiles_old');
+  });
+
+  it('fails closed when a retained UUID-era table cannot be deleted', async () => {
+    const mock = createMockSupabase({
+      body_metrics_old: { message: 'legacy table unavailable' },
+    });
+
+    await expect(
+      deleteLegacyUserDatabaseRows(mock.client, 'legacy-uuid', { error: () => undefined }),
+    ).rejects.toBeInstanceOf(UserDataDeletionError);
+  });
+});
+
+describe('account deletion asset ownership', () => {
+  it('creates a user-scoped Cloudinary public id and rejects unsafe segments', () => {
+    expect(cloudinaryPublicIdForOwner('user_123', 'metric-owned', 1720000000)).toBe(
+      'progress-photos/user_123/metric-owned_1720000000',
+    );
+    expect(() => cloudinaryPublicIdForOwner('../victim', 'metric-owned', 1720000000)).toThrow(
+      'Invalid Cloudinary asset identity',
+    );
+  });
+
+  it('accepts only storage objects under the authenticated subject prefix', () => {
+    expect(ownedStoragePathFromValue('user_123/photo.jpg', 'user_123')).toBe('user_123/photo.jpg');
+    expect(
+      ownedStoragePathFromValue(
+        'https://project.supabase.co/storage/v1/object/public/photos/user_123/photo.jpg',
+        'user_123',
+      ),
+    ).toBe('user_123/photo.jpg');
+    expect(ownedStoragePathFromValue('victim/photo.jpg', 'user_123')).toBeNull();
+    expect(ownedStoragePathFromValue('user_123/../victim/photo.jpg', 'user_123')).toBeNull();
+  });
+
+  it('accepts only Cloudinary IDs derived from an owned metric id', () => {
+    const ownedIds = new Set(['metric-owned']);
+    expect(
+      ownedCloudinaryPublicIdFromUrl(
+        'https://res.cloudinary.com/demo/image/upload/c_fill/v123/progress-photos/user_123/metric-owned_1720000000.webp',
+        'user_123',
+        ownedIds,
+      ),
+    ).toBe('progress-photos/user_123/metric-owned_1720000000');
+    expect(
+      ownedCloudinaryPublicIdFromUrl(
+        'https://res.cloudinary.com/demo/image/upload/v123/progress-photos/user_123/metric-victim_1720000000.webp',
+        'user_123',
+        ownedIds,
+      ),
+    ).toBeNull();
+    expect(
+      ownedCloudinaryPublicIdFromUrl(
+        'https://res.cloudinary.com/demo/image/upload/v123/progress-photos/victim/metric-owned_1720000000.webp',
+        'user_123',
+        ownedIds,
+      ),
+    ).toBeNull();
+    expect(
+      ownedCloudinaryPublicIdFromUrl(
+        'https://res.cloudinary.com/demo/image/upload/v123/progress-photos/metric-owned_1720000000.webp',
+        'user_123',
+        ownedIds,
+      ),
+    ).toBeNull();
+  });
+
+  it('rejects a Cloudinary ID authorized only by a client-controlled progress-photo id', () => {
+    const ownedBodyMetricIds = new Set(['metric-owned']);
+    const attackerControlledProgressPhotoId = 'metric-victim';
+
+    expect(
+      ownedCloudinaryPublicIdFromUrl(
+        `https://res.cloudinary.com/demo/image/upload/v123/progress-photos/user_123/${attackerControlledProgressPhotoId}_1720000000.webp`,
+        'user_123',
+        ownedBodyMetricIds,
+      ),
+    ).toBeNull();
   });
 });

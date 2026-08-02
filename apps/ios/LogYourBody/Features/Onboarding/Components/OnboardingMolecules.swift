@@ -52,14 +52,17 @@ struct OnboardingOptionButton: View {
                     .foregroundStyle(isSelected ? theme.colors.primary : theme.colors.textSecondary.opacity(0.6))
             }
             .padding(theme.spacing.md)
-            .systemBGlassSurface(
-                cornerRadius: theme.radius.card,
-                tint: isSelected ? theme.colors.primary : theme.colors.text,
-                tintOpacity: isSelected ? 0.16 : 0.035,
-                borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                borderOpacity: isSelected ? 0.85 : 0.65,
-                borderWidth: isSelected ? 2 : 1
+            .background(
+                isSelected ? theme.colors.surfaceSecondary : theme.colors.surface,
+                in: RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
             )
+            .overlay {
+                RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
+                    .stroke(
+                        isSelected ? theme.colors.text.opacity(0.9) : theme.colors.border.opacity(JovieTokens.hairlineOpacity),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            }
         })
         .buttonStyle(.plain)
         .jovieTouchTarget()
@@ -321,18 +324,14 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [theme.colors.background, theme.colors.backgroundSecondary],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            theme.colors.background
                 .ignoresSafeArea()
 
             ScrollView {
                 content
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(.horizontal, JovieTokens.screenInset)
-                    .padding(.top, JovieTokens.compactInset)
+                    .padding(.top, theme.spacing.xs)
                     .padding(.bottom, showsCTA ? theme.spacing.lg : theme.spacing.xl)
             }
             .scrollIndicators(.hidden)
@@ -350,7 +349,7 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
     private var ctaContainer: some View {
         VStack(spacing: 0) {
             Rectangle()
-                .fill(theme.colors.text.opacity(0.08))
+                .fill(theme.colors.border.opacity(JovieTokens.hairlineOpacity))
                 .frame(height: 1)
 
             cta
@@ -376,6 +375,7 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
     var content: Content
     var footer: Footer
     var progress: OnboardingFlowViewModel.ProgressContext?
+    var screen: WorldClassScreen?
     var hasFooter: Bool
 
     init(
@@ -384,6 +384,7 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
         showsBackButton: Bool = true,
         onBack: (() -> Void)? = nil,
         progress: OnboardingFlowViewModel.ProgressContext? = nil,
+        screen: WorldClassScreen? = nil,
         @ViewBuilder content: () -> Content,
         @ViewBuilder footer: () -> Footer
     ) {
@@ -394,10 +395,21 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
         self.content = content()
         self.footer = footer()
         self.progress = progress
+        self.screen = screen
         self.hasFooter = true
     }
 
     var body: some View {
+        Group {
+            if let screen {
+                scaffold.worldClassScreen(screen)
+            } else {
+                scaffold
+            }
+        }
+    }
+
+    private var scaffold: some View {
         OnboardingScaffold(showsCTA: hasFooter) {
             contentStack
         } cta: {
@@ -456,6 +468,7 @@ extension OnboardingPageTemplate where Footer == EmptyView {
         showsBackButton: Bool = true,
         onBack: (() -> Void)? = nil,
         progress: OnboardingFlowViewModel.ProgressContext? = nil,
+        screen: WorldClassScreen? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -465,6 +478,7 @@ extension OnboardingPageTemplate where Footer == EmptyView {
         self.content = content()
         self.footer = EmptyView()
         self.progress = progress
+        self.screen = screen
         self.hasFooter = false
     }
 }

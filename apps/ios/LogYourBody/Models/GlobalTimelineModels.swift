@@ -8,6 +8,7 @@ enum GlobalTimelineScale: String, Codable {
 
 enum MetricPresence: String, Codable, CaseIterable {
     case present
+    case estimated
     case interpolated
     case lastKnown = "last_known"
     case missing
@@ -19,7 +20,9 @@ enum MetricPresence: String, Codable, CaseIterable {
         switch rawValue {
         case "present":
             self = .present
-        case "interpolated", "estimated":
+        case "estimated":
+            self = .estimated
+        case "interpolated":
             self = .interpolated
         case "last_known":
             self = .lastKnown

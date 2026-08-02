@@ -49,10 +49,11 @@ struct BodyScoreBodyFatVisualView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Pick the closest match",
-            subtitle: "Use the cues to estimate your body fat.",
+            title: "Choose the closest range.",
+            subtitle: "This is an estimate. You can replace it with a measured value anytime.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .bodyFatVisual),
+            screen: .visualEstimate,
             content: {
                 VStack(spacing: JovieTokens.itemGap) {
                     ForEach(Self.visualEstimates) { estimate in

@@ -62,13 +62,14 @@ struct LegalConsentView: View {
                         )
                     }
                     .padding(12)
-                    .systemBGlassSurface(
-                        cornerRadius: JovieTokens.cardRadius,
-                        tint: .jovieText,
-                        tintOpacity: 0.045,
-                        borderColor: .jovieHairline,
-                        borderOpacity: 0.9
+                    .background(
+                        Color.jovieSurface,
+                        in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
                     )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
+                            .stroke(Color.jovieHairline.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
+                    }
 
                     Text("You can review these documents again in Settings.")
                         .font(.footnote)
@@ -97,15 +98,19 @@ struct LegalConsentView: View {
                 LegalDocumentView(documentType: .privacy)
             }
         }
+        .worldClassScreen(.legalConsent)
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Before you continue")
+            Text("Your data stays yours.")
                 .font(.title2.weight(.bold))
                 .foregroundColor(.jovieText)
 
-            Text("Please review and accept the Terms of Service and Privacy Policy.")
+            Text(
+                "We use the profile details, measurements, photos, and consent records you choose to provide. " +
+                    "You can export or request deletion anytime."
+            )
                 .font(.body)
                 .foregroundColor(.jovieTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -11,15 +11,99 @@ import UIKit
 enum JovieTokens {
     static let screenInset: CGFloat = 20
     static let compactInset: CGFloat = 16
-    static let sectionGap: CGFloat = 24
+    static let sectionGap: CGFloat = 28
     static let itemGap: CGFloat = 12
     static let minimumHitTarget: CGFloat = 44
-    static let controlHeight: CGFloat = 48
+    static let controlHeight: CGFloat = 52
     static let compactControlHeight: CGFloat = 44
     static let cardRadius: CGFloat = 20
     static let controlRadius: CGFloat = 16
+    static let hairlineOpacity: Double = 0.72
+    static let ambientAccentOpacity: Double = 0.08
     static let subtleDuration: Double = 0.15
     static let cinematicDuration: Double = 0.42
+}
+
+enum WorldClassScreenFlow: String, CaseIterable {
+    case entry
+    case onboarding
+    case core
+    case subscription
+    case account
+}
+
+/// Compiled inventory for the ground-up UI migration. Stable screen IDs let
+/// XCUITest and accessibility audits target product states without coupling to
+/// copy or view hierarchy.
+enum WorldClassScreen: String, CaseIterable, Identifiable {
+    case launch
+    case signIn
+    case legalConsent
+    case biometricLock
+    case whatsNew
+    case bodyScoreIntro
+    case sexAtBirth
+    case height
+    case appleHealth
+    case confirmImportedData
+    case weight
+    case bodyFatMethod
+    case bodyFatValue
+    case visualEstimate
+    case calculation
+    case bodyScoreReveal
+    case chooseHomeView
+    case email
+    case verifyAccount
+    case completeProfile
+    case firstProgressPhoto
+    case paywall
+    case home
+    case photoTimeline
+    case stats
+    case metricDetail
+    case logWeight
+    case logBodyFat
+    case addProgressPhoto
+    case glp1CheckIn
+    case shareBodyScore
+    case syncDetails
+    case dailyReminder
+    case planUnavailable
+    case restorePurchases
+    case settings
+    case editProfile
+    case trackingAndGoals
+    case integrations
+    case importPhotos
+    case exportData
+    case activeSessions
+    case privacyAndData
+    case deleteAccount
+    case bugReport
+
+    var id: String { rawValue }
+    var accessibilityIdentifier: String { "world_class_screen_\(rawValue)" }
+
+    var flow: WorldClassScreenFlow {
+        switch self {
+        case .launch, .signIn, .legalConsent, .biometricLock, .whatsNew:
+            return .entry
+        case .bodyScoreIntro, .sexAtBirth, .height, .appleHealth, .confirmImportedData,
+             .weight, .bodyFatMethod, .bodyFatValue, .visualEstimate, .calculation,
+             .bodyScoreReveal, .chooseHomeView, .email, .verifyAccount, .completeProfile,
+             .firstProgressPhoto, .paywall:
+            return .onboarding
+        case .home, .photoTimeline, .stats, .metricDetail, .logWeight, .logBodyFat,
+             .addProgressPhoto, .glp1CheckIn, .shareBodyScore, .syncDetails:
+            return .core
+        case .dailyReminder, .planUnavailable, .restorePurchases:
+            return .subscription
+        case .settings, .editProfile, .trackingAndGoals, .integrations, .importPhotos,
+             .exportData, .activeSessions, .privacyAndData, .deleteAccount, .bugReport:
+            return .account
+        }
+    }
 }
 
 protocol Theme {
@@ -258,9 +342,9 @@ struct DefaultTheme: Theme {
     let materials = MaterialTheme()
     let typography = TypographyTheme(
         // Display
-        displayLarge: .system(.largeTitle, design: .rounded).weight(.bold),
-        displayMedium: .system(.title, design: .rounded).weight(.bold),
-        displaySmall: .system(.title2, design: .rounded).weight(.semibold),
+        displayLarge: .system(.largeTitle, design: .default).weight(.bold),
+        displayMedium: .system(.title, design: .default).weight(.bold),
+        displaySmall: .system(.title2, design: .default).weight(.semibold),
 
         // Headline
         headlineLarge: .system(.title2, design: .default).weight(.semibold),
@@ -359,6 +443,11 @@ extension View {
                 minWidth: JovieTokens.minimumHitTarget,
                 minHeight: JovieTokens.minimumHitTarget
             )
+    }
+
+    func worldClassScreen(_ screen: WorldClassScreen) -> some View {
+        accessibilityElement(children: .contain)
+            .accessibilityIdentifier(screen.accessibilityIdentifier)
     }
 }
 

@@ -36,15 +36,16 @@ struct BodyScoreFirstProgressPhotoView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Start your visual timeline.",
-            subtitle: "Add a photo now, or do it later from Home.",
+            title: "Start a visual timeline?",
+            subtitle: "One private photo makes future change easier to see. Add one now or skip.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .firstPhoto),
+            screen: .firstProgressPhoto,
             content: {
-                VStack(alignment: .leading, spacing: theme.spacing.lg) {
-                    previewCard
-                    actionStack
-                }
+                previewCard
+            },
+            footer: {
+                actionStack
             }
         )
         .task {
@@ -69,11 +70,14 @@ struct BodyScoreFirstProgressPhotoView: View {
                 .foregroundStyle(theme.colors.text.opacity(0.82))
 
             VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                Text("Start with a photo.")
+                Text("A private baseline, on your terms.")
                     .font(theme.typography.headlineSmall)
                     .foregroundStyle(theme.colors.text)
 
-                Text("We’ll pair it with the baseline metrics you just entered, so Home starts with a visual check-in.")
+                Text(
+                    "Consistent framing helps you compare honestly. " +
+                        "We never alter your body or analyze a photo without consent."
+                )
                     .font(OnboardingTypography.body)
                     .foregroundStyle(theme.colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -40,18 +40,18 @@ enum DefaultHomeMode: String, Codable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .avatar:
-            return "Avatar"
+            return "Quick answer"
         case .photo:
-            return "Photo"
+            return "Visual timeline"
         }
     }
 
     var subtitle: String {
         switch self {
         case .avatar:
-            return "Privacy-safe body timeline"
+            return "Trend, meaning, and next action"
         case .photo:
-            return "Real progress photos"
+            return "Private progress photos over time"
         }
     }
 

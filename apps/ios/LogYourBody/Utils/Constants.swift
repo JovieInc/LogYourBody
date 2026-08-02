@@ -159,6 +159,8 @@ enum PhotoTimelineHUDPolicy {
         switch presence {
         case .present:
             return "Measured"
+        case .estimated:
+            return "Estimated"
         case .interpolated:
             if let confidence {
                 return "Interpolated - \(confidence.rawValue) confidence"

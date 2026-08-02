@@ -35,7 +35,6 @@ struct BiometricAuthView: View {
 
     let biometricType: BiometricType
     let onAuthenticate: () -> Void
-    let onUsePassword: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -63,28 +62,16 @@ struct BiometricAuthView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            VStack(spacing: JovieTokens.itemGap) {
-                BaseButton(
-                    "Try \(biometricType.title) again",
-                    configuration: ButtonConfiguration(
-                        style: .custom(background: .jovieAction, foreground: .jovieActionText),
-                        fullWidth: true,
-                        icon: biometricType.icon
-                    ),
-                    action: onAuthenticate
-                )
-                .accessibilityHint("Starts \(biometricType.title) authentication again")
-
-                Button(action: onUsePassword) {
-                    Text("Continue without \(biometricType.title)")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Color.jovieTextSecondary)
-                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
-                }
-                .buttonStyle(.plain)
-                .jovieTouchTarget()
-                .accessibilityHint("Closes the biometric lock")
-            }
+            BaseButton(
+                "Try again or use passcode",
+                configuration: ButtonConfiguration(
+                    style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                    fullWidth: true,
+                    icon: biometricType.icon
+                ),
+                action: onAuthenticate
+            )
+            .accessibilityHint("Starts device-owner authentication")
         }
         .padding(JovieTokens.sectionGap)
         .frame(maxWidth: 440)
@@ -101,8 +88,7 @@ struct BiometricAuthView: View {
 #Preview {
     BiometricAuthView(
         biometricType: .faceID,
-        onAuthenticate: {},
-        onUsePassword: {}
+        onAuthenticate: {}
     )
     .padding()
     .background(Color.jovieCanvas)

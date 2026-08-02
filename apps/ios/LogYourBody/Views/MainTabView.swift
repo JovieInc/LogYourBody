@@ -32,19 +32,16 @@ struct MainTabView: View {
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("-lybUITestWeightLoggerMVPFixture") {
             selectedSurface = .weightLoggerMVP
-            HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
             return
         }
 
         if arguments.contains("-lybUITestPhotoTimelineHUDFixture") {
             selectedSurface = .photoTimelineHUD
-            HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
             return
         }
 
         if arguments.contains("-lybUITestFullDashboardFixture") {
             selectedSurface = .legacyFullDashboardBeta
-            HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: healthKitSyncEnabled)
             return
         }
         #endif

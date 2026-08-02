@@ -76,10 +76,6 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
                 Capsule(style: .continuous)
                     .fill(theme.colors.text.opacity(buttonOpacity(isPressed: configuration.isPressed)))
             )
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(theme.colors.text.opacity(0.16))
-            )
             .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(reduceMotion ? nil : theme.animation.fast, value: configuration.isPressed)
     }
@@ -224,16 +220,11 @@ struct OnboardingCard<Content: View>: View {
     var body: some View {
         content
             .padding(theme.spacing.md)
-            .systemBGlassSurface(
-                cornerRadius: theme.radius.card,
-                tint: theme.colors.text,
-                tintOpacity: 0.04,
-                borderColor: theme.colors.border,
-                borderOpacity: 0.7,
-                shadowOpacity: 0.18,
-                shadowRadius: 14,
-                shadowY: 8
-            )
+            .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
+                    .stroke(theme.colors.border.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
+            }
     }
 }
 

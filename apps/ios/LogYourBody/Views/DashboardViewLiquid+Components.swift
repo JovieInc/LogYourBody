@@ -91,10 +91,10 @@ struct DashboardHomeTimelineHero: View {
                     )
                     .accessibilityIdentifier("dashboard_home_timeline_photo_stage")
                 } else {
-                    DashboardHomeTimelineAvatarPlaceholder(
-                        bodyFatPercentage: metric.bodyFatPercentage,
-                        gender: gender,
-                        mode: homeMode
+                    DashboardQuickAnswerField(
+                        headline: bodyScoreTagline,
+                        deltaText: bodyScoreDeltaText,
+                        dateText: dateText
                     )
                     .allowsHitTesting(false)
                 }
@@ -104,7 +104,10 @@ struct DashboardHomeTimelineHero: View {
                         .allowsHitTesting(false)
                 }
             }
-            .aspectRatio(4.0 / 5.0, contentMode: .fit)
+            .aspectRatio(
+                shouldShowPhoto ? 4.0 / 5.0 : (dynamicTypeSize.isAccessibilitySize ? 1.05 : 1.55),
+                contentMode: .fit
+            )
             .frame(maxWidth: .infinity)
             .background(theme.colors.background)
             .clipped()
@@ -332,6 +335,56 @@ struct DashboardHomeTimelineHero: View {
         Rectangle()
             .fill(theme.colors.border)
             .frame(height: 1)
+    }
+}
+
+private struct DashboardQuickAnswerField: View {
+    @Environment(\.theme) private var theme
+
+    let headline: String
+    let deltaText: String?
+    let dateText: String
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            GeometryReader { geometry in
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: geometry.size.height * 0.72))
+                    path.addCurve(
+                        to: CGPoint(x: geometry.size.width, y: geometry.size.height * 0.26),
+                        control1: CGPoint(x: geometry.size.width * 0.28, y: geometry.size.height * 0.62),
+                        control2: CGPoint(x: geometry.size.width * 0.62, y: geometry.size.height * 0.42)
+                    )
+                }
+                .stroke(theme.colors.info, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            }
+            .padding(.vertical, 28)
+            .opacity(0.8)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(headline)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(theme.colors.text)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(deltaText ?? "Your latest measurements are ready to review.")
+                    .font(.body)
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(dateText)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(theme.colors.textTertiary)
+            }
+            .padding(20)
+        }
+        .background(theme.colors.surface)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            ["Quick answer", headline, deltaText ?? "Your latest measurements are ready to review", dateText]
+                .joined(separator: ". ")
+        )
+        .accessibilityIdentifier("dashboard_home_quick_answer")
     }
 }
 

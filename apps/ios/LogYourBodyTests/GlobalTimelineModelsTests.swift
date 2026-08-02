@@ -20,13 +20,10 @@ final class GlobalTimelineModelsTests: XCTestCase {
 
     func testMetricPresenceDecodesCanonicalRawValues() throws {
         XCTAssertEqual(try decodePresence("present"), .present)
+        XCTAssertEqual(try decodePresence("estimated"), .estimated)
         XCTAssertEqual(try decodePresence("interpolated"), .interpolated)
         XCTAssertEqual(try decodePresence("last_known"), .lastKnown)
         XCTAssertEqual(try decodePresence("missing"), .missing)
-    }
-
-    func testMetricPresenceDecodesLegacyEstimatedAliasAsInterpolated() throws {
-        XCTAssertEqual(try decodePresence("estimated"), .interpolated)
     }
 
     func testMetricPresenceRejectsUnknownRawValues() {
@@ -38,6 +35,9 @@ final class GlobalTimelineModelsTests: XCTestCase {
 
         let encoded = try encoder.encode(MetricPresence.interpolated)
         XCTAssertEqual(String(data: encoded, encoding: .utf8), "\"interpolated\"")
+
+        let estimated = try encoder.encode(MetricPresence.estimated)
+        XCTAssertEqual(String(data: estimated, encoding: .utf8), "\"estimated\"")
     }
 
     func testGlobalTimelineScaleRawValuesStayStableForBucketAndCursorCoding() {

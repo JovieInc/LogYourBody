@@ -9,10 +9,36 @@ var resolvedWeightUnit: String {
         weightUnit.isEmpty ? currentSystem.weightUnit : weightUnit
     }
 
+var entryTitle: String {
+        switch selectedTab {
+        case 0: "Weight"
+        case 1: "Body fat"
+        case 2: "Progress photo"
+        case 3: "Weekly check-in"
+        default: "Add entry"
+        }
+    }
+
+var entryScreen: WorldClassScreen {
+        switch selectedTab {
+        case 0: .logWeight
+        case 1: .logBodyFat
+        case 2: .addProgressPhoto
+        case 3: .glp1CheckIn
+        default: .logWeight
+        }
+    }
+
 var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Tab selector
+                Text(selectedDate.formatted(date: .complete, time: .shortened))
+                    .font(.subheadline)
+                    .foregroundStyle(Color.jovieTextSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.top, 8)
+
                 Picker("Entry Type", selection: $selectedTab) {
                     Label("Weight", systemImage: "scalemass").tag(0)
                     Label("Body Fat", systemImage: "percent").tag(1)
@@ -22,7 +48,7 @@ var body: some View {
                     }
                 }
                 .pickerStyle(SegmentedPickerStyle())
-                .padding(.horizontal)
+                .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.vertical, 12)
                 .accessibilityLabel("Entry type selector")
                 .accessibilityHint("Select the type of entry you want to add")
@@ -38,7 +64,7 @@ var body: some View {
                     DatePicker("", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
                         .labelsHidden()
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.vertical, 8)
 
                 Divider()
@@ -59,29 +85,25 @@ var body: some View {
                     }
                 }
 
-                // Save button
-                Button(action: saveEntry) {
-                    HStack {
-                        if isProcessingPhotos || isSavingEntry {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                                .scaleEffect(0.8)
-                        } else {
-                            Text(saveButtonText)
-                                .font(.appBody)
-                                .fontWeight(.semibold)
-                        }
-                    }
-                    .frame(height: 48)
-                    .frame(maxWidth: .infinity)
-                    .background(canSave ? Color.white : Color.appBorder)
-                    .foregroundColor(canSave ? .black : .white)
-                    .cornerRadius(Constants.cornerRadius)
-                }
-                .disabled(!canSave || isProcessingPhotos || isSavingEntry)
-                .padding()
+                BaseButton(
+                    saveButtonText,
+                    configuration: ButtonConfiguration(
+                        style: .custom(background: .jovieAction, foreground: .jovieActionText),
+                        size: .large,
+                        isLoading: isProcessingPhotos || isSavingEntry,
+                        isEnabled: canSave && !isProcessingPhotos && !isSavingEntry,
+                        fullWidth: true,
+                        cornerRadius: 9_999
+                    ),
+                    action: saveEntry
+                )
+                .accessibilityIdentifier("add_entry_save_button")
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.vertical, 12)
             }
-            .navigationTitle("Add Entry")
+            .background(Color.jovieCanvas.ignoresSafeArea())
+            .worldClassScreen(entryScreen)
+            .navigationTitle(entryTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -576,11 +598,9 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                     .foregroundColor(.appTextSecondary)
 
                 Picker("Method", selection: $bodyFatMethod) {
-                    Text("Visual Estimate").tag("Visual")
-                    Text("Body Scan").tag("Scan")
-                    Text("Calipers").tag("Calipers")
-                    Text("Bioelectrical").tag("BIA")
-                    Text("DEXA").tag("DEXA")
+                    ForEach(BodyFatEntryMethod.allCases, id: \.rawValue) { method in
+                        Text(method.title).tag(method.rawValue)
+                    }
                 }
                 .pickerStyle(MenuPickerStyle())
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { fetchUserInfo } from '@/lib/auth/jovie-oauth';
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
 import type { ProductUserRecord } from '@/lib/ports/user-directory';
+import { deleteUserHealthData } from '@/lib/supabase/account-deletion';
 
 const CURRENT_TERMS_VERSION = '2026-07-14';
 const CURRENT_PRIVACY_VERSION = '2026-07-14';
@@ -98,6 +99,12 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const identity = await authenticate(request);
   if (!identity) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  await neonUserDirectory.deleteUser(identity.sub);
-  return new NextResponse(null, { status: 204 });
+  try {
+    await deleteUserHealthData(identity.sub);
+    await neonUserDirectory.deleteUser(identity.sub);
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error('Mobile account deletion failed', error);
+    return NextResponse.json({ error: 'account_deletion_failed' }, { status: 500 });
+  }
 }

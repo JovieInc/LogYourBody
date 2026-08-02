@@ -134,16 +134,10 @@ public struct MetricSummaryCard: View {
                 .padding(.top, verticalPadding)
                 .padding(.bottom, verticalPadding)
         }
-        .systemBGlassSurface(
-            cornerRadius: theme.radius.card,
-            tint: theme.colors.text,
-            tintOpacity: reduceTransparency ? 0 : 0.025,
-            borderColor: theme.colors.border,
-            borderOpacity: 0.85,
-            shadowOpacity: 0.18,
-            shadowRadius: 6,
-            shadowY: 4
-        )
+        .background(theme.colors.surface, in: shape)
+        .overlay {
+            shape.stroke(theme.colors.border.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
+        }
         .contentShape(shape)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
@@ -159,7 +153,7 @@ public struct MetricSummaryCard: View {
                     .foregroundStyle(accentColor.opacity(0.8))
 
                 Text(titleText)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(accentColor.opacity(0.8))
                     .lineLimit(1)
             }

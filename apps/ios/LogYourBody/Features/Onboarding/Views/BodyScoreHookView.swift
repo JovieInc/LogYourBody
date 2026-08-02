@@ -5,19 +5,23 @@ struct BodyScoreHookView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let bulletItems: [OnboardingBulletItem] = [
-        .init(iconName: "chart.xyaxis.line", text: "Track weight, body fat, and FFMI together."),
-        .init(iconName: "person.3", text: "See where you land vs similar bodies."),
-        .init(iconName: "arrow.triangle.2.circlepath", text: "Update your score anytime as you progress.")
+        .init(iconName: "scalemass", text: "Your latest weight"),
+        .init(iconName: "percent", text: "A measured or estimated body-fat value"),
+        .init(iconName: "ruler", text: "Your height for a frame-adjusted comparison")
     ]
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Get your Body Score in 60 seconds.",
-            subtitle: "See your muscle, body fat, and FFMI in one score.",
+            title: "See what’s changing.",
+            subtitle: "Use weight, body fat, and height to build your first Body Score in about 60 seconds.",
             showsBackButton: false,
-            progress: viewModel.progress(for: .hook)
+            progress: viewModel.progress(for: .hook),
+            screen: .bodyScoreIntro
         ) {
             VStack(spacing: JovieTokens.sectionGap) {
+                BodyScoreContourField()
+                    .frame(height: 190)
+
                 OnboardingBulletList(items: bulletItems)
             }
         } footer: {
@@ -25,7 +29,7 @@ struct BodyScoreHookView: View {
                 Button {
                     viewModel.goToNextStep()
                 } label: {
-                    Text("Start my 60-sec Body Score")
+                    Text("Build my Body Score")
                 }
                 .accessibilityIdentifier("body_score_onboarding_start_button")
                 .buttonStyle(OnboardingPrimaryButtonStyle())
@@ -37,6 +41,44 @@ struct BodyScoreHookView: View {
                 }
             }
         }
+    }
+}
+
+private struct BodyScoreContourField: View {
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Canvas { context, size in
+            let center = CGPoint(x: size.width * 0.5, y: size.height * 0.52)
+            let maximum = min(size.width, size.height) * 0.82
+
+            for ring in 0..<9 {
+                let progress = CGFloat(ring) / 8
+                let width = maximum * (0.2 + progress * 0.8)
+                let height = width * (0.58 + progress * 0.18)
+                let rect = CGRect(
+                    x: center.x - width / 2,
+                    y: center.y - height / 2,
+                    width: width,
+                    height: height
+                )
+                let color = ring.isMultiple(of: 2) ? theme.colors.info : theme.colors.accentPink
+                context.stroke(
+                    Path(ellipseIn: rect),
+                    with: .color(color.opacity(0.14 + Double(8 - ring) * 0.016)),
+                    lineWidth: ring == 0 ? 1.5 : 1
+                )
+            }
+        }
+        .background {
+            RadialGradient(
+                colors: [theme.colors.info.opacity(JovieTokens.ambientAccentOpacity), .clear],
+                center: .center,
+                startRadius: 4,
+                endRadius: 150
+            )
+        }
+        .accessibilityHidden(true)
     }
 }
 

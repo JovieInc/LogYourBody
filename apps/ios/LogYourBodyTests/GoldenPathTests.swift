@@ -5,7 +5,7 @@
 // THE GOLDEN PATH GATE.
 //
 // The one journey that must always work for a paying user:
-//   Launch → Sign in (email OTP) → Subscribe (Premium) → Log today's weight
+//   Launch → Continue with Apple → Subscribe (Premium) → Log today's weight
 //   → See it on the timeline → It survives offline and syncs.
 //
 // Canonical definition: docs/GOLDEN_PATH.md. Every test maps to a stage

@@ -33,7 +33,7 @@ struct BodyScoreGaugeView: View {
 
             VStack(spacing: 0) {
                 Text(scoreText)
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                    .font(.system(size: 42, weight: .bold, design: .default))
                     .foregroundColor(.white)
                     .monospacedDigit()
                     .minimumScaleFactor(0.65)
@@ -62,8 +62,7 @@ struct DashboardBodyScoreHeroCard: View {
     let onTapWeight: (() -> Void)?
 
     var body: some View {
-        HeroGlassCard {
-            VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 22) {
                 gaugeAndSummary
 
                 HStack(spacing: 12) {
@@ -84,9 +83,13 @@ struct DashboardBodyScoreHeroCard: View {
                     )
                 }
                 .accessibilityIdentifier("dashboard_body_score_hero_stats")
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.jovieSurface, in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
+                .stroke(Color.jovieHairline.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
         }
         .accessibilityIdentifier("dashboard_body_score_hero")
     }
@@ -146,7 +149,7 @@ struct DashboardBodyScoreHeroCard: View {
                 .lineLimit(1)
 
             Text(value)
-                .font(.system(size: 19, weight: .bold, design: .rounded))
+                .font(.system(size: 19, weight: .bold, design: .default))
                 .foregroundColor(Color.liquidTextPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)

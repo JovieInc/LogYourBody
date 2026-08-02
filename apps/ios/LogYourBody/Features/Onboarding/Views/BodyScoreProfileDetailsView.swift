@@ -198,6 +198,7 @@ struct BodyScoreProfileDetailsView: View {
                 }
             },
             progress: viewModel.progress(for: .profileDetails),
+            screen: .completeProfile,
             content: {
                 VStack(spacing: JovieTokens.sectionGap) {
                     switch viewModel.profileDetailsActiveSubstep {
