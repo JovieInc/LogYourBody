@@ -130,6 +130,34 @@ struct OnboardingTextButton: View {
     }
 }
 
+/// The shared disclosure affordance for short onboarding explanations.
+/// Keep the label, icon, hit target, and expanded state consistent across pages.
+struct OnboardingDisclosureLink: View {
+    @Environment(\.theme)
+    private var theme
+
+    let title: String
+    let isExpanded: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: theme.spacing.xs) {
+                Image(systemName: "questionmark.circle")
+                    .font(theme.typography.captionLarge.weight(.semibold))
+
+                Text(title)
+                    .font(theme.typography.captionLarge)
+            }
+            .foregroundStyle(theme.colors.primary)
+        }
+        .buttonStyle(.plain)
+        .jovieTouchTarget()
+        .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+        .accessibilityHint(isExpanded ? "Hides more information." : "Shows more information.")
+    }
+}
+
 // MARK: - Supporting Atoms
 
 struct OnboardingBulletItem: Identifiable, Hashable {
@@ -195,7 +223,7 @@ struct OnboardingCard<Content: View>: View {
 
     var body: some View {
         content
-            .padding(20)
+            .padding(theme.spacing.md)
             .systemBGlassSurface(
                 cornerRadius: theme.radius.card,
                 tint: theme.colors.text,
