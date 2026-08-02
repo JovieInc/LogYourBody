@@ -705,6 +705,21 @@ final class LogYourBodyUITests: XCTestCase {
     func testLaunchQualityGateCapturesCriticalSurfaces() throws {
         let app = XCUIApplication()
 
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture"
+        ])
+        XCTAssertTrue(app.descendants(matching: .any)["chat_first_root"].waitForExistence(timeout: 12))
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
+        app.swipeLeft()
+        XCTAssertTrue(app.descendants(matching: .any)["chat_sidebar"].waitForExistence(timeout: 5))
+        let timelineLink = app.buttons["chat_timeline_link"]
+        XCTAssertTrue(timelineLink.waitForExistence(timeout: 5))
+        XCTAssertTrue(timelineLink.isHittable)
+        timelineLink.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
+        attachScreenshot(named: "launch-quality-chat-sidebar-timeline", from: app)
+
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
         try assertAndCaptureOnboardingFixedCTA(in: app)
 

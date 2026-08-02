@@ -780,7 +780,7 @@ struct LaunchTimelineSurface: View {
 
     private func launchAccessibilityMarker(id: String, label: String) -> some View {
         Color.clear
-            .frame(width: 1, height: 1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement()
             .accessibilityLabel(label)
             .accessibilityIdentifier(id)
@@ -803,8 +803,8 @@ struct LaunchTimelineSurface: View {
 
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.04),
-                    Color.black.opacity(0.68)
+                    theme.colors.background.opacity(0.04),
+                    theme.colors.background.opacity(0.68)
                 ],
                 startPoint: .top,
                 endPoint: .bottom

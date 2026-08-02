@@ -26,11 +26,11 @@ final class GoldenPathTests: XCTestCase {
 
     // MARK: - Stage 1 · Launch: pinned surface, sign-in method, entitlement
 
-    func testGP1_PaidSurfaceIsPhotoTimelineHUD() {
+    func testGP1_PaidSurfaceIsChatFirst() {
         XCTAssertEqual(
             PaidAppSurfacePolicy.surface(),
-            .photoTimelineHUD,
-            "Paid home surface is pinned to the photo timeline HUD; changing it must update docs/GOLDEN_PATH.md"
+            .chatFirst,
+            "Paid home surface is pinned to authenticated chat; changing it must update docs/GOLDEN_PATH.md"
         )
     }
 
@@ -260,8 +260,8 @@ final class GoldenPathTests: XCTestCase {
     // MARK: - Stage 7 · The full journey, end to end
 
     func testGP7_FullGoldenPathEndToEnd() {
-        // 1. Launch: the paid surface is the photo timeline HUD.
-        XCTAssertEqual(PaidAppSurfacePolicy.surface(), .photoTimelineHUD)
+        // 1. Launch: authenticated chat, with Timeline available from its sidebar.
+        XCTAssertEqual(PaidAppSurfacePolicy.surface(), .chatFirst)
 
         // 2-3. Sign in + subscribe: gates open only when every requirement is met.
         let user = makeCompleteUser()

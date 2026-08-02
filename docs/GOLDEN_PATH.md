@@ -1,8 +1,8 @@
 # The LogYourBody Golden Path
 
-**One sentence:** A paying user can launch the app, continue with Apple, subscribe,
-log today's weight, immediately see it on their body timeline, and trust that it survives —
-offline, across launches, and through sync.
+**One sentence:** A paying user can launch into authenticated chat, continue with Apple,
+subscribe, log today's weight, immediately see it on their body timeline, ask about the
+authorized trend, and trust that the data survives — offline, across launches, and through sync.
 
 This is the entire value loop of the product. LogYourBody is a paid iOS app with a single
 promise: _log your body, see your progress_. If any stage below breaks, a paying user gets
@@ -25,7 +25,7 @@ Golden Path gate (`GoldenPathTests`) must stay green on every commit to `main`.
 
 | #   | Stage           | Contract                                                                                                                                                                                                                                                    | Enforced by                                                                                |
 | --- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| 1   | **Launch**      | The app boots to the pinned paid surface (photo timeline HUD); Apple is the only primary sign-in method; the RevenueCat entitlement is `Premium`.                                                                                                           | `GoldenPathTests` GP1                                                                      |
+| 1   | **Launch**      | The app boots to authenticated chat with the Timeline available from its sidebar; Apple is the only primary sign-in method; the RevenueCat entitlement is `Premium`.                                                                                        | `GoldenPathTests` GP1; launch-quality chat/sidebar XCUITests                               |
 | 2   | **Sign in**     | An unauthenticated user can never reach the paid surface; a profile is "complete" only with name + DOB + height + gender.                                                                                                                                   | `GoldenPathTests` GP2                                                                      |
 | 3   | **Subscribe**   | An unsubscribed user is gated; a fully qualified user (authed + onboarded + complete profile + subscribed) passes every gate; trial→paid emits the conversion event.                                                                                        | `GoldenPathTests` GP3                                                                      |
 | 4   | **Log weight**  | Valid weights (70–660 lbs / 32–300 kg) save; garbage and out-of-range input is rejected with a plain-language message; no double-submit while saving.                                                                                                       | `GoldenPathTests` GP4                                                                      |

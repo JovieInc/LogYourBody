@@ -282,8 +282,8 @@ fi
   printf '# iOS Launch Quality Audit\n\n'
   printf -- '- Destination: `%s`\n' "$DESTINATION"
   printf -- '- Static UI regression audit: `launch-ui-regression-audit.md`\n'
-  printf -- '- Unit coverage: photo timeline HUD policy, Body Score share card layout\n'
-  printf -- '- UI coverage: timeline routing, no bottom stats switch card, home/analytics/onboarding/share screenshot attachments\n'
+  printf -- '- Unit coverage: chat-first launch policy, photo timeline HUD availability, Body Score share card layout\n'
+  printf -- '- UI coverage: chat launch/sidebar/Timeline routing, no bottom stats switch card, home/analytics/onboarding/share screenshot attachments\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
   printf -- '- Build strategy: one `build-for-testing`, unit selectors in one `test-without-building` run, and one composite launch-quality UI selector that captures all required screenshot surfaces with simulator parallelism disabled\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
