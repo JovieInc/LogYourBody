@@ -6,6 +6,14 @@ import SwiftUI
 import Foundation
 import UIKit
 
+enum PreferencesProfileEditor: String, Identifiable {
+    case fullName
+    case dateOfBirth
+    case height
+
+    var id: String { rawValue }
+}
+
 struct PreferencesView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.openURL) var openURL
@@ -29,7 +37,13 @@ struct PreferencesView: View {
     @State var restoreAlertMessage = ""
     @State var isRestoringPurchases = false
     @State var activeGoalEditor: PreferenceGoalKind?
-    @State var isShowingProfileSettings = false
+    @State var activeProfileEditor: PreferencesProfileEditor?
+    @State var profileEditorName = ""
+    @State var profileEditorDateOfBirth = Date()
+    @State var profileEditorHeightCm = 170
+    @State var profileEditorUsesMetricHeight = false
+    @State var profileEditorHasChanges = false
+    @State var profileEditorErrorMessage: String?
     @State var isUploadingPhoto = false
     @State var avatarUploadProgress = 0.0
     @State var profileImageURL: String?
@@ -106,14 +120,44 @@ struct PreferencesView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .sheet(isPresented: $isShowingProfileSettings) {
-            NavigationStack {
-                ProfileSettingsViewV2()
-                    .environmentObject(authManager)
+        .sheet(item: $activeProfileEditor) { editor in
+            switch editor {
+            case .fullName:
+                ProfileNameEditorSheet(
+                    name: $profileEditorName,
+                    hasChanges: $profileEditorHasChanges,
+                    onCommit: saveProfileName
+                )
+            case .dateOfBirth:
+                DatePickerSheet(
+                    date: $profileEditorDateOfBirth,
+                    hasChanges: $profileEditorHasChanges,
+                    onCommit: saveProfileDateOfBirth
+                )
+            case .height:
+                ProfileHeightPickerSheet(
+                    heightCm: $profileEditorHeightCm,
+                    useMetric: $profileEditorUsesMetricHeight,
+                    hasChanges: $profileEditorHasChanges,
+                    onCommit: saveProfileHeight
+                )
             }
         }
         .sheet(item: $activeGoalEditor) { goal in
             goalEditorSheet(for: goal)
+        }
+        .alert(
+            "Couldn’t save profile field",
+            isPresented: Binding(
+                get: { profileEditorErrorMessage != nil },
+                set: { if !$0 { profileEditorErrorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                profileEditorErrorMessage = nil
+            }
+        } message: {
+            Text(profileEditorErrorMessage ?? "Check your connection and try again.")
         }
         .onAppear {
             migrateLegacyWeightGoalIfNeeded()

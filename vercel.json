@@ -6,6 +6,12 @@
   "installCommand": "node -v && corepack enable && corepack prepare pnpm@10.34.1 --activate && pnpm install --no-frozen-lockfile",
   "devCommand": "pnpm --filter apps/web dev",
   "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/internal/chat-retention",
+      "schedule": "17 4 * * *"
+    }
+  ],
   "git": {
     "deploymentEnabled": false
   },

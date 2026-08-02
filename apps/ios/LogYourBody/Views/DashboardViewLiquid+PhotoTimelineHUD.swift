@@ -4,55 +4,50 @@ extension DashboardViewLiquid {
     // MARK: - Photo Timeline HUD
 
     var photoTimelineHUD: some View {
-        GeometryReader { geometry in
-            let viewportWidth = max(1, geometry.size.width)
-            let heroHorizontalInset: CGFloat = 10
-            let heroWidth = max(1, viewportWidth - heroHorizontalInset * 2)
+        ZStack(alignment: .topLeading) {
+            timelineAccessibilityMarker(id: "photo_timeline_hud", label: "Timeline overview")
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 12) {
-                    compactHeader
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
+            Group {
+                if let metric = currentMetric {
+                    let bodyScore = bodyScoreText()
 
-                    syncStatusBanner
-                        .padding(.horizontal, 20)
-
-                    homeModeSwitch
-                        .padding(.horizontal, 20)
-
-                    if let metric = currentMetric {
-                        homeTimelineHero(metric: metric)
-                            .frame(width: heroWidth, alignment: .top)
-                            .clipped()
-                    }
-
-                    hudTimelineSection
-                        .padding(.horizontal, 20)
-
-                    if isGlp1WeeklyCheckInEnabled {
-                        hudGlp1WeeklyCheckIn
-                            .padding(.horizontal, 20)
-                    }
-
-                    if isPhaseInsightEnabled {
-                        hudPhaseInsight
-                            .padding(.horizontal, 20)
-                    }
+                    LaunchTimelineSurface(
+                        metric: metric,
+                        bodyMetrics: bodyMetrics,
+                        selectedIndex: $selectedIndex,
+                        dateText: formatHUDDate(metric.date),
+                        bodyScoreText: bodyScore.scoreText,
+                        bodyScoreTagline: bodyScore.tagline,
+                        bodyScoreDeltaText: heroBodyScoreDeltaText(),
+                        weightValue: heroWeightValue(),
+                        weightCaption: heroWeightCaption(),
+                        bodyFatValue: heroBodyFatValue(),
+                        bodyFatCaption: heroBodyFatCaption(),
+                        ffmiValue: heroFFMIValue(),
+                        ffmiCaption: heroFFMICaption(),
+                        onTapBodyScore: bodyScore.score > 0 ? {
+                            selectedMetricType = .bodyScore
+                            isMetricDetailActive = true
+                        } : nil,
+                        onTapWeight: {
+                            selectedMetricType = .weight
+                            isMetricDetailActive = true
+                        },
+                        onTapBodyFat: {
+                            selectedMetricType = .bodyFat
+                            isMetricDetailActive = true
+                        },
+                        onTapFFMI: {
+                            selectedMetricType = .ffmi
+                            isMetricDetailActive = true
+                        },
+                        onShareBodyScore: makeBodyScoreShareAction(metric: metric, score: bodyScore.score)
+                    )
+                } else {
+                    photoTimelineHUDEmptyState
                 }
-                .frame(width: viewportWidth, alignment: .top)
-                .padding(.bottom, 28)
-            }
-            .scrollBounceBehavior(.basedOnSize)
-            .refreshable {
-                await viewModel.refreshData(
-                    authManager: authManager,
-                    realtimeSyncManager: realtimeSyncManager
-                )
-                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
             }
         }
-        .accessibilityIdentifier("photo_timeline_hud")
         .worldClassScreen(.home)
     }
 
@@ -67,18 +62,24 @@ extension DashboardViewLiquid {
                 switch selectedPhotoTimelineRootPage {
                 case .timeline:
                     ZStack {
+                        timelineAccessibilityMarker(
+                            id: "photo_timeline_root_page_timeline",
+                            label: "Timeline page"
+                        )
                         if bodyMetrics.isEmpty {
                             photoTimelineHUDEmptyState
                         } else {
                             photoTimelineHUD
                         }
                     }
-                    .accessibilityIdentifier("photo_timeline_root_page_timeline")
                 case .analytics:
                     ZStack {
+                        timelineAccessibilityMarker(
+                            id: "photo_timeline_root_page_analytics",
+                            label: "Stats page"
+                        )
                         photoTimelineAnalyticsPage
                     }
-                        .accessibilityIdentifier("photo_timeline_root_page_analytics")
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -96,7 +97,18 @@ extension DashboardViewLiquid {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityIdentifier("photo_timeline_root_nav")
+        .overlay(alignment: .topLeading) {
+            timelineAccessibilityMarker(id: "photo_timeline_root_nav", label: "Timeline navigation")
+        }
+    }
+
+    private func timelineAccessibilityMarker(id: String, label: String) -> some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .accessibilityElement()
+            .accessibilityLabel(label)
+            .accessibilityIdentifier(id)
+            .allowsHitTesting(false)
     }
 
     private func photoTimelineRootNavigationButton(page: PhotoTimelineRootPage) -> some View {

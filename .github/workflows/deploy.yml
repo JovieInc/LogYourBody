@@ -159,6 +159,26 @@ jobs:
       - name: Pull Vercel environment
         run: pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
 
+      - name: Verify authenticated chat runtime configuration
+        run: |
+          env_file=.vercel/.env.production.local
+          test -f "$env_file"
+          missing_variables=0
+          for required_variable in DATABASE_URL OPENAI_API_KEY CRON_SECRET; do
+            if ! rg --quiet "^${required_variable}=" "$env_file"; then
+              echo "::error::Missing required Vercel production variable: $required_variable"
+              missing_variables=1
+            fi
+          done
+          test "$missing_variables" -eq 0
+
+      - name: Apply product database migrations
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          test -n "$DATABASE_URL"
+          pnpm --filter logyourbody db:apply:neon
+
       - name: Build Vercel output
         run: pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN"
 

@@ -24,6 +24,16 @@ extension DashboardViewLiquid {
                         .padding(.horizontal, JovieTokens.screenInset)
 
                     metricsView
+
+                    if isGlp1WeeklyCheckInEnabled {
+                        hudGlp1WeeklyCheckIn
+                            .padding(.horizontal, JovieTokens.screenInset)
+                    }
+
+                    if isPhaseInsightEnabled {
+                        hudPhaseInsight
+                            .padding(.horizontal, JovieTokens.screenInset)
+                    }
                 }
                 .padding(.top, JovieTokens.itemGap)
                 .padding(.bottom, JovieTokens.sectionGap)

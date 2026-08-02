@@ -12,19 +12,42 @@ struct MainTabView: View {
     @State private var selectedSurface: PaidAppSurface = PaidAppSurfacePolicy.surface()
 
     var body: some View {
-        NavigationStack {
-            switch selectedSurface {
-            case .photoTimelineHUD:
-                DashboardViewLiquid(layoutMode: .photoTimelineHUD)
-            case .legacyFullDashboardBeta:
-                DashboardViewLiquid(layoutMode: .legacyTabbed)
-            case .weightLoggerMVP:
-                PaidWeightLoggerMVPView()
+        Group {
+            if shouldOpenChatFirst {
+                ChatFirstRootView()
+            } else {
+                NavigationStack {
+                    switch selectedSurface {
+                    case .chatFirst:
+                        ChatFirstRootView()
+                    case .photoTimelineHUD:
+                        DashboardViewLiquid(layoutMode: .photoTimelineHUD)
+                    case .legacyFullDashboardBeta:
+                        DashboardViewLiquid(layoutMode: .legacyTabbed)
+                    case .weightLoggerMVP:
+                        PaidWeightLoggerMVPView()
+                    }
+                }
             }
         }
         .onAppear {
             updateSelectedSurface()
         }
+    }
+
+    private var shouldOpenChatFirst: Bool {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-lybUITestChatFirstFixture") {
+            return true
+        }
+
+        if arguments.contains(where: { $0.hasPrefix("-lybUITest") }) {
+            return false
+        }
+        #endif
+
+        return true
     }
 
     private func updateSelectedSurface() {
@@ -633,5 +656,837 @@ private struct PaidWeightLoggerMVPView: View {
         MainTabView()
             .environmentObject(AuthManager())
             .environmentObject(RealtimeSyncManager.shared)
+    }
+}
+
+private struct ChatMessage: Identifiable, Equatable {
+    enum Role: Equatable {
+        case assistant
+        case user
+    }
+
+    enum Delivery: Equatable {
+        case complete
+        case sending
+        case failed
+        case stopped
+    }
+
+    var id: String
+    let role: Role
+    var text: String
+    let clientMessageId: String?
+    let replyToClientMessageId: String?
+    var delivery: Delivery
+
+    static let welcome = ChatMessage(
+        id: "chat-welcome",
+        role: .assistant,
+        text: "Ask about your measurements, trends, or progress photos. " +
+            "I’ll use only the body context authorized for your account.",
+        clientMessageId: nil,
+        replyToClientMessageId: nil,
+        delivery: .complete
+    )
+
+    init(
+        id: String = UUID().uuidString,
+        role: Role,
+        text: String,
+        clientMessageId: String? = nil,
+        replyToClientMessageId: String? = nil,
+        delivery: Delivery = .complete
+    ) {
+        self.id = id
+        self.role = role
+        self.text = text
+        self.clientMessageId = clientMessageId
+        self.replyToClientMessageId = replyToClientMessageId
+        self.delivery = delivery
+    }
+}
+
+private struct FailedChatTurn: Equatable {
+    let message: String
+    let clientMessageId: String
+}
+
+private enum ChatDestination: Hashable {
+    case timeline
+    case settings
+}
+
+@MainActor
+private struct ChatFirstRootView: View {
+    @EnvironmentObject private var authManager: AuthManager
+    @Environment(\.theme) private var theme
+    @State private var path: [ChatDestination] = []
+    @State private var isSidebarPresented = false
+    @State private var draft = ""
+    @State private var isResponding = false
+    @State private var isLoadingConversation = true
+    @State private var messages: [ChatMessage] = [.welcome]
+    @State private var conversationId = UUID().uuidString
+    @State private var currentRequestTask: Task<Void, Never>?
+    @State private var activeClientMessageId: String?
+    @State private var requestGeneration: UUID?
+    @State private var failedTurn: FailedChatTurn?
+    @State private var chatErrorMessage: String?
+    @State private var isConversationLoadRetryAvailable = false
+    @State private var isDeleteConfirmationPresented = false
+    @FocusState private var isComposerFocused: Bool
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            ZStack(alignment: .leading) {
+                accessibilityMarker(id: "chat_first_root", label: "Chat")
+                chatSurface
+
+                if isSidebarPresented {
+                    Color.black.opacity(0.42)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeOut(duration: 0.22)) {
+                                isSidebarPresented = false
+                            }
+                        }
+
+                    chatSidebar
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
+            }
+            .background(theme.colors.background.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: ChatDestination.self) { destination in
+                switch destination {
+                case .timeline:
+                    DashboardViewLiquid(layoutMode: .photoTimelineHUD)
+                        .toolbar(.hidden, for: .tabBar)
+                case .settings:
+                    PreferencesView()
+                        .environmentObject(authManager)
+                        .toolbar(.hidden, for: .tabBar)
+                }
+            }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 24, coordinateSpace: .local)
+                    .onEnded(handleSidebarGesture)
+            )
+            .task(id: authManager.currentUser?.id) {
+                await loadLatestConversation()
+            }
+            .onDisappear {
+                currentRequestTask?.cancel()
+            }
+            .alert("Delete this chat?", isPresented: $isDeleteConfirmationPresented) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
+                    deleteCurrentConversation()
+                }
+            } message: {
+                Text("This permanently removes the conversation from LogYourBody.")
+            }
+        }
+    }
+
+    private var chatSurface: some View {
+        VStack(spacing: 0) {
+            chatMessages
+            starterPrompts
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            chatHeader
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            composer
+        }
+        .background(theme.colors.background.ignoresSafeArea())
+    }
+
+    private var chatHeader: some View {
+        HStack(spacing: 12) {
+            Button {
+                withAnimation(.easeOut(duration: 0.22)) {
+                    isSidebarPresented = true
+                }
+            } label: {
+                Image(systemName: "sidebar.leading")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(theme.colors.text)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open sidebar")
+            .accessibilityHint("Shows Timeline, Settings, and profile controls")
+            .accessibilityIdentifier("chat_sidebar_button")
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("LogYourBody")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(theme.colors.text)
+
+                Text("Private body chat")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(theme.colors.textSecondary)
+            }
+
+            Spacer(minLength: 0)
+
+            if isLoadingConversation {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(theme.colors.textSecondary)
+                    .accessibilityLabel("Loading conversation")
+            } else {
+                Circle()
+                    .fill(chatErrorMessage == nil ? theme.colors.accentTeal : Color.orange)
+                    .frame(width: 8, height: 8)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(theme.colors.border.opacity(0.55))
+                .frame(height: 1)
+        }
+    }
+
+    private var chatMessages: some View {
+        ScrollViewReader { proxy in
+            ScrollView(showsIndicators: false) {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    if isLoadingConversation {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(theme.colors.textSecondary)
+
+                            Text("Loading your conversation")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(theme.colors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                        .accessibilityIdentifier("chat_loading_state")
+                    }
+
+                    ForEach(messages) { message in
+                        if !message.text.isEmpty {
+                            ChatBubble(message: message)
+                                .id(message.id)
+                        }
+                    }
+
+                    if isResponding {
+                        HStack(spacing: 6) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                Circle()
+                                    .fill(theme.colors.textSecondary)
+                                    .frame(width: 5, height: 5)
+                            }
+                        }
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 13)
+                        .background(theme.colors.surface, in: Capsule())
+                        .accessibilityLabel("Thinking")
+                        .accessibilityIdentifier("chat_thinking_indicator")
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 12)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: messages.count) { _, _ in
+                guard let lastID = messages.last?.id else { return }
+                withAnimation(.easeOut(duration: 0.24)) {
+                    proxy.scrollTo(lastID, anchor: .bottom)
+                }
+            }
+            .onChange(of: isResponding) { _, responding in
+                guard responding else { return }
+                if let lastID = messages.last?.id {
+                    withAnimation(.easeOut(duration: 0.24)) {
+                        proxy.scrollTo(lastID, anchor: .bottom)
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("chat_messages")
+    }
+
+    private var starterPrompts: some View {
+        VStack(spacing: 0) {
+            if let chatErrorMessage {
+                HStack(alignment: .center, spacing: 10) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(Color.orange)
+
+                    Text(chatErrorMessage)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Spacer(minLength: 0)
+
+                    if failedTurn != nil {
+                        Button("Retry", action: retryFailedTurn)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(theme.colors.text)
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("chat_retry_button")
+                    } else if isConversationLoadRetryAvailable {
+                        Button("Retry") {
+                            Task { await loadLatestConversation() }
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.colors.text)
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("chat_reload_button")
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(theme.colors.surface.opacity(0.92))
+                .accessibilityElement(children: .contain)
+            }
+
+            if messages == [.welcome] && !isComposerFocused && !isLoadingConversation {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        starterPrompt("How am I doing?")
+                        starterPrompt("Summarize my trend")
+                        starterPrompt("What changed recently?")
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                }
+                .transition(.opacity)
+            }
+        }
+    }
+
+    private func starterPrompt(_ text: String) -> some View {
+        Button(text) {
+            send(text)
+        }
+        .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(theme.colors.text)
+        .padding(.horizontal, 13)
+        .frame(minHeight: 38)
+        .background(theme.colors.surface, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(theme.colors.border, lineWidth: 1)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var composer: some View {
+        HStack(spacing: 10) {
+            TextField("Message LogYourBody", text: $draft, axis: .vertical)
+                .lineLimit(1...4)
+                .focused($isComposerFocused)
+                .font(.system(size: 16))
+                .foregroundStyle(theme.colors.text)
+                .tint(theme.colors.primary)
+                .submitLabel(.send)
+                .onSubmit {
+                    send(draft)
+                }
+                .accessibilityIdentifier("chat_composer")
+
+            Button {
+                if isResponding {
+                    stopResponse()
+                } else {
+                    send(draft)
+                }
+            } label: {
+                Image(systemName: isResponding ? "stop.fill" : "arrow.up")
+                    .font(.system(size: isResponding ? 11 : 15, weight: .bold))
+                    .foregroundStyle(
+                        (canSend || isResponding) ? theme.colors.background : theme.colors.textTertiary
+                    )
+                    .frame(width: 34, height: 34)
+                    .background(
+                        (canSend || isResponding) ? theme.colors.text : theme.colors.surface,
+                        in: Circle()
+                    )
+            }
+            .disabled((!canSend && !isResponding) || isLoadingConversation)
+            .buttonStyle(.plain)
+            .accessibilityLabel(isResponding ? "Stop answer" : "Send message")
+            .accessibilityIdentifier("chat_send_button")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(theme.colors.border.opacity(0.55))
+                .frame(height: 1)
+        }
+        .animation(.easeOut(duration: 0.18), value: canSend)
+    }
+
+    private var chatSidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Text("LogYourBody")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(theme.colors.text)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    withAnimation(.easeOut(duration: 0.22)) {
+                        isSidebarPresented = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close sidebar")
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
+            .padding(.bottom, 18)
+
+            Text("Workspace")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(theme.colors.textSecondary)
+                .textCase(.uppercase)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 7)
+
+            sidebarButton(title: "Chat", icon: "bubble.left.and.bubble.right.fill") {
+                closeSidebar()
+            }
+
+            sidebarButton(title: "Timeline", icon: "photo.on.rectangle.angled") {
+                closeSidebar()
+                path.append(.timeline)
+            }
+            .accessibilityIdentifier("chat_timeline_link")
+
+            sidebarButton(title: "Settings", icon: "gearshape.fill") {
+                closeSidebar()
+                path.append(.settings)
+            }
+            .accessibilityIdentifier("chat_settings_link")
+
+            if messages.contains(where: { $0.role == .user }) {
+                sidebarButton(title: "Delete chat", icon: "trash") {
+                    closeSidebar()
+                    isDeleteConfirmationPresented = true
+                }
+                .accessibilityIdentifier("chat_delete_conversation_button")
+            }
+
+            Spacer(minLength: 0)
+
+            Text(
+                "Chats stay in LogYourBody for 30 days. A minimized body context is sent " +
+                    "to our model provider for each answer; it is never embedded or indexed."
+            )
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+        }
+        .frame(maxWidth: 306, maxHeight: .infinity, alignment: .topLeading)
+        .background(.regularMaterial)
+        .overlay(alignment: .trailing) {
+            Rectangle()
+                .fill(theme.colors.border.opacity(0.7))
+                .frame(width: 1)
+        }
+        .overlay(alignment: .topLeading) {
+            accessibilityMarker(id: "chat_sidebar", label: "Chat sidebar")
+        }
+    }
+
+    private func accessibilityMarker(id: String, label: String) -> some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .accessibilityElement()
+            .accessibilityLabel(label)
+            .accessibilityIdentifier(id)
+            .allowsHitTesting(false)
+    }
+
+    private func sidebarButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 13) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 22)
+
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(theme.colors.text)
+            .padding(.horizontal, 20)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !isLoadingConversation &&
+            !isResponding
+    }
+
+    private var chatService: ChatServicing {
+        AppServicePorts.chatService
+    }
+
+    private func closeSidebar() {
+        withAnimation(.easeOut(duration: 0.22)) {
+            isSidebarPresented = false
+        }
+    }
+
+    private func handleSidebarGesture(_ value: DragGesture.Value) {
+        let horizontalDistance = value.translation.width
+        guard abs(horizontalDistance) > 60 else { return }
+
+        if isSidebarPresented {
+            if horizontalDistance < 0 {
+                closeSidebar()
+            }
+        } else {
+            // Support the existing left-swipe muscle memory while also
+            // accepting the conventional leading-edge reveal gesture.
+            withAnimation(.easeOut(duration: 0.22)) {
+                isSidebarPresented = true
+            }
+        }
+    }
+
+    private func send(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !isResponding, !isLoadingConversation else { return }
+
+        let clientMessageId = UUID().uuidString
+        messages.append(
+            ChatMessage(
+                role: .user,
+                text: trimmed,
+                clientMessageId: clientMessageId,
+                delivery: .sending
+            )
+        )
+        draft = ""
+        isComposerFocused = false
+        startTurn(message: trimmed, clientMessageId: clientMessageId)
+    }
+
+    private func startTurn(message: String, clientMessageId: String) {
+        currentRequestTask?.cancel()
+        messages.removeAll { $0.replyToClientMessageId == clientMessageId }
+        if let userIndex = messages.firstIndex(where: { $0.clientMessageId == clientMessageId }) {
+            messages[userIndex].delivery = .sending
+        }
+        messages.append(
+            ChatMessage(
+                id: "stream-\(clientMessageId)",
+                role: .assistant,
+                text: "",
+                replyToClientMessageId: clientMessageId,
+                delivery: .sending
+            )
+        )
+
+        failedTurn = nil
+        chatErrorMessage = nil
+        isConversationLoadRetryAvailable = false
+        isResponding = true
+        activeClientMessageId = clientMessageId
+        let generation = UUID()
+        requestGeneration = generation
+        AppServicePorts.analyticsTracker.track(event: "chat_first_message_sent")
+
+        currentRequestTask = Task { @MainActor in
+            defer {
+                if requestGeneration == generation {
+                    isResponding = false
+                    activeClientMessageId = nil
+                    requestGeneration = nil
+                    currentRequestTask = nil
+                }
+            }
+
+            guard let accessToken = await chatAccessToken() else {
+                applyTurnFailure(
+                    ChatServiceError.authenticationExpired,
+                    message: message,
+                    clientMessageId: clientMessageId
+                )
+                return
+            }
+
+            do {
+                var completed = false
+                let stream = chatService.streamMessage(
+                    accessToken: accessToken,
+                    conversationId: conversationId,
+                    clientMessageId: clientMessageId,
+                    message: message
+                )
+
+                for try await event in stream {
+                    try Task.checkCancellation()
+                    switch event {
+                    case .metadata(let serverConversationId, _, _):
+                        conversationId = serverConversationId
+                    case .delta(let text):
+                        mutateAssistant(clientMessageId: clientMessageId) { assistant in
+                            assistant.text += text
+                        }
+                    case .completed(let messageId, _, _):
+                        mutateAssistant(clientMessageId: clientMessageId) { assistant in
+                            assistant.id = messageId
+                            assistant.delivery = .complete
+                        }
+                        if let userIndex = messages.firstIndex(where: { $0.clientMessageId == clientMessageId }) {
+                            messages[userIndex].delivery = .complete
+                        }
+                        completed = true
+                    case .failure(_, let message, let retryable):
+                        throw ChatServiceError.server(message: message, retryable: retryable)
+                    }
+                }
+
+                try Task.checkCancellation()
+                guard completed else { throw ChatServiceError.invalidResponse }
+                AppServicePorts.analyticsTracker.track(event: "chat_first_answer_completed")
+            } catch is CancellationError {
+                return
+            } catch let error as ChatServiceError {
+                applyTurnFailure(error, message: message, clientMessageId: clientMessageId)
+            } catch {
+                applyTurnFailure(
+                    ChatServiceError.server(
+                        message: "Chat is temporarily unavailable. Please try again.",
+                        retryable: true
+                    ),
+                    message: message,
+                    clientMessageId: clientMessageId
+                )
+            }
+        }
+    }
+
+    private func retryFailedTurn() {
+        guard let failedTurn, !isResponding else { return }
+        startTurn(message: failedTurn.message, clientMessageId: failedTurn.clientMessageId)
+    }
+
+    private func stopResponse() {
+        guard isResponding,
+              let clientMessageId = activeClientMessageId,
+              let userIndex = messages.firstIndex(where: { $0.clientMessageId == clientMessageId }) else {
+            isResponding = false
+            return
+        }
+
+        let failedMessage = messages[userIndex].text
+        let task = currentRequestTask
+        requestGeneration = nil
+        currentRequestTask = nil
+        task?.cancel()
+
+        mutateAssistant(clientMessageId: clientMessageId) { assistant in
+            assistant.delivery = .stopped
+        }
+        messages[userIndex].delivery = .stopped
+        failedTurn = FailedChatTurn(message: failedMessage, clientMessageId: clientMessageId)
+        chatErrorMessage = "Answer stopped. Retry when you’re ready."
+        isResponding = false
+        activeClientMessageId = nil
+        AppServicePorts.analyticsTracker.track(event: "chat_first_answer_cancelled")
+    }
+
+    private func mutateAssistant(
+        clientMessageId: String,
+        mutation: (inout ChatMessage) -> Void
+    ) {
+        guard let index = messages.firstIndex(where: {
+            $0.replyToClientMessageId == clientMessageId
+        }) else { return }
+        mutation(&messages[index])
+    }
+
+    private func applyTurnFailure(
+        _ error: ChatServiceError,
+        message: String,
+        clientMessageId: String
+    ) {
+        if let assistantIndex = messages.firstIndex(where: {
+            $0.replyToClientMessageId == clientMessageId
+        }) {
+            if messages[assistantIndex].text.isEmpty {
+                messages.remove(at: assistantIndex)
+            } else {
+                messages[assistantIndex].delivery = .failed
+            }
+        }
+        if let userIndex = messages.firstIndex(where: { $0.clientMessageId == clientMessageId }) {
+            messages[userIndex].delivery = .failed
+        }
+        if error != .authenticationExpired && error.isRetryable {
+            failedTurn = FailedChatTurn(message: message, clientMessageId: clientMessageId)
+        } else {
+            failedTurn = nil
+        }
+        isConversationLoadRetryAvailable = false
+        chatErrorMessage = error.localizedDescription
+        AppServicePorts.analyticsTracker.track(
+            event: "chat_first_answer_failed",
+            properties: ["retryable": error.isRetryable ? "true" : "false"]
+        )
+    }
+
+    private func loadLatestConversation() async {
+        currentRequestTask?.cancel()
+        isLoadingConversation = true
+        isConversationLoadRetryAvailable = false
+        defer { isLoadingConversation = false }
+
+        guard authManager.currentUser != nil,
+              let accessToken = await chatAccessToken() else {
+            chatErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
+            return
+        }
+
+        do {
+            guard let conversation = try await chatService.loadLatest(accessToken: accessToken) else {
+                messages = [.welcome]
+                conversationId = UUID().uuidString
+                return
+            }
+            conversationId = conversation.id
+            messages = conversation.messages.map { message in
+                ChatMessage(
+                    id: message.id,
+                    role: message.role == .user ? .user : .assistant,
+                    text: message.content,
+                    clientMessageId: message.clientMessageId,
+                    delivery: .complete
+                )
+            }
+            if messages.isEmpty { messages = [.welcome] }
+            chatErrorMessage = nil
+        } catch let error as ChatServiceError {
+            chatErrorMessage = error.localizedDescription
+            isConversationLoadRetryAvailable = error.isRetryable
+        } catch {
+            chatErrorMessage = "Your conversation could not be loaded. Please try again."
+            isConversationLoadRetryAvailable = true
+        }
+    }
+
+    private func deleteCurrentConversation() {
+        guard !isResponding else { return }
+        closeSidebar()
+
+        Task { @MainActor in
+            guard let accessToken = await chatAccessToken() else {
+                chatErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
+                return
+            }
+
+            do {
+                try await chatService.deleteConversation(
+                    accessToken: accessToken,
+                    conversationId: conversationId
+                )
+                messages = [.welcome]
+                conversationId = UUID().uuidString
+                failedTurn = nil
+                chatErrorMessage = nil
+                isConversationLoadRetryAvailable = false
+                AppServicePorts.analyticsTracker.track(event: "chat_first_conversation_deleted")
+            } catch let error as ChatServiceError {
+                chatErrorMessage = error.localizedDescription
+            } catch {
+                chatErrorMessage = "The chat could not be deleted. Please try again."
+            }
+        }
+    }
+
+    private func chatAccessToken() async -> String? {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestChatFirstFixture") {
+            return "ui-test-bearer-token"
+        }
+        #endif
+        return await authManager.getAccessToken()
+    }
+}
+
+private struct ChatBubble: View {
+    @Environment(\.theme) private var theme
+    let message: ChatMessage
+
+    var body: some View {
+        VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 5) {
+            HStack {
+                if message.role == .user {
+                    Spacer(minLength: 36)
+                }
+
+                Text(message.text)
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(message.role == .user ? theme.colors.background : theme.colors.text)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 15)
+                    .padding(.vertical, 12)
+                    .background(
+                        message.role == .user
+                            ? theme.colors.text
+                            : theme.colors.surface,
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    )
+                    .overlay {
+                        if message.role == .assistant {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .stroke(theme.colors.border, lineWidth: 1)
+                        }
+                    }
+                    .opacity(message.delivery == .failed ? 0.72 : 1)
+
+                if message.role == .assistant {
+                    Spacer(minLength: 36)
+                }
+            }
+
+            if message.delivery == .failed || message.delivery == .stopped {
+                Text(message.delivery == .stopped ? "Stopped" : "Not delivered")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(theme.colors.textTertiary)
+                    .padding(.horizontal, 8)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            message.role == .user
+                ? "You: \(message.text)"
+                : "LogYourBody: \(message.text)"
+        )
     }
 }

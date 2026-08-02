@@ -305,14 +305,161 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
 
-    func testPhotoHUDFixtureDefaultsToQuickAnswerWhenNoPhotoExists() throws {
+    func testPhotoHUDFixtureShowsFocusedNoPhotoTimelineWhenNoPhotoExists() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_quick_answer"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["No progress photo"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["dashboard_home_timeline_avatar"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["dashboard_home_timeline_photo_stage"].exists)
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
+    }
+
+    func testChatFirstLaunchKeepsSidebarAndTimelineFocused() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture"
+        ])
+
+        XCTAssertTrue(app.descendants(matching: .any)["chat_first_root"].waitForExistence(timeout: 12))
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
+
+        let window = app.windows.firstMatch
+        let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.48))
+        let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.48))
+        start.press(forDuration: 0.05, thenDragTo: end)
+
+        XCTAssertTrue(app.descendants(matching: .any)["chat_sidebar"].waitForExistence(timeout: 5))
+        app.buttons["Timeline"].tap()
+
+        let timeline = app.descendants(matching: .any)["launch_timeline_surface"]
+        XCTAssertTrue(timeline.waitForExistence(timeout: 12))
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_photo_strip"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
+        XCTAssertEqual(app.scrollViews.count, 1, "Timeline should expose only the horizontal photo strip scroll surface")
+        attachScreenshot(named: "chat-first-timeline-destination", from: app)
+    }
+
+    func testChatStreamsFixtureAnswer() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture"
+        ])
+
+        XCTAssertTrue(app.descendants(matching: .any)["chat_first_root"].waitForExistence(timeout: 12))
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        XCTAssertTrue(prompt.isHittable)
+        prompt.tap()
+
+        let answer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Your fixture trend is stable")
+        ).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 8))
+        XCTAssertTrue(answer.label.contains("Open Timeline to inspect the selected day."))
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_error_state"].exists)
+        attachScreenshot(named: "chat-stream-success", from: app)
+    }
+
+    func testChatProviderFailureShowsRetry() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatErrorFixture"
+        ])
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 12))
+        prompt.tap()
+
+        let error = app.staticTexts["The answer could not be completed."]
+        XCTAssertTrue(error.waitForExistence(timeout: 8))
+        let retry = app.buttons["chat_retry_button"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5))
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        attachScreenshot(named: "chat-provider-retry", from: app)
+    }
+
+    func testChatOfflineStateIsVisibleAndRetryable() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatOfflineFixture"
+        ])
+
+        let offlineCopy = app.staticTexts["You’re offline. Reconnect, then try again."]
+        XCTAssertTrue(offlineCopy.waitForExistence(timeout: 12))
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5))
+        prompt.tap()
+
+        let retry = app.buttons["chat_retry_button"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 8))
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        attachScreenshot(named: "chat-offline-retry", from: app)
+    }
+
+    func testChatCanCancelStreamingAnswer() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatSlowFixture"
+        ])
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 12))
+        prompt.tap()
+
+        let partialAnswer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Reviewing your authorized trend")
+        ).firstMatch
+        XCTAssertTrue(partialAnswer.waitForExistence(timeout: 5))
+
+        let stopButton = app.buttons["Stop answer"]
+        XCTAssertTrue(stopButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(stopButton.isHittable)
+        stopButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Answer stopped. Retry when you’re ready."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Stopped"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["chat_retry_button"].isHittable)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        attachScreenshot(named: "chat-stream-cancelled", from: app)
+    }
+
+    func testSettingsProfileFieldsOpenDirectEditors() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture"
+        ])
+
+        app.buttons["Open sidebar"].tap()
+        app.buttons["Settings"].tap()
+
+        let profileLink = app.buttons["settings_profile_link"]
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 10))
+        profileLink.tap()
+
+        let heightRow = app.buttons["settings_profile_height_row"]
+        XCTAssertTrue(heightRow.waitForExistence(timeout: 8))
+        heightRow.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["profile_height_editor"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Set Height"].exists)
+        XCTAssertFalse(app.navigationBars["Edit Profile"].exists)
+        attachScreenshot(named: "settings-profile-direct-height-editor", from: app)
     }
 
     func testAccessibilityDynamicTypeQuickAnswerReservesExpandedHeight() throws {
@@ -379,8 +526,8 @@ final class LogYourBodyUITests: XCTestCase {
         launch(app, with: launchArguments)
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
-        let home = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
-        XCTAssertTrue(home.waitForExistence(timeout: 10))
+        let timeline = app.descendants(matching: .any)["launch_timeline_surface"]
+        XCTAssertTrue(timeline.waitForExistence(timeout: 10))
 
         let windowFrame = app.windows.firstMatch.frame
         let homeViewportFrame = assertViewport(
@@ -388,19 +535,14 @@ final class LogYourBodyUITests: XCTestCase {
             expectedWidth: expectedViewportWidth,
             fallback: windowFrame
         )
-        let homeModeSwitch = app.descendants(matching: .any)["home_mode_switch"]
-        XCTAssertTrue(homeModeSwitch.waitForExistence(timeout: 5))
-        XCTAssertGreaterThanOrEqual(homeModeSwitch.frame.minX, homeViewportFrame.minX - 1)
-        XCTAssertLessThanOrEqual(homeModeSwitch.frame.maxX, homeViewportFrame.maxX + 1)
+        XCTAssertGreaterThanOrEqual(timeline.frame.minX, homeViewportFrame.minX - 1)
+        XCTAssertLessThanOrEqual(timeline.frame.maxX, homeViewportFrame.maxX + 1)
 
-        for mode in ["avatar", "photo"] {
-            let button = app.buttons["home_mode_\(mode)_button"]
-            XCTAssertTrue(button.waitForExistence(timeout: 5))
-            XCTAssertTrue(button.isHittable)
-            XCTAssertGreaterThanOrEqual(button.frame.height + 0.1, 44)
-            XCTAssertGreaterThanOrEqual(button.frame.minX, homeViewportFrame.minX - 1)
-            XCTAssertLessThanOrEqual(button.frame.maxX, homeViewportFrame.maxX + 1)
-        }
+        let strip = app.descendants(matching: .any)["launch_timeline_photo_strip"]
+        XCTAssertTrue(strip.waitForExistence(timeout: 5))
+        XCTAssertTrue(strip.isHittable)
+        XCTAssertGreaterThanOrEqual(strip.frame.minX, homeViewportFrame.minX - 1)
+        XCTAssertLessThanOrEqual(strip.frame.maxX, homeViewportFrame.maxX + 1)
         attachScreenshot(named: "\(screenshotPrefix)-home", from: app)
 
         // Start the detail surface from its deterministic analytics fixture so
@@ -465,14 +607,14 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
-        let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
-        XCTAssertTrue(hero.waitForExistence(timeout: 12))
+        let strip = app.descendants(matching: .any)["launch_timeline_photo_strip"]
+        XCTAssertTrue(strip.waitForExistence(timeout: 12))
 
         // Regression guard for JovieInc/Jovie#11350: a horizontal swipe on the
         // home visual must own date navigation — it must NOT flip the root
         // page to Stats/Analytics.
-        let start = hero.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.4))
-        let end = hero.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.4))
+        let start = strip.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        let end = strip.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: end)
 
         XCTAssertFalse(
@@ -544,14 +686,14 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestGlp1WeeklyCheckInFixture"
         ])
 
-        let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
-        XCTAssertTrue(hero.waitForExistence(timeout: 10))
+        let timeline = app.descendants(matching: .any)["launch_timeline_surface"]
+        XCTAssertTrue(timeline.waitForExistence(timeout: 10))
 
         let window = app.windows.firstMatch
         let windowFrame = window.frame
-        XCTAssertGreaterThan(hero.frame.width, windowFrame.width * 0.82)
-        XCTAssertGreaterThanOrEqual(hero.frame.minX, windowFrame.minX - 1)
-        XCTAssertLessThanOrEqual(hero.frame.maxX, windowFrame.maxX + 1)
+        XCTAssertGreaterThan(timeline.frame.width, windowFrame.width * 0.82)
+        XCTAssertGreaterThanOrEqual(timeline.frame.minX, windowFrame.minX - 1)
+        XCTAssertLessThanOrEqual(timeline.frame.maxX, windowFrame.maxX + 1)
 
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
         let statsButton = app.buttons["Stats"]
@@ -562,6 +704,21 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testLaunchQualityGateCapturesCriticalSurfaces() throws {
         let app = XCUIApplication()
+
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture"
+        ])
+        XCTAssertTrue(app.descendants(matching: .any)["chat_first_root"].waitForExistence(timeout: 12))
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
+        app.swipeLeft()
+        XCTAssertTrue(app.descendants(matching: .any)["chat_sidebar"].waitForExistence(timeout: 5))
+        let timelineLink = app.buttons["chat_timeline_link"]
+        XCTAssertTrue(timelineLink.waitForExistence(timeout: 5))
+        XCTAssertTrue(timelineLink.isHittable)
+        timelineLink.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
+        attachScreenshot(named: "launch-quality-chat-sidebar-timeline", from: app)
 
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
         try assertAndCaptureOnboardingFixedCTA(in: app)
@@ -619,7 +776,11 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestPhaseInsightFixture"
         ])
 
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 10))
+
+        let statsButton = app.buttons["Stats"]
+        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+        statsButton.tap()
 
         let insight = app.descendants(matching: .any)["photo_timeline_hud_phase_insight"]
         scrollUntilExists(insight, in: app)
@@ -641,6 +802,10 @@ final class LogYourBodyUITests: XCTestCase {
         ])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+
+        let statsButton = app.buttons["Stats"]
+        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+        statsButton.tap()
 
         let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
         scrollUntilExists(prompt, in: app)
@@ -760,17 +925,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
 
-        let avatarButton = app.buttons["home_mode_avatar_button"]
-        XCTAssertTrue(avatarButton.waitForExistence(timeout: 10))
-        if avatarButton.isHittable {
-            avatarButton.tap()
-        }
-
-        let photoButton = app.buttons["home_mode_photo_button"]
-        XCTAssertTrue(photoButton.waitForExistence(timeout: 5))
-        if photoButton.isHittable {
-            photoButton.tap()
-        }
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_photo_strip"].waitForExistence(timeout: 10))
 
         try exerciseTimelineRootNavigation(in: app)
     }
@@ -818,6 +973,7 @@ final class LogYourBodyUITests: XCTestCase {
             [
                 app.descendants(matching: .any)["photo_timeline_root_nav"],
                 app.descendants(matching: .any)["photo_timeline_root_page_timeline"],
+                app.descendants(matching: .any)["launch_timeline_surface"],
                 app.descendants(matching: .any)["dashboard_home_timeline_hero"],
                 app.buttons["Stats"],
                 app.staticTexts["Start with a photo"]
@@ -907,14 +1063,14 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func assertAndCaptureTimelineHomeSurface(in app: XCUIApplication) throws {
-        let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
-        XCTAssertTrue(hero.waitForExistence(timeout: 10))
+        let timeline = app.descendants(matching: .any)["launch_timeline_surface"]
+        XCTAssertTrue(timeline.waitForExistence(timeout: 10))
 
         let window = app.windows.firstMatch
         let windowFrame = window.frame
-        XCTAssertGreaterThan(hero.frame.width, windowFrame.width * 0.82)
-        XCTAssertGreaterThanOrEqual(hero.frame.minX, windowFrame.minX - 1)
-        XCTAssertLessThanOrEqual(hero.frame.maxX, windowFrame.maxX + 1)
+        XCTAssertGreaterThan(timeline.frame.width, windowFrame.width * 0.82)
+        XCTAssertGreaterThanOrEqual(timeline.frame.minX, windowFrame.minX - 1)
+        XCTAssertLessThanOrEqual(timeline.frame.maxX, windowFrame.maxX + 1)
 
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
         attachScreenshot(named: "launch-quality-home-timeline", from: app)
@@ -923,8 +1079,8 @@ final class LogYourBodyUITests: XCTestCase {
     private func assertAndCaptureBodyScoreShareSheet(in app: XCUIApplication) throws {
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
 
-        let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
-        XCTAssertTrue(hero.waitForExistence(timeout: 20))
+        let timeline = app.descendants(matching: .any)["launch_timeline_surface"]
+        XCTAssertTrue(timeline.waitForExistence(timeout: 20))
 
         let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
         XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
