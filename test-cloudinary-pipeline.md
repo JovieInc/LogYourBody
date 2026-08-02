@@ -6,17 +6,18 @@ First, verify the edge function is deployed:
 
 ```bash
 # Check if edge function is deployed
-npx supabase functions list
+supabase functions list
 
 # Deploy if needed
-npx supabase functions deploy process-progress-photo
+supabase functions deploy process-progress-photo
 ```
 
 ## 2. Check Environment Variables
 
 Ensure these are set in Supabase dashboard:
+
 - CLOUDINARY_CLOUD_NAME
-- CLOUDINARY_API_KEY  
+- CLOUDINARY_API_KEY
 - CLOUDINARY_API_SECRET
 
 ## 3. Test Upload Flow
@@ -35,7 +36,7 @@ Ensure these are set in Supabase dashboard:
    - Look for user_id/metrics_id_timestamp.jpg
 
 2. Check Cloudinary Dashboard:
-   - Look for processed images with background removed
+   - Look for processed images under `progress-photos/<user_id>/<metric_id>_<timestamp>`
 
 3. Check Database:
    - body_metrics table should have:
@@ -46,16 +47,19 @@ Ensure these are set in Supabase dashboard:
 ## 5. Common Issues
 
 ### Storage Upload Fails
+
 - Check authentication token is valid
 - Verify bucket policies allow upload
 - Check file size is under 10MB
 
 ### Edge Function Fails
+
 - Check Cloudinary credentials are set
 - Verify edge function is deployed
-- Check edge function logs: `npx supabase functions logs process-progress-photo`
+- Check edge function logs: `supabase functions logs process-progress-photo`
 
 ### No Background Removal
+
 - Verify Cloudinary plan includes AI background removal
 - Check transformation string in edge function
 
@@ -63,11 +67,11 @@ Ensure these are set in Supabase dashboard:
 
 ```bash
 # View edge function logs
-npx supabase functions logs process-progress-photo --tail
+supabase functions logs process-progress-photo --tail
 
 # Test edge function locally
-npx supabase functions serve process-progress-photo
+supabase functions serve process-progress-photo
 
 # Check storage bucket
-npx supabase storage ls photos
+supabase storage ls photos
 ```

@@ -51,7 +51,7 @@ These metrics decide what gets built next:
 
 Ship only the paid native iOS loop:
 
-- Apple Sign In and email OTP.
+- Apple Sign In as the single primary authentication path.
 - Working paywall/free trial with a logout escape.
 - Manual weight logging.
 - HealthKit weight import where already stable.

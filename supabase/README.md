@@ -43,6 +43,12 @@ supabase/
 - Edge functions from individual apps are copied during deployment
 - Run `pnpm check:supabase-migrations` before migration work to detect unsafe drift between the legacy web copy and this root
 
+## Photo Processing And Account Deletion
+
+- `process-progress-photo` validates the authenticated owner, then writes processed Cloudinary assets under `progress-photos/<user_id>/<metric_id>_<timestamp>`.
+- `delete-user-assets` removes user-scoped Storage objects, verified Cloudinary assets, required health-data rows, and the legacy Supabase principal when applicable. Any unscoped legacy Cloudinary URL fails closed for manual review.
+- On `main`, `.github/workflows/deploy.yml` deploys both edge functions before the dependent Vercel production deployment.
+
 ## Migration Naming Convention
 
 Use the format: `YYYYMMDDHHMMSS_description.sql`

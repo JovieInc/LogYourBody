@@ -1,6 +1,6 @@
 # The LogYourBody Golden Path
 
-**One sentence:** A paying user can launch the app, sign in with their email, subscribe,
+**One sentence:** A paying user can launch the app, continue with Apple, subscribe,
 log today's weight, immediately see it on their body timeline, and trust that it survives —
 offline, across launches, and through sync.
 
@@ -25,7 +25,7 @@ Golden Path gate (`GoldenPathTests`) must stay green on every commit to `main`.
 
 | #   | Stage           | Contract                                                                                                                                                                                                                                                    | Enforced by                                                                                |
 | --- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| 1   | **Launch**      | The app boots to the pinned paid surface (photo timeline HUD); email OTP is the primary sign-in method; the RevenueCat entitlement is `Premium`.                                                                                                            | `GoldenPathTests` GP1                                                                      |
+| 1   | **Launch**      | The app boots to the pinned paid surface (photo timeline HUD); Apple is the only primary sign-in method; the RevenueCat entitlement is `Premium`.                                                                                                           | `GoldenPathTests` GP1                                                                      |
 | 2   | **Sign in**     | An unauthenticated user can never reach the paid surface; a profile is "complete" only with name + DOB + height + gender.                                                                                                                                   | `GoldenPathTests` GP2                                                                      |
 | 3   | **Subscribe**   | An unsubscribed user is gated; a fully qualified user (authed + onboarded + complete profile + subscribed) passes every gate; trial→paid emits the conversion event.                                                                                        | `GoldenPathTests` GP3                                                                      |
 | 4   | **Log weight**  | Valid weights (70–660 lbs / 32–300 kg) save; garbage and out-of-range input is rejected with a plain-language message; no double-submit while saving.                                                                                                       | `GoldenPathTests` GP4                                                                      |
@@ -50,7 +50,7 @@ GP7 walks the full journey end-to-end in a single test.
 - **Any change that breaks a Golden Path test is a P0.** Fix the product or, if the product
   decision changed (e.g. a new paid surface), update the contract _and this document in the
   same PR_ — the definition and the gate must never drift apart.
-- **Keep the suite fast and pure.** UI-level golden path coverage (launch → OTP screen →
+- **Keep the suite fast and pure.** UI-level golden path coverage (launch → Apple sign-in →
   paywall render on simulator) belongs in the launch-quality gate, not here.
 - **New golden-path stages** (e.g. progress photos becoming core) require updating this doc,
   the suite, and the table above together.
