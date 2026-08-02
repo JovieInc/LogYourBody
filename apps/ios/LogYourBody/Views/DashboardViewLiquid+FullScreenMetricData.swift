@@ -44,6 +44,14 @@ extension DashboardViewLiquid {
         )
     }
 
+    func generateFullScreenWeightTrendChartData() -> [MetricChartDataPoint] {
+        buildFullScreenWeightTrendChartData(
+            from: sortedBodyMetricsAscending,
+            bodyMetrics: bodyMetrics,
+            measurementSystem: currentMeasurementSystem
+        )
+    }
+
     func generateFullScreenBodyFatChartData() -> [MetricChartDataPoint] {
         buildFullScreenBodyFatChartData(
             sortedBodyMetrics: sortedBodyMetricsAscending,
@@ -115,11 +123,13 @@ extension DashboardViewLiquid {
     func prewarmMetricCaches() async {
         guard !sortedBodyMetricsAscending.isEmpty || !recentDailyMetrics.isEmpty || !glp1DoseLogs.isEmpty else {
             fullChartCache = [:]
+            fullTrendChartCache = [:]
             metricEntriesCache = [:]
             return
         }
 
         fullChartCache = [:]
+        fullTrendChartCache = [:]
         metricEntriesCache = [:]
 
         let sortedMetrics = sortedBodyMetricsAscending
@@ -134,10 +144,11 @@ extension DashboardViewLiquid {
             heightUnit: heightUnitSnapshot
         )
 
-        let (chartCache, bodyScoreEntries) = await Task.detached(
+        let (chartCache, trendChartCache, bodyScoreEntries) = await Task.detached(
             priority: .utility
-        ) { () -> ([MetricType: [MetricChartDataPoint]], MetricEntriesPayload?) in
+        ) { () -> ([MetricType: [MetricChartDataPoint]], [MetricType: [MetricChartDataPoint]], MetricEntriesPayload?) in
             var cache: [MetricType: [MetricChartDataPoint]] = [:]
+            var trendCache: [MetricType: [MetricChartDataPoint]] = [:]
             var bodyScoreEntries: MetricEntriesPayload?
 
             let stepsData = buildFullScreenStepsChartData(from: recentDailySnapshot)
@@ -151,6 +162,15 @@ extension DashboardViewLiquid {
             )
             if !weightData.isEmpty {
                 cache[.weight] = weightData
+            }
+
+            let weightTrendData = buildFullScreenWeightTrendChartData(
+                from: sortedMetrics,
+                bodyMetrics: bodyMetricsSnapshot,
+                measurementSystem: measurementSystemSnapshot
+            )
+            if !weightTrendData.isEmpty {
+                trendCache[.weight] = weightTrendData
             }
 
             let bodyFatData = buildFullScreenBodyFatChartData(
@@ -187,10 +207,11 @@ extension DashboardViewLiquid {
                 bodyScoreEntries = bodyScoreResult.entriesPayload
             }
 
-            return (cache, bodyScoreEntries)
+            return (cache, trendCache, bodyScoreEntries)
         }.value
 
         fullChartCache = chartCache
+        fullTrendChartCache = trendChartCache
 
         if let bodyScoreEntries {
             metricEntriesCache[.bodyScore] = bodyScoreEntries
@@ -356,6 +377,47 @@ private func buildFullScreenWeightChartData(
                 value: converted
             )
         }
+}
+
+private func buildFullScreenWeightTrendChartData(
+    from sortedBodyMetricsAscending: [BodyMetrics],
+    bodyMetrics: [BodyMetrics],
+    measurementSystem: MeasurementSystem
+) -> [MetricChartDataPoint] {
+    guard let interpolationContext = MetricsInterpolationService.shared
+        .makeWeightInterpolationContext(for: bodyMetrics) else {
+        return []
+    }
+
+    return sortedBodyMetricsAscending.compactMap { metric in
+        guard metric.weight != nil,
+              let trend = interpolationContext.trendWeight(for: metric.date) else {
+            return nil
+        }
+
+        let converted: Double
+        switch measurementSystem {
+        case .metric:
+            converted = trend.value
+        case .imperial:
+            converted = trend.value * 2.20462
+        }
+
+        let presence: MetricPresence
+        if trend.isLastKnown {
+            presence = .lastKnown
+        } else if trend.isInterpolated {
+            presence = .interpolated
+        } else {
+            presence = .present
+        }
+
+        return MetricChartDataPoint(
+            date: metric.date,
+            value: converted,
+            presence: presence
+        )
+    }
 }
 
 private func buildFullScreenBodyFatChartData(

@@ -390,4 +390,33 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         XCTAssertEqual(metric.createdAt.timeIntervalSince(createdAt), 0, accuracy: 0.001)
         XCTAssertEqual(metric.updatedAt.timeIntervalSince(updatedAt), 0, accuracy: 0.001)
     }
+
+    func testUpdateOrCreateBodyMetricNormalizesDisplayUnitsForLocalStorage() async throws {
+        let coreData = CoreDataManager.shared
+        let id = UUID().uuidString
+        let userId = "sync_test_user_body_imperial_\(UUID().uuidString)"
+        let date = wholeSecondDate(1_500)
+        let formatter = ISO8601DateFormatter()
+
+        let payload: [String: Any] = [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: date),
+            "weight": 180.0,
+            "weight_unit": "lbs",
+            "waist_circumference": 40.0,
+            "hip_circumference": 42.0,
+            "waist_unit": "in"
+        ]
+
+        coreData.updateOrCreateBodyMetric(from: payload)
+
+        let cachedMetric = await cachedBodyMetric(id: id)
+        let metric = try XCTUnwrap(cachedMetric)
+        XCTAssertEqual(metric.weight, UnitConversion.lbsToKg(180), accuracy: 0.0001)
+        XCTAssertEqual(metric.weightUnit, "kg")
+        XCTAssertEqual(metric.waistCircumference, 101.6, accuracy: 0.0001)
+        XCTAssertEqual(metric.hipCircumference, 106.68, accuracy: 0.0001)
+        XCTAssertEqual(metric.waistUnit, "cm")
+    }
 }

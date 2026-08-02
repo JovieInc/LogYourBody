@@ -38,7 +38,10 @@ enum ExportCSVBuilder {
         for metric in sortedMetrics {
             let date = dateFormatter.string(from: metric.date)
             let weight = metric.weight ?? 0
-            let weightUnit = metric.weightUnit ?? "lbs"
+            // BodyMetrics stores weight canonically in kilograms. Keep the
+            // export truthful for older sparse records and photo-only
+            // placeholders that carry no weight value.
+            let weightUnit = metric.weight == nil ? "kg" : (metric.weightUnit ?? "kg")
             let bodyFat = metric.bodyFatPercentage ?? 0
             let ffmi: Double
             if let ffmiValue {

@@ -549,6 +549,16 @@ extension DashboardViewLiquid {
         return generator()
     }
 
+    func cachedTrendChartData(
+        for type: MetricType,
+        generator: () -> [MetricChartDataPoint]
+    ) -> [MetricChartDataPoint] {
+        if let cached = fullTrendChartCache[type] {
+            return cached
+        }
+        return generator()
+    }
+
     func weightRangeStats() -> MetricRangeStats? {
         let system = currentMeasurementSystem
         return computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in

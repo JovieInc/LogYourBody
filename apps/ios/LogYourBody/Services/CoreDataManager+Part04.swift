@@ -70,11 +70,14 @@ extension CoreDataManager {
                     hipCm = 0
                 }
 
+                // Cached iOS metrics are canonicalized to kg/cm. The server
+                // may return display-unit values (for example, 180 lbs), but
+                // every local writer and calculator expects normalized values.
                 metric.weight = weightKg
-                metric.weightUnit = rawWeightUnit
+                metric.weightUnit = rawWeight > 0 ? "kg" : nil
                 metric.waistCircumference = waistCm
                 metric.hipCircumference = hipCm
-                metric.waistUnit = rawWaistUnit
+                metric.waistUnit = rawWaistValue > 0 || rawHipValue > 0 ? "cm" : nil
                 metric.bodyFatPercentage = data["body_fat_percentage"] as? Double ?? 0
                 metric.bodyFatMethod = data["body_fat_method"] as? String
                 metric.muscleMass = data["muscle_mass"] as? Double ?? 0

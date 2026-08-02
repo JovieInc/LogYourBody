@@ -82,6 +82,21 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         }
     }
 
+    func testMeasurementSystemDefaultsFollowLocaleUntilUserPreferenceExists() {
+        XCTAssertEqual(
+            MeasurementSystem.measurementSystem(for: Locale(identifier: "en_US")),
+            .imperial
+        )
+        XCTAssertEqual(
+            MeasurementSystem.measurementSystem(for: Locale(identifier: "de_DE")),
+            .metric
+        )
+        XCTAssertEqual(MeasurementSystem.fromStored(rawValue: "Metric"), .metric)
+        XCTAssertEqual(MeasurementSystem.fromStored(rawValue: "Imperial"), .imperial)
+        XCTAssertEqual(WeightUnit.localeDefault.measurementSystem, MeasurementSystem.localeDefault)
+        XCTAssertEqual(HeightUnit.localeDefault.measurementSystem, MeasurementSystem.localeDefault)
+    }
+
     func testWeightGoalStoresKilogramsAndPresentsOncePerSelectedUnit() throws {
         let goal = try XCTUnwrap(WeightGoal(displayValue: 180, measurementSystem: .imperial))
 

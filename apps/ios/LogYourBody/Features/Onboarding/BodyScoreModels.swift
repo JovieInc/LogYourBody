@@ -23,6 +23,10 @@ enum WeightUnit: String, Codable, CaseIterable, CustomStringConvertible {
             return "LBS"
         }
     }
+
+    static var localeDefault: WeightUnit {
+        MeasurementSystem.localeDefault == .metric ? .kilograms : .pounds
+    }
 }
 
 enum HeightUnit: String, Codable, CaseIterable, CustomStringConvertible {
@@ -45,6 +49,10 @@ enum HeightUnit: String, Codable, CaseIterable, CustomStringConvertible {
         case .inches:
             return "FT/IN"
         }
+    }
+
+    static var localeDefault: HeightUnit {
+        MeasurementSystem.localeDefault == .metric ? .centimeters : .inches
     }
 }
 
@@ -75,7 +83,7 @@ struct HeightValue: Codable, Equatable {
     var value: Double?
     var unit: HeightUnit
 
-    init(value: Double? = nil, unit: HeightUnit = .inches) {
+    init(value: Double? = nil, unit: HeightUnit = .localeDefault) {
         self.value = value
         self.unit = unit
     }
@@ -105,7 +113,7 @@ struct WeightValue: Codable, Equatable {
     var value: Double?
     var unit: WeightUnit
 
-    init(value: Double? = nil, unit: WeightUnit = .pounds) {
+    init(value: Double? = nil, unit: WeightUnit = .localeDefault) {
         self.value = value
         self.unit = unit
     }
@@ -170,7 +178,7 @@ struct BodyScoreInput: Codable, Equatable {
         height: HeightValue = HeightValue(),
         weight: WeightValue = WeightValue(),
         bodyFat: BodyFatValue = BodyFatValue(),
-        measurementPreference: MeasurementSystem = .imperial,
+        measurementPreference: MeasurementSystem = .localeDefault,
         healthSnapshot: HealthImportSnapshot = HealthImportSnapshot()
     ) {
         self.sex = sex

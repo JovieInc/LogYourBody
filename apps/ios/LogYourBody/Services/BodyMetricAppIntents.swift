@@ -40,8 +40,12 @@ struct LogWeightIntent: AppIntent {
     )
     var weight: Double
 
-    @Parameter(title: "Unit", default: .pounds)
+    @Parameter(title: "Unit")
     var unit: BodyMetricIntentWeightUnit
+
+    init() {
+        unit = MeasurementSystem.preferredFromDefaults == .metric ? .kilograms : .pounds
+    }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let result = try await BodyMetricLoggingService.shared.log(

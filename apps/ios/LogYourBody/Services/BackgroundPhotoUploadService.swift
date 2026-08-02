@@ -155,7 +155,7 @@ class BackgroundPhotoUploadService: ObservableObject {
             date: date,
             localDate: localDate,
             weight: nil,
-            weightUnit: "lbs",
+            weightUnit: nil,
             bodyFatPercentage: nil,
             bodyFatMethod: nil,
             muscleMass: nil,

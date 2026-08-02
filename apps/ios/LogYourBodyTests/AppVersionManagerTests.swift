@@ -72,7 +72,10 @@ final class AppVersionManagerTests: XCTestCase {
 
         let firstLaunch = try XCTUnwrap(UserDefaults.standard.object(forKey: "firstLaunchDate") as? Date)
         XCTAssertEqual(firstLaunch.timeIntervalSinceNow, 0, accuracy: 5)
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Constants.preferredWeightUnitKey), "lbs")
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: Constants.preferredWeightUnitKey),
+            MeasurementSystem.localeDefault.weightUnit
+        )
         XCTAssertEqual(UserDefaults.standard.object(forKey: "healthKitSyncEnabled") as? Bool, true)
 
         // Every launch records the current version/build.

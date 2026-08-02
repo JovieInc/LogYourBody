@@ -130,7 +130,7 @@ final class ExportCSVBuilderTests: XCTestCase {
         )
     }
 
-    func testBodyMetricsDefaultsMissingWeightAndUnitToZeroAndLbs() {
+    func testBodyMetricsDefaultsMissingWeightAndUnitToCanonicalKilograms() {
         let metric = makeMetric(id: "sparse", date: makeDate(2_024, 1, 5))
 
         let csv = ExportCSVBuilder.makeBodyMetricsCSV(
@@ -139,7 +139,24 @@ final class ExportCSVBuilderTests: XCTestCase {
             dateFormatter: makeFormatter()
         )
 
-        XCTAssertEqual(rows(of: csv).last, "1/5/24,0.0,lbs,0.0,0.0,0.0,0.0,\"\",")
+        XCTAssertEqual(rows(of: csv).last, "1/5/24,0.0,kg,0.0,0.0,0.0,0.0,\"\",")
+    }
+
+    func testBodyMetricsMissingWeightIgnoresLegacyDisplayUnit() {
+        let metric = makeMetric(
+            id: "photo-only",
+            date: makeDate(2_024, 1, 5),
+            weight: nil,
+            weightUnit: "lbs"
+        )
+
+        let csv = ExportCSVBuilder.makeBodyMetricsCSV(
+            metrics: [metric],
+            heightInches: nil,
+            dateFormatter: makeFormatter()
+        )
+
+        XCTAssertEqual(rows(of: csv).last, "1/5/24,0.0,kg,0.0,0.0,0.0,0.0,\"\",")
     }
 
     func testBodyMetricsFFMIIsZeroWhenHeightUnavailable() {
@@ -194,7 +211,7 @@ final class ExportCSVBuilderTests: XCTestCase {
         XCTAssertEqual(rows(of: csv).count, 2)
         XCTAssertEqual(
             rows(of: csv).last,
-            "1/5/24,0.0,lbs,0.0,0.0,0.0,0.0,\"Felt strong, slept well\","
+            "1/5/24,0.0,kg,0.0,0.0,0.0,0.0,\"Felt strong, slept well\","
         )
     }
 

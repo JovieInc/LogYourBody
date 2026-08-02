@@ -121,10 +121,10 @@ final class OnboardingFlowViewModel: ObservableObject {
     @Published var showEmailCaptureSheet = false
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var heightUnit: HeightUnit = .centimeters {
+    @Published var heightUnit: HeightUnit = .localeDefault {
         didSet { persistProgress() }
     }
-    @Published var weightUnit: WeightUnit = .pounds {
+    @Published var weightUnit: WeightUnit = .localeDefault {
         didSet { persistProgress() }
     }
     @Published var heightCentimetersText: String = "" {

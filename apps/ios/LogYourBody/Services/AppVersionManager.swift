@@ -300,7 +300,10 @@ class AppVersionManager {
     private func setupDefaultSettings() {
         // Set up any default settings for fresh installs
         if UserDefaults.standard.object(forKey: Constants.preferredWeightUnitKey) == nil {
-            UserDefaults.standard.set("lbs", forKey: Constants.preferredWeightUnitKey)
+            UserDefaults.standard.set(
+                MeasurementSystem.localeDefault.weightUnit,
+                forKey: Constants.preferredWeightUnitKey
+            )
         }
 
         if UserDefaults.standard.object(forKey: Constants.healthKitSyncEnabledKey) == nil {

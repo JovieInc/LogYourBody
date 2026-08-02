@@ -43,7 +43,7 @@ struct PreferencesView: View {
     @State var dailyReminderDate = Date()
 
     static var defaultMeasurementSystem: String {
-        MeasurementSystem.imperial.rawValue
+        MeasurementSystem.localeDefault.rawValue
     }
 
     var currentSystem: MeasurementSystem {

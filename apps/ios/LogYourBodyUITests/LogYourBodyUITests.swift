@@ -167,6 +167,31 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(restoreButton.exists)
     }
 
+    func testProfileEditorProvidesAnEscapeRoute() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+
+        try openSettings(in: app)
+
+        let profileLink = app.descendants(matching: .any)["settings_profile_link"]
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 5))
+        profileLink.tap()
+
+        let fullNameRow = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Full name")
+        ).firstMatch
+        XCTAssertTrue(fullNameRow.waitForExistence(timeout: 5))
+        fullNameRow.tap()
+
+        let cancelButton = app.buttons["profile_editor_cancel_button"]
+        XCTAssertTrue(cancelButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(cancelButton.isHittable)
+        cancelButton.tap()
+
+        XCTAssertFalse(app.staticTexts["Edit Profile"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 5))
+    }
+
     func testSubscribedMVPSettingsWeightGoalUsesNativeValidatedEditor() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
@@ -432,11 +457,25 @@ final class LogYourBodyUITests: XCTestCase {
         scrollUntilHittable(weightCard, in: app)
         XCTAssertTrue(weightCard.waitForExistence(timeout: 8))
         XCTAssertTrue(weightCard.isHittable)
+        let weightValue = try XCTUnwrap(
+            weightCard.label
+                .split(separator: ",", maxSplits: 2, omittingEmptySubsequences: true)
+                .dropFirst()
+                .first?
+                .split(separator: " ")
+                .first
+        )
         weightCard.tap()
 
         let detail = app.descendants(matching: .any)["metric_detail_screen"]
         XCTAssertTrue(detail.waitForExistence(timeout: 8))
-        XCTAssertTrue(app.descendants(matching: .any)["metric_detail_headline"].waitForExistence(timeout: 5))
+        let detailHeadline = app.descendants(matching: .any)["metric_detail_headline"]
+        XCTAssertTrue(detailHeadline.waitForExistence(timeout: 5))
+        let trendHeadlineExpectation = expectation(
+            for: NSPredicate(format: "label == %@", String(weightValue)),
+            evaluatedWith: detailHeadline
+        )
+        wait(for: [trendHeadlineExpectation], timeout: 8)
         XCTAssertTrue(app.descendants(matching: .any)["metric_detail_chart"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["metric_detail_related_metrics"].exists)
         let relatedMetricIds = ["steps", "weight", "body_fat", "ffmi", "body_score"]
@@ -843,7 +882,10 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func assertAndCaptureBodyScoreShareSheet(in app: XCUIApplication) throws {
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard_home_timeline_hero"].waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+
+        let hero = app.descendants(matching: .any)["dashboard_home_timeline_hero"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 20))
 
         let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
         XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
@@ -868,7 +910,10 @@ final class LogYourBodyUITests: XCTestCase {
 
         let cardFrame = shareCard.frame
         let windowFrame = app.windows.firstMatch.frame
-        XCTAssertGreaterThan(cardFrame.width, windowFrame.width * 0.88)
+        // The portrait preview is fitted into the remaining vertical space
+        // below the controls, so its width is intentionally below the full
+        // sheet width on compact iPhones.
+        XCTAssertGreaterThan(cardFrame.width, windowFrame.width * 0.80)
         XCTAssertGreaterThan(cardFrame.height, cardFrame.width * 1.18)
         XCTAssertGreaterThan(cardFrame.minY, windowFrame.minY + 72)
         XCTAssertLessThanOrEqual(cardFrame.maxY, windowFrame.maxY - 72)
