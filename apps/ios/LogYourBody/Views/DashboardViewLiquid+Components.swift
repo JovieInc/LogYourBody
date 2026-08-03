@@ -9,7 +9,7 @@ struct DashboardTimelineScrubber: View {
 
     var body: some View {
         Group {
-            if bodyMetrics.count > 1 {
+            if !bodyMetrics.isEmpty {
                 ProgressTimelineView(
                     bodyMetrics: bodyMetrics,
                     selectedIndex: $selectedIndex,
