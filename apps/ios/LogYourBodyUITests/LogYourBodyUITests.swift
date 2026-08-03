@@ -713,7 +713,12 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatFirstFixture"
         ])
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
-        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_scrubber"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
+        let scrubber = app.descendants(matching: .any)["launch_timeline_scrubber"]
+        if !scrubber.waitForExistence(timeout: 3) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(scrubber.waitForExistence(timeout: 5))
         try openChatTab(in: app)
         attachScreenshot(named: "launch-quality-chat-tab", from: app)
         app.buttons["Timeline"].tap()
