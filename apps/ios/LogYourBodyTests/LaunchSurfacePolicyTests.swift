@@ -362,15 +362,15 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertTrue(ProfileCompletionPolicy.isComplete(profile: blankNameProfile, fallbackName: "Fallback User"))
     }
 
-    func testWorldClassScreenCatalogCoversAllFortyFiveApprovedStates() {
-        XCTAssertEqual(WorldClassScreen.allCases.count, 45)
+    func testWorldClassScreenCatalogCoversAllFortySixApprovedStates() {
+        XCTAssertEqual(WorldClassScreen.allCases.count, 46)
 
         let counts = Dictionary(grouping: WorldClassScreen.allCases, by: \.flow)
             .mapValues(\.count)
 
         XCTAssertEqual(counts[.entry], 5)
         XCTAssertEqual(counts[.onboarding], 17)
-        XCTAssertEqual(counts[.core], 10)
+        XCTAssertEqual(counts[.core], 11)
         XCTAssertEqual(counts[.subscription], 3)
         XCTAssertEqual(counts[.account], 10)
     }

@@ -61,6 +61,7 @@ enum WorldClassScreen: String, CaseIterable, Identifiable {
     case home
     case photoTimeline
     case stats
+    case chat
     case metricDetail
     case logWeight
     case logBodyFat
@@ -94,7 +95,7 @@ enum WorldClassScreen: String, CaseIterable, Identifiable {
              .bodyScoreReveal, .chooseHomeView, .email, .verifyAccount, .completeProfile,
              .firstProgressPhoto, .paywall:
             return .onboarding
-        case .home, .photoTimeline, .stats, .metricDetail, .logWeight, .logBodyFat,
+        case .home, .photoTimeline, .stats, .chat, .metricDetail, .logWeight, .logBodyFat,
              .addProgressPhoto, .glp1CheckIn, .shareBodyScore, .syncDetails:
             return .core
         case .dailyReminder, .planUnavailable, .restorePurchases:

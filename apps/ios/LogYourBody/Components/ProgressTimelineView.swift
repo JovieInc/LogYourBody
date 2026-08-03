@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ProgressTimelineView: View {
     // MARK: - Properties
@@ -22,6 +23,8 @@ struct ProgressTimelineView: View {
     @State private var currentDateLabel: String = ""
     @State private var renderSignature: TimelineRenderSignature
     @State private var renderData: TimelineRenderData
+    @State private var selectionFeedbackGenerator = UISelectionFeedbackGenerator()
+    @State private var lastHapticTime = Date.distantPast
 
     private let timelineHeight: CGFloat = 50
     private let scrubberHandleSize: CGFloat = 44
@@ -57,25 +60,34 @@ struct ProgressTimelineView: View {
 
             // Timeline strip
             GeometryReader { geometry in
+                let trackInset = scrubberHandleSize / 2
+                let trackWidth = max(1, geometry.size.width - scrubberHandleSize)
+
                 ZStack(alignment: .leading) {
                     // Background track
                     timelineTrack
 
                     // Anchors (photos/metrics)
                     anchorsView(
-                        width: geometry.size.width,
+                        width: trackWidth,
                         anchors: renderData.anchors,
                         zoomLevel: renderData.zoomLevel
                     )
+                    .offset(x: trackInset)
                     .accessibilityHidden(true)
 
                     // Scrubber handle
                     scrubberHandle
-                        .offset(x: handlePosition * geometry.size.width - scrubberHandleSize / 2)
+                        .offset(x: handlePosition * trackWidth)
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged {
-                                    handleDrag($0, width: geometry.size.width, renderData: renderData)
+                                    handleDrag(
+                                        $0,
+                                        width: trackWidth,
+                                        trackInset: trackInset,
+                                        renderData: renderData
+                                    )
                                 }
                                 .onEnded { _ in handleDragEnd() }
                         )
@@ -115,34 +127,52 @@ struct ProgressTimelineView: View {
 
     // MARK: - Subviews
 
+    @ViewBuilder
     private var dateLabel: some View {
-        Text(currentDateLabel)
+        let label = Text(currentDateLabel)
             .font(.footnote.weight(.medium))
             .foregroundColor(Color.liquidTextPrimary)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(Color.white.opacity(0.15))
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                    )
-            )
             .padding(.bottom, 4)
             .accessibilityHidden(true)
+
+        if #available(iOS 26.0, *) {
+            label
+                .glassEffect(
+                    .regular.tint(Color.liquidAccent.opacity(0.12)),
+                    in: Capsule(style: .continuous)
+                )
+        } else {
+            label
+                .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+                .overlay {
+                    Capsule(style: .continuous)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                }
+        }
     }
 
+    @ViewBuilder
     private var timelineTrack: some View {
-        RoundedRectangle(cornerRadius: 3)
-            .fill(Color.white.opacity(0.10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+        let track = Capsule(style: .continuous)
+            .fill(Color.white.opacity(0.08))
+            .overlay {
+                Capsule(style: .continuous)
+                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
+            }
+            .frame(height: 12)
+            .padding(.horizontal, scrubberHandleSize / 2)
+            .padding(.vertical, (timelineHeight - 12) / 2)
+
+        if #available(iOS 26.0, *) {
+            track.glassEffect(
+                .regular.tint(Color.liquidAccent.opacity(0.08)).interactive(),
+                in: Capsule(style: .continuous)
             )
-            .frame(height: 6)
-            .padding(.vertical, (timelineHeight - 6) / 2)
-            .accessibilityHidden(true)
+        } else {
+            track.background(.ultraThinMaterial, in: Capsule(style: .continuous))
+        }
     }
 
     private func anchorsView(
@@ -170,42 +200,13 @@ struct ProgressTimelineView: View {
     }
 
     private func photoModeAnchor(for anchor: TimelineAnchor, zoomLevel: TimelineZoomLevel) -> some View {
-        Group {
-            if anchor.anchorType == .photo || anchor.anchorType == .photoWithMetrics {
-                if let photoUrl = anchor.bodyMetrics.photoUrl,
-                   !photoUrl.isEmpty,
-                   let _ = URL(string: photoUrl) {
-                    OptimizedProgressPhotoView(
-                        photoUrl: photoUrl,
-                        maxHeight: zoomLevel.thumbnailSize
-                    )
-                    .frame(width: zoomLevel.thumbnailSize, height: zoomLevel.thumbnailSize)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(Color.white.opacity(0.5), lineWidth: 2)
-                    )
-                } else {
-                    photoPlaceholder(zoomLevel: zoomLevel)
-                }
-            } else if zoomLevel.showMetricTicks {
-                Circle()
-                    .fill(Color.white.opacity(0.3))
-                    .frame(width: 4, height: 4)
-            } else {
-                EmptyView()
-            }
-        }
-    }
+        let isPhotoDetent = anchor.anchorType == .photo || anchor.anchorType == .photoWithMetrics
 
-    private func photoPlaceholder(zoomLevel: TimelineZoomLevel) -> some View {
-        Circle()
-            .fill(Color.white.opacity(0.2))
-            .frame(width: zoomLevel.thumbnailSize, height: zoomLevel.thumbnailSize)
-            .overlay(
-                Image(systemName: "photo")
-                    .font(.system(size: zoomLevel.thumbnailSize * 0.4))
-                    .foregroundColor(Color.white.opacity(0.5))
+        return Capsule(style: .continuous)
+            .fill(Color.white.opacity(isPhotoDetent ? 0.72 : 0.28))
+            .frame(
+                width: isPhotoDetent ? 3 : 2,
+                height: isPhotoDetent ? 18 : (zoomLevel.showMetricTicks ? 8 : 4)
             )
     }
 
@@ -222,12 +223,13 @@ struct ProgressTimelineView: View {
             }
     }
 
+    @ViewBuilder
     private var scrubberHandle: some View {
-        ZStack {
+        let handle = ZStack {
             Capsule()
                 .fill(Color.liquidAccent)
-                .frame(width: 4, height: 24)
-                .shadow(color: Color.liquidAccent.opacity(0.5), radius: 4, x: 0, y: 2)
+                .frame(width: 5, height: isDragging ? 30 : 25)
+                .shadow(color: Color.liquidAccent.opacity(0.45), radius: 5, x: 0, y: 2)
 
             Color.clear
         }
@@ -241,6 +243,15 @@ struct ProgressTimelineView: View {
             adjustSelection(for: direction)
         }
         .accessibilityIdentifier("dashboard_timeline_scrubber_handle")
+
+        if #available(iOS 26.0, *) {
+            handle.glassEffect(
+                .regular.tint(Color.liquidAccent.opacity(0.22)).interactive(),
+                in: Capsule(style: .continuous)
+            )
+        } else {
+            handle.background(.ultraThinMaterial, in: Capsule(style: .continuous))
+        }
     }
 
     // MARK: - Logic
@@ -254,11 +265,19 @@ struct ProgressTimelineView: View {
         return renderData.anchors.first(where: { $0.bodyMetrics.id == metric.id })?.position ?? dragPosition
     }
 
-    private func handleDrag(_ value: DragGesture.Value, width: CGFloat, renderData: TimelineRenderData) {
-        isDragging = true
+    private func handleDrag(
+        _ value: DragGesture.Value,
+        width: CGFloat,
+        trackInset: CGFloat,
+        renderData: TimelineRenderData
+    ) {
+        if !isDragging {
+            isDragging = true
+            selectionFeedbackGenerator.prepare()
+        }
 
         // Calculate position (0.0 to 1.0)
-        let position = max(0, min(1, value.location.x / width))
+        let position = max(0, min(1, (value.location.x - trackInset) / width))
         dragPosition = position
 
         // Convert position to date
@@ -317,12 +336,8 @@ struct ProgressTimelineView: View {
             withAnimation(.easeOut(duration: 0.2)) {
                 isDragging = false
             }
-        }
-
-        // Haptic feedback
-        let impact = UIImpactFeedbackGenerator(style: .light)
-        impact.impactOccurred()
     }
+}
 
     private var accessibilityTimelineValue: String {
         guard !bodyMetrics.isEmpty else {
@@ -362,6 +377,16 @@ struct ProgressTimelineView: View {
     private func updateSelectedIndex(_ index: Int) {
         guard bodyMetrics.indices.contains(index), selectedIndex != index else { return }
         selectedIndex = index
+
+        guard isDragging else { return }
+        let now = Date()
+        let isEdgeDetent = index == bodyMetrics.startIndex || index == bodyMetrics.index(before: bodyMetrics.endIndex)
+        let minimumInterval = isEdgeDetent ? 0 : 0.04
+        guard now.timeIntervalSince(lastHapticTime) >= minimumInterval else { return }
+
+        selectionFeedbackGenerator.selectionChanged()
+        selectionFeedbackGenerator.prepare()
+        lastHapticTime = now
     }
 
     private func refreshRenderDataIfNeeded(for signature: TimelineRenderSignature) {

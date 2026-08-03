@@ -311,34 +311,35 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["No progress photo"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_scrubber"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_photo_strip"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["dashboard_home_timeline_avatar"].exists)
         XCTAssertFalse(app.tabBars.firstMatch.exists)
     }
 
-    func testChatFirstLaunchKeepsSidebarAndTimelineFocused() throws {
+    func testChatIsAPeerTabWithoutReplacingTimelineNavigation() throws {
         let app = XCUIApplication()
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture"
         ])
 
-        XCTAssertTrue(app.descendants(matching: .any)["chat_first_root"].waitForExistence(timeout: 12))
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["Timeline"].exists)
+        XCTAssertTrue(app.buttons["Stats"].exists)
+        XCTAssertTrue(app.buttons["Chat"].exists)
+        XCTAssertTrue(app.buttons["Settings"].exists)
+        XCTAssertFalse(app.buttons["Open sidebar"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_sidebar"].exists)
         XCTAssertFalse(app.tabBars.firstMatch.exists)
 
-        let window = app.windows.firstMatch
-        let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.48))
-        let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.48))
-        start.press(forDuration: 0.05, thenDragTo: end)
+        try openChatTab(in: app)
+        attachScreenshot(named: "timeline-chat-peer-navigation", from: app)
 
-        XCTAssertTrue(app.descendants(matching: .any)["chat_sidebar"].waitForExistence(timeout: 5))
         app.buttons["Timeline"].tap()
-
-        let timeline = app.descendants(matching: .any)["launch_timeline_surface"]
-        XCTAssertTrue(timeline.waitForExistence(timeout: 12))
-        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_photo_strip"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.tabBars.firstMatch.exists)
-        XCTAssertEqual(app.scrollViews.count, 1, "Timeline should expose only the horizontal photo strip scroll surface")
-        attachScreenshot(named: "chat-first-timeline-destination", from: app)
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_scrubber"].exists)
     }
 
     func testChatStreamsFixtureAnswer() throws {
@@ -348,7 +349,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatFirstFixture"
         ])
 
-        XCTAssertTrue(app.descendants(matching: .any)["chat_first_root"].waitForExistence(timeout: 12))
+        try openChatTab(in: app)
         XCTAssertFalse(app.tabBars.firstMatch.exists)
 
         let prompt = app.buttons["How am I doing?"]
@@ -374,6 +375,8 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatErrorFixture"
         ])
 
+        try openChatTab(in: app)
+
         let prompt = app.buttons["How am I doing?"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 12))
         prompt.tap()
@@ -394,6 +397,8 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatFirstFixture",
             "-lybUITestChatOfflineFixture"
         ])
+
+        try openChatTab(in: app)
 
         let offlineCopy = app.staticTexts["You’re offline. Reconnect, then try again."]
         XCTAssertTrue(offlineCopy.waitForExistence(timeout: 12))
@@ -416,6 +421,8 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatFirstFixture",
             "-lybUITestChatSlowFixture"
         ])
+
+        try openChatTab(in: app)
 
         let prompt = app.buttons["How am I doing?"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 12))
@@ -440,12 +447,8 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testSettingsProfileFieldsOpenDirectEditors() throws {
         let app = XCUIApplication()
-        launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
-            "-lybUITestChatFirstFixture"
-        ])
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
-        app.buttons["Open sidebar"].tap()
         app.buttons["Settings"].tap()
 
         let profileLink = app.buttons["settings_profile_link"]
@@ -538,7 +541,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(timeline.frame.minX, homeViewportFrame.minX - 1)
         XCTAssertLessThanOrEqual(timeline.frame.maxX, homeViewportFrame.maxX + 1)
 
-        let strip = app.descendants(matching: .any)["launch_timeline_photo_strip"]
+        let strip = app.descendants(matching: .any)["launch_timeline_scrubber"]
         XCTAssertTrue(strip.waitForExistence(timeout: 5))
         XCTAssertTrue(strip.isHittable)
         XCTAssertGreaterThanOrEqual(strip.frame.minX, homeViewportFrame.minX - 1)
@@ -607,7 +610,7 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
-        let strip = app.descendants(matching: .any)["launch_timeline_photo_strip"]
+        let strip = app.descendants(matching: .any)["launch_timeline_scrubber"]
         XCTAssertTrue(strip.waitForExistence(timeout: 12))
 
         // Regression guard for JovieInc/Jovie#11350: a horizontal swipe on the
@@ -709,16 +712,17 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture"
         ])
-        XCTAssertTrue(app.descendants(matching: .any)["chat_first_root"].waitForExistence(timeout: 12))
-        XCTAssertFalse(app.tabBars.firstMatch.exists)
-        app.swipeLeft()
-        XCTAssertTrue(app.descendants(matching: .any)["chat_sidebar"].waitForExistence(timeout: 5))
-        let timelineLink = app.buttons["chat_timeline_link"]
-        XCTAssertTrue(timelineLink.waitForExistence(timeout: 5))
-        XCTAssertTrue(timelineLink.isHittable)
-        timelineLink.tap()
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
-        attachScreenshot(named: "launch-quality-chat-sidebar-timeline", from: app)
+        let scrubber = app.descendants(matching: .any)["launch_timeline_scrubber"]
+        if !scrubber.waitForExistence(timeout: 3) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(scrubber.waitForExistence(timeout: 5))
+        try openChatTab(in: app)
+        attachScreenshot(named: "launch-quality-chat-tab", from: app)
+        app.buttons["Timeline"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
 
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
         try assertAndCaptureOnboardingFixedCTA(in: app)
@@ -925,7 +929,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
 
-        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_photo_strip"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_scrubber"].waitForExistence(timeout: 10))
 
         try exerciseTimelineRootNavigation(in: app)
     }
@@ -980,6 +984,20 @@ final class LogYourBodyUITests: XCTestCase {
             ],
             timeout: timeout
         )
+    }
+
+    private func openChatTab(in app: XCUIApplication) throws {
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+
+        let chatButton = app.buttons["Chat"]
+        XCTAssertTrue(chatButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(chatButton.isHittable)
+        chatButton.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 10)
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["chat_sidebar"].exists)
     }
 
     private func waitForOneOf(_ elements: [XCUIElement], timeout: TimeInterval) -> Bool {

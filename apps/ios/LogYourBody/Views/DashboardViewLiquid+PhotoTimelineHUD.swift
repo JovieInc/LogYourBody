@@ -80,12 +80,20 @@ extension DashboardViewLiquid {
                         )
                         photoTimelineAnalyticsPage
                     }
+                case .chat:
+                    ZStack {
+                        timelineAccessibilityMarker(
+                            id: "photo_timeline_root_page_chat",
+                            label: "Chat page"
+                        )
+                        ChatTabView()
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
         }
-        .worldClassScreen(selectedPhotoTimelineRootPage == .timeline ? .photoTimeline : .stats)
+        .worldClassScreen(selectedPhotoTimelineRootPage.worldClassScreen)
     }
 
     private var photoTimelineRootNavigation: some View {
@@ -94,7 +102,22 @@ extension DashboardViewLiquid {
 
             photoTimelineRootNavigationButton(page: .analytics)
 
+            photoTimelineRootNavigationButton(page: .chat)
+
             Spacer(minLength: 0)
+
+            NavigationLink {
+                PreferencesView()
+                    .environmentObject(authManager)
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Settings")
+            .accessibilityHint("Opens account and app settings")
+            .accessibilityIdentifier("photo_timeline_root_settings")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .topLeading) {
@@ -115,6 +138,7 @@ extension DashboardViewLiquid {
         let isSelected = selectedPhotoTimelineRootPage == page
 
         return Button {
+            HapticManager.shared.selection()
             selectedPhotoTimelineRootPage = page
         } label: {
             VStack(spacing: 6) {

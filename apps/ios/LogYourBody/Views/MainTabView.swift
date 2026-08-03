@@ -12,42 +12,19 @@ struct MainTabView: View {
     @State private var selectedSurface: PaidAppSurface = PaidAppSurfacePolicy.surface()
 
     var body: some View {
-        Group {
-            if shouldOpenChatFirst {
-                ChatFirstRootView()
-            } else {
-                NavigationStack {
-                    switch selectedSurface {
-                    case .chatFirst:
-                        ChatFirstRootView()
-                    case .photoTimelineHUD:
-                        DashboardViewLiquid(layoutMode: .photoTimelineHUD)
-                    case .legacyFullDashboardBeta:
-                        DashboardViewLiquid(layoutMode: .legacyTabbed)
-                    case .weightLoggerMVP:
-                        PaidWeightLoggerMVPView()
-                    }
-                }
+        NavigationStack {
+            switch selectedSurface {
+            case .photoTimelineHUD:
+                DashboardViewLiquid(layoutMode: .photoTimelineHUD)
+            case .legacyFullDashboardBeta:
+                DashboardViewLiquid(layoutMode: .legacyTabbed)
+            case .weightLoggerMVP:
+                PaidWeightLoggerMVPView()
             }
         }
         .onAppear {
             updateSelectedSurface()
         }
-    }
-
-    private var shouldOpenChatFirst: Bool {
-        #if DEBUG
-        let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("-lybUITestChatFirstFixture") {
-            return true
-        }
-
-        if arguments.contains(where: { $0.hasPrefix("-lybUITest") }) {
-            return false
-        }
-        #endif
-
-        return true
     }
 
     private func updateSelectedSurface() {
@@ -711,17 +688,10 @@ private struct FailedChatTurn: Equatable {
     let clientMessageId: String
 }
 
-private enum ChatDestination: Hashable {
-    case timeline
-    case settings
-}
-
 @MainActor
-private struct ChatFirstRootView: View {
+struct ChatTabView: View {
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.theme) private var theme
-    @State private var path: [ChatDestination] = []
-    @State private var isSidebarPresented = false
     @State private var draft = ""
     @State private var isResponding = false
     @State private var isLoadingConversation = true
@@ -737,56 +707,25 @@ private struct ChatFirstRootView: View {
     @FocusState private var isComposerFocused: Bool
 
     var body: some View {
-        NavigationStack(path: $path) {
-            ZStack(alignment: .leading) {
-                accessibilityMarker(id: "chat_first_root", label: "Chat")
-                chatSurface
-
-                if isSidebarPresented {
-                    Color.black.opacity(0.42)
-                        .ignoresSafeArea()
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation(.easeOut(duration: 0.22)) {
-                                isSidebarPresented = false
-                            }
-                        }
-
-                    chatSidebar
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                }
+        ZStack(alignment: .topLeading) {
+            accessibilityMarker(id: "chat_tab_root", label: "Chat")
+            chatSurface
+        }
+        .background(theme.colors.background.ignoresSafeArea())
+        .worldClassScreen(.chat)
+        .task(id: authManager.currentUser?.id) {
+            await loadLatestConversation()
+        }
+        .onDisappear {
+            currentRequestTask?.cancel()
+        }
+        .alert("Delete this chat?", isPresented: $isDeleteConfirmationPresented) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                deleteCurrentConversation()
             }
-            .background(theme.colors.background.ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: ChatDestination.self) { destination in
-                switch destination {
-                case .timeline:
-                    DashboardViewLiquid(layoutMode: .photoTimelineHUD)
-                        .toolbar(.hidden, for: .tabBar)
-                case .settings:
-                    PreferencesView()
-                        .environmentObject(authManager)
-                        .toolbar(.hidden, for: .tabBar)
-                }
-            }
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 24, coordinateSpace: .local)
-                    .onEnded(handleSidebarGesture)
-            )
-            .task(id: authManager.currentUser?.id) {
-                await loadLatestConversation()
-            }
-            .onDisappear {
-                currentRequestTask?.cancel()
-            }
-            .alert("Delete this chat?", isPresented: $isDeleteConfirmationPresented) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
-                    deleteCurrentConversation()
-                }
-            } message: {
-                Text("This permanently removes the conversation from LogYourBody.")
-            }
+        } message: {
+            Text("This permanently removes the conversation from LogYourBody.")
         }
     }
 
@@ -805,33 +744,10 @@ private struct ChatFirstRootView: View {
     }
 
     private var chatHeader: some View {
-        HStack(spacing: 12) {
-            Button {
-                withAnimation(.easeOut(duration: 0.22)) {
-                    isSidebarPresented = true
-                }
-            } label: {
-                Image(systemName: "sidebar.leading")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(theme.colors.text)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open sidebar")
-            .accessibilityHint("Shows Timeline, Settings, and profile controls")
-            .accessibilityIdentifier("chat_sidebar_button")
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("LogYourBody")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(theme.colors.text)
-
-                Text("Private body chat")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(theme.colors.textSecondary)
-            }
-
-            Spacer(minLength: 0)
+        HStack(spacing: 8) {
+            Text("Private body chat")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(theme.colors.textSecondary)
 
             if isLoadingConversation {
                 ProgressView()
@@ -844,10 +760,26 @@ private struct ChatFirstRootView: View {
                     .frame(width: 8, height: 8)
                     .accessibilityHidden(true)
             }
+
+            Spacer(minLength: 0)
+
+            if messages.contains(where: { $0.role == .user }) {
+                Menu {
+                    Button("Delete Chat", systemImage: "trash", role: .destructive) {
+                        isDeleteConfirmationPresented = true
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Chat options")
+                .accessibilityIdentifier("chat_options_menu")
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 44)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(theme.colors.border.opacity(0.55))
@@ -1033,87 +965,6 @@ private struct ChatFirstRootView: View {
         .animation(.easeOut(duration: 0.18), value: canSend)
     }
 
-    private var chatSidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                Text("LogYourBody")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(theme.colors.text)
-
-                Spacer(minLength: 0)
-
-                Button {
-                    withAnimation(.easeOut(duration: 0.22)) {
-                        isSidebarPresented = false
-                    }
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(theme.colors.textSecondary)
-                        .frame(width: 40, height: 40)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close sidebar")
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 12)
-            .padding(.bottom, 18)
-
-            Text("Workspace")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(theme.colors.textSecondary)
-                .textCase(.uppercase)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 7)
-
-            sidebarButton(title: "Chat", icon: "bubble.left.and.bubble.right.fill") {
-                closeSidebar()
-            }
-
-            sidebarButton(title: "Timeline", icon: "photo.on.rectangle.angled") {
-                closeSidebar()
-                path.append(.timeline)
-            }
-            .accessibilityIdentifier("chat_timeline_link")
-
-            sidebarButton(title: "Settings", icon: "gearshape.fill") {
-                closeSidebar()
-                path.append(.settings)
-            }
-            .accessibilityIdentifier("chat_settings_link")
-
-            if messages.contains(where: { $0.role == .user }) {
-                sidebarButton(title: "Delete chat", icon: "trash") {
-                    closeSidebar()
-                    isDeleteConfirmationPresented = true
-                }
-                .accessibilityIdentifier("chat_delete_conversation_button")
-            }
-
-            Spacer(minLength: 0)
-
-            Text(
-                "Chats stay in LogYourBody for 30 days. A minimized body context is sent " +
-                    "to our model provider for each answer; it is never embedded or indexed."
-            )
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(theme.colors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
-        }
-        .frame(maxWidth: 306, maxHeight: .infinity, alignment: .topLeading)
-        .background(.regularMaterial)
-        .overlay(alignment: .trailing) {
-            Rectangle()
-                .fill(theme.colors.border.opacity(0.7))
-                .frame(width: 1)
-        }
-        .overlay(alignment: .topLeading) {
-            accessibilityMarker(id: "chat_sidebar", label: "Chat sidebar")
-        }
-    }
-
     private func accessibilityMarker(id: String, label: String) -> some View {
         Color.clear
             .frame(width: 1, height: 1)
@@ -1121,26 +972,6 @@ private struct ChatFirstRootView: View {
             .accessibilityLabel(label)
             .accessibilityIdentifier(id)
             .allowsHitTesting(false)
-    }
-
-    private func sidebarButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 13) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 22)
-
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(theme.colors.text)
-            .padding(.horizontal, 20)
-            .frame(minHeight: 48)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     private var canSend: Bool {
@@ -1151,29 +982,6 @@ private struct ChatFirstRootView: View {
 
     private var chatService: ChatServicing {
         AppServicePorts.chatService
-    }
-
-    private func closeSidebar() {
-        withAnimation(.easeOut(duration: 0.22)) {
-            isSidebarPresented = false
-        }
-    }
-
-    private func handleSidebarGesture(_ value: DragGesture.Value) {
-        let horizontalDistance = value.translation.width
-        guard abs(horizontalDistance) > 60 else { return }
-
-        if isSidebarPresented {
-            if horizontalDistance < 0 {
-                closeSidebar()
-            }
-        } else {
-            // Support the existing left-swipe muscle memory while also
-            // accepting the conventional leading-edge reveal gesture.
-            withAnimation(.easeOut(duration: 0.22)) {
-                isSidebarPresented = true
-            }
-        }
     }
 
     private func send(_ text: String) {
@@ -1401,7 +1209,6 @@ private struct ChatFirstRootView: View {
 
     private func deleteCurrentConversation() {
         guard !isResponding else { return }
-        closeSidebar()
 
         Task { @MainActor in
             guard let accessToken = await chatAccessToken() else {
