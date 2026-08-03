@@ -13,10 +13,10 @@ import UIKit
 
 
 final class PhotoTimelineHUDPolicyTests: XCTestCase {
-    func testPhotoTimelineHUDRemainsAvailableWhileChatIsDefaultV1Surface() {
+    func testPhotoTimelineHUDIsDefaultV1Surface() {
         XCTAssertTrue(PhotoTimelineHUDPolicy.defaultShowsPhotoTimelineHUD)
         XCTAssertTrue(PhotoTimelineHUDPolicy.shouldShowPhotoTimelineHUD())
-        XCTAssertEqual(PaidAppSurfacePolicy.surface(), .chatFirst)
+        XCTAssertEqual(PaidAppSurfacePolicy.surface(), .photoTimelineHUD)
     }
 
     func testDefaultHomeModeDefaultsToAvatar() {

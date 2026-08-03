@@ -5,7 +5,6 @@
 import Foundation
 
 enum PaidAppSurface: Equatable {
-    case chatFirst
     case weightLoggerMVP
     case legacyFullDashboardBeta
     case photoTimelineHUD
@@ -13,7 +12,7 @@ enum PaidAppSurface: Equatable {
 
 enum PaidAppSurfacePolicy {
     static func surface() -> PaidAppSurface {
-        .chatFirst
+        .photoTimelineHUD
     }
 }
 

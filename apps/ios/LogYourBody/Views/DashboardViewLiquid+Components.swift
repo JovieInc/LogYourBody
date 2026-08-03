@@ -767,8 +767,8 @@ struct LaunchTimelineSurface: View {
                         .padding(.top, 18)
                         .padding(.bottom, 8)
 
-                    timelineStrip
-                        .frame(height: 98)
+                    timelineScrubber
+                        .frame(height: 80)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
@@ -1005,93 +1005,19 @@ struct LaunchTimelineSurface: View {
 
             Spacer(minLength: 0)
 
-            Text("Swipe through entries")
+            Text("Scrub through time")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(theme.colors.textSecondary)
         }
         .accessibilityElement(children: .combine)
     }
 
-    private var timelineStrip: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(bodyMetrics.enumerated()), id: \.element.id) { index, metric in
-                        Button {
-                            HapticManager.shared.selection()
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                selectedIndex = index
-                            }
-                        } label: {
-                            timelineThumbnail(metric: metric, isSelected: index == selectedIndex)
-                        }
-                        .buttonStyle(.plain)
-                        .id(index)
-                        .accessibilityLabel(
-                            "Timeline entry \(metric.date.formatted(date: .abbreviated, time: .omitted))"
-                        )
-                        .accessibilityValue(index == selectedIndex ? "Selected" : "Not selected")
-                        .accessibilityIdentifier("launch_timeline_entry_\(index)")
-                    }
-                }
-                .padding(.horizontal, 1)
-            }
-            .accessibilityIdentifier("launch_timeline_photo_strip")
-            .onAppear {
-                proxy.scrollTo(selectedIndex, anchor: .center)
-            }
-            .onChange(of: selectedIndex) { _, newIndex in
-                withAnimation(.easeOut(duration: 0.2)) {
-                    proxy.scrollTo(newIndex, anchor: .center)
-                }
-            }
-        }
-    }
-
-    private func timelineThumbnail(metric: BodyMetrics, isSelected: Bool) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            if let photoURL = metric.photoUrl, !photoURL.isEmpty {
-                CachedAsyncImage(urlString: photoURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    thumbnailPlaceholder
-                }
-            } else {
-                thumbnailPlaceholder
-            }
-
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.58)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            Text(metric.date.formatted(.dateTime.month(.abbreviated).day()))
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(6)
-        }
-        .frame(width: 76, height: 96)
-        .clipShape(RoundedRectangle(cornerRadius: 11))
-        .overlay {
-            RoundedRectangle(cornerRadius: 11)
-                .stroke(isSelected ? theme.colors.text : theme.colors.border, lineWidth: isSelected ? 2 : 1)
-        }
-        .scaleEffect(isSelected ? 1.02 : 1)
-    }
-
-    private var thumbnailPlaceholder: some View {
-        LinearGradient(
-            colors: [theme.colors.surface, theme.colors.backgroundSecondary],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
+    private var timelineScrubber: some View {
+        DashboardTimelineScrubber(
+            bodyMetrics: bodyMetrics,
+            selectedIndex: $selectedIndex,
+            timelineMode: .constant(.photo)
         )
-        .overlay {
-            Image(systemName: "circle.dashed")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(theme.colors.textTertiary)
-        }
+        .accessibilityIdentifier("launch_timeline_scrubber")
     }
 }

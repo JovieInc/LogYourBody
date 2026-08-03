@@ -132,8 +132,8 @@ def write_outputs(artifact_dir: Path, violations: list[AuditViolation]) -> None:
                 "- The dashboard avatar visual fills a full-width black stage while preserving each transparent asset's native aspect ratio.",
                 "- Dashboard/HUD launch surfaces stay on theme-backed glass or flat surface treatments.",
                 "- Timeline/Stats swipe navigation changes page on release, not during drag updates.",
-                "- Paid users default directly into authenticated chat without a Statsig or legacy fallback gate.",
-                "- The Timeline HUD remains available from the chat sidebar as the critical body-history surface.",
+                "- Paid users default directly into the timeline HUD without a Statsig or legacy fallback gate.",
+                "- Chat remains a peer navigation tab and never replaces the body-history shell.",
             ]
         )
 
@@ -262,9 +262,9 @@ def main() -> int:
     require_token(
         root=root,
         path=main_tab_view_policies,
-        token="static func surface() -> PaidAppSurface {\n        .chatFirst",
-        check="routing.chat_first_default",
-        detail="Paid app default surface must route straight to authenticated chat for v1.",
+        token="static func surface() -> PaidAppSurface {\n        .photoTimelineHUD",
+        check="routing.timeline_hud_default",
+        detail="Paid app default surface must route straight to the timeline HUD for v1.",
         violations=violations,
     )
 

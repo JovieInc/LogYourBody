@@ -125,6 +125,7 @@ struct DashboardViewLiquid: View {
     enum PhotoTimelineRootPage: Hashable {
         case timeline
         case analytics
+        case chat
 
         var navigationTitle: String {
             switch self {
@@ -132,6 +133,8 @@ struct DashboardViewLiquid: View {
                 "Timeline"
             case .analytics:
                 "Stats"
+            case .chat:
+                "Chat"
             }
         }
 
@@ -141,6 +144,19 @@ struct DashboardViewLiquid: View {
                 "photo_timeline_root_nav_timeline"
             case .analytics:
                 "photo_timeline_root_nav_stats"
+            case .chat:
+                "photo_timeline_root_nav_chat"
+            }
+        }
+
+        var worldClassScreen: WorldClassScreen {
+            switch self {
+            case .timeline:
+                .photoTimeline
+            case .analytics:
+                .stats
+            case .chat:
+                .chat
             }
         }
     }
