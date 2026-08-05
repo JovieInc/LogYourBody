@@ -13,6 +13,20 @@ import XCTest
 final class TimelineDataProviderScrubTests: XCTestCase {
     private let calendar = Calendar.current
 
+    // MARK: - Timeline drag position (track geometry -> normalized position)
+
+    func testDragPositionMapsLocationToTrackFraction() {
+        XCTAssertEqual(TimelineCalculator.position(forLocationX: 25, trackWidth: 200), 0.125)
+        XCTAssertEqual(TimelineCalculator.position(forLocationX: 100, trackWidth: 200), 0.5)
+        XCTAssertEqual(TimelineCalculator.position(forLocationX: 200, trackWidth: 200), 1)
+    }
+
+    func testDragPositionClampsOutsideTrackAndHandlesInvalidWidth() {
+        XCTAssertEqual(TimelineCalculator.position(forLocationX: -10, trackWidth: 200), 0)
+        XCTAssertEqual(TimelineCalculator.position(forLocationX: 250, trackWidth: 200), 1)
+        XCTAssertEqual(TimelineCalculator.position(forLocationX: 100, trackWidth: 0), 0)
+    }
+
     // MARK: - dateFromPosition (position -> date, three-zone time weighting)
 
     func testDateFromPositionMapsZoneBoundaries() throws {

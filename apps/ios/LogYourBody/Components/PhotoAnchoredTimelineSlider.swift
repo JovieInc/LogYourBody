@@ -36,6 +36,11 @@ struct TimelineDataPoint: Identifiable {
 
 /// Calculates smart time-weighted positions for timeline entries
 class TimelineCalculator {
+    static func position(forLocationX locationX: CGFloat, trackWidth: CGFloat) -> Double {
+        guard trackWidth > 0 else { return 0 }
+        return min(max(Double(locationX / trackWidth), 0), 1)
+    }
+
     /// Calculate weighted timeline positions for body metrics
     static func calculateTimelinePoints(from metrics: [BodyMetrics]) -> [TimelineDataPoint] {
         guard !metrics.isEmpty else { return [] }
@@ -525,11 +530,10 @@ struct PhotoAnchoredTimelineSlider: View {
                         isDragging = true
                         thumbScale = 1.2
 
-                        let geometry = value.translation.width
-                        guard geometry > 0 else { return }
-
-                        let position = value.location.x / geometry
-                        let clampedPosition = min(max(0, position), 1)
+                        let clampedPosition = TimelineCalculator.position(
+                            forLocationX: value.location.x,
+                            trackWidth: geometry.size.width
+                        )
 
                         // Find nearest timeline point to this position
                         if let nearestPoint = TimelineCalculator.findNearestPoint(to: clampedPosition, in: timelinePoints) {
