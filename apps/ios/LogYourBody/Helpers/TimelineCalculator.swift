@@ -28,6 +28,11 @@ struct TimelineDataPoint: Identifiable {
 class TimelineCalculator {
     private static let timelineCache = LRUCache<TimelineCacheKey, [TimelineDataPoint]>(capacity: 50)
 
+    static func position(forLocationX locationX: CGFloat, trackWidth: CGFloat) -> Double {
+        guard trackWidth > 0 else { return 0 }
+        return min(max(Double(locationX / trackWidth), 0), 1)
+    }
+
     /// Calculate weighted timeline positions for body metrics
     /// - Parameter metrics: Array of BodyMetrics sorted by date (newest first)
     /// - Returns: Array of TimelineDataPoint with weighted positions
