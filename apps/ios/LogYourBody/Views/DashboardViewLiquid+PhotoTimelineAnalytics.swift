@@ -56,7 +56,7 @@ extension DashboardViewLiquid {
     }
 
     var photoTimelinePresenceSummary: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
             ViewThatFits(in: .horizontal) {
                 HStack {
                     timelineDataTitle
@@ -70,11 +70,7 @@ extension DashboardViewLiquid {
                 }
             }
 
-            Text(photoTimelinePresenceLegendText)
-                .font(.footnote.weight(.medium))
-                .foregroundColor(theme.colors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("photo_timeline_stats_presence_legend")
+            photoTimelinePresenceChipGrid
         }
         .padding(JovieTokens.compactInset)
         .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous))
@@ -85,6 +81,58 @@ extension DashboardViewLiquid {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Timeline data. \(photoTimelinePresenceLegendText). \(timelinePresenceValueCount) values.")
         .accessibilityIdentifier("photo_timeline_stats_presence_summary")
+    }
+
+    private var photoTimelinePresenceChipGrid: some View {
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ],
+            spacing: 8
+        ) {
+            ForEach(MetricPresence.allCases, id: \.self) { presence in
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(photoTimelinePresenceColor(for: presence))
+                        .frame(width: 8, height: 8)
+
+                    Text(photoTimelinePresenceLabel(for: presence))
+                        .font(.footnote.weight(.medium))
+                        .foregroundColor(theme.colors.text)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 4)
+
+                    Text("\(timelinePresenceCounts[presence] ?? 0)")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(theme.colors.textSecondary)
+                        .monospacedDigit()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    theme.colors.backgroundSecondary,
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+            }
+        }
+        .accessibilityIdentifier("photo_timeline_stats_presence_legend")
+    }
+
+    func photoTimelinePresenceColor(for presence: MetricPresence) -> Color {
+        switch presence {
+        case .present:
+            return theme.colors.primary
+        case .estimated:
+            return theme.colors.accentOrange
+        case .interpolated:
+            return theme.colors.accentPink
+        case .lastKnown:
+            return theme.colors.accentViolet
+        case .missing:
+            return theme.colors.textTertiary
+        }
     }
 
     private var timelineDataTitle: some View {
