@@ -721,13 +721,18 @@ struct DashboardStepsCard<ProgressView: View>: View {
 
 /// The focused timeline surface used by the launch experience.
 ///
+/// Composition follows the locked JOV-2866 photo-first hierarchy: the photo
+/// stage is the visual anchor, the timeline scrubber sits immediately below
+/// it, three compact metric facts follow, and Body Score stays available as a
+/// secondary row rather than the first visual object.
+///
 /// This intentionally has no vertical scroll container. The only scrolling
 /// gesture on the page is the photo strip, so a user can move through time
-/// directly without losing the score and essential metrics above it.
+/// directly without losing the essential metrics below it.
 struct LaunchTimelineSurface: View {
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .largeTitle) private var scoreFontSize: CGFloat = 58
+    @ScaledMetric(relativeTo: .largeTitle) private var scoreFontSize: CGFloat = 34
 
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
@@ -750,7 +755,7 @@ struct LaunchTimelineSurface: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let stageHeight = min(248, max(160, geometry.size.height * 0.35))
+            let stageHeight = min(336, max(216, geometry.size.height * 0.44))
 
             ZStack(alignment: .topLeading) {
                 launchAccessibilityMarker(id: "launch_timeline_surface", label: "Timeline")
@@ -760,15 +765,15 @@ struct LaunchTimelineSurface: View {
                         .frame(height: stageHeight)
                         .clipShape(RoundedRectangle(cornerRadius: theme.radius.card))
 
-                    scoreAndMetrics
-                        .padding(.top, 14)
-
-                    stripHeader
-                        .padding(.top, 18)
-                        .padding(.bottom, 8)
-
                     timelineScrubber
                         .frame(height: 80)
+                        .padding(.top, 12)
+
+                    metricStrip
+                        .padding(.top, 12)
+
+                    scoreRow
+                        .padding(.top, 12)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
@@ -876,46 +881,46 @@ struct LaunchTimelineSurface: View {
         }
     }
 
-    private var scoreAndMetrics: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Group {
-                if let onTapBodyScore {
-                    Button(action: onTapBodyScore) {
-                        scoreContent
-                    }
-                    .buttonStyle(.plain)
-                } else {
+    private var metricStrip: some View {
+        HStack(spacing: 8) {
+            launchMetricCell(
+                title: "Weight",
+                value: weightValue,
+                caption: weightCaption,
+                accent: theme.colors.accentViolet,
+                action: onTapWeight
+            )
+
+            launchMetricCell(
+                title: "Body Fat",
+                value: bodyFatValue,
+                caption: bodyFatCaption,
+                accent: theme.colors.accentPink,
+                action: onTapBodyFat
+            )
+
+            launchMetricCell(
+                title: "FFMI",
+                value: ffmiValue,
+                caption: ffmiCaption,
+                accent: theme.colors.accentTeal,
+                action: onTapFFMI
+            )
+        }
+    }
+
+    private var scoreRow: some View {
+        Group {
+            if let onTapBodyScore {
+                Button(action: onTapBodyScore) {
                     scoreContent
                 }
-            }
-            .accessibilityIdentifier("launch_timeline_body_score")
-
-            HStack(spacing: 8) {
-                launchMetricCell(
-                    title: "Weight",
-                    value: weightValue,
-                    caption: weightCaption,
-                    accent: theme.colors.accentViolet,
-                    action: onTapWeight
-                )
-
-                launchMetricCell(
-                    title: "Body Fat",
-                    value: bodyFatValue,
-                    caption: bodyFatCaption,
-                    accent: theme.colors.accentPink,
-                    action: onTapBodyFat
-                )
-
-                launchMetricCell(
-                    title: "FFMI",
-                    value: ffmiValue,
-                    caption: ffmiCaption,
-                    accent: theme.colors.accentTeal,
-                    action: onTapFFMI
-                )
+                .buttonStyle(.plain)
+            } else {
+                scoreContent
             }
         }
+        .accessibilityIdentifier("launch_timeline_body_score")
     }
 
     private var scoreContent: some View {
@@ -968,23 +973,23 @@ struct LaunchTimelineSurface: View {
                     .frame(width: 22, height: 2)
 
                 Text(title)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(theme.colors.textSecondary)
                     .lineLimit(1)
 
                 Text(value)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .foregroundStyle(theme.colors.text)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .minimumScaleFactor(0.6)
 
                 Text(caption)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(theme.colors.textSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .background(theme.colors.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
@@ -995,21 +1000,6 @@ struct LaunchTimelineSurface: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(title) \(value), \(caption)")
-    }
-
-    private var stripHeader: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Timeline")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(theme.colors.text)
-
-            Spacer(minLength: 0)
-
-            Text("Scrub through time")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(theme.colors.textSecondary)
-        }
-        .accessibilityElement(children: .combine)
     }
 
     private var timelineScrubber: some View {
