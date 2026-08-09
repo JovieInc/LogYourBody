@@ -4,26 +4,16 @@ struct BodyScoreHookView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @Environment(\.dismiss) private var dismiss
 
-    private let bulletItems: [OnboardingBulletItem] = [
-        .init(iconName: "scalemass", text: "Your latest weight"),
-        .init(iconName: "percent", text: "A measured or estimated body-fat value"),
-        .init(iconName: "ruler", text: "Your height for a frame-adjusted comparison")
-    ]
-
     var body: some View {
         OnboardingPageTemplate(
             title: "See what’s changing.",
-            subtitle: "Use weight, body fat, and height to build your first Body Score in about 60 seconds.",
+            subtitle: "Weight, body fat, and height build your first Body Score in about a minute.",
             showsBackButton: false,
             progress: viewModel.progress(for: .hook),
             screen: .bodyScoreIntro
         ) {
-            VStack(spacing: JovieTokens.sectionGap) {
-                BodyScoreContourField()
-                    .frame(height: 190)
-
-                OnboardingBulletList(items: bulletItems)
-            }
+            BodyScoreContourField()
+                .frame(height: 190)
         } footer: {
             VStack(spacing: 12) {
                 Button {

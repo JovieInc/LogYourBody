@@ -773,6 +773,26 @@ final class LogYourBodyUITests: XCTestCase {
         try assertAndCaptureOnboardingFirstPhotoCTA(in: app)
     }
 
+    func testOnboardingConcisionSurvivesAccessibilityDynamicType() throws {
+        let app = XCUIApplication()
+        let accessibilityArguments = [
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXL"
+        ]
+
+        launch(
+            app,
+            with: ["-lybUITestBodyScoreOnboardingFixture"] + accessibilityArguments
+        )
+        try assertAndCaptureOnboardingFixedCTA(in: app)
+
+        launch(
+            app,
+            with: ["-lybUITestBodyScoreFirstPhotoFixture"] + accessibilityArguments
+        )
+        try assertAndCaptureOnboardingFirstPhotoCTA(in: app)
+    }
+
     func testPhaseInsightFixtureShowsDeterministicCuttingInsight() throws {
         let app = XCUIApplication()
         launch(app, with: [
@@ -1063,6 +1083,9 @@ final class LogYourBodyUITests: XCTestCase {
         let windowFrame = app.windows.firstMatch.frame
         XCTAssertGreaterThan(startButton.frame.minY, windowFrame.height * 0.72)
         XCTAssertLessThanOrEqual(startButton.frame.maxY, windowFrame.maxY + 1)
+        XCTAssertFalse(app.staticTexts["Your latest weight"].exists)
+        XCTAssertFalse(app.staticTexts["A measured or estimated body-fat value"].exists)
+        XCTAssertFalse(app.staticTexts["Your height for a frame-adjusted comparison"].exists)
         attachScreenshot(named: "launch-quality-onboarding-fixed-cta", from: app)
     }
 
@@ -1076,6 +1099,9 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(addPhotoButton.isHittable)
         XCTAssertTrue(skipButton.isHittable)
         XCTAssertFalse(app.buttons["Continue"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["onboarding_first_photo_card"].exists)
+        XCTAssertFalse(app.staticTexts["A private baseline, on your terms."].exists)
+        XCTAssertFalse(app.staticTexts["Camera and photo library access are optional."].exists)
 
         attachScreenshot(named: "launch-quality-onboarding-first-photo", from: app)
     }
