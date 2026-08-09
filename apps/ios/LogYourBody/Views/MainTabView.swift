@@ -692,7 +692,9 @@ private struct FailedChatTurn: Equatable {
 struct ChatTabView: View {
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var draft = ""
+    @State private var composerTextHeight: CGFloat = 0
     @State private var isResponding = false
     @State private var isLoadingConversation = true
     @State private var messages: [ChatMessage] = [.welcome]
@@ -918,7 +920,10 @@ struct ChatTabView: View {
     }
 
     private var composer: some View {
-        HStack(spacing: 10) {
+        let isMultiline = ChatComposerGeometry.isMultiline(textHeight: composerTextHeight)
+        let cornerRadius = ChatComposerGeometry.cornerRadius(isMultiline: isMultiline)
+
+        return HStack(alignment: .bottom, spacing: JovieTokens.itemGap) {
             TextField("Message LogYourBody", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($isComposerFocused)
@@ -930,6 +935,14 @@ struct ChatTabView: View {
                     send(draft)
                 }
                 .accessibilityIdentifier("chat_composer")
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: ChatComposerTextHeightPreferenceKey.self,
+                            value: geometry.size.height
+                        )
+                    }
+                }
 
             Button {
                 if isResponding {
@@ -943,7 +956,10 @@ struct ChatTabView: View {
                     .foregroundStyle(
                         (canSend || isResponding) ? theme.colors.background : theme.colors.textTertiary
                     )
-                    .frame(width: 34, height: 34)
+                    .frame(
+                        width: JovieTokens.minimumHitTarget,
+                        height: JovieTokens.minimumHitTarget
+                    )
                     .background(
                         (canSend || isResponding) ? theme.colors.text : theme.colors.surface,
                         in: Circle()
@@ -954,15 +970,45 @@ struct ChatTabView: View {
             .accessibilityLabel(isResponding ? "Stop answer" : "Send message")
             .accessibilityIdentifier("chat_send_button")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.leading, JovieTokens.compactInset)
+        .padding(.trailing, JovieTokens.tightGap)
+        .padding(.vertical, JovieTokens.tightGap)
+        .background {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(theme.colors.surface.opacity(JovieTokens.hairlineOpacity))
+
+            Color.clear
+                .accessibilityElement()
+                .accessibilityLabel("Chat composer container")
+                .accessibilityIdentifier("chat_composer_shell")
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(
+                    (isComposerFocused ? theme.colors.primary : theme.colors.border)
+                        .opacity(JovieTokens.hairlineOpacity),
+                    lineWidth: 1
+                )
+        }
+        .padding(.horizontal, JovieTokens.screenInset)
+        .padding(.vertical, JovieTokens.itemGap)
         .background(.ultraThinMaterial)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(theme.colors.border.opacity(0.55))
+                .fill(theme.colors.border.opacity(JovieTokens.hairlineOpacity))
                 .frame(height: 1)
         }
-        .animation(.easeOut(duration: 0.18), value: canSend)
+        .onPreferenceChange(ChatComposerTextHeightPreferenceKey.self) { height in
+            composerTextHeight = height
+        }
+        .animation(
+            ChatComposerGeometry.transitionAnimation(reduceMotion: reduceMotion),
+            value: isMultiline
+        )
+        .animation(
+            ChatComposerGeometry.transitionAnimation(reduceMotion: reduceMotion),
+            value: canSend
+        )
     }
 
     private func accessibilityMarker(id: String, label: String) -> some View {
@@ -1242,6 +1288,14 @@ struct ChatTabView: View {
         }
         #endif
         return await authManager.getAccessToken()
+    }
+}
+
+private struct ChatComposerTextHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
