@@ -1,19 +1,5 @@
 import SwiftUI
 
-// MARK: - Bullet Lists
-
-struct OnboardingBulletList: View {
-    let items: [OnboardingBulletItem]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(items) { item in
-                OnboardingIconBullet(item: item)
-            }
-        }
-    }
-}
-
 // MARK: - Option Buttons
 
 struct OnboardingOptionButton: View {

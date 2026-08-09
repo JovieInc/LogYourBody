@@ -37,12 +37,12 @@ struct BodyScoreFirstProgressPhotoView: View {
     var body: some View {
         OnboardingPageTemplate(
             title: "Start a visual timeline?",
-            subtitle: "One private photo makes future change easier to see. Add one now or skip.",
+            subtitle: "Add one private, unaltered photo now or skip. Analysis always requires consent.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .firstPhoto),
             screen: .firstProgressPhoto,
             content: {
-                previewCard
+                EmptyView()
             },
             footer: {
                 actionStack
@@ -61,52 +61,6 @@ struct BodyScoreFirstProgressPhotoView: View {
             )
             .environmentObject(authManager)
         }
-    }
-
-    private var previewCard: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.md) {
-            Image(systemName: "camera.metering.center.weighted")
-                .font(theme.typography.headlineMedium)
-                .foregroundStyle(theme.colors.text.opacity(0.82))
-
-            VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                Text("A private baseline, on your terms.")
-                    .font(theme.typography.headlineSmall)
-                    .foregroundStyle(theme.colors.text)
-
-                Text(
-                    "Consistent framing helps you compare honestly. " +
-                        "We never alter your body or analyze a photo without consent."
-                )
-                    .font(OnboardingTypography.body)
-                    .foregroundStyle(theme.colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            HStack(alignment: .top, spacing: theme.spacing.sm) {
-                Image(systemName: "lock.shield")
-                    .font(.system(.footnote, design: .default).weight(.semibold))
-                    .foregroundStyle(theme.colors.text)
-
-                Text("Camera and photo library access are optional.")
-                    .font(OnboardingTypography.caption)
-                    .foregroundStyle(theme.colors.textTertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(theme.spacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .systemBGlassSurface(
-            cornerRadius: theme.radius.card,
-            tint: theme.colors.text,
-            tintOpacity: 0.04,
-            borderColor: theme.colors.border,
-            borderOpacity: 0.65,
-            shadowOpacity: 0.12,
-            shadowRadius: 12,
-            shadowY: 6
-        )
-        .accessibilityIdentifier("onboarding_first_photo_card")
     }
 
     private var actionStack: some View {

@@ -156,38 +156,6 @@ struct OnboardingDisclosureLink: View {
 
 // MARK: - Supporting Atoms
 
-struct OnboardingBulletItem: Identifiable, Hashable {
-    let id = UUID()
-    let iconName: String
-    let text: String
-}
-
-struct OnboardingIconBullet: View {
-    @Environment(\.theme)
-    private var theme
-
-    let item: OnboardingBulletItem
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: item.iconName)
-                .font(.system(.body, design: .rounded).weight(.semibold))
-                .foregroundStyle(theme.colors.primary)
-                .frame(width: 24, height: 24)
-                .background(
-                    Circle()
-                        .fill(theme.colors.primary.opacity(0.15))
-                )
-
-            Text(item.text)
-                .font(theme.typography.bodyMedium)
-                .foregroundStyle(theme.colors.text)
-                .multilineTextAlignment(.leading)
-        }
-        .padding(.vertical, 4)
-    }
-}
-
 struct OnboardingBadge: View {
     @Environment(\.theme)
     private var theme
