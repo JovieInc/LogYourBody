@@ -11,6 +11,7 @@ import UIKit
 enum JovieTokens {
     static let screenInset: CGFloat = 20
     static let compactInset: CGFloat = 16
+    static let tightGap: CGFloat = 8
     static let sectionGap: CGFloat = 28
     static let itemGap: CGFloat = 12
     static let minimumHitTarget: CGFloat = 44
@@ -22,6 +23,22 @@ enum JovieTokens {
     static let ambientAccentOpacity: Double = 0.08
     static let subtleDuration: Double = 0.15
     static let cinematicDuration: Double = 0.42
+}
+
+enum ChatComposerGeometry {
+    static let multilineTextHeightThreshold = JovieTokens.sectionGap
+
+    static func isMultiline(textHeight: CGFloat) -> Bool {
+        textHeight > multilineTextHeightThreshold
+    }
+
+    static func cornerRadius(isMultiline: Bool) -> CGFloat {
+        isMultiline ? JovieTokens.controlRadius : JovieTokens.controlHeight
+    }
+
+    static func transitionAnimation(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration)
+    }
 }
 
 enum WorldClassScreenFlow: String, CaseIterable {

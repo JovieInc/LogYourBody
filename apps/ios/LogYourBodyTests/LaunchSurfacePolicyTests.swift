@@ -13,6 +13,32 @@ import UIKit
 
 
 final class LaunchSurfacePolicyTests: XCTestCase {
+    func testChatComposerGeometryUsesOnlyCanonicalPillAndMultilineRadii() {
+        XCTAssertFalse(
+            ChatComposerGeometry.isMultiline(
+                textHeight: ChatComposerGeometry.multilineTextHeightThreshold
+            )
+        )
+        XCTAssertTrue(
+            ChatComposerGeometry.isMultiline(
+                textHeight: ChatComposerGeometry.multilineTextHeightThreshold + 1
+            )
+        )
+        XCTAssertEqual(
+            ChatComposerGeometry.cornerRadius(isMultiline: false),
+            JovieTokens.controlHeight
+        )
+        XCTAssertEqual(
+            ChatComposerGeometry.cornerRadius(isMultiline: true),
+            JovieTokens.controlRadius
+        )
+    }
+
+    func testChatComposerGeometryDisablesTransitionAnimationForReducedMotion() {
+        XCTAssertNil(ChatComposerGeometry.transitionAnimation(reduceMotion: true))
+        XCTAssertNotNil(ChatComposerGeometry.transitionAnimation(reduceMotion: false))
+    }
+
     func testIncompleteOnboardingRequiresBodyCompositionOnboarding() {
         XCTAssertTrue(
             LaunchSurfacePolicy.requiresBodyCompositionOnboarding(

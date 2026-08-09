@@ -445,6 +445,45 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "chat-stream-cancelled", from: app)
     }
 
+    func testChatComposerKeepsOneGridFromPillToMultiline() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture"
+        ])
+
+        try openChatTab(in: app)
+
+        let composer = app.textFields["chat_composer"]
+        let shell = app.descendants(matching: .any)["chat_composer_shell"]
+        let sendButton = app.buttons["chat_send_button"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 8))
+        XCTAssertTrue(shell.waitForExistence(timeout: 5))
+        XCTAssertTrue(sendButton.waitForExistence(timeout: 5))
+
+        let singleLineFrame = shell.frame
+        XCTAssertGreaterThanOrEqual(sendButton.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(sendButton.frame.height, 44)
+        attachScreenshot(named: "chat-composer-single-line", from: app)
+
+        composer.tap()
+        composer.typeText(
+            "Compare my latest weight, body-fat trend, and progress photos with the previous month " +
+                "and explain the most important change in plain language."
+        )
+
+        let multiline = NSPredicate { _, _ in
+            shell.frame.height > singleLineFrame.height
+        }
+        expectation(for: multiline, evaluatedWith: shell)
+        waitForExpectations(timeout: 5)
+
+        XCTAssertEqual(shell.frame.minX, singleLineFrame.minX, accuracy: 1)
+        XCTAssertEqual(shell.frame.width, singleLineFrame.width, accuracy: 1)
+        XCTAssertLessThanOrEqual(sendButton.frame.maxY, shell.frame.maxY)
+        attachScreenshot(named: "chat-composer-multiline", from: app)
+    }
+
     func testSettingsProfileFieldsOpenDirectEditors() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
