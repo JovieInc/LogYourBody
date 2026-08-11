@@ -17,7 +17,7 @@ importers:
         version: 7.0.42(zod@4.1.13)
       eve:
         specifier: 0.27.13
-        version: 0.27.13(@opentelemetry/api@1.9.0)(ai@7.0.42(zod@4.1.13))(dotenv@17.2.3)(jiti@2.6.1)(vite@7.2.4(@types/node@22.20.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))
+        version: 0.27.13(@opentelemetry/api@1.9.0)(ai@7.0.42(zod@4.1.13))(dotenv@17.2.3)(jiti@2.6.1)(lru-cache@11.5.2)(vite@7.2.4(@types/node@22.20.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))
       zod:
         specifier: ^4.1.13
         version: 4.1.13
@@ -10803,10 +10803,10 @@ snapshots:
 
   esutils@2.0.3: {}
 
-  eve@0.27.13(@opentelemetry/api@1.9.0)(ai@7.0.42(zod@4.1.13))(dotenv@17.2.3)(jiti@2.6.1)(vite@7.2.4(@types/node@22.20.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1)):
+  eve@0.27.13(@opentelemetry/api@1.9.0)(ai@7.0.42(zod@4.1.13))(dotenv@17.2.3)(jiti@2.6.1)(lru-cache@11.5.2)(vite@7.2.4(@types/node@22.20.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1)):
     dependencies:
       ai: 7.0.42(zod@4.1.13)
-      nitro: 3.0.260610-beta(dotenv@17.2.3)(jiti@2.6.1)(vite@7.2.4(@types/node@22.20.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))
+      nitro: 3.0.260610-beta(dotenv@17.2.3)(jiti@2.6.1)(lru-cache@11.5.2)(vite@7.2.4(@types/node@22.20.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))
       undici: 8.9.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
@@ -12466,7 +12466,7 @@ snapshots:
 
   nf3@0.3.23: {}
 
-  nitro@3.0.260610-beta(dotenv@17.2.3)(jiti@2.6.1)(vite@7.2.4(@types/node@22.20.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1)):
+  nitro@3.0.260610-beta(dotenv@17.2.3)(jiti@2.6.1)(lru-cache@11.5.2)(vite@7.2.4(@types/node@22.20.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1)):
     dependencies:
       consola: 3.4.2
       crossws: 0.4.10(srvx@0.11.22)
@@ -12481,7 +12481,7 @@ snapshots:
       rolldown: 1.2.1
       srvx: 0.11.22
       unenv: 2.0.0-rc.24
-      unstorage: 2.0.0-alpha.7(db0@0.3.4)(ofetch@2.0.0-alpha.3)
+      unstorage: 2.0.0-alpha.7(db0@0.3.4)(lru-cache@11.5.2)(ofetch@2.0.0-alpha.3)
     optionalDependencies:
       dotenv: 17.2.3
       jiti: 2.6.1
@@ -13779,9 +13779,10 @@ snapshots:
       '@unrs/resolver-binding-win32-ia32-msvc': 1.11.1
       '@unrs/resolver-binding-win32-x64-msvc': 1.11.1
 
-  unstorage@2.0.0-alpha.7(db0@0.3.4)(ofetch@2.0.0-alpha.3):
+  unstorage@2.0.0-alpha.7(db0@0.3.4)(lru-cache@11.5.2)(ofetch@2.0.0-alpha.3):
     optionalDependencies:
       db0: 0.3.4
+      lru-cache: 11.5.2
       ofetch: 2.0.0-alpha.3
 
   unzipper@0.12.3:
