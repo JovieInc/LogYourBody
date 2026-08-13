@@ -83,31 +83,40 @@ async function loadSyncManager({ online = true } = {}) {
     const url = String(input);
     fetchUrls.push(url);
     const method = (init?.method || 'GET').toUpperCase();
-    const payload = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown> | unknown[]) : {};
+    const payload = init?.body
+      ? (JSON.parse(String(init.body)) as Record<string, unknown> | unknown[])
+      : {};
+
+    const jsonResponse = (body: unknown, status: number) =>
+      ({
+        ok: status >= 200 && status < 300,
+        status,
+        json: async () => body,
+      }) as Response;
 
     if (url.includes('/api/profile') && method === 'GET') {
-      return new Response(JSON.stringify({ profile: { id: 'user_1' } }), { status: 200 });
+      return jsonResponse({ profile: { id: 'user_1' } }, 200);
     }
     if (url.includes('/api/profile') && method === 'PATCH') {
-      if (tableErrors.has('profiles')) return new Response('fail', { status: 500 });
       upserts.push({ table: 'profiles', payload: payload as Record<string, unknown> });
-      return new Response(JSON.stringify({ profile: { id: 'user_1' } }), { status: 200 });
+      if (tableErrors.has('profiles')) return jsonResponse({ error: 'fail' }, 500);
+      return jsonResponse({ profile: { id: 'user_1' } }, 200);
     }
     if (url.includes('/api/body-metrics') && method === 'POST') {
-      if (tableErrors.has('body_metrics')) return new Response('fail', { status: 500 });
       upserts.push({ table: 'body_metrics', payload: payload as Record<string, unknown> });
-      return new Response(JSON.stringify({ metric: {} }), { status: 201 });
+      if (tableErrors.has('body_metrics')) return jsonResponse({ error: 'fail' }, 500);
+      return jsonResponse({ metric: {} }, 201);
     }
     if (url.includes('/daily-metrics') && method === 'POST') {
-      if (tableErrors.has('daily_metrics')) return new Response('fail', { status: 500 });
       const records = Array.isArray(payload) ? payload : [];
       upserts.push({
         table: 'daily_metrics',
         payload: (records[0] as Record<string, unknown>) || {},
       });
-      return new Response(JSON.stringify({ records: [] }), { status: 200 });
+      if (tableErrors.has('daily_metrics')) return jsonResponse({ error: 'fail' }, 500);
+      return jsonResponse({ records: [] }, 200);
     }
-    return new Response('not found', { status: 404 });
+    return jsonResponse({ error: 'not found' }, 404);
   });
 
   jest.doMock('@/lib/db/indexed-db', () => ({ indexedDB: indexedDBMock }));
@@ -115,7 +124,7 @@ async function loadSyncManager({ online = true } = {}) {
 
   const module = await import('../sync-manager');
   await Promise.resolve();
-  jest.clearAllMocks();
+  fetchMock.mockClear();
   fetchUrls.length = 0;
 
   return {
