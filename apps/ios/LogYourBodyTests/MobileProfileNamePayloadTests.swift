@@ -84,7 +84,14 @@ final class MobileProfileNamePayloadTests: XCTestCase {
         {"profile":{"id":"date-user","date_of_birth":"1990-01-01","onboarding_completed":true}}
         """#.utf8)
         let iso = Data(#"""
-        {"profile":{"id":"date-user","date_of_birth":"1990-01-01T00:00:00Z","legal_accepted_at":"2026-07-14T20:00:00.000Z","onboarding_completed":true}}
+        {
+          "profile": {
+            "id": "date-user",
+            "date_of_birth": "1990-01-01T00:00:00Z",
+            "legal_accepted_at": "2026-07-14T20:00:00.000Z",
+            "onboarding_completed": true
+          }
+        }
         """#.utf8)
 
         let dayEnvelope = try AuthManager.decodeProductProfileEnvelope(from: dayOnly)
@@ -104,7 +111,14 @@ final class MobileProfileNamePayloadTests: XCTestCase {
                 statusCode: 200,
                 body: Data(
                     #"""
-                    {"profile":{"id":"name-user","full_name":"Tim White","date_of_birth":"1990-01-01T08:00:00Z","onboarding_completed":true}}
+                    {
+                      "profile": {
+                        "id": "name-user",
+                        "full_name": "Tim White",
+                        "date_of_birth": "1990-01-01T08:00:00Z",
+                        "onboarding_completed": true
+                      }
+                    }
                     """#.utf8
                 )
             )
