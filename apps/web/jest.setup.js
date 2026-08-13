@@ -210,22 +210,6 @@ jest.mock('framer-motion', () => ({
   AnimatePresence: ({ children }) => children,
 }));
 
-// Mock Supabase profile module
-jest.mock('@/lib/supabase/profile', () => ({
-  getProfile: jest.fn().mockResolvedValue({
-    height: 71,
-    height_unit: 'ft',
-    gender: 'male',
-    settings: {
-      units: {
-        weight: 'lbs',
-        height: 'ft',
-        measurements: 'in',
-      },
-    },
-  }),
-}));
-
 // Mock createClient from Supabase
 jest.mock('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({

@@ -32,7 +32,7 @@ jest.mock('@/hooks/use-network-status', () => ({
   useNetworkStatus: () => true,
 }));
 
-jest.mock('@/lib/supabase/profile', () => ({
+jest.mock('@/lib/profile', () => ({
   getProfile: jest.fn(),
 }));
 
@@ -180,7 +180,7 @@ jest.mock('../page', () => {
   };
 });
 
-import { getProfile } from '@/lib/supabase/profile';
+import { getProfile } from '@/lib/profile';
 import { createClient } from '@/lib/supabase/client';
 
 const mockProfile = {

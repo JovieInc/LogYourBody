@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
 import ProfileSettingsPage from '../page';
-import * as profileApi from '@/lib/supabase/profile';
+import * as profileApi from '@/lib/profile';
 // import { format } from 'date-fns' // Not used
 
 // Mock dependencies
@@ -12,7 +12,7 @@ jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
-jest.mock('@/lib/supabase/profile', () => ({
+jest.mock('@/lib/profile', () => ({
   getProfile: jest.fn(),
   updateProfile: jest.fn(),
 }));
@@ -163,7 +163,7 @@ jest.mock('../page', () => {
 
   const { useRouter } = require('next/navigation') as typeof import('next/navigation');
 
-  const profileApi = require('@/lib/supabase/profile') as typeof import('@/lib/supabase/profile');
+  const profileApi = require('@/lib/profile') as typeof import('@/lib/profile');
 
   type ActivityLevel =
     | 'sedentary'

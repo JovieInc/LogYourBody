@@ -9,7 +9,6 @@ const protectedRoutePrefixes = [
   '/api/weights',
   '/api/auth/delete-account',
   '/api/parse-pdf',
-  '/api/parse-pdf-alt',
   '/api/parse-pdf-v2',
   '/onboarding',
   '/settings',

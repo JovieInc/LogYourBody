@@ -3,13 +3,13 @@ import { render, screen } from '@testing-library/react';
 import DashboardPage from '../page';
 import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
-import { getProfile } from '@/lib/supabase/profile';
+import { getProfile } from '@/lib/profile';
 import { createClient } from '@/lib/supabase/client';
 
 // Mock dependencies
 jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation');
-jest.mock('@/lib/supabase/profile');
+jest.mock('@/lib/profile');
 jest.mock('@/lib/supabase/client', () => ({
   createClient: jest.fn(),
 }));

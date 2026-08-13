@@ -140,6 +140,6 @@ Do not build a food logger or workout tracker. This product is for people who al
 - Build the smallest iOS-native product increment that improves activation, retention, paid conversion, or reliability.
 - Put risky/new user-visible behavior behind Statsig gates.
 - Prefer follow-up PRs over bloating an active PR.
-- Treat App Store/TestFlight, RevenueCat, Clerk, HealthKit, Supabase, and device validation as real closeout surfaces.
+- Treat App Store/TestFlight, RevenueCat, Jovie Auth, HealthKit, Neon, and device validation as real closeout surfaces.
 - Open issues only after the roadmap item has a clear trigger, KPI, and acceptance criteria.
 - When a user asks for Watch, iPad, web, AI, or bulk import, first check whether the trigger is met. If it is not met, propose the smallest validation step instead.

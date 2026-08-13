@@ -173,9 +173,11 @@ Sensitive information we collect:
 
 ### Service Providers We Share With
 
-- **Supabase**: Database and authentication
+- **Jovie**: Authentication services
+- **Neon**: Database hosting
+- **Supabase**: Legacy photo processing and account-deletion helpers
+- **Cloudinary**: Progress-photo storage
 - **AWS**: Cloud infrastructure
-- **Clerk**: Authentication services
 - **RevenueCat**: Subscription and purchase entitlements
 - **Sentry**: Error tracking and crash reports
 

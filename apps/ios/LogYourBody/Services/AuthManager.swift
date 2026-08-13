@@ -326,41 +326,6 @@ final class AuthManager: NSObject, ObservableObject {
         }
     }
 
-    func signIn(email: String, password: String) async throws {
-        try await authenticate(
-            path: "sign-in/email",
-            body: ["email": email, "password": password]
-        )
-        AppServicePorts.analyticsTracker.track(event: "login_completed", properties: ["method": "email"])
-    }
-
-    func signUp(email: String, password: String, name: String? = nil) async throws {
-        var body: [String: Any] = ["email": email, "password": password]
-        if let name, !name.isEmpty { body["name"] = name }
-        try await authenticate(path: "sign-up/email", body: body)
-        AppServicePorts.analyticsTracker.track(event: "signup_completed", properties: ["method": "email"])
-    }
-
-    private func authenticate(path: String, body: [String: Any]) async throws {
-        let response = try await requestBetterAuth(path: path, method: "POST", body: body)
-        guard let accessToken = response.resolvedAccessToken,
-              let user = response.user else { throw AuthError.invalidToken }
-        let expiresAt = response.session?.expiryDate
-            ?? Date().addingTimeInterval(response.expiresIn ?? 86_400)
-        let session = ProductAuthSession(
-            accessToken: accessToken,
-            refreshToken: response.refreshToken ?? accessToken,
-            expiresAt: expiresAt,
-            subject: user.id,
-            email: user.email ?? Self.syntheticAuthEmail(userId: user.id),
-            name: user.name,
-            issuedAt: Date()
-        )
-        try keychain.save(session, forKey: storedSessionKey)
-        authSession = session
-        applyAuthenticatedSession(session)
-    }
-
     private func requestBetterAuth(
         path: String,
         method: String,

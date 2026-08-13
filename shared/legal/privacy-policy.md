@@ -61,17 +61,17 @@ We use the information we collect to:
 
 ### Where We Store Data
 
-- Your data is stored on secure servers provided by Supabase (PostgreSQL database)
-- Progress photos are stored in encrypted cloud storage
+- Product data (profile, body metrics, chat, waitlist) is stored in Neon (PostgreSQL)
+- Progress photos are stored in encrypted cloud object storage
 - We use industry-standard encryption for data in transit and at rest
 
 ### Security Measures
 
-- All passwords are hashed using bcrypt
+- Sign in with Apple through Jovie Better Auth; we do not store user passwords
 - HTTPS/TLS encryption for all data transmission
 - Regular security audits and updates
 - Limited access to personal data (need-to-know basis)
-- Secure authentication via Clerk
+- Secure authentication via Jovie Better Auth
 
 ### Data Retention
 
@@ -85,9 +85,10 @@ We do not sell, trade, or rent your personal information. We may share your info
 
 1. **With Your Consent**: When you explicitly agree to share
 2. **Service Providers**: Third-party services that help operate our Service:
-   - Clerk (authentication)
-   - Supabase (database hosting)
-   - Neon (waitlist database hosting)
+   - Jovie (authentication)
+   - Neon (database hosting)
+   - Supabase (legacy photo processing and account-deletion helpers)
+   - Cloudinary (progress-photo storage)
    - Vercel (web hosting)
    - RevenueCat (subscription and purchase entitlements)
    - Sentry (error tracking and crash reporting)

@@ -72,7 +72,7 @@ bundle exec fastlane ci_ios
 Changes in these areas deserve extra scrutiny and may block unattended automation:
 
 - `.github/**`
-- Authentication, Clerk, Supabase, and session handling
+- Authentication, Jovie Better Auth, Neon, and session handling
 - Billing, RevenueCat, StoreKit, App Store, subscriptions, and entitlements
 - iOS signing, provisioning, Fastlane, and release metadata
 - Database migrations and destructive data paths
