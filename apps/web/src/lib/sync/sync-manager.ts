@@ -1,5 +1,4 @@
 import { indexedDB } from '@/lib/db/indexed-db';
-import { createClient } from '@/lib/supabase/client';
 import type { BodyMetrics, UserProfile } from '@/types/body-metrics';
 import type { DailyMetrics } from '@/lib/db/indexed-db';
 
@@ -26,42 +25,32 @@ class SyncManager {
   private isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
   constructor() {
-    // Only setup browser-specific features on client side
     if (typeof window !== 'undefined') {
-      // Listen for online/offline events
       window.addEventListener('online', this.handleOnline);
       window.addEventListener('offline', this.handleOffline);
-      
-      // Start periodic sync
       this.startPeriodicSync();
-      
-      // Update pending count on initialization
       this.updatePendingCount();
     }
   }
 
-  // State management
   private updateState(updates: Partial<SyncState>) {
     this.state = { ...this.state, ...updates };
     this.notifyListeners();
   }
 
   private notifyListeners() {
-    this.listeners.forEach(listener => listener(this.state));
+    this.listeners.forEach((listener) => listener(this.state));
   }
 
   subscribe(listener: (state: SyncState) => void) {
     this.listeners.add(listener);
-    // Immediately notify with current state
     listener(this.state);
-    
-    // Return unsubscribe function
+
     return () => {
       this.listeners.delete(listener);
     };
   }
 
-  // Network handlers
   private handleOnline = () => {
     this.isOnline = true;
     this.syncIfNeeded();
@@ -71,24 +60,23 @@ class SyncManager {
     this.isOnline = false;
   };
 
-  // Periodic sync
   private startPeriodicSync() {
-    // Sync every 15 minutes when online (reduced from 5 for better battery life)
-    this.syncInterval = setInterval(() => {
-      if (this.isOnline) {
-        this.syncIfNeeded();
-      }
-    }, 15 * 60 * 1000);
+    this.syncInterval = setInterval(
+      () => {
+        if (this.isOnline) {
+          this.syncIfNeeded();
+        }
+      },
+      15 * 60 * 1000,
+    );
   }
 
   async syncIfNeeded() {
     if (!this.isOnline || this.state.isSyncing) return;
 
     const unsynced = await indexedDB.getUnsyncedItems();
-    const totalUnsynced = 
-      unsynced.bodyMetrics.length + 
-      unsynced.dailyMetrics.length + 
-      unsynced.profiles.length;
+    const totalUnsynced =
+      unsynced.bodyMetrics.length + unsynced.dailyMetrics.length + unsynced.profiles.length;
 
     if (totalUnsynced > 0) {
       await this.syncAll();
@@ -101,40 +89,31 @@ class SyncManager {
     this.updateState({ isSyncing: true, syncStatus: 'syncing' });
 
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
+      const userId = await this.requireSubject();
       const unsynced = await indexedDB.getUnsyncedItems();
       let hasErrors = false;
 
-      // Sync profiles
       for (const profile of unsynced.profiles) {
         try {
-          await this.syncProfile(profile, user.id);
+          await this.syncProfile(profile, userId);
         } catch (error) {
           hasErrors = true;
           console.error('Profile sync error:', error);
         }
       }
 
-      // Sync body metrics
       for (const metrics of unsynced.bodyMetrics) {
         try {
-          await this.syncBodyMetrics(metrics, user.id);
+          await this.syncBodyMetrics(metrics, userId);
         } catch (error) {
           hasErrors = true;
           console.error('Body metrics sync error:', error);
         }
       }
 
-      // Sync daily metrics
       for (const metrics of unsynced.dailyMetrics) {
         try {
-          await this.syncDailyMetrics(metrics, user.id);
+          await this.syncDailyMetrics(metrics, userId);
         } catch (error) {
           hasErrors = true;
           console.error('Daily metrics sync error:', error);
@@ -147,7 +126,6 @@ class SyncManager {
         syncStatus: hasErrors ? 'error' : 'success',
         error: hasErrors ? 'Some items failed to sync' : undefined,
       });
-
     } catch (error) {
       this.updateState({
         isSyncing: false,
@@ -159,77 +137,98 @@ class SyncManager {
     await this.updatePendingCount();
   }
 
+  private async requireSubject(): Promise<string> {
+    const response = await fetch('/api/profile', { cache: 'no-store' });
+    if (!response.ok) throw new Error('User not authenticated');
+    const payload = (await response.json()) as { profile?: { id?: string } };
+    const id = payload.profile?.id;
+    if (!id) throw new Error('User not authenticated');
+    return id;
+  }
+
   private async syncProfile(profile: UserProfile, userId: string) {
-    const supabase = createClient();
-    
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({
-        ...profile,
-        id: userId,
-        updated_at: new Date().toISOString(),
-      });
-
-    if (error) throw error;
-
+    const response = await fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        fullName: profile.full_name,
+        dateOfBirth:
+          typeof profile.date_of_birth === 'string'
+            ? profile.date_of_birth.slice(0, 10)
+            : undefined,
+        height: profile.height,
+        heightUnit: profile.height_unit === 'ft' ? 'in' : profile.height_unit,
+        gender: profile.gender,
+        activityLevel: profile.activity_level,
+        goalWeight: profile.goal_weight,
+        goalWeightUnit: profile.goal_weight_unit,
+        onboardingCompleted: profile.onboarding_completed,
+      }),
+    });
+    if (!response.ok) throw new Error('Failed to sync profile');
     await indexedDB.markAsSynced('profiles', profile.id || userId);
     await indexedDB.updateSyncStatus('profiles', profile.id || userId, 'synced');
   }
 
   private async syncBodyMetrics(metrics: BodyMetrics, userId: string) {
-    const supabase = createClient();
-    
-    const { error } = await supabase
-      .from('body_metrics')
-      .upsert({
-        ...metrics,
-        user_id: userId,
-        updated_at: new Date().toISOString(),
-      });
-
-    if (error) throw error;
-
+    const date = metricDate(metrics.date);
+    const response = await fetch('/api/body-metrics', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        date,
+        weight: metrics.weight,
+        weightUnit: metrics.weight_unit,
+        bodyFatPercentage: metrics.body_fat_percentage,
+        bodyFatMethod: metrics.body_fat_method,
+        waist: metrics.waist,
+        neck: metrics.neck,
+        hip: metrics.hip,
+        notes: metrics.notes,
+        photoUrl: metrics.photo_url,
+        dataSource: metrics.data_source || 'manual',
+      }),
+    });
+    if (!response.ok) throw new Error('Failed to sync body metrics');
     await indexedDB.markAsSynced('bodyMetrics', metrics.id);
     await indexedDB.updateSyncStatus('bodyMetrics', metrics.id, 'synced');
+    void userId;
   }
 
   private async syncDailyMetrics(metrics: DailyMetrics, userId: string) {
-    const supabase = createClient();
-    
-    const { error } = await supabase
-      .from('daily_metrics')
-      .upsert({
-        ...metrics,
-        user_id: userId,
-        updated_at: new Date().toISOString(),
-      });
-
-    if (error) throw error;
-
+    const response = await fetch('/api/auth/mobile/sync/v1/daily-metrics', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify([
+        {
+          id: metrics.id,
+          user_id: userId,
+          date: metrics.date instanceof Date ? metrics.date.toISOString() : metrics.date,
+          steps: metrics.steps,
+          notes: metrics.notes,
+        },
+      ]),
+    });
+    if (!response.ok) throw new Error('Failed to sync daily metrics');
     await indexedDB.markAsSynced('dailyMetrics', metrics.id);
     await indexedDB.updateSyncStatus('dailyMetrics', metrics.id, 'synced');
   }
 
   async updatePendingCount() {
     const unsynced = await indexedDB.getUnsyncedItems();
-    const count = 
-      unsynced.bodyMetrics.length + 
-      unsynced.dailyMetrics.length + 
-      unsynced.profiles.length;
+    const count =
+      unsynced.bodyMetrics.length + unsynced.dailyMetrics.length + unsynced.profiles.length;
 
     this.updateState({ pendingSyncCount: count });
   }
 
-  // Public methods for data operations
   async logWeight(weight: number, unit: string, notes?: string) {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) throw new Error('User not authenticated');
+    const userId = await this.requireSubject();
 
     const metrics: BodyMetrics = {
       id: crypto.randomUUID(),
-      user_id: user.id,
+      user_id: userId,
       date: new Date().toISOString(),
       weight,
       weight_unit: unit as 'kg' | 'lbs',
@@ -238,11 +237,9 @@ class SyncManager {
       updated_at: new Date().toISOString(),
     };
 
-    // Save to IndexedDB
-    await indexedDB.saveBodyMetrics(metrics, user.id);
+    await indexedDB.saveBodyMetrics(metrics, userId);
     await this.updatePendingCount();
 
-    // Attempt immediate sync if online
     if (this.isOnline) {
       this.syncIfNeeded();
     }
@@ -251,14 +248,11 @@ class SyncManager {
   }
 
   async logDailyMetrics(steps?: number, notes?: string) {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) throw new Error('User not authenticated');
+    const userId = await this.requireSubject();
 
     const metrics: DailyMetrics = {
       id: crypto.randomUUID(),
-      user_id: user.id,
+      user_id: userId,
       date: new Date(),
       steps,
       notes,
@@ -266,11 +260,9 @@ class SyncManager {
       updated_at: new Date(),
     };
 
-    // Save to IndexedDB
     await indexedDB.saveDailyMetrics(metrics);
     await this.updatePendingCount();
 
-    // Attempt immediate sync if online
     if (this.isOnline) {
       this.syncIfNeeded();
     }
@@ -279,24 +271,15 @@ class SyncManager {
   }
 
   async getLocalBodyMetrics(from?: Date, to?: Date): Promise<BodyMetrics[]> {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) return [];
-
-    return indexedDB.getBodyMetrics(user.id, from, to);
+    const userId = await this.requireSubject();
+    return indexedDB.getBodyMetrics(userId, from, to);
   }
 
   async getLocalDailyMetrics(date: Date): Promise<DailyMetrics | null> {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) return null;
-
-    return indexedDB.getDailyMetrics(user.id, date);
+    const userId = await this.requireSubject();
+    return indexedDB.getDailyMetrics(userId, date);
   }
 
-  // Cleanup
   destroy() {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
@@ -311,7 +294,6 @@ class SyncManager {
     this.listeners.clear();
   }
 
-  // Clear all local data (for logout)
   async clearAllData() {
     await indexedDB.clearAllData();
     this.updateState({
@@ -321,6 +303,11 @@ class SyncManager {
       error: undefined,
     });
   }
+}
+
+function metricDate(value: string | Date): string {
+  const iso = value instanceof Date ? value.toISOString() : value;
+  return iso.slice(0, 10);
 }
 
 export const syncManager = new SyncManager();

@@ -1,16 +1,14 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createBrowserClient } from '@supabase/ssr';
 
-export function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+export const SUPABASE_DATA_PLANE_RETIRED =
+  'Supabase data plane retired. LogYourBody product data is stored in Neon behind first-party APIs.';
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('Missing Supabase environment variables')
-    throw new Error('Missing Supabase environment variables')
-  }
-
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+export function createClient(): ReturnType<typeof createBrowserClient> {
+  throw new Error(SUPABASE_DATA_PLANE_RETIRED);
 }
 
-// For backward compatibility, export a singleton instance
-export const supabase = createClient()
+export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, {
+  get() {
+    throw new Error(SUPABASE_DATA_PLANE_RETIRED);
+  },
+});

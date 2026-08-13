@@ -77,124 +77,64 @@ final class PhotoUploadManagerTests: XCTestCase {
         XCTAssertTrue(PhotoUploadStubURLProtocol.requests.isEmpty)
     }
 
-    // MARK: - Vision processing stage (real Vision, synthetic image)
+    // MARK: - First-party photo store fail-closed
 
-    func testImageUploadFailsBeforeNetworkWhenVisionRejectsSyntheticImage() async throws {
-        // Real Vision on a synthetic person-less image never reaches the network:
-        // the stage throws (no human detected, or Vision unavailable on this
-        // platform) and the raw processing error is surfaced verbatim.
-        let userId = "photo_vision_user_\(UUID().uuidString)"
-        authenticate(userId: userId)
-        let manager = makeManager(token: "stub-jwt")
-        let metrics = makeMetrics(id: UUID().uuidString, userId: userId)
-        PhotoUploadStubURLProtocol.install { _ in .http(200, body: Data()) }
-
-        var thrownError: Error?
-        do {
-            _ = try await manager.uploadProgressPhoto(for: metrics, image: makeSolidImage())
-            XCTFail("Expected the Vision stage to reject a person-less image")
-        } catch {
-            thrownError = error
-        }
-
-        let error = try XCTUnwrap(thrownError)
-        XCTAssertFalse(error is PhotoUploadManager.PhotoError, "Processing errors surface raw, not as PhotoError")
-        XCTAssertEqual(manager.uploadError, error.localizedDescription)
-        XCTAssertFalse(manager.isUploading)
-        XCTAssertNil(manager.currentUploadTask)
-        XCTAssertTrue(PhotoUploadStubURLProtocol.requests.isEmpty)
-    }
-
-    // MARK: - Successful upload
-
-    func testSuccessfulUploadStoresPhotoAndTriggersProcessing() async throws {
+    func testRemotePhotoStoreUnavailableFailsClosedWithoutSupabaseStorage() async throws {
         let userId = "photo_upload_user_\(UUID().uuidString)"
         let metricId = UUID().uuidString
         let metrics = try await seedPhotoPlaceholder(id: metricId, userId: userId)
         authenticate(userId: userId)
 
-        let processedURL = "https://cdn.example.com/processed.png"
-        PhotoUploadStubURLProtocol.install { request in
-            if request.url?.path.contains("/storage/v1/") == true {
-                return .http(200, body: Data("{}".utf8))
-            }
-            return .http(200, body: Data(#"{"processedUrl": "\#(processedURL)"}"#.utf8))
+        let stayOnDevice =
+            "Progress photo cloud storage is not available. Photos stay on this device until Cloudinary is configured on the first-party API."
+        PhotoUploadStubURLProtocol.install { _ in
+            .http(
+                503,
+                body: Data(#"{"error":"photo_store_unavailable","message":"\#(stayOnDevice)"}"#.utf8)
+            )
         }
 
         let manager = makeManager(token: "stub-jwt")
-        let pngData = try makePNGData()
-        let returnedURL = try await manager.uploadProgressPhoto(for: metrics, imageData: pngData)
+        await assertThrowsPhotoError(.uploadFailed(stayOnDevice)) {
+            _ = try await manager.uploadProgressPhoto(for: metrics, imageData: try makePNGData())
+        }
 
-        XCTAssertEqual(returnedURL, processedURL)
+        XCTAssertEqual(manager.uploadError, stayOnDevice)
         XCTAssertFalse(manager.isUploading)
-        XCTAssertNil(manager.uploadError)
         XCTAssertNil(manager.currentUploadTask)
-        XCTAssertEqual(manager.uploadProgress, 1.0)
 
-        // Storage upload request construction (bucket/path/auth headers/body)
         let requests = PhotoUploadStubURLProtocol.requests
-        XCTAssertEqual(requests.count, 2)
-        let storageRequest = try XCTUnwrap(requests.first)
-        XCTAssertEqual(storageRequest.httpMethod, "POST")
-        XCTAssertEqual(storageRequest.url?.host, PhotoUploadStubURLProtocol.stubHost)
-        let storagePath = try XCTUnwrap(
-            storageRequest.url?.path.replacingOccurrences(of: "/storage/v1/object/photos/", with: "")
-        )
-        XCTAssertTrue(storagePath.hasPrefix("\(userId)/\(metricId)_"))
-        XCTAssertTrue(storagePath.hasSuffix(".jpg"))
-        XCTAssertEqual(storageRequest.value(forHTTPHeaderField: "apikey"), Constants.supabaseAnonKey)
-        XCTAssertEqual(storageRequest.value(forHTTPHeaderField: "Authorization"), "Bearer stub-jwt")
-        XCTAssertEqual(storageRequest.value(forHTTPHeaderField: "Content-Type"), "image/png")
-        XCTAssertEqual(PhotoUploadStubURLProtocol.bodyData(of: storageRequest), pngData)
+        XCTAssertEqual(requests.count, 1)
+        let photoRequest = try XCTUnwrap(requests.first)
+        XCTAssertEqual(photoRequest.httpMethod, "POST")
+        XCTAssertEqual(photoRequest.url?.path, "/api/auth/mobile/photos")
+        XCTAssertEqual(photoRequest.value(forHTTPHeaderField: "Authorization"), "Bearer stub-jwt")
+        XCTAssertNil(photoRequest.value(forHTTPHeaderField: "apikey"))
+        XCTAssertFalse(photoRequest.url?.path.contains("/storage/v1/") ?? false)
 
-        // Processing trigger fires after the upload with the stored path
-        let functionRequest = try XCTUnwrap(requests.last)
-        XCTAssertEqual(functionRequest.httpMethod, "POST")
-        XCTAssertEqual(functionRequest.url?.path, "/functions/v1/process-progress-photo")
-        XCTAssertEqual(functionRequest.value(forHTTPHeaderField: "apikey"), Constants.supabaseAnonKey)
-        XCTAssertEqual(functionRequest.value(forHTTPHeaderField: "Authorization"), "Bearer stub-jwt")
-        XCTAssertEqual(functionRequest.value(forHTTPHeaderField: "Content-Type"), "application/json")
-        let functionBody = try XCTUnwrap(PhotoUploadStubURLProtocol.bodyData(of: functionRequest))
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: functionBody) as? [String: Any])
-        XCTAssertEqual(json["storagePath"] as? String, storagePath)
-        XCTAssertEqual(json["metricsId"] as? String, metricId)
-
-        // Local Core Data record updated with both URLs and marked for sync
         let cached = try await cachedPhotoState(metricId: metricId)
-        XCTAssertEqual(cached.photoUrl, processedURL)
-        XCTAssertEqual(cached.originalPhotoUrl, storagePath)
-        XCTAssertEqual(cached.syncStatus, "pending")
-        XCTAssertFalse(cached.isSynced)
+        XCTAssertNil(cached.originalPhotoUrl)
+        XCTAssertNil(cached.photoUrl)
     }
 
-    func testHEICInputIsConvertedToJPEGBeforeUpload() async throws {
-        let userId = "photo_heic_user_\(UUID().uuidString)"
-        let metricId = UUID().uuidString
-        let metrics = try await seedPhotoPlaceholder(id: metricId, userId: userId)
+    func testImageUploadFailsClosedAtPhotoStoreBeforeVision() async throws {
+        let userId = "photo_vision_user_\(UUID().uuidString)"
         authenticate(userId: userId)
-
-        let processedURL = "https://cdn.example.com/heic-processed.png"
-        PhotoUploadStubURLProtocol.install { request in
-            if request.url?.path.contains("/storage/v1/") == true {
-                return .http(200, body: Data("{}".utf8))
-            }
-            return .http(200, body: Data(#"{"processedUrl": "\#(processedURL)"}"#.utf8))
+        let manager = makeManager(token: "stub-jwt")
+        let metrics = makeMetrics(id: UUID().uuidString, userId: userId)
+        PhotoUploadStubURLProtocol.install { _ in
+            .http(503, body: Data(#"{"error":"photo_store_unavailable","message":"stay on this device"}"#.utf8))
         }
 
-        let manager = makeManager(token: "stub-jwt")
-        let heicData = try makeHEICData()
-        let returnedURL = try await manager.uploadProgressPhoto(for: metrics, imageData: heicData)
+        await assertThrowsPhotoError(.uploadFailed("stay on this device")) {
+            _ = try await manager.uploadProgressPhoto(for: metrics, image: makeSolidImage())
+        }
 
-        XCTAssertEqual(returnedURL, processedURL)
-        let storageRequest = try XCTUnwrap(PhotoUploadStubURLProtocol.requests.first)
-        XCTAssertTrue(storageRequest.url?.path.hasSuffix(".jpg") ?? false)
-        let body = try XCTUnwrap(PhotoUploadStubURLProtocol.bodyData(of: storageRequest))
-        XCTAssertTrue(body.starts(with: [0xFF, 0xD8, 0xFF]), "Expected JPEG payload after HEIC conversion")
+        XCTAssertEqual(PhotoUploadStubURLProtocol.requests.count, 1)
+        XCTAssertEqual(PhotoUploadStubURLProtocol.requests.first?.url?.path, "/api/auth/mobile/photos")
     }
 
-    // MARK: - Failure paths
-
-    func testStorageHTTPErrorSurfacesServerMessageAndSkipsProcessing() async throws {
+    func testPhotoStoreHTTPErrorSurfacesServerMessage() async throws {
         let userId = "photo_http_user_\(UUID().uuidString)"
         let metricId = UUID().uuidString
         let metrics = try await seedPhotoPlaceholder(id: metricId, userId: userId)
@@ -209,21 +149,15 @@ final class PhotoUploadManagerTests: XCTestCase {
             _ = try await manager.uploadProgressPhoto(for: metrics, imageData: try makePNGData())
         }
 
-        XCTAssertEqual(manager.uploadError, "row level security violated")
-        XCTAssertFalse(manager.isUploading)
-        XCTAssertNil(manager.currentUploadTask)
-
-        // Only the storage request was attempted; processing was never triggered
         XCTAssertEqual(PhotoUploadStubURLProtocol.requests.count, 1)
-        XCTAssertTrue(PhotoUploadStubURLProtocol.requests.first?.url?.path.contains("/storage/v1/") ?? false)
+        XCTAssertEqual(PhotoUploadStubURLProtocol.requests.first?.url?.path, "/api/auth/mobile/photos")
 
-        // The local record was not marked storage-committed
         let cached = try await cachedPhotoState(metricId: metricId)
         XCTAssertNil(cached.originalPhotoUrl)
         XCTAssertNil(cached.photoUrl)
     }
 
-    func testStorageNetworkErrorMapsToDocumentedNetworkMessage() async throws {
+    func testPhotoStoreNetworkErrorMapsToDocumentedNetworkMessage() async throws {
         let userId = "photo_network_user_\(UUID().uuidString)"
         let metricId = UUID().uuidString
         let metrics = try await seedPhotoPlaceholder(id: metricId, userId: userId)
@@ -241,60 +175,6 @@ final class PhotoUploadManagerTests: XCTestCase {
             "Network connection error. Check your connection and try again."
         )
         XCTAssertFalse(manager.isUploading)
-    }
-
-    func testProcessingHTTPErrorSurfacesServerMessageAfterStorageCommit() async throws {
-        let userId = "photo_processing_user_\(UUID().uuidString)"
-        let metricId = UUID().uuidString
-        let metrics = try await seedPhotoPlaceholder(id: metricId, userId: userId)
-        authenticate(userId: userId)
-
-        PhotoUploadStubURLProtocol.install { request in
-            if request.url?.path.contains("/storage/v1/") == true {
-                return .http(200, body: Data("{}".utf8))
-            }
-            return .http(500, body: Data("edge function exploded".utf8))
-        }
-
-        let manager = makeManager(token: "stub-jwt")
-        await assertThrowsPhotoError(.processingFailed("edge function exploded")) {
-            _ = try await manager.uploadProgressPhoto(for: metrics, imageData: try makePNGData())
-        }
-
-        XCTAssertEqual(manager.uploadError, "edge function exploded")
-        XCTAssertFalse(manager.isUploading)
-        XCTAssertNil(manager.currentUploadTask)
-
-        // The storage commit survives the processing failure (retry-safe state)
-        let storagePath = try XCTUnwrap(
-            PhotoUploadStubURLProtocol.requests.first?.url?.path
-                .replacingOccurrences(of: "/storage/v1/object/photos/", with: "")
-        )
-        let cached = try await cachedPhotoState(metricId: metricId)
-        XCTAssertEqual(cached.originalPhotoUrl, storagePath)
-        XCTAssertEqual(cached.syncStatus, CoreDataManager.photoUploadStorageCommittedSyncStatus)
-        XCTAssertNil(cached.photoUrl)
-    }
-
-    func testProcessingResponseWithoutURLSurfacesFormatError() async throws {
-        let userId = "photo_format_user_\(UUID().uuidString)"
-        let metricId = UUID().uuidString
-        let metrics = try await seedPhotoPlaceholder(id: metricId, userId: userId)
-        authenticate(userId: userId)
-
-        PhotoUploadStubURLProtocol.install { request in
-            if request.url?.path.contains("/storage/v1/") == true {
-                return .http(200, body: Data("{}".utf8))
-            }
-            return .http(200, body: Data(#"{"unexpected": true}"#.utf8))
-        }
-
-        let manager = makeManager(token: "stub-jwt")
-        await assertThrowsPhotoError(.processingFailed("Invalid response format")) {
-            _ = try await manager.uploadProgressPhoto(for: metrics, imageData: try makePNGData())
-        }
-
-        XCTAssertEqual(manager.uploadError, "Invalid response format")
     }
 
     // MARK: - Helpers
@@ -414,22 +294,8 @@ final class PhotoUploadManagerTests: XCTestCase {
         try XCTUnwrap(makeSolidImage().pngData())
     }
 
-    private func makeHEICData() throws -> Data {
-        let cgImage = try XCTUnwrap(makeSolidImage().cgImage)
-        let data = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(data, "public.heic" as CFString, 1, nil) else {
-            throw PhotoUploadTestError.heicEncodingUnavailable
-        }
-        CGImageDestinationAddImage(destination, cgImage, nil)
-        guard CGImageDestinationFinalize(destination) else {
-            throw PhotoUploadTestError.heicEncodingUnavailable
-        }
-        return data as Data
-    }
-
     private enum PhotoUploadTestError: Error {
         case missingMetric
-        case heicEncodingUnavailable
     }
 }
 

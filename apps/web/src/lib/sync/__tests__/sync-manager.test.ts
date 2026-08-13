@@ -15,6 +15,8 @@ const emptyUnsynced: UnsyncedItems = {
   profiles: [],
 };
 
+const dailyId = '11111111-1111-4111-8111-111111111111';
+
 function profile(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
     id: 'user_1',
@@ -43,7 +45,7 @@ function bodyMetric(overrides: Partial<BodyMetrics> = {}): BodyMetrics {
 
 function dailyMetric(overrides: Partial<DailyMetrics> = {}): DailyMetrics {
   return {
-    id: 'daily_1',
+    id: dailyId,
     user_id: 'user_1',
     date: new Date('2026-06-20T12:00:00.000Z'),
     steps: 8_000,
@@ -75,31 +77,51 @@ async function loadSyncManager({ online = true } = {}) {
 
   const upserts: Array<{ table: TableName; payload: Record<string, unknown> }> = [];
   const tableErrors = new Map<TableName, { message: string }>();
+  const fetchUrls: string[] = [];
 
-  const supabase = {
-    auth: {
-      getUser: jest.fn().mockResolvedValue({
-        data: { user: { id: 'user_1' } },
-      }),
-    },
-    from: jest.fn((table: TableName) => ({
-      upsert: jest.fn(async (payload: Record<string, unknown>) => {
-        upserts.push({ payload, table });
-        return { error: tableErrors.get(table) ?? null };
-      }),
-    })),
-  };
+  const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    fetchUrls.push(url);
+    const method = (init?.method || 'GET').toUpperCase();
+    const payload = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown> | unknown[]) : {};
+
+    if (url.includes('/api/profile') && method === 'GET') {
+      return new Response(JSON.stringify({ profile: { id: 'user_1' } }), { status: 200 });
+    }
+    if (url.includes('/api/profile') && method === 'PATCH') {
+      if (tableErrors.has('profiles')) return new Response('fail', { status: 500 });
+      upserts.push({ table: 'profiles', payload: payload as Record<string, unknown> });
+      return new Response(JSON.stringify({ profile: { id: 'user_1' } }), { status: 200 });
+    }
+    if (url.includes('/api/body-metrics') && method === 'POST') {
+      if (tableErrors.has('body_metrics')) return new Response('fail', { status: 500 });
+      upserts.push({ table: 'body_metrics', payload: payload as Record<string, unknown> });
+      return new Response(JSON.stringify({ metric: {} }), { status: 201 });
+    }
+    if (url.includes('/daily-metrics') && method === 'POST') {
+      if (tableErrors.has('daily_metrics')) return new Response('fail', { status: 500 });
+      const records = Array.isArray(payload) ? payload : [];
+      upserts.push({
+        table: 'daily_metrics',
+        payload: (records[0] as Record<string, unknown>) || {},
+      });
+      return new Response(JSON.stringify({ records: [] }), { status: 200 });
+    }
+    return new Response('not found', { status: 404 });
+  });
 
   jest.doMock('@/lib/db/indexed-db', () => ({ indexedDB: indexedDBMock }));
-  jest.doMock('@/lib/supabase/client', () => ({ createClient: jest.fn(() => supabase) }));
+  global.fetch = fetchMock as typeof fetch;
 
   const module = await import('../sync-manager');
   await Promise.resolve();
   jest.clearAllMocks();
+  fetchUrls.length = 0;
 
   return {
+    fetchMock,
+    fetchUrls,
     indexedDBMock,
-    supabase,
     syncManager: module.syncManager,
     tableErrors,
     upserts,
@@ -121,7 +143,7 @@ describe('syncManager', () => {
     jest.resetModules();
   });
 
-  it('uploads unsynced profile, body metric, and daily metric records before reporting success', async () => {
+  it('uploads unsynced profile, body metric, and daily metric records to first-party Neon APIs', async () => {
     const { indexedDBMock, syncManager, upserts } = await loadSyncManager();
     indexedDBMock.getUnsyncedItems
       .mockResolvedValueOnce({
@@ -139,33 +161,29 @@ describe('syncManager', () => {
     expect(upserts).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          payload: expect.objectContaining({ id: 'user_1' }),
+          payload: expect.objectContaining({ onboardingCompleted: true }),
           table: 'profiles',
         }),
         expect.objectContaining({
-          payload: expect.objectContaining({ id: 'metric_1', user_id: 'user_1', weight: 180 }),
+          payload: expect.objectContaining({ date: '2026-06-20', weight: 180, weightUnit: 'lbs' }),
           table: 'body_metrics',
         }),
         expect.objectContaining({
-          payload: expect.objectContaining({ id: 'daily_1', steps: 8_000, user_id: 'user_1' }),
+          payload: expect.objectContaining({ id: dailyId, steps: 8_000, user_id: 'user_1' }),
           table: 'daily_metrics',
         }),
       ]),
     );
     expect(indexedDBMock.markAsSynced).toHaveBeenCalledWith('profiles', 'user_1');
     expect(indexedDBMock.markAsSynced).toHaveBeenCalledWith('bodyMetrics', 'metric_1');
-    expect(indexedDBMock.markAsSynced).toHaveBeenCalledWith('dailyMetrics', 'daily_1');
+    expect(indexedDBMock.markAsSynced).toHaveBeenCalledWith('dailyMetrics', dailyId);
     expect(indexedDBMock.updateSyncStatus).toHaveBeenCalledWith('profiles', 'user_1', 'synced');
     expect(indexedDBMock.updateSyncStatus).toHaveBeenCalledWith(
       'bodyMetrics',
       'metric_1',
       'synced',
     );
-    expect(indexedDBMock.updateSyncStatus).toHaveBeenCalledWith(
-      'dailyMetrics',
-      'daily_1',
-      'synced',
-    );
+    expect(indexedDBMock.updateSyncStatus).toHaveBeenCalledWith('dailyMetrics', dailyId, 'synced');
     expect(states.at(-1)).toMatchObject({ pendingSyncCount: 0, syncStatus: 'success' });
 
     unsubscribe();
@@ -198,7 +216,7 @@ describe('syncManager', () => {
     ]);
     expect(indexedDBMock.markAsSynced).toHaveBeenCalledWith('profiles', 'user_1');
     expect(indexedDBMock.markAsSynced).not.toHaveBeenCalledWith('bodyMetrics', 'metric_1');
-    expect(indexedDBMock.markAsSynced).toHaveBeenCalledWith('dailyMetrics', 'daily_1');
+    expect(indexedDBMock.markAsSynced).toHaveBeenCalledWith('dailyMetrics', dailyId);
     expect(states.at(-1)).toMatchObject({
       error: 'Some items failed to sync',
       pendingSyncCount: 1,
@@ -209,7 +227,7 @@ describe('syncManager', () => {
   });
 
   it('stores new weight entries locally without attempting immediate sync while offline', async () => {
-    const { indexedDBMock, supabase, syncManager, upserts } = await loadSyncManager({
+    const { fetchMock, indexedDBMock, syncManager, upserts } = await loadSyncManager({
       online: false,
     });
     const randomUUIDSpy = jest.spyOn(crypto, 'randomUUID').mockReturnValue('metric_local');
@@ -239,7 +257,8 @@ describe('syncManager', () => {
       'user_1',
     );
     expect(upserts).toEqual([]);
-    expect(supabase.auth.getUser).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/profile');
 
     randomUUIDSpy.mockRestore();
   });

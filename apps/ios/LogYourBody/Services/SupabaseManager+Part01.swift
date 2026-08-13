@@ -2,641 +2,207 @@ import Foundation
 import SwiftUI
 
 extension SupabaseManager {
-// MARK: - JWT Token Management
-
     func getSupabaseJWT() async throws -> String {
-        guard let jwtString = await AuthManager.shared.getSupabaseToken() else {
+        guard let jwtString = await AuthManager.shared.getAccessToken() else {
             throw SupabaseError.tokenGenerationFailed
         }
-
         return jwtString
     }
 
-func fetchLatestBodyMetricTimestamp(userId: String, token: String) async throws -> Date? {
-        let url = try SupabaseURLBuilder.restURL(
-            table: "body_metrics",
-            query: "user_id=eq.\(userId)&order=updated_at.desc&limit=1",
-            baseURL: supabaseURL
+    func fetchLatestBodyMetricTimestamp(userId: String, token: String) async throws -> Date? {
+        _ = userId
+        let metrics = try await fetchBodyMetrics(
+            userId: userId,
+            since: Date(timeIntervalSince1970: 0),
+            token: token
         )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw SupabaseError.requestFailed
-        }
-
-        let result = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
-        guard let first = result.first,
-              let dateString = first["updated_at"] as? String else {
-            return nil
-        }
-
         let formatter = ISO8601DateFormatter()
-        return formatter.date(from: dateString)
+        let timestamps = metrics.compactMap { record -> Date? in
+            let value = (record["server_updated_at"] as? String) ?? (record["updated_at"] as? String)
+            return value.flatMap(formatter.date(from:))
+        }
+        return timestamps.max()
     }
 
-func fetchBodyMetrics(userId: String, since: Date, token: String) async throws -> [[String: Any]] {
-        let dateFormatter = ISO8601DateFormatter()
-        let sinceString = dateFormatter.string(from: since)
-
-        let url = try SupabaseURLBuilder.restURL(
-            table: "body_metrics",
-            query: "user_id=eq.\(userId)&updated_at=gte.\(sinceString)&order=created_at.desc",
-            baseURL: supabaseURL
+    func fetchBodyMetrics(userId: String, since: Date, token: String) async throws -> [[String: Any]] {
+        _ = userId
+        let sinceString = ISO8601DateFormatter().string(from: since)
+        let url = try productAPIURL(
+            "/api/auth/mobile/sync/v1/body-metrics",
+            query: "since=\(sinceString)"
         )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw SupabaseError.requestFailed
-        }
-
-        let result = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
-        return result
+        let request = authorizedJSONRequest(url: url, method: "GET", token: token)
+        let (data, response) = try await session.data(for: request)
+        _ = try requireHTTPSuccess(response, data: data)
+        return try records(from: data)
     }
 
-func fetchDailyMetrics(userId: String, since: Date, token: String) async throws -> [[String: Any]] {
-        let dateFormatter = ISO8601DateFormatter()
-        let sinceString = dateFormatter.string(from: since)
-
-        let url = try SupabaseURLBuilder.restURL(
-            table: "daily_metrics",
-            query: "user_id=eq.\(userId)&updated_at=gte.\(sinceString)&order=date.desc",
-            baseURL: supabaseURL
+    func fetchDailyMetrics(userId: String, since: Date, token: String) async throws -> [[String: Any]] {
+        _ = userId
+        let sinceString = ISO8601DateFormatter().string(from: since)
+        let url = try productAPIURL(
+            "/api/auth/mobile/sync/v1/daily-metrics",
+            query: "since=\(sinceString)"
         )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw SupabaseError.requestFailed
-        }
-
-        let result = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
-        return result
+        let request = authorizedJSONRequest(url: url, method: "GET", token: token)
+        let (data, response) = try await session.data(for: request)
+        _ = try requireHTTPSuccess(response, data: data)
+        return try records(from: data)
     }
 
-func fetchProfile(userId: String, token: String) async throws -> [String: Any]? {
-        let url = try SupabaseURLBuilder.restURL(
-            table: "profiles",
-            query: "id=eq.\(userId)&select=*",
-            baseURL: supabaseURL
-        )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw SupabaseError.requestFailed
-        }
-
-        let result = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
-        return result.first
+    func fetchProfile(userId: String, token: String) async throws -> [String: Any]? {
+        _ = userId
+        let url = try productAPIURL("/api/auth/mobile/profile")
+        let request = authorizedJSONRequest(url: url, method: "GET", token: token)
+        let (data, response) = try await session.data(for: request)
+        _ = try requireHTTPSuccess(response, data: data)
+        let object = try jsonObject(from: data)
+        return object["profile"] as? [String: Any] ?? object
     }
 
-func upsertProfilePayload(_ profile: [String: Any], token: String) async throws {
-        guard profile["id"] is String else { throw SupabaseError.invalidData }
-
-        let url = try SupabaseURLBuilder.restURL(table: "profiles", baseURL: supabaseURL)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=representation,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-
-        guard JSONSerialization.isValidJSONObject(profile) else {
-            throw SupabaseError.invalidData
-        }
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: profile)
-
-        let (responseData, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw SupabaseError.requestFailed
-        }
-
-        let rows = if responseData.isEmpty {
-            [[String: Any]]()
-        } else {
-            try JSONSerialization.jsonObject(with: responseData) as? [[String: Any]] ?? []
-        }
-        guard !rows.isEmpty else { throw SupabaseError.requestFailed }
+    func upsertProfilePayload(_ profile: [String: Any], token: String) async throws {
+        try await updateProfile(profile, token: token)
     }
 
-nonisolated static func sanitizedProfilePayload(_ profile: [String: Any]) throws -> [String: Any] {
-        let isoFormatter = ISO8601DateFormatter()
-        let sanitizedProfile = profile.reduce(into: [String: Any]()) { result, element in
-            let (key, value) = element
-            guard let unwrappedValue = unwrapOptional(value) else { return }
-
-            let columnName = profileColumnName(for: key)
-            if let dateValue = unwrappedValue as? Date {
-                result[columnName] = isoFormatter.string(from: dateValue)
-            } else {
-                result[columnName] = unwrappedValue
-            }
-        }
-
-        guard JSONSerialization.isValidJSONObject(sanitizedProfile) else {
-            throw SupabaseError.invalidData
-        }
-
-        return sanitizedProfile
+    nonisolated static func sanitizedProfilePayload(_ profile: [String: Any]) throws -> [String: Any] {
+        try firstPartyProfilePatchBody(profile)
     }
-
-// MARK: - Profile Operations
 
     func fetchProfile(userId: String) async throws -> UserProfile? {
         let jwt = try await getSupabaseJWT()
-
-        let url = try SupabaseURLBuilder.restURL(
-            table: "profiles",
-            query: "id=eq.\(userId)&select=*",
-            baseURL: supabaseURL
-        )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "Profile fetch unauthorized",
-                category: "supabase",
-                level: .error,
-                data: [
-                    "operation": "fetchProfile",
-                    "userId": userId
-                ]
-            )
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 200 {
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "Profile fetch HTTP error",
-                category: "supabase",
-                level: .error,
-                data: [
-                    "operation": "fetchProfile",
-                    "userId": userId,
-                    "statusCode": String(httpResponse.statusCode)
-                ]
-            )
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let profiles = try decoder.decode([UserProfile].self, from: data)
-
-        return profiles.first
+        guard let data = try await fetchProfile(userId: userId, token: jwt) else { return nil }
+        return userProfile(from: data)
     }
 
-func upsertProfile(_ profile: UserProfile) async throws {
+    func upsertProfile(_ profile: UserProfile) async throws {
         let jwt = try await getSupabaseJWT()
-
-        let url = try SupabaseURLBuilder.restURL(table: "profiles", baseURL: supabaseURL)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=minimal,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        request.httpBody = try encoder.encode(profile)
-
-        let (_, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
+        var payload: [String: Any] = [:]
+        if let fullName = profile.fullName { payload["fullName"] = fullName }
+        if let dateOfBirth = profile.dateOfBirth { payload["dateOfBirth"] = dateOfBirth }
+        if let height = profile.height { payload["height"] = height }
+        if let heightUnit = profile.heightUnit { payload["heightUnit"] = heightUnit }
+        if let gender = profile.gender { payload["gender"] = gender }
+        if let activityLevel = profile.activityLevel { payload["activityLevel"] = activityLevel }
+        if let goalWeight = profile.goalWeight { payload["goalWeight"] = goalWeight }
+        if let goalWeightUnit = profile.goalWeightUnit { payload["goalWeightUnit"] = goalWeightUnit }
+        if let onboardingCompleted = profile.onboardingCompleted {
+            payload["onboardingCompleted"] = onboardingCompleted
         }
-
-        if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
+        try await updateProfile(payload, token: jwt)
     }
-
-// MARK: - GLP-1 Medications Operations
 
     func fetchGlp1Medications(userId: String) async throws -> [Glp1Medication] {
-        let jwt = try await getSupabaseJWT()
-
-        let url = try SupabaseURLBuilder.restURL(
-            table: "glp1_medications",
-            query: "user_id=eq.\(userId)&order=started_at.asc",
-            baseURL: supabaseURL
-        )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "GLP-1 dose logs fetch unauthorized",
-                category: "supabase",
-                level: .error,
-                data: [
-                    "operation": "fetchGlp1DoseLogs",
-                    "userId": userId
-                ]
-            )
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 200 {
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "GLP-1 dose logs fetch HTTP error",
-                category: "supabase",
-                level: .error,
-                data: [
-                    "operation": "fetchGlp1DoseLogs",
-                    "userId": userId,
-                    "statusCode": String(httpResponse.statusCode)
-                ]
-            )
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([Glp1Medication].self, from: data)
+        try await decodeCollection("glp1-medications", as: Glp1Medication.self, userId: userId)
     }
 
-func saveGlp1Medication(_ medication: Glp1Medication) async throws {
-        let jwt = try await getSupabaseJWT()
-
-        let url = try SupabaseURLBuilder.restURL(table: "glp1_medications", baseURL: supabaseURL)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=minimal,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        request.httpBody = try encoder.encode(medication)
-
-        let (_, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "GLP-1 medication save unauthorized",
-                category: "supabase",
-                level: .error,
-                data: [
-                    "operation": "saveGlp1Medication",
-                    "userId": medication.userId
-                ]
-            )
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "GLP-1 medication save HTTP error",
-                category: "supabase",
-                level: .error,
-                data: [
-                    "operation": "saveGlp1Medication",
-                    "userId": medication.userId,
-                    "statusCode": String(httpResponse.statusCode)
-                ]
-            )
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
+    func saveGlp1Medication(_ medication: Glp1Medication) async throws {
+        try await postEncodable(medication, collection: "glp1-medications")
     }
 
-func fetchDexaResults(userId: String, limit: Int = 50) async throws -> [DexaResult] {
-        let jwt = try await getSupabaseJWT()
-
-        let url = try SupabaseURLBuilder.restURL(
-            table: "dexa_results",
-            query: "user_id=eq.\(userId)&order=acquire_time.desc&limit=\(limit)",
-            baseURL: supabaseURL
-        )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 200 {
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([DexaResult].self, from: data)
+    func fetchDexaResults(userId: String, limit: Int = 50) async throws -> [DexaResult] {
+        try await decodeCollection("dexa-results", as: DexaResult.self, userId: userId, limit: limit)
     }
-
-// MARK: - Dexa Results Operations
 
     func upsertDexaResult(_ result: DexaResult) async throws {
-        let jwt = try await getSupabaseJWT()
-
-        let url = try SupabaseURLBuilder.restURL(table: "dexa_results", baseURL: supabaseURL)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=minimal,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        request.httpBody = try encoder.encode(result)
-
-        let (_, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
+        try await postEncodable(result, collection: "dexa-results")
     }
-
-// MARK: - Body Metrics Operations
 
     func fetchBodyMetrics(userId: String, limit: Int = 30) async throws -> [BodyMetrics] {
-        let jwt = try await getSupabaseJWT()
-
-        let url = try SupabaseURLBuilder.restURL(
-            table: "body_metrics",
-            query: "user_id=eq.\(userId)&order=date.desc&limit=\(limit)",
-            baseURL: supabaseURL
-        )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 200 {
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([BodyMetrics].self, from: data)
+        try await decodeCollection("body-metrics", as: BodyMetrics.self, userId: userId, limit: limit)
     }
 
-func saveBodyMetrics(_ metrics: BodyMetrics) async throws {
+    func saveBodyMetrics(_ metrics: BodyMetrics) async throws {
         let jwt = try await getSupabaseJWT()
-
-        let url = try SupabaseURLBuilder.restURL(table: "body_metrics", baseURL: supabaseURL)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=minimal,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        request.httpBody = try encoder.encode(metrics)
-
-        let (_, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
+        let encoded = try encoder.encode(metrics)
+        let object = try JSONSerialization.jsonObject(with: encoded)
+        let records = object as? [[String: Any]] ?? [(object as? [String: Any])].compactMap { $0 }
+        _ = try await upsertBodyMetricsBatch(records, token: jwt)
     }
-
-// MARK: - Daily Metrics Operations
 
     func fetchDailyMetrics(userId: String, from date: Date) async throws -> [DailyMetrics] {
+        _ = userId
         let jwt = try await getSupabaseJWT()
-
-        let dateFormatter = ISO8601DateFormatter()
-        let fromDateString = dateFormatter.string(from: date)
-
-        let url = try SupabaseURLBuilder.restURL(
-            table: "daily_metrics",
-            query: "user_id=eq.\(userId)&date=gte.\(fromDateString)&order=date.desc",
-            baseURL: supabaseURL
-        )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 200 {
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
-
+        let records = try await fetchDailyMetrics(userId: userId, since: date, token: jwt)
+        let data = try JSONSerialization.data(withJSONObject: records)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([DailyMetrics].self, from: data)
+        return (try? decoder.decode([DailyMetrics].self, from: data)) ?? []
     }
 
-func saveDailyMetrics(_ metrics: DailyMetrics) async throws {
-        let jwt = try await getSupabaseJWT()
-
-        let url = try SupabaseURLBuilder.restURL(table: "daily_metrics", baseURL: supabaseURL)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=minimal,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        request.httpBody = try encoder.encode(metrics)
-
-        let (_, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
+    func saveDailyMetrics(_ metrics: DailyMetrics) async throws {
+        try await postEncodable(metrics, collection: "daily-metrics")
     }
-
-// MARK: - GLP-1 Dose Logs Operations
 
     func fetchGlp1DoseLogs(userId: String, limit: Int = 100) async throws -> [Glp1DoseLog] {
-        let jwt = try await getSupabaseJWT()
-
-        let url = try SupabaseURLBuilder.restURL(
-            table: "glp1_dose_logs",
-            query: "user_id=eq.\(userId)&order=taken_at.desc&limit=\(limit)",
-            baseURL: supabaseURL
-        )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let (data, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 200 {
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([Glp1DoseLog].self, from: data)
+        try await decodeCollection("glp1-dose-logs", as: Glp1DoseLog.self, userId: userId, limit: limit)
     }
 
-func saveGlp1DoseLog(_ log: Glp1DoseLog) async throws {
+    func saveGlp1DoseLog(_ log: Glp1DoseLog) async throws {
+        try await postEncodable(log, collection: "glp1-dose-logs")
+    }
+
+    private func decodeCollection<T: Decodable>(
+        _ collection: String,
+        as type: T.Type,
+        userId: String,
+        limit: Int? = nil
+    ) async throws -> [T] {
+        _ = userId
         let jwt = try await getSupabaseJWT()
+        var query = "since=1970-01-01T00:00:00.000Z"
+        if let limit {
+            query += "&limit=\(limit)"
+        }
+        let url = try productAPIURL("/api/auth/mobile/sync/v1/\(collection)", query: query)
+        let request = authorizedJSONRequest(url: url, method: "GET", token: jwt)
+        let (data, response) = try await session.data(for: request)
+        _ = try requireHTTPSuccess(response, data: data)
+        let records = try records(from: data)
+        let recordsData = try JSONSerialization.data(withJSONObject: records)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return (try? decoder.decode([T].self, from: recordsData)) ?? []
+    }
 
-        let url = try SupabaseURLBuilder.restURL(table: "glp1_dose_logs", baseURL: supabaseURL)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=minimal,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-
+    private func postEncodable<T: Encodable>(_ value: T, collection: String) async throws {
+        let jwt = try await getSupabaseJWT()
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        request.httpBody = try encoder.encode(log)
+        let encoded = try encoder.encode(value)
+        let object = try JSONSerialization.jsonObject(with: encoded)
+        let payload: Any = object as? [Any] ?? [object]
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        _ = try await upsertData(
+            table: collection.replacingOccurrences(of: "-", with: "_"),
+            data: body,
+            token: jwt
+        )
+    }
 
-        let (_, response) = try await self.session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
-        }
-
-        if httpResponse.statusCode == 401 {
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "GLP-1 dose log save unauthorized",
-                category: "supabase",
-                level: .error,
-                data: [
-                    "operation": "saveGlp1DoseLog",
-                    "userId": log.userId
-                ]
-            )
-            throw SupabaseError.unauthorized
-        }
-
-        if httpResponse.statusCode != 201 && httpResponse.statusCode != 204 {
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "GLP-1 dose log save HTTP error",
-                category: "supabase",
-                level: .error,
-                data: [
-                    "operation": "saveGlp1DoseLog",
-                    "userId": log.userId,
-                    "statusCode": String(httpResponse.statusCode)
-                ]
-            )
-            throw SupabaseError.httpError(httpResponse.statusCode)
-        }
+    private func userProfile(from data: [String: Any]) -> UserProfile {
+        let formatter = ISO8601DateFormatter()
+        let dayFormatter = DateFormatter()
+        dayFormatter.calendar = Calendar(identifier: .gregorian)
+        dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dayFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        dayFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = data["date_of_birth"] as? String
+        let dateOfBirth = dateString.flatMap { formatter.date(from: $0) ?? dayFormatter.date(from: $0) }
+        return UserProfile(
+            id: data["id"] as? String,
+            email: data["email"] as? String,
+            username: data["username"] as? String,
+            fullName: data["full_name"] as? String,
+            dateOfBirth: dateOfBirth,
+            height: data["height"] as? Double,
+            heightUnit: data["height_unit"] as? String,
+            gender: data["gender"] as? String,
+            activityLevel: data["activity_level"] as? String,
+            goalWeight: data["goal_weight"] as? Double,
+            goalWeightUnit: data["goal_weight_unit"] as? String,
+            onboardingCompleted: data["onboarding_completed"] as? Bool
+        )
     }
 }

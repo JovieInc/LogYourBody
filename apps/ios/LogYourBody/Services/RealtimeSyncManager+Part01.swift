@@ -185,7 +185,7 @@ func syncAll(onCompletion: (() -> Void)? = nil) {
             var operationsNeedingRetry = operationsToProcess
 
             do {
-                guard let token = await self.authManager.getSupabaseToken() else {
+                guard let token = await self.authManager.getAccessToken() else {
                     throw SyncError.tokenGenerationFailed
                 }
 

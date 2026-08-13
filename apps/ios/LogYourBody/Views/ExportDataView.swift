@@ -359,17 +359,14 @@ struct ExportDataView: View {
                 throw ExportError.exportFailed("Authentication failed")
             }
 
-            // Call edge function
-            guard let url = try? SupabaseURLBuilder.functionURL("export-user-data") else {
+            guard let baseURL = URL(string: Configuration.apiBaseURL),
+                  let url = URL(string: "/api/auth/mobile/export", relativeTo: baseURL)?.absoluteURL else {
                 throw ExportError.exportFailed("Invalid server configuration")
             }
             var request = URLRequest(url: url)
-            request.httpMethod = "POST"
+            request.httpMethod = "GET"
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-            let body = ["format": "json", "emailLink": true] as [String: Any]
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
 
             let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -378,19 +375,17 @@ struct ExportDataView: View {
                 throw ExportError.exportFailed("Server error")
             }
 
-            // Parse response
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let message = json["message"] as? String {
-                successMessage = message
-            } else {
-                successMessage = "Export link has been sent to your email. The link will expire in 24 hours."
-            }
+            let tempDir = FileManager.default.temporaryDirectory
+            let fileName = "LogYourBody_Export_\(formatDate(Date())).json"
+            let fileURL = tempDir.appendingPathComponent(fileName)
+            try data.write(to: fileURL, options: .atomic)
+            exportedFileURL = fileURL
 
-            // Small delay for visual feedback
+            successMessage = "Your export is ready."
             try await Task.sleep(nanoseconds: 500_000_000)
 
             isExporting = false
-            showSuccess = true
+            showShareSheet = true
         } catch {
             isExporting = false
             errorMessage = error.localizedDescription

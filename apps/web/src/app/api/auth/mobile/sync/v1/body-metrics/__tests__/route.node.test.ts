@@ -168,6 +168,7 @@ describe('/api/auth/mobile/sync/v1/body-metrics', () => {
     await expect(pull.json()).resolves.toMatchObject({
       version: 1,
       deleted_ids: [eveningId],
+      records: [{ id: morningId, user_id: 'owner-b' }],
     });
     expect(sync.pulled).toEqual([
       {

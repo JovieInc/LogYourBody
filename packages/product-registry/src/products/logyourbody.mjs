@@ -72,6 +72,7 @@ export const logYourBody = {
       'chat_messages',
       'chat_usage_limits',
       'waitlist_entries',
+      'native_records',
       'progress_photos',
       'data_exports',
       'dexa_results',

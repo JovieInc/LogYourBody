@@ -64,8 +64,8 @@ class PhotoUploadManager: ObservableObject {
     }
 
     private init() {
-        supabaseTokenProvider = { await AuthManager.shared.getSupabaseToken() }
-        supabaseBaseURL = Constants.supabaseURL
+        supabaseTokenProvider = { await AuthManager.shared.getAccessToken() }
+        supabaseBaseURL = Configuration.apiBaseURL
         storageSessionProvider = {
             let configuration = URLSessionConfiguration.default
             configuration.timeoutIntervalForRequest = 60.0 // 60 seconds
@@ -75,13 +75,13 @@ class PhotoUploadManager: ObservableObject {
         functionSessionProvider = { .shared }
     }
 
-    /// Test seam: injects the Supabase token provider, base URL, and URL
+    /// Test seam: injects the first-party token provider, API base URL, and URL
     /// sessions so the upload pipeline can be exercised without a live auth
-    /// session or Info.plist Supabase configuration. URLSession only honors
-    /// custom URLProtocols via configuration.protocolClasses, so stubbing
-    /// the network boundary requires session injection. Production code uses
-    /// `.shared`, which wires `AuthManager`, `Constants.supabaseURL`, and the
-    /// production sessions.
+    /// session. URLSession only honors custom URLProtocols via
+    /// configuration.protocolClasses, so stubbing the network boundary
+    /// requires session injection. Production code uses `.shared`, which
+    /// wires `AuthManager`, `Configuration.apiBaseURL`, and the production
+    /// sessions.
     init(
         supabaseTokenProvider: @escaping () async -> String?,
         supabaseBaseURL: String,
@@ -184,68 +184,10 @@ class PhotoUploadManager: ObservableObject {
         }
 
         do {
-            // Step 1: Process image with Vision framework
-            updateUploadStatus(.preparing, progress: 0.1)
-            // print("📸 PhotoUploadManager: Processing image with Vision framework")
-
-            let processedResult = try await ImageProcessingService.shared.processImage(image, imageId: UUID().uuidString)
-            let orientedProcessedImage = processedResult.finalImage
-            // print("✅ PhotoUploadManager: Image processed successfully (cropped, aligned, background removed)")
-
-            // Step 2: Prepare image for upload (PNG to preserve transparency)
-            updateUploadStatus(.preparing, progress: 0.2)
-            // print("📸 PhotoUploadManager: Preparing image for upload")
-            guard let imageData = await BackgroundRemovalService.shared.prepareForUpload(orientedProcessedImage) else {
-                // print("❌ PhotoUploadManager: Failed to prepare image")
-                throw PhotoError.imageConversionFailed
-            }
-            // print("✅ PhotoUploadManager: Image prepared, size: \(imageData.count) bytes")
-
-            // Step 3: Upload to Supabase Storage
-            updateUploadStatus(.uploading, progress: 0.3)
-            let fileName = "\(userId)/\(metrics.id)_\(Date().timeIntervalSince1970).png"
-            // print("📸 PhotoUploadManager: Uploading to Supabase Storage with fileName: \(fileName)")
-            _ = try await uploadToSupabase(imageData: imageData, fileName: fileName)
-            let storagePath = fileName
-            await coreDataManager.markPhotoUploadStorageCommitted(
-                id: metrics.id,
-                userId: userId,
-                storagePath: storagePath
+            try await requestRemotePhotoStore(metricsId: metrics.id)
+            throw PhotoError.uploadFailed(
+                "Progress photo cloud storage is not available. Photos stay on this device."
             )
-            // print("✅ PhotoUploadManager: Upload complete, storage path: \(storagePath)")
-
-            updateUploadStatus(.uploading, progress: 0.5)
-
-            // Step 4: Trigger Cloudinary optimization via edge function
-            updateUploadStatus(.processing, progress: 0.6)
-            // print("📸 PhotoUploadManager: Calling edge function for Cloudinary optimization")
-            let processedUrl = try await processImageWithCloudinary(
-                storagePath: storagePath,
-                metricsId: metrics.id
-            )
-            // print("✅ PhotoUploadManager: Processing complete, URL: \(processedUrl)")
-
-            updateUploadStatus(.processing, progress: 0.8)
-
-            // Step 4: Update local and remote records
-            try await updateMetricsWithPhoto(
-                metricsId: metrics.id,
-                storagePath: storagePath,
-                processedUrl: processedUrl
-            )
-
-            updateUploadStatus(.completed, progress: 1.0)
-
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "Photo upload completed",
-                category: "photos",
-                data: [
-                    "operation": "uploadProgressPhoto",
-                    "metricsId": metrics.id
-                ]
-            )
-
-            return processedUrl
         } catch {
             self.uploadError = error.localizedDescription
             let appError: AppError
@@ -354,73 +296,10 @@ class PhotoUploadManager: ObservableObject {
         }
 
         do {
-            // Step 1: Convert HEIC/HEIF to UIImage if needed
-            updateUploadStatus(.preparing, progress: 0.1)
-
-            var finalImageData = imageData
-
-            // Check if it's HEIC/HEIF format
-            if let source = CGImageSourceCreateWithData(imageData as CFData, nil),
-               let uti = CGImageSourceGetType(source) {
-                let heicTypes = ["public.heic", "public.heif"]
-                if heicTypes.contains(uti as String) {
-                    // Convert HEIC to UIImage then to JPEG
-                    if let image = UIImage(data: imageData),
-                       let jpegData = prepareImageForUpload(image) {
-                        finalImageData = jpegData
-                    } else {
-                        throw PhotoError.imageConversionFailed
-                    }
-                }
-            } else if let image = UIImage(data: imageData),
-                      let preparedData = prepareImageForUpload(image) {
-                // For other formats, process through UIImage
-                finalImageData = preparedData
-            }
-
-            // Step 2: Upload to Supabase Storage
-            updateUploadStatus(.uploading, progress: 0.2)
-            let fileName = "\(userId)/\(metrics.id)_\(Date().timeIntervalSince1970).jpg"
-            _ = try await uploadToSupabase(imageData: finalImageData, fileName: fileName)
-            let storagePath = fileName
-            await coreDataManager.markPhotoUploadStorageCommitted(
-                id: metrics.id,
-                userId: userId,
-                storagePath: storagePath
+            try await requestRemotePhotoStore(metricsId: metrics.id)
+            throw PhotoError.uploadFailed(
+                "Progress photo cloud storage is not available. Photos stay on this device."
             )
-
-            updateUploadStatus(.uploading, progress: 0.5)
-
-            // Step 4: Trigger Cloudinary optimization via edge function
-            updateUploadStatus(.processing, progress: 0.6)
-            // print("📸 PhotoUploadManager: Calling edge function for Cloudinary optimization")
-            let processedUrl = try await processImageWithCloudinary(
-                storagePath: storagePath,
-                metricsId: metrics.id
-            )
-            // print("✅ PhotoUploadManager: Processing complete, URL: \(processedUrl)")
-
-            updateUploadStatus(.processing, progress: 0.8)
-
-            // Step 4: Update local and remote records
-            try await updateMetricsWithPhoto(
-                metricsId: metrics.id,
-                storagePath: storagePath,
-                processedUrl: processedUrl
-            )
-
-            updateUploadStatus(.completed, progress: 1.0)
-
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "Photo upload (data) completed",
-                category: "photos",
-                data: [
-                    "operation": "uploadProgressPhotoData",
-                    "metricsId": metrics.id
-                ]
-            )
-
-            return processedUrl
         } catch {
             self.uploadError = error.localizedDescription
             self.currentUploadTask = UploadTask(
@@ -445,133 +324,51 @@ class PhotoUploadManager: ObservableObject {
         }
     }
 
-    private func uploadToSupabase(imageData: Data, fileName: String) async throws -> String {
+    private func requestRemotePhotoStore(metricsId: String) async throws {
         let token = try await authenticatedJWT()
-
-        // print("📸 PhotoUploadManager: Got JWT token for storage upload")
-
-        let url: URL
-        do {
-            url = try SupabaseURLBuilder.storageURL(bucket: "photos", path: fileName, baseURL: supabaseBaseURL)
-        } catch {
-            throw mapUploadEndpointError(error, action: "Photo upload")
+        let base = supabaseBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: "\(base)/api/auth/mobile/photos") else {
+            throw PhotoError.uploadFailed("Photo upload is temporarily unavailable. Please try again.")
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("image/png", forHTTPHeaderField: "Content-Type")
-        request.httpBody = imageData
-
-        // Configure URLSession with longer timeout for photo uploads
-        let uploadSession = storageSessionProvider()
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await uploadSession.data(for: request)
-        } catch {
-            throw mapUploadEndpointError(error, action: "Photo upload")
-        }
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            // print("❌ PhotoUploadManager: Invalid response type")
-            throw PhotoError.uploadFailed("Photo upload failed. Please try again.")
-        }
-
-        // print("📸 PhotoUploadManager: Storage upload response: \(httpResponse.statusCode)")
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-            // print("❌ PhotoUploadManager: Storage upload failed: \(errorMessage)")
-            throw PhotoError.uploadFailed(errorMessage)
-        }
-
-        // Return the storage path; callers can construct URLs or use it for signed URLs
-        return fileName
-    }
-
-    private func processImageWithCloudinary(storagePath: String, metricsId: String) async throws -> String {
-        let token = try await authenticatedJWT()
-
-        let url: URL
-        do {
-            url = try SupabaseURLBuilder.functionURL("process-progress-photo", baseURL: supabaseBaseURL)
-        } catch {
-            if error is SupabaseError {
-                throw PhotoError.processingFailed("Photo processing is temporarily unavailable. Please try again.")
-            }
-            if let networkError = mapNetworkError(error) {
-                throw networkError
-            }
-            throw PhotoError.processingFailed("Photo processing failed. Please try again.")
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(Constants.supabaseAnonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = [
-            "storagePath": storagePath,
-            "metricsId": metricsId
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["metricsId": metricsId])
 
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await functionSessionProvider().data(for: request)
         } catch {
-            if let networkError = mapNetworkError(error) {
-                throw networkError
-            }
-            throw PhotoError.processingFailed("Photo processing failed. Please try again.")
+            throw mapUploadEndpointError(error, action: "Photo upload")
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            // print("❌ PhotoUploadManager: Invalid edge function response")
-            throw PhotoError.processingFailed("Photo processing failed. Please try again.")
+            throw PhotoError.uploadFailed("Photo upload failed. Please try again.")
         }
 
-        // print("📸 PhotoUploadManager: Edge function response: \(httpResponse.statusCode)")
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-            // print("❌ PhotoUploadManager: Edge function failed: \(errorMessage)")
-            throw PhotoError.processingFailed(errorMessage)
-        }
-
-        guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let processedUrl = result["processedUrl"] as? String else {
-            // print("❌ PhotoUploadManager: Invalid edge function response format: \(String(data: data, encoding: .utf8) ?? "No response data")")
-            throw PhotoError.processingFailed("Invalid response format")
-        }
-
-        return processedUrl
-    }
-
-    private func updateMetricsWithPhoto(metricsId: String, storagePath: String, processedUrl: String) async throws {
-        // Update local CoreData
-        guard let userId = authManager.currentUser?.id else {
+        if httpResponse.statusCode == 401 {
             throw PhotoError.notAuthenticated
         }
 
-        let didUpdate = try await coreDataManager.updateBodyMetricPhoto(
-            id: metricsId,
-            userId: userId,
-            storagePath: storagePath,
-            processedUrl: processedUrl
-        )
-
-        guard didUpdate else {
-            throw PhotoError.processingFailed("Could not save photo locally")
+        if httpResponse.statusCode == 503 {
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let message = json["message"] as? String,
+               !message.isEmpty {
+                throw PhotoError.uploadFailed(message)
+            }
+            throw PhotoError.uploadFailed(
+                "Progress photo cloud storage is not available. Photos stay on this device."
+            )
         }
 
-        // Trigger sync to update remote
-        RealtimeSyncManager.shared.syncIfNeeded()
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw PhotoError.uploadFailed(errorMessage)
+        }
     }
 
     private func updateUploadStatus(_ status: UploadStatus, progress: Double) {

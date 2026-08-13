@@ -1,19 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const functionSource = readFileSync(
-  new URL('../../../supabase/functions/process-progress-photo/index.ts', import.meta.url),
-  'utf8',
-);
-const canonicalFunctionSource = functionSource.replaceAll('"', "'").replace(/\s+/g, ' ');
-
-const functionConfig = readFileSync(
-  new URL('../../../supabase/functions/process-progress-photo/config.toml', import.meta.url),
-  'utf8',
-);
-
-const webPhotoUtils = readFileSync(
-  new URL('../../../apps/web/src/utils/photo-utils.ts', import.meta.url),
+const photosRoute = readFileSync(
+  new URL('../../../apps/web/src/app/api/auth/mobile/photos/route.ts', import.meta.url),
   'utf8',
 );
 
@@ -22,53 +11,27 @@ const iosPhotoUploadManager = readFileSync(
   'utf8',
 );
 
-describe('process-progress-photo auth boundary', () => {
-  it('requires a verified user token before processing photos', () => {
-    expect(functionConfig).toContain('verify_jwt = true');
-    expect(canonicalFunctionSource).toContain("req.headers.get('Authorization')");
-    expect(canonicalFunctionSource).toContain('supabase.auth.getUser(token)');
-    expect(canonicalFunctionSource).toMatch(
-      /return jsonResponse\( \{ error: 'Missing or invalid authorization header' \}, 401,? \)/,
-    );
-    expect(canonicalFunctionSource).toContain(
-      "return jsonResponse({ error: 'Invalid token' }, 401)",
-    );
+describe('first-party progress photo auth boundary', () => {
+  it('requires a verified bearer token before the photo store stub runs', () => {
+    expect(photosRoute).toContain('fetchUserInfo(token)');
+    expect(photosRoute).toContain("error: 'unauthorized'");
+    expect(photosRoute).toContain("error: 'photo_store_unavailable'");
+    expect(photosRoute).toContain('status: 503');
   });
 
-  it('checks metric and storage ownership before signing or uploading the photo', () => {
-    expect(canonicalFunctionSource).toContain('!normalizedStoragePath.startsWith(`${user.id}/`)');
-    expect(canonicalFunctionSource).toContain(".select('id, user_id')");
-    expect(canonicalFunctionSource).toContain('metric.user_id !== user.id');
-
-    expect(canonicalFunctionSource.indexOf(".select('id, user_id')")).toBeLessThan(
-      canonicalFunctionSource.indexOf('.createSignedUrl(normalizedStoragePath'),
-    );
-    expect(canonicalFunctionSource.indexOf('metric.user_id !== user.id')).toBeLessThan(
-      canonicalFunctionSource.indexOf('fetch( `https://api.cloudinary.com'),
-    );
-  });
-
-  it('keeps the user predicate on the final service-role update', () => {
-    expect(canonicalFunctionSource).toContain(".eq('id', metricsId) .eq('user_id', user.id)");
-    expect(canonicalFunctionSource).toContain(
-      "return jsonResponse({ error: 'Failed to update metrics photo' }, 500)",
-    );
-  });
-
-  it('does not let clients call the function with the anon key as bearer auth', () => {
-    expect(webPhotoUtils).toContain('await supabase.auth.getSession()');
-    expect(webPhotoUtils).toContain('Authorization: `Bearer ${accessToken}`');
-    expect(webPhotoUtils).not.toContain('Authorization: `Bearer ${supabaseAnonKey}`');
-
+  it('keeps native photo upload on the first-party bearer API', () => {
     expect(iosPhotoUploadManager).toContain(
       'private func authenticatedJWT() async throws -> String',
     );
     expect(iosPhotoUploadManager).toContain('let token = try await authenticatedJWT()');
+    expect(iosPhotoUploadManager).toContain('/api/auth/mobile/photos');
     expect(iosPhotoUploadManager).toContain(
       'request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")',
     );
     expect(iosPhotoUploadManager).not.toContain(
       'request.setValue("Bearer \\(Constants.supabaseAnonKey)"',
     );
+    expect(iosPhotoUploadManager).not.toContain('storage/v1');
+    expect(iosPhotoUploadManager).not.toContain('process-progress-photo');
   });
 });

@@ -34,10 +34,12 @@ describe('neonUserDirectory.deleteUser', () => {
     expect(mockSql.mock.calls[1]?.[1]).toBe('jovie-subject');
     expect(normalizedStatement(2)).toBe('delete from public.body_metrics where user_subject = ?');
     expect(mockSql.mock.calls[2]?.[1]).toBe('jovie-subject');
-    expect(normalizedStatement(3)).toBe(
+    expect(normalizedStatement(3)).toBe('delete from public.native_records where user_subject = ?');
+    expect(mockSql.mock.calls[3]?.[1]).toBe('jovie-subject');
+    expect(normalizedStatement(4)).toBe(
       "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ?",
     );
-    expect(mockSql.mock.calls[3]?.[1]).toBe('jovie-subject');
+    expect(mockSql.mock.calls[4]?.[1]).toBe('jovie-subject');
   });
 
   it('keeps the identity projection when health-row deletion fails', async () => {

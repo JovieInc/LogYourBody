@@ -100,7 +100,8 @@ export function createNativeBodyMetricsSyncHandlers(deps: NativeSyncRouteDepende
   return {
     async GET(request: NextRequest) {
       const identity = await deps.authenticate(request);
-      if (!identity) return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unauthorized' }, 401);
+      if (!identity)
+        return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unauthorized' }, 401);
 
       const parsed = PullQuerySchema.safeParse({
         since: request.nextUrl.searchParams.get('since') ?? undefined,
@@ -116,28 +117,38 @@ export function createNativeBodyMetricsSyncHandlers(deps: NativeSyncRouteDepende
         after_id: parsed.data.after_id ?? null,
         limit: parsed.data.limit,
       });
-      return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, ...result });
+      return json({
+        version: NATIVE_BODY_METRICS_SYNC_VERSION,
+        ...result,
+        records: result.records.map((record) => ({ ...record, user_id: identity.sub })),
+      });
     },
 
     async POST(request: NextRequest) {
       const identity = await deps.authenticate(request);
-      if (!identity) return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unauthorized' }, 401);
+      if (!identity)
+        return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unauthorized' }, 401);
 
       const parsed = PushBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) {
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_records' }, 400);
       }
 
-      const result = await deps.sync.push(
-        identity.sub,
-        parsed.data.records.map(mapPushRecord),
+      const result = await deps.sync.push(identity.sub, parsed.data.records.map(mapPushRecord));
+      return json(
+        {
+          version: NATIVE_BODY_METRICS_SYNC_VERSION,
+          ...result,
+          records: result.records.map((record) => ({ ...record, user_id: identity.sub })),
+        },
+        200,
       );
-      return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, ...result }, 200);
     },
 
     async DELETE(request: NextRequest) {
       const identity = await deps.authenticate(request);
-      if (!identity) return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unauthorized' }, 401);
+      if (!identity)
+        return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unauthorized' }, 401);
 
       const parsed = DeleteBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) {
