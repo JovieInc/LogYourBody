@@ -70,16 +70,10 @@ jobs:
 
       - name: Verify authenticated chat runtime configuration
         run: |
-          env_file=.vercel/.env.production.local
-          test -f "$env_file"
-          missing_variables=0
-          for required_variable in DATABASE_URL OPENAI_API_KEY CRON_SECRET; do
-            if ! rg --quiet "^${required_variable}=" "$env_file"; then
-              echo "::error::Missing required Vercel production variable: $required_variable"
-              missing_variables=1
-            fi
-          done
-          test "$missing_variables" -eq 0
+          # Portable Node checker: GitHub-hosted runners do not ship ripgrep (`rg`).
+          # The self-test proves this step cannot false-fail when `rg` is absent.
+          node --test .github/scripts/verify-vercel-chat-runtime-env.test.mjs
+          node .github/scripts/verify-vercel-chat-runtime-env.mjs .vercel/.env.production.local
 
       - name: Apply product database migrations
         env:
