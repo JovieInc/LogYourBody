@@ -74,7 +74,7 @@ jobs:
           test -f "$env_file"
           missing_variables=0
           for required_variable in DATABASE_URL OPENAI_API_KEY CRON_SECRET; do
-            if ! rg --quiet "^${required_variable}=" "$env_file"; then
+            if ! grep -qE "^${required_variable}=" "$env_file"; then
               echo "::error::Missing required Vercel production variable: $required_variable"
               missing_variables=1
             fi
