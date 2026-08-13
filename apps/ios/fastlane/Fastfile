@@ -43,18 +43,21 @@ platform :ios do
     value
   end
 
-  testflight_upload_options = lambda do |ipa:, groups:, distribute_external:, changelog: nil|
+  testflight_upload_options = lambda do |ipa:, groups:, distribute_external:, changelog: nil, skip_waiting_for_build_processing: false, distribute_only: false, app_version: nil, build_number: nil|
     options = {
-      ipa: ipa,
       # Pilot cannot assign tester groups until Apple has processed the build.
-      skip_waiting_for_build_processing: false,
+      skip_waiting_for_build_processing: skip_waiting_for_build_processing,
       app_identifier: app_identifier.call,
       apple_id: app_store_app_id.call,
       team_id: ENV["APPLE_TEAM_ID"],
       groups: groups,
       distribute_external: distribute_external
     }
+    options[:ipa] = ipa unless ipa.to_s.empty?
     options[:changelog] = changelog unless changelog.nil?
+    options[:distribute_only] = true if distribute_only
+    options[:app_version] = app_version unless app_version.to_s.empty?
+    options[:build_number] = build_number unless build_number.to_s.empty?
     options
   end
   
