@@ -11,9 +11,7 @@ import { Loader2, Plus, Settings, Upload, ChevronDown } from 'lucide-react';
 import { BodyMetrics, UserProfile, ProgressPhoto } from '@/types/body-metrics';
 import { convertWeight } from '@/utils/body-calculations';
 import { useNetworkStatus } from '@/hooks/use-network-status';
-import { getFilePathFromUrl } from '@/utils/storage-utils';
 import { getProfile } from '@/lib/profile';
-import { createClient } from '@/lib/supabase/client';
 import {
   createTimelineData,
   getTimelineDisplayValues,
@@ -33,48 +31,6 @@ import { useSync } from '@/hooks/use-sync';
 import { syncManager } from '@/lib/sync/sync-manager';
 import { indexedDB } from '@/lib/db/indexed-db';
 import { AvatarDisplay, ProfilePanel } from './DashboardPanels';
-
-function isSupabasePhotosUrl(url: string | null | undefined): boolean {
-  if (!url) return false;
-  return url.includes('/storage/v1/object') && url.includes('/photos/');
-}
-
-async function getSignedPhotoUrlIfNeeded(
-  supabase: ReturnType<typeof createClient>,
-  url: string | null,
-): Promise<string | null> {
-  if (!url) return url;
-  if (!isSupabasePhotosUrl(url)) {
-    return url;
-  }
-
-  const path = getFilePathFromUrl(url, 'photos');
-  if (!path) {
-    return url;
-  }
-
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from('photos')
-    .createSignedUrl(path, 60 * 10);
-
-  if (signedError || !signedData || !signedData.signedUrl) {
-    console.error('Failed to create signed URL for dashboard photo', signedError);
-    return url;
-  }
-
-  let signedUrl = signedData.signedUrl as string;
-
-  if (!signedUrl.startsWith('http')) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (supabaseUrl) {
-      const base = supabaseUrl.endsWith('/') ? supabaseUrl.slice(0, -1) : supabaseUrl;
-      const pathPart = signedUrl.startsWith('/') ? signedUrl : `/${signedUrl}`;
-      signedUrl = `${base}${pathPart}`;
-    }
-  }
-
-  return signedUrl;
-}
 
 const TimelineSlider = dynamic(
   () => import('./components/TimelineSlider').then((mod) => ({ default: mod.TimelineSlider })),
@@ -173,72 +129,25 @@ export default function DashboardPage() {
           setMetricsHistory(localMetrics);
         }
 
-        // Batch all server queries to run in parallel
-        const supabase = createClient();
-        const [metricsResponse, photosResult] = await Promise.all([
-          fetch('/api/body-metrics', { cache: 'no-store' }),
-          supabase
-            .from('progress_photos')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('date', { ascending: false }),
-        ]);
-
-        // Process metrics data
+        const metricsResponse = await fetch('/api/body-metrics', { cache: 'no-store' });
         if (!metricsResponse.ok) {
           console.error('Error loading metrics:', metricsResponse.status);
         } else {
           const metricsPayload = (await metricsResponse.json()) as { metrics: BodyMetrics[] };
           const metrics = metricsPayload.metrics || [];
-          const metricsWithUrls = await Promise.all(
-            metrics.map(async (metric) => {
-              if (!metric.photo_url) {
-                return metric;
-              }
 
-              const signedUrl = await getSignedPhotoUrlIfNeeded(supabase, metric.photo_url);
-              return {
-                ...metric,
-                photo_url: signedUrl ?? metric.photo_url,
-              };
-            }),
-          );
-
-          if (metricsWithUrls.length > 0) {
-            setLatestMetrics(metricsWithUrls[0]);
-            setMetricsHistory(metricsWithUrls.slice().reverse()); // Reverse to have oldest first for timeline
+          if (metrics.length > 0) {
+            setLatestMetrics(metrics[0]);
+            setMetricsHistory(metrics.slice().reverse());
           }
 
-          // Save to local storage
-          metricsWithUrls.forEach((metric) => {
+          metrics.forEach((metric) => {
             indexedDB.saveBodyMetrics(metric, user.id);
           });
         }
 
-        // Process photos data
-        if (photosResult.error) {
-          console.error('Error loading photos:', photosResult.error);
-        } else if (photosResult.data) {
-          const photosWithUrls = await Promise.all(
-            photosResult.data.map(async (photo) => {
-              const signedPhotoUrl = await getSignedPhotoUrlIfNeeded(supabase, photo.photo_url);
-              const signedThumbUrl = await getSignedPhotoUrlIfNeeded(
-                supabase,
-                photo.thumbnail_url ?? null,
-              );
-
-              return {
-                ...photo,
-                photo_url: signedPhotoUrl ?? photo.photo_url,
-                thumbnail_url: signedThumbUrl ?? photo.thumbnail_url,
-              } as ProgressPhoto;
-            }),
-          );
-
-          setPhotosHistory(photosWithUrls.slice().reverse()); // Reverse to have oldest first for timeline
-        }
-
-        // Trigger sync to ensure we have latest data
+        // Existing Supabase photo blobs were abandoned in the hard cut.
+        setPhotosHistory([]);
         syncManager.syncIfNeeded();
       };
 

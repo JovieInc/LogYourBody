@@ -47,51 +47,35 @@ export default function DataExportPage() {
 
     try {
       const token = await session?.getToken();
+      const response = await fetch('/api/auth/mobile/export', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/export-user-data`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            format: exportFormat,
-            emailLink: exportMethod === 'email',
-          }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (response.ok) {
-        if (exportMethod === 'email') {
-          setExportStatus('success');
-          setStatusMessage(
-            data.message ||
-              'Export link has been sent to your email. The link will expire in 24 hours.',
-          );
-        } else {
-          // For direct download, the response should contain the file
-          const blob = new Blob([JSON.stringify(data)], {
-            type: exportFormat === 'json' ? 'application/json' : 'text/csv',
-          });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `logyourbody-export-${new Date().toISOString().split('T')[0]}.${exportFormat}`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-
-          setExportStatus('success');
-          setStatusMessage('Your data has been downloaded successfully.');
-        }
-      } else {
-        throw new Error(data.error || 'Export failed');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data.error === 'string' ? data.error : 'Export failed');
       }
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: exportFormat === 'json' ? 'application/json' : 'text/csv',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `logyourbody-export-${new Date().toISOString().split('T')[0]}.${exportFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setExportStatus('success');
+      setStatusMessage(
+        exportMethod === 'email'
+          ? 'Email export is retired. Your Neon data downloaded as JSON instead.'
+          : 'Your data has been downloaded successfully.',
+      );
     } catch (error) {
       console.error('Export error:', error);
       setExportStatus('error');

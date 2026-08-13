@@ -3,7 +3,6 @@
 import { NextRequest } from 'next/server';
 import { fetchUserInfo } from '@/lib/auth/jovie-oauth';
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
-import { deleteUserHealthData } from '@/lib/supabase/account-deletion';
 import { DELETE, GET, PATCH } from '../route';
 
 jest.mock('@/lib/auth/jovie-oauth', () => ({ fetchUserInfo: jest.fn() }));
@@ -13,9 +12,6 @@ jest.mock('@/lib/neon/user-directory-adapter', () => ({
     updateProfile: jest.fn(),
     deleteUser: jest.fn(),
   },
-}));
-jest.mock('@/lib/supabase/account-deletion', () => ({
-  deleteUserHealthData: jest.fn(),
 }));
 
 const mockedFetchUserInfo = jest.mocked(fetchUserInfo);
@@ -114,25 +110,20 @@ describe('/api/auth/mobile/profile', () => {
     });
   });
 
-  it('deletes health data before removing the LYB product principal', async () => {
+  it('deletes the Neon product principal and owned rows', async () => {
     mockedFetchUserInfo.mockResolvedValue(identity);
     const response = await DELETE(request('DELETE'));
     expect(response.status).toBe(204);
-    expect(deleteUserHealthData).toHaveBeenCalledWith(identity.sub);
     expect(mockedDirectory.deleteUser).toHaveBeenCalledWith(identity.sub);
-    expect(jest.mocked(deleteUserHealthData).mock.invocationCallOrder[0]).toBeLessThan(
-      mockedDirectory.deleteUser.mock.invocationCallOrder[0],
-    );
   });
 
-  it('fails closed when health-data deletion fails', async () => {
+  it('fails closed when Neon account deletion fails', async () => {
     mockedFetchUserInfo.mockResolvedValue(identity);
-    jest.mocked(deleteUserHealthData).mockRejectedValue(new Error('database unavailable'));
+    mockedDirectory.deleteUser.mockRejectedValue(new Error('database unavailable'));
 
     const response = await DELETE(request('DELETE'));
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: 'account_deletion_failed' });
-    expect(mockedDirectory.deleteUser).not.toHaveBeenCalled();
   });
 });

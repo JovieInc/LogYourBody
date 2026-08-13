@@ -15,7 +15,6 @@ jobs:
     outputs:
       web: ${{ steps.filter.outputs.web }}
       ios: ${{ steps.filter.outputs.ios }}
-      account_backend: ${{ steps.filter.outputs.account_backend }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -32,104 +31,14 @@ jobs:
               - 'apps/web/vercel.json'
             ios:
               - 'apps/ios/**'
-            account_backend:
-              - 'apps/web/src/lib/supabase/account-deletion.ts'
-              - 'apps/web/src/app/api/auth/delete-account/**'
-              - 'apps/web/src/app/api/auth/mobile/profile/**'
-              - 'supabase/config.toml'
-              - 'supabase/functions/delete-user-assets/**'
-              - 'supabase/functions/process-progress-photo/**'
-              - '.github/workflows/deploy.yml'
-
-  account-deletion-backend:
-    name: Account Deletion Backend
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.account_backend == 'true'
-    timeout-minutes: 15
-    environment: Production
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Deploy fail-closed asset deletion
-        run: |
-          test -n "$SUPABASE_ACCESS_TOKEN"
-          test -n "$SUPABASE_PROJECT_REF"
-          if ! configured_secrets=$(supabase secrets list \
-            --project-ref "$SUPABASE_PROJECT_REF" \
-            --output-format json); then
-            echo "::error::Unable to list Supabase function secrets"
-            exit 1
-          fi
-          missing_secrets=0
-          for required_secret in \
-            CLOUDINARY_CLOUD_NAME \
-            CLOUDINARY_API_KEY \
-            CLOUDINARY_API_SECRET; do
-            if ! printf '%s' "$configured_secrets" | jq -e \
-              --arg name "$required_secret" \
-              'map(.name) | index($name) != null' > /dev/null; then
-              echo "::error::Missing required Supabase function secret: $required_secret"
-              missing_secrets=1
-            fi
-          done
-          test "$missing_secrets" -eq 0
-          for function_name in delete-user-assets process-progress-photo; do
-            supabase functions deploy "$function_name" \
-              --project-ref "$SUPABASE_PROJECT_REF"
-          done
-
-      - name: Provision the first-party server credential
-        run: |
-          test -n "$VERCEL_TOKEN"
-          api_keys=$(supabase projects api-keys \
-            --project-ref "$SUPABASE_PROJECT_REF" \
-            --output-format json)
-          service_role_key=$(printf '%s' "$api_keys" | jq -er \
-            '.[] | select(.name == "service_role") | .api_key')
-          test -n "$service_role_key"
-
-          npm install --global vercel@latest
-          link_dir=$(mktemp -d)
-          vercel link --yes \
-            --cwd "$link_dir" \
-            --project log-your-body \
-            --scope jovie \
-            --token "$VERCEL_TOKEN"
-          printf '%s' "$service_role_key" | vercel env add \
-            SUPABASE_SERVICE_ROLE_KEY production \
-            --force \
-            --sensitive \
-            --cwd "$link_dir" \
-            --scope jovie \
-            --token "$VERCEL_TOKEN"
 
   web:
     name: Web
     runs-on: ubuntu-latest
-    needs: [detect-changes, account-deletion-backend]
-    if: >-
-      always() &&
-      needs.detect-changes.outputs.web == 'true' &&
-      (needs.account-deletion-backend.result == 'success' ||
-      needs.account-deletion-backend.result == 'skipped')
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.web == 'true'
     timeout-minutes: 15
     env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || vars.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key' }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
@@ -273,7 +182,7 @@ jobs:
     name: Deploy Summary
     runs-on: ubuntu-latest
     if: always()
-    needs: [detect-changes, account-deletion-backend, web, ios-beta]
+    needs: [detect-changes, web, ios-beta]
     steps:
       - name: Generate summary
         run: |
@@ -282,7 +191,6 @@ jobs:
             echo ""
             echo "- Web changed: ${{ needs.detect-changes.outputs.web }}"
             echo "- iOS changed: ${{ needs.detect-changes.outputs.ios }}"
-            echo "- Account backend changed: ${{ needs.detect-changes.outputs.account_backend }}"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -292,14 +200,6 @@ jobs:
             echo "⏭️ Web deployment skipped (no changes)" >> "$GITHUB_STEP_SUMMARY"
           elif [[ "${{ needs.web.result }}" == "failure" ]]; then
             echo "❌ Web deployment failed" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          if [[ "${{ needs.account-deletion-backend.result }}" == "success" ]]; then
-            echo "✅ Account-deletion backend deployed" >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ needs.account-deletion-backend.result }}" == "skipped" ]]; then
-            echo "⏭️ Account-deletion backend skipped (no changes)" >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ needs.account-deletion-backend.result }}" == "failure" ]]; then
-            echo "❌ Account-deletion backend failed" >> "$GITHUB_STEP_SUMMARY"
           fi
 
           if [[ "${{ needs.ios-beta.result }}" == "success" ]]; then

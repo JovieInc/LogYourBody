@@ -154,6 +154,11 @@ export const neonUserDirectory: UserDirectoryPort = {
     `;
 
     await database`
+      delete from public.native_records
+      where user_subject = ${subject}
+    `;
+
+    await database`
       delete from public.app_users
       where identity_provider = 'jovie' and identity_subject = ${subject}
     `;
