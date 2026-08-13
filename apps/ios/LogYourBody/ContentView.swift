@@ -248,7 +248,7 @@ struct ContentView: View {
 
     private var mainContent: some View {
         Group {
-            if authManager.isAuthenticated {
+            if JovieSessionPolicy.isSignedIn(authManager.authSession) {
                 authenticatedContent
             } else {
                 loginContent

@@ -20,6 +20,7 @@ final class AuthLegacyStorageMigrationTests: XCTestCase {
         defaults.set("legacy-access", forKey: Constants.authTokenKey)
         defaults.set("legacy-refresh", forKey: "refreshToken")
         defaults.set("legacy-session", forKey: "clerkSession")
+        defaults.set("legacy-name", forKey: "pendingNameUpdate")
         defaults.set("legacy-user-json", forKey: Constants.currentUserKey)
         defaults.set(true, forKey: Constants.hasCompletedOnboardingKey)
 
@@ -28,10 +29,12 @@ final class AuthLegacyStorageMigrationTests: XCTestCase {
         XCTAssertTrue(removedKeys.contains(Constants.authTokenKey))
         XCTAssertTrue(removedKeys.contains("refreshToken"))
         XCTAssertTrue(removedKeys.contains("clerkSession"))
+        XCTAssertTrue(removedKeys.contains("pendingNameUpdate"))
         XCTAssertTrue(removedKeys.contains(Constants.currentUserKey))
         XCTAssertNil(defaults.object(forKey: Constants.authTokenKey))
         XCTAssertNil(defaults.object(forKey: "refreshToken"))
         XCTAssertNil(defaults.object(forKey: "clerkSession"))
+        XCTAssertNil(defaults.object(forKey: "pendingNameUpdate"))
         XCTAssertNil(defaults.object(forKey: Constants.currentUserKey))
         XCTAssertEqual(defaults.bool(forKey: Constants.hasCompletedOnboardingKey), true)
     }

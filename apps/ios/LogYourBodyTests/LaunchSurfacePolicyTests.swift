@@ -39,6 +39,25 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertNotNil(ChatComposerGeometry.transitionAnimation(reduceMotion: false))
     }
 
+    func testJovieSessionPolicyRequiresNonEmptyAccessToken() {
+        XCTAssertFalse(JovieSessionPolicy.isSignedIn(nil))
+        XCTAssertFalse(
+            JovieSessionPolicy.isSignedIn(
+                .localFixture(subject: "user", email: "user@example.com", accessToken: "")
+            )
+        )
+        XCTAssertFalse(
+            JovieSessionPolicy.isSignedIn(
+                .localFixture(subject: "user", email: "user@example.com", accessToken: "   ")
+            )
+        )
+        XCTAssertTrue(
+            JovieSessionPolicy.isSignedIn(
+                .localFixture(subject: "user", email: "user@example.com")
+            )
+        )
+    }
+
     func testIncompleteOnboardingRequiresBodyCompositionOnboarding() {
         XCTAssertTrue(
             LaunchSurfacePolicy.requiresBodyCompositionOnboarding(

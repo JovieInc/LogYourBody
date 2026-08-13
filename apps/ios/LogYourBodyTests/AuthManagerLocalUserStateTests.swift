@@ -19,9 +19,27 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
         super.tearDown()
     }
 
+    func testIsAuthenticatedRequiresJovieAccessToken() {
+        let manager = AuthManager()
+        XCTAssertFalse(manager.isAuthenticated)
+
+        manager.authSession = .localFixture(subject: "user-1", email: "user@example.com")
+        XCTAssertTrue(manager.isAuthenticated)
+
+        manager.authSession = .localFixture(
+            subject: "user-1",
+            email: "user@example.com",
+            accessToken: "   "
+        )
+        XCTAssertFalse(manager.isAuthenticated)
+
+        manager.authSession = nil
+        XCTAssertFalse(manager.isAuthenticated)
+    }
+
     func testLogoutSetsExitReasonUserInitiated() async {
         let manager = AuthManager()
-        manager.isAuthenticated = true
+        manager.authSession = .localFixture(subject: "test-user", email: "test@example.com")
 
         await manager.logout()
 
@@ -31,7 +49,7 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
 
     func testHandleSupabaseUnauthorizedExpiresSessionWithoutRefreshToken() async {
         let manager = AuthManager()
-        manager.isAuthenticated = true
+        manager.authSession = .localFixture(subject: "test-user", email: "test@example.com")
         manager.currentUser = LocalUser(
             id: "test-user",
             email: "test@example.com",

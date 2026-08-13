@@ -339,7 +339,11 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
             profile: nil,
             onboardingCompleted: true
         )
-        authManager.isAuthenticated = true
+        authManager.authSession = .localFixture(
+            subject: activeUserId,
+            email: "pending-active@example.com",
+            name: "Pending Active"
+        )
 
         let manager = RealtimeSyncManager(
             coreDataManager: CoreDataManager.shared,
@@ -391,7 +395,11 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
             profile: nil,
             onboardingCompleted: true
         )
-        authManager.isAuthenticated = true
+        authManager.authSession = .localFixture(
+            subject: userId,
+            email: "retry@example.com",
+            name: "Retry User"
+        )
 
         let manager = RealtimeSyncManager(
             coreDataManager: CoreDataManager.shared,
@@ -454,7 +462,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
 
         let authManager = AuthManager()
         authManager.currentUser = nil
-        authManager.isAuthenticated = false
+        authManager.authSession = nil
         let manager = RealtimeSyncManager(
             coreDataManager: CoreDataManager.shared,
             authManager: authManager,

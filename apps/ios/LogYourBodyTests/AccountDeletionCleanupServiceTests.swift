@@ -178,6 +178,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
             Constants.hasCompletedOnboardingKey,
             Constants.onboardingCompletedVersionKey,
             Constants.onboardingCompletedUserIdKey,
+            "pendingNameUpdate",
             Constants.defaultHomeModeKey,
             Constants.timelineModeKey,
             "healthKitSyncEnabled",
