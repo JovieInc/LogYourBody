@@ -1,0 +1,90 @@
+/* Locked canonical marketing Footer skin (Pen CCDnQ / gallery T32Pu).
+   Geometry matches Jovie's founder-locked Marketing Footer. Do not restyle
+   spacing, type, or hierarchy without a new lock. */
+
+.marketing-footer-premium {
+  --mf-text: rgba(255, 255, 255, 0.92);
+  --mf-text-secondary: rgba(255, 255, 255, 0.6);
+  --mf-text-tertiary: rgba(255, 255, 255, 0.48);
+  --mf-hairline: rgba(255, 255, 255, 0.07);
+  background: #06070a;
+  color: var(--mf-text);
+  border-top: 1px solid var(--mf-hairline);
+}
+
+.marketing-footer-premium .mf-eyebrow {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--mf-text-tertiary);
+  line-height: 1;
+  margin-bottom: 1.25rem;
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+}
+
+.marketing-footer-premium .mf-link {
+  display: inline-flex;
+  width: fit-content;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  color: var(--mf-text-secondary);
+  transition: color 150ms ease;
+  border-radius: 4px;
+}
+
+.marketing-footer-premium .mf-link:hover,
+.marketing-footer-premium .mf-link:focus-visible {
+  color: var(--mf-text);
+}
+
+.marketing-footer-premium .mf-link:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline-offset: 2px;
+}
+
+.marketing-footer-premium .mf-baseband {
+  border-top: 1px solid var(--mf-hairline);
+  margin-top: clamp(3rem, 5.5vw, 4.5rem);
+  padding-top: clamp(1.5rem, 2.5vw, 2rem);
+}
+
+.marketing-footer-premium .mf-baseband--compact {
+  margin-top: 0;
+  padding-top: 1.25rem;
+}
+
+.marketing-footer-premium .mf-legal-link {
+  display: inline-flex;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  letter-spacing: 0;
+  color: var(--mf-text-tertiary);
+  transition: color 150ms ease;
+  border-radius: 4px;
+}
+
+.marketing-footer-premium .mf-legal-link:hover,
+.marketing-footer-premium .mf-legal-link:focus-visible {
+  color: var(--mf-text);
+}
+
+.marketing-footer-premium .mf-legal-link:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline-offset: 2px;
+}
+
+.marketing-footer-premium .mf-copyright {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  color: var(--mf-text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-footer-premium .mf-link,
+  .marketing-footer-premium .mf-legal-link {
+    transition: none;
+  }
+}
