@@ -86,7 +86,8 @@ final class PhotoUploadManagerTests: XCTestCase {
         authenticate(userId: userId)
 
         let stayOnDevice =
-            "Progress photo cloud storage is not available. Photos stay on this device until Cloudinary is configured on the first-party API."
+            "Progress photo cloud storage is not available. " +
+            "Photos stay on this device until Cloudinary is configured on the first-party API."
         PhotoUploadStubURLProtocol.install { _ in
             .http(
                 503,
