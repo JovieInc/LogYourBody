@@ -16,19 +16,12 @@ extension DashboardViewLiquid {
                         bodyMetrics: bodyMetrics,
                         selectedIndex: $selectedIndex,
                         dateText: formatHUDDate(metric.date),
-                        bodyScoreText: bodyScore.scoreText,
-                        bodyScoreTagline: bodyScore.tagline,
-                        bodyScoreDeltaText: heroBodyScoreDeltaText(),
                         weightValue: heroWeightValue(),
                         weightCaption: heroWeightCaption(),
                         bodyFatValue: heroBodyFatValue(),
                         bodyFatCaption: heroBodyFatCaption(),
                         ffmiValue: heroFFMIValue(),
                         ffmiCaption: heroFFMICaption(),
-                        onTapBodyScore: bodyScore.score > 0 ? {
-                            selectedMetricType = .bodyScore
-                            isMetricDetailActive = true
-                        } : nil,
                         onTapWeight: {
                             selectedMetricType = .weight
                             isMetricDetailActive = true
@@ -41,7 +34,7 @@ extension DashboardViewLiquid {
                             selectedMetricType = .ffmi
                             isMetricDetailActive = true
                         },
-                        onShareBodyScore: makeBodyScoreShareAction(metric: metric, score: bodyScore.score)
+                        onShare: makeBodyScoreShareAction(metric: metric, score: bodyScore.score)
                     )
                 } else {
                     photoTimelineHUDEmptyState

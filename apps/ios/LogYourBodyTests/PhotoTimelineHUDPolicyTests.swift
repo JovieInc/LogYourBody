@@ -94,6 +94,20 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         }
     }
 
+    func testTimelinePhotoScrubLockKeepsBodyScoreOffTimeline() {
+        XCTAssertEqual(TimelinePhotoScrubLock.version, "1.1.1")
+        XCTAssertEqual(TimelinePhotoScrubLock.visibleMetricTitles, ["FFMI", "Weight", "Body Fat"])
+        XCTAssertFalse(TimelinePhotoScrubLock.showsBodyScoreOnTimeline)
+        XCTAssertFalse(TimelinePhotoScrubLock.showsIdleThumbnails)
+        XCTAssertEqual(TimelinePhotoScrubLock.shareActionTitle, "Share")
+        XCTAssertEqual(TimelinePhotoScrubLock.visibleControlPointSize, 32)
+        XCTAssertEqual(JovieTokens.minimumHitTarget, 44)
+        XCTAssertLessThan(
+            TimelinePhotoScrubLock.visibleControlPointSize,
+            JovieTokens.minimumHitTarget
+        )
+    }
+
     func testPhotoTimelineHUDMetricStateCopyIsExplicit() {
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .present), "Measured")
         XCTAssertEqual(

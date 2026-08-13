@@ -719,63 +719,45 @@ struct DashboardStepsCard<ProgressView: View>: View {
 
 // MARK: - Launch Timeline
 
-/// The focused timeline surface used by the launch experience.
+/// Paid Timeline surface locked to photo-scrub v1.1.1.
 ///
-/// Composition follows the locked JOV-2866 photo-first hierarchy: the photo
-/// stage is the visual anchor, the timeline scrubber sits immediately below
-/// it, three compact metric facts follow, and Body Score stays available as a
-/// secondary row rather than the first visual object.
-///
-/// This intentionally has no vertical scroll container. The only scrolling
-/// gesture on the page is the photo strip, so a user can move through time
-/// directly without losing the essential metrics below it.
+/// One fused photo + recessed slider. Exactly FFMI, Weight, and Body Fat.
+/// Share is the only chrome action. Body Score stays off this surface.
 struct LaunchTimelineSurface: View {
     @Environment(\.theme) private var theme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .largeTitle) private var scoreFontSize: CGFloat = 34
 
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
     @Binding var selectedIndex: Int
     let dateText: String
-    let bodyScoreText: String
-    let bodyScoreTagline: String
-    let bodyScoreDeltaText: String?
     let weightValue: String
     let weightCaption: String
     let bodyFatValue: String
     let bodyFatCaption: String
     let ffmiValue: String
     let ffmiCaption: String
-    let onTapBodyScore: (() -> Void)?
     let onTapWeight: () -> Void
     let onTapBodyFat: () -> Void
     let onTapFFMI: () -> Void
-    let onShareBodyScore: (() -> Void)?
+    let onShare: (() -> Void)?
+
+    private let metricTitles = TimelinePhotoScrubLock.visibleMetricTitles
 
     var body: some View {
         GeometryReader { geometry in
-            let stageHeight = min(336, max(216, geometry.size.height * 0.44))
+            let stageHeight = min(420, max(280, geometry.size.height * 0.58))
 
             ZStack(alignment: .topLeading) {
                 launchAccessibilityMarker(id: "launch_timeline_surface", label: "Timeline")
 
                 VStack(alignment: .leading, spacing: 0) {
-                    timelineStage
+                    fusedPhotoStage
                         .frame(height: stageHeight)
-                        .clipShape(RoundedRectangle(cornerRadius: theme.radius.card))
-
-                    timelineScrubber
-                        .frame(height: 80)
-                        .padding(.top, 12)
 
                     metricStrip
-                        .padding(.top, 12)
-
-                    scoreRow
-                        .padding(.top, 12)
+                        .padding(.top, 14)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, JovieTokens.compactInset)
                 .padding(.top, 4)
                 .padding(.bottom, 12)
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
@@ -792,69 +774,110 @@ struct LaunchTimelineSurface: View {
             .allowsHitTesting(false)
     }
 
-    private var timelineStage: some View {
-        ZStack(alignment: .bottomLeading) {
-            if let photoURL = metric.photoUrl, !photoURL.isEmpty {
-                CachedAsyncImage(urlString: photoURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    stagePlaceholder
-                }
-            } else {
-                stagePlaceholder
-            }
+    private var fusedPhotoStage: some View {
+        ZStack(alignment: .bottom) {
+            photoFill
 
             LinearGradient(
                 colors: [
-                    theme.colors.background.opacity(0.04),
-                    theme.colors.background.opacity(0.68)
+                    theme.colors.background.opacity(0.08),
+                    theme.colors.background.opacity(0.22),
+                    theme.colors.background.opacity(0.78)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .allowsHitTesting(false)
 
-            HStack(alignment: .bottom, spacing: 10) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Selected day")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.72))
-
-                    Text(dateText)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                }
+            VStack(spacing: 0) {
+                stageChrome
+                    .padding(.horizontal, 10)
+                    .padding(.top, 10)
 
                 Spacer(minLength: 0)
 
-                if let onShareBodyScore {
-                    Button(action: onShareBodyScore) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 36, height: 36)
-                            .background(.black.opacity(0.32), in: Circle())
-                    }
-                    .frame(width: 44, height: 44)
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Share Body Score")
-                    .accessibilityIdentifier("body_score_hero_share_button")
-                }
+                recessedSlider
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 10)
             }
-            .padding(14)
         }
-        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card))
-        .clipped()
+        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(
-            metric.photoUrl?.isEmpty == false
+            PhotoTimelineHUDPolicy.hasUsablePhoto(metric)
                 ? "Selected progress photo, \(dateText)"
                 : "No progress photo for \(dateText)"
         )
         .accessibilityIdentifier("launch_timeline_stage")
+    }
+
+    @ViewBuilder
+    private var photoFill: some View {
+        if let photoURL = metric.photoUrl, !photoURL.isEmpty {
+            CachedAsyncImage(urlString: photoURL) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                stagePlaceholder
+            }
+        } else {
+            stagePlaceholder
+        }
+    }
+
+    private var stageChrome: some View {
+        HStack(spacing: 10) {
+            Text(dateText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(.black.opacity(0.38)))
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+
+            if let onShare {
+                Button(action: onShare) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(
+                            width: TimelinePhotoScrubLock.visibleControlPointSize,
+                            height: TimelinePhotoScrubLock.visibleControlPointSize
+                        )
+                        .background(Circle().fill(.black.opacity(0.38)))
+                }
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                .contentShape(Circle())
+                .buttonStyle(.plain)
+                .accessibilityLabel(TimelinePhotoScrubLock.shareActionTitle)
+                .accessibilityHint("Opens sharing options for this day")
+                .accessibilityIdentifier("body_score_hero_share_button")
+            }
+        }
+    }
+
+    private var recessedSlider: some View {
+        DashboardTimelineScrubber(
+            bodyMetrics: bodyMetrics,
+            selectedIndex: $selectedIndex,
+            timelineMode: .constant(.photo)
+        )
+        .frame(height: 64)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.black.opacity(0.42))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(.white.opacity(0.08), lineWidth: 1)
+        }
+        .accessibilityIdentifier("launch_timeline_scrubber")
     }
 
     private var stagePlaceholder: some View {
@@ -874,17 +897,26 @@ struct LaunchTimelineSurface: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.colors.text)
 
-                Text("Your Body Score stays front and center")
+                Text("Add one to this day")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(theme.colors.textSecondary)
             }
+            .padding(.bottom, 72)
         }
     }
 
     private var metricStrip: some View {
         HStack(spacing: 8) {
             launchMetricCell(
-                title: "Weight",
+                title: metricTitles[0],
+                value: ffmiValue,
+                caption: ffmiCaption,
+                accent: theme.colors.accentTeal,
+                action: onTapFFMI
+            )
+
+            launchMetricCell(
+                title: metricTitles[1],
                 value: weightValue,
                 caption: weightCaption,
                 accent: theme.colors.accentViolet,
@@ -892,71 +924,13 @@ struct LaunchTimelineSurface: View {
             )
 
             launchMetricCell(
-                title: "Body Fat",
+                title: metricTitles[2],
                 value: bodyFatValue,
                 caption: bodyFatCaption,
                 accent: theme.colors.accentPink,
                 action: onTapBodyFat
             )
-
-            launchMetricCell(
-                title: "FFMI",
-                value: ffmiValue,
-                caption: ffmiCaption,
-                accent: theme.colors.accentTeal,
-                action: onTapFFMI
-            )
         }
-    }
-
-    private var scoreRow: some View {
-        Group {
-            if let onTapBodyScore {
-                Button(action: onTapBodyScore) {
-                    scoreContent
-                }
-                .buttonStyle(.plain)
-            } else {
-                scoreContent
-            }
-        }
-        .accessibilityIdentifier("launch_timeline_body_score")
-    }
-
-    private var scoreContent: some View {
-        HStack(alignment: .lastTextBaseline, spacing: 12) {
-            Text(bodyScoreText)
-                .font(.system(size: scoreFontSize, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(theme.colors.text)
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Body Score")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(theme.colors.textSecondary)
-                    .textCase(.uppercase)
-
-                Text(bodyScoreTagline)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.colors.text)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                    .minimumScaleFactor(0.78)
-
-                if let bodyScoreDeltaText {
-                    Text(bodyScoreDeltaText)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(theme.colors.textSecondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer(minLength: 0)
-        }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Body Score \(bodyScoreText), \(bodyScoreTagline)")
     }
 
     private func launchMetricCell(
@@ -997,17 +971,10 @@ struct LaunchTimelineSurface: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(theme.colors.border.opacity(0.8), lineWidth: 1)
             }
+            .contentShape(Rectangle())
         }
+        .frame(minHeight: JovieTokens.minimumHitTarget)
         .buttonStyle(.plain)
         .accessibilityLabel("\(title) \(value), \(caption)")
-    }
-
-    private var timelineScrubber: some View {
-        DashboardTimelineScrubber(
-            bodyMetrics: bodyMetrics,
-            selectedIndex: $selectedIndex,
-            timelineMode: .constant(.photo)
-        )
-        .accessibilityIdentifier("launch_timeline_scrubber")
     }
 }
