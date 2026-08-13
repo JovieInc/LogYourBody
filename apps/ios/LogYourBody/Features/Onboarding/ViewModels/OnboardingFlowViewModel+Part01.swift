@@ -80,6 +80,8 @@ func goToNextStep() {
         case .profileDetails:
             if includesFirstPhotoStep {
                 currentStep = .firstPhoto
+            } else if hasMarkedOnboardingComplete {
+                currentStep = .paywall
             } else {
                 Task {
                     await finishOnboardingAndShowPaywall(from: previousStep)

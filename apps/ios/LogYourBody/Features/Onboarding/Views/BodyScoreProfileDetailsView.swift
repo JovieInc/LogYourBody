@@ -466,6 +466,9 @@ struct BodyScoreProfileDetailsView: View {
 
                 await MainActor.run {
                     isSaving = false
+                    if completesOnboardingNow {
+                        viewModel.hasMarkedOnboardingComplete = true
+                    }
                     HapticManager.shared.successAction()
 
                     if var currentUser = authManager.currentUser {
@@ -497,7 +500,7 @@ struct BodyScoreProfileDetailsView: View {
             } catch {
                 await MainActor.run {
                     isSaving = false
-                    errorMessage = error.localizedDescription
+                    errorMessage = "We couldn't save your setup. Check your connection and try again."
                 }
             }
         }

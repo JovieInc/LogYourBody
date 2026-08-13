@@ -142,11 +142,18 @@ func applyCompletedOnboardingLocally(with updates: [String: Any]) {
         guard var currentUser = AuthManager.shared.currentUser else { return }
 
         let existingProfile = currentUser.profile
+        let draftedFullName = [profileFirstName, profileLastName]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let resolvedFullName = draftedFullName.isEmpty
+            ? (existingProfile?.fullName ?? currentUser.name)
+            : draftedFullName
         let updatedProfile = UserProfile(
             id: existingProfile?.id ?? currentUser.id,
             email: existingProfile?.email ?? currentUser.email,
             username: existingProfile?.username,
-            fullName: existingProfile?.fullName ?? currentUser.name,
+            fullName: resolvedFullName,
             dateOfBirth: updates["dateOfBirth"] as? Date ?? existingProfile?.dateOfBirth,
             height: updates["height"] as? Double ?? existingProfile?.height,
             heightUnit: updates["heightUnit"] as? String ?? existingProfile?.heightUnit,
@@ -158,6 +165,7 @@ func applyCompletedOnboardingLocally(with updates: [String: Any]) {
         )
 
         currentUser.profile = updatedProfile
+        currentUser.name = resolvedFullName ?? currentUser.name
         currentUser.onboardingCompleted = true
         AuthManager.shared.currentUser = currentUser
     }

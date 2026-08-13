@@ -4,6 +4,7 @@ import XCTest
 /// Regression: the last onboarding profile step calls `consolidateNameUpdate`,
 /// which must PATCH `/api/auth/mobile/profile` with camelCase `fullName`.
 /// The server schema is `.strict()` and rejects snake_case `full_name` with 400.
+/// JOV-4672: a 2xx body with ISO-8601 `date_of_birth` must not fail completion.
 @MainActor
 final class MobileProfileNamePayloadTests: XCTestCase {
     private let defaultsSuiteName = "MobileProfileNamePayloadTests"
@@ -76,6 +77,88 @@ final class MobileProfileNamePayloadTests: XCTestCase {
         XCTAssertEqual(json["fullName"] as? String, "Tim White")
         XCTAssertNil(json["full_name"], "snake_case full_name is rejected by the strict mobile profile schema")
         XCTAssertEqual(manager.currentUser?.name, "Tim White")
+    }
+
+    func testProductProfileDecoderAcceptsDayAndISO8601Dates() throws {
+        let dayOnly = Data(#"""
+        {"profile":{"id":"date-user","date_of_birth":"1990-01-01","onboarding_completed":true}}
+        """#.utf8)
+        let iso = Data(#"""
+        {"profile":{"id":"date-user","date_of_birth":"1990-01-01T00:00:00Z","legal_accepted_at":"2026-07-14T20:00:00.000Z","onboarding_completed":true}}
+        """#.utf8)
+
+        let dayEnvelope = try AuthManager.decodeProductProfileEnvelope(from: dayOnly)
+        let isoEnvelope = try AuthManager.decodeProductProfileEnvelope(from: iso)
+
+        XCTAssertEqual(dayEnvelope.profile.id, "date-user")
+        XCTAssertNotNil(dayEnvelope.profile.dateOfBirth)
+        XCTAssertNotNil(isoEnvelope.profile.dateOfBirth)
+        XCTAssertEqual(isoEnvelope.profile.legalAcceptedAt, "2026-07-14T20:00:00.000Z")
+        XCTAssertEqual(isoEnvelope.profile.onboardingCompleted, true)
+    }
+
+    func testUpdateProfileDurablySucceedsWhenResponseDateUsesISO8601() async throws {
+        NamePayloadStubURLProtocol.install { request in
+            XCTAssertEqual(request.httpMethod, "PATCH")
+            return StubbedHTTPResponse(
+                statusCode: 200,
+                body: Data(
+                    #"""
+                    {"profile":{"id":"name-user","full_name":"Tim White","date_of_birth":"1990-01-01T08:00:00Z","onboarding_completed":true}}
+                    """#.utf8
+                )
+            )
+        }
+
+        let manager = try makeStubbedAuthManager()
+        try await manager.updateProfileDurably([
+            "dateOfBirth": Date(timeIntervalSince1970: 631_152_000),
+            "onboardingCompleted": true
+        ])
+    }
+
+    func testUpdateProfileDurablyTreatsUnreadableSuccessBodyAsSaved() async throws {
+        NamePayloadStubURLProtocol.install { _ in
+            StubbedHTTPResponse(statusCode: 200, body: Data("not-json".utf8))
+        }
+
+        let manager = try makeStubbedAuthManager()
+        try await manager.updateProfileDurably(["onboardingCompleted": true])
+    }
+
+    private func makeStubbedAuthManager() throws -> AuthManager {
+        guard let defaults = UserDefaults(suiteName: defaultsSuiteName) else {
+            XCTFail("UserDefaults suite unavailable")
+            throw URLError(.unknown)
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [NamePayloadStubURLProtocol.self]
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+
+        let manager = AuthManager(
+            userDefaults: defaults,
+            urlSession: URLSession(configuration: configuration)
+        )
+        manager.currentUser = LocalUser(
+            id: "name-user",
+            email: "name@example.com",
+            name: "Tim White",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: false
+        )
+        manager.authSession = ProductAuthSession(
+            accessToken: "stub-access-token",
+            refreshToken: "stub-refresh-token",
+            expiresAt: Date(timeIntervalSinceNow: 3_600),
+            subject: "name-user",
+            email: "name@example.com",
+            name: "Tim White",
+            issuedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        return manager
     }
 }
 

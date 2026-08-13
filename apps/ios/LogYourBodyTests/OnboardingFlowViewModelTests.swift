@@ -278,6 +278,79 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.includesFirstPhotoStep)
     }
 
+    func testProfileDetailsDoesNotRewriteWhenAlreadyMarkedComplete() async {
+        var updateAttempts = 0
+        let viewModel = OnboardingFlowViewModel(
+            includesFirstPhotoStep: false,
+            profileUpdateHandler: { _ in
+                updateAttempts += 1
+            }
+        )
+        viewModel.currentStep = .profileDetails
+        viewModel.hasMarkedOnboardingComplete = true
+
+        viewModel.goToNextStep()
+        await Task.yield()
+
+        XCTAssertEqual(viewModel.currentStep, .paywall)
+        XCTAssertEqual(updateAttempts, 0)
+    }
+
+    func testFirstPhotoCompletionAppliesDraftFullNameLocally() async {
+        let userId = "onboarding-last-step-name-\(UUID().uuidString)"
+        let previousUser = AuthManager.shared.currentUser
+        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+
+        defer {
+            AuthManager.shared.currentUser = previousUser
+            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            OnboardingProgressStore.shared.clearProgress(for: userId)
+        }
+
+        AuthManager.shared.currentUser = User(
+            id: userId,
+            email: "last-step@example.com",
+            name: nil,
+            profile: UserProfile(
+                id: userId,
+                email: "last-step@example.com",
+                username: nil,
+                fullName: nil,
+                dateOfBirth: nil,
+                height: nil,
+                heightUnit: nil,
+                gender: nil,
+                activityLevel: nil,
+                goalWeight: nil,
+                goalWeightUnit: nil,
+                onboardingCompleted: false
+            ),
+            onboardingCompleted: false
+        )
+        AuthManager.shared.isAuthenticated = true
+
+        let viewModel = OnboardingFlowViewModel(
+            includesFirstPhotoStep: true,
+            profileUpdateHandler: { _ in }
+        )
+        viewModel.currentStep = .firstPhoto
+        viewModel.hasHydratedProfileDetailsDraft = true
+        viewModel.profileFirstName = "Avery"
+        viewModel.profileLastName = "Stone"
+        viewModel.profileDateOfBirth = Date(timeIntervalSince1970: 631_152_000)
+        viewModel.profileBiologicalSex = .female
+        viewModel.profileHeightUnit = .centimeters
+        viewModel.profileHeightCentimetersText = "170"
+
+        await viewModel.completeFirstPhotoStep()
+
+        XCTAssertEqual(viewModel.currentStep, .paywall)
+        XCTAssertEqual(AuthManager.shared.currentUser?.name, "Avery Stone")
+        XCTAssertEqual(AuthManager.shared.currentUser?.profile?.fullName, "Avery Stone")
+        XCTAssertTrue(AuthManager.shared.currentUser?.onboardingCompleted == true)
+        XCTAssertTrue(ProfileCompletionPolicy.isComplete(user: AuthManager.shared.currentUser))
+    }
+
     func testProfileDetailsCompletesOnboardingWhenFirstPhotoDisabled() async {
         let viewModel = OnboardingFlowViewModel(
             includesFirstPhotoStep: false,
