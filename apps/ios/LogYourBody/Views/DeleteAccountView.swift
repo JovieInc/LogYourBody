@@ -270,6 +270,7 @@ struct AccountDeletionCleanupService {
         Constants.hasCompletedOnboardingKey,
         Constants.onboardingCompletedVersionKey,
         Constants.onboardingCompletedUserIdKey,
+        "pendingNameUpdate",
         Constants.preferredWeightUnitKey,
         Constants.preferredMeasurementSystemKey,
         Constants.goalWeightKey,

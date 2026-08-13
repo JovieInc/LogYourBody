@@ -10,9 +10,6 @@
         "forceConsistentCasingInFileNames": true,
         "baseUrl": ".",
         "paths": {
-            "@shared-ui/*": [
-                "packages/shared-ui/src/*"
-            ],
             "@shared-lib/*": [
                 "packages/shared-lib/src/*"
             ]

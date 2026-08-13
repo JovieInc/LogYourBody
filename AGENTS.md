@@ -12,11 +12,12 @@ LogYourBody is a comprehensive fitness tracking application with native iOS and 
 LogYourBody/
 ├── apps/
 │   ├── ios/           # Native iOS app (SwiftUI, Swift 5.9+)
-│   └── web/           # Next.js web application
+│   └── web/           # Next.js marketing/legal/API surface
 ├── packages/          # Shared packages and libraries
-│   ├── backend/       # Backend services (if applicable)
-│   ├── shared-*/      # Shared utilities, types, and components
-│   └── supabase/      # Shared Supabase client and types
+│   ├── design-tokens/ # Shared design tokens
+│   ├── product-registry/ # Canonical product identity and endpoints
+│   └── shared-lib/    # CI policy / migration guards
+├── supabase/          # Legacy photo/export/deletion functions (JOV-4831 owns cutover)
 ├── .github/           # GitHub Actions workflows and configurations
 └── docs/              # Project documentation
 ```
@@ -29,12 +30,12 @@ LogYourBody/
 
 ## Project Context
 
-- **Mission**: Help users monitor weight, body composition, and progress photos with HealthKit integration and Supabase-backed sync.
-- **Platforms**: Native iOS app (SwiftUI, Swift 5.9+) and Next.js web app share Clerk-based authentication.
+- **Mission**: Help users monitor weight, body composition, and progress photos with HealthKit integration and first-party Neon sync.
+- **Platforms**: Native iOS app (SwiftUI, Swift 5.9+) and Next.js web app share Jovie Better Auth (`logyourbody-ios` / `logyourbody-web`).
 - **Key Stacks**:
-  - **Authentication**: Clerk SDK with browser-based OAuth for Apple Sign In.
+  - **Authentication**: Jovie Better Auth issuer with Sign in with Apple. No Clerk.
   - **Design System**: iOS 26 Liquid Glass with graceful fallbacks.
-  - **Data**: Core Data for local storage, Supabase for cloud sync, HealthKit for weight and step data.
+  - **Data**: Core Data is the device source of truth. Neon via first-party bearer APIs is the cloud data plane. Native never connects to Postgres.
   - **Feature Flags**: Statsig for controlled rollouts and A/B testing.
 
 ### Product Scope Guardrails
@@ -67,7 +68,7 @@ The canonical product and brand standards are:
 `gbrain` is the shared knowledge brain holding prior decisions, bug post-mortems, conventions, and architecture notes for this repo. **Query it before exploring the codebase or making an architectural decision.**
 
 ```bash
-gbrain search "clerk proxy auth"          # keyword (tsvector)
+gbrain search "jovie better auth"          # keyword (tsvector)
 gbrain query "what is the timeline scrubber convention?"   # hybrid
 ```
 
@@ -170,7 +171,7 @@ When the user asks an agent to ship, land, deploy, or continue an active release
 6. Watch `main` CI and deployment after merge.
 7. Run `pnpm sync:main` to fast-forward local `main`, prune remotes, and delete local branches whose upstream was auto-deleted on merge.
 8. Trigger the appropriate release workflow from `main` when the release checklist says to do so.
-9. Verify the actual external state: TestFlight/App Store, Vercel, RevenueCat, Supabase, Clerk, or other provider state as applicable.
+9. Verify the actual external state: TestFlight/App Store, Vercel, RevenueCat, Neon, Jovie Auth, or other provider state as applicable.
 10. Open follow-up PRs for non-blocking issues instead of holding the main PR when the product remains deployable.
 
 Only stop before merge/release when there is a hard external blocker the agent cannot satisfy, such as missing credentials, account-owner approval, App Review rejection, provider outage, merge conflicts that cannot be resolved safely, or an unresolved failing required check.
@@ -241,7 +242,7 @@ For specific apps/packages, use filters:
 
 ```bash
 pnpm --filter apps/web lint
-pnpm --filter packages/backend test
+pnpm --filter @jovieinc/product-registry test
 ```
 
 ### CI Workflows
@@ -373,8 +374,8 @@ For **specific apps/packages**, use filters:
 ```bash
 pnpm --filter apps/web lint
 pnpm --filter apps/web build
-pnpm --filter packages/backend test
-pnpm --filter packages/shared-ui typecheck
+pnpm --filter @jovieinc/product-registry test
+pnpm --filter @jovieinc/product-registry test
 ```
 
 ### Do Not Introduce
@@ -516,15 +517,15 @@ pnpm --filter apps/web build
 
 ### Authentication Flow
 
-- iOS: Clerk SDK with browser-based OAuth for Apple Sign In
-- Web: Clerk with multiple providers
-- Both platforms share the same user accounts
+- iOS: Jovie Better Auth OAuth PKCE (`logyourbody-ios`) with Sign in with Apple
+- Web: Jovie Better Auth OAuth PKCE (`logyourbody-web`) with Sign in with Apple
+- Both platforms share the same Jovie user (`sub`)
 
 ### Data Persistence
 
-- iOS: Core Data for local storage, Supabase for cloud sync
-- Web: Supabase for all data operations
-- Sync is handled automatically by the SyncManager (iOS)
+- iOS: Core Data is the device source of truth
+- Cloud: Neon via first-party bearer APIs (native never talks to Postgres)
+- Legacy Supabase remains only for photo processing / export / account-deletion helpers until JOV-4831 completes cutover
 
 ## Testing
 
@@ -547,7 +548,7 @@ For specific apps/packages:
 
 ```bash
 pnpm --filter apps/web test
-pnpm --filter packages/backend test
+pnpm --filter @jovieinc/product-registry test
 ```
 
 For iOS tests, see "Working with the iOS App" section above.
@@ -667,7 +668,7 @@ All external services (feature flags, analytics, email/notifications, payments, 
 
 - iOS: Apple Developer Documentation, SwiftUI tutorials
 - Web: Next.js docs, React docs, Tailwind CSS docs
-- Both: Supabase docs, Clerk docs
+- Both: Neon docs, Jovie Better Auth docs
 
 ### Debugging
 
@@ -730,7 +731,7 @@ pnpm build              # Build all packages/apps
 
 # For specific apps/packages:
 pnpm --filter apps/web lint
-pnpm --filter packages/backend test
+pnpm --filter @jovieinc/product-registry test
 ```
 
 ### CI/CD Workflows

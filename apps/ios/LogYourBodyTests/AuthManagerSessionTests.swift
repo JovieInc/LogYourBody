@@ -217,7 +217,6 @@ final class AuthManagerSessionTests: XCTestCase {
         let expired = makeSession(expiresAt: Date().addingTimeInterval(-5))
         try keychain.save(expired, forKey: storedSessionKey)
         manager.authSession = expired
-        manager.isAuthenticated = true
         manager.currentUser = LocalUser(
             id: "user-123",
             email: "user@example.com",
@@ -245,7 +244,6 @@ final class AuthManagerSessionTests: XCTestCase {
     func testMalformedTokenResponseExpiresSession() async {
         let manager = makeManager()
         manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
-        manager.isAuthenticated = true
         AuthStubURLProtocol.requestHandler = { _ in
             AuthStubURLProtocol.StubbedResponse(statusCode: 200, body: Data("not-json".utf8))
         }
@@ -269,7 +267,6 @@ final class AuthManagerSessionTests: XCTestCase {
             avatarUrl: nil,
             profile: nil
         )
-        manager.isAuthenticated = true
         manager.needsLegalConsent = true
         manager.memberSinceDate = Date()
 

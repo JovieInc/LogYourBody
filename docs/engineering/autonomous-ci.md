@@ -10,7 +10,7 @@ Only deterministic release-breakers should block merges:
 
 - `CI Summary`: aggregate status for changed-path install, lint, typecheck, tests, and iOS validation.
 - Security or secret checks when they produce concrete evidence.
-- Migration, release-signing, App Store, RevenueCat, Clerk, Supabase, or workflow changes that can break production and have a reproducible failure mode.
+- Migration, release-signing, App Store, RevenueCat, Jovie Auth, Neon, or workflow changes that can break production and have a reproducible failure mode.
 - Fork safety checks for untrusted pull requests.
 
 If a risk is subjective, stylistic, speculative, or not backed by a command/policy violation, it belongs in advisory review.
@@ -25,7 +25,7 @@ Agents should assume an implementation request includes closeout unless the user
 4. Wait for required GitHub checks and required deployments.
 5. Merge through the configured PR path when gates are green.
 6. Watch the `main` CI/deploy result after merge.
-7. Verify the real external surface: production web, TestFlight/App Store, RevenueCat, Clerk, Supabase, or whichever provider owns the shipped behavior.
+7. Verify the real external surface: production web, TestFlight/App Store, RevenueCat, Jovie Auth, Neon, or whichever provider owns the shipped behavior.
 8. Create follow-up PRs for non-blocking findings.
 
 The loop should stop only for hard external blockers: missing credentials, account-owner approval, provider outage, App Review rejection, unresolved required-check failure, or unsafe conflicts that need product judgment.

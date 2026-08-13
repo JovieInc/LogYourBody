@@ -36,6 +36,7 @@ final class DebugResetManagerTests: XCTestCase {
         "healthKitSyncEnabled",
         "biometricLockEnabled",
         "appleSignInName",
+        "pendingNameUpdate",
         "HasSyncedHistoricalSteps",
         "lastSyncDate",
         "hasSeenWhatsNew"

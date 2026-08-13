@@ -159,7 +159,7 @@ describe('middleware production debug/test gate', () => {
     );
   });
 
-  it.each(['/api/parse-pdf', '/api/parse-pdf-alt', '/api/parse-pdf-v2'])(
+  it.each(['/api/parse-pdf', '/api/parse-pdf-v2'])(
     'keeps advanced import API route %s behind product auth in production',
     async (pathname) => {
       process.env.VERCEL_ENV = 'production';

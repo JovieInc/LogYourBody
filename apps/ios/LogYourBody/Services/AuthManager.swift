@@ -86,6 +86,35 @@ struct ProductAuthSession: Codable, Equatable {
     let issuedAt: Date
 
     var id: String { subject }
+
+    static func localFixture(
+        subject: String,
+        email: String,
+        name: String? = nil,
+        accessToken: String = "jovie-local-access",
+        refreshToken: String = "jovie-local-refresh",
+        expiresAt: Date = Date().addingTimeInterval(3_600)
+    ) -> ProductAuthSession {
+        ProductAuthSession(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresAt: expiresAt,
+            subject: subject,
+            email: email,
+            name: name,
+            issuedAt: Date()
+        )
+    }
+}
+
+enum JovieSessionPolicy {
+    static func isSignedIn(_ session: ProductAuthSession?) -> Bool {
+        guard let token = session?.accessToken.trimmingCharacters(in: .whitespacesAndNewlines),
+              !token.isEmpty else {
+            return false
+        }
+        return true
+    }
 }
 
 struct OAuthTokenResponse: Decodable {
@@ -218,9 +247,12 @@ actor AsyncGate {
 final class AuthManager: NSObject, ObservableObject {
     static let shared = AuthManager()
 
-    @Published var isAuthenticated = false
     @Published var currentUser: LocalUser?
     @Published var authSession: ProductAuthSession?
+
+    /// Signed-in means a first-party Jovie access token is present.
+    /// This is not Clerk in-memory session state and is not stored in UserDefaults.
+    var isAuthenticated: Bool { JovieSessionPolicy.isSignedIn(authSession) }
     @Published var isAuthProviderLoaded = false
     @Published var authProviderInitError: String?
     @Published var needsLegalConsent = false
@@ -266,6 +298,7 @@ final class AuthManager: NSObject, ObservableObject {
         "clerkJWT",
         "clerkSession",
         "clerkToken",
+        "pendingNameUpdate",
         "jwt",
         "refreshToken",
         "session",
@@ -307,7 +340,6 @@ final class AuthManager: NSObject, ObservableObject {
                 forKey: storedSessionKey,
                 as: ProductAuthSession.self
             ) {
-                authSession = stored
                 if stored.expiresAt.timeIntervalSinceNow > 60 {
                     if await validateStoredSession(stored) {
                         applyAuthenticatedSession(stored)
@@ -315,7 +347,7 @@ final class AuthManager: NSObject, ObservableObject {
                         await performLogout(exitReason: .sessionExpired)
                     }
                 } else {
-                    _ = await refreshAccessToken()
+                    _ = await refreshAccessToken(using: stored)
                 }
             }
             authProviderInitError = nil
@@ -324,41 +356,6 @@ final class AuthManager: NSObject, ObservableObject {
             authProviderInitError = "Secure sign-in storage could not be opened."
             isAuthProviderLoaded = false
         }
-    }
-
-    func signIn(email: String, password: String) async throws {
-        try await authenticate(
-            path: "sign-in/email",
-            body: ["email": email, "password": password]
-        )
-        AppServicePorts.analyticsTracker.track(event: "login_completed", properties: ["method": "email"])
-    }
-
-    func signUp(email: String, password: String, name: String? = nil) async throws {
-        var body: [String: Any] = ["email": email, "password": password]
-        if let name, !name.isEmpty { body["name"] = name }
-        try await authenticate(path: "sign-up/email", body: body)
-        AppServicePorts.analyticsTracker.track(event: "signup_completed", properties: ["method": "email"])
-    }
-
-    private func authenticate(path: String, body: [String: Any]) async throws {
-        let response = try await requestBetterAuth(path: path, method: "POST", body: body)
-        guard let accessToken = response.resolvedAccessToken,
-              let user = response.user else { throw AuthError.invalidToken }
-        let expiresAt = response.session?.expiryDate
-            ?? Date().addingTimeInterval(response.expiresIn ?? 86_400)
-        let session = ProductAuthSession(
-            accessToken: accessToken,
-            refreshToken: response.refreshToken ?? accessToken,
-            expiresAt: expiresAt,
-            subject: user.id,
-            email: user.email ?? Self.syntheticAuthEmail(userId: user.id),
-            name: user.name,
-            issuedAt: Date()
-        )
-        try keychain.save(session, forKey: storedSessionKey)
-        authSession = session
-        applyAuthenticatedSession(session)
     }
 
     private func requestBetterAuth(
@@ -560,11 +557,11 @@ final class AuthManager: NSObject, ObservableObject {
             issuedAt: Date()
         )
         try keychain.save(session, forKey: storedSessionKey)
-        authSession = session
         applyAuthenticatedSession(session)
     }
 
     private func applyAuthenticatedSession(_ session: ProductAuthSession) {
+        authSession = session
         currentUser = LocalUser(
             id: session.subject,
             email: session.email,
@@ -574,7 +571,6 @@ final class AuthManager: NSObject, ObservableObject {
             onboardingCompleted: false
         )
         memberSinceDate = session.issuedAt
-        isAuthenticated = true
         lastExitReason = .none
         Task { await bootstrapAuthenticatedProfileIfNeeded(sessionId: session.id) }
     }
@@ -582,7 +578,7 @@ final class AuthManager: NSObject, ObservableObject {
     func getAccessToken() async -> String? {
         guard let session = authSession else { return nil }
         if session.expiresAt.timeIntervalSinceNow > 60 { return session.accessToken }
-        return await refreshAccessToken()
+        return await refreshAccessToken(using: session)
     }
 
     func getSupabaseToken() async -> String? {
@@ -591,9 +587,9 @@ final class AuthManager: NSObject, ObservableObject {
         nil
     }
 
-    private func refreshAccessToken() async -> String? {
+    private func refreshAccessToken(using session: ProductAuthSession? = nil) async -> String? {
         if let refreshTask { return await refreshTask.value }
-        guard let current = authSession else {
+        guard let current = session ?? authSession else {
             await performLogout(exitReason: .sessionExpired)
             return nil
         }
@@ -643,7 +639,6 @@ final class AuthManager: NSObject, ObservableObject {
         try? keychain.delete(forKey: storedSessionKey)
         authSession = nil
         currentUser = nil
-        isAuthenticated = false
         needsLegalConsent = false
         memberSinceDate = nil
         bootstrappedProfileSessionIds.removeAll()
@@ -872,7 +867,6 @@ final class AuthManager: NSObject, ObservableObject {
     func applySignedOutUITestFixture() {
         authSession = nil
         currentUser = nil
-        isAuthenticated = false
         isAuthProviderLoaded = true
         authProviderInitError = nil
     }

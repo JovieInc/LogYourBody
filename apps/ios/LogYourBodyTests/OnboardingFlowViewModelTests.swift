@@ -47,12 +47,12 @@ final class OnboardingFlowViewModelTests: XCTestCase {
     func testPersistedProgressRestoresDefaultHomeModeChoice() {
         let userId = "onboarding-default-mode-\(UUID().uuidString)"
         let previousUser = AuthManager.shared.currentUser
-        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+        let previousSession = AuthManager.shared.authSession
         let previousDefaultHomeMode = UserDefaults.standard.string(forKey: Constants.defaultHomeModeKey)
 
         defer {
             AuthManager.shared.currentUser = previousUser
-            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            AuthManager.shared.authSession = previousSession
             if let previousDefaultHomeMode {
                 UserDefaults.standard.set(previousDefaultHomeMode, forKey: Constants.defaultHomeModeKey)
             } else {
@@ -66,7 +66,11 @@ final class OnboardingFlowViewModelTests: XCTestCase {
             email: "default-mode@example.com",
             name: "Default Mode"
         )
-        AuthManager.shared.isAuthenticated = true
+        AuthManager.shared.authSession = .localFixture(
+            subject: userId,
+            email: AuthManager.shared.currentUser?.email ?? "onboarding@example.com",
+            name: AuthManager.shared.currentUser?.name
+        )
         UserDefaults.standard.set(DefaultHomeMode.avatar.rawValue, forKey: Constants.defaultHomeModeKey)
 
         let viewModel = OnboardingFlowViewModel()
@@ -87,12 +91,12 @@ final class OnboardingFlowViewModelTests: XCTestCase {
     func testAuthenticatedFlowConsumesPreAuthDefaultHomeModeChoice() {
         let userId = "preauth-default-mode-\(UUID().uuidString)"
         let previousUser = AuthManager.shared.currentUser
-        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+        let previousSession = AuthManager.shared.authSession
         let previousDefaultHomeMode = UserDefaults.standard.string(forKey: Constants.defaultHomeModeKey)
 
         defer {
             AuthManager.shared.currentUser = previousUser
-            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            AuthManager.shared.authSession = previousSession
             if let previousDefaultHomeMode {
                 UserDefaults.standard.set(previousDefaultHomeMode, forKey: Constants.defaultHomeModeKey)
             } else {
@@ -108,7 +112,11 @@ final class OnboardingFlowViewModelTests: XCTestCase {
             email: "preauth-default-mode@example.com",
             name: "Pre Auth"
         )
-        AuthManager.shared.isAuthenticated = true
+        AuthManager.shared.authSession = .localFixture(
+            subject: userId,
+            email: AuthManager.shared.currentUser?.email ?? "onboarding@example.com",
+            name: AuthManager.shared.currentUser?.name
+        )
         UserDefaults.standard.set(DefaultHomeMode.avatar.rawValue, forKey: Constants.defaultHomeModeKey)
 
         let input = BodyScoreInput(
@@ -150,14 +158,14 @@ final class OnboardingFlowViewModelTests: XCTestCase {
     func testPersistedProgressRestoresProfileDetailsDraft() throws {
         let userId = "onboarding-profile-draft-\(UUID().uuidString)"
         let previousUser = AuthManager.shared.currentUser
-        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+        let previousSession = AuthManager.shared.authSession
         let dateOfBirth = try XCTUnwrap(
             Calendar.current.date(from: DateComponents(year: 1_992, month: 7, day: 4))
         )
 
         defer {
             AuthManager.shared.currentUser = previousUser
-            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            AuthManager.shared.authSession = previousSession
             OnboardingProgressStore.shared.clearProgress(for: userId)
         }
 
@@ -167,7 +175,11 @@ final class OnboardingFlowViewModelTests: XCTestCase {
             name: "Seed User"
         )
         AuthManager.shared.currentUser = initialUser
-        AuthManager.shared.isAuthenticated = true
+        AuthManager.shared.authSession = .localFixture(
+            subject: userId,
+            email: AuthManager.shared.currentUser?.email ?? "onboarding@example.com",
+            name: AuthManager.shared.currentUser?.name
+        )
 
         let viewModel = OnboardingFlowViewModel()
         viewModel.currentStep = .profileDetails
@@ -366,11 +378,11 @@ final class OnboardingFlowViewModelTests: XCTestCase {
     func testFirstPhotoCompletionMarksLocalUserComplete() async {
         let userId = "onboarding-first-photo-complete-\(UUID().uuidString)"
         let previousUser = AuthManager.shared.currentUser
-        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+        let previousSession = AuthManager.shared.authSession
 
         defer {
             AuthManager.shared.currentUser = previousUser
-            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            AuthManager.shared.authSession = previousSession
             OnboardingProgressStore.shared.clearProgress(for: userId)
         }
 
@@ -394,7 +406,11 @@ final class OnboardingFlowViewModelTests: XCTestCase {
             ),
             onboardingCompleted: false
         )
-        AuthManager.shared.isAuthenticated = true
+        AuthManager.shared.authSession = .localFixture(
+            subject: userId,
+            email: AuthManager.shared.currentUser?.email ?? "onboarding@example.com",
+            name: AuthManager.shared.currentUser?.name
+        )
 
         let viewModel = OnboardingFlowViewModel(
             includesFirstPhotoStep: true,
@@ -566,14 +582,14 @@ final class OnboardingFlowViewModelTests: XCTestCase {
     func testBuildOnboardingProfileUpdatesPrefersPersistedProfileDetailsDraft() throws {
         let userId = "onboarding-profile-update-draft-\(UUID().uuidString)"
         let previousUser = AuthManager.shared.currentUser
-        let previousAuthenticationState = AuthManager.shared.isAuthenticated
+        let previousSession = AuthManager.shared.authSession
         let profileDateOfBirth = try XCTUnwrap(
             Calendar.current.date(from: DateComponents(year: 1_991, month: 3, day: 22))
         )
 
         defer {
             AuthManager.shared.currentUser = previousUser
-            AuthManager.shared.isAuthenticated = previousAuthenticationState
+            AuthManager.shared.authSession = previousSession
             OnboardingProgressStore.shared.clearProgress(for: userId)
         }
 
@@ -583,7 +599,11 @@ final class OnboardingFlowViewModelTests: XCTestCase {
             name: "Profile Draft"
         )
         AuthManager.shared.currentUser = user
-        AuthManager.shared.isAuthenticated = true
+        AuthManager.shared.authSession = .localFixture(
+            subject: userId,
+            email: AuthManager.shared.currentUser?.email ?? "onboarding@example.com",
+            name: AuthManager.shared.currentUser?.name
+        )
 
         let viewModel = OnboardingFlowViewModel()
         viewModel.updateSex(.male)

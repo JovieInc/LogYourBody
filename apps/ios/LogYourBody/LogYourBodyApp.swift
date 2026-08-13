@@ -487,7 +487,11 @@ struct LogYourBodyApp: App {
             profile: profile,
             onboardingCompleted: !usesBodyScoreOnboardingFixture
         )
-        authManager.isAuthenticated = true
+        authManager.authSession = .localFixture(
+            subject: userId,
+            email: fixtureEmail,
+            name: fixtureName
+        )
         authManager.isAuthProviderLoaded = true
         subscriptionManager.isSubscribed = isSubscribed
         subscriptionManager.customerInfo = nil

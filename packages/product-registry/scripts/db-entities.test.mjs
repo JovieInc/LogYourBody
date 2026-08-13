@@ -16,15 +16,7 @@ import { logYourBody } from '../src/products/logyourbody.mjs';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const { tables, buckets } = logYourBody.endpoints;
 
-// Explicit exceptions: { name, reason }.
-const exceptions = [
-  {
-    name: '_',
-    reason: 'DatabaseStatus connectivity probe intentionally targets a nonexistent table',
-  },
-];
-
-const allowed = new Set([...tables, ...buckets, ...exceptions.map((entry) => entry.name)]);
+const allowed = new Set([...tables, ...buckets]);
 const patterns = [
   /\.from\(\s*['"]([\w]+)['"]/g, // supabase-js table or storage bucket
   /\binsert\s+into\s+(?:public\.)?["'`]?([a-z][a-z0-9_]*)["'`]?/g, // raw SQL

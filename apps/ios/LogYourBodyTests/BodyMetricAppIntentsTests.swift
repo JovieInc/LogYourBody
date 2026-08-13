@@ -30,7 +30,7 @@ import UIKit
 @MainActor
 final class BodyMetricAppIntentsTests: XCTestCase {
     private var previousUser: User?
-    private var previousIsAuthenticated = false
+    private var previousSession: ProductAuthSession?
     private var previousMeasurementSystem: String?
     private var previousHealthKitAuthorization = false
 
@@ -43,10 +43,10 @@ final class BodyMetricAppIntentsTests: XCTestCase {
         await AuthManager.shared.ensureAuthInitializationTask().value
 
         previousUser = AuthManager.shared.currentUser
-        previousIsAuthenticated = AuthManager.shared.isAuthenticated
+        previousSession = AuthManager.shared.authSession
         // Signed out by default; keeps RealtimeSyncManager.syncIfNeeded inert.
         AuthManager.shared.currentUser = nil
-        AuthManager.shared.isAuthenticated = false
+        AuthManager.shared.authSession = nil
 
         previousMeasurementSystem = UserDefaults.standard.string(
             forKey: Constants.preferredMeasurementSystemKey
@@ -62,7 +62,7 @@ final class BodyMetricAppIntentsTests: XCTestCase {
 
     override func tearDown() async throws {
         AuthManager.shared.currentUser = previousUser
-        AuthManager.shared.isAuthenticated = previousIsAuthenticated
+        AuthManager.shared.authSession = previousSession
 
         if let previousMeasurementSystem {
             UserDefaults.standard.set(

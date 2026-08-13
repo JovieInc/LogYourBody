@@ -35,7 +35,11 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
         )
         let authManager = AuthManager()
         authManager.currentUser = user
-        authManager.isAuthenticated = true
+        authManager.authSession = .localFixture(
+            subject: userId,
+            email: "hk_denied@example.com",
+            name: "HealthKit Denied"
+        )
 
         let localMetric = BodyMetrics(
             id: UUID().uuidString,

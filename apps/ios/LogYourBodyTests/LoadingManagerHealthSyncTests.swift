@@ -16,7 +16,7 @@ import UIKit
 final class LoadingManagerHealthSyncTests: XCTestCase {
     func testStartLoadingCompletesBlockingPhase() async {
         let authManager = AuthManager()
-        authManager.isAuthenticated = false
+        authManager.authSession = nil
 
         let mockCoordinator = MockHealthSyncCoordinator()
         let manager = LoadingManager(
@@ -34,7 +34,10 @@ final class LoadingManagerHealthSyncTests: XCTestCase {
 
     func testRunWarmUpTasksInvokesHealthSyncWhenAuthenticated() async {
         let authManager = AuthManager()
-        authManager.isAuthenticated = true
+        authManager.authSession = .localFixture(
+            subject: "loading-user",
+            email: "loading@example.com"
+        )
 
         let mockCoordinator = MockHealthSyncCoordinator()
         let manager = LoadingManager(
@@ -49,7 +52,7 @@ final class LoadingManagerHealthSyncTests: XCTestCase {
 
     func testRunWarmUpTasksSkipsWhenNotAuthenticated() async {
         let authManager = AuthManager()
-        authManager.isAuthenticated = false
+        authManager.authSession = nil
 
         let mockCoordinator = MockHealthSyncCoordinator()
         let manager = LoadingManager(

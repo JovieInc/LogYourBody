@@ -126,6 +126,7 @@ class DebugResetManager {
             Constants.hasCompletedOnboardingKey,
             Constants.onboardingCompletedVersionKey,
             Constants.onboardingCompletedUserIdKey,
+            "pendingNameUpdate",
             Constants.preferredMeasurementSystemKey,
             Constants.healthKitSyncEnabledKey,
             "biometricLockEnabled",
