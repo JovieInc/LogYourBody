@@ -36,10 +36,12 @@ export async function deletePhoto(photoId: string): Promise<void> {
 
 export async function uploadPhotoWithMetrics(
   file: File,
-  metrics?: Partial<PhotoData>,
+  userId: string,
+  additionalData?: { weight?: number; body_fat_percentage?: number; notes?: string },
 ): Promise<PhotoUploadResult> {
   void file;
-  void metrics;
+  void userId;
+  void additionalData;
   return {
     success: false,
     error: PHOTO_STORE_UNAVAILABLE,
