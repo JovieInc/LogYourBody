@@ -7,23 +7,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 const deployWorkflow = readFileSync(`${repoRoot}/.github/workflows/deploy.yml`, 'utf8');
-const webReleaseLoop = readFileSync(
-  `${repoRoot}/.github/workflows/web-release-loop.yml`,
-  'utf8',
-);
+const webReleaseLoop = readFileSync(`${repoRoot}/.github/workflows/web-release-loop.yml`, 'utf8');
 
 const requiredVariables = ['DATABASE_URL', 'OPENAI_API_KEY', 'CRON_SECRET'] as const;
-
-function extractVerifyStep(workflow: string): string {
-  const match = workflow.match(
-    /name: Verify authenticated chat runtime configuration\n\s+run: \|\n([\s\S]*?)(?:\n\n      - name:|\n\n  [a-z])/,
-  );
-  expect(match?.[1]).toBeDefined();
-  return match![1]
-    .split('\n')
-    .map((line) => line.replace(/^ {10}/, ''))
-    .join('\n');
-}
+const ripgrepInvocation = /(^|[\s;`])rg(\s|$)/m;
 
 function hasRequiredVariable(envFile: string, requiredVariable: string): boolean {
   try {
@@ -47,15 +34,15 @@ describe('deploy Vercel env verify uses POSIX grep', () => {
   });
 
   it('replaces rg with quiet grep and keeps the same required keys', () => {
-    const verifyStep = extractVerifyStep(deployWorkflow);
+    expect(deployWorkflow).toContain('Verify authenticated chat runtime configuration');
+    expect(deployWorkflow).toContain('grep -qE');
+    expect(deployWorkflow).not.toContain('rg --quiet');
+    expect(deployWorkflow).not.toMatch(ripgrepInvocation);
+    expect(webReleaseLoop).not.toMatch(ripgrepInvocation);
 
-    expect(verifyStep).not.toMatch(/(^|[\s;`])rg(\s|$)/);
-    expect(verifyStep).toContain('grep -qE');
-    expect(verifyStep).not.toContain('rg --quiet');
-    expect(webReleaseLoop).not.toMatch(/(^|[\s;`])rg(\s|$)/);
-
+    expect(deployWorkflow).toContain(`for required_variable in ${requiredVariables.join(' ')}`);
     for (const requiredVariable of requiredVariables) {
-      expect(verifyStep).toContain(requiredVariable);
+      expect(deployWorkflow).toContain(requiredVariable);
     }
   });
 
@@ -76,12 +63,16 @@ describe('deploy Vercel env verify uses POSIX grep', () => {
       expect(hasRequiredVariable(envFile, requiredVariable)).toBe(true);
     }
 
-    const listed = execFileSync('grep', ['-E', '^(DATABASE_URL|OPENAI_API_KEY|CRON_SECRET)=', envFile], {
-      encoding: 'utf8',
-    });
-    const quiet = execFileSync('grep', ['-qE', '^(DATABASE_URL|OPENAI_API_KEY|CRON_SECRET)=', envFile], {
-      encoding: 'utf8',
-    });
+    const listed = execFileSync(
+      'grep',
+      ['-E', '^(DATABASE_URL|OPENAI_API_KEY|CRON_SECRET)=', envFile],
+      { encoding: 'utf8' },
+    );
+    const quiet = execFileSync(
+      'grep',
+      ['-qE', '^(DATABASE_URL|OPENAI_API_KEY|CRON_SECRET)=', envFile],
+      { encoding: 'utf8' },
+    );
 
     expect(listed).toContain('sk-test-do-not-print');
     expect(quiet).toBe('');
