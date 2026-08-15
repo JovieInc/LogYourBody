@@ -196,7 +196,10 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(fullNameRow.waitForExistence(timeout: 5))
         fullNameRow.tap()
 
-        let cancelButton = app.buttons["profile_editor_cancel_button"]
+        let identifiedCancelButton = app.buttons["profile_editor_cancel_button"]
+        let cancelButton = identifiedCancelButton.waitForExistence(timeout: 2)
+            ? identifiedCancelButton
+            : app.buttons["Cancel"]
         XCTAssertTrue(cancelButton.waitForExistence(timeout: 5))
         XCTAssertTrue(cancelButton.isHittable)
         cancelButton.tap()
@@ -509,7 +512,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(
             app,
             with: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestFullDashboardFixture",
                 "-UIPreferredContentSizeCategoryName",
                 "UICTContentSizeCategoryAccessibilityXXL"
             ]
@@ -903,6 +906,10 @@ final class LogYourBodyUITests: XCTestCase {
         ])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+
+        let statsButton = app.buttons["Stats"]
+        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
+        statsButton.tap()
 
         let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
         scrollUntilExists(prompt, in: app)
