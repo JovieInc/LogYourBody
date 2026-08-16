@@ -37,7 +37,8 @@
     "sync:main": "bash scripts/sync-main.sh",
     "eve:info": "eve info",
     "eve:build": "eve build",
-    "eve:dev": "eve dev"
+    "eve:dev": "eve dev",
+    "eve:smoke": "bash scripts/eve/local-smoke.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",

@@ -32,20 +32,15 @@ product work or send messages.
 
 ## Local validation
 
-The repo's current Node runtime is **20.x**. Vercel Eve's documented CLI
-requirement is **Node 24+**. Keep `package.json` `engines.node` on 20.x for
-the web app and CI. On a Node 24+ environment with a model credential, run:
+Run the credential-free smoke eval from the repository root:
 
 ```bash
-pnpm eve:info
-pnpm eve:build
-pnpm eve:dev
+corepack pnpm --config.engine-strict=false eve:smoke
 ```
 
-If the shell is still Node 20, an ephemeral Node 24 runner is enough, for
-example `pnpm dlx node@24 node_modules/eve/bin/eve.js info`. Do not change
-the app engine contract to make those commands the default.
+The command uses pinned Node 24.12.0 for eve 0.27.13, boots only a local runtime, and verifies deterministic two-turn session continuity without a provider credential. It removes Eve's generated local runtime and workflow state before and after the run so stale fixtures cannot affect the result or repository guards. It does not create a Vercel project, external connection, channel, schedule, or deployment.
 
-`eve:dev` is intentionally not run by CI. It requires a model credential and
-starts an interactive local runtime. No Vercel project is created by these
-commands. Do not add secrets to the repo.
+The web workspace remains on Node 20.x. Do not change that application engine
+contract to satisfy Eve's Node 24 runtime requirement. `eve:dev` needs a model
+credential and remains a local, interactive command; never add that credential
+to the repository.
