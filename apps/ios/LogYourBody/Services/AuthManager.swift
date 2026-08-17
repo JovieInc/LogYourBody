@@ -562,6 +562,21 @@ final class AuthManager: NSObject, ObservableObject {
 
     private func applyAuthenticatedSession(_ session: ProductAuthSession) {
         authSession = session
+        lastExitReason = .none
+
+        if var existing = currentUser, existing.id == session.subject {
+            if let name = session.name?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !name.isEmpty {
+                existing.name = name
+            }
+            currentUser = existing
+            if existing.profile == nil {
+                bootstrappedProfileSessionIds.remove(session.id)
+                Task { await bootstrapAuthenticatedProfileIfNeeded(sessionId: session.id) }
+            }
+            return
+        }
+
         currentUser = LocalUser(
             id: session.subject,
             email: session.email,
@@ -571,7 +586,6 @@ final class AuthManager: NSObject, ObservableObject {
             onboardingCompleted: false
         )
         memberSinceDate = session.issuedAt
-        lastExitReason = .none
         Task { await bootstrapAuthenticatedProfileIfNeeded(sessionId: session.id) }
     }
 

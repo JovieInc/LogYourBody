@@ -99,30 +99,20 @@ extension DashboardViewLiquid {
     /// Headline formatter for the weight metric card using trend-weight when enabled.
     func formatTrendWeightHeadline(_ metric: BodyMetrics, usesTrend: Bool) -> String {
         let system = currentMeasurementSystem
-
-        if usesTrend,
-           let trendResult = MetricsInterpolationService.shared.estimateTrendWeight(
-               for: metric.date,
-               metrics: bodyMetrics
-           ) {
-            let converted = convertWeight(trendResult.value, to: system) ?? trendResult.value
-            return String(format: "%.1f", converted)
-        }
-
-        if let rawWeight = metric.weight {
-            let converted = convertWeight(rawWeight, to: system) ?? rawWeight
-            return String(format: "%.1f", converted)
-        }
-
-        if let trendFallback = MetricsInterpolationService.shared.estimateTrendWeight(
+        let trendKg = MetricsInterpolationService.shared.estimateTrendWeight(
             for: metric.date,
             metrics: bodyMetrics
-        ) {
-            let converted = convertWeight(trendFallback.value, to: system) ?? trendFallback.value
-            return String(format: "%.1f", converted)
+        )?.value
+        guard let kilograms = TimelineWeightHeadlinePolicy.kilograms(
+            measuredWeight: metric.weight,
+            trendWeight: trendKg,
+            prefersTrend: usesTrend
+        ) else {
+            return "–"
         }
 
-        return "–"
+        let converted = convertWeight(kilograms, to: system) ?? kilograms
+        return String(format: "%.1f", converted)
     }
 
     // MARK: - Metric Entries Helpers

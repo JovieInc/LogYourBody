@@ -61,6 +61,28 @@ final class DashboardMetricFormattingTests: XCTestCase {
 
     // MARK: - formatDelta
 
+    func testTimelineHeadlineUsesMeasuredWeightEvenWhenTrendIsPreferred() {
+        XCTAssertEqual(
+            TimelineWeightHeadlinePolicy.kilograms(
+                measuredWeight: 82.736, // 182.4 lb stored as kg
+                trendWeight: 83.5,
+                prefersTrend: true
+            ),
+            82.736
+        )
+    }
+
+    func testTimelineHeadlineFallsBackToTrendWhenDayHasNoMeasuredWeight() {
+        XCTAssertEqual(
+            TimelineWeightHeadlinePolicy.kilograms(
+                measuredWeight: nil,
+                trendWeight: 83.5,
+                prefersTrend: true
+            ),
+            83.5
+        )
+    }
+
     func testFormatDeltaSignAndUnit() {
         XCTAssertEqual(formatDelta(delta: 2.0, unit: "lbs"), "+2 lbs")
         XCTAssertEqual(formatDelta(delta: -1.5, unit: "lbs"), "\u{2013}1.5 lbs") // en dash
