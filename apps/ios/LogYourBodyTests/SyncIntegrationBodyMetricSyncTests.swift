@@ -15,10 +15,12 @@ import UIKit
 final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
+        UserDefaults.standard.removeObject(forKey: Constants.pendingSyncOperationsKey)
         try await CoreDataManager.shared.deleteAllDataAndWait()
     }
 
     override func tearDown() async throws {
+        UserDefaults.standard.removeObject(forKey: Constants.pendingSyncOperationsKey)
         try await CoreDataManager.shared.deleteAllDataAndWait()
         try await super.tearDown()
     }
@@ -256,6 +258,51 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertTrue(unsyncedForUser.isEmpty)
     }
 
+    func testSyncLocalChangesSendsNullWeightForBodyFatOnlyLog() async throws {
+        let coreData = CoreDataManager.shared
+        let id = UUID().uuidString
+        let userId = "sync_test_user_bf_only_\(UUID().uuidString)"
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+
+        let metricModel = BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            localDate: "2027-01-15",
+            weight: nil,
+            weightUnit: nil,
+            bodyFatPercentage: 17.4,
+            bodyFatMethod: "Manual",
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: BodyMetricSource.manual.rawValue,
+            createdAt: date,
+            updatedAt: date
+        )
+
+        try await coreData.saveBodyMetricsAndWait(metricModel, userId: userId)
+
+        let stubSupabase = StubSupabaseManager()
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            supabaseManager: stubSupabase
+        )
+
+        try await Task.detached {
+            try await manager.syncLocalChanges(token: "test-token")
+        }.value
+
+        let payload = try XCTUnwrap(stubSupabase.bodyMetricsBatches.first?.first)
+        XCTAssertEqual(payload["id"] as? String, id)
+        XCTAssertTrue(payload["weight"] is NSNull, "Missing weight must be JSON null, not 0")
+        XCTAssertTrue(payload["notes"] is NSNull)
+        XCTAssertEqual(try XCTUnwrap(payload["body_fat_percentage"] as? Double), 17.4, accuracy: 0.001)
+        XCTAssertEqual(payload["weight_unit"] as? String, "kg")
+    }
+
     func testSyncLocalChangesScopesUnsyncedRowsToActiveUser() async throws {
         let coreData = CoreDataManager.shared
 
@@ -386,7 +433,13 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         }
 
         let userId = "retry_pending_operation_\(UUID().uuidString)"
-        let authManager = AuthManager()
+        // Signed in (non-empty token) but expired, with refresh failing closed so
+        // getAccessToken() returns nil without a 60s network wait. A still-valid
+        // fixture token would process the identified delete and drop it.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SyncTokenUnavailableURLProtocol.self]
+        configuration.timeoutIntervalForRequest = 1
+        let authManager = AuthManager(urlSession: URLSession(configuration: configuration))
         authManager.currentUser = LocalUser(
             id: userId,
             email: "retry@example.com",
@@ -395,10 +448,14 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
             profile: nil,
             onboardingCompleted: true
         )
-        authManager.authSession = .localFixture(
+        authManager.authSession = ProductAuthSession(
+            accessToken: "expired-access",
+            refreshToken: "expired-refresh",
+            expiresAt: Date().addingTimeInterval(-120),
             subject: userId,
             email: "retry@example.com",
-            name: "Retry User"
+            name: "Retry User",
+            issuedAt: Date().addingTimeInterval(-3_600)
         )
 
         let manager = RealtimeSyncManager(
@@ -528,7 +585,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         let userId = "sync_test_user_empty_photo_placeholder_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_765_600_000)
 
-        let result = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
@@ -561,7 +618,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         let userId = "sync_test_user_in_flight_photo_placeholder_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_765_610_000)
 
-        let result = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
@@ -596,7 +653,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         let date = Date(timeIntervalSince1970: 1_765_620_000)
         let storagePath = "\(userId)/committed-upload.png"
 
-        let result = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
@@ -675,4 +732,16 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertEqual(cachedAfterSync?.syncStatus, "synced")
         XCTAssertEqual(cachedAfterSync?.photoUrl, processedUrl)
     }
+}
+
+/// Fails every HTTP request immediately so expired-token refresh cannot hang.
+private final class SyncTokenUnavailableURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+    }
+
+    override func stopLoading() {}
 }

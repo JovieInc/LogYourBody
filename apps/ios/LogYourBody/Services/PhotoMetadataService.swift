@@ -108,8 +108,8 @@ class PhotoMetadataService {
         userId: String,
         dataSource: String? = nil,
         preserveExistingMeasurements: Bool = false
-    ) async -> BodyMetrics {
-        await createOrUpdateMetricsWithResult(
+    ) async throws -> BodyMetrics {
+        try await createOrUpdateMetricsWithResult(
             for: date,
             photoUrl: photoUrl,
             weight: weight,
@@ -122,6 +122,8 @@ class PhotoMetadataService {
     }
 
     /// Create or update body metrics and report whether this call created a new local row.
+    /// Persists to Core Data before returning so a dismissed log sheet cannot
+    /// race the store (the paid Golden Path write).
     func createOrUpdateMetricsWithResult(
         for date: Date,
         photoUrl: String? = nil,
@@ -131,7 +133,7 @@ class PhotoMetadataService {
         userId: String,
         dataSource: String? = nil,
         preserveExistingMeasurements: Bool = false
-    ) async -> PhotoMetricsUpdateResult {
+    ) async throws -> PhotoMetricsUpdateResult {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
         let localDate = BodyMetricLocalDate.key(for: date)
@@ -177,7 +179,7 @@ class PhotoMetadataService {
                 updatedAt: Date()
             )
 
-            CoreDataManager.shared.saveBodyMetrics(updated, userId: userId)
+            try await persistMetricsBeforeReturning(updated, userId: userId)
             return PhotoMetricsUpdateResult(metrics: updated, createdNewEntry: false)
         } else {
             // Create new metrics
@@ -204,9 +206,16 @@ class PhotoMetadataService {
                 updatedAt: Date()
             )
 
-            CoreDataManager.shared.saveBodyMetrics(new, userId: userId)
+            try await persistMetricsBeforeReturning(new, userId: userId)
             return PhotoMetricsUpdateResult(metrics: new, createdNewEntry: true)
         }
+    }
+
+    /// The Add Entry sheet dismisses as soon as this method returns. A fire-and-
+    /// forget `saveBodyMetrics` lets the sheet close before the row exists, so
+    /// the timeline can miss today's measured log and sync can skip it.
+    private func persistMetricsBeforeReturning(_ metrics: BodyMetrics, userId: String) async throws {
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metrics, userId: userId)
     }
 
     /// Create or reuse the metrics row for an upload and mark empty placeholders in flight atomically.

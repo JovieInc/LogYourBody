@@ -159,25 +159,32 @@ func saveWeight(userId: String) {
             Task {
                 defer { isSavingEntry = false }
 
-                _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
-                    for: selectedDate,
-                    weight: weightInKg,
-                    userId: userId
-                )
-                RealtimeSyncManager.shared.syncIfNeeded()
+                do {
+                    _ = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+                        for: selectedDate,
+                        weight: weightInKg,
+                        userId: userId
+                    )
+                    RealtimeSyncManager.shared.syncIfNeeded()
 
-                BodyScoreCache.shared.invalidate(for: userId)
-                BodyScoreRecalculationService.shared.scheduleRecalculation()
+                    BodyScoreCache.shared.invalidate(for: userId)
+                    BodyScoreRecalculationService.shared.scheduleRecalculation()
 
-                trackEntrySaved(
-                    type: "weight",
-                    properties: [
-                        "unit": resolvedWeightUnit
-                    ]
-                )
-                HapticManager.shared.successAction()
+                    trackEntrySaved(
+                        type: "weight",
+                        properties: [
+                            "unit": resolvedWeightUnit
+                        ]
+                    )
+                    HapticManager.shared.successAction()
 
-                dismiss()
+                    dismiss()
+                } catch {
+                    handleValidationError(
+                        .invalidWeight("Your weight could not be saved. Try again."),
+                        for: .weight
+                    )
+                }
             }
         } catch let error as ValidationError {
             handleValidationError(error, for: .weight)
@@ -195,20 +202,27 @@ func saveBodyFat(userId: String) {
             Task {
                 defer { isSavingEntry = false }
 
-                _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
-                    for: selectedDate,
-                    bodyFatPercentage: validatedBodyFat,
-                    bodyFatMethod: bodyFatMethod,
-                    userId: userId
-                )
-                RealtimeSyncManager.shared.syncIfNeeded()
+                do {
+                    _ = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+                        for: selectedDate,
+                        bodyFatPercentage: validatedBodyFat,
+                        bodyFatMethod: bodyFatMethod,
+                        userId: userId
+                    )
+                    RealtimeSyncManager.shared.syncIfNeeded()
 
-                BodyScoreCache.shared.invalidate(for: userId)
-                BodyScoreRecalculationService.shared.scheduleRecalculation()
+                    BodyScoreCache.shared.invalidate(for: userId)
+                    BodyScoreRecalculationService.shared.scheduleRecalculation()
 
-                trackEntrySaved(type: "body_fat")
-                HapticManager.shared.successAction()
-                dismiss()
+                    trackEntrySaved(type: "body_fat")
+                    HapticManager.shared.successAction()
+                    dismiss()
+                } catch {
+                    handleValidationError(
+                        .invalidBodyFat("Your body fat could not be saved. Try again."),
+                        for: .bodyFat
+                    )
+                }
             }
         } catch let error as ValidationError {
             handleValidationError(error, for: .bodyFat)

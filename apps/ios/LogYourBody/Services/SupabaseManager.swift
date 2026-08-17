@@ -157,7 +157,7 @@ class SupabaseManager: ObservableObject {
             return nil
         }
 
-        if let fullName = stringValue(["fullName", "full_name"]) {
+        if let fullName = stringValue(["fullName", "full_name", "name"]) {
             body["fullName"] = fullName
         }
         if let dateOfBirth = stringValue(["dateOfBirth", "date_of_birth"]) {
@@ -188,7 +188,7 @@ class SupabaseManager: ObservableObject {
             body["goalWeight"] = goalWeight
         }
         if let goalWeightUnit = stringValue(["goalWeightUnit", "goal_weight_unit"]) {
-            body["goalWeightUnit"] = goalWeightUnit
+            body["goalWeightUnit"] = goalWeightUnit == "lbs" ? "lb" : goalWeightUnit
         }
         if let onboardingCompleted = unwrapOptional(profile["onboardingCompleted"] as Any) as? Bool
             ?? unwrapOptional(profile["onboarding_completed"] as Any) as? Bool {

@@ -818,21 +818,13 @@ final class AuthManager: NSObject, ObservableObject {
         return formatter
     }()
 
-    nonisolated private static func normalizedProductProfilePayload(
+    nonisolated static func normalizedProductProfilePayload(
         _ updates: [String: Any]
     ) throws -> [String: Any] {
-        var payload: [String: Any] = [:]
-        for (key, value) in updates {
-            if let date = value as? Date {
-                payload[key] = productDateFormatter.string(from: date)
-            } else if JSONSerialization.isValidJSONObject([key: value]) {
-                payload[key] = value
-            }
-        }
-        guard JSONSerialization.isValidJSONObject(payload) else {
-            throw AuthError.server("Your profile details could not be saved.")
-        }
-        return payload
+        // The mobile profile PATCH schema is `.strict()`. Unknown keys such as
+        // `name` (legacy settings) 400 the entire save, so reuse the first-party
+        // allowlist and map aliases before the request leaves the device.
+        try SupabaseManager.firstPartyProfilePatchBody(updates)
     }
 
     func deleteCurrentAccount() async throws {

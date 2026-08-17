@@ -47,7 +47,7 @@ final class PhotoMetadataServiceTests: XCTestCase {
         )
         try await CoreDataManager.shared.saveBodyMetricsAndWait(existing, userId: userId)
 
-        let updated = await PhotoMetadataService.shared.createOrUpdateMetrics(
+        let updated = try await PhotoMetadataService.shared.createOrUpdateMetrics(
             for: date,
             photoUrl: "file:///first-photo.jpg",
             weight: 77.0,
@@ -65,11 +65,11 @@ final class PhotoMetadataServiceTests: XCTestCase {
         XCTAssertEqual(updated.photoUrl, "file:///first-photo.jpg")
     }
 
-    func testCreateOrUpdateMetricsAssignsDataSourceForNewFirstPhotoBaseline() async {
+    func testCreateOrUpdateMetricsAssignsDataSourceForNewFirstPhotoBaseline() async throws {
         let userId = "photo_baseline_new_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_765_000_000)
 
-        let created = await PhotoMetadataService.shared.createOrUpdateMetrics(
+        let created = try await PhotoMetadataService.shared.createOrUpdateMetrics(
             for: date,
             weight: 79.5,
             bodyFatPercentage: 16.5,
@@ -86,17 +86,17 @@ final class PhotoMetadataServiceTests: XCTestCase {
         XCTAssertNil(created.photoUrl)
     }
 
-    func testCreateOrUpdateMetricsDefaultsNewManualMeasurementsToManualSource() async {
+    func testCreateOrUpdateMetricsDefaultsNewManualMeasurementsToManualSource() async throws {
         let userId = "manual_entry_default_source_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_765_100_000)
 
-        let weightEntry = await PhotoMetadataService.shared.createOrUpdateMetrics(
+        let weightEntry = try await PhotoMetadataService.shared.createOrUpdateMetrics(
             for: date,
             weight: 82.4,
             userId: userId
         )
 
-        let bodyFatEntry = await PhotoMetadataService.shared.createOrUpdateMetrics(
+        let bodyFatEntry = try await PhotoMetadataService.shared.createOrUpdateMetrics(
             for: date.addingTimeInterval(86_400),
             bodyFatPercentage: 17.1,
             userId: userId
@@ -106,11 +106,11 @@ final class PhotoMetadataServiceTests: XCTestCase {
         XCTAssertEqual(bodyFatEntry.dataSource, BodyMetricSource.manual.rawValue)
     }
 
-    func testCreateOrUpdateMetricsKeepsPhotoDefaultForPhotoOnlyPlaceholder() async {
+    func testCreateOrUpdateMetricsKeepsPhotoDefaultForPhotoOnlyPlaceholder() async throws {
         let userId = "photo_entry_default_source_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_765_200_000)
 
-        let photoEntry = await PhotoMetadataService.shared.createOrUpdateMetrics(
+        let photoEntry = try await PhotoMetadataService.shared.createOrUpdateMetrics(
             for: date,
             userId: userId
         )
@@ -120,15 +120,15 @@ final class PhotoMetadataServiceTests: XCTestCase {
         XCTAssertNil(photoEntry.bodyFatPercentage)
     }
 
-    func testCreateOrUpdateMetricsWithResultDistinguishesNewPhotoPlaceholderFromExistingMetric() async {
+    func testCreateOrUpdateMetricsWithResultDistinguishesNewPhotoPlaceholderFromExistingMetric() async throws {
         let userId = "photo_placeholder_result_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_765_300_000)
 
-        let first = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let first = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
-        let second = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let second = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
@@ -142,7 +142,7 @@ final class PhotoMetadataServiceTests: XCTestCase {
         let userId = "photo_placeholder_cleanup_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_765_400_000)
 
-        let result = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
@@ -167,11 +167,11 @@ final class PhotoMetadataServiceTests: XCTestCase {
         let userId = "photo_placeholder_retry_cleanup_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_765_450_000)
 
-        let first = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let first = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
-        let retry = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let retry = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
@@ -194,7 +194,7 @@ final class PhotoMetadataServiceTests: XCTestCase {
         let userId = "photo_placeholder_original_only_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_765_475_000)
 
-        let result = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
@@ -215,7 +215,7 @@ final class PhotoMetadataServiceTests: XCTestCase {
         let date = Date(timeIntervalSince1970: 1_765_485_000)
         let storagePath = "\(userId)/committed-upload.png"
 
-        let result = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
@@ -245,7 +245,7 @@ final class PhotoMetadataServiceTests: XCTestCase {
         let userId = "photo_placeholder_in_flight_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_765_490_000)
 
-        let result = await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
             for: date,
             userId: userId
         )
@@ -386,6 +386,26 @@ final class PhotoMetadataServiceTests: XCTestCase {
 
         let visibleMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
         XCTAssertTrue(visibleMetrics.contains { $0.id == metric.id })
+    }
+
+    func testCreateOrUpdateMetricsPersistsWeightBeforeReturning() async throws {
+        let userId = "persist_before_return_\(UUID().uuidString)"
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let localDate = BodyMetricLocalDate.key(for: date)
+
+        let created = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+            for: date,
+            weight: 82.4,
+            userId: userId
+        )
+
+        let stored = await CoreDataManager.shared.fetchBodyMetrics(for: userId, localDate: localDate)
+        let persisted = try XCTUnwrap(stored.first?.toBodyMetrics())
+
+        XCTAssertEqual(persisted.id, created.id)
+        XCTAssertEqual(try XCTUnwrap(persisted.weight), 82.4, accuracy: 0.001)
+        XCTAssertEqual(persisted.localDate, localDate)
+        XCTAssertEqual(persisted.dataSource, BodyMetricSource.manual.rawValue)
     }
 
     private func cachedMetric(id: String) async -> CachedBodyMetrics? {

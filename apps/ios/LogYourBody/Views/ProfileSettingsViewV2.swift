@@ -452,7 +452,7 @@ struct ProfileSettingsViewV2: View {
 
                 // Update auth manager with proper sync
                 let updates: [String: Any] = [
-                    "name": editableName.isEmpty ? "" : editableName,
+                    "fullName": editableName.isEmpty ? "" : editableName,
                     "dateOfBirth": editableDateOfBirth,
                     "height": Double(editableHeightCm),
                     "heightUnit": useMetricHeight ? "cm" : "in",

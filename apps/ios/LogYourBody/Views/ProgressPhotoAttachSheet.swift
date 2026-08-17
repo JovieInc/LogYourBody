@@ -632,7 +632,7 @@ struct ProgressPhotoAttachSheet: View {
             throw PhotoUploadManager.PhotoError.imageConversionFailed
         }
 
-        _ = await PhotoMetadataService.shared.createOrUpdateMetrics(
+        _ = try await PhotoMetadataService.shared.createOrUpdateMetrics(
             for: metrics.date,
             photoUrl: photoUrl,
             userId: userId

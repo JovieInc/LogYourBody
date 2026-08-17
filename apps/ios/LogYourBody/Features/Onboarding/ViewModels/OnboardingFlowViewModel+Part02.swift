@@ -177,17 +177,22 @@ func prepareFirstPhotoBaselineMetric() async -> BodyMetrics? {
         firstPhotoErrorMessage = nil
         defer { isPreparingFirstPhotoMetric = false }
 
-        let metric = await PhotoMetadataService.shared.createOrUpdateMetrics(
-            for: Date(),
-            weight: bodyScoreInput.weight.inKilograms,
-            bodyFatPercentage: bodyScoreInput.bodyFat.percentage,
-            bodyFatMethod: firstPhotoBaselineBodyFatMethod,
-            userId: userId,
-            dataSource: firstPhotoBaselineDataSource,
-            preserveExistingMeasurements: true
-        )
-        onboardingFirstPhotoMetric = metric
-        return metric
+        do {
+            let metric = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+                for: Date(),
+                weight: bodyScoreInput.weight.inKilograms,
+                bodyFatPercentage: bodyScoreInput.bodyFat.percentage,
+                bodyFatMethod: firstPhotoBaselineBodyFatMethod,
+                userId: userId,
+                dataSource: firstPhotoBaselineDataSource,
+                preserveExistingMeasurements: true
+            )
+            onboardingFirstPhotoMetric = metric
+            return metric
+        } catch {
+            firstPhotoErrorMessage = "Your first photo baseline could not be saved. Try again."
+            return nil
+        }
     }
 
 var firstPhotoBaselineDataSource: String {
