@@ -181,6 +181,17 @@ enum PhotoTimelineHUDPolicy {
     }
 }
 
+/// Founder-locked Timeline photo-scrub contract v1.1.1 (2026-08-04).
+/// Body Score stays off this surface. ScoreCalibrationContract is design-spec only.
+enum TimelinePhotoScrubLock {
+    static let version = "1.1.1"
+    static let visibleMetricTitles = ["FFMI", "Weight", "Body Fat"]
+    static let showsBodyScoreOnTimeline = false
+    static let showsIdleThumbnails = false
+    static let shareActionTitle = "Share"
+    static let visibleControlPointSize: CGFloat = 32
+}
+
 enum BulkProgressPhotoImportPolicy {
     static let defaultShowsBulkImport = false
     static let activationProgressPhotoCount = 2
