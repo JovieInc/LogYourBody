@@ -2,6 +2,22 @@ import Foundation
 import CoreData
 import HealthKit
 
+enum BodyMetricSyncDateParser {
+    /// Neon emits `toISOString()` (`…T12:15:00.000Z`). The default
+    /// `ISO8601DateFormatter()` rejects fractional seconds and would wipe
+    /// `metric.date` on pull.
+    static func date(from string: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractional.date(from: string) {
+            return date
+        }
+        let wholeSeconds = ISO8601DateFormatter()
+        wholeSeconds.formatOptions = [.withInternetDateTime]
+        return wholeSeconds.date(from: string)
+    }
+}
+
 extension CoreDataManager {
 // MARK: - Update from Server Data
 
@@ -22,8 +38,6 @@ extension CoreDataManager {
                 }
 
                 let metric = results.first ?? CachedBodyMetrics(context: context)
-
-                let formatter = ISO8601DateFormatter()
 
                 // Update fields
                 metric.id = id
@@ -97,8 +111,9 @@ extension CoreDataManager {
                     metric.sourceMetadataJSON = nil
                 }
 
-                if let dateString = data["date"] as? String {
-                    metric.date = formatter.date(from: dateString)
+                if let dateString = data["date"] as? String,
+                   let parsedDate = BodyMetricSyncDateParser.date(from: dateString) {
+                    metric.date = parsedDate
                 }
                 metric.localDate = BodyMetricLocalDate.normalized(
                     data["local_date"] as? String,
@@ -106,12 +121,12 @@ extension CoreDataManager {
                 )
 
                 if let createdString = data["created_at"] as? String,
-                   let createdAt = formatter.date(from: createdString) {
+                   let createdAt = BodyMetricSyncDateParser.date(from: createdString) {
                     metric.createdAt = createdAt
                 }
 
                 if let updatedString = data["updated_at"] as? String,
-                   let updatedAt = formatter.date(from: updatedString) {
+                   let updatedAt = BodyMetricSyncDateParser.date(from: updatedString) {
                     metric.updatedAt = updatedAt
                 }
 
@@ -148,25 +163,24 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
                 let results = try context.fetch(request)
                 let metric = results.first ?? CachedDailyMetrics(context: context)
 
-                let formatter = ISO8601DateFormatter()
-
                 // Update fields
                 metric.id = id
                 metric.userId = data["user_id"] as? String
                 metric.steps = Int32(data["steps"] as? Int ?? 0)
                 metric.notes = data["notes"] as? String
 
-                if let dateString = data["date"] as? String {
-                    metric.date = formatter.date(from: dateString)
+                if let dateString = data["date"] as? String,
+                   let parsedDate = BodyMetricSyncDateParser.date(from: dateString) {
+                    metric.date = parsedDate
                 }
 
                 if let createdString = data["created_at"] as? String,
-                   let createdAt = formatter.date(from: createdString) {
+                   let createdAt = BodyMetricSyncDateParser.date(from: createdString) {
                     metric.createdAt = createdAt
                 }
 
                 if let updatedString = data["updated_at"] as? String,
-                   let updatedAt = formatter.date(from: updatedString) {
+                   let updatedAt = BodyMetricSyncDateParser.date(from: updatedString) {
                     metric.updatedAt = updatedAt
                 }
 

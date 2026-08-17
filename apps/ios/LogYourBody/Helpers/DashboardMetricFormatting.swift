@@ -9,6 +9,24 @@ struct CircleSymbol: ChartSymbolShape {
     }
 }
 
+/// Paid HUD must show the logged scale weight on a day that has one.
+/// Trend/EMA is a fallback only when that day has no measured weight.
+enum TimelineWeightHeadlinePolicy {
+    static func kilograms(
+        measuredWeight: Double?,
+        trendWeight: Double?,
+        prefersTrend: Bool
+    ) -> Double? {
+        if let measuredWeight {
+            return measuredWeight
+        }
+        if prefersTrend {
+            return trendWeight
+        }
+        return trendWeight
+    }
+}
+
 struct MetricRangeStats {
     let startValue: Double
     let endValue: Double

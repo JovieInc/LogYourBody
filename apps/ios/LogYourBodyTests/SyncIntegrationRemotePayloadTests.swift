@@ -207,6 +207,63 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         XCTAssertEqual(cachedProfile.syncStatus, "synced")
     }
 
+    func testUpdateOrCreateBodyMetric_PreservesDateWhenServerSendsFractionalISO8601() async throws {
+        let coreData = CoreDataManager.shared
+        let id = UUID().uuidString
+        let userId = "sync_test_user_fractional_iso_\(UUID().uuidString)"
+        let measuredAt = Date(timeIntervalSince1970: 1_776_082_500) // 2026-04-13T12:15:00Z
+        try await coreData.saveBodyMetricsAndWait(
+            BodyMetrics(
+                id: id,
+                userId: userId,
+                date: measuredAt,
+                localDate: "2026-04-13",
+                weight: 82.7,
+                weightUnit: "kg",
+                bodyFatPercentage: nil,
+                bodyFatMethod: nil,
+                muscleMass: nil,
+                boneMass: nil,
+                notes: nil,
+                photoUrl: nil,
+                dataSource: BodyMetricSource.manual.rawValue,
+                createdAt: measuredAt,
+                updatedAt: measuredAt
+            ),
+            userId: userId
+        )
+
+        coreData.updateOrCreateBodyMetric(from: [
+            "id": id,
+            "user_id": userId,
+            "date": "2026-04-13T12:15:00.000Z",
+            "local_date": "2026-04-13",
+            "weight": 82.7,
+            "weight_unit": "kg",
+            "created_at": "2026-04-13T12:15:00.000Z",
+            "updated_at": "2026-04-13T12:15:00.000Z"
+        ])
+
+        var stored: CachedBodyMetrics?
+        for _ in 0..<20 {
+            stored = await cachedBodyMetric(id: id)
+            if stored?.date != nil { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        let persisted = try XCTUnwrap(stored)
+        let parsed = try XCTUnwrap(persisted.date)
+        XCTAssertEqual(parsed.timeIntervalSince1970, measuredAt.timeIntervalSince1970, accuracy: 0.001)
+        XCTAssertNotNil(persisted.toBodyMetrics())
+        let parsedFractional = try XCTUnwrap(
+            BodyMetricSyncDateParser.date(from: "2026-04-13T12:15:00.000Z")
+        )
+        XCTAssertEqual(
+            parsedFractional.timeIntervalSince1970,
+            measuredAt.timeIntervalSince1970,
+            accuracy: 0.001
+        )
+    }
+
     func testUpdateOrCreateBodyMetric_IsIdempotentForSameId() async throws {
         let coreData = CoreDataManager.shared
 

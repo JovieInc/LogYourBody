@@ -40,4 +40,33 @@ final class SupabaseProfilePayloadTests: XCTestCase {
         XCTAssertNil(sanitized["onboarding_completed"])
         XCTAssertNil(sanitized["avatar_url"])
     }
+
+    func testFirstPartyProfilePatchMapsLegacyNameAndDropsUnknownKeys() throws {
+        let payload = try SupabaseManager.firstPartyProfilePatchBody([
+            "name": "Tim White",
+            "goalWeightUnit": "lbs",
+            "avatarUrl": "https://example.com/avatar.png",
+            "unknown": "drop-me"
+        ])
+
+        XCTAssertEqual(payload["fullName"] as? String, "Tim White")
+        XCTAssertEqual(payload["goalWeightUnit"] as? String, "lb")
+        XCTAssertNil(payload["name"])
+        XCTAssertNil(payload["unknown"])
+        XCTAssertNil(payload["avatarUrl"])
+    }
+
+    func testAuthManagerNormalizedPayloadUsesFirstPartyAllowlist() throws {
+        let payload = try AuthManager.normalizedProductProfilePayload([
+            "name": "Settings User",
+            "dateOfBirth": Date(timeIntervalSince1970: 631_152_000),
+            "height": 180.0,
+            "heightUnit": "cm"
+        ])
+
+        XCTAssertEqual(payload["fullName"] as? String, "Settings User")
+        XCTAssertEqual(payload["dateOfBirth"] as? String, "1990-01-01")
+        XCTAssertEqual(payload["height"] as? Double, 180.0)
+        XCTAssertNil(payload["name"])
+    }
 }

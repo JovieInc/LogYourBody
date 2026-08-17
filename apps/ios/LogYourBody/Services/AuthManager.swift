@@ -562,6 +562,21 @@ final class AuthManager: NSObject, ObservableObject {
 
     private func applyAuthenticatedSession(_ session: ProductAuthSession) {
         authSession = session
+        lastExitReason = .none
+
+        if var existing = currentUser, existing.id == session.subject {
+            if let name = session.name?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !name.isEmpty {
+                existing.name = name
+            }
+            currentUser = existing
+            if existing.profile == nil {
+                bootstrappedProfileSessionIds.remove(session.id)
+                Task { await bootstrapAuthenticatedProfileIfNeeded(sessionId: session.id) }
+            }
+            return
+        }
+
         currentUser = LocalUser(
             id: session.subject,
             email: session.email,
@@ -571,7 +586,6 @@ final class AuthManager: NSObject, ObservableObject {
             onboardingCompleted: false
         )
         memberSinceDate = session.issuedAt
-        lastExitReason = .none
         Task { await bootstrapAuthenticatedProfileIfNeeded(sessionId: session.id) }
     }
 
@@ -818,21 +832,13 @@ final class AuthManager: NSObject, ObservableObject {
         return formatter
     }()
 
-    nonisolated private static func normalizedProductProfilePayload(
+    nonisolated static func normalizedProductProfilePayload(
         _ updates: [String: Any]
     ) throws -> [String: Any] {
-        var payload: [String: Any] = [:]
-        for (key, value) in updates {
-            if let date = value as? Date {
-                payload[key] = productDateFormatter.string(from: date)
-            } else if JSONSerialization.isValidJSONObject([key: value]) {
-                payload[key] = value
-            }
-        }
-        guard JSONSerialization.isValidJSONObject(payload) else {
-            throw AuthError.server("Your profile details could not be saved.")
-        }
-        return payload
+        // The mobile profile PATCH schema is `.strict()`. Unknown keys such as
+        // `name` (legacy settings) 400 the entire save, so reuse the first-party
+        // allowlist and map aliases before the request leaves the device.
+        try SupabaseManager.firstPartyProfilePatchBody(updates)
     }
 
     func deleteCurrentAccount() async throws {
