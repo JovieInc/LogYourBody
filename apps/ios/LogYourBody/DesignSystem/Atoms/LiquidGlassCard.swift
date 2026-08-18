@@ -10,6 +10,7 @@ import SwiftUI
 /// Liquid glass card with backdrop blur, subtle highlights, and soft shadows
 struct LiquidGlassCard<Content: View>: View {
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     let content: Content
     let cornerRadius: CGFloat
@@ -35,46 +36,54 @@ struct LiquidGlassCard<Content: View>: View {
     }
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let style = JovieGlassSurface.style(reduceTransparency: reduceTransparency)
+        let spec = JovieGlassSurfaceSpec(
+            tint: .white,
+            tintOpacity: 0.03,
+            solidFill: theme.colors.surface,
+            fallbackMaterial: theme.materials.glassUltraThin
+        )
+
         content
             .padding(padding)
-            .background(
-                ZStack {
-                    // Base glass layer with backdrop blur + subtle white tint
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(theme.materials.glassUltraThin)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: cornerRadius)
-                                .fill(Color.white.opacity(0.03))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: cornerRadius)
-                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                        )
-
-                    // Subtle top inner highlight (enhanced for better gloss effect)
-                    if showHighlight {
-                        VStack {
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.15),
-                                    Color.clear
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .frame(height: 4)
-                            Spacer()
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                    }
-                }
+            .appliedJovieGlass(
+                reduceTransparency: reduceTransparency,
+                spec: spec,
+                in: shape
             )
+            .overlay {
+                if style != .nativeGlass {
+                    shape.strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                }
+            }
+            .overlay {
+                if showHighlight && style != .nativeGlass {
+                    glassHighlight(in: shape)
+                }
+            }
             .shadow(
                 color: showShadow ? Color.black.opacity(0.20) : .clear,
                 radius: 12,
                 x: 0,
                 y: 6
             )
+    }
+
+    private func glassHighlight(in shape: RoundedRectangle) -> some View {
+        VStack {
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.15),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 4)
+            Spacer()
+        }
+        .clipShape(shape)
     }
 }
 
@@ -99,6 +108,7 @@ struct CompactGlassCard<Content: View>: View {
 /// Hero glass card for main photo/avatar (16pt radius, uses regularMaterial)
 struct HeroGlassCard<Content: View>: View {
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     let content: Content
 
@@ -107,22 +117,28 @@ struct HeroGlassCard<Content: View>: View {
     }
 
     var body: some View {
-        content
-            .background(
-                ZStack {
-                    // Use regularMaterial for viewport + subtle white tint
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(theme.materials.glassRegular)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.white.opacity(0.03))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                        )
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let style = JovieGlassSurface.style(reduceTransparency: reduceTransparency)
+        let spec = JovieGlassSurfaceSpec(
+            tint: .white,
+            tintOpacity: 0.03,
+            solidFill: theme.colors.surface,
+            fallbackMaterial: theme.materials.glassRegular
+        )
 
-                    // Subtle top inner highlight (enhanced)
+        content
+            .appliedJovieGlass(
+                reduceTransparency: reduceTransparency,
+                spec: spec,
+                in: shape
+            )
+            .overlay {
+                if style != .nativeGlass {
+                    shape.strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                }
+            }
+            .overlay {
+                if style != .nativeGlass {
                     VStack {
                         LinearGradient(
                             colors: [
@@ -135,9 +151,9 @@ struct HeroGlassCard<Content: View>: View {
                         .frame(height: 4)
                         Spacer()
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(shape)
                 }
-            )
+            }
             .shadow(
                 color: Color.black.opacity(0.25),
                 radius: 16,
@@ -150,6 +166,7 @@ struct HeroGlassCard<Content: View>: View {
 /// Pill-style button with glass effect
 struct GlassPillButton: View {
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     let icon: String
     let title: String
@@ -158,8 +175,19 @@ struct GlassPillButton: View {
     @State private var isPressed = false
 
     var body: some View {
+        let shape = Capsule(style: .continuous)
+        let style = JovieGlassSurface.style(reduceTransparency: reduceTransparency)
+        let spec = JovieGlassSurfaceSpec(
+            tint: .white,
+            tintOpacity: 0.03,
+            interactive: true,
+            solidFill: theme.colors.surface,
+            fallbackMaterial: theme.materials.glassUltraThin,
+            fallbackTint: Color.black,
+            fallbackTintOpacity: 0.2
+        )
+
         Button(action: {
-            // HapticManager.shared.buttonTap()
             action()
         }, label: {
             HStack(spacing: 8) {
@@ -171,21 +199,16 @@ struct GlassPillButton: View {
             .foregroundColor(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(
-                Capsule()
-                    .fill(theme.materials.glassUltraThin)
-                    .overlay(
-                        Capsule()
-                            .fill(Color.black.opacity(0.2))
-                    )
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(
-                                Color.white.opacity(0.1),
-                                lineWidth: 1
-                            )
-                    )
+            .appliedJovieGlass(
+                reduceTransparency: reduceTransparency,
+                spec: spec,
+                in: shape
             )
+            .overlay {
+                if style != .nativeGlass {
+                    shape.strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                }
+            }
             .scaleEffect(isPressed ? 0.95 : 1.0)
             .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4)
         })
