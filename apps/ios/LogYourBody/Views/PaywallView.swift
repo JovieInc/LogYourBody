@@ -22,11 +22,10 @@ struct PaywallView: View {
     @State private var showPrivacySheet = false
     @State private var showLogoutConfirmation = false
     @State private var selectedPackageIdentifier = ProductRegistry.Paywall.annualPackageID
+    @State private var legalSheetDetent = NativeSheetPresentationPolicy.initialDetent(for: .paywallLegal)
 
     var body: some View {
-        ZStack {
-            theme.colors.background.ignoresSafeArea()
-
+        NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: JovieTokens.sectionGap) {
                     header
@@ -55,12 +54,37 @@ struct PaywallView: View {
                 .padding(.bottom, JovieTokens.sectionGap)
             }
             .scrollBounceBehavior(.basedOnSize)
+            .allowsHitTesting(!subscriptionManager.isPurchasing)
             .accessibilityIdentifier("paywall_screen")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Menu {
+                        Button("Restore Purchases", systemImage: "arrow.clockwise") {
+                            Task { await restorePurchases() }
+                        }
+                        .disabled(subscriptionManager.isPurchasing)
 
-            if subscriptionManager.isPurchasing {
-                LoadingOverlay(message: "Processing purchase…")
+                        Button("Log out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+                            showLogoutConfirmation = true
+                        }
+                        .disabled(subscriptionManager.isPurchasing)
+
+                        Button("Terms of Service", systemImage: "doc.text") {
+                            showTermsSheet = true
+                        }
+
+                        Button("Privacy Policy", systemImage: "hand.raised") {
+                            showPrivacySheet = true
+                        }
+                    } label: {
+                        Label("More", systemImage: "ellipsis.circle")
+                    }
+                    .accessibilityLabel("Paywall account and legal actions")
+                }
             }
         }
+        .background(theme.colors.background)
         .alert("Purchase Error", isPresented: $showPurchaseError) {
             Button("OK", role: .cancel) { subscriptionManager.errorMessage = nil }
         } message: {
@@ -100,10 +124,10 @@ struct PaywallView: View {
             AppServicePorts.analyticsTracker.track(event: "paywall_view")
         }
         .sheet(isPresented: $showTermsSheet) {
-            NavigationStack { LegalDocumentView(documentType: .terms) }
+            legalDocumentSheet(.terms)
         }
         .sheet(isPresented: $showPrivacySheet) {
-            NavigationStack { LegalDocumentView(documentType: .privacy) }
+            legalDocumentSheet(.privacy)
         }
         .worldClassScreen(.paywall)
     }
@@ -304,19 +328,10 @@ struct PaywallView: View {
             Task { await loadOfferings() }
         } label: {
             Label("Retry", systemImage: "arrow.clockwise")
-                .font(theme.typography.labelLarge)
-                .foregroundStyle(theme.colors.text)
-                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
-                .background(
-                    RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
-                        .fill(theme.colors.text.opacity(0.06))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
-                        .stroke(theme.colors.border, lineWidth: 1)
-                )
+                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.glass)
+        .controlSize(.large)
         .disabled(isLoading)
         .accessibilityLabel("Retry loading subscription plans")
         .accessibilityHint("Attempts to load the available subscription plans again.")
@@ -326,11 +341,10 @@ struct PaywallView: View {
     private var contactSupportButton: some View {
         Button(action: contactSupportAboutUnavailablePlans) {
             Label("Contact support", systemImage: "envelope")
-                .font(theme.typography.labelLarge)
-                .foregroundStyle(theme.colors.text)
-                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.glass)
+        .controlSize(.large)
         .accessibilityLabel("Contact support")
         .accessibilityHint("Opens email support for unavailable subscription plans.")
         .accessibilityIdentifier("paywall_contact_support_button")
@@ -417,6 +431,21 @@ struct PaywallView: View {
             showRestoreError = true
         }
         AppServicePorts.analyticsTracker.track(event: success ? "restore_success" : "restore_failed")
+    }
+
+    private func legalDocumentSheet(_ documentType: LegalDocumentView.LegalDocumentType) -> some View {
+        NavigationStack {
+            LegalDocumentView(documentType: documentType)
+                .toolbar {
+                    ToolbarItemGroup(placement: .cancellationAction) {
+                        Button("Done") {
+                            showTermsSheet = false
+                            showPrivacySheet = false
+                        }
+                    }
+                }
+        }
+        .nativeSheetChrome(for: .paywallLegal, detent: $legalSheetDetent)
     }
 
     private func contactSupportAboutUnavailablePlans() {

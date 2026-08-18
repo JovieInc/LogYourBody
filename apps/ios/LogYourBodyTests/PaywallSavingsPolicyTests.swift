@@ -53,4 +53,18 @@ final class PaywallSavingsPolicyTests: XCTestCase {
         XCTAssertNil(PaywallSavingsPolicy.savingsPercent(monthlyPrice: 0, annualPrice: annual))
         XCTAssertNil(PaywallSavingsPolicy.monthlyEquivalent(annualPrice: 0))
     }
+
+    func testPaywallLegalSheetsUseNativeChromeWithoutCustomDimming() {
+        XCTAssertEqual(
+            NativeSheetPresentationPolicy.detents(for: .paywallLegal),
+            [.medium, .large]
+        )
+        XCTAssertEqual(
+            NativeSheetPresentationPolicy.dragIndicator(for: .paywallLegal),
+            .visible
+        )
+        XCTAssertFalse(NativeSheetPresentationPolicy.usesCustomDimOverlay(.paywallLegal))
+        XCTAssertFalse(NativeSheetPresentationPolicy.usesCustomGrabber(.paywallLegal))
+        XCTAssertTrue(NativeSheetPresentationPolicy.usesNativeNavigationChrome(.paywallLegal))
+    }
 }

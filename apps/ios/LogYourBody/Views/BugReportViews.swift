@@ -3,63 +3,44 @@ import UIKit
 
 struct BugReportPromptSheet: View {
     @EnvironmentObject var bugReportManager: BugReportManager
+    @State private var sheetDetent = NativeSheetPresentationPolicy.initialDetent(for: .bugReportPrompt)
 
     var body: some View {
-        VStack(spacing: 24) {
-            Capsule()
-                .fill(Color.white.opacity(0.4))
-                .frame(width: 40, height: 4)
-                .padding(.top, 8)
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Tell us what happened. A screenshot is optional and may include whatever is visible on screen.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .listRowBackground(Color.clear)
+                }
 
-            Text("Report a problem")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(.appText)
-
-            Text("Tell us what happened. A screenshot is optional and may include whatever is visible on screen.")
-                .font(.subheadline)
-                .foregroundColor(.appTextSecondary)
-                .multilineTextAlignment(.center)
-
-            Button(
-                action: {
+                Section {
+                    Toggle(isOn: $bugReportManager.isShakeToReportEnabled) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Shake iPhone to report a bug")
+                            Text("Toggle off to disable")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(.appPrimary)
+                }
+            }
+            .navigationTitle("Report a problem")
+            .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                Button("Report a problem") {
                     HapticManager.shared.buttonTap()
                     bugReportManager.presentFormFromPrompt()
-                },
-                label: {
-                    Text("Report a problem")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color.white)
-                        .foregroundColor(.black)
-                        .clipShape(Capsule())
                 }
-            )
-
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Shake iPhone to report a bug")
-                        .font(.subheadline)
-                        .foregroundColor(.appText)
-
-                    Text("Toggle off to disable")
-                        .font(.caption)
-                        .foregroundColor(.appTextSecondary)
-                }
-
-                Spacer()
-
-                Toggle("", isOn: $bugReportManager.isShakeToReportEnabled)
-                    .labelsHidden()
-                    .tint(.appPrimary)
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 24)
-        .background(
-            Color.appBackground
-                .ignoresSafeArea()
-        )
+        .nativeSheetChrome(for: .bugReportPrompt, detent: $sheetDetent)
     }
 }
 
@@ -74,33 +55,43 @@ struct BugReportFormView: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.appBackground
-                .ignoresSafeArea()
+        NavigationStack {
+            Form {
+                Section {
+                    messageField
+                } header: {
+                    Text("Tell us what happened")
+                } footer: {
+                    Text(characterCountText)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
 
-            VStack(spacing: 0) {
-                header
+                Section {
+                    infoText
+                }
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Tell us what happened")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.appText)
-
-                        messageField
-
-                        infoText
-
-                        screenshotSection
+                screenshotSection
+            }
+            .navigationTitle("Report a problem")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        HapticManager.shared.selection()
+                        bugReportManager.cancel()
+                        dismiss()
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
-                    .padding(.bottom, 32)
+                }
+
+                ToolbarItemGroup(placement: .confirmationAction) {
+                    Button("Send") {
+                        HapticManager.shared.buttonTap()
+                        bugReportManager.submit()
+                        dismiss()
+                    }
+                    .disabled(!bugReportManager.canSubmit)
                 }
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            bottomBar
         }
         .onAppear {
             AppServicePorts.analyticsTracker.track(
@@ -113,50 +104,11 @@ struct BugReportFormView: View {
         .worldClassScreen(.bugReport)
     }
 
-    private var header: some View {
-        HStack {
-            Spacer()
-
-            Text("Report a problem")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.appText)
-
-            Spacer()
-
-            Button(
-                action: {
-                    HapticManager.shared.selection()
-                    bugReportManager.cancel()
-                    dismiss()
-                },
-                label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .padding(8)
-                        .background(Color.white.opacity(0.15))
-                        .clipShape(Circle())
-                }
-            )
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-    }
-
     private var messageField: some View {
         ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.appCard)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.appBorder, lineWidth: 1)
-                )
-
             TextEditor(text: $bugReportManager.message)
                 .focused($isTextEditorFocused)
-                .scrollContentBackground(.hidden)
-                .padding(12)
-                .frame(minHeight: 180, maxHeight: 200)
+                .frame(minHeight: 160)
                 .onChange(of: bugReportManager.message) { _, newValue in
                     if newValue.count > BugReportManager.maxMessageLength {
                         bugReportManager.message = String(newValue.prefix(BugReportManager.maxMessageLength))
@@ -166,30 +118,18 @@ struct BugReportFormView: View {
             if bugReportManager.message.isEmpty {
                 Text("What did you expect, and what happened instead?")
                     .font(.body)
-                    .foregroundColor(.appTextSecondary)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 18)
-            }
-
-            VStack {
-                Spacer()
-
-                HStack {
-                    Spacer()
-
-                    Text(characterCountText)
-                        .font(.caption2)
-                        .foregroundColor(.appTextSecondary)
-                        .padding(.trailing, 14)
-                        .padding(.bottom, 8)
-                }
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+                    .padding(.leading, 4)
+                    .allowsHitTesting(false)
             }
         }
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
     }
 
     private var infoText: some View {
         let supportLink = Text("contact support.")
-            .foregroundColor(.appPrimary)
+            .foregroundStyle(Color.appPrimary)
         let combined = Text(
             "Reports include your description and basic app and device details. Screenshots are optional. " +
                 "If you have additional questions, \(supportLink)"
@@ -197,72 +137,28 @@ struct BugReportFormView: View {
 
         return combined
             .font(.footnote)
-            .foregroundColor(.appTextSecondary)
-            .multilineTextAlignment(.leading)
+            .foregroundStyle(.secondary)
             .onTapGesture {
                 openSupport()
             }
     }
 
+    @ViewBuilder
     private var screenshotSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Include screenshot in report")
-                    .font(.subheadline)
-                    .foregroundColor(.appText)
-
-                Spacer()
-
-                Toggle("", isOn: $bugReportManager.includeScreenshot)
-                    .labelsHidden()
-                    .tint(.appPrimary)
-            }
+        Section {
+            Toggle("Include screenshot in report", isOn: $bugReportManager.includeScreenshot)
+                .tint(.appPrimary)
 
             if let data = bugReportManager.screenshotData,
                let image = UIImage(data: data) {
                 Image(uiImage: image)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 200)
-                    .clipped()
-                    .cornerRadius(16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.appBorder, lineWidth: 1)
-                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .accessibilityLabel("Screenshot included in report")
             }
         }
-    }
-
-    private var bottomBar: some View {
-        VStack(spacing: 12) {
-            Button(
-                action: {
-                    HapticManager.shared.buttonTap()
-                    bugReportManager.submit()
-                    dismiss()
-                },
-                label: {
-                    Text("Send")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(bugReportManager.canSubmit ? Color.white : Color.white.opacity(0.3))
-                        .foregroundColor(.black)
-                        .clipShape(Capsule())
-                }
-            )
-            .disabled(!bugReportManager.canSubmit)
-            .padding(.horizontal, 24)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
-        }
-        .background(
-            Color.appBackground
-                .opacity(0.95)
-                .ignoresSafeArea(edges: .bottom)
-        )
     }
 
     private func openSupport() {

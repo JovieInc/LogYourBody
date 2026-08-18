@@ -2,6 +2,11 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
+enum DailyReminderPromptPresentationPolicy {
+    static var usesNativePermissionAlert: Bool { true }
+    static var usesCustomGrabber: Bool { NativeSheetPresentationPolicy.usesCustomGrabber(.dailyReminder) }
+}
+
 struct DailyWeighInReminderPromptView: View {
     @ObservedObject private var notificationManager: NotificationManager
     @Environment(\.openURL) private var openURL

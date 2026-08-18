@@ -61,4 +61,11 @@ final class DailyReminderPolicyTests: XCTestCase {
         XCTAssertNil(components.day)
         XCTAssertNil(components.month)
     }
+
+    func testDailyReminderPromptUsesNativePermissionAlert() {
+        XCTAssertTrue(DailyReminderPromptPresentationPolicy.usesNativePermissionAlert)
+        XCTAssertFalse(DailyReminderPromptPresentationPolicy.usesCustomGrabber)
+        XCTAssertTrue(NativeSheetPresentationPolicy.detents(for: .dailyReminder).isEmpty)
+        XCTAssertFalse(NativeSheetPresentationPolicy.usesCustomDimOverlay(.dailyReminder))
+    }
 }

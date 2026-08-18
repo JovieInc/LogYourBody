@@ -101,26 +101,25 @@ var body: some View {
                 .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.vertical, 12)
             }
-            .background(Color.jovieCanvas.ignoresSafeArea())
             .worldClassScreen(entryScreen)
             .navigationTitle(entryTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .cancellationAction) {
                     Button("Cancel") {
-                        guard PhotoUploadBatchPolicy.canDismiss(
+                        guard NativeSheetPresentationPolicy.canDismissAddEntry(
                             isSaving: isSavingEntry,
                             isProcessing: isProcessingPhotos
                         ) else { return }
                         dismiss()
                     }
-                    .disabled(!PhotoUploadBatchPolicy.canDismiss(
+                    .disabled(!NativeSheetPresentationPolicy.canDismissAddEntry(
                         isSaving: isSavingEntry,
                         isProcessing: isProcessingPhotos
                     ))
                 }
             }
-            .interactiveDismissDisabled(!PhotoUploadBatchPolicy.canDismiss(
+            .interactiveDismissDisabled(!NativeSheetPresentationPolicy.canDismissAddEntry(
                 isSaving: isSavingEntry,
                 isProcessing: isProcessingPhotos
             ))
@@ -153,6 +152,7 @@ var body: some View {
                 loadGlp1MedicationsIfNeeded()
             }
         }
+        .nativeSheetChrome(for: .addEntry, detent: $sheetDetent)
     }
 
 // MARK: - GLP-1 Entry View
@@ -181,18 +181,12 @@ var body: some View {
                         .font(.appBodySmall)
                         .foregroundColor(.appTextSecondary)
 
-                    Button {
+                    Button("Add medication") {
                         isPresentingGlp1AddMedication = true
-                    } label: {
-                        Text("Add medication")
-                            .font(.appBody)
-                            .fontWeight(.semibold)
-                            .frame(height: 44)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.appPrimary)
-                            .foregroundColor(.white)
-                            .cornerRadius(Constants.cornerRadius)
                     }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
                     .padding(.top, 4)
                 }
             } else {
