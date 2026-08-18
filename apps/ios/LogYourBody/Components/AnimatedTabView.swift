@@ -6,7 +6,6 @@ import SwiftUI
 
 struct AnimatedTabView: View {
     @Binding var selectedTab: Tab
-    @Namespace private var namespace
     @State private var bounceAnimation = false
 
     enum Tab: Int, CaseIterable {
@@ -40,12 +39,10 @@ struct AnimatedTabView: View {
             ForEach(Tab.allCases, id: \.self) { tab in
                 TabButton(
                     tab: tab,
-                    isSelected: selectedTab == tab,
-                    namespace: namespace
+                    isSelected: selectedTab == tab
                 ) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         selectedTab = tab
-                        // HapticManager.shared.buttonTap()
                         bounceAnimation.toggle()
                     }
                 }
@@ -53,87 +50,29 @@ struct AnimatedTabView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(
-            // Liquid Glass effect - matches LiquidGlassCard design
-            ZStack {
-                // Base glass layer with material blur
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(Color.white.opacity(0.03))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 24)
-                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                    )
-
-                // Subtle top highlight
-                VStack {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.15),
-                            Color.clear
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 4)
-                    Spacer()
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-            }
+        .dashboardChromeGlass(
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous),
+            cornerRadius: 24
         )
-        .shadow(color: Color.black.opacity(0.20), radius: 12, x: 0, y: 6)
     }
 }
 
 struct TabButton: View {
     let tab: AnimatedTabView.Tab
     let isSelected: Bool
-    let namespace: Namespace.ID
     let action: () -> Void
     @State private var isPressed = false
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                ZStack {
-                    // Selection indicator with glass morphing effect
-                    if isSelected {
-                        ZStack {
-                            // Base selection circle
-                            Circle()
-                                .fill(Color.white.opacity(0.08))
-                                .frame(width: 44, height: 44)
-                                .blur(radius: 8)
-
-                            // Inner glow
-                            Circle()
-                                .fill(
-                                    RadialGradient(
-                                        colors: [
-                                            Color.white.opacity(0.15),
-                                            Color.white.opacity(0.0)
-                                        ],
-                                        center: .center,
-                                        startRadius: 0,
-                                        endRadius: 22
-                                    )
-                                )
-                                .frame(width: 40, height: 40)
-                        }
-                        .matchedGeometryEffect(id: "selection", in: namespace)
-                    }
-
-                    Image(systemName: tab.icon)
-                        .font(.system(size: 24, weight: isSelected ? .medium : .regular))
-                        .foregroundColor(isSelected ? .white : Color.white.opacity(0.5))
-                        .symbolEffect(.bounce, value: isSelected)
-                        .scaleEffect(isSelected ? 1.0 : 0.9)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
-                }
-                .frame(width: 44, height: 44) // Minimum tap target
+                Image(systemName: tab.icon)
+                    .font(.system(size: 24, weight: isSelected ? .medium : .regular))
+                    .foregroundColor(isSelected ? .white : Color.white.opacity(0.5))
+                    .symbolEffect(.bounce, value: isSelected)
+                    .scaleEffect(isSelected ? 1.0 : 0.9)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+                    .frame(width: 44, height: 44)
             }
             .frame(maxWidth: .infinity)
             .scaleEffect(isPressed ? 0.9 : 1.0)

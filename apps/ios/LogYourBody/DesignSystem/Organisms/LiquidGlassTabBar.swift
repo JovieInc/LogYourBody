@@ -3,4 +3,4 @@
 // LogYourBody
 //
 // Organism: Liquid Glass Tab Bar
-// (navigation component currently not in use; implementation removed)
+// Native TabView owns tab-bar glass. Do not paint a custom tab-bar material here.

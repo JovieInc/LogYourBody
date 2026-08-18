@@ -4,6 +4,109 @@
 //
 import SwiftUI
 
+// MARK: - Dashboard Chrome Policy
+
+/// Visual-only contract for dashboard / photo-timeline chrome.
+///
+/// Apple Liquid Glass belongs on tab bars, toolbars, and floating controls.
+/// Photos, charts, and metric cards stay on the content layer.
+enum DashboardChromePolicy {
+    static let photoTimelineUsesSystemTabBar = false
+    static let legacyDashboardUsesSystemTabBar = true
+    static let appliesGlassToContentCards = false
+    static let appliesGlassToInteractiveChrome = true
+    static let usesNativeTabBarMinimizeOnScroll = true
+}
+
+enum DashboardChromeGlass {
+    @ViewBuilder
+    static func cluster<Content: View>(
+        spacing: CGFloat = 8,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) {
+                content()
+            }
+        } else {
+            content()
+        }
+    }
+}
+
+struct DashboardLegacyTabBarChromeModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func dashboardChromeGlass<S: Shape>(
+        in shape: S,
+        cornerRadius: CGFloat,
+        tint: Color = .white,
+        tintOpacity: Double = 0.12,
+        interactive: Bool = true
+    ) -> some View {
+        if #available(iOS 26.0, *) {
+            glassEffect(
+                dashboardChromeGlassStyle(
+                    tint: tint,
+                    tintOpacity: tintOpacity,
+                    interactive: interactive
+                ),
+                in: shape
+            )
+        } else {
+            systemBGlassSurface(
+                cornerRadius: cornerRadius,
+                tint: tint,
+                tintOpacity: 0.035,
+                borderColor: Color.white.opacity(0.12),
+                borderOpacity: 1
+            )
+        }
+    }
+
+    func dashboardContentSurface(cornerRadius: CGFloat, border: Color) -> some View {
+        modifier(DashboardContentSurfaceModifier(cornerRadius: cornerRadius, border: border))
+    }
+}
+
+@available(iOS 26.0, *)
+private func dashboardChromeGlassStyle(
+    tint: Color,
+    tintOpacity: Double,
+    interactive: Bool
+) -> Glass {
+    if interactive {
+        return .regular.tint(tint.opacity(tintOpacity)).interactive()
+    }
+
+    return .regular.tint(tint.opacity(tintOpacity))
+}
+
+private struct DashboardContentSurfaceModifier: ViewModifier {
+    @Environment(\.theme) private var theme
+
+    let cornerRadius: CGFloat
+    let border: Color
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        content
+            .background(theme.colors.surface, in: shape)
+            .overlay {
+                shape.stroke(border.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
+            }
+    }
+}
+
 // MARK: - Empty State View
 
 struct DashboardEmptyStateView: View {
@@ -146,17 +249,7 @@ struct DashboardHeaderBar<Leading: View, Trailing: View>: View {
         .background(
             Group {
                 if showLiquidGlass {
-                    if #available(iOS 18.0, *) {
-                        Rectangle()
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                Rectangle()
-                                    .fill(Color.appBackground.opacity(0.8))
-                            )
-                    } else {
-                        Rectangle()
-                            .fill(Color.appBackground.opacity(0.95))
-                    }
+                    Color.appBackground
                 }
             }
         )

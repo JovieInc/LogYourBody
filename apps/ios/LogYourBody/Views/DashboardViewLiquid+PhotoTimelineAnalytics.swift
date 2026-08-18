@@ -73,11 +73,7 @@ extension DashboardViewLiquid {
             photoTimelinePresenceChipGrid
         }
         .padding(JovieTokens.compactInset)
-        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
-                .stroke(theme.colors.border.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
-        }
+        .dashboardContentSurface(cornerRadius: theme.radius.card, border: theme.colors.border)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Timeline data. \(photoTimelinePresenceLegendText). \(timelinePresenceValueCount) values.")
         .accessibilityIdentifier("photo_timeline_stats_presence_summary")

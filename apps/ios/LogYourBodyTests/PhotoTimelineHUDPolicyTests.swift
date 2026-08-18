@@ -108,6 +108,17 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         )
     }
 
+    func testDashboardChromeKeepsGlassOnControlsNotCards() {
+        XCTAssertFalse(DashboardChromePolicy.photoTimelineUsesSystemTabBar)
+        XCTAssertTrue(DashboardChromePolicy.legacyDashboardUsesSystemTabBar)
+        XCTAssertFalse(DashboardChromePolicy.appliesGlassToContentCards)
+        XCTAssertTrue(DashboardChromePolicy.appliesGlassToInteractiveChrome)
+        XCTAssertTrue(DashboardChromePolicy.usesNativeTabBarMinimizeOnScroll)
+        XCTAssertEqual(PaidAppSurfacePolicy.surface(), .photoTimelineHUD)
+        XCTAssertNotEqual(PaidAppSurfacePolicy.surface(), .weightLoggerMVP)
+        XCTAssertNotEqual(PaidAppSurfacePolicy.surface(), .legacyFullDashboardBeta)
+    }
+
     func testPhotoTimelineHUDMetricStateCopyIsExplicit() {
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .present), "Measured")
         XCTAssertEqual(

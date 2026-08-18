@@ -138,43 +138,45 @@ struct DashboardHomeTimelineHero: View {
     }
 
     private var timelineDateBar: some View {
-        HStack(spacing: 10) {
-            Text(dateText)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.colors.text)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(theme.colors.background.opacity(0.42)))
-                .allowsHitTesting(false)
+        DashboardChromeGlass.cluster(spacing: 10) {
+            HStack(spacing: 10) {
+                Text(dateText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(theme.colors.text)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 7)
+                    .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
+                    .allowsHitTesting(false)
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
 
-            if let onShareBodyScore {
-                Button {
-                    onShareBodyScore()
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.colors.text)
-                        .frame(width: 32, height: 32)
-                        .background(Circle().fill(theme.colors.background.opacity(0.42)))
+                if let onShareBodyScore {
+                    Button {
+                        onShareBodyScore()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(theme.colors.text)
+                            .frame(width: 32, height: 32)
+                            .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
+                    }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Share Body Score")
+                    .accessibilityHint("Opens sharing options for this Body Score")
+                    .accessibilityIdentifier("body_score_hero_share_button")
                 }
-                .frame(width: 44, height: 44)
-                .contentShape(Circle())
-                .buttonStyle(.plain)
-                .accessibilityLabel("Share Body Score")
-                .accessibilityHint("Opens sharing options for this Body Score")
-                .accessibilityIdentifier("body_score_hero_share_button")
-            }
 
-            Text(timelinePositionText)
-                .font(.system(size: 12, weight: .semibold))
-                .monospacedDigit()
-                .foregroundColor(theme.colors.textSecondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(theme.colors.background.opacity(0.34)))
-                .allowsHitTesting(false)
+                Text(timelinePositionText)
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundColor(theme.colors.textSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
+                    .allowsHitTesting(false)
+            }
         }
     }
 
@@ -406,23 +408,32 @@ private struct DashboardHomeTimelineMetricButton: View {
                     .frame(width: 28, height: 2)
                     .cornerRadius(1)
 
-                Text(title)
-                    .font(.caption2.weight(.bold))
-                    .foregroundColor(theme.colors.textSecondary)
-                    .lineLimit(1)
+                DSMetricLabel(
+                    text: title,
+                    size: .caption2,
+                    weight: .bold,
+                    color: theme.colors.textSecondary
+                )
+                .lineLimit(1)
 
-                Text(value)
-                    .font(.title3.weight(.bold))
-                    .monospacedDigit()
-                    .foregroundColor(theme.colors.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.68)
+                DSMetricValue(
+                    value: value,
+                    unit: nil,
+                    size: .title3.weight(.bold),
+                    color: theme.colors.text
+                )
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
 
-                Text(caption)
-                    .font(.caption2.weight(.medium))
-                    .foregroundColor(theme.colors.textTertiary)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                    .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.72)
+                DSMetricLabel(
+                    text: caption,
+                    size: .caption2,
+                    weight: .medium,
+                    color: theme.colors.textTertiary
+                )
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.72)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
@@ -557,20 +568,8 @@ struct DashboardHomeTab<Header: View, SyncBanner: View, MetricContent: View, Qui
                 }
             )
             .background(
-                theme.colors.background.opacity(0.9)
+                theme.colors.background
                     .ignoresSafeArea(edges: .top)
-                    .overlay(
-                        Rectangle()
-                            .fill(theme.materials.glassUltraThin)
-                            .opacity(0.2 * scrollProgress)
-                            .ignoresSafeArea(edges: .top)
-                    )
-            )
-            .shadow(
-                color: theme.colors.background.opacity(0.18 * scrollProgress),
-                radius: 18,
-                x: 0,
-                y: 10
             )
         }
     }
@@ -666,24 +665,18 @@ struct DashboardStepsCard<ProgressView: View>: View {
     let onTap: (() -> Void)?
 
     var body: some View {
-        LiquidGlassCard(
-            cornerRadius: theme.radius.card,
-            blurRadius: 20,
-            padding: 14,
-            showShadow: false,
-            showHighlight: false
-        ) {
-            Group {
-                if let onTap {
-                    Button(action: onTap) {
-                        cardContent
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                } else {
+        Group {
+            if let onTap {
+                Button(action: onTap) {
                     cardContent
                 }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                cardContent
             }
         }
+        .padding(14)
+        .dashboardContentSurface(cornerRadius: theme.radius.card, border: theme.colors.border)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Steps: " + formattedSteps + " of " + formattedGoal)
         .accessibilityHint(subtext)
@@ -828,34 +821,36 @@ struct LaunchTimelineSurface: View {
     }
 
     private var stageChrome: some View {
-        HStack(spacing: 10) {
-            Text(dateText)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(.black.opacity(0.38)))
-                .lineLimit(1)
+        DashboardChromeGlass.cluster(spacing: 10) {
+            HStack(spacing: 10) {
+                Text(dateText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 7)
+                    .lineLimit(1)
+                    .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
 
-            if let onShare {
-                Button(action: onShare) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(
-                            width: TimelinePhotoScrubLock.visibleControlPointSize,
-                            height: TimelinePhotoScrubLock.visibleControlPointSize
-                        )
-                        .background(Circle().fill(.black.opacity(0.38)))
+                if let onShare {
+                    Button(action: onShare) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(
+                                width: TimelinePhotoScrubLock.visibleControlPointSize,
+                                height: TimelinePhotoScrubLock.visibleControlPointSize
+                            )
+                            .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
+                    }
+                    .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    .contentShape(Circle())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(TimelinePhotoScrubLock.shareActionTitle)
+                    .accessibilityHint("Opens sharing options for this day")
+                    .accessibilityIdentifier("body_score_hero_share_button")
                 }
-                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
-                .contentShape(Circle())
-                .buttonStyle(.plain)
-                .accessibilityLabel(TimelinePhotoScrubLock.shareActionTitle)
-                .accessibilityHint("Opens sharing options for this day")
-                .accessibilityIdentifier("body_score_hero_share_button")
             }
         }
     }
@@ -871,12 +866,8 @@ struct LaunchTimelineSurface: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.black.opacity(0.42))
+                .fill(theme.colors.background.opacity(0.35))
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(.white.opacity(0.08), lineWidth: 1)
-        }
         .accessibilityIdentifier("launch_timeline_scrubber")
     }
 
@@ -946,31 +937,36 @@ struct LaunchTimelineSurface: View {
                     .fill(accent)
                     .frame(width: 22, height: 2)
 
-                Text(title)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(theme.colors.textSecondary)
-                    .lineLimit(1)
+                DSMetricLabel(
+                    text: title,
+                    size: .system(size: 11),
+                    weight: .bold,
+                    color: theme.colors.textSecondary
+                )
+                .lineLimit(1)
 
-                Text(value)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .foregroundStyle(theme.colors.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                DSMetricValue(
+                    value: value,
+                    unit: nil,
+                    size: .system(size: 20, weight: .semibold, design: .rounded),
+                    color: theme.colors.text
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
 
-                Text(caption)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(theme.colors.textSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                DSMetricLabel(
+                    text: caption,
+                    size: .system(size: 11),
+                    weight: .medium,
+                    color: theme.colors.textSecondary
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
             }
             .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(theme.colors.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(theme.colors.border.opacity(0.8), lineWidth: 1)
-            }
+            .dashboardContentSurface(cornerRadius: 12, border: theme.colors.border)
             .contentShape(Rectangle())
         }
         .frame(minHeight: JovieTokens.minimumHitTarget)

@@ -113,10 +113,20 @@ struct DashboardBodyScoreHeroCard: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let deltaText {
-                    GlassChip(
-                        icon: deltaIcon(for: deltaText),
-                        text: deltaText,
-                        color: deltaColor(for: deltaText)
+                    HStack(spacing: 6) {
+                        Image(systemName: deltaIcon(for: deltaText))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(deltaColor(for: deltaText).opacity(0.8))
+                        Text(deltaText)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(deltaColor(for: deltaText).opacity(0.9))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .dashboardChromeGlass(
+                        in: Capsule(style: .continuous),
+                        cornerRadius: 999,
+                        tint: deltaColor(for: deltaText)
                     )
                 }
             }
@@ -143,16 +153,22 @@ struct DashboardBodyScoreHeroCard: View {
 
     private func heroStatTile(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title.uppercased())
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color.liquidTextPrimary.opacity(0.6))
-                .lineLimit(1)
+            DSMetricLabel(
+                text: title.uppercased(),
+                size: .system(size: 12),
+                weight: .semibold,
+                color: Color.liquidTextPrimary.opacity(0.6)
+            )
+            .lineLimit(1)
 
-            Text(value)
-                .font(.system(size: 19, weight: .bold, design: .default))
-                .foregroundColor(Color.liquidTextPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.68)
+            DSMetricValue(
+                value: value,
+                unit: nil,
+                size: .system(size: 19, weight: .bold, design: .default),
+                color: Color.liquidTextPrimary
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.68)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

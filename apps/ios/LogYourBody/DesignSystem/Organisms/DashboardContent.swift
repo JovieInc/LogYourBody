@@ -156,13 +156,11 @@ struct DashboardContent: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(displayMode == .photo ? .white : .white.opacity(0.4))
                 .frame(width: 44, height: 44)
-                .background(
-                    Circle()
-                        .fill(displayMode == .photo ? Color.appPrimary : Color.black.opacity(0.3))
-                )
-                .overlay(
-                    Circle()
-                        .strokeBorder(displayMode == .photo ? Color.liquidAccent : Color.clear, lineWidth: 2)
+                .dashboardChromeGlass(
+                    in: Circle(),
+                    cornerRadius: 22,
+                    tint: displayMode == .photo ? Color.appPrimary : .white,
+                    tintOpacity: displayMode == .photo ? 0.28 : 0.12
                 )
         }
     }
@@ -181,14 +179,19 @@ struct DashboardContent: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 8)
-                .background(Capsule().fill(Color.appPrimary))
+                .dashboardChromeGlass(
+                    in: Capsule(style: .continuous),
+                    cornerRadius: 999,
+                    tint: Color.appPrimary,
+                    tintOpacity: 0.28
+                )
             } else {
                 // Icon only when photo exists
                 Image(systemName: "camera.fill")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white)
                     .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.black.opacity(0.5)))
+                    .dashboardChromeGlass(in: Circle(), cornerRadius: 18)
             }
         }
     }
@@ -204,7 +207,6 @@ struct DashboardContent: View {
             .padding(.horizontal, 20)
         }
         .padding(.vertical, 12)
-        .background(Color.appCard.opacity(0.5))
     }
 
     // MARK: - Calculations

@@ -282,8 +282,6 @@ struct DashboardViewLiquid: View {
             .navigationDestination(isPresented: $isStatsDestinationActive) {
                 photoTimelineStatsDestination
             }
-            .toolbarBackground(theme.materials.glassUltraThin, for: ToolbarPlacement.tabBar)
-            .toolbarBackground(Visibility.visible, for: ToolbarPlacement.tabBar)
             .onScreenshot {
                 guard selectedTab == .home else { return }
                 guard !isMetricDetailActive else { return }
@@ -626,6 +624,7 @@ struct DashboardViewLiquid: View {
             }
             .tint(theme.colors.primary)
             .accessibilityIdentifier("legacy_full_dashboard_beta")
+            .modifier(DashboardLegacyTabBarChromeModifier())
         }
     }
 

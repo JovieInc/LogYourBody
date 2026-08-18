@@ -409,9 +409,10 @@ struct PhotoAnchoredTimelineSlider: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(hasPreviousPhoto ? .white : .white.opacity(0.3))
                             .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(Color.white.opacity(hasPreviousPhoto ? 0.1 : 0.05))
+                            .dashboardChromeGlass(
+                                in: Circle(),
+                                cornerRadius: 16,
+                                tintOpacity: hasPreviousPhoto ? 0.14 : 0.06
                             )
                     }
                     .disabled(!hasPreviousPhoto)
@@ -439,9 +440,10 @@ struct PhotoAnchoredTimelineSlider: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(hasNextPhoto ? .white : .white.opacity(0.3))
                             .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(Color.white.opacity(hasNextPhoto ? 0.1 : 0.05))
+                            .dashboardChromeGlass(
+                                in: Circle(),
+                                cornerRadius: 16,
+                                tintOpacity: hasNextPhoto ? 0.14 : 0.06
                             )
                     }
                     .disabled(!hasNextPhoto)

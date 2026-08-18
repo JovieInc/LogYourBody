@@ -145,11 +145,13 @@ struct ProgressTimelineView: View {
                 )
         } else {
             label
-                .background(.ultraThinMaterial, in: Capsule(style: .continuous))
-                .overlay {
-                    Capsule(style: .continuous)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                }
+                .systemBGlassSurface(
+                    cornerRadius: 999,
+                    tint: Color.liquidAccent,
+                    tintOpacity: 0.035,
+                    borderColor: Color.white.opacity(0.2),
+                    borderOpacity: 1
+                )
         }
     }
 
@@ -171,7 +173,7 @@ struct ProgressTimelineView: View {
                 in: Capsule(style: .continuous)
             )
         } else {
-            track.background(.ultraThinMaterial, in: Capsule(style: .continuous))
+            track
         }
     }
 
@@ -250,7 +252,7 @@ struct ProgressTimelineView: View {
                 in: Capsule(style: .continuous)
             )
         } else {
-            handle.background(.ultraThinMaterial, in: Capsule(style: .continuous))
+            handle
         }
     }
 
