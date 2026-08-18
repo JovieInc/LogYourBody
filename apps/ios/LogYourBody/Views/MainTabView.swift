@@ -973,31 +973,20 @@ struct ChatTabView: View {
         .padding(.leading, JovieTokens.compactInset)
         .padding(.trailing, JovieTokens.tightGap)
         .padding(.vertical, JovieTokens.tightGap)
+        .dashboardChromeGlass(
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
+            cornerRadius: cornerRadius,
+            tint: isComposerFocused ? theme.colors.primary : .white,
+            tintOpacity: isComposerFocused ? 0.16 : 0.1
+        )
         .background {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(theme.colors.surface.opacity(JovieTokens.hairlineOpacity))
-
             Color.clear
                 .accessibilityElement()
                 .accessibilityLabel("Chat composer container")
                 .accessibilityIdentifier("chat_composer_shell")
         }
-        .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(
-                    (isComposerFocused ? theme.colors.primary : theme.colors.border)
-                        .opacity(JovieTokens.hairlineOpacity),
-                    lineWidth: 1
-                )
-        }
         .padding(.horizontal, JovieTokens.screenInset)
         .padding(.vertical, JovieTokens.itemGap)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(theme.colors.border.opacity(JovieTokens.hairlineOpacity))
-                .frame(height: 1)
-        }
         .onPreferenceChange(ChatComposerTextHeightPreferenceKey.self) { height in
             composerTextHeight = height
         }

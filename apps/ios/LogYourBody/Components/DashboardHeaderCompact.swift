@@ -61,9 +61,11 @@ struct DashboardHeaderCompact: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(Color.white)
                         .frame(width: 28, height: 28)
-                        .background(
-                            Circle()
-                                .fill(Color.appPrimary)
+                        .dashboardChromeGlass(
+                            in: Circle(),
+                            cornerRadius: 14,
+                            tint: Color.appPrimary,
+                            tintOpacity: 0.28
                         )
                 }
                 .frame(width: 44, height: 44)
@@ -85,13 +87,8 @@ struct DashboardHeaderCompact: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
-                                .background(Color.white.opacity(0.06))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 999)
-                                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                                )
                                 .foregroundColor(Color.liquidTextPrimary.opacity(0.8))
-                                .clipShape(Capsule())
+                                .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
                         }
                         .buttonStyle(.plain)
                         .frame(minHeight: 44)
@@ -105,13 +102,8 @@ struct DashboardHeaderCompact: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
-                                .background(Color.white.opacity(0.06))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 999)
-                                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                                )
                                 .foregroundColor(Color.liquidTextPrimary.opacity(0.8))
-                                .clipShape(Capsule())
+                                .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
                         }
                         .buttonStyle(.plain)
                         .frame(minHeight: 44)
@@ -192,13 +184,11 @@ struct DashboardHeaderCompact: View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(syncStatusColor.opacity(0.42), lineWidth: 1)
+            .dashboardChromeGlass(
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous),
+                cornerRadius: 14,
+                tint: syncStatusColor,
+                tintOpacity: 0.16
             )
         }
         .buttonStyle(.plain)

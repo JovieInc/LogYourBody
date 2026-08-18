@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct DashboardFFMITile: View {
+    @Environment(\.theme) private var theme
+
     let currentMetric: BodyMetrics?
     let bodyMetrics: [BodyMetrics]
     let heightInches: Double?
@@ -8,50 +10,60 @@ struct DashboardFFMITile: View {
     let animatedFFMI: Double
 
     var body: some View {
-        CompactGlassCard {
-            HStack(spacing: 12) {
-                // Left: Value and goal
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("FFMI")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(Color.liquidTextPrimary.opacity(0.85))
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                DSMetricLabel(
+                    text: "FFMI",
+                    size: .system(size: 15),
+                    weight: .semibold,
+                    color: theme.colors.text.opacity(0.85)
+                )
 
-                    if let metric = currentMetric,
-                       let ffmiData = ffmiData(for: metric) {
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(String(format: "%.1f", animatedFFMI))
-                                .font(.system(size: 28, weight: .bold))
-                                .tracking(-0.3)
-                                .foregroundColor(Color.liquidTextPrimary)
-                                .monospacedDigit()
-
-                            if ffmiData.isInterpolated || ffmiData.isLastKnown {
-                                DSInterpolationIcon(
-                                    confidenceLevel: ffmiData.confidenceLevel,
-                                    isLastKnown: ffmiData.isLastKnown
-                                )
-                            }
-                        }
-                        Text("of \(String(format: "%.0f", ffmiGoal))")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.70))
-                    } else {
-                        Text("—")
-                            .font(.system(size: 28, weight: .bold))
-                            .tracking(-0.3)
-                            .foregroundColor(Color.liquidTextPrimary.opacity(0.30))
-                    }
-                }
-
-                Spacer()
-
-                // Right: Progress bar
                 if let metric = currentMetric,
                    let ffmiData = ffmiData(for: metric) {
-                    ffmiProgressBar(current: ffmiData.value, goal: ffmiGoal)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        DSMetricValue(
+                            value: String(format: "%.1f", animatedFFMI),
+                            unit: nil,
+                            size: .system(size: 28, weight: .bold),
+                            color: theme.colors.text
+                        )
+                        .tracking(-0.3)
+                        .monospacedDigit()
+
+                        if ffmiData.isInterpolated || ffmiData.isLastKnown {
+                            DSInterpolationIcon(
+                                confidenceLevel: ffmiData.confidenceLevel,
+                                isLastKnown: ffmiData.isLastKnown
+                            )
+                        }
+                    }
+                    DSMetricLabel(
+                        text: "of \(String(format: "%.0f", ffmiGoal))",
+                        size: .system(size: 12),
+                        weight: .medium,
+                        color: theme.colors.text.opacity(0.70)
+                    )
+                } else {
+                    DSMetricValue(
+                        value: "—",
+                        unit: nil,
+                        size: .system(size: 28, weight: .bold),
+                        color: theme.colors.text.opacity(0.30)
+                    )
+                    .tracking(-0.3)
                 }
             }
+
+            Spacer()
+
+            if let metric = currentMetric,
+               let ffmiData = ffmiData(for: metric) {
+                ffmiProgressBar(current: ffmiData.value, goal: ffmiGoal)
+            }
         }
+        .padding(12)
+        .dashboardContentSurface(cornerRadius: theme.radius.card, border: theme.colors.border)
     }
 
     private func ffmiData(for metric: BodyMetrics) -> InterpolatedMetric? {

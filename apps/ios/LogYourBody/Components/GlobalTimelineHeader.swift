@@ -31,10 +31,7 @@ struct GlobalTimelineHeader: View {
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.15))
-                    )
+                    .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
             }
             .buttonStyle(.plain)
             .frame(minHeight: 44)

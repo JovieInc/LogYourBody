@@ -52,13 +52,7 @@ extension DashboardViewLiquid {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .systemBGlassSurface(
-            cornerRadius: theme.radius.card,
-            tint: theme.colors.text,
-            tintOpacity: 0.025,
-            borderColor: theme.colors.border,
-            borderOpacity: 0.85
-        )
+        .dashboardContentSurface(cornerRadius: theme.radius.card, border: theme.colors.border)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("photo_timeline_hud_phase_insight")
         .accessibilityLabel(phaseInsightAccessibilityLabel(for: insight))
@@ -119,13 +113,7 @@ extension DashboardViewLiquid {
                     .background(Capsule().fill(theme.colors.text))
             }
             .padding(14)
-            .systemBGlassSurface(
-                cornerRadius: theme.radius.card,
-                tint: theme.colors.text,
-                tintOpacity: 0.025,
-                borderColor: theme.colors.border,
-                borderOpacity: 0.85
-            )
+            .dashboardContentSurface(cornerRadius: theme.radius.card, border: theme.colors.border)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("photo_timeline_hud_glp1_weekly_checkin")

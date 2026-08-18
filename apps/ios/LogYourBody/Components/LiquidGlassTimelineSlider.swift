@@ -51,32 +51,18 @@ struct LiquidGlassTimelineSlider: View {
 
                     Spacer()
 
-                    // Photo indicator with glass badge
-                    ZStack {
-                        // Glass background
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                Capsule()
-                                    .fill(Color.white.opacity(0.05))
-                            )
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
-                            )
+                    HStack(spacing: 6) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.appPrimary)
 
-                        HStack(spacing: 6) {
-                            Image(systemName: "camera.fill")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.appPrimary)
-
-                            Text("\(getCurrentPhotoPosition())/\(photoMetrics.count)")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
+                        Text("\(getCurrentPhotoPosition())/\(photoMetrics.count)")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white)
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
                     .fixedSize()
 
                     Spacer()
@@ -300,7 +286,7 @@ struct LiquidGlassTrack: View {
         ZStack {
             // Base glass layer
             RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
+                .fill(Color.white.opacity(0.08))
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
                         .fill(Color.white.opacity(0.03))
@@ -405,7 +391,7 @@ struct LiquidGlassThumb: View {
 
             // Glass sphere
             Circle()
-                .fill(.ultraThinMaterial)
+                .fill(Color.white.opacity(0.16))
                 .overlay(
                     Circle()
                         .fill(
@@ -477,7 +463,7 @@ struct LiquidPhotoAnchor: View {
 
             // Glass container
             Circle()
-                .fill(.ultraThinMaterial)
+                .fill(Color.white.opacity(0.12))
                 .overlay(
                     AsyncImage(url: URL(string: photoUrl)) { image in
                         image
@@ -542,17 +528,10 @@ struct GlassNavigationButton: View {
             .foregroundColor(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        Capsule()
-                            .fill(Color.white.opacity(isPressed ? 0.1 : 0.05))
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
-                    )
+            .dashboardChromeGlass(
+                in: Capsule(style: .continuous),
+                cornerRadius: 999,
+                tintOpacity: isPressed ? 0.18 : 0.12
             )
             .scaleEffect(isPressed ? 0.95 : 1.0)
         }

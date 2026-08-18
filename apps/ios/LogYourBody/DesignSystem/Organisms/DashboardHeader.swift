@@ -16,8 +16,6 @@ struct DashboardHeader: View {
     var onAvatarTap: (() -> Void)?
     var onStepsTap: (() -> Void)?
 
-    @Environment(\.colorScheme) var colorScheme
-
     var body: some View {
         HStack {
             // Left: Avatar and greeting
@@ -89,17 +87,7 @@ struct DashboardHeader: View {
     @ViewBuilder
     private var headerBackground: some View {
         if showLiquidGlass {
-            if #available(iOS 18.0, *) {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        Rectangle()
-                            .fill(backgroundOpacityColor)
-                    )
-            } else {
-                Rectangle()
-                    .fill(backgroundOpacityColor)
-            }
+            Color.appBackground
         }
     }
 
@@ -110,10 +98,6 @@ struct DashboardHeader: View {
                 .fill(Color.appBorder)
                 .frame(height: 0.5)
         }
-    }
-
-    private var backgroundOpacityColor: Color {
-        colorScheme == .dark ? Color.appBackground.opacity(0.8) : Color.appBackground.opacity(0.95)
     }
 }
 

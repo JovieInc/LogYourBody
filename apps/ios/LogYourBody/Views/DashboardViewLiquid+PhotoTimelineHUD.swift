@@ -90,12 +90,19 @@ extension DashboardViewLiquid {
     }
 
     private var photoTimelineRootNavigation: some View {
-        HStack(spacing: 22) {
-            photoTimelineRootNavigationButton(page: .timeline)
-
-            photoTimelineRootNavigationButton(page: .analytics)
-
-            photoTimelineRootNavigationButton(page: .chat)
+        HStack(spacing: 12) {
+            JovieSegmentedControl(
+                selection: $selectedPhotoTimelineRootPage,
+                items: [.timeline, .analytics, .chat],
+                title: { $0.navigationTitle },
+                accessibilityLabel: { $0.navigationTitle },
+                accessibilityHint: { "Shows the \($0.navigationTitle.lowercased()) page" },
+                accessibilityIdentifier: { $0.accessibilityIdentifier },
+                selectedTint: theme.colors.text,
+                selectedForeground: theme.colors.background,
+                unselectedForeground: theme.colors.textSecondary,
+                onSelection: { _ in HapticManager.shared.selection() }
+            )
 
             Spacer(minLength: 0)
 
@@ -106,6 +113,8 @@ extension DashboardViewLiquid {
                 Image(systemName: "gearshape")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(theme.colors.textSecondary)
+                    .frame(width: 32, height: 32)
+                    .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
                     .frame(width: 44, height: 44)
             }
             .accessibilityLabel("Settings")
@@ -125,42 +134,6 @@ extension DashboardViewLiquid {
             .accessibilityLabel(label)
             .accessibilityIdentifier(id)
             .allowsHitTesting(false)
-    }
-
-    private func photoTimelineRootNavigationButton(page: PhotoTimelineRootPage) -> some View {
-        let isSelected = selectedPhotoTimelineRootPage == page
-
-        return Button {
-            HapticManager.shared.selection()
-            selectedPhotoTimelineRootPage = page
-        } label: {
-            VStack(spacing: 6) {
-                Text(page.navigationTitle)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(
-                        selectedPhotoTimelineRootPage == page
-                            ? theme.colors.text
-                            : theme.colors.textSecondary
-                    )
-
-                Capsule()
-                    .fill(
-                        isSelected
-                            ? theme.colors.text
-                            : Color.clear
-                    )
-                    .frame(width: 24, height: 2)
-            }
-            .frame(minHeight: 44, alignment: .bottom)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(page.navigationTitle)
-        .accessibilityValue(isSelected ? "Selected" : "Not selected")
-        .accessibilityHint("Shows the \(page.navigationTitle.lowercased()) page")
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-        .accessibilityIdentifier(page.accessibilityIdentifier)
     }
 
     var hudTimelineSection: some View {
@@ -193,13 +166,6 @@ extension DashboardViewLiquid {
             )
         }
         .padding(.vertical, 8)
-        .systemBGlassSurface(
-            cornerRadius: theme.radius.card,
-            tint: theme.colors.text,
-            tintOpacity: 0.025,
-            borderColor: theme.colors.border,
-            borderOpacity: 0.85
-        )
         .accessibilityIdentifier("photo_timeline_hud_timeline")
     }
 
@@ -316,13 +282,7 @@ extension DashboardViewLiquid {
             }
             .padding(24)
             .frame(maxWidth: .infinity, minHeight: 420, alignment: .bottomLeading)
-            .systemBGlassSurface(
-                cornerRadius: theme.radius.card,
-                tint: theme.colors.text,
-                tintOpacity: 0.03,
-                borderColor: theme.colors.border,
-                borderOpacity: 0.9
-            )
+            .dashboardContentSurface(cornerRadius: theme.radius.card, border: theme.colors.border)
             .padding(.horizontal, 20)
 
             Spacer(minLength: 80)

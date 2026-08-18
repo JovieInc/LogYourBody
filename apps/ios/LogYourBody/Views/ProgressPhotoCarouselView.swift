@@ -21,25 +21,7 @@ struct ProgressPhotoGlassCard<Content: View>: View {
     var body: some View {
         content
             .padding(padding)
-            .background(
-                Group {
-                    if #available(iOS 18.0, *) {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: cornerRadius)
-                                    .fill(Color.white.opacity(0.05))
-                            )
-                    } else {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .fill(Color.appCard)
-                    }
-                }
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(Color.appBorder, lineWidth: 1)
-            )
+            .dashboardContentSurface(cornerRadius: cornerRadius, border: Color.appBorder)
     }
 }
 
