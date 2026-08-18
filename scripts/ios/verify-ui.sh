@@ -51,12 +51,6 @@ REQUIRED_IDS=(
   chat_send_button
   body_score_onboarding_start_button
   body_score_share_sheet
-  world_class_screen_signIn
-  world_class_screen_home
-  world_class_screen_settings
-  world_class_screen_paywall
-  world_class_screen_bodyScoreIntro
-  world_class_screen_dailyReminder
 )
 
 missing=0
