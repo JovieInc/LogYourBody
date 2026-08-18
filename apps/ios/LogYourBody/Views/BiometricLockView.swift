@@ -112,9 +112,7 @@ struct BiometricLockView: View {
             Image(systemName: biometricType.icon)
                 .font(.system(size: 48, weight: .medium))
                 .foregroundStyle(Color.jovieText)
-                .frame(width: 120, height: 120)
-                .background(Color.jovieSurfaceElevated, in: Circle())
-                .overlay(Circle().stroke(Color.jovieHairline, lineWidth: 1))
+                .frame(width: 88, height: 88)
                 .accessibilityHidden(true)
 
             VStack(spacing: 6) {
@@ -137,7 +135,6 @@ struct BiometricLockView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityElement(children: .combine)
         }
-        .padding(JovieTokens.sectionGap)
         .frame(maxWidth: 440)
         .accessibilityElement(children: .contain)
     }

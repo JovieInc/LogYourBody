@@ -90,15 +90,20 @@ struct BodyScoreBodyFatVisualView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-                            .systemBGlassSurface(
-                                cornerRadius: theme.radius.card,
-                                tint: isSelected(estimate) ? theme.colors.primary : theme.colors.text,
-                                tintOpacity: isSelected(estimate) ? 0.13 : 0.035,
-                                borderColor: isSelected(estimate) ? theme.colors.primary : theme.colors.border,
-                                borderOpacity: isSelected(estimate) ? 0.85 : 0.65,
-                                borderWidth: isSelected(estimate) ? 2 : 1
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.controlHeight, alignment: .leading)
+                            .background(
+                                isSelected(estimate) ? theme.colors.surfaceSecondary : theme.colors.surface,
+                                in: RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
                             )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
+                                    .stroke(
+                                        isSelected(estimate)
+                                            ? theme.colors.text.opacity(0.9)
+                                            : theme.colors.border.opacity(JovieTokens.hairlineOpacity),
+                                        lineWidth: isSelected(estimate) ? 1.5 : 1
+                                    )
+                            }
                         }
                         .buttonStyle(.plain)
                         .jovieTouchTarget()

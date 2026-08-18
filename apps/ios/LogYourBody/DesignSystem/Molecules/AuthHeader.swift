@@ -19,7 +19,7 @@ struct AuthHeader: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: JovieTokens.itemGap) {
             Text(title)
                 .font(theme.typography.displayMedium)
                 .foregroundColor(theme.colors.text)
@@ -32,7 +32,7 @@ struct AuthHeader: View {
                     .multilineTextAlignment(.center)
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, JovieTokens.screenInset)
         .fixedSize(horizontal: false, vertical: true)
     }
 }
@@ -50,7 +50,7 @@ struct AuthServiceStatusBanner: View {
     let onRetry: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
             if let errorMessage {
                 Label("Connection unavailable", systemImage: "exclamationmark.triangle.fill")
                     .font(theme.typography.labelMedium)
@@ -67,8 +67,7 @@ struct AuthServiceStatusBanner: View {
                     configuration: ButtonConfiguration(
                         style: .custom(background: .jovieSurfaceElevated, foreground: .jovieText),
                         isLoading: isRetrying,
-                        fullWidth: true,
-                        cornerRadius: JovieTokens.controlRadius
+                        fullWidth: true
                     ),
                     action: onRetry
                 )
@@ -87,14 +86,6 @@ struct AuthServiceStatusBanner: View {
                 .accessibilityLabel("Connecting to sign-in service")
             }
         }
-        .padding(16)
-        .systemBGlassSurface(
-            cornerRadius: JovieTokens.cardRadius,
-            tint: errorMessage == nil ? theme.colors.info : theme.colors.error,
-            tintOpacity: 0.08,
-            borderColor: errorMessage == nil ? theme.colors.info : theme.colors.error,
-            borderOpacity: 0.3
-        )
     }
 }
 

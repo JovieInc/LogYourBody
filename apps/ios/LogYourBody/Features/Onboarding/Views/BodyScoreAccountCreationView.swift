@@ -46,12 +46,15 @@ struct BodyScoreAccountCreationView: View {
                         if viewModel.isCreatingAccount {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.background))
+                        } else {
+                            Image(systemName: "apple.logo")
                         }
                         Text(viewModel.isCreatingAccount ? "Opening Apple…" : "Continue with Apple")
                     }
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
                 .disabled(!viewModel.canContinueAccountCreation || viewModel.isCreatingAccount)
+                .jovieTouchTarget()
                 .accessibilityValue(viewModel.isCreatingAccount ? "Creating account" : "")
             }
         )

@@ -77,26 +77,20 @@ struct OnboardingSegmentedControl<Option: Hashable & CustomStringConvertible>: V
                         .frame(minHeight: JovieTokens.compactControlHeight)
                         .foregroundStyle(selection == option ? theme.colors.text : theme.colors.textSecondary)
                         .systemBGlassSurface(
-                            cornerRadius: theme.radius.input,
+                            cornerRadius: JovieTokens.controlHeight,
                             tint: selection == option ? theme.colors.primary : theme.colors.text,
-                            tintOpacity: selection == option ? 0.28 : 0.02,
+                            tintOpacity: selection == option ? 0.22 : 0.03,
                             borderColor: selection == option ? theme.colors.primary : theme.colors.border,
-                            borderOpacity: selection == option ? 0.9 : 0.5
+                            borderOpacity: selection == option ? 0.9 : 0.45
                         )
+                        .clipShape(Capsule(style: .continuous))
                 })
                 .buttonStyle(.plain)
+                .jovieTouchTarget()
                 .accessibilityValue(selection == option ? "Selected" : "Not selected")
                 .accessibilityAddTraits(selection == option ? .isSelected : [])
             }
         }
-        .padding(theme.spacing.xxs)
-        .systemBGlassSurface(
-            cornerRadius: theme.radius.input,
-            tint: theme.colors.text,
-            tintOpacity: 0.02,
-            borderColor: theme.colors.border,
-            borderOpacity: 0.45
-        )
     }
 }
 
@@ -146,14 +140,15 @@ struct OnboardingTextFieldRow: View {
                 .textInputAutocapitalization(.never)
                 .focused($isFocused)
                 .padding(.horizontal, theme.spacing.sm)
-                .frame(minHeight: JovieTokens.compactControlHeight)
+                .frame(minHeight: JovieTokens.controlHeight)
                 .systemBGlassSurface(
-                    cornerRadius: theme.radius.input,
+                    cornerRadius: JovieTokens.controlHeight,
                     tint: isFocused ? theme.colors.primary : theme.colors.text,
                     tintOpacity: isFocused ? 0.07 : 0.03,
                     borderColor: isFocused ? theme.colors.primary : theme.colors.border,
                     borderOpacity: isFocused ? 0.9 : 0.65
                 )
+                .clipShape(Capsule(style: .continuous))
         }
     }
 }
@@ -198,14 +193,7 @@ struct OnboardingValueRow: View {
                 .jovieTouchTarget()
             }
         }
-        .padding(theme.spacing.md)
-        .systemBGlassSurface(
-            cornerRadius: theme.radius.card,
-            tint: theme.colors.text,
-            tintOpacity: 0.035,
-            borderColor: theme.colors.border,
-            borderOpacity: 0.55
-        )
+        .padding(.vertical, theme.spacing.xs)
     }
 }
 
@@ -242,14 +230,6 @@ struct OnboardingFormSection<Content: View>: View {
             VStack(spacing: theme.spacing.md) {
                 content
             }
-            .padding(theme.spacing.md)
-            .systemBGlassSurface(
-                cornerRadius: theme.radius.card,
-                tint: theme.colors.text,
-                tintOpacity: 0.035,
-                borderColor: theme.colors.border,
-                borderOpacity: 0.6
-            )
         }
     }
 }
@@ -423,12 +403,13 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
                         .foregroundStyle(theme.colors.text)
                         .padding(theme.spacing.xs)
                         .systemBGlassSurface(
-                            cornerRadius: theme.radius.input,
+                            cornerRadius: JovieTokens.controlHeight,
                             tint: theme.colors.text,
                             tintOpacity: 0.05,
                             borderColor: theme.colors.border,
                             borderOpacity: 0.5
                         )
+                        .clipShape(Circle())
                 })
                 .buttonStyle(.plain)
                 .jovieTouchTarget()

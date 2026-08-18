@@ -44,7 +44,7 @@ struct LegalConsentView: View {
                 VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
                     header
 
-                    VStack(spacing: 8) {
+                    VStack(spacing: JovieTokens.itemGap) {
                         LegalConsentCheckbox(
                             isChecked: $acceptedTerms,
                             agreement: "I accept the Terms of Service",
@@ -60,15 +60,6 @@ struct LegalConsentView: View {
                             linkHint: "Opens the Privacy Policy.",
                             onLinkTap: { showPrivacySheet = true }
                         )
-                    }
-                    .padding(12)
-                    .background(
-                        Color.jovieSurface,
-                        in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
-                            .stroke(Color.jovieHairline.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
                     }
 
                     Text("You can review these documents again in Settings.")
@@ -130,8 +121,7 @@ struct LegalConsentView: View {
                     style: .custom(background: .jovieAction, foreground: .jovieActionText),
                     isLoading: isLoading,
                     isEnabled: canContinue,
-                    fullWidth: true,
-                    cornerRadius: JovieTokens.controlRadius
+                    fullWidth: true
                 ),
                 action: accept
             )
@@ -167,25 +157,14 @@ private struct LegalConsentCheckbox: View {
     let onLinkTap: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Button(action: { isChecked.toggle() }, label: {
-                Image(systemName: isChecked ? "checkmark" : "square")
-                    .font(.system(.body, design: .default).weight(.semibold))
-                    .foregroundColor(isChecked ? .jovieActionText : .jovieTextSecondary)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(isChecked ? Color.jovieAction : Color.jovieSurfaceElevated)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .stroke(isChecked ? Color.clear : Color.jovieHairline, lineWidth: 1)
-                    )
-                    .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
-            })
-            .buttonStyle(.plain)
+        HStack(alignment: .center, spacing: 12) {
+            Toggle(isOn: $isChecked) {
+                EmptyView()
+            }
+            .labelsHidden()
+            .tint(Color.jovieAction)
+            .jovieTouchTarget()
             .accessibilityLabel(agreement)
-            .accessibilityValue(isChecked ? "Selected" : "Not selected")
             .accessibilityHint("Required to continue.")
 
             Button(action: onLinkTap) {
@@ -194,9 +173,10 @@ private struct LegalConsentCheckbox: View {
                     .foregroundColor(.jovieText)
                     .underline()
                     .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
+            .jovieTouchTarget()
             .accessibilityHint(linkHint)
         }
         .fixedSize(horizontal: false, vertical: true)

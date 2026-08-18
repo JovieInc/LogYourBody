@@ -142,7 +142,7 @@ struct BaseTextField: View {
                                 .foregroundColor(.appTextSecondary)
                         })
                         .buttonStyle(PlainButtonStyle())
-                        .frame(minWidth: 44, minHeight: 44)
+                        .jovieTouchTarget()
                         .accessibilityLabel(isSecureTextVisible ? "Hide password" : "Show password")
                     }
 

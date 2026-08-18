@@ -108,12 +108,13 @@ struct BodyScoreHeightView: View {
             .padding(.horizontal, 18)
             .frame(minHeight: JovieTokens.controlHeight)
             .systemBGlassSurface(
-                cornerRadius: theme.radius.input,
+                cornerRadius: JovieTokens.controlHeight,
                 tint: centimetersFocused ? theme.colors.primary : theme.colors.text,
                 tintOpacity: centimetersFocused ? 0.07 : 0.03,
                 borderColor: centimetersFocused ? theme.colors.primary : theme.colors.border,
                 borderOpacity: centimetersFocused ? 0.9 : 0.65
             )
+            .clipShape(Capsule(style: .continuous))
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     self.centimetersFocused = true
@@ -168,13 +169,6 @@ struct BodyScoreHeightView: View {
                 }
             }
             .frame(height: 160)
-            .systemBGlassSurface(
-                cornerRadius: 20,
-                tint: theme.colors.text,
-                tintOpacity: 0.03,
-                borderColor: theme.colors.border,
-                borderOpacity: 0.65
-            )
 
             Text("We’ll convert everything into centimeters automatically.")
                 .font(OnboardingTypography.caption)

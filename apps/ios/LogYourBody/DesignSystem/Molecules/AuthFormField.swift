@@ -42,7 +42,7 @@ struct AuthFormField: View {
                     showToggle: isSecure,
                     errorMessage: validationMessage,
                     helperText: helperText,
-                    cornerRadius: theme.radius.input,
+                    cornerRadius: JovieTokens.controlHeight,
                     accessibilityLabel: label,
                     accessibilityIdentifier: accessibilityIdentifier,
                     messageAccessibilityIdentifier: accessibilityIdentifier.map { "\($0)_validation_message" }
@@ -54,12 +54,13 @@ struct AuthFormField: View {
                 onSubmit: onSubmit
             )
             .systemBGlassSurface(
-                cornerRadius: theme.radius.input,
+                cornerRadius: JovieTokens.controlHeight,
                 tint: theme.colors.text,
                 tintOpacity: 0.03,
                 borderColor: validationMessage == nil ? theme.colors.border : theme.colors.error,
                 borderOpacity: validationMessage == nil ? 0.65 : 0.8
             )
+            .clipShape(Capsule(style: .continuous))
             .disabled(isDisabled)
         }
     }

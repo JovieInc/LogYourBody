@@ -67,8 +67,8 @@ struct ButtonConfiguration {
 
         var height: CGFloat {
             switch self {
-            case .small: return 36
-            case .medium: return 48
+            case .small: return JovieTokens.compactControlHeight
+            case .medium: return JovieTokens.controlHeight
             case .large: return 56
             case .custom(let height, _, _): return height
             }
@@ -119,8 +119,12 @@ struct BaseButton<Label: View>: View {
         configuration.isEnabled && !configuration.isLoading && isEnvironmentEnabled
     }
 
+    private var usesCapsule: Bool {
+        configuration.cornerRadius == nil
+    }
+
     private var cornerRadius: CGFloat {
-        configuration.cornerRadius ?? JovieTokens.controlRadius
+        configuration.cornerRadius ?? JovieTokens.controlHeight
     }
 
     private var labelTextStyle: Font.TextStyle {
@@ -145,14 +149,16 @@ struct BaseButton<Label: View>: View {
                 .frame(minHeight: minimumHeight)
                 .padding(.horizontal, configuration.size.padding.leading)
                 .background(backgroundView)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .clipShape(buttonShape)
                 .overlay(borderOverlay)
-                .scaleEffect(reduceMotion ? 1 : (isPressed || configuration.isLoading ? 0.98 : 1.0))
+                .contentShape(buttonShape)
+                .scaleEffect(reduceMotion ? 1 : (isPressed || configuration.isLoading ? 0.96 : 1.0))
                 .opacity(isEnabled ? 1.0 : 0.6)
                 .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: isPressed)
                 .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: configuration.isLoading)
         })
         .buttonStyle(PlainButtonStyle())
+        .jovieTouchTarget()
         .disabled(!isEnabled)
         .onLongPressGesture(
             minimumDuration: 0,
@@ -185,11 +191,18 @@ struct BaseButton<Label: View>: View {
         configuration.style.backgroundColor
     }
 
+    private var buttonShape: AnyShape {
+        if usesCapsule {
+            AnyShape(Capsule(style: .continuous))
+        } else {
+            AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
+    }
+
     @ViewBuilder
     private var borderOverlay: some View {
         if let borderColor = configuration.style.borderColor {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(borderColor, lineWidth: 1.5)
+            buttonShape.stroke(borderColor, lineWidth: 1)
         }
     }
 
@@ -286,8 +299,8 @@ struct BaseIconButton: View {
                             }
                         )
                 )
-                .frame(minWidth: JovieTokens.minimumHitTarget, minHeight: JovieTokens.minimumHitTarget)
-                .scaleEffect(reduceMotion ? 1 : (isPressed ? 0.9 : 1.0))
+                .jovieTouchTarget()
+                .scaleEffect(reduceMotion ? 1 : (isPressed ? 0.96 : 1.0))
                 .opacity(isEnabled ? 1.0 : 0.6)
                 .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: isPressed)
         })

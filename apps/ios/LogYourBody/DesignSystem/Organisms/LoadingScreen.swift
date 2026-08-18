@@ -98,7 +98,7 @@ struct CompactLoadingScreen: View {
 
     var body: some View {
         if isLoading {
-            VStack(spacing: 16) {
+            VStack(spacing: JovieTokens.itemGap) {
                 DSCircularProgress(
                     progress: showProgress ? progress : 0.75,
                     size: 50,
@@ -112,10 +112,7 @@ struct CompactLoadingScreen: View {
                     color: .appTextSecondary
                 )
             }
-            .padding(24)
-            .background(Color.appCard)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+            .padding(JovieTokens.compactInset)
         }
     }
 }

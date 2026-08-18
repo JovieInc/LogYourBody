@@ -280,12 +280,13 @@ struct BodyScoreProfileDetailsView: View {
                         .padding(.horizontal, 14)
                         .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
-                            cornerRadius: theme.radius.input,
+                            cornerRadius: JovieTokens.controlHeight,
                             tint: focusedNameField == .firstName ? theme.colors.primary : theme.colors.text,
                             tintOpacity: focusedNameField == .firstName ? 0.07 : 0.03,
                             borderColor: focusedNameField == .firstName ? theme.colors.primary : theme.colors.border,
                             borderOpacity: focusedNameField == .firstName ? 0.9 : 0.65
                         )
+                        .clipShape(Capsule(style: .continuous))
                         .onSubmit {
                             handleFirstNameContinue()
                         }
@@ -313,12 +314,13 @@ struct BodyScoreProfileDetailsView: View {
                         .padding(.horizontal, 14)
                         .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
-                            cornerRadius: theme.radius.input,
+                            cornerRadius: JovieTokens.controlHeight,
                             tint: focusedNameField == .lastName ? theme.colors.primary : theme.colors.text,
                             tintOpacity: focusedNameField == .lastName ? 0.07 : 0.03,
                             borderColor: focusedNameField == .lastName ? theme.colors.primary : theme.colors.border,
                             borderOpacity: focusedNameField == .lastName ? 0.9 : 0.65
                         )
+                        .clipShape(Capsule(style: .continuous))
                         .onSubmit {
                             handleLastNameContinue()
                         }
@@ -387,12 +389,13 @@ struct BodyScoreProfileDetailsView: View {
                         .padding(.horizontal, 14)
                         .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
-                            cornerRadius: theme.radius.input,
+                            cornerRadius: JovieTokens.controlHeight,
                             tint: theme.colors.text,
                             tintOpacity: 0.03,
                             borderColor: theme.colors.border,
                             borderOpacity: 0.65
                         )
+                        .clipShape(Capsule(style: .continuous))
                         .accessibilityLabel("Height in centimeters")
                         .accessibilityHint("Enter a height between 100 and 250 centimeters.")
 
