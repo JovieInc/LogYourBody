@@ -73,4 +73,26 @@ final class ProgressPhotoAttachPolicyTests: XCTestCase {
         XCTAssertFalse(ProgressPhotoAttachPolicy.isBusy(status: .success))
         XCTAssertFalse(ProgressPhotoAttachPolicy.isBusy(status: .failed("Upload failed")))
     }
+
+    func testProgressPhotoAttachSheetPresentationMatchesDismissRules() {
+        XCTAssertEqual(
+            ProgressPhotoAttachPolicy.canDismiss(status: .ready),
+            NativeSheetPresentationPolicy.canDismissProgressPhotoAttach(status: .ready)
+        )
+        XCTAssertTrue(ProgressPhotoAttachPolicy.canDismiss(status: .empty))
+        XCTAssertTrue(ProgressPhotoAttachPolicy.canDismiss(status: .ready))
+        XCTAssertTrue(ProgressPhotoAttachPolicy.canDismiss(status: .success))
+        XCTAssertFalse(ProgressPhotoAttachPolicy.canDismiss(status: .processing))
+        XCTAssertEqual(
+            NativeSheetPresentationPolicy.detents(for: .progressPhotoAttach),
+            [.medium, .large]
+        )
+        XCTAssertEqual(
+            NativeSheetPresentationPolicy.dragIndicator(for: .progressPhotoAttach),
+            .visible
+        )
+        XCTAssertTrue(NativeSheetPresentationPolicy.presentsCameraAsFullScreenCover(.progressPhotoAttach))
+        XCTAssertTrue(NativeSheetPresentationPolicy.presentsCameraAsFullScreenCover(.camera))
+        XCTAssertFalse(NativeSheetPresentationPolicy.usesCustomGrabber(.progressPhotoAttach))
+    }
 }

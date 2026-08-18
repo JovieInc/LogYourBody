@@ -5,6 +5,12 @@
 import SwiftUI
 import UIKit
 
+enum BulkPhotoImportPresentationPolicy {
+    static func canConfirmImport(selectedCount: Int, isImporting: Bool) -> Bool {
+        selectedCount > 0 && !isImporting
+    }
+}
+
 struct BulkPhotoImportView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.theme) private var theme
@@ -47,25 +53,27 @@ struct BulkPhotoImportView: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.jovieCanvas
-                .ignoresSafeArea()
-
-            content
-        }
+        content
         .navigationTitle("Import Photos")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 if !scanner.scannedPhotos.isEmpty && !isImporting {
-                    Button(allPhotosSelected ? "Clear" : "Select All") {
-                        if allPhotosSelected {
-                            selectedPhotos.removeAll()
-                        } else {
+                    Menu {
+                        Button("Select All", systemImage: "checkmark.circle") {
                             selectedPhotos = Set(scanner.scannedPhotos.map { $0.id })
                         }
+                        .disabled(allPhotosSelected)
+
+                        Button("Clear", systemImage: "xmark.circle") {
+                            selectedPhotos.removeAll()
+                        }
+                        .disabled(selectedPhotos.isEmpty)
+                    } label: {
+                        Label(allPhotosSelected ? "Clear" : "Select All", systemImage: "ellipsis.circle")
                     }
                     .jovieTouchTarget()
+                    .accessibilityLabel(allPhotosSelected ? "Clear selection" : "Select photos")
                 }
             }
         }
@@ -414,6 +422,10 @@ struct BulkPhotoImportView: View {
                             icon: "square.and.arrow.down"
                         ),
                         action: {
+                            guard BulkPhotoImportPresentationPolicy.canConfirmImport(
+                                selectedCount: selectedCount,
+                                isImporting: isImporting
+                            ) else { return }
                             showImportConfirmation = true
                         }
                     )

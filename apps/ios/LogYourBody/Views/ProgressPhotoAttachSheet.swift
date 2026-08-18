@@ -70,6 +70,10 @@ struct ProgressPhotoAttachPolicy {
         }
         return false
     }
+
+    static func canDismiss(status: ProgressPhotoAttachStatus) -> Bool {
+        NativeSheetPresentationPolicy.canDismissProgressPhotoAttach(status: status)
+    }
 }
 
 struct ProgressPhotoAttachSheet: View {
@@ -90,6 +94,7 @@ struct ProgressPhotoAttachSheet: View {
     @State private var attachStatus: ProgressPhotoAttachStatus = .empty
     @State private var isCameraPresented = false
     @State private var photoSelectionLoadID = UUID()
+    @State private var sheetDetent = NativeSheetPresentationPolicy.initialDetent(for: .progressPhotoAttach)
     @AccessibilityFocusState private var isStatusFocused: Bool
 
     private var targetDate: Date {
@@ -120,43 +125,43 @@ struct ProgressPhotoAttachSheet: View {
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
-                ZStack {
-                    Color.jovieCanvas.ignoresSafeArea()
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
-                            header
-                            previewPane(height: previewHeight(for: geometry.size.height))
-                            statusPane
-                            actionPane
-                        }
-                        .padding(.horizontal, JovieTokens.screenInset)
-                        .padding(.top, JovieTokens.itemGap)
-                        .padding(.bottom, JovieTokens.itemGap)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+                        header
+                        previewPane(height: previewHeight(for: geometry.size.height))
+                        statusPane
+                        actionPane
                     }
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.top, JovieTokens.itemGap)
+                    .padding(.bottom, JovieTokens.itemGap)
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     attachButton
                         .padding(.horizontal, JovieTokens.screenInset)
                         .padding(.vertical, JovieTokens.itemGap)
-                        .background(Color.jovieCanvas.opacity(0.96))
                 }
             }
             .navigationTitle("Progress Photo")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
                     .disabled(isBusy)
                 }
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    photoSourceMenu
+                }
             }
-            .sheet(isPresented: $isCameraPresented) {
+            .fullScreenCover(isPresented: $isCameraPresented) {
                 CameraView { image in
                     handleCameraImage(image)
                 }
             }
+            .interactiveDismissDisabled(!ProgressPhotoAttachPolicy.canDismiss(status: attachStatus))
             .onAppear {
                 updateInitialPermissionState()
             }
@@ -164,8 +169,30 @@ struct ProgressPhotoAttachSheet: View {
                 announceStatusChange(status)
             }
         }
+        .nativeSheetChrome(for: .progressPhotoAttach, detent: $sheetDetent)
         .accessibilityIdentifier("progress_photo_attach_sheet")
         .worldClassScreen(.addProgressPhoto)
+    }
+
+    private var photoSourceMenu: some View {
+        Menu {
+            Button("Take Photo", systemImage: "camera.fill") {
+                startCameraCapture()
+            }
+            .disabled(!cameraAuthorizer.isCameraAvailable)
+
+            #if DEBUG
+            if usesProgressPhotoAttachFixture {
+                Button("Use Fixture Photo", systemImage: "testtube.2") {
+                    selectFixturePhoto()
+                }
+            }
+            #endif
+        } label: {
+            Label("Add Photo", systemImage: "plus")
+        }
+        .disabled(isBusy)
+        .accessibilityLabel("Add progress photo")
     }
 
     private var header: some View {
@@ -333,28 +360,25 @@ struct ProgressPhotoAttachSheet: View {
                     loadSelectedPhoto(assets.first)
                 }
             } label: {
-                actionRow(
-                    title: "Choose from Library",
-                    subtitle: "Select one existing progress photo",
-                    icon: "photo.fill"
-                )
+                Label("Choose from Library", systemImage: "photo.fill")
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.glass)
+            .controlSize(.large)
             .disabled(isBusy)
             .accessibilityIdentifier("progress_photo_attach_library_button")
 
             Button {
                 startCameraCapture()
             } label: {
-                actionRow(
-                    title: "Take Photo",
-                    subtitle: cameraSubtitle,
-                    icon: "camera.fill"
-                )
+                Label("Take Photo", systemImage: "camera.fill")
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.glass)
+            .controlSize(.large)
             .disabled(isBusy || !cameraAuthorizer.isCameraAvailable)
             .accessibilityIdentifier("progress_photo_attach_camera_button")
+            .accessibilityHint(cameraSubtitle)
 
             if !cameraAuthorizer.isCameraAvailable {
                 Text("Camera capture is unavailable in Simulator. Choose from Library for simulator validation.")
@@ -368,13 +392,11 @@ struct ProgressPhotoAttachSheet: View {
                 Button {
                     selectFixturePhoto()
                 } label: {
-                    actionRow(
-                        title: "Use Fixture Photo",
-                        subtitle: "Debug-only simulator image",
-                        icon: "testtube.2"
-                    )
+                    Label("Use Fixture Photo", systemImage: "testtube.2")
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.glass)
+                .controlSize(.large)
                 .disabled(isBusy)
                 .accessibilityIdentifier("progress_photo_attach_fixture_button")
             }
@@ -388,68 +410,23 @@ struct ProgressPhotoAttachSheet: View {
             : "Unavailable in Simulator"
     }
 
-    private func actionRow(title: String, subtitle: String, icon: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(.body, design: .rounded).weight(.semibold))
-                .foregroundColor(theme.colors.info)
-                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
-                .background(Circle().fill(theme.colors.info.opacity(0.12)))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(theme.typography.labelLarge)
-                    .foregroundColor(theme.colors.text)
-
-                Text(subtitle)
-                    .font(theme.typography.bodySmall)
-                    .foregroundColor(theme.colors.textSecondary)
-                    .lineLimit(2)
-            }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(.footnote, design: .default).weight(.semibold))
-                .foregroundColor(theme.colors.textSecondary)
-        }
-        .padding(.horizontal, theme.spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: theme.radius.input, style: .continuous)
-                .fill(theme.colors.surface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: theme.radius.input, style: .continuous)
-                .stroke(theme.colors.border, lineWidth: 1)
-        )
-        .jovieTouchTarget()
-    }
-
     private var attachButton: some View {
         Button {
             attachSelectedPhoto()
         } label: {
-            HStack {
-                Spacer()
-
-                if isBusy {
-                    ProgressView()
-                        .tint(.black)
-                } else if isSuccess {
-                    Label("Close", systemImage: "checkmark")
-                } else {
-                    Label("Attach Photo", systemImage: "paperclip")
-                }
-
-                Spacer()
+            if isBusy {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+            } else if isSuccess {
+                Label("Close", systemImage: "checkmark")
+                    .frame(maxWidth: .infinity)
+            } else {
+                Label("Attach Photo", systemImage: "paperclip")
+                    .frame(maxWidth: .infinity)
             }
-            .font(theme.typography.labelLarge)
-            .frame(minHeight: JovieTokens.controlHeight)
-            .background(canAttach || isSuccess ? theme.colors.interactive : theme.colors.interactiveDisabled)
-            .foregroundColor(canAttach || isSuccess ? Color.jovieActionText : theme.colors.textSecondary)
-            .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.glassProminent)
+        .controlSize(.large)
         .disabled((!canAttach && !isSuccess) || isBusy)
         .accessibilityLabel(isSuccess ? "Close progress photo" : "Attach progress photo")
         .accessibilityHint(canAttach ? "Attaches the selected photo to this timeline point" : "Choose a photo before attaching")

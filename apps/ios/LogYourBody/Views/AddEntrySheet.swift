@@ -61,6 +61,111 @@ struct PhotoUploadBatchPolicy {
     }
 }
 
+enum NativeSheetPresentationPolicy {
+    enum Surface: String, CaseIterable {
+        case addEntry
+        case addMedication
+        case progressPhotoAttach
+        case camera
+        case bugReportPrompt
+        case bugReportForm
+        case paywallLegal
+        case dailyReminder
+        case bulkPhotoImport
+    }
+
+    static func detents(for surface: Surface) -> Set<PresentationDetent> {
+        switch surface {
+        case .addEntry, .addMedication, .progressPhotoAttach, .paywallLegal:
+            return [.medium, .large]
+        case .bugReportPrompt:
+            return [.medium]
+        case .camera, .bugReportForm, .dailyReminder, .bulkPhotoImport:
+            return []
+        }
+    }
+
+    static func initialDetent(for surface: Surface) -> PresentationDetent {
+        switch surface {
+        case .bugReportPrompt:
+            return .medium
+        default:
+            return .large
+        }
+    }
+
+    static func dragIndicator(for surface: Surface) -> Visibility {
+        detents(for: surface).isEmpty ? .hidden : .visible
+    }
+
+    static func usesCustomGrabber(_ surface: Surface) -> Bool {
+        false
+    }
+
+    static func usesCustomDimOverlay(_ surface: Surface) -> Bool {
+        false
+    }
+
+    static func usesNativeNavigationChrome(_ surface: Surface) -> Bool {
+        switch surface {
+        case .camera:
+            return false
+        default:
+            return true
+        }
+    }
+
+    static func presentsCameraAsFullScreenCover(_ surface: Surface) -> Bool {
+        surface == .camera || surface == .progressPhotoAttach
+    }
+
+    static func canDismissAddEntry(isSaving: Bool, isProcessing: Bool) -> Bool {
+        PhotoUploadBatchPolicy.canDismiss(isSaving: isSaving, isProcessing: isProcessing)
+    }
+
+    static func canDismissProgressPhotoAttach(status: ProgressPhotoAttachStatus) -> Bool {
+        !ProgressPhotoAttachPolicy.isBusy(status: status)
+    }
+
+    static func canDismissAfterPhotoUpload(successfulCount: Int, totalCount: Int) -> Bool {
+        PhotoUploadBatchPolicy.shouldDismissAfterUpload(
+            successfulCount: successfulCount,
+            totalCount: totalCount
+        )
+    }
+}
+
+extension View {
+    func nativeSheetChrome(
+        for surface: NativeSheetPresentationPolicy.Surface,
+        detent: Binding<PresentationDetent>? = nil
+    ) -> some View {
+        modifier(NativeSheetChromeModifier(surface: surface, detent: detent))
+    }
+}
+
+private struct NativeSheetChromeModifier: ViewModifier {
+    let surface: NativeSheetPresentationPolicy.Surface
+    var detent: Binding<PresentationDetent>?
+
+    func body(content: Content) -> some View {
+        let detents = NativeSheetPresentationPolicy.detents(for: surface)
+        let indicator = NativeSheetPresentationPolicy.dragIndicator(for: surface)
+
+        if detents.isEmpty {
+            content
+        } else if let detent {
+            content
+                .presentationDetents(detents, selection: detent)
+                .presentationDragIndicator(indicator)
+        } else {
+            content
+                .presentationDetents(detents)
+                .presentationDragIndicator(indicator)
+        }
+    }
+}
+
 struct AddEntrySheet: View {
     @Environment(\.dismiss)
     var dismiss
@@ -120,6 +225,7 @@ struct AddEntrySheet: View {
     @State var errorMessage = ""
     @State var isSavingEntry = false
     @State var showDeletePhotosPrompt = false
+    @State var sheetDetent = NativeSheetPresentationPolicy.initialDetent(for: .addEntry)
     @AppStorage(Constants.deletePhotosAfterImportKey) var deletePhotosAfterImport = false
     @AppStorage(Constants.hasPromptedDeletePhotosKey) var hasPromptedDeletePhotos = false
 
@@ -146,6 +252,7 @@ struct Glp1AddMedicationView: View {
     @State var customDoseUnit: String = "mg/week"
     @State var customSchedule: Glp1CustomSchedule = .weekly
     @State var customScheduleDays: String = ""
+    @State var sheetDetent = NativeSheetPresentationPolicy.initialDetent(for: .addMedication)
 
     var presets: [Glp1MedicationPreset] {
         Glp1MedicationCatalog.allPresets
@@ -294,18 +401,12 @@ struct Glp1AddMedicationView: View {
                                 .modernTextFieldStyle()
                                 .accessibilityLabel("Custom compound dose unit")
 
-                            Button {
+                            Button("Use custom compound") {
                                 createCustomMedication()
-                            } label: {
-                                Text("Use custom compound")
-                                    .font(.appBodySmall)
-                                    .fontWeight(.semibold)
-                                    .frame(height: 40)
-                                    .frame(maxWidth: .infinity)
-                                    .background(customCompoundCanSave ? Color.appPrimary : Color.appBorder)
-                                    .foregroundColor(customCompoundCanSave ? .black : .white)
-                                    .cornerRadius(Constants.cornerRadius)
                             }
+                            .buttonStyle(.glassProminent)
+                            .controlSize(.large)
+                            .frame(maxWidth: .infinity)
                             .disabled(!customCompoundCanSave || isSaving)
                         }
                         .padding(.vertical, 6)
@@ -317,88 +418,53 @@ struct Glp1AddMedicationView: View {
                         customCompoundName = newValue
                     }
                 }
-
-                VStack(spacing: 8) {
-                    if errorMessage != nil {
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.error)
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Couldn't save. Check connection and try again.")
-                                    .font(.appBodySmall)
-
-                                HStack(spacing: 12) {
-                                    Button("Try again") {
-                                        if let preset = selectedPreset {
-                                            createMedication(from: preset)
-                                        }
-                                    }
-                                    .font(.appBodySmall)
-
-                                    Button("Discard", role: .destructive) {
-                                        errorMessage = nil
-                                        isSaving = false
-                                    }
-                                    .font(.appBodySmall)
-                                }
-                            }
-
-                            Spacer(minLength: 0)
-                        }
-                        .padding(12)
-                        .background(Color.black.opacity(0.9))
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.error.opacity(0.3), lineWidth: 1)
-                        )
-                    }
-
-                    HStack(spacing: 12) {
-                        Button {
-                            if let preset = selectedPreset {
-                                createMedication(from: preset)
-                            }
-                        } label: {
-                            HStack {
-                                if isSaving {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                                } else {
-                                    Text("Save medication")
-                                        .font(.appBody)
-                                        .fontWeight(.semibold)
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .frame(height: 44)
-                        .background(selectedPreset != nil ? Color.appPrimary : Color.appBorder)
-                        .foregroundColor(selectedPreset != nil ? .black : .white)
-                        .cornerRadius(Constants.cornerRadius)
-                        .disabled(selectedPreset == nil || isSaving)
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-                .background(
-                    Color.black.opacity(0.9)
-                )
             }
             .navigationTitle("Select GLP-1")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
                     .disabled(isSaving)
                 }
+
+                ToolbarItemGroup(placement: .confirmationAction) {
+                    Button("Save medication") {
+                        if let preset = selectedPreset {
+                            createMedication(from: preset)
+                        }
+                    }
+                    .disabled(selectedPreset == nil || isSaving)
+                }
             }
+            .alert("Couldn't save", isPresented: glp1SaveErrorBinding) {
+                Button("Try again") {
+                    if let preset = selectedPreset {
+                        createMedication(from: preset)
+                    }
+                }
+                Button("Discard", role: .destructive) {
+                    errorMessage = nil
+                    isSaving = false
+                }
+            } message: {
+                Text("Check connection and try again.")
+            }
+            .interactiveDismissDisabled(isSaving)
         }
+        .nativeSheetChrome(for: .addMedication, detent: $sheetDetent)
+    }
+
+    var glp1SaveErrorBinding: Binding<Bool> {
+        Binding(
+            get: { errorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    errorMessage = nil
+                }
+            }
+        )
     }
 
     var filteredPresets: [Glp1MedicationPreset] {

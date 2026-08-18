@@ -31,12 +31,10 @@ extension AddEntrySheet {
                         }
                     } label: {
                         Label("Choose Photos", systemImage: "photo.fill")
-                            .frame(height: 48)
                             .frame(maxWidth: .infinity)
-                            .background(Color.appPrimary)
-                            .foregroundColor(.white)
-                            .cornerRadius(Constants.cornerRadius)
                     }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
                     .padding(.horizontal)
                 }
                 .padding(.top, 40)

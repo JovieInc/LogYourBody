@@ -49,4 +49,18 @@ final class BulkProgressPhotoImportPolicyTests: XCTestCase {
             "Import progress photos from your photo library."
         )
     }
+
+    func testBulkImportConfirmationMatchesSelectionAndIdleRules() {
+        XCTAssertTrue(
+            BulkPhotoImportPresentationPolicy.canConfirmImport(selectedCount: 2, isImporting: false)
+        )
+        XCTAssertFalse(
+            BulkPhotoImportPresentationPolicy.canConfirmImport(selectedCount: 0, isImporting: false)
+        )
+        XCTAssertFalse(
+            BulkPhotoImportPresentationPolicy.canConfirmImport(selectedCount: 2, isImporting: true)
+        )
+        XCTAssertTrue(NativeSheetPresentationPolicy.usesNativeNavigationChrome(.bulkPhotoImport))
+        XCTAssertFalse(NativeSheetPresentationPolicy.usesCustomGrabber(.bulkPhotoImport))
+    }
 }

@@ -10,5 +10,8 @@ struct CameraView: View {
 
     var body: some View {
         PlatformCameraCaptureView(onImageCaptured: onImageCaptured)
+            .ignoresSafeArea()
+            .presentationBackground(.black)
+            .statusBarHidden()
     }
 }
