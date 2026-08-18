@@ -16,6 +16,20 @@ enum PaidAppSurfacePolicy {
     }
 }
 
+enum HomeChatChromePolicy {
+    static let pinsComposerOnHome = true
+    static let showsTabBarOnHome = false
+    static let showsChatAsPeerNavigation = false
+
+    static func shouldExpandChat(afterSendingUserMessage: Bool) -> Bool {
+        afterSendingUserMessage
+    }
+
+    static func worldClassScreen(isChatExpanded: Bool, selected: WorldClassScreen) -> WorldClassScreen {
+        isChatExpanded ? .chat : selected
+    }
+}
+
 enum PaidWeightLoggerMVPPolicy {
     static func validationMessage(weightText: String, unit: String) -> String? {
         let trimmed = weightText.trimmingCharacters(in: .whitespacesAndNewlines)
