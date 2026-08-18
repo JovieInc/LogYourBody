@@ -19,6 +19,17 @@ final class LegalConsentPolicyTests: XCTestCase {
 
     // MARK: - Continue-gate policy
 
+    func testLegalConsentUsesTheShippedEntryScreenIdentifier() {
+        XCTAssertEqual(WorldClassScreen.legalConsent.flow, .entry)
+        XCTAssertEqual(
+            WorldClassScreen.legalConsent.accessibilityIdentifier,
+            WorldClassScreen.allCases.first { $0 == .legalConsent }?.accessibilityIdentifier
+        )
+        XCTAssertTrue(
+            WorldClassScreen.legalConsent.accessibilityIdentifier.hasPrefix("world_class_screen_")
+        )
+    }
+
     func testContinueStartsDisabled() {
         XCTAssertFalse(
             LegalConsentPolicy.canContinue(acceptedTerms: false, acceptedPrivacy: false, isLoading: false)

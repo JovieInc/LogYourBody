@@ -44,6 +44,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
 
     private func completeBasicsStep(in app: XCUIApplication) {
         XCTAssertTrue(app.staticTexts["Which reference should we use?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_sexAtBirth"].exists)
 
         let continueButton = app.buttons["body_score_onboarding_basics_continue_button"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 3))
@@ -59,6 +60,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
 
     private func completeHeightStep(in app: XCUIApplication) {
         XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_height"].exists)
 
         // The UI-test fixture forces imperial units; switch to centimeters so
         // the height can be typed instead of spun in on picker wheels.
@@ -83,6 +85,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
 
     private func completeHealthConnectStep(in app: XCUIApplication) {
         XCTAssertTrue(app.staticTexts["Use what your iPhone already knows."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_appleHealth"].exists)
 
         // Synchronous path: skips the HealthKit permission sheet entirely.
         let manualEntryButton = app.buttons["body_score_onboarding_enter_manually_button"]
@@ -93,6 +96,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
 
     private func completeManualWeightStep(in app: XCUIApplication) {
         XCTAssertTrue(app.staticTexts["What’s your current weight?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_weight"].exists)
 
         // Switching the height step to centimeters also flips the preferred
         // measurement system to metric; return the weight unit to pounds.
@@ -117,6 +121,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
 
     private func completeBodyFatChoiceStep(in app: XCUIApplication) {
         XCTAssertTrue(app.staticTexts["How do you know your body fat?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_bodyFatMethod"].exists)
 
         // Selecting an option advances to the matching input step directly.
         let manualButton = app.buttons["body_score_onboarding_body_fat_manual_button"]
@@ -127,6 +132,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
 
     private func completeBodyFatNumericStep(in app: XCUIApplication) {
         XCTAssertTrue(app.staticTexts["Enter your body fat."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_bodyFatValue"].exists)
 
         let bodyFatField = app.textFields["Body fat percentage"]
         XCTAssertTrue(bodyFatField.waitForExistence(timeout: 3))
@@ -148,6 +154,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         // score calculation; waiting for the reveal is the deterministic way
         // to observe that transition without racing the spinner.
         XCTAssertTrue(app.staticTexts["You’re building from a strong base."].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_bodyScoreReveal"].exists)
         XCTAssertFalse(app.staticTexts["Building your Body Score"].exists)
 
         // The score hero is a combined accessibility element labelled

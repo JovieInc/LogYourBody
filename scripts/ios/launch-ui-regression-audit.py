@@ -224,7 +224,13 @@ def main() -> int:
         require_one_of_tokens(
             root=root,
             path=path,
-            tokens=(".systemBGlassSurface(", ".background(theme.colors.surface"),
+            tokens=(
+                ".systemBGlassSurface(",
+                ".background(theme.colors.surface",
+                ".dashboardChromeGlass(",
+                ".dashboardContentSurface(",
+                "JovieSegmentedControl(",
+            ),
             check="dashboard.theme_backed_surface",
             detail="Dashboard/HUD cards must use a theme-backed glass or flat surface treatment.",
             violations=violations,

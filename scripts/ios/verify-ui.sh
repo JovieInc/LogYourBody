@@ -51,6 +51,12 @@ REQUIRED_IDS=(
   chat_send_button
   body_score_onboarding_start_button
   body_score_share_sheet
+  world_class_screen_signIn
+  world_class_screen_home
+  world_class_screen_settings
+  world_class_screen_paywall
+  world_class_screen_bodyScoreIntro
+  world_class_screen_dailyReminder
 )
 
 missing=0
@@ -67,6 +73,28 @@ if [[ "$missing" -ne 0 ]]; then
 fi
 
 echo "UI identifier contract: ${#REQUIRED_IDS[@]} required ids present"
+
+python3 - <<'PY'
+from pathlib import Path
+import re, sys
+theme = Path("LogYourBody/DesignSystem/Theme.swift").read_text()
+block = re.search(r"enum WorldClassScreen:.*?\{(.*?)\n    var id", theme, re.S).group(1)
+screens = re.findall(r"case (\w+)", block)
+sources = "\n".join(p.read_text(errors="replace") for p in Path("LogYourBody").rglob("*.swift"))
+missing = []
+for name in screens:
+    if re.search(
+        rf"worldClassScreen\(\.{name}\)|world_class_screen_{name}|screen:\s*\.{name}\b|:\s*\.{name}\b|^\s+\.{name}\s*$",
+        sources,
+        re.M,
+    ):
+        continue
+    missing.append(name)
+if missing:
+    print("missing WorldClassScreen attachments:", ", ".join(missing), file=sys.stderr)
+    sys.exit(1)
+print(f"WorldClassScreen attachments: {len(screens)} screens present in app sources")
+PY
 
 if command -v swiftlint >/dev/null 2>&1; then
   # Config `included` still covers the whole iOS target. Keep lint advisory here

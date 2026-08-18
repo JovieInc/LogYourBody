@@ -363,6 +363,7 @@ struct PaywallView: View {
             .buttonStyle(.plain)
             .disabled(subscriptionManager.isPurchasing)
             .accessibilityIdentifier("paywall_restore_purchases_button")
+            .worldClassScreen(.restorePurchases)
 
             Button(role: .destructive) {
                 showLogoutConfirmation = true
