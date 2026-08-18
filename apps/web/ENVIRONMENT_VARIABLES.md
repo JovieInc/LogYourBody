@@ -31,6 +31,27 @@ LYB_CHAT_MODEL=gpt-4o-mini
 NEXT_PUBLIC_VERSION=local-dev
 ```
 
+## Progress photos (Cloudflare R2)
+
+Remote progress-photo uploads fail closed with HTTP 503 until every variable
+below is set. Create an R2 bucket, an S3 API token with object read/write, and
+a public delivery hostname (custom domain or r2.dev). See
+https://developers.cloudflare.com/r2/. These names are server-only; never
+prefix them with `NEXT_PUBLIC_`.
+
+```bash
+CLOUDFLARE_ACCOUNT_ID=32-char-account-id
+CLOUDFLARE_R2_ACCESS_KEY_ID=...
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
+CLOUDFLARE_R2_BUCKET=lyb-progress-photos
+CLOUDFLARE_R2_PUBLIC_BASE_URL=https://photos.logyourbody.com
+```
+
+iOS requests a short-lived signed PUT from `POST /api/auth/mobile/photos`,
+writes JPEG/PNG/WebP bytes directly to R2, then persists the public URL on the
+local body-metrics row. Account deletion removes `progress-photos/<subject>/`
+when these variables are present.
+
 ## Legacy migration variables
 
 The following variables are retained only while the remaining photo/storage,

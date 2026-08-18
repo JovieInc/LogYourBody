@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { fetchUserInfo } from '@/lib/auth/jovie-oauth';
+import { deleteOwnedProgressPhotos } from '@/lib/cloudflare/r2-progress-photo-store';
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
 import type { ProductUserRecord } from '@/lib/ports/user-directory';
 
@@ -99,6 +100,7 @@ export async function DELETE(request: NextRequest) {
   const identity = await authenticate(request);
   if (!identity) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   try {
+    await deleteOwnedProgressPhotos(identity.sub);
     await neonUserDirectory.deleteUser(identity.sub);
     return new NextResponse(null, { status: 204 });
   } catch (error) {

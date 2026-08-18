@@ -88,7 +88,7 @@ We do not sell, trade, or rent your personal information. We may share your info
    - Jovie (authentication)
    - Neon (database hosting)
    - Supabase (legacy photo processing and account-deletion helpers)
-   - Cloudinary (progress-photo storage)
+   - Cloudflare R2 (progress-photo storage)
    - Vercel (web hosting)
    - RevenueCat (subscription and purchase entitlements)
    - Sentry (error tracking and crash reporting)

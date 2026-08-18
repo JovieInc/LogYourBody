@@ -68,6 +68,10 @@ export const endpoints = {
       apiHost: 'api.cloudinary.com',
       deliveryHost: 'res.cloudinary.com',
     },
+    cloudflare: {
+      r2ApiHost: 'r2.cloudflarestorage.com',
+      r2PublicHost: 'photos.logyourbody.com',
+    },
     revenuecat: {
       apiHost: 'api.revenuecat.com',
     },
@@ -138,7 +142,7 @@ export const endpoints = {
     },
     {
       value: 'https://github.com/clerk/clerk-ios',
-      reason: 'OSS attribution in open-source-licenses.md.',
+      reason: 'Historical audit/docs remnants; Clerk is not a runtime dependency.',
     },
     {
       value: 'https://github.com/hmlongco/Factory',
@@ -182,7 +186,7 @@ export const endpoints = {
     },
     {
       value: 'https://github.com/clerk/javascript',
-      reason: 'OSS attribution in open-source-licenses.md.',
+      reason: 'Historical audit/docs remnants; Clerk is not a runtime dependency.',
     },
     {
       value: 'https://github.com/vercel/turbo',
@@ -339,6 +343,10 @@ export const endpoints = {
     {
       value: 'https://cloudinary.com',
       reason: 'Cloudinary console link in edge-function docs.',
+    },
+    {
+      value: 'https://developers.cloudflare.com',
+      reason: 'Cloudflare R2 docs referenced by the first-party photo-store setup.',
     },
     {
       value: 'https://openrouter.ai',

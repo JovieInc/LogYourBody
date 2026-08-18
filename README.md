@@ -6,14 +6,14 @@ The native paid iOS app is the default product. Web is marketing, legal, support
 
 ## Canonical architecture
 
-| Layer | Source of truth |
-| --- | --- |
-| Identity | Jovie Better Auth issuer, OAuth clients `logyourbody-ios` / `logyourbody-web`. Sign in with Apple only. No Clerk. |
-| Cloud data | Neon via first-party bearer APIs. Native never connects to Postgres. |
-| Device data | Core Data |
-| Product shell | Timeline is paid home. Stats and Chat are peers. |
-| Chat | LYB-5 bearer API (`/api/auth/mobile/chat/v1`) |
-| Photos | Object storage (Cloudinary). Neon replaces Postgres, not a CDN. |
+| Layer         | Source of truth                                                                                                   |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Identity      | Jovie Better Auth issuer, OAuth clients `logyourbody-ios` / `logyourbody-web`. Sign in with Apple only. No Clerk. |
+| Cloud data    | Neon via first-party bearer APIs. Native never connects to Postgres.                                              |
+| Device data   | Core Data                                                                                                         |
+| Product shell | Timeline is paid home. Stats and Chat are peers.                                                                  |
+| Chat          | LYB-5 bearer API (`/api/auth/mobile/chat/v1`)                                                                     |
+| Photos        | Cloudflare R2 via first-party signed PUTs. Neon stores the public URL, not the bytes.                             |
 
 JOV-4831 / PR #903 owns the remaining Neon schema/sync/delete cutover, including retiring leftover Supabase photo/export/deletion helpers.
 
