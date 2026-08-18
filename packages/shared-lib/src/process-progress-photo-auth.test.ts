@@ -16,7 +16,8 @@ describe('first-party progress photo auth boundary', () => {
     expect(photosRoute).toContain('fetchUserInfo(token)');
     expect(photosRoute).toContain("error: 'unauthorized'");
     expect(photosRoute).toContain("error: 'photo_store_unavailable'");
-    expect(photosRoute).toContain('status: 503');
+    expect(photosRoute).toContain('noStoreJson');
+    expect(photosRoute).toContain('503');
   });
 
   it('keeps native photo upload on the first-party bearer API', () => {
