@@ -46,8 +46,8 @@ extension PreferencesView {
                     icon: "trash",
                     title: "Delete account",
                     subtitle: "Permanently remove your account and data.",
-                    showChevron: true,
-                    tintColor: theme.colors.error
+                    showChevron: false,
+                    tintColor: .red
                 )
             }
             .accessibilityLabel("Delete account")
@@ -57,7 +57,6 @@ extension PreferencesView {
                     HapticManager.shared.notification(type: .error)
                 }
             )
-            .buttonStyle(.plain)
         }
     }
 

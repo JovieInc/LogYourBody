@@ -10,17 +10,11 @@ extension PreferencesView {
             header: "Tracking & goals",
             footer: "Set targets that reflect your goals."
         ) {
-            VStack(spacing: 0) {
-                measurementSystemSection
-                stepGoalRow
-
-                DSDivider().insetted(16)
-                goalRow(for: .weight)
-                DSDivider().insetted(16)
-                goalRow(for: .bodyFat)
-                DSDivider().insetted(16)
-                goalRow(for: .ffmi)
-            }
+            measurementSystemSection
+            stepGoalRow
+            goalRow(for: .weight)
+            goalRow(for: .bodyFat)
+            goalRow(for: .ffmi)
         }
     }
 

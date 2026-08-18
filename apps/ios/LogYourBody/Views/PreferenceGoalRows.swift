@@ -5,142 +5,76 @@
 import SwiftUI
 
 struct PreferenceMeasurementSystemRow: View {
-    @Environment(\.theme)
-    private var theme
-    @Environment(\.dynamicTypeSize)
-    private var dynamicTypeSize
-
     @Binding var measurementSystem: String
     let currentSystem: MeasurementSystem
 
     var body: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: theme.spacing.sm) {
-                    measurementLabel
-                    measurementPicker
-                        .frame(maxWidth: .infinity)
-                }
-            } else {
-                HStack(spacing: theme.spacing.sm) {
-                    measurementLabel
-
-                    Spacer(minLength: theme.spacing.sm)
-
-                    measurementPicker
-                        .frame(maxWidth: 210)
-                }
-            }
-        }
-        .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
-        .frame(minHeight: JovieTokens.minimumHitTarget)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("settings_units_row")
-    }
-
-    private var measurementLabel: some View {
-        HStack(spacing: theme.spacing.sm) {
-            Image(systemName: "globe")
-                .font(theme.typography.headlineSmall)
-                .foregroundColor(theme.colors.text)
-                .frame(width: 24)
-
-            VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                Text("Units")
-                    .font(theme.typography.labelLarge)
-                    .foregroundColor(theme.colors.text)
-
-                Text(currentSystem == .metric ? "Metric (kg, cm)" : "Imperial (lbs, ft)")
-                    .font(theme.typography.captionLarge)
-                    .foregroundColor(theme.colors.textSecondary)
-            }
-        }
-        .layoutPriority(1)
-    }
-
-    private var measurementPicker: some View {
-        Picker("Units", selection: $measurementSystem) {
+        Picker(selection: $measurementSystem) {
             Text("Metric").tag(MeasurementSystem.metric.rawValue)
             Text("Imperial").tag(MeasurementSystem.imperial.rawValue)
+        } label: {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Units")
+                    Text(currentSystem == .metric ? "Metric (kg, cm)" : "Imperial (lbs, ft)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: "globe")
+            }
         }
-        .pickerStyle(.segmented)
-        .frame(minHeight: JovieTokens.minimumHitTarget)
+        .pickerStyle(.menu)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("settings_units_row")
     }
 }
 
 struct PreferenceStepGoalRow: View {
-    @Environment(\.theme)
-    private var theme
-
     @Binding var stepGoal: Int
     let formattedValue: String
 
     var body: some View {
         Stepper(value: $stepGoal, in: 0...100_000, step: 1_000) {
-            HStack(spacing: theme.spacing.sm) {
-                Image(systemName: "figure.walk")
-                    .font(theme.typography.headlineSmall)
-                    .foregroundColor(theme.colors.text)
-                    .frame(width: 24)
-
-                VStack(alignment: .leading, spacing: theme.spacing.xxs) {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
                     Text("Daily step goal")
-                        .font(theme.typography.labelLarge)
-                        .foregroundColor(theme.colors.text)
-
                     Text(formattedValue)
-                        .font(theme.typography.captionLarge)
-                        .foregroundColor(theme.colors.textSecondary)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
+            } icon: {
+                Image(systemName: "figure.walk")
             }
         }
-        .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
-        .frame(minHeight: JovieTokens.minimumHitTarget)
         .accessibilityIdentifier("settings_step_goal_row")
     }
 }
 
 struct PreferenceGoalRow: View {
-    @Environment(\.theme)
-    private var theme
-
     let goal: PreferenceGoalKind
     let valueText: String
     let edit: () -> Void
 
     var body: some View {
         Button(action: edit) {
-            HStack(spacing: theme.spacing.sm) {
-                Image(systemName: goal.icon)
-                    .font(theme.typography.headlineSmall)
-                    .foregroundColor(theme.colors.textSecondary)
-                    .frame(width: 24)
-
-                VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                    Text(goal.title)
-                        .font(theme.typography.labelLarge)
-                        .foregroundColor(theme.colors.text)
-
-                    Text(valueText)
-                        .font(theme.typography.captionLarge)
-                        .foregroundColor(theme.colors.textSecondary)
+            Label {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(goal.title)
+                            .foregroundStyle(.primary)
+                        Text(valueText)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
                 }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(theme.colors.textTertiary)
+            } icon: {
+                Image(systemName: goal.icon)
+                    .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .accessibilityIdentifier("settings_\(goal.rawValue)_goal_edit_button")
-        .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
-        .frame(minHeight: JovieTokens.minimumHitTarget)
     }
 }

@@ -7,33 +7,27 @@ import SwiftUI
 extension PreferencesView {
     var remindersSection: some View {
         SettingsSection(header: "Reminders") {
-            VStack(spacing: 0) {
-                SettingsToggleRow(
-                    icon: "bell.badge.fill",
-                    title: "Daily weigh-in",
-                    isOn: dailyWeighInReminderBinding,
-                    subtitle: dailyReminderSubtitle
+            SettingsToggleRow(
+                icon: "bell.badge.fill",
+                title: "Daily weigh-in",
+                isOn: dailyWeighInReminderBinding,
+                subtitle: dailyReminderSubtitle
+            )
+            .accessibilityIdentifier("settings_daily_weigh_in_reminder_toggle")
+
+            if notificationManager.isDailyWeighInReminderEnabled {
+                DatePicker(
+                    "Reminder time",
+                    selection: $dailyReminderDate,
+                    displayedComponents: .hourAndMinute
                 )
-                .accessibilityIdentifier("settings_daily_weigh_in_reminder_toggle")
-
-                if notificationManager.isDailyWeighInReminderEnabled {
-                    DSDivider().insetted(16)
-
-                    DatePicker(
-                        "Reminder time",
-                        selection: $dailyReminderDate,
-                        displayedComponents: .hourAndMinute
-                    )
-                    .datePickerStyle(.compact)
-                    .padding(.horizontal, theme.spacing.md)
-                    .padding(.vertical, theme.spacing.sm)
-                    .onChange(of: dailyReminderDate) { _, newValue in
-                        Task {
-                            await notificationManager.updateDailyWeighInReminderTime(to: newValue)
-                        }
+                .datePickerStyle(.compact)
+                .onChange(of: dailyReminderDate) { _, newValue in
+                    Task {
+                        await notificationManager.updateDailyWeighInReminderTime(to: newValue)
                     }
-                    .accessibilityIdentifier("settings_daily_weigh_in_reminder_time_picker")
                 }
+                .accessibilityIdentifier("settings_daily_weigh_in_reminder_time_picker")
             }
         }
     }

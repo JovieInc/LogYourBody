@@ -105,7 +105,6 @@ struct PreferenceGoalEditorSheet: View {
     }
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let goal: PreferenceGoalKind
@@ -142,46 +141,68 @@ struct PreferenceGoalEditorSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.jovieCanvas
-                    .ignoresSafeArea()
+            Form {
+                Section {
+                    HStack {
+                        TextField(goal.placeholder, text: $draftText)
+                            .keyboardType(.decimalPad)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .submitLabel(.done)
+                            .focused($focusedField, equals: .value)
+                            .accessibilityLabel(goal.title)
+                            .accessibilityValue(accessibilityValue)
+                            .accessibilityHint(validation.errorMessage ?? goal.helperText)
+                            .accessibilityIdentifier("settings_goal_editor_text_field")
 
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
-                        valueCard
+                        if let unitLabel {
+                            Text(unitLabel)
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                        }
                     }
-                    .frame(maxWidth: 560, alignment: .leading)
-                    .padding(.horizontal, JovieTokens.screenInset)
-                    .padding(.top, JovieTokens.itemGap)
-                    .padding(.bottom, JovieTokens.sectionGap)
+                } footer: {
+                    if let message = validation.errorMessage {
+                        Label(message, systemImage: "exclamationmark.circle.fill")
+                            .foregroundStyle(.red)
+                            .accessibilityIdentifier("settings_goal_editor_error")
+                            .accessibilityFocused($errorFocused)
+                    } else {
+                        Text(goal.helperText)
+                    }
                 }
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                actions
-                    .padding(.horizontal, JovieTokens.screenInset)
-                    .padding(.top, JovieTokens.itemGap)
-                    .padding(
-                        .bottom,
-                        dynamicTypeSize.isAccessibilitySize ? JovieTokens.sectionGap : JovieTokens.itemGap
-                    )
-                    .background(Color.jovieCanvas.opacity(0.98))
+
+                if let resetTitle, let reset {
+                    Section {
+                        Button(resetTitle, role: .destructive) {
+                            reset()
+                            dismiss()
+                        }
+                        .accessibilityHint("Removes the custom \(goal.title.lowercased())")
+                        .accessibilityIdentifier("settings_\(goal.rawValue)_goal_reset_button")
+                    }
+                }
             }
             .navigationTitle(goal.title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.jovieCanvas, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(action: dismiss.callAsFunction) {
-                        Image(systemName: "xmark")
-                            .font(.body.weight(.semibold))
-                            .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    Button("Cancel", action: dismiss.callAsFunction)
+                        .accessibilityLabel("Cancel editing")
+                        .accessibilityHint("Discards changes to this goal")
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        guard let value = validation.value else { return }
+                        save(value)
+                        dismiss()
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.jovieText)
-                    .accessibilityLabel("Cancel editing")
-                    .accessibilityHint("Discards changes to this goal")
+                    .disabled(!validation.isValid)
+                    .accessibilityLabel("Save")
+                    .accessibilityHint(
+                        validation.isValid ? "Saves this goal" : validation.errorMessage ?? "Enter a valid goal"
+                    )
                 }
 
                 ToolbarItem(placement: .keyboard) {
@@ -193,7 +214,7 @@ struct PreferenceGoalEditorSheet: View {
                 }
             }
         }
-        .presentationDetents([.large])
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
         .presentationDragIndicator(.visible)
         .onAppear {
             errorFocused = validation.errorMessage != nil
@@ -211,124 +232,6 @@ struct PreferenceGoalEditorSheet: View {
         .accessibilityIdentifier("settings_goal_editor_sheet")
     }
 
-    private var valueCard: some View {
-        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
-            Text("Goal")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.jovieTextSecondary)
-
-            HStack(alignment: .center, spacing: JovieTokens.itemGap) {
-                TextField(goal.placeholder, text: $draftText)
-                    .keyboardType(.decimalPad)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .submitLabel(.done)
-                    .font(.system(.title, design: .rounded).weight(.semibold))
-                    .foregroundStyle(Color.jovieText)
-                    .focused($focusedField, equals: .value)
-                    .accessibilityLabel(goal.title)
-                    .accessibilityValue(accessibilityValue)
-                    .accessibilityHint(validation.errorMessage ?? goal.helperText)
-                    .accessibilityIdentifier("settings_goal_editor_text_field")
-
-                if let unitLabel {
-                    Text(unitLabel)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color.jovieTextSecondary)
-                        .accessibilityHidden(true)
-                }
-            }
-            .padding(.horizontal, JovieTokens.compactInset)
-            .frame(maxWidth: .infinity, minHeight: 64)
-            .background(Color.jovieSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
-                    .stroke(fieldBorderColor, lineWidth: focusedField == .value ? 2 : 1)
-            }
-            .animation(
-                reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration),
-                value: focusedField
-            )
-
-            if let message = validation.errorMessage {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .accessibilityHidden(true)
-
-                    Text(message)
-                        .accessibilityIdentifier("settings_goal_editor_error")
-                        .accessibilityFocused($errorFocused)
-                }
-                .font(.footnote)
-                .foregroundStyle(Color.red)
-                .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Label(goal.helperText, systemImage: "info.circle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(Color.jovieTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel(goal.helperText)
-            }
-        }
-        .padding(JovieTokens.compactInset)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .systemBGlassSurface(
-            cornerRadius: JovieTokens.controlRadius,
-            tint: .white,
-            tintOpacity: 0.025,
-            borderColor: .jovieHairline
-        )
-    }
-
-    private var saveAction: some View {
-        BaseButton(
-            "Save",
-            configuration: ButtonConfiguration(
-                style: .custom(background: .jovieAction, foreground: .jovieActionText),
-                isEnabled: validation.isValid,
-                fullWidth: true,
-                icon: "checkmark"
-            )
-        ) {
-            guard let value = validation.value else { return }
-            save(value)
-            dismiss()
-        }
-        .disabled(!validation.isValid)
-        .accessibilityLabel("Save")
-        .accessibilityHint(validation.isValid ? "Saves this goal" : validation.errorMessage ?? "Enter a valid goal")
-    }
-
-    private var actions: some View {
-        VStack(spacing: JovieTokens.itemGap) {
-            saveAction
-
-            if let resetTitle, let reset {
-                Button {
-                    reset()
-                    dismiss()
-                } label: {
-                    Label(resetTitle, systemImage: "arrow.counterclockwise")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Color.jovieText)
-                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .background(Color.jovieSurfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
-                        .stroke(Color.jovieHairline, lineWidth: 1)
-                }
-                .accessibilityHint("Removes the custom \(goal.title.lowercased())")
-                .accessibilityIdentifier("settings_\(goal.rawValue)_goal_reset_button")
-            }
-        }
-    }
-
     private var accessibilityValue: String {
         let value = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return "No value" }
@@ -337,12 +240,5 @@ struct PreferenceGoalEditorSheet: View {
             return "\(value) \(unitLabel)"
         }
         return value
-    }
-
-    private var fieldBorderColor: Color {
-        if validation.errorMessage != nil {
-            return .red.opacity(0.85)
-        }
-        return focusedField == .value ? .jovieMetricAccent : .jovieHairline
     }
 }

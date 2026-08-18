@@ -7,13 +7,9 @@ import SwiftUI
 extension PreferencesView {
     var accountSection: some View {
         SettingsSection(header: "Account") {
-            VStack(spacing: 0) {
-                accountEmailRow
-                DSDivider().insetted(16)
-                changeProfilePhotoRow
-                DSDivider().insetted(16)
-                logoutRow
-            }
+            accountEmailRow
+            changeProfilePhotoRow
+            logoutRow
         }
     }
 
@@ -35,7 +31,6 @@ extension PreferencesView {
                 value: isUploadingPhoto ? "\(Int(avatarUploadProgress * 100))%" : nil
             )
         }
-        .buttonStyle(.plain)
         .disabled(isUploadingPhoto)
     }
 
@@ -52,13 +47,9 @@ extension PreferencesView {
 
     var profileSection: some View {
         SettingsSection(header: "Profile") {
-            VStack(spacing: 0) {
-                profileFullNameRow
-                DSDivider().insetted(16)
-                profileDateOfBirthRow
-                DSDivider().insetted(16)
-                profileHeightRow
-            }
+            profileFullNameRow
+            profileDateOfBirthRow
+            profileHeightRow
         }
     }
 
@@ -104,10 +95,10 @@ extension PreferencesView {
                 icon: icon,
                 title: title,
                 value: value,
-                showChevron: true
+                showChevron: false
             )
         }
-        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
     }
 
     func beginProfileEditor(_ editor: PreferencesProfileEditor) {
@@ -232,34 +223,26 @@ struct ProfileNameEditorSheet: View {
     @Binding var hasChanges: Bool
     let onCommit: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.theme) private var theme
     @FocusState private var isFocused: Bool
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: theme.spacing.md) {
-                TextField("Full name", text: $name)
-                    .textContentType(.name)
-                    .font(theme.typography.bodyLarge)
-                    .foregroundStyle(theme.colors.text)
-                    .padding(.horizontal, theme.spacing.md)
-                    .frame(minHeight: JovieTokens.minimumHitTarget)
-                    .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card))
-                    .focused($isFocused)
-                    .onChange(of: name) { _, _ in hasChanges = true }
-
-                Spacer()
+            Form {
+                Section {
+                    TextField("Full name", text: $name)
+                        .textContentType(.name)
+                        .focused($isFocused)
+                        .onChange(of: name) { _, _ in hasChanges = true }
+                }
             }
-            .padding(theme.spacing.screenPadding)
-            .settingsBackground()
             .navigationTitle("Full Name")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .jovieTouchTarget()
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         onCommit()
                         dismiss()

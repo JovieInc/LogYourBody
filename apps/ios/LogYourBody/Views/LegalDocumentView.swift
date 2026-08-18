@@ -157,37 +157,30 @@ struct LegalDocumentView: View {
     }
 
     var body: some View {
-        ZStack {
-            // Atom: Background
-            Color.appBackground
-                .ignoresSafeArea()
-
+        Group {
             if isLoading {
-                // Atom: Loading Indicator
                 DSLoadingIndicator(message: "Loading...")
             } else if loadError {
-                // Molecule: Error State
                 ErrorStateView(
                     title: "Unable to load document",
                     buttonAction: loadDocument
                 )
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Molecule: Document Header
+                List {
+                    Section {
                         DocumentHeader(
                             icon: documentType.icon,
                             title: documentType.title
                         )
-                        .padding(.top, 20)
-                        .padding(.horizontal)
+                        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
 
-                        // Organism: Markdown Content
                         MarkdownView(markdown: documentContent)
-                            .padding(.horizontal)
-                            .padding(.bottom, 40)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 24, trailing: 16))
+                            .listRowSeparator(.hidden)
                     }
                 }
+                .listStyle(.insetGrouped)
             }
         }
         .navigationTitle(documentType.title)

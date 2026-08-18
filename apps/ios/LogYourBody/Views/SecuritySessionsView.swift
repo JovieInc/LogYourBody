@@ -18,10 +18,6 @@ enum SessionListOrdering {
 
 struct SecuritySessionsView: View {
     @EnvironmentObject var authManager: AuthManager
-    @Environment(\.dismiss)
-    var dismiss
-    @Environment(\.theme)
-    private var theme
     @State private var sessions: [SessionInfo] = []
     @State private var isLoading = true
     @State private var showError = false
@@ -37,66 +33,55 @@ struct SecuritySessionsView: View {
     @State private var refreshing = false
 
     var body: some View {
-        ZStack {
+        List {
+            SettingsSection {
+                DataInfoRow(
+                    icon: "lock.shield.fill",
+                    title: "Signed-in devices",
+                    description: "Current device is marked. Locations are approximate, " +
+                        "and revoked devices can sign in again.",
+                    iconColor: .accentColor
+                )
+            }
+
+            if sessions.isEmpty && !isLoading {
+                SettingsSection {
+                    SettingsEmptyState(
+                        icon: "checkmark.shield.fill",
+                        title: "Only this device",
+                        message: "No other devices are signed in.",
+                        iconColor: .green
+                    )
+                }
+            } else if !sessions.isEmpty {
+                SettingsSection(header: "Active Sessions") {
+                    ForEach(sessions) { session in
+                        SessionRowView(
+                            session: session,
+                            onRevoke: {
+                                sessionToRevoke = session
+                                showRevokeConfirmation = true
+                            }
+                        )
+                    }
+                }
+
+                SettingsSection {
+                    Text("Last updated: \(Date().formatted(date: .omitted, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollBounceBehavior(.basedOnSize)
+        .refreshable {
+            await loadSessions()
+        }
+        .overlay {
             if isLoading && sessions.isEmpty {
                 LoadingOverlay(message: "Loading sessions...")
-            } else {
-                ScrollView {
-                    VStack(spacing: theme.spacing.sectionSpacing) {
-                        SettingsSection {
-                            DataInfoRow(
-                                icon: "lock.shield.fill",
-                                title: "Signed-in devices",
-                                description: "Current device is marked. Locations are approximate, " +
-                                    "and revoked devices can sign in again.",
-                                iconColor: theme.colors.info
-                            )
-                        }
-
-                        if sessions.isEmpty {
-                            SettingsEmptyState(
-                                icon: "checkmark.shield.fill",
-                                title: "Only this device",
-                                message: "No other devices are signed in.",
-                                iconColor: theme.colors.success
-                            )
-                            .padding(.top, theme.spacing.lg)
-                        } else {
-                            SettingsSection(header: "Active Sessions") {
-                                VStack(spacing: 0) {
-                                    ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
-                                        if index > 0 {
-                                            Divider()
-                                        }
-                                        SessionRowView(
-                                            session: session,
-                                            onRevoke: {
-                                                sessionToRevoke = session
-                                                showRevokeConfirmation = true
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Last Updated
-                        if !sessions.isEmpty {
-                            Text("Last updated: \(Date().formatted(date: .omitted, time: .shortened))")
-                                .font(theme.typography.captionMedium)
-                                .foregroundColor(theme.colors.textTertiary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, theme.spacing.xs)
-                        }
-                    }
-                    .padding(.vertical, theme.spacing.md)
-                    .settingsSectionStyle()
-                }
-                .scrollBounceBehavior(.basedOnSize)
-                .refreshable {
-                    await loadSessions()
-                }
-                .settingsBackground()
             }
         }
         .navigationTitle("Active Sessions")
@@ -123,8 +108,11 @@ struct SecuritySessionsView: View {
         .onDisappear {
             refreshTimer?.invalidate()
         }
-        .alert("Revoke Session?", isPresented: $showRevokeConfirmation) {
-            Button("Cancel", role: .cancel) {}
+        .confirmationDialog(
+            "Revoke Session?",
+            isPresented: $showRevokeConfirmation,
+            titleVisibility: .visible
+        ) {
             Button("Revoke", role: .destructive) {
                 if let session = sessionToRevoke {
                     Task {
@@ -132,10 +120,9 @@ struct SecuritySessionsView: View {
                     }
                 }
             }
+            Button("Cancel", role: .cancel) {}
         } message: {
-            if sessionToRevoke != nil {
-                Text("Are you sure you want to revoke this session? The device will be signed out immediately.")
-            }
+            Text("Are you sure you want to revoke this session? The device will be signed out immediately.")
         }
         .standardErrorAlert(isPresented: $showError, message: errorMessage)
         .overlay(
@@ -146,8 +133,6 @@ struct SecuritySessionsView: View {
         )
         .worldClassScreen(.activeSessions)
     }
-
-    // MARK: - View Components
 
     // MARK: - Methods
 
@@ -207,115 +192,75 @@ struct SecuritySessionsView: View {
 // MARK: - Session Row View
 
 struct SessionRowView: View {
-    @Environment(\.theme)
-    private var theme
-
     let session: SessionInfo
     let onRevoke: () -> Void
     @State private var isExpanded = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Main Content
-            Button(
-                action: {
-                    withAnimation(theme.animation.spring) {
-                        isExpanded.toggle()
-                    }
-                },
-                label: {
-                    HStack(spacing: theme.spacing.sm) {
-                        Image(systemName: deviceIcon)
-                            .font(theme.typography.headlineSmall)
-                            .foregroundColor(iconColor)
-                            .frame(width: 24)
-                            .padding(theme.spacing.xs)
-                            .background(iconBackgroundColor)
-                            .clipShape(Circle())
-
-                        VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                            HStack {
-                                Text(session.deviceName)
-                                    .font(theme.typography.labelLarge)
-                                    .foregroundColor(theme.colors.text)
-
-                                if session.isCurrentSession {
-                                    Text("THIS DEVICE")
-                                        .font(theme.typography.captionSmall.weight(.bold))
-                                        .foregroundColor(theme.colors.success)
-                                        .padding(.horizontal, theme.spacing.xs)
-                                        .padding(.vertical, theme.spacing.xxxs)
-                                        .background(theme.colors.success.opacity(0.15))
-                                        .clipShape(Capsule())
-                                }
-                            }
-
-                            VStack(alignment: .leading, spacing: theme.spacing.xxxs) {
-                                Text(session.location)
-                                    .font(theme.typography.captionLarge)
-                                    .foregroundColor(theme.colors.textSecondary)
-
-                                HStack(spacing: theme.spacing.xxs) {
-                                    Image(systemName: "clock")
-                                        .font(theme.typography.captionSmall)
-                                    Text(timeAgoString(from: session.lastActiveAt))
-                                        .font(theme.typography.captionLarge)
-                                }
-                                .foregroundColor(theme.colors.textSecondary)
-                            }
-                        }
-
-                        Spacer()
-
-                        if !session.isCurrentSession {
-                            Button(action: onRevoke) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(theme.typography.headlineSmall)
-                                    .foregroundColor(theme.colors.error)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        } else if !session.ipAddress.isEmpty {
-                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundColor(theme.colors.textTertiary)
-                        }
-                    }
-                    .padding(.horizontal, theme.spacing.md)
-                    .padding(.vertical, theme.spacing.sm)
-                    .contentShape(Rectangle())
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.snappy) {
+                    isExpanded.toggle()
                 }
-            )
-            .buttonStyle(PlainButtonStyle())
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: deviceIcon)
+                        .foregroundStyle(iconColor)
+                        .frame(width: 28, height: 28)
+                        .background(iconBackgroundColor, in: Circle())
 
-            // Additional Details (expandable)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(session.deviceName)
+                                .foregroundStyle(.primary)
+
+                            if session.isCurrentSession {
+                                Text("THIS DEVICE")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.green)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(.green.opacity(0.15), in: Capsule())
+                            }
+                        }
+
+                        Text(session.location)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Label(timeAgoString(from: session.lastActiveAt), systemImage: "clock")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    if !session.isCurrentSession {
+                        Button(action: onRevoke) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
+                    } else if !session.ipAddress.isEmpty {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
             if isExpanded {
-                VStack(spacing: 0) {
-                    Divider()
-
-                    VStack(spacing: theme.spacing.xs) {
-                        HStack {
-                            Label("IP Address", systemImage: "network")
-                                .font(theme.typography.captionLarge)
-                                .foregroundColor(theme.colors.textSecondary)
-                            Spacer()
-                            Text(session.ipAddress)
-                                .font(theme.typography.captionLarge)
-                                .foregroundColor(theme.colors.textSecondary)
-                        }
-
-                        HStack {
-                            Label("First Signed In", systemImage: "calendar")
-                                .font(theme.typography.captionLarge)
-                                .foregroundColor(theme.colors.textSecondary)
-                            Spacer()
-                            Text(session.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                .font(theme.typography.captionLarge)
-                                .foregroundColor(theme.colors.textSecondary)
-                        }
-                    }
-                    .padding(.horizontal, theme.spacing.md)
-                    .padding(.vertical, theme.spacing.sm)
+                VStack(spacing: 8) {
+                    LabeledContent("IP Address", value: session.ipAddress)
+                    LabeledContent(
+                        "First Signed In",
+                        value: session.createdAt.formatted(date: .abbreviated, time: .shortened)
+                    )
                 }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -337,11 +282,11 @@ struct SessionRowView: View {
     }
 
     private var iconColor: Color {
-        session.isCurrentSession ? theme.colors.success : theme.colors.info
+        session.isCurrentSession ? .green : .accentColor
     }
 
     private var iconBackgroundColor: Color {
-        session.isCurrentSession ? theme.colors.success.opacity(0.15) : theme.colors.info.opacity(0.15)
+        session.isCurrentSession ? .green.opacity(0.15) : .accentColor.opacity(0.15)
     }
 
     private func timeAgoString(from date: Date) -> String {
@@ -350,7 +295,6 @@ struct SessionRowView: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
-
 
 // MARK: - Preview
 

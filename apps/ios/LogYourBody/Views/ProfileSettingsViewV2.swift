@@ -67,8 +67,6 @@ struct ProfileSettingsViewV2: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss)
     var dismiss
-    @Environment(\.theme)
-    private var theme
     // Editable fields
     @State private var editableName: String = ""
     @State private var editableFirstName: String = ""
@@ -89,24 +87,14 @@ struct ProfileSettingsViewV2: View {
     @State private var saveErrorMessage: String?
 
     var body: some View {
-        ZStack {
-            ScrollView {
-                VStack(spacing: theme.spacing.sectionSpacing) {
-                    basicInformationCard
-
-                    physicalInformationCard
-                }
-                .padding(.horizontal, theme.spacing.screenPadding)
-                .padding(.top, theme.spacing.md)
-                .padding(.bottom, 40)
-            }
-            .scrollBounceBehavior(.basedOnSize)
+        Form {
+            basicInformationCard
+            physicalInformationCard
         }
-        .settingsBackground()
         .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button {
                     dismiss()
                 } label: {
@@ -118,18 +106,16 @@ struct ProfileSettingsViewV2: View {
                 .accessibilityIdentifier("profile_editor_cancel_button")
             }
 
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 if isSaving {
                     ProgressView()
                         .scaleEffect(0.8)
-                        .tint(theme.colors.primary)
                         .frame(minWidth: JovieTokens.minimumHitTarget, minHeight: JovieTokens.minimumHitTarget)
                 } else if hasChanges {
                     Button("Save") {
                         saveProfile()
                     }
                     .fontWeight(.medium)
-                    .foregroundColor(theme.colors.primary)
                     .jovieTouchTarget()
                     .accessibilityHint("Saves your profile changes.")
                 }
@@ -141,12 +127,16 @@ struct ProfileSettingsViewV2: View {
                 useMetric: $useMetricHeight,
                 hasChanges: $hasChanges
             )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingDatePicker) {
             DatePickerSheet(
                 date: $editableDateOfBirth,
                 hasChanges: $hasChanges
             )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .onAppear {
             loadCurrentProfile()
@@ -181,172 +171,60 @@ struct ProfileSettingsViewV2: View {
 
     private var basicInformationCard: some View {
         SettingsSection(header: "Basic Information") {
-            VStack(spacing: 0) {
-                editableTextRow(
-                    label: "First name",
-                    text: $editableFirstName,
-                    contentType: .givenName
-                )
+            editableTextRow(
+                label: "First name",
+                text: $editableFirstName,
+                contentType: .givenName
+            )
 
-                Divider()
-                    .padding(.leading, 16)
+            editableTextRow(
+                label: "Last name",
+                text: $editableLastName,
+                contentType: .familyName
+            )
 
-                editableTextRow(
-                    label: "Last name",
-                    text: $editableLastName,
-                    contentType: .familyName
-                )
+            LabeledContent("Email", value: authManager.currentUser?.email ?? "")
+                .foregroundStyle(.secondary)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Email")
+                .accessibilityValue(authManager.currentUser?.email ?? "")
 
-                Divider()
-                    .padding(.leading, 16)
-
-                // Email (read-only)
-                settingsRow(
-                    label: "Email",
-                    value: authManager.currentUser?.email ?? "",
-                    showDisclosure: false,
-                    isDisabled: true
-                )
-
-                Divider()
-                    .padding(.leading, 16)
-
-                genderSelector
-            }
-        }
-    }
-
-    private var genderSelector: some View {
-        HStack(spacing: 0) {
-            Text("Biological sex")
-                .foregroundColor(theme.colors.text)
-                .font(theme.typography.labelLarge)
-                .accessibilityHidden(true)
-
-            Spacer(minLength: theme.spacing.sm)
-
-            Picker(selection: $editableGender) {
+            Picker("Biological sex", selection: $editableGender) {
                 ForEach(BiologicalSex.allCases, id: \.self) { gender in
                     Text(gender.description).tag(gender)
                 }
-            } label: {
-                HStack(spacing: theme.spacing.xs) {
-                    Text(editableGender.description)
-                        .font(theme.typography.labelMedium)
-                        .foregroundColor(theme.colors.textSecondary)
-                        .lineLimit(1)
-
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(theme.typography.captionMedium.weight(.semibold))
-                        .foregroundColor(theme.colors.textTertiary)
-                }
             }
             .pickerStyle(.menu)
-            .tint(theme.colors.text)
             .accessibilityLabel("Biological sex")
             .accessibilityValue(editableGender.description)
-        }
-        .padding(.horizontal, theme.spacing.md)
-        .frame(minHeight: JovieTokens.minimumHitTarget)
-        .onChange(of: editableGender) { _, _ in
-            hasChanges = true
+            .onChange(of: editableGender) { _, _ in
+                hasChanges = true
+            }
         }
     }
 
     private var physicalInformationCard: some View {
         SettingsSection(header: "Physical Information") {
-            VStack(spacing: 0) {
-                // Height
-                Button {
-                    showingHeightPicker = true
-                } label: {
-                    HStack {
-                        Text("Height")
-                            .font(theme.typography.labelLarge)
-                            .foregroundColor(theme.colors.text)
-                        Spacer()
-                        HStack(spacing: theme.spacing.xxs) {
-                            Text(formattedHeight)
-                                .font(theme.typography.labelMedium)
-                                .foregroundColor(theme.colors.text)
-                            Image(systemName: "ruler")
-                                .font(theme.typography.captionLarge)
-                                .foregroundColor(theme.colors.textSecondary)
-                        }
-                        Image(systemName: "chevron.right")
-                            .font(theme.typography.captionMedium.weight(.semibold))
-                            .foregroundColor(theme.colors.textTertiary)
-                    }
-                    .padding(.horizontal, theme.spacing.md)
-                    .frame(minHeight: JovieTokens.minimumHitTarget)
-                }
-                .accessibilityLabel("Height")
-                .accessibilityValue(formattedHeight)
-                .accessibilityHint("Double-tap to edit your height.")
-
-                Divider()
-                    .padding(.leading, 16)
-
-                // Age/Date of Birth
-                Button {
-                    showingDatePicker = true
-                } label: {
-                    HStack {
-                        Text("Age")
-                            .font(theme.typography.labelLarge)
-                            .foregroundColor(theme.colors.text)
-                        Spacer()
-                        HStack(spacing: theme.spacing.xxs) {
-                            Text(formattedAge)
-                                .font(theme.typography.labelMedium)
-                                .foregroundColor(theme.colors.text)
-                            Image(systemName: "calendar")
-                                .font(theme.typography.captionLarge)
-                                .foregroundColor(theme.colors.textSecondary)
-                        }
-                        Image(systemName: "chevron.right")
-                            .font(theme.typography.captionMedium.weight(.semibold))
-                            .foregroundColor(theme.colors.textTertiary)
-                    }
-                    .padding(.horizontal, theme.spacing.md)
-                    .frame(minHeight: JovieTokens.minimumHitTarget)
-                }
-                .accessibilityLabel("Age")
-                .accessibilityValue(formattedAge)
-                .accessibilityHint("Double-tap to edit your date of birth.")
+            Button {
+                showingHeightPicker = true
+            } label: {
+                LabeledContent("Height", value: formattedHeight)
             }
-        }
-    }
+            .foregroundStyle(.primary)
+            .accessibilityLabel("Height")
+            .accessibilityValue(formattedHeight)
+            .accessibilityHint("Double-tap to edit your height.")
 
-    @ViewBuilder
-    private func settingsRow(
-        label: String,
-        value: String,
-        showDisclosure: Bool = true,
-        isDisabled: Bool = false
-    ) -> some View {
-        HStack {
-            Text(label)
-                .font(theme.typography.labelLarge)
-                .foregroundColor(isDisabled ? theme.colors.textSecondary : theme.colors.text)
-
-            Spacer()
-
-            Text(value)
-                .font(theme.typography.labelMedium)
-                .foregroundColor(isDisabled ? theme.colors.textTertiary : theme.colors.textSecondary)
-
-            if showDisclosure && !isDisabled {
-                Image(systemName: "chevron.right")
-                    .font(theme.typography.captionMedium.weight(.semibold))
-                    .foregroundColor(theme.colors.textTertiary)
+            Button {
+                showingDatePicker = true
+            } label: {
+                LabeledContent("Age", value: formattedAge)
             }
+            .foregroundStyle(.primary)
+            .accessibilityLabel("Age")
+            .accessibilityValue(formattedAge)
+            .accessibilityHint("Double-tap to edit your date of birth.")
         }
-        .padding(.horizontal, theme.spacing.md)
-        .frame(minHeight: JovieTokens.minimumHitTarget)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(label)
-        .accessibilityValue(value)
     }
 
     private func editableTextRow(
@@ -354,27 +232,15 @@ struct ProfileSettingsViewV2: View {
         text: Binding<String>,
         contentType: UITextContentType
     ) -> some View {
-        HStack(spacing: theme.spacing.md) {
-            Text(label)
-                .font(theme.typography.labelLarge)
-                .foregroundColor(theme.colors.text)
-                .accessibilityHidden(true)
-
-            TextField(label, text: text)
-                .textContentType(contentType)
-                .textInputAutocapitalization(.words)
-                .submitLabel(.done)
-                .font(theme.typography.labelMedium)
-                .foregroundColor(theme.colors.text)
-                .multilineTextAlignment(.trailing)
-                .accessibilityLabel(label)
-                .onChange(of: text.wrappedValue) { _, _ in
-                    hasChanges = true
-                    updateEditableName()
-                }
-        }
-        .padding(.horizontal, theme.spacing.md)
-        .frame(minHeight: JovieTokens.minimumHitTarget)
+        TextField(label, text: text)
+            .textContentType(contentType)
+            .textInputAutocapitalization(.words)
+            .submitLabel(.done)
+            .accessibilityLabel(label)
+            .onChange(of: text.wrappedValue) { _, _ in
+                hasChanges = true
+                updateEditableName()
+            }
     }
 
     private func updateEditableName() {
@@ -498,32 +364,40 @@ struct ProfileHeightPickerSheet: View {
     @Binding var hasChanges: Bool
     @Environment(\.dismiss)
     var dismiss
-    @Environment(\.theme)
-    private var theme
     var onCommit: (() -> Void)?
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                unitSelector
-                heightDisplay
-                heightPicker
+            Form {
+                Picker("Unit", selection: $useMetric) {
+                    Text("Imperial (ft/in)").tag(false)
+                    Text("Metric (cm)").tag(true)
+                }
+                .pickerStyle(.menu)
+
+                Section {
+                    Text(formattedHeight)
+                        .font(.title.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    Text(alternateHeight)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+
+                Section {
+                    heightPicker
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .settingsBackground()
             .navigationTitle("Set Height")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button {
+                    Button("Cancel") {
                         dismiss()
-                    } label: {
-                        Text("Cancel")
-                            .frame(width: 68, height: JovieTokens.minimumHitTarget)
                     }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
+                    .frame(minWidth: 68, minHeight: JovieTokens.minimumHitTarget)
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         hasChanges = true
                         onCommit?()
@@ -537,31 +411,6 @@ struct ProfileHeightPickerSheet: View {
         }
     }
 
-    private var unitSelector: some View {
-        Picker("Unit", selection: $useMetric) {
-            Text("Imperial (ft/in)").tag(false)
-            Text("Metric (cm)").tag(true)
-        }
-        .pickerStyle(.menu)
-        .tint(theme.colors.text)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, theme.spacing.md)
-        .frame(minHeight: JovieTokens.minimumHitTarget)
-    }
-
-    private var heightDisplay: some View {
-        VStack(spacing: 8) {
-            Text(formattedHeight)
-                .font(theme.typography.displayMedium)
-                .foregroundColor(theme.colors.text)
-
-            Text(alternateHeight)
-                .font(theme.typography.captionLarge)
-                .foregroundColor(theme.colors.textSecondary)
-        }
-        .padding()
-    }
-
     private var heightPicker: some View {
         Group {
             if useMetric {
@@ -570,7 +419,7 @@ struct ProfileHeightPickerSheet: View {
                         Text("\(cm) cm").tag(cm)
                     }
                 }
-                .pickerStyle(WheelPickerStyle())
+                .pickerStyle(.wheel)
                 .labelsHidden()
             } else {
                 imperialHeightPicker
@@ -603,7 +452,7 @@ struct ProfileHeightPickerSheet: View {
                     Text("\(feet) ft").tag(feet)
                 }
             }
-            .pickerStyle(WheelPickerStyle())
+            .pickerStyle(.wheel)
             .frame(maxWidth: .infinity)
 
             Picker("Inches", selection: inchesBinding) {
@@ -611,7 +460,7 @@ struct ProfileHeightPickerSheet: View {
                     Text("\(inches) in").tag(inches)
                 }
             }
-            .pickerStyle(WheelPickerStyle())
+            .pickerStyle(.wheel)
             .frame(maxWidth: .infinity)
         }
     }
@@ -636,39 +485,29 @@ struct DatePickerSheet: View {
     @Binding var hasChanges: Bool
     @Environment(\.dismiss)
     var dismiss
-    @Environment(\.theme)
-    private var theme
     var onCommit: (() -> Void)?
     var body: some View {
         NavigationStack {
-            VStack(spacing: theme.spacing.md) {
+            Form {
                 DatePicker(
-                    "",
+                    "Date of Birth",
                     selection: $date,
                     in: ...Date(),
                     displayedComponents: .date
                 )
-                .datePickerStyle(WheelDatePickerStyle())
+                .datePickerStyle(.wheel)
                 .labelsHidden()
-
-                Spacer()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .settingsBackground()
             .navigationTitle("Date of Birth")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button {
+                    Button("Cancel") {
                         dismiss()
-                    } label: {
-                        Text("Cancel")
-                            .frame(width: 68, height: JovieTokens.minimumHitTarget)
                     }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
+                    .frame(minWidth: 68, minHeight: JovieTokens.minimumHitTarget)
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         hasChanges = true
                         onCommit?()

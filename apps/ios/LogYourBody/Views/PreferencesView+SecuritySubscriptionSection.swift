@@ -23,17 +23,13 @@ extension PreferencesView {
 
     var subscriptionSection: some View {
         SettingsSection(header: "Subscription") {
-            VStack(spacing: 0) {
-                subscriptionStatusRow
+            subscriptionStatusRow
 
-                if let renewal = subscriptionRenewalText {
-                    DSDivider().insetted(16)
-                    subscriptionRenewalRow(renewal: renewal)
-                }
-
-                DSDivider().insetted(16)
-                manageSubscriptionRow
+            if let renewal = subscriptionRenewalText {
+                subscriptionRenewalRow(renewal: renewal)
             }
+
+            manageSubscriptionRow
         }
     }
 
@@ -42,7 +38,7 @@ extension PreferencesView {
             icon: "crown.fill",
             title: subscriptionStatusText,
             subtitle: subscriptionPlanDisplay,
-            tintColor: subscriptionManager.isSubscribed ? nil : theme.colors.warning
+            tintColor: subscriptionManager.isSubscribed ? nil : .orange
         )
         .accessibilityIdentifier("settings_subscription_status_row")
     }
@@ -68,7 +64,7 @@ extension PreferencesView {
                 showChevron: true
             )
         }
-        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
         .accessibilityIdentifier("settings_manage_subscription_button")
     }
 
