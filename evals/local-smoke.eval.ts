@@ -1,16 +1,18 @@
 import { defineEval } from 'eve/evals';
 import { equals } from 'eve/evals/expect';
+import { localConnectionFixture, smokeReply } from '../agent/lib/account-connection';
 
 export default defineEval({
-  description: 'Exercise the local runtime without credentials or side effects.',
+  description: 'Exercise the core chat account boundary without credentials or side effects.',
   tags: ['smoke'],
   async test(t) {
-    const first = await t.send('first private-safe smoke message');
-    t.check(first.message, equals('LYB local smoke turn 1: first private-safe smoke message'));
+    const state = localConnectionFixture();
+    const first = await t.send('How is my health trend?');
+    t.check(first.message, equals(smokeReply(state, 1)));
 
-    const second = await t.send('second private-safe smoke message');
+    const second = await t.send('What should I do next?');
     await t.require(second.sessionId, equals(first.sessionId));
-    t.check(second.message, equals('LYB local smoke turn 2: second private-safe smoke message'));
+    t.check(second.message, equals(smokeReply(state, 2)));
 
     t.succeeded();
     t.usedNoTools();

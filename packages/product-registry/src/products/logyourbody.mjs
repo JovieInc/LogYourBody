@@ -185,6 +185,10 @@ export const logYourBody = {
       { value: 'https://www.typescriptlang.org', reason: 'TypeScript documentation links.' },
       { value: 'https://tailwindcss.com', reason: 'Tailwind documentation links.' },
       { value: 'https://vitest.dev', reason: 'Vitest documentation links.' },
+      {
+        value: 'https://eve.dev',
+        reason: 'Official external eve agent framework documentation.',
+      },
       { value: 'https://playwright.dev', reason: 'Playwright documentation links.' },
       { value: 'https://turbo.build', reason: 'Turborepo schema/docs links.' },
       { value: 'https://web.dev', reason: 'web.dev PWA guide links.' },

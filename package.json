@@ -35,9 +35,9 @@
     "check:vendor-boundaries": "node scripts/check-vendor-boundaries.js",
     "check:supabase-migrations": "node scripts/check-supabase-migration-drift.js",
     "sync:main": "bash scripts/sync-main.sh",
-    "eve:info": "eve info",
-    "eve:build": "eve build",
-    "eve:dev": "eve dev",
+    "eve:info": "bash scripts/eve/run-node24.sh info",
+    "eve:build": "bash scripts/eve/run-node24.sh build",
+    "eve:dev": "bash scripts/eve/run-node24.sh dev",
     "eve:smoke": "bash scripts/eve/local-smoke.sh"
   },
   "devDependencies": {
