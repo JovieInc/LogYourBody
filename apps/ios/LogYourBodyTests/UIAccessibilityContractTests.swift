@@ -103,6 +103,7 @@ enum UIAccessibilityContract {
         "metric_detail_headline",
         "metric_detail_chart",
         "chat_tab_root",
+        "home_chat_composer_dock",
         "chat_composer",
         "chat_composer_shell",
         "chat_send_button",

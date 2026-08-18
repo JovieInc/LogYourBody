@@ -690,6 +690,9 @@ private struct FailedChatTurn: Equatable {
 
 @MainActor
 struct ChatTabView: View {
+    var showsTranscript: Bool = true
+    var onExpandRequest: () -> Void = {}
+
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -710,11 +713,18 @@ struct ChatTabView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            accessibilityMarker(id: "chat_tab_root", label: "Chat")
+            accessibilityMarker(
+                id: showsTranscript ? "chat_tab_root" : "home_chat_composer_dock",
+                label: showsTranscript ? "Chat" : "Chat composer"
+            )
             chatSurface
         }
-        .background(theme.colors.background.ignoresSafeArea())
-        .worldClassScreen(.chat)
+        .background {
+            if showsTranscript {
+                theme.colors.background.ignoresSafeArea()
+            }
+        }
+        .modifier(ChatTabWorldClassScreenModifier(isEnabled: showsTranscript))
         .task(id: authManager.currentUser?.id) {
             await loadLatestConversation()
         }
@@ -733,16 +743,20 @@ struct ChatTabView: View {
 
     private var chatSurface: some View {
         VStack(spacing: 0) {
-            chatMessages
+            if showsTranscript {
+                chatMessages
+            }
             starterPrompts
         }
+        .frame(maxHeight: showsTranscript ? .infinity : nil)
         .safeAreaInset(edge: .top, spacing: 0) {
-            chatHeader
+            if showsTranscript {
+                chatHeader
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             composer
         }
-        .background(theme.colors.background.ignoresSafeArea())
     }
 
     private var chatHeader: some View {
@@ -1034,6 +1048,9 @@ struct ChatTabView: View {
         )
         draft = ""
         isComposerFocused = false
+        if HomeChatChromePolicy.shouldExpandChat(afterSendingUserMessage: true) {
+            onExpandRequest()
+        }
         startTurn(message: trimmed, clientMessageId: clientMessageId)
     }
 
@@ -1285,6 +1302,18 @@ private struct ChatComposerTextHeightPreferenceKey: PreferenceKey {
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
+    }
+}
+
+private struct ChatTabWorldClassScreenModifier: ViewModifier {
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.worldClassScreen(.chat)
+        } else {
+            content
+        }
     }
 }
 

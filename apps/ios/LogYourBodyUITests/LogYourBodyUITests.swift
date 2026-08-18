@@ -324,7 +324,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.firstMatch.exists)
     }
 
-    func testChatIsAPeerTabWithoutReplacingTimelineNavigation() throws {
+    func testHomePinsChatComposerWithoutTabBar() throws {
         let app = XCUIApplication()
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
@@ -335,18 +335,29 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["Timeline"].exists)
         XCTAssertTrue(app.buttons["Stats"].exists)
-        XCTAssertTrue(app.buttons["Chat"].exists)
+        XCTAssertFalse(app.buttons["Chat"].exists)
         XCTAssertTrue(app.buttons["Settings"].exists)
         XCTAssertFalse(app.buttons["Open sidebar"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["chat_sidebar"].exists)
         XCTAssertFalse(app.tabBars.firstMatch.exists)
 
-        try openChatTab(in: app)
-        attachScreenshot(named: "timeline-chat-peer-navigation", from: app)
+        try waitForHomeChatComposer(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["home_chat_composer_dock"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].exists)
+        attachScreenshot(named: "home-chat-composer-dock", from: app)
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        prompt.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 10))
+        attachScreenshot(named: "home-chat-expanded-transcript", from: app)
 
         app.buttons["Timeline"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_scrubber"].exists)
+        XCTAssertTrue(app.textFields["chat_composer"].exists)
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
     }
 
     func testChatStreamsFixtureAnswer() throws {
@@ -356,7 +367,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatFirstFixture"
         ])
 
-        try openChatTab(in: app)
+        try waitForHomeChatComposer(in: app)
         XCTAssertFalse(app.tabBars.firstMatch.exists)
 
         let prompt = app.buttons["How am I doing?"]
@@ -382,7 +393,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatErrorFixture"
         ])
 
-        try openChatTab(in: app)
+        try waitForHomeChatComposer(in: app)
 
         let prompt = app.buttons["How am I doing?"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 12))
@@ -405,7 +416,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatOfflineFixture"
         ])
 
-        try openChatTab(in: app)
+        try waitForHomeChatComposer(in: app)
 
         let offlineCopy = app.staticTexts["You’re offline. Reconnect, then try again."]
         XCTAssertTrue(offlineCopy.waitForExistence(timeout: 12))
@@ -429,7 +440,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatSlowFixture"
         ])
 
-        try openChatTab(in: app)
+        try waitForHomeChatComposer(in: app)
 
         let prompt = app.buttons["How am I doing?"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 12))
@@ -459,7 +470,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatFirstFixture"
         ])
 
-        try openChatTab(in: app)
+        try waitForHomeChatComposer(in: app)
 
         let composer = app.textFields["chat_composer"]
         let shell = app.descendants(matching: .any)["chat_composer_shell"]
@@ -765,8 +776,14 @@ final class LogYourBodyUITests: XCTestCase {
             app.swipeUp()
         }
         XCTAssertTrue(scrubber.waitForExistence(timeout: 5))
-        try openChatTab(in: app)
-        attachScreenshot(named: "launch-quality-chat-tab", from: app)
+        try waitForHomeChatComposer(in: app)
+        attachScreenshot(named: "launch-quality-chat-composer", from: app)
+        let prompt = app.buttons["How am I doing?"]
+        if prompt.waitForExistence(timeout: 5) {
+            prompt.tap()
+            _ = app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8)
+            attachScreenshot(named: "launch-quality-chat-tab", from: app)
+        }
         app.buttons["Timeline"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
 
@@ -1056,19 +1073,15 @@ final class LogYourBodyUITests: XCTestCase {
         )
     }
 
-    private func openChatTab(in app: XCUIApplication) throws {
+    private func waitForHomeChatComposer(in app: XCUIApplication) throws {
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
 
-        let chatButton = app.buttons["Chat"]
-        XCTAssertTrue(chatButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(chatButton.isHittable)
-        chatButton.tap()
-
-        XCTAssertTrue(
-            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 10)
-        )
-        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_chat"].exists)
+        let composer = app.textFields["chat_composer"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["home_chat_composer_dock"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["chat_sidebar"].exists)
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
+        XCTAssertFalse(app.buttons["Chat"].exists)
     }
 
     private func waitForOneOf(_ elements: [XCUIElement], timeout: TimeInterval) -> Bool {

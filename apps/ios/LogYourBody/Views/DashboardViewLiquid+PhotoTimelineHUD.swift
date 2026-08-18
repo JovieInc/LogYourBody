@@ -51,49 +51,69 @@ extension DashboardViewLiquid {
                 .padding(.top, 8)
                 .padding(.bottom, 4)
 
-            ZStack {
-                switch selectedPhotoTimelineRootPage {
-                case .timeline:
-                    ZStack {
-                        timelineAccessibilityMarker(
-                            id: "photo_timeline_root_page_timeline",
-                            label: "Timeline page"
-                        )
-                        if bodyMetrics.isEmpty {
-                            photoTimelineHUDEmptyState
-                        } else {
-                            photoTimelineHUD
-                        }
-                    }
-                case .analytics:
-                    ZStack {
-                        timelineAccessibilityMarker(
-                            id: "photo_timeline_root_page_analytics",
-                            label: "Stats page"
-                        )
-                        photoTimelineAnalyticsPage
-                    }
-                case .chat:
-                    ZStack {
-                        timelineAccessibilityMarker(
-                            id: "photo_timeline_root_page_chat",
-                            label: "Chat page"
-                        )
-                        ChatTabView()
+            photoTimelineHomeContent
+                .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)
+                .opacity(isHomeChatExpanded ? 0 : 1)
+                .allowsHitTesting(!isHomeChatExpanded)
+                .accessibilityHidden(isHomeChatExpanded)
+                .clipped()
+
+            ChatTabView(
+                showsTranscript: isHomeChatExpanded,
+                onExpandRequest: {
+                    isHomeChatExpanded = true
+                }
+            )
+            .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? .infinity : nil)
+        }
+        .worldClassScreen(
+            HomeChatChromePolicy.worldClassScreen(
+                isChatExpanded: isHomeChatExpanded,
+                selected: selectedPhotoTimelineRootPage.worldClassScreen
+            )
+        )
+        .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
+            isHomeChatExpanded = false
+        }
+    }
+
+    @ViewBuilder
+    private var photoTimelineHomeContent: some View {
+        ZStack {
+            switch selectedPhotoTimelineRootPage {
+            case .timeline, .chat:
+                ZStack {
+                    timelineAccessibilityMarker(
+                        id: "photo_timeline_root_page_timeline",
+                        label: "Timeline page"
+                    )
+                    if bodyMetrics.isEmpty {
+                        photoTimelineHUDEmptyState
+                    } else {
+                        photoTimelineHUD
                     }
                 }
+            case .analytics:
+                ZStack {
+                    timelineAccessibilityMarker(
+                        id: "photo_timeline_root_page_analytics",
+                        label: "Stats page"
+                    )
+                    photoTimelineAnalyticsPage
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
         }
-        .worldClassScreen(selectedPhotoTimelineRootPage.worldClassScreen)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
     }
 
     private var photoTimelineRootNavigation: some View {
         HStack(spacing: 12) {
             JovieSegmentedControl(
                 selection: $selectedPhotoTimelineRootPage,
-                items: [.timeline, .analytics, .chat],
+                items: HomeChatChromePolicy.showsChatAsPeerNavigation
+                    ? [.timeline, .analytics, .chat]
+                    : [.timeline, .analytics],
                 title: { $0.navigationTitle },
                 accessibilityLabel: { $0.navigationTitle },
                 accessibilityHint: { "Shows the \($0.navigationTitle.lowercased()) page" },
@@ -101,7 +121,10 @@ extension DashboardViewLiquid {
                 selectedTint: theme.colors.text,
                 selectedForeground: theme.colors.background,
                 unselectedForeground: theme.colors.textSecondary,
-                onSelection: { _ in HapticManager.shared.selection() }
+                onSelection: { _ in
+                    HapticManager.shared.selection()
+                    isHomeChatExpanded = false
+                }
             )
 
             Spacer(minLength: 0)

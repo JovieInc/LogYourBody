@@ -39,6 +39,26 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertNotNil(ChatComposerGeometry.transitionAnimation(reduceMotion: false))
     }
 
+    func testHomeChatChromePinsComposerAndDropsPeerChatTab() {
+        XCTAssertTrue(HomeChatChromePolicy.pinsComposerOnHome)
+        XCTAssertFalse(HomeChatChromePolicy.showsTabBarOnHome)
+        XCTAssertFalse(HomeChatChromePolicy.showsChatAsPeerNavigation)
+        XCTAssertTrue(HomeChatChromePolicy.shouldExpandChat(afterSendingUserMessage: true))
+        XCTAssertFalse(HomeChatChromePolicy.shouldExpandChat(afterSendingUserMessage: false))
+        XCTAssertEqual(
+            HomeChatChromePolicy.worldClassScreen(isChatExpanded: false, selected: .photoTimeline),
+            .photoTimeline
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.worldClassScreen(isChatExpanded: true, selected: .photoTimeline),
+            .chat
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.worldClassScreen(isChatExpanded: false, selected: .stats),
+            .stats
+        )
+    }
+
     func testJovieSessionPolicyRequiresNonEmptyAccessToken() {
         XCTAssertFalse(JovieSessionPolicy.isSignedIn(nil))
         XCTAssertFalse(
