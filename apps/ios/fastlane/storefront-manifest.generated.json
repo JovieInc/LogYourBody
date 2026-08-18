@@ -17,11 +17,11 @@
       "id": "en-US",
       "metadata": {
         "name": "LogYourBody",
-        "subtitle": "Weight and body metrics",
+        "subtitle": "Know if the work is working.",
         "keywords": "progress,photos,composition,fat,lean,mass,private,timeline,ffmi,tracker,measurements,recomposition",
         "promotionalText": "Track progress photos, weight, body fat, and Apple Health context from a private photo-first timeline.",
-        "description": "LogYourBody is a focused body-composition tracker for people who want a private progress-photo timeline with weight, body-fat, and Apple Health context.\n\nStart with the essentials:\n\n- Add progress photos to a swipeable body timeline\n- Log weight and body-fat context in pounds or kilograms\n- Review Stats for weight, body fat, FFMI, and steps\n- Optionally connect Apple Health for weight, body-fat, height, and step context\n- Sync entries to your account\n- Export your account data\n- Keep access managed through LogYourBody Pro\n\nLogYourBody is built for consistent body-composition tracking without noisy coaching. Your photos and entries stay available on device and sync to your account when you are signed in.\n\nLogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.",
-        "releaseNotes": "Photo-first MVP release with paid access, progress-photo timeline, weight and body-fat logging, optional HealthKit context, account sync, restore purchases, data export, and account deletion.",
+        "description": "LogYourBody is a focused body-composition tracker for people who want a private progress-photo timeline with weight, body-fat, and Apple Health context.\n\nStart with the essentials:\n\n- Add progress photos to a private, time-weighted body timeline\n- Log weight and body-fat context in pounds or kilograms\n- Review Stats for weight, body fat, FFMI, and steps\n- Optionally connect Apple Health for weight, body-fat, height, and step context\n- Sync entries to your account\n- Export your account data\n- Keep access managed through LogYourBody Pro\n\nLogYourBody is built for consistent body-composition tracking without noisy coaching. Your photos and entries stay available on device and sync to your account when you are signed in.\n\nLogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.",
+        "releaseNotes": "Private body-composition timeline with a single time-weighted photo scrubber, weight and body-fat logging, optional Apple Health context, Stats, restore purchases, data export, and account deletion.",
         "supportUrl": "https://logyourbody.com/support",
         "marketingUrl": "https://logyourbody.com",
         "privacyUrl": "https://logyourbody.com/privacy"

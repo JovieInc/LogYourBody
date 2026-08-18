@@ -17,7 +17,7 @@ export const logYourBodyStorefront = {
       id: 'en-US',
       metadata: {
         name: 'LogYourBody',
-        subtitle: 'Weight and body metrics',
+        subtitle: 'Know if the work is working.',
         keywords:
           'progress,photos,composition,fat,lean,mass,private,timeline,ffmi,tracker,measurements,recomposition',
         promotionalText:
@@ -26,7 +26,7 @@ export const logYourBodyStorefront = {
 
 Start with the essentials:
 
-- Add progress photos to a swipeable body timeline
+- Add progress photos to a private, time-weighted body timeline
 - Log weight and body-fat context in pounds or kilograms
 - Review Stats for weight, body fat, FFMI, and steps
 - Optionally connect Apple Health for weight, body-fat, height, and step context
@@ -38,7 +38,7 @@ LogYourBody is built for consistent body-composition tracking without noisy coac
 
 LogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.`,
         releaseNotes:
-          'Photo-first MVP release with paid access, progress-photo timeline, weight and body-fat logging, optional HealthKit context, account sync, restore purchases, data export, and account deletion.',
+          'Private body-composition timeline with a single time-weighted photo scrubber, weight and body-fat logging, optional Apple Health context, Stats, restore purchases, data export, and account deletion.',
         supportUrl: 'https://logyourbody.com/support',
         marketingUrl: 'https://logyourbody.com',
         privacyUrl: 'https://logyourbody.com/privacy',
