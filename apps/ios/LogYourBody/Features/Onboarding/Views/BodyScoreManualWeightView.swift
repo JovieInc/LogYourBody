@@ -86,12 +86,13 @@ struct BodyScoreManualWeightView: View {
                             .padding(.horizontal, 18)
                             .frame(minHeight: JovieTokens.controlHeight)
                             .systemBGlassSurface(
-                                cornerRadius: theme.radius.input,
+                                cornerRadius: JovieTokens.controlHeight,
                                 tint: weightFieldFocused ? theme.colors.primary : theme.colors.text,
                                 tintOpacity: weightFieldFocused ? 0.07 : 0.03,
                                 borderColor: weightFieldBorderColor,
                                 borderOpacity: 1
                             )
+                            .clipShape(Capsule(style: .continuous))
                             .overlay(
                                 HStack {
                                     Spacer()
@@ -113,14 +114,16 @@ struct BodyScoreManualWeightView: View {
                                         .foregroundStyle(theme.colors.text)
                                         .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
                                         .systemBGlassSurface(
-                                            cornerRadius: 16,
+                                            cornerRadius: JovieTokens.controlHeight,
                                             tint: theme.colors.text,
                                             tintOpacity: 0.03,
                                             borderColor: theme.colors.border,
                                             borderOpacity: 0.55
                                         )
+                                        .clipShape(Circle())
                                 }
                                 .buttonStyle(.plain)
+                                .jovieTouchTarget()
                                 .accessibilityLabel("Decrease weight by \(stepDescription)")
 
                                 Button {
@@ -131,14 +134,16 @@ struct BodyScoreManualWeightView: View {
                                         .foregroundStyle(theme.colors.text)
                                         .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
                                         .systemBGlassSurface(
-                                            cornerRadius: 16,
+                                            cornerRadius: JovieTokens.controlHeight,
                                             tint: theme.colors.text,
                                             tintOpacity: 0.05,
                                             borderColor: theme.colors.border,
                                             borderOpacity: 0.65
                                         )
+                                        .clipShape(Circle())
                                 }
                                 .buttonStyle(.plain)
+                                .jovieTouchTarget()
                                 .accessibilityLabel("Increase weight by \(stepDescription)")
                             }
                         }

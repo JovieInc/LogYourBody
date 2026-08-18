@@ -7,84 +7,82 @@ import SwiftUI
 
 struct LoginView: View {
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var authManager: AuthManager
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var showTerms = false
     @State private var showPrivacy = false
+    @State private var hasAppeared = false
 
     var body: some View {
         ZStack {
             theme.colors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                Spacer()
+                Spacer(minLength: 72)
 
-                AuthHeader(
-                    title: "Your body, over time.",
-                    subtitle: "Private body-composition tracking that takes seconds, not another habit to manage."
-                )
+                VStack(spacing: JovieTokens.sectionGap) {
+                    AuthHeader(
+                        title: "Your body, over time.",
+                        subtitle: "Private body-composition tracking that takes seconds, not another habit to manage."
+                    )
+                    .opacity(hasAppeared ? 1 : 0)
+                    .offset(y: reduceMotion || hasAppeared ? 0 : 8)
 
-                VStack(spacing: 14) {
-                    Button(action: authenticate) {
-                        HStack(spacing: 10) {
-                            if isLoading {
-                                ProgressView()
-                                    .progressViewStyle(.circular)
-                                    .tint(theme.colors.background)
-                            } else {
-                                Image(systemName: "apple.logo")
+                    VStack(spacing: JovieTokens.itemGap) {
+                        appleSignInControl
+
+                        Text("Apple is the fastest way back to your private history.")
+                            .font(theme.typography.captionLarge)
+                            .foregroundColor(theme.colors.textSecondary)
+                            .multilineTextAlignment(.center)
+
+                        if let providerError = authManager.authProviderInitError {
+                            VStack(spacing: JovieTokens.itemGap) {
+                                Text(providerError)
+                                    .font(theme.typography.captionLarge)
+                                    .foregroundColor(theme.colors.error)
+                                    .multilineTextAlignment(.center)
+
+                                BaseButton(
+                                    "Retry connection",
+                                    configuration: ButtonConfiguration(
+                                        style: .secondary,
+                                        size: .small,
+                                        fullWidth: true
+                                    ),
+                                    action: {
+                                        Task { await authManager.retryAuthProviderInitialization() }
+                                    }
+                                )
                             }
-
-                            Text(isLoading ? "Opening Apple…" : "Continue with Apple")
-                                .font(theme.typography.labelLarge)
-                        }
-                        .foregroundColor(theme.colors.background)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .background(Capsule(style: .continuous).fill(theme.colors.text))
-                    }
-                    .disabled(isLoading || !authManager.isAuthProviderReady)
-                    .accessibilityIdentifier("continueWithAppleButton")
-
-                    Text("Apple is the fastest way back to your private history.")
-                        .font(theme.typography.captionLarge)
-                        .foregroundColor(theme.colors.textSecondary)
-                        .multilineTextAlignment(.center)
-
-                    if let providerError = authManager.authProviderInitError {
-                        VStack(spacing: 10) {
-                            Text(providerError)
-                                .font(theme.typography.captionLarge)
-                                .foregroundColor(theme.colors.error)
-                                .multilineTextAlignment(.center)
-
-                            Button("Retry") {
-                                Task { await authManager.retryAuthProviderInitialization() }
-                            }
-                            .font(theme.typography.labelMedium)
-                            .foregroundColor(theme.colors.text)
                         }
                     }
+                    .opacity(hasAppeared ? 1 : 0)
+                    .offset(y: reduceMotion || hasAppeared ? 0 : 8)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 36)
+                .frame(maxWidth: 430)
+                .padding(.horizontal, JovieTokens.screenInset)
 
-                Spacer()
+                Spacer(minLength: 72)
 
-                HStack(spacing: 5) {
+                VStack(spacing: 2) {
                     Text("By continuing, you agree to our")
-                    Button("Terms") { showTerms = true }
-                    Text("and")
-                    Button("Privacy Policy") { showPrivacy = true }
+                    HStack(spacing: 4) {
+                        DSAuthLink(title: "Terms") { showTerms = true }
+                        Text("and")
+                        DSAuthLink(title: "Privacy Policy") { showPrivacy = true }
+                    }
                 }
                 .font(theme.typography.captionSmall)
                 .foregroundColor(theme.colors.textSecondary)
-                .padding(.bottom, 24)
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.bottom, JovieTokens.compactInset)
             }
         }
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .standardErrorAlert(isPresented: $showError, message: errorMessage)
         .sheet(isPresented: $showTerms) {
             NavigationStack { LegalDocumentView(documentType: .terms) }
@@ -94,8 +92,43 @@ struct LoginView: View {
         }
         .onAppear {
             AppServicePorts.analyticsTracker.track(event: "login_view")
+            guard !hasAppeared else { return }
+            if reduceMotion {
+                hasAppeared = true
+            } else {
+                withAnimation(.easeOut(duration: JovieTokens.subtleDuration)) {
+                    hasAppeared = true
+                }
+            }
         }
         .worldClassScreen(.signIn)
+    }
+
+    private var appleSignInControl: some View {
+        Button(action: authenticate) {
+            HStack(spacing: 10) {
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(theme.colors.background)
+                } else {
+                    Image(systemName: "apple.logo")
+                }
+
+                Text(isLoading ? "Opening Apple…" : "Continue with Apple")
+                    .font(theme.typography.labelLarge)
+            }
+            .foregroundColor(theme.colors.background)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: JovieTokens.controlHeight)
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .background(theme.colors.text, in: Capsule(style: .continuous))
+        .jovieTouchTarget()
+        .disabled(isLoading || !authManager.isAuthProviderReady)
+        .accessibilityIdentifier("continueWithAppleButton")
+        .accessibilityHint("Starts Sign in with Apple through Jovie Better Auth.")
     }
 
     private func authenticate() {

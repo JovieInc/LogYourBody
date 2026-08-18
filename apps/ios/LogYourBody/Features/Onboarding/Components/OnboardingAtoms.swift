@@ -76,6 +76,7 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
                 Capsule(style: .continuous)
                     .fill(theme.colors.text.opacity(buttonOpacity(isPressed: configuration.isPressed)))
             )
+            .jovieTouchTarget()
             .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(reduceMotion ? nil : theme.animation.fast, value: configuration.isPressed)
     }
@@ -96,14 +97,16 @@ struct OnboardingSecondaryButtonStyle: ButtonStyle {
             .font(theme.typography.labelLarge)
             .frame(maxWidth: .infinity)
             .frame(minHeight: JovieTokens.compactControlHeight)
+            .jovieTouchTarget()
             .foregroundStyle(theme.colors.text)
             .systemBGlassSurface(
-                cornerRadius: theme.radius.button,
+                cornerRadius: JovieTokens.controlHeight,
                 tint: theme.colors.text,
                 tintOpacity: configuration.isPressed ? 0.05 : 0.035,
                 borderColor: theme.colors.border,
                 borderOpacity: 0.65
             )
+            .clipShape(Capsule(style: .continuous))
             .animation(reduceMotion ? nil : theme.animation.fast, value: configuration.isPressed)
     }
 }

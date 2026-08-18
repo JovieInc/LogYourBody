@@ -33,28 +33,17 @@ struct AuthConsentCheckbox: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Button(action: { isChecked.toggle() }, label: {
-                Image(systemName: isChecked ? "checkmark" : "square")
-                    .font(.system(.body, design: .default).weight(.semibold))
-                    .foregroundColor(isChecked ? .jovieActionText : theme.colors.textSecondary)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(isChecked ? Color.jovieAction : Color.jovieSurfaceElevated)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .stroke(isChecked ? Color.clear : Color.jovieHairline, lineWidth: 1)
-                    )
-                    .frame(width: 44, height: 44)
-            })
-            .buttonStyle(.plain)
+        HStack(alignment: .center, spacing: 12) {
+            Toggle(isOn: $isChecked) {
+                EmptyView()
+            }
+            .labelsHidden()
+            .tint(Color.jovieAction)
+            .jovieTouchTarget()
             .accessibilityLabel("Agree to \(linkText)")
-            .accessibilityValue(isChecked ? "Selected" : "Not selected")
             .accessibilityHint("Required to create an account.")
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("I agree to the")
                     .font(theme.typography.bodySmall)
                     .foregroundColor(theme.colors.textSecondary)
@@ -68,7 +57,8 @@ struct AuthConsentCheckbox: View {
                         .multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .jovieTouchTarget()
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityLabel("Read \(linkText)")
                 .accessibilityHint(text)
             }

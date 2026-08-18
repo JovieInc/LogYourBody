@@ -21,8 +21,7 @@ struct DSAuthLink: View {
                 .underline()
         }
         .buttonStyle(PlainButtonStyle())
-        .frame(minWidth: 44, minHeight: 44)
-        .contentShape(Rectangle())
+        .jovieTouchTarget()
     }
 }
 
@@ -43,8 +42,7 @@ struct DSAuthNavigationLink<Destination: View>: View {
                 .underline()
         }
         .buttonStyle(PlainButtonStyle())
-        .frame(minWidth: 44, minHeight: 44)
-        .contentShape(Rectangle())
+        .jovieTouchTarget()
     }
 }
 

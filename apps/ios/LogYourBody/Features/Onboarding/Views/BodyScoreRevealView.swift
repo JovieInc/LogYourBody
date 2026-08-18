@@ -221,13 +221,14 @@ struct BodyScoreRevealView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .systemBGlassSurface(
-            cornerRadius: theme.radius.full,
-            tint: theme.colors.text,
-            tintOpacity: 0.035,
-            borderColor: theme.colors.border,
-            borderOpacity: 0.55
+        .background(
+            theme.colors.surface,
+            in: Capsule(style: .continuous)
         )
+        .overlay {
+            Capsule(style: .continuous)
+                .stroke(theme.colors.border.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(referenceAccessibilityText(result: result))
     }

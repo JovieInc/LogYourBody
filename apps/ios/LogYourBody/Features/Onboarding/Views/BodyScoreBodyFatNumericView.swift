@@ -61,12 +61,13 @@ struct BodyScoreBodyFatNumericView: View {
                         .padding(.horizontal, 20)
                         .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
-                            cornerRadius: 20,
+                            cornerRadius: JovieTokens.controlHeight,
                             tint: percentageFieldFocused ? theme.colors.primary : theme.colors.text,
                             tintOpacity: percentageFieldFocused ? 0.07 : 0.03,
                             borderColor: percentageFieldStrokeColor,
                             borderOpacity: 1
                         )
+                        .clipShape(Capsule(style: .continuous))
                         .accessibilityLabel("Body fat percentage")
                         .accessibilityHint("Enter a value between 4 and 60 percent.")
 

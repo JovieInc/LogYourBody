@@ -73,14 +73,7 @@ struct BiometricAuthView: View {
             )
             .accessibilityHint("Starts device-owner authentication")
         }
-        .padding(JovieTokens.sectionGap)
         .frame(maxWidth: 440)
-        .systemBGlassSurface(
-            cornerRadius: JovieTokens.cardRadius,
-            tint: .white,
-            tintOpacity: 0.025,
-            borderColor: .jovieHairline
-        )
         .accessibilityElement(children: .contain)
     }
 }

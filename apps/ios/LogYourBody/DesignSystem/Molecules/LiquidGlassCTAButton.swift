@@ -8,12 +8,13 @@
 import SwiftUI
 
 struct LiquidGlassCTAButton: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     let text: String
     let icon: String?
     let action: () -> Void
     let isEnabled: Bool
 
-    // Convenience initializers
     init(
         text: String,
         action: @escaping () -> Void,
@@ -42,10 +43,12 @@ struct LiquidGlassCTAButton: View {
             text,
             configuration: ButtonConfiguration(
                 style: .custom(
-                    background: liquidGlassBackground,
+                    background: reduceTransparency
+                        ? (isEnabled ? Color.white : Color.white.opacity(0.18))
+                        : Color.clear,
                     foreground: isEnabled ? .black : .white.opacity(0.5)
                 ),
-                size: .large,
+                size: .medium,
                 isEnabled: isEnabled,
                 fullWidth: true,
                 icon: icon,
@@ -53,40 +56,19 @@ struct LiquidGlassCTAButton: View {
             ),
             action: action
         )
-        .overlay(liquidGlassOverlay)
-        .clipShape(RoundedRectangle(cornerRadius: 28))
-    }
-
-    // MARK: - Styling Components
-
-    private var liquidGlassBackground: Color {
-        if #available(iOS 18.0, *) {
-            if isEnabled {
-                return Color.white
-            } else {
-                return Color.white.opacity(0.1)
+        .background {
+            if !reduceTransparency {
+                Capsule(style: .continuous)
+                    .fill(isEnabled ? Color.white : Color.white.opacity(0.12))
             }
-        } else {
-            return isEnabled ? Color.white : Color.white.opacity(0.1)
         }
-    }
-
-    @ViewBuilder
-    private var liquidGlassOverlay: some View {
-        if isEnabled {
-            RoundedRectangle(cornerRadius: 28)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.3),
-                            Color.white.opacity(0.0)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+        .overlay {
+            if isEnabled && !reduceTransparency {
+                Capsule(style: .continuous)
+                    .stroke(Color.white.opacity(0.28), lineWidth: 1)
+            }
         }
+        .clipShape(Capsule(style: .continuous))
     }
 }
 
@@ -101,24 +83,23 @@ struct LiquidGlassSecondaryCTAButton: View {
             text,
             configuration: ButtonConfiguration(
                 style: .custom(
-                    background: Color.white.opacity(0.1),
-                    foreground: Color.white.opacity(0.7)
+                    background: Color.clear,
+                    foreground: Color.white.opacity(0.84)
                 ),
-                size: .custom(
-                    height: 44,
-                    padding: EdgeInsets(top: 12, leading: 24, bottom: 12, trailing: 24),
-                    fontSize: 15
-                ),
+                size: .small,
                 isEnabled: true,
                 fullWidth: false
             ),
             action: action
         )
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+        .systemBGlassSurface(
+            cornerRadius: JovieTokens.controlHeight,
+            tint: .white,
+            tintOpacity: 0.04,
+            borderColor: .white,
+            borderOpacity: 0.18
         )
-        .clipShape(Capsule())
+        .clipShape(Capsule(style: .continuous))
     }
 }
 
@@ -127,6 +108,7 @@ struct LiquidGlassSecondaryCTAButton: View {
 struct LiquidGlassCTAModifier: ViewModifier {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     let isEnabled: Bool
 
@@ -134,55 +116,36 @@ struct LiquidGlassCTAModifier: ViewModifier {
         content
             .font(.system(.headline, design: .default).weight(.semibold))
             .frame(maxWidth: .infinity)
-            .frame(minHeight: 56)
+            .frame(minHeight: JovieTokens.controlHeight)
+            .jovieTouchTarget()
             .foregroundColor(isEnabled ? .black : .white.opacity(0.5))
             .background(backgroundView)
             .overlay(overlayView)
-            .clipShape(RoundedRectangle(cornerRadius: 28))
+            .clipShape(Capsule(style: .continuous))
             .animation(reduceMotion ? nil : theme.animation.fast, value: isEnabled)
     }
 
     @ViewBuilder private var backgroundView: some View {
-        if #available(iOS 18.0, *) {
-            if isEnabled {
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(Color.white)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28)
-                            .fill(theme.materials.glassUltraThin)
-                            .opacity(0.1)
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(Color.white.opacity(0.1))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28)
-                            .fill(theme.materials.glassUltraThin)
-                            .opacity(0.2)
-                    )
-            }
+        if reduceTransparency {
+            Capsule(style: .continuous)
+                .fill(isEnabled ? Color.white : Color.white.opacity(0.18))
+        } else if isEnabled {
+            Capsule(style: .continuous)
+                .fill(Color.white)
         } else {
-            RoundedRectangle(cornerRadius: 28)
-                .fill(
-                    isEnabled ? Color.white : Color.white.opacity(0.1)
+            Capsule(style: .continuous)
+                .fill(theme.materials.glassUltraThin)
+                .overlay(
+                    Capsule(style: .continuous)
+                        .fill(Color.white.opacity(0.08))
                 )
         }
     }
 
     @ViewBuilder private var overlayView: some View {
-        if isEnabled {
-            RoundedRectangle(cornerRadius: 28)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.3),
-                            Color.white.opacity(0.0)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+        if isEnabled && !reduceTransparency {
+            Capsule(style: .continuous)
+                .stroke(Color.white.opacity(0.28), lineWidth: 1)
         }
     }
 }
