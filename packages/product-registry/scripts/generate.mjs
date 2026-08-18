@@ -129,6 +129,7 @@ const imgSrc = [
   supabaseProjectUrl,
   `https://${endpoints.vendor.pravatar.host}`,
   `https://${endpoints.vendor.github.avatarsHost}`,
+  `https://${endpoints.vendor.cloudflare.r2PublicHost}`,
 ].join(' ');
 const cspReportOnlyDirectives = [
   `connect-src ${connectSrc}`,

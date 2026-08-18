@@ -90,6 +90,10 @@ export const logYourBody = {
     vendor: {
       supabaseProjectRef: 'ihivupqpctpkrgqgxfjf',
       cloudinary: { apiHost: 'api.cloudinary.com', deliveryHost: 'res.cloudinary.com' },
+      cloudflare: {
+        r2ApiHost: 'r2.cloudflarestorage.com',
+        r2PublicHost: 'photos.logyourbody.com',
+      },
       revenuecat: { apiHost: 'api.revenuecat.com' },
       statsig: { apiHost: 'statsigapi.net' },
       sentry: { ingestHost: '*.ingest.sentry.io' },
@@ -167,6 +171,10 @@ export const logYourBody = {
       { value: 'https://guides.cocoapods.org', reason: 'CocoaPods guide link in gitignore boilerplate.' },
       { value: 'https://supabase.com', reason: 'Supabase docs and dashboard links.' },
       { value: 'https://cloudinary.com', reason: 'Cloudinary console link in edge-function docs.' },
+      {
+        value: 'https://developers.cloudflare.com',
+        reason: 'Cloudflare R2 docs referenced by the first-party photo-store setup.',
+      },
       { value: 'https://openrouter.ai', reason: 'OpenRouter API used by advisory AI review CI.' },
       { value: 'https://platform.openai.com', reason: 'OpenAI platform link in CI docs.' },
       { value: 'https://claude.ai', reason: 'Claude product links in AI tooling docs.' },

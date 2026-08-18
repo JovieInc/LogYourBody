@@ -87,7 +87,7 @@ final class PhotoUploadManagerTests: XCTestCase {
 
         let stayOnDevice =
             "Progress photo cloud storage is not available. " +
-            "Photos stay on this device until Cloudinary is configured on the first-party API."
+            "Photos stay on this device until Cloudflare R2 is configured on the first-party API."
         PhotoUploadStubURLProtocol.install { _ in
             .http(
                 503,
@@ -176,6 +176,104 @@ final class PhotoUploadManagerTests: XCTestCase {
             "Network connection error. Check your connection and try again."
         )
         XCTAssertFalse(manager.isUploading)
+    }
+
+    // MARK: - Cloudflare R2 upload
+
+    func testSignedR2PutPersistsPhotoURLWithoutSupabaseStorage() async throws {
+        let userId = "photo_r2_user_\(UUID().uuidString)"
+        let metricId = UUID().uuidString
+        let metrics = try await seedPhotoPlaceholder(id: metricId, userId: userId)
+        authenticate(userId: userId)
+
+        let objectKey = "progress-photos/\(userId)/\(metricId)_1755453600000.jpg"
+        let photoUrl = "https://photos.logyourbody.com/\(objectKey)"
+        let uploadPath = "/r2/\(objectKey)"
+        PhotoUploadStubURLProtocol.install { request in
+            if request.httpMethod == "POST" {
+                let body = PhotoUploadStubURLProtocol.bodyData(of: request).flatMap {
+                    try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
+                }
+                XCTAssertEqual(body?["metricsId"] as? String, metricId)
+                XCTAssertEqual(body?["contentType"] as? String, "image/jpeg")
+                return .http(200, body: Data("""
+                {
+                  "uploadUrl": "https://\(PhotoUploadStubURLProtocol.stubHost)\(uploadPath)",
+                  "uploadMethod": "PUT",
+                  "uploadHeaders": { "Content-Type": "image/jpeg" },
+                  "objectKey": "\(objectKey)",
+                  "photoUrl": "\(photoUrl)",
+                  "storagePath": "\(objectKey)",
+                  "expiresIn": 300
+                }
+                """.utf8))
+            }
+
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.url?.path, uploadPath)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/jpeg")
+            let uploaded = PhotoUploadStubURLProtocol.bodyData(of: request)
+            XCTAssertFalse(uploaded?.isEmpty ?? true)
+            return .http(200, body: Data())
+        }
+
+        let manager = makeManager(token: "stub-jwt")
+        let returned = try await manager.uploadProgressPhoto(
+            for: metrics,
+            imageData: try makePNGData()
+        )
+
+        XCTAssertEqual(returned, photoUrl)
+        XCTAssertNil(manager.uploadError)
+        XCTAssertFalse(manager.isUploading)
+
+        let requests = PhotoUploadStubURLProtocol.requests
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests[0].httpMethod, "POST")
+        XCTAssertEqual(requests[0].url?.path, "/api/auth/mobile/photos")
+        XCTAssertEqual(requests[0].value(forHTTPHeaderField: "Authorization"), "Bearer stub-jwt")
+        XCTAssertNil(requests[0].value(forHTTPHeaderField: "apikey"))
+        XCTAssertEqual(requests[1].httpMethod, "PUT")
+        XCTAssertFalse(requests[1].url?.path.contains("/storage/v1/") ?? true)
+
+        let cached = try await cachedPhotoState(metricId: metricId)
+        XCTAssertEqual(cached.photoUrl, photoUrl)
+        XCTAssertEqual(cached.originalPhotoUrl, objectKey)
+        XCTAssertFalse(cached.isSynced)
+        XCTAssertEqual(cached.syncStatus, "pending")
+    }
+
+    func testSignedPutToUnexpectedHostIsRejectedBeforeUpload() async throws {
+        let userId = "photo_host_user_\(UUID().uuidString)"
+        let metricId = UUID().uuidString
+        let metrics = try await seedPhotoPlaceholder(id: metricId, userId: userId)
+        authenticate(userId: userId)
+
+        PhotoUploadStubURLProtocol.install { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            return .http(200, body: Data("""
+            {
+              "uploadUrl": "https://evil.example/steal",
+              "uploadMethod": "PUT",
+              "uploadHeaders": { "Content-Type": "image/jpeg" },
+              "objectKey": "progress-photos/\(userId)/stolen.jpg",
+              "photoUrl": "https://evil.example/stolen.jpg",
+              "storagePath": "progress-photos/\(userId)/stolen.jpg"
+            }
+            """.utf8))
+        }
+
+        let manager = makeManager(token: "stub-jwt")
+        await assertThrowsPhotoError(
+            .uploadFailed("Photo upload is temporarily unavailable. Please try again.")
+        ) {
+            _ = try await manager.uploadProgressPhoto(for: metrics, imageData: try makePNGData())
+        }
+
+        XCTAssertEqual(PhotoUploadStubURLProtocol.requests.count, 1)
+        let cached = try await cachedPhotoState(metricId: metricId)
+        XCTAssertNil(cached.photoUrl)
+        XCTAssertNil(cached.originalPhotoUrl)
     }
 
     // MARK: - Helpers
@@ -354,9 +452,9 @@ private final class PhotoUploadStubURLProtocol: URLProtocol {
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 1_024)
         defer { buffer.deallocate() }
         while stream.hasBytesAvailable {
-            let count = stream.read(buffer, maxLength: 1_024)
-            guard count > 0 else { break }
-            data.append(buffer, count: count)
+            let bytesRead = stream.read(buffer, maxLength: 1_024)
+            guard bytesRead > 0 else { break }
+            data.append(buffer, count: bytesRead)
         }
         return data.isEmpty ? nil : data
     }

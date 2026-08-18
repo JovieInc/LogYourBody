@@ -46,6 +46,10 @@ export interface ProductEndpoints {
       readonly apiHost: string;
       readonly deliveryHost: string;
     };
+    readonly cloudflare: {
+      readonly r2ApiHost: string;
+      readonly r2PublicHost: string;
+    };
     readonly revenuecat: {
       readonly apiHost: string;
     };

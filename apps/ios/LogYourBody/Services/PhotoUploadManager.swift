@@ -147,13 +147,8 @@ class PhotoUploadManager: ObservableObject {
 
     func uploadProgressPhoto(for metrics: BodyMetrics, image: UIImage) async throws -> String {
         guard let userId = authManager.currentUser?.id else {
-            // print("❌ PhotoUploadManager: No authenticated user")
             throw PhotoError.notAuthenticated
         }
-
-        // print("📸 PhotoUploadManager: Starting upload for metrics \(metrics.id)")
-        // print("📸 PhotoUploadManager: Current user ID: \(userId)")
-        // print("📸 PhotoUploadManager: Current user email: \(authManager.currentUser?.email ?? "nil")")
 
         ErrorTrackingService.shared.addBreadcrumb(
             message: "Starting photo upload",
@@ -165,6 +160,51 @@ class PhotoUploadManager: ObservableObject {
             ]
         )
 
+        return try await performProgressPhotoUpload(
+            metricsId: metrics.id,
+            userId: userId,
+            operation: "uploadProgressPhoto"
+        ) {
+            guard let imageData = self.prepareImageForUpload(image) else {
+                throw PhotoError.imageConversionFailed
+            }
+            return imageData
+        }
+    }
+
+    // Support for HEIC/HEIF format conversion
+    func uploadProgressPhoto(for metrics: BodyMetrics, imageData: Data) async throws -> String {
+        guard let userId = authManager.currentUser?.id else {
+            throw PhotoError.notAuthenticated
+        }
+
+        ErrorTrackingService.shared.addBreadcrumb(
+            message: "Starting photo upload (data)",
+            category: "photos",
+            data: [
+                "operation": "uploadProgressPhotoData",
+                "metricsId": metrics.id,
+                "userId": userId
+            ]
+        )
+
+        return try await performProgressPhotoUpload(
+            metricsId: metrics.id,
+            userId: userId,
+            operation: "uploadProgressPhotoData"
+        ) {
+            try self.jpegDataForUpload(from: imageData)
+        }
+    }
+
+    // MARK: - Private Methods
+
+    private func performProgressPhotoUpload(
+        metricsId: String,
+        userId: String,
+        operation: String,
+        prepare: () throws -> Data
+    ) async throws -> String {
         self.isUploading = true
         self.uploadProgress = 0.0
         self.uploadError = nil
@@ -172,7 +212,7 @@ class PhotoUploadManager: ObservableObject {
         let uploadId = UUID().uuidString
         self.currentUploadTask = UploadTask(
             id: uploadId,
-            metricsId: metrics.id,
+            metricsId: metricsId,
             status: .preparing,
             progress: 0.0,
             error: nil
@@ -184,10 +224,43 @@ class PhotoUploadManager: ObservableObject {
         }
 
         do {
-            try await requestRemotePhotoStore(metricsId: metrics.id)
-            throw PhotoError.uploadFailed(
-                "Progress photo cloud storage is not available. Photos stay on this device."
+            updateUploadStatus(.preparing, progress: 0.1)
+            let imageData = try prepare()
+
+            updateUploadStatus(.uploading, progress: 0.25)
+            let ticket = try await requestRemotePhotoStore(
+                metricsId: metricsId,
+                contentType: "image/jpeg",
+                byteSize: imageData.count
             )
+
+            updateUploadStatus(.uploading, progress: 0.45)
+            try await putPhotoObject(ticket: ticket, imageData: imageData)
+
+            let storagePath = ticket.storagePath
+            await coreDataManager.markPhotoUploadStorageCommitted(
+                id: metricsId,
+                userId: userId,
+                storagePath: storagePath
+            )
+
+            updateUploadStatus(.processing, progress: 0.8)
+            try await updateMetricsWithPhoto(
+                metricsId: metricsId,
+                storagePath: storagePath,
+                processedUrl: ticket.photoUrl
+            )
+
+            updateUploadStatus(.completed, progress: 1.0)
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "Photo upload completed",
+                category: "photos",
+                data: [
+                    "operation": operation,
+                    "metricsId": metricsId
+                ]
+            )
+            return ticket.photoUrl
         } catch {
             self.uploadError = error.localizedDescription
             let appError: AppError
@@ -195,13 +268,13 @@ class PhotoUploadManager: ObservableObject {
                 appError = AppError.photo(photoError)
             } else {
                 appError = AppError.unexpected(
-                    context: "uploadProgressPhoto",
+                    context: operation,
                     underlying: error
                 )
             }
             let context = ErrorContext(
                 feature: "photos",
-                operation: "uploadProgressPhoto",
+                operation: operation,
                 screen: nil,
                 userId: userId
             )
@@ -212,13 +285,13 @@ class PhotoUploadManager: ObservableObject {
                 category: "photos",
                 level: .error,
                 data: [
-                    "operation": "uploadProgressPhoto",
-                    "metricsId": metrics.id
+                    "operation": operation,
+                    "metricsId": metricsId
                 ]
             )
             self.currentUploadTask = UploadTask(
                 id: uploadId,
-                metricsId: metrics.id,
+                metricsId: metricsId,
                 status: .failed,
                 progress: self.uploadProgress,
                 error: error.localizedDescription
@@ -226,8 +299,6 @@ class PhotoUploadManager: ObservableObject {
             throw error
         }
     }
-
-    // MARK: - Private Methods
 
     private func prepareImageForUpload(_ image: UIImage) -> Data? {
         // For regular uploads, we'll use the simple orientation fix
@@ -261,70 +332,19 @@ class PhotoUploadManager: ObservableObject {
         return resizedImage.jpegData(compressionQuality: 0.85)
     }
 
-    // Support for HEIC/HEIF format conversion
-    func uploadProgressPhoto(for metrics: BodyMetrics, imageData: Data) async throws -> String {
-        guard let userId = authManager.currentUser?.id else {
-            throw PhotoError.notAuthenticated
+    private func jpegDataForUpload(from imageData: Data) throws -> Data {
+        if let image = UIImage(data: imageData),
+           let jpegData = prepareImageForUpload(image) {
+            return jpegData
         }
-
-        ErrorTrackingService.shared.addBreadcrumb(
-            message: "Starting photo upload (data)",
-            category: "photos",
-            data: [
-                "operation": "uploadProgressPhotoData",
-                "metricsId": metrics.id,
-                "userId": userId
-            ]
-        )
-
-        self.isUploading = true
-        self.uploadProgress = 0.0
-        self.uploadError = nil
-
-        let uploadId = UUID().uuidString
-        self.currentUploadTask = UploadTask(
-            id: uploadId,
-            metricsId: metrics.id,
-            status: .preparing,
-            progress: 0.0,
-            error: nil
-        )
-
-        defer {
-            self.isUploading = false
-            self.currentUploadTask = nil
-        }
-
-        do {
-            try await requestRemotePhotoStore(metricsId: metrics.id)
-            throw PhotoError.uploadFailed(
-                "Progress photo cloud storage is not available. Photos stay on this device."
-            )
-        } catch {
-            self.uploadError = error.localizedDescription
-            self.currentUploadTask = UploadTask(
-                id: uploadId,
-                metricsId: metrics.id,
-                status: .failed,
-                progress: self.uploadProgress,
-                error: error.localizedDescription
-            )
-
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "Photo upload (data) failed: \(error.localizedDescription)",
-                category: "photos",
-                level: .error,
-                data: [
-                    "operation": "uploadProgressPhotoData",
-                    "metricsId": metrics.id
-                ]
-            )
-
-            throw error
-        }
+        throw PhotoError.imageConversionFailed
     }
 
-    private func requestRemotePhotoStore(metricsId: String) async throws {
+    private func requestRemotePhotoStore(
+        metricsId: String,
+        contentType: String,
+        byteSize: Int
+    ) async throws -> RemotePhotoUploadTicket {
         let token = try await authenticatedJWT()
         let base = supabaseBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard let url = URL(string: "\(base)/api/auth/mobile/photos") else {
@@ -336,7 +356,11 @@ class PhotoUploadManager: ObservableObject {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["metricsId": metricsId])
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "metricsId": metricsId,
+            "contentType": contentType,
+            "byteSize": byteSize
+        ])
 
         let data: Data
         let response: URLResponse
@@ -369,6 +393,78 @@ class PhotoUploadManager: ObservableObject {
             let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
             throw PhotoError.uploadFailed(errorMessage)
         }
+
+        return try RemotePhotoUploadTicket.parse(data)
+    }
+
+    private func putPhotoObject(ticket: RemotePhotoUploadTicket, imageData: Data) async throws {
+        try assertAllowedUploadURL(ticket.uploadURL)
+
+        var request = URLRequest(url: ticket.uploadURL)
+        request.httpMethod = ticket.uploadMethod
+        request.httpBody = imageData
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        for (header, value) in ticket.uploadHeaders {
+            request.setValue(value, forHTTPHeaderField: header)
+        }
+        if request.value(forHTTPHeaderField: "Content-Type") == nil {
+            request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await storageSessionProvider().data(for: request)
+        } catch {
+            throw mapUploadEndpointError(error, action: "Photo upload")
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PhotoError.uploadFailed("Photo upload failed. Please try again.")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw PhotoError.uploadFailed(errorMessage)
+        }
+    }
+
+    private func assertAllowedUploadURL(_ url: URL) throws {
+        guard url.scheme?.lowercased() == "https",
+              let host = url.host?.lowercased() else {
+            throw PhotoError.uploadFailed("Photo upload is temporarily unavailable. Please try again.")
+        }
+
+        let apiHost = URL(string: supabaseBaseURL)?.host?.lowercased()
+        let isCloudflareR2 = host == "r2.cloudflarestorage.com" ||
+            host.hasSuffix(".r2.cloudflarestorage.com")
+        let isFirstPartyAPIHost = apiHost.map { host == $0 } ?? false
+        guard isCloudflareR2 || isFirstPartyAPIHost else {
+            throw PhotoError.uploadFailed("Photo upload is temporarily unavailable. Please try again.")
+        }
+    }
+
+    private func updateMetricsWithPhoto(
+        metricsId: String,
+        storagePath: String,
+        processedUrl: String
+    ) async throws {
+        guard let userId = authManager.currentUser?.id else {
+            throw PhotoError.notAuthenticated
+        }
+
+        let didUpdate = try await coreDataManager.updateBodyMetricPhoto(
+            id: metricsId,
+            userId: userId,
+            storagePath: storagePath,
+            processedUrl: processedUrl
+        )
+
+        guard didUpdate else {
+            throw PhotoError.processingFailed("Could not save photo locally")
+        }
+
+        RealtimeSyncManager.shared.syncIfNeeded()
     }
 
     private func updateUploadStatus(_ status: UploadStatus, progress: Double) {
@@ -382,6 +478,49 @@ class PhotoUploadManager: ObservableObject {
                 error: nil
             )
         }
+    }
+}
+
+private struct RemotePhotoUploadTicket {
+    let uploadURL: URL
+    let uploadMethod: String
+    let uploadHeaders: [String: String]
+    let objectKey: String
+    let photoUrl: String
+    let storagePath: String
+
+    static func parse(_ data: Data) throws -> RemotePhotoUploadTicket {
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw PhotoUploadManager.PhotoError.uploadFailed("Photo upload failed. Please try again.")
+        }
+
+        let uploadURLString = json["uploadUrl"] as? String
+        let photoUrl = json["photoUrl"] as? String
+        let objectKey = json["objectKey"] as? String
+        let method = (json["uploadMethod"] as? String)?.uppercased() ?? "PUT"
+        let headers = json["uploadHeaders"] as? [String: String] ?? [:]
+        let storagePath = (json["storagePath"] as? String) ?? objectKey
+
+        guard method == "PUT",
+              let uploadURLString,
+              let uploadURL = URL(string: uploadURLString),
+              let photoUrl,
+              !photoUrl.isEmpty,
+              let objectKey,
+              !objectKey.isEmpty,
+              let storagePath,
+              !storagePath.isEmpty else {
+            throw PhotoUploadManager.PhotoError.uploadFailed("Photo upload failed. Please try again.")
+        }
+
+        return RemotePhotoUploadTicket(
+            uploadURL: uploadURL,
+            uploadMethod: method,
+            uploadHeaders: headers,
+            objectKey: objectKey,
+            photoUrl: photoUrl,
+            storagePath: storagePath
+        )
     }
 }
 
