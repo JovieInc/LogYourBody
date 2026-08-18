@@ -25,6 +25,14 @@ enum JovieTokens {
     static let cinematicDuration: Double = 0.42
 }
 
+/// Dark-only canvas steps for `DefaultTheme`. Accents stay reserved for metrics.
+enum JoviePalette {
+    static let canvasHex = "#08090A"
+    static let surfaceHex = "#0F1011"
+    static let elevatedHex = "#17171A"
+    static let raisedHex = "#1C1C1E"
+}
+
 enum ChatComposerGeometry {
     static let multilineTextHeightThreshold = JovieTokens.sectionGap
 
@@ -121,6 +129,77 @@ enum WorldClassScreen: String, CaseIterable, Identifiable {
              .exportData, .activeSessions, .privacyAndData, .deleteAccount, .bugReport:
             return .account
         }
+    }
+}
+
+/// Single glass rendering contract for `systemBGlassSurface` and card atoms.
+///
+/// Native `glassEffect` is iOS 26+ only. Reduce Transparency always wins and
+/// uses an opaque surface fill. Pre-iOS 26 keeps ultraThinMaterial + hairline.
+enum JovieGlassSurface {
+    enum Style: Equatable {
+        case solid
+        case nativeGlass
+        case materialFallback
+    }
+
+    static var isNativeGlassAvailable: Bool {
+        if #available(iOS 26.0, *) {
+            return true
+        }
+        return false
+    }
+
+    static func style(
+        reduceTransparency: Bool,
+        isNativeGlassAvailable: Bool = JovieGlassSurface.isNativeGlassAvailable
+    ) -> Style {
+        if reduceTransparency {
+            return .solid
+        }
+        if isNativeGlassAvailable {
+            return .nativeGlass
+        }
+        return .materialFallback
+    }
+
+    @available(iOS 26.0, *)
+    static func glass(tint: Color, tintOpacity: Double, interactive: Bool) -> Glass {
+        var glass: Glass = tintOpacity > 0
+            ? .regular.tint(tint.opacity(tintOpacity))
+            : .regular
+        if interactive {
+            glass = glass.interactive()
+        }
+        return glass
+    }
+}
+
+struct JovieGlassSurfaceSpec {
+    var tint: Color
+    var tintOpacity: Double
+    var interactive: Bool
+    var solidFill: Color
+    var fallbackMaterial: Material
+    var fallbackTint: Color
+    var fallbackTintOpacity: Double
+
+    init(
+        tint: Color,
+        tintOpacity: Double,
+        interactive: Bool = false,
+        solidFill: Color,
+        fallbackMaterial: Material,
+        fallbackTint: Color? = nil,
+        fallbackTintOpacity: Double? = nil
+    ) {
+        self.tint = tint
+        self.tintOpacity = tintOpacity
+        self.interactive = interactive
+        self.solidFill = solidFill
+        self.fallbackMaterial = fallbackMaterial
+        self.fallbackTint = fallbackTint ?? tint
+        self.fallbackTintOpacity = fallbackTintOpacity ?? tintOpacity
     }
 }
 
@@ -312,14 +391,14 @@ struct HapticsTheme {
 struct DefaultTheme: Theme {
     let colors = ColorTheme(
         // Background
-        background: Color(hex: "#000000"),
-        backgroundSecondary: Color(hex: "#0b0b0b"),
-        backgroundTertiary: Color(hex: "#111111"),
+        background: Color(hex: JoviePalette.canvasHex),
+        backgroundSecondary: Color(hex: JoviePalette.surfaceHex),
+        backgroundTertiary: Color(hex: JoviePalette.elevatedHex),
 
         // Surface
-        surface: Color(hex: "#0b0b0b"),
-        surfaceSecondary: Color(hex: "#141414"),
-        surfaceTertiary: Color(hex: "#1f1f1f"),
+        surface: Color(hex: JoviePalette.surfaceHex),
+        surfaceSecondary: Color(hex: JoviePalette.elevatedHex),
+        surfaceTertiary: Color(hex: JoviePalette.raisedHex),
 
         // Primary
         primary: .jovieAction,
@@ -436,7 +515,8 @@ extension View {
         borderWidth: CGFloat = 1,
         shadowOpacity: Double = 0,
         shadowRadius: CGFloat = 0,
-        shadowY: CGFloat = 0
+        shadowY: CGFloat = 0,
+        interactive: Bool = false
     ) -> some View {
         modifier(
             SystemBGlassSurfaceModifier(
@@ -448,9 +528,36 @@ extension View {
                 borderWidth: borderWidth,
                 shadowOpacity: shadowOpacity,
                 shadowRadius: shadowRadius,
-                shadowY: shadowY
+                shadowY: shadowY,
+                interactive: interactive
             )
         )
+    }
+
+    @ViewBuilder
+    func appliedJovieGlass<S: Shape>(
+        reduceTransparency: Bool,
+        spec: JovieGlassSurfaceSpec,
+        in shape: S
+    ) -> some View {
+        if reduceTransparency {
+            background(shape.fill(spec.solidFill))
+        } else if #available(iOS 26.0, *) {
+            glassEffect(
+                JovieGlassSurface.glass(
+                    tint: spec.tint,
+                    tintOpacity: spec.tintOpacity,
+                    interactive: spec.interactive
+                ),
+                in: shape
+            )
+        } else {
+            background(
+                shape
+                    .fill(spec.fallbackMaterial)
+                    .overlay(shape.fill(spec.fallbackTint.opacity(spec.fallbackTintOpacity)))
+            )
+        }
     }
 
     /// Expands a visual control to Apple's minimum recommended hit target without
@@ -512,25 +619,24 @@ private struct SystemBGlassSurfaceModifier: ViewModifier {
     let shadowOpacity: Double
     let shadowRadius: CGFloat
     let shadowY: CGFloat
+    let interactive: Bool
 
     func body(content: Content) -> some View {
         let radius = cornerRadius ?? theme.radius.card
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        let spec = JovieGlassSurfaceSpec(
+            tint: tint,
+            tintOpacity: tintOpacity,
+            interactive: interactive,
+            solidFill: theme.colors.surface,
+            fallbackMaterial: theme.materials.glassUltraThin
+        )
 
         content
-            .background(
-                Group {
-                    if reduceTransparency {
-                        shape.fill(theme.colors.surface)
-                    } else {
-                        shape
-                            .fill(theme.materials.glassUltraThin)
-                            .overlay(
-                                shape
-                                    .fill(tint.opacity(tintOpacity))
-                            )
-                    }
-                }
+            .appliedJovieGlass(
+                reduceTransparency: reduceTransparency,
+                spec: spec,
+                in: shape
             )
             .overlay(
                 shape

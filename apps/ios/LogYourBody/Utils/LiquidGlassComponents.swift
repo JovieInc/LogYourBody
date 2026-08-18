@@ -2,15 +2,11 @@
 // LiquidGlassComponents.swift
 // LogYourBody
 //
+// Shared Liquid Glass lives in one system:
+// - DesignSystem/Theme.swift (`systemBGlassSurface`, `JovieGlassSurface`)
+// - DesignSystem/Atoms/LiquidGlassCard.swift
 //
-// LiquidGlassComponents.swift
-// LogYourBody
-//
-// Placeholder file for Xcode project reference
-// import SwiftUI
-
-// This file is intentionally empty.
-// The actual Liquid Glass components are in the Components folder:
+// Named product chrome that is not the shared primitive:
 // - Components/LiquidGlassTimelineSlider.swift
 // - Components/LiquidGlassTabBar.swift
 // - Components/LiquidGlassCTAButton.swift
