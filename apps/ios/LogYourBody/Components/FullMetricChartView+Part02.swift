@@ -317,8 +317,11 @@ var minSeriesValue: Double? {
     }
 
 var headlineValueText: String {
-        if let point = selectedFocusPoint {
-            return formatHeadlineValue(point.value)
+        // Only replace the card's latest/trend headline when the user is
+        // actively inspecting a chart point. The stats card and this screen
+        // must stay on the same number when metric detail opens at rest.
+        if let activePoint {
+            return formatHeadlineValue(activePoint.value)
         }
         return currentValue
     }
