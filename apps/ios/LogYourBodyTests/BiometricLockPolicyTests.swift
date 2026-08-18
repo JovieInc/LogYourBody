@@ -6,6 +6,14 @@ import XCTest
 @testable import LogYourBody
 
 final class BiometricLockPolicyTests: XCTestCase {
+    func testBiometricLockUsesTheShippedEntryScreenIdentifier() {
+        XCTAssertEqual(WorldClassScreen.biometricLock.flow, .entry)
+        XCTAssertEqual(
+            WorldClassScreen.biometricLock.accessibilityIdentifier,
+            WorldClassScreen.allCases.first { $0 == .biometricLock }?.accessibilityIdentifier
+        )
+    }
+
     func testSuccessfulAuthenticationUnlocks() {
         XCTAssertTrue(BiometricLockPolicy.shouldUnlock(after: .success))
     }

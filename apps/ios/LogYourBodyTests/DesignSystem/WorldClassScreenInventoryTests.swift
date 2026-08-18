@@ -94,6 +94,24 @@ final class WorldClassScreenInventoryTests: XCTestCase {
         }
     }
 
+    func testEachFlowHasAShippedPathProbeScreen() {
+        let probes: [(WorldClassScreenFlow, WorldClassScreen)] = [
+            (.entry, .signIn),
+            (.onboarding, .bodyScoreIntro),
+            (.core, .home),
+            (.subscription, .dailyReminder),
+            (.account, .settings)
+        ]
+
+        XCTAssertEqual(Set(probes.map(\.0)), Set(WorldClassScreenFlow.allCases))
+
+        for (flow, screen) in probes {
+            XCTAssertEqual(screen.flow, flow)
+            XCTAssertEqual(screen.accessibilityIdentifier, WorldClassScreen(rawValue: screen.rawValue)?.accessibilityIdentifier)
+            XCTAssertTrue(screen.accessibilityIdentifier.hasPrefix("world_class_screen_"))
+        }
+    }
+
     func testFlowMembershipStaysStable() {
         XCTAssertEqual(WorldClassScreen.launch.flow, .entry)
         XCTAssertEqual(WorldClassScreen.signIn.flow, .entry)

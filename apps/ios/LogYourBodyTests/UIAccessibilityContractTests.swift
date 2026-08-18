@@ -45,6 +45,12 @@ final class UIAccessibilityContractTests: XCTestCase {
         XCTAssertTrue(required.contains("continueWithAppleButton"))
         XCTAssertTrue(required.contains("launch_timeline_surface"))
         XCTAssertTrue(required.contains("paywall_purchase_button"))
+        XCTAssertTrue(required.contains(WorldClassScreen.signIn.accessibilityIdentifier))
+        XCTAssertTrue(required.contains(WorldClassScreen.home.accessibilityIdentifier))
+        XCTAssertTrue(required.contains(WorldClassScreen.settings.accessibilityIdentifier))
+        XCTAssertTrue(required.contains(WorldClassScreen.paywall.accessibilityIdentifier))
+        XCTAssertTrue(required.contains(WorldClassScreen.bodyScoreIntro.accessibilityIdentifier))
+        XCTAssertTrue(required.contains(WorldClassScreen.dailyReminder.accessibilityIdentifier))
         XCTAssertEqual(
             "settings_\(PreferenceGoalKind.weight.rawValue)_goal_edit_button",
             "settings_weight_goal_edit_button"
@@ -112,6 +118,12 @@ enum UIAccessibilityContract {
         "body_score_share_close_button",
         "photo_timeline_hud_phase_insight",
         "photo_timeline_hud_glp1_weekly_checkin",
-        "integrations_bulk_photo_import_link"
+        "integrations_bulk_photo_import_link",
+        "world_class_screen_signIn",
+        "world_class_screen_home",
+        "world_class_screen_settings",
+        "world_class_screen_paywall",
+        "world_class_screen_bodyScoreIntro",
+        "world_class_screen_dailyReminder"
     ]
 }

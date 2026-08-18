@@ -97,6 +97,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(app, with: ["-lybUITestPaywallFixture"])
 
         XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_paywall"].exists)
         XCTAssertTrue(
             app.descendants(matching: .any)["paywall_plans_unavailable_state"].waitForExistence(timeout: 8)
         )
@@ -299,6 +300,7 @@ final class LogYourBodyUITests: XCTestCase {
         }
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_stats"].exists)
         let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]
         XCTAssertTrue(presenceSummary.waitForExistence(timeout: 5))
         XCTAssertTrue(presenceSummary.label.contains("Measured"))
@@ -313,6 +315,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_home"].exists)
         XCTAssertTrue(app.staticTexts["No progress photo"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_scrubber"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_photo_strip"].exists)
@@ -1064,6 +1067,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 10)
         )
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_chat"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["chat_sidebar"].exists)
     }
 
@@ -1181,6 +1185,9 @@ final class LogYourBodyUITests: XCTestCase {
 
         let shareSheet = app.descendants(matching: .any)["body_score_share_sheet"]
         let shareCard = app.descendants(matching: .any)["body_score_share_card"]
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_shareBodyScore"].waitForExistence(timeout: 8)
+        )
         // Sheet identifier is preferred; card must remain discoverable for launch quality.
         let sheetVisible = shareSheet.waitForExistence(timeout: 8)
         let cardVisible = shareCard.waitForExistence(timeout: sheetVisible ? 4 : 8)
@@ -1277,5 +1284,6 @@ final class LogYourBodyUITests: XCTestCase {
         settingsButton.tap()
 
         XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_settings"].exists)
     }
 }
