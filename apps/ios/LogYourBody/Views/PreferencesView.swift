@@ -17,7 +17,6 @@ enum PreferencesProfileEditor: String, Identifiable {
 struct PreferencesView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.openURL) var openURL
-    @Environment(\.theme) var theme
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @StateObject var subscriptionManager = SubscriptionManager.shared
     @StateObject var notificationManager = NotificationManager.shared
@@ -49,7 +48,6 @@ struct PreferencesView: View {
     @State var profileImageURL: String?
     @State var profilePhotoErrorMessage = ""
     @State var showingProfilePhotoError = false
-    @State var isCompactHeaderVisible = false
     @State var showingLogoutConfirmation = false
     @State var showingNotificationSettingsAlert = false
     @State var isTriggeringHealthResync = false
@@ -65,31 +63,11 @@ struct PreferencesView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            ScrollView {
-                settingsLauncher
-                .padding(.horizontal, theme.spacing.screenPadding)
-                .padding(.vertical, theme.spacing.md)
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(
-                            key: ScrollOffsetPreferenceKey.self,
-                            value: geo.frame(in: .named("settingsScroll")).minY
-                        )
-                    }
-                )
-            }
-            .coordinateSpace(name: "settingsScroll")
-            .scrollBounceBehavior(.basedOnSize)
-            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                let shouldShowCompactHeader = value < -60
-                guard shouldShowCompactHeader != isCompactHeaderVisible else { return }
-                isCompactHeaderVisible = shouldShowCompactHeader
-            }
-
-            compactHeader
+        List {
+            settingsLauncher
         }
-        .settingsBackground()
+        .listStyle(.insetGrouped)
+        .scrollBounceBehavior(.basedOnSize)
         .alert("Restore Purchases", isPresented: $showingRestoreAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -118,30 +96,12 @@ struct PreferencesView: View {
             Button("Cancel", role: .cancel) {}
         }
         .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .sheet(item: $activeProfileEditor) { editor in
-            switch editor {
-            case .fullName:
-                ProfileNameEditorSheet(
-                    name: $profileEditorName,
-                    hasChanges: $profileEditorHasChanges,
-                    onCommit: saveProfileName
-                )
-            case .dateOfBirth:
-                DatePickerSheet(
-                    date: $profileEditorDateOfBirth,
-                    hasChanges: $profileEditorHasChanges,
-                    onCommit: saveProfileDateOfBirth
-                )
-            case .height:
-                ProfileHeightPickerSheet(
-                    heightCm: $profileEditorHeightCm,
-                    useMetric: $profileEditorUsesMetricHeight,
-                    hasChanges: $profileEditorHasChanges,
-                    onCommit: saveProfileHeight
-                )
-            }
+            profileEditorSheet(for: editor)
+                .presentationDetents(editor == .height ? [.large] : [.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(item: $activeGoalEditor) { goal in
             goalEditorSheet(for: goal)
@@ -168,6 +128,31 @@ struct PreferencesView: View {
             }
         }
         .worldClassScreen(.settings)
+    }
+
+    @ViewBuilder
+    private func profileEditorSheet(for editor: PreferencesProfileEditor) -> some View {
+        switch editor {
+        case .fullName:
+            ProfileNameEditorSheet(
+                name: $profileEditorName,
+                hasChanges: $profileEditorHasChanges,
+                onCommit: saveProfileName
+            )
+        case .dateOfBirth:
+            DatePickerSheet(
+                date: $profileEditorDateOfBirth,
+                hasChanges: $profileEditorHasChanges,
+                onCommit: saveProfileDateOfBirth
+            )
+        case .height:
+            ProfileHeightPickerSheet(
+                heightCm: $profileEditorHeightCm,
+                useMetric: $profileEditorUsesMetricHeight,
+                hasChanges: $profileEditorHasChanges,
+                onCommit: saveProfileHeight
+            )
+        }
     }
 
     func checkBiometricAvailability() {

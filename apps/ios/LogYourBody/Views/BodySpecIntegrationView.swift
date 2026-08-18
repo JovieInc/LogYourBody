@@ -2,7 +2,6 @@ import SwiftUI
 
 struct BodySpecIntegrationView: View {
     @EnvironmentObject var authManager: AuthManager
-    @Environment(\.theme) private var theme
 
     @State private var isConfigured = false
     @State private var isConnected = false
@@ -44,7 +43,7 @@ struct BodySpecIntegrationView: View {
                 icon: "waveform.path.ecg",
                 title: "DEXA scan import",
                 description: "Connect BodySpec to bring your DEXA scan history into LogYourBody.",
-                iconColor: theme.colors.info
+                iconColor: .accentColor
             )
         }
     }
@@ -56,47 +55,31 @@ struct BodySpecIntegrationView: View {
                 ? "You can disconnect at any time."
                 : "BodySpec is not available in this version of the app."
         ) {
-            VStack(spacing: 0) {
-                SettingsRow(
-                    icon: connectionIcon,
-                    title: connectionTitle,
-                    subtitle: connectionDescription,
-                    tintColor: connectionTint
-                )
+            SettingsRow(
+                icon: connectionIcon,
+                title: connectionTitle,
+                subtitle: connectionDescription,
+                tintColor: connectionTint
+            )
 
-                if isConfigured {
-                    Divider()
-
-                    BaseButton(
+            if isConfigured {
+                Button {
+                    connectTapped()
+                } label: {
+                    Label(
                         isConnected ? "Reconnect BodySpec" : "Connect BodySpec",
-                        configuration: ButtonConfiguration(
-                            style: .custom(background: .jovieAction, foreground: .jovieActionText),
-                            isLoading: isConnecting,
-                            isEnabled: !isConnecting,
-                            fullWidth: true,
-                            icon: "link"
-                        ),
-                        action: connectTapped
+                        systemImage: "link"
                     )
-                    .padding(theme.spacing.md)
-                    .accessibilityHint("Connects your BodySpec account.")
+                }
+                .disabled(isConnecting)
+                .accessibilityHint("Connects your BodySpec account.")
 
-                    if isConnected {
-                        Divider()
-
-                        BaseButton(
-                            "Disconnect BodySpec",
-                            configuration: ButtonConfiguration(
-                                style: .destructive,
-                                isEnabled: !isConnecting,
-                                fullWidth: true,
-                                icon: "link.badge.minus"
-                            ),
-                            action: disconnectTapped
-                        )
-                        .padding(theme.spacing.md)
-                        .accessibilityHint("Disconnects your BodySpec account from LogYourBody.")
+                if isConnected {
+                    Button("Disconnect BodySpec", role: .destructive) {
+                        disconnectTapped()
                     }
+                    .disabled(isConnecting)
+                    .accessibilityHint("Disconnects your BodySpec account from LogYourBody.")
                 }
             }
         }
@@ -107,40 +90,34 @@ struct BodySpecIntegrationView: View {
             header: "DEXA sync",
             footer: "New scans are added to your body metrics."
         ) {
-            VStack(spacing: 0) {
-                if isConfigured, isConnected {
-                    BaseButton(
-                        "Sync DEXA scans",
-                        configuration: ButtonConfiguration(
-                            style: .custom(background: .jovieAction, foreground: .jovieActionText),
-                            isLoading: isSyncing,
-                            isEnabled: !isSyncing,
-                            fullWidth: true,
-                            icon: "arrow.triangle.2.circlepath"
-                        ),
-                        action: syncTapped
-                    )
-                    .padding(theme.spacing.md)
-                    .accessibilityHint("Checks BodySpec for new DEXA scans now.")
-                } else {
-                    SettingsRow(
-                        icon: "arrow.triangle.2.circlepath",
-                        title: "Sync unavailable",
-                        subtitle: syncUnavailableDescription,
-                        tintColor: theme.colors.textSecondary
-                    )
+            if isConfigured, isConnected {
+                Button {
+                    syncTapped()
+                } label: {
+                    if isSyncing {
+                        Label("Syncing…", systemImage: "arrow.triangle.2.circlepath")
+                    } else {
+                        Label("Sync DEXA scans", systemImage: "arrow.triangle.2.circlepath")
+                    }
                 }
+                .disabled(isSyncing)
+                .accessibilityHint("Checks BodySpec for new DEXA scans now.")
+            } else {
+                SettingsRow(
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "Sync unavailable",
+                    subtitle: syncUnavailableDescription,
+                    tintColor: .secondary
+                )
+            }
 
-                if let lastSyncSummary {
-                    Divider()
-
-                    DataInfoRow(
-                        icon: "checkmark.circle",
-                        title: "Sync complete",
-                        description: lastSyncSummary,
-                        iconColor: theme.colors.success
-                    )
-                }
+            if let lastSyncSummary {
+                DataInfoRow(
+                    icon: "checkmark.circle",
+                    title: "Sync complete",
+                    description: lastSyncSummary,
+                    iconColor: .green
+                )
             }
         }
     }
@@ -150,56 +127,42 @@ struct BodySpecIntegrationView: View {
             header: "Recent scans",
             footer: "Your five most recent BodySpec DEXA scans appear here."
         ) {
-            VStack(spacing: 0) {
-                if isLoadingScans {
-                    DataInfoRow(
-                        icon: "arrow.triangle.2.circlepath",
-                        title: "Loading scans",
-                        description: "Checking your BodySpec history…",
-                        iconColor: theme.colors.textSecondary
-                    )
-                } else if let recentScansError {
-                    DataInfoRow(
-                        icon: "exclamationmark.triangle",
-                        title: "Couldn’t load scans",
-                        description: recentScansError,
-                        iconColor: theme.colors.warning
-                    )
+            if isLoadingScans {
+                DataInfoRow(
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "Loading scans",
+                    description: "Checking your BodySpec history…",
+                    iconColor: .secondary
+                )
+            } else if let recentScansError {
+                DataInfoRow(
+                    icon: "exclamationmark.triangle",
+                    title: "Couldn’t load scans",
+                    description: recentScansError,
+                    iconColor: .orange
+                )
 
-                    Divider()
-
-                    BaseButton(
-                        "Try again",
-                        configuration: ButtonConfiguration(
-                            style: .secondary,
-                            fullWidth: true,
-                            icon: "arrow.clockwise"
-                        ),
-                        action: reloadRecentScans
+                Button {
+                    reloadRecentScans()
+                } label: {
+                    Label("Try again", systemImage: "arrow.clockwise")
+                }
+            } else if recentScans.isEmpty {
+                DataInfoRow(
+                    icon: "doc.text.magnifyingglass",
+                    title: "No DEXA scans yet",
+                    description: isConnected
+                        ? "New scans from BodySpec will appear here after syncing."
+                        : "Connect BodySpec to see your DEXA scan history.",
+                    iconColor: .secondary
+                )
+            } else {
+                ForEach(recentScans.prefix(5)) { scan in
+                    SettingsRow(
+                        icon: "calendar",
+                        title: formattedDate(scan.acquireTime),
+                        subtitle: scan.locationName?.isEmpty == false ? scan.locationName : "BodySpec DEXA scan"
                     )
-                    .padding(theme.spacing.md)
-                } else if recentScans.isEmpty {
-                    DataInfoRow(
-                        icon: "doc.text.magnifyingglass",
-                        title: "No DEXA scans yet",
-                        description: isConnected
-                            ? "New scans from BodySpec will appear here after syncing."
-                            : "Connect BodySpec to see your DEXA scan history.",
-                        iconColor: theme.colors.textSecondary
-                    )
-                } else {
-                    ForEach(Array(recentScans.prefix(5).enumerated()), id: \.element.id) { index, scan in
-                        SettingsRow(
-                            icon: "calendar",
-                            title: formattedDate(scan.acquireTime),
-                            subtitle: scan.locationName?.isEmpty == false ? scan.locationName : "BodySpec DEXA scan",
-                            tintColor: theme.colors.text
-                        )
-
-                        if index < min(recentScans.count, 5) - 1 {
-                            Divider()
-                        }
-                    }
                 }
             }
         }
@@ -207,27 +170,18 @@ struct BodySpecIntegrationView: View {
 
     private func errorRecoverySection(message: String) -> some View {
         SettingsSection(header: "Needs attention") {
-            VStack(spacing: 0) {
-                DataInfoRow(
-                    icon: "exclamationmark.triangle",
-                    title: "BodySpec couldn’t finish",
-                    description: message,
-                    iconColor: theme.colors.error
-                )
+            DataInfoRow(
+                icon: "exclamationmark.triangle",
+                title: "BodySpec couldn’t finish",
+                description: message,
+                iconColor: .red
+            )
 
-                if recoveryAction != nil {
-                    Divider()
-
-                    BaseButton(
-                        "Try again",
-                        configuration: ButtonConfiguration(
-                            style: .secondary,
-                            fullWidth: true,
-                            icon: "arrow.clockwise"
-                        ),
-                        action: retryLastAction
-                    )
-                    .padding(theme.spacing.md)
+            if recoveryAction != nil {
+                Button {
+                    retryLastAction()
+                } label: {
+                    Label("Try again", systemImage: "arrow.clockwise")
                 }
             }
         }
@@ -239,8 +193,8 @@ struct BodySpecIntegrationView: View {
     }
 
     private var connectionTint: Color {
-        if !isConfigured { return theme.colors.warning }
-        return isConnected ? theme.colors.success : theme.colors.textSecondary
+        if !isConfigured { return .orange }
+        return isConnected ? .green : .secondary
     }
 
     private var connectionTitle: String {

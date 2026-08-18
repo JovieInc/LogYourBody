@@ -25,8 +25,6 @@ struct DesignSettingsRow: View {
     let type: SettingsRowType
     let action: (() -> Void)?
 
-    @State private var isPressed = false
-
     init(
         icon: String? = nil,
         iconColor: Color? = nil,
@@ -44,122 +42,74 @@ struct DesignSettingsRow: View {
     }
 
     var body: some View {
-        Button(
-            action: {
-                if case .navigation = type {
-                    // // HapticManager.shared.selection()
-                    action?()
-                } else if case .action = type {
-                    // // HapticManager.shared.impact(style: .light)
-                    action?()
-                }
-            },
-            label: {
-                HStack(spacing: 12) {
-                    // Icon
-                    if let icon = icon {
-                        Image(systemName: icon)
-                            .font(.system(size: 20))
-                            .foregroundColor(iconColor ?? .appPrimary)
-                            .frame(width: 28, height: 28)
-                    }
-
-                    // Content
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title)
-                            .font(.body)
-                            .foregroundColor(.primary)
-
-                        if let subtitle = subtitle {
-                            Text(subtitle)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(2)
-                        }
-                    }
-
-                    Spacer()
-
-                    // Trailing content
-                    trailingContent
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    Color.appBackground
-                        .opacity(isPressed ? 0.5 : 0)
-                )
-                .contentShape(Rectangle())
-            }
-        )
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!isInteractive)
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            if isInteractive {
-                withAnimation(.easeOut(duration: 0.1)) {
-                    isPressed = pressing
-                }
-            }
-        }, perform: {})
-    }
-
-    @ViewBuilder private var trailingContent: some View {
         switch type {
-        case .navigation:
-            Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color.secondary.opacity(0.6))
-
         case .toggle(let isOn):
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .tint(.appPrimary)
-
-        case .value(let text):
-            Text(text)
-                .font(.body)
-                .foregroundColor(.secondary)
-
-        case .action:
-            EmptyView()
-
+            Toggle(isOn: isOn) {
+                rowLabel
+            }
         case .picker(let selection, let options):
-            Menu {
+            Picker(selection: selection) {
                 ForEach(options, id: \.self) { option in
-                    Button(
-                        action: {
-                            selection.wrappedValue = option
-                        },
-                        label: {
-                            HStack {
-                                Text(option)
-                                if selection.wrappedValue == option {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        })
+                    Text(option).tag(option)
                 }
             } label: {
-                HStack(spacing: 4) {
-                    Text(selection.wrappedValue)
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 12))
-                        .foregroundColor(Color.secondary.opacity(0.6))
+                rowLabel
+            }
+            .pickerStyle(.menu)
+        case .stepper(let value, let range):
+            Stepper(value: value, in: range) {
+                HStack {
+                    rowLabel
+                    Spacer()
+                    Text("\(value.wrappedValue)")
+                        .foregroundStyle(.secondary)
                 }
             }
-
-        case .stepper(let value, let range):
-            Stepper(
-                value: value,
-                in: range
-            ) {
-                Text("\(value.wrappedValue)")
-                    .font(.body)
-                    .foregroundColor(.secondary)
+        case .value(let text):
+            LabeledContent {
+                Text(text)
+                    .foregroundStyle(.secondary)
+            } label: {
+                rowLabel
             }
-            .labelsHidden()
+        case .navigation, .action:
+            Button(
+                action: { action?() },
+                label: {
+                    HStack {
+                        rowLabel
+                        Spacer()
+                        if case .navigation = type {
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+            )
+            .buttonStyle(.plain)
+            .disabled(!isInteractive)
+        }
+    }
+
+    private var rowLabel: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .foregroundStyle(.primary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        } icon: {
+            if let icon {
+                Image(systemName: icon)
+                    .foregroundStyle(iconColor ?? .accentColor)
+            }
         }
     }
 
@@ -191,36 +141,7 @@ struct DesignSettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            if let title = title {
-                Text(title.uppercased())
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 4)
-            }
-
-            // Content with separators
-            VStack(spacing: 0) {
-                content()
-            }
-            .background(Color.appCard)
-            .cornerRadius(12)
-            .padding(.horizontal, 16)
-
-            // Footer
-            if let footer = footer {
-                Text(footer)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-            }
-        }
-        .padding(.vertical, 8)
+        SettingsSection(header: title, footer: footer, content: content)
     }
 }
 
@@ -232,8 +153,6 @@ struct ListRow: View {
     let leading: AnyView?
     let trailing: AnyView?
     let action: (() -> Void)?
-
-    @State private var isPressed = false
 
     init(
         title: String,
@@ -251,61 +170,41 @@ struct ListRow: View {
 
     var body: some View {
         Button(
-            action: {
-                // // HapticManager.shared.selection()
-                action?()
-            },
+            action: { action?() },
             label: {
                 HStack(spacing: 12) {
-                    // Leading content
-                    if let leading = leading {
+                    if let leading {
                         leading
                     }
 
-                    // Main content
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
-                            .font(.body)
-                            .foregroundColor(.primary)
+                            .foregroundStyle(.primary)
                             .lineLimit(1)
 
-                        if let subtitle = subtitle {
+                        if let subtitle {
                             Text(subtitle)
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                                 .lineLimit(2)
                         }
                     }
 
                     Spacer()
 
-                    // Trailing content
-                    if let trailing = trailing {
+                    if let trailing {
                         trailing
                     } else if action != nil {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color.secondary.opacity(0.6))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    Color.appBackground
-                        .opacity(isPressed ? 0.5 : 0)
-                )
                 .contentShape(Rectangle())
             }
         )
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
         .disabled(action == nil)
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            if action != nil {
-                withAnimation(.easeOut(duration: 0.1)) {
-                    isPressed = pressing
-                }
-            }
-        }, perform: {})
     }
 }
 
@@ -316,43 +215,14 @@ struct DestructiveRow: View {
     let icon: String?
     let action: () -> Void
 
-    @State private var isPressed = false
-
     var body: some View {
-        Button(
-            action: {
-                // // HapticManager.shared.impact(style: .medium)
-                action()
-            },
-            label: {
-                HStack(spacing: 12) {
-                    if let icon = icon {
-                        Image(systemName: icon)
-                            .font(.system(size: 20))
-                            .foregroundColor(.red)
-                    }
-
-                    Text(title)
-                        .font(.body)
-                        .foregroundColor(.red)
-
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    .red
-                        .opacity(isPressed ? 0.1 : 0)
-                )
-                .contentShape(Rectangle())
+        Button(role: .destructive, action: action) {
+            if let icon {
+                Label(title, systemImage: icon)
+            } else {
+                Text(title)
             }
-        )
-        .buttonStyle(PlainButtonStyle())
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            withAnimation(.easeOut(duration: 0.1)) {
-                isPressed = pressing
-            }
-        }, perform: {})
+        }
     }
 }
 
@@ -361,108 +231,89 @@ struct DestructiveRow: View {
 struct SettingsRow_Previews: PreviewProvider {
     static var previews: some View {
         ThemePreview {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Settings sections
-                    DesignSettingsSection(title: "Account") {
-                        DesignSettingsRow(
-                            icon: "person.circle",
-                            title: "Profile",
-                            subtitle: "John Doe",
-                            type: .navigation
-                        ) { }
+            List {
+                DesignSettingsSection(title: "Account") {
+                    DesignSettingsRow(
+                        icon: "person.circle",
+                        title: "Profile",
+                        subtitle: "John Doe",
+                        type: .navigation
+                    ) { }
 
-                        Divider()
-                            .background(Color(white: 0.15))
-                            .padding(.leading, 60)
+                    DesignSettingsRow(
+                        icon: "envelope",
+                        title: "Email",
+                        type: .value(text: "john@example.com")
+                    )
+                }
 
-                        DesignSettingsRow(
-                            icon: "envelope",
-                            title: "Email",
-                            type: .value(text: "john@example.com")
+                DesignSettingsSection(title: "Preferences") {
+                    DesignSettingsRow(
+                        icon: "moon",
+                        title: "Dark Mode",
+                        type: .toggle(isOn: .constant(true))
+                    )
+
+                    DesignSettingsRow(
+                        icon: "textformat",
+                        title: "Font Size",
+                        type: .picker(
+                            selection: .constant("Medium"),
+                            options: ["Small", "Medium", "Large"]
                         )
-                    }
+                    )
 
-                    DesignSettingsSection(title: "Preferences") {
-                        DesignSettingsRow(
-                            icon: "moon",
-                            title: "Dark Mode",
-                            type: .toggle(isOn: .constant(true))
+                    DesignSettingsRow(
+                        icon: "bell",
+                        title: "Notifications",
+                        subtitle: "Manage notification preferences",
+                        type: .navigation
+                    ) { }
+                }
+
+                DesignSettingsSection(
+                    title: "Data",
+                    footer: "Your data will be permanently deleted"
+                ) {
+                    DestructiveRow(
+                        title: "Delete Account",
+                        icon: "trash"
+                    ) { }
+                }
+
+                DesignSettingsSection(title: "Recent Activity") {
+                    ListRow(
+                        title: "Workout Session",
+                        subtitle: "45 minutes • 320 calories",
+                        leading: AnyView(
+                            Image(systemName: "figure.run")
+                                .font(.title3)
+                                .foregroundStyle(.orange)
+                        ),
+                        trailing: AnyView(
+                            Text("2h ago")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         )
+                    ) { }
 
-                        Divider()
-                            .background(Color(white: 0.15))
-                            .padding(.leading, 60)
-
-                        DesignSettingsRow(
-                            icon: "textformat",
-                            title: "Font Size",
-                            type: .picker(
-                                selection: .constant("Medium"),
-                                options: ["Small", "Medium", "Large"]
-                            )
+                    ListRow(
+                        title: "Weight Entry",
+                        subtitle: "72.5 kg",
+                        leading: AnyView(
+                            Image(systemName: "scalemass")
+                                .font(.title3)
+                                .foregroundStyle(.blue)
+                        ),
+                        trailing: AnyView(
+                            Text("Yesterday")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         )
-
-                        Divider()
-                            .background(Color(white: 0.15))
-                            .padding(.leading, 60)
-
-                        DesignSettingsRow(
-                            icon: "bell",
-                            title: "Notifications",
-                            subtitle: "Manage notification preferences",
-                            type: .navigation
-                        ) { }
-                    }
-
-                    DesignSettingsSection(
-                        title: "Data",
-                        footer: "Your data will be permanently deleted"
-                    ) {
-                        DestructiveRow(
-                            title: "Delete Account",
-                            icon: "trash"
-                        ) { }
-                    }
-
-                    // List rows
-                    DesignSettingsSection(title: "Recent Activity") {
-                        ListRow(
-                            title: "Workout Session",
-                            subtitle: "45 minutes • 320 calories",
-                            leading: AnyView(
-                                Image(systemName: "figure.run")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.orange)
-                            ),
-                            trailing: AnyView(
-                                Text("2h ago")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            )
-                        ) { }
-
-                        Divider()
-                            .background(Color(white: 0.15))
-
-                        ListRow(
-                            title: "Weight Entry",
-                            subtitle: "72.5 kg",
-                            leading: AnyView(
-                                Image(systemName: "scalemass")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.blue)
-                            ),
-                            trailing: AnyView(
-                                Text("Yesterday")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            )
-                        ) { }
-                    }
+                    ) { }
                 }
             }
-            .background(Color.black)
+            .listStyle(.insetGrouped)
         }
     }
 }

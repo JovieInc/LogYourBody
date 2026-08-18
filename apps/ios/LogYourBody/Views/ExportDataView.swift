@@ -57,37 +57,109 @@ struct ExportDataView: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.jovieCanvas
-                .ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
-                    exportHeader
-                    deliveryMethodPicker
-                    deliveryDetails
-                    includedData
-                    privacyAndSupport
-                }
-                .padding(.horizontal, JovieTokens.screenInset)
-                .padding(.top, JovieTokens.sectionGap)
-                .padding(.bottom, 20)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        Form {
+            Section {
+                Label("Your data, on your terms", systemImage: "lock.document.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text("Export your data")
+                    .font(.title2.weight(.bold))
+                Text(
+                    "Download a copy anytime. Nothing is removed from LogYourBody, and the included data is shown before export."
+                )
+                    .foregroundStyle(.secondary)
             }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
+            .accessibilityElement(children: .combine)
 
+            Section {
+                Picker("Delivery method", selection: $exportMethod) {
+                    ForEach(ExportMethod.allCases, id: \.self) { method in
+                        Text(method.rawValue).tag(method)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("export_delivery_method_picker")
+
+                Text(exportMethod.description)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if exportMethod == .download {
+                    Label(
+                        "Direct download contains one JSON file and does not include progress photos.",
+                        systemImage: "info.circle"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            } header: {
+                Text("Delivery")
+            }
+
+            Section("Included") {
+                DataTypeRow(
+                    icon: "person.fill",
+                    title: "Profile information",
+                    description: "Name, email, date of birth, and height"
+                )
+                DataTypeRow(
+                    icon: "scalemass",
+                    title: "Body metrics",
+                    description: "Weight, body fat, and measurements"
+                )
+                DataTypeRow(
+                    icon: "chart.line.uptrend.xyaxis",
+                    title: "Progress history",
+                    description: "Historical data points and daily logs"
+                )
+            }
+
+            Section {
+                Text(
+                    exportMethod == .email
+                        ? "A secure download link will be sent to your registered email address and expires after 24 hours."
+                        : "The JSON file is saved to your device. Share it only with people and services you trust."
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Button("Email support about an export") {
+                    requestExportViaEmail()
+                }
+                .accessibilityHint("Opens an email to LogYourBody support.")
+            }
+
+            Section {
+                Button {
+                    exportData()
+                } label: {
+                    Label(
+                        exportMethod == .email ? "Email secure link" : "Download JSON",
+                        systemImage: "square.and.arrow.up"
+                    )
+                }
+                .disabled(isExportDisabled)
+                .accessibilityIdentifier("export_data_action")
+                .accessibilityHint(
+                    exportMethod == .email
+                        ? "Sends a secure export link to your registered email address."
+                        : "Prepares a JSON export on this device."
+                )
+            }
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
+        .overlay {
             if isExporting {
                 exportProgressOverlay
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            exportAction
-        }
         .navigationTitle("Export Data")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
                     dismiss()
                 }
@@ -129,178 +201,20 @@ struct ExportDataView: View {
         .worldClassScreen(.exportData)
     }
 
-    private var exportHeader: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Your data, on your terms", systemImage: "lock.document.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.jovieTextSecondary)
-
-            Text("Export your data")
-                .font(.title2.weight(.bold))
-                .foregroundColor(.jovieText)
-
-            Text("Download a copy anytime. Nothing is removed from LogYourBody, and the included data is shown before export.")
-                .font(.body)
-                .foregroundColor(.jovieTextSecondary)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private var deliveryMethodPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Delivery")
-                .font(.headline)
-                .foregroundColor(.jovieText)
-
-            Picker("Delivery method", selection: $exportMethod) {
-                ForEach(ExportMethod.allCases, id: \.self) { method in
-                    Text(method.rawValue).tag(method)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(minHeight: JovieTokens.minimumHitTarget)
-            .padding(4)
-            .background(
-                RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
-                    .fill(Color.jovieSurface)
-            )
-            .accessibilityIdentifier("export_delivery_method_picker")
-        }
-    }
-
-    private var deliveryDetails: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(exportMethod == .email ? "Secure email link" : "Direct device download")
-                .font(.headline)
-                .foregroundColor(.jovieText)
-
-            Text(exportMethod.description)
-                .font(.subheadline)
-                .foregroundColor(.jovieTextSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if exportMethod == .download {
-                Label("Direct download contains one JSON file and does not include progress photos.", systemImage: "info.circle")
-                    .font(.footnote)
-                    .foregroundColor(.jovieTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(16)
-        .systemBGlassSurface(
-            cornerRadius: JovieTokens.cardRadius,
-            tint: .jovieText,
-            tintOpacity: 0.045,
-            borderColor: .jovieHairline,
-            borderOpacity: 0.9
-        )
-        .accessibilityElement(children: .combine)
-    }
-
-    private var includedData: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Included")
-                .font(.headline)
-                .foregroundColor(.jovieText)
-
-            VStack(alignment: .leading, spacing: 4) {
-                DataTypeRow(
-                    icon: "person.fill",
-                    title: "Profile information",
-                    description: "Name, email, date of birth, and height"
-                )
-                DataTypeRow(
-                    icon: "scalemass",
-                    title: "Body metrics",
-                    description: "Weight, body fat, and measurements"
-                )
-                DataTypeRow(
-                    icon: "chart.line.uptrend.xyaxis",
-                    title: "Progress history",
-                    description: "Historical data points and daily logs"
-                )
-            }
-            .padding(12)
-            .systemBGlassSurface(
-                cornerRadius: JovieTokens.cardRadius,
-                tint: .jovieText,
-                tintOpacity: 0.045,
-                borderColor: .jovieHairline,
-                borderOpacity: 0.9
-            )
-        }
-    }
-
-    private var privacyAndSupport: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(
-                exportMethod == .email
-                    ? "A secure download link will be sent to your registered email address and expires after 24 hours."
-                    : "The JSON file is saved to your device. Share it only with people and services you trust."
-            )
-            .font(.footnote)
-            .foregroundColor(.jovieTextSecondary)
-            .fixedSize(horizontal: false, vertical: true)
-
-            Button("Email support about an export") {
-                requestExportViaEmail()
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundColor(.jovieText)
-            .frame(minHeight: JovieTokens.minimumHitTarget)
-            .accessibilityHint("Opens an email to LogYourBody support.")
-        }
-    }
-
-    private var exportAction: some View {
-        VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.jovieHairline)
-                .frame(height: 1)
-
-            BaseButton(
-                exportMethod == .email ? "Email secure link" : "Download JSON",
-                configuration: ButtonConfiguration(
-                    style: .custom(background: .jovieAction, foreground: .jovieActionText),
-                    isLoading: isExporting,
-                    isEnabled: !isExportDisabled,
-                    fullWidth: true,
-                    icon: "square.and.arrow.up",
-                    cornerRadius: JovieTokens.controlRadius
-                ),
-                action: exportData
-            )
-            .accessibilityIdentifier("export_data_action")
-            .accessibilityHint(
-                exportMethod == .email
-                    ? "Sends a secure export link to your registered email address."
-                    : "Prepares a JSON export on this device."
-            )
-            .padding(.horizontal, JovieTokens.screenInset)
-            .padding(.vertical, 12)
-        }
-        .background(Color.jovieCanvas.opacity(0.96).ignoresSafeArea(edges: .bottom))
-    }
-
     private var exportProgressOverlay: some View {
         ZStack {
-            Color.black.opacity(0.55)
+            Color.black.opacity(0.45)
                 .ignoresSafeArea()
 
             VStack(spacing: 14) {
                 ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .jovieText))
                     .scaleEffect(1.2)
 
                 Text("Preparing your data")
                     .font(.headline)
-                    .foregroundColor(.jovieText)
             }
             .padding(28)
-            .background(
-                RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
-                    .fill(Color.jovieSurfaceElevated)
-            )
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Preparing your data")
             .accessibilityAddTraits(.updatesFrequently)
@@ -565,27 +479,19 @@ private struct DataTypeRow: View {
     let description: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.body.weight(.medium))
-                .foregroundColor(.jovieTextSecondary)
-                .frame(width: JovieTokens.minimumHitTarget)
-                .accessibilityHidden(true)
-
+        Label {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline.weight(.medium))
-                    .foregroundColor(.jovieText)
-
                 Text(description)
                     .font(.footnote)
-                    .foregroundColor(.jovieTextSecondary)
+                    .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-
-            Spacer()
+        } icon: {
+            Image(systemName: icon)
+                .foregroundStyle(.secondary)
         }
-        .frame(minHeight: JovieTokens.minimumHitTarget)
         .accessibilityElement(children: .combine)
     }
 }

@@ -21,14 +21,12 @@ struct SettingsSectionGroup<Content: View>: View {
     }
 
     var body: some View {
-        VStack(spacing: 24) {
-            ForEach(sections, id: \.id) { section in
-                SettingsSection(
-                    header: section.header,
-                    footer: section.footer,
-                    content: section.content
-                )
-            }
+        ForEach(sections, id: \.id) { section in
+            SettingsSection(
+                header: section.header,
+                footer: section.footer,
+                content: section.content
+            )
         }
     }
 }
@@ -46,7 +44,7 @@ struct SettingsLinkRow<Destination: View>: View {
         icon: String,
         title: String,
         value: String? = nil,
-        tintColor: Color = .linearText,
+        tintColor: Color = .primary,
         @ViewBuilder destination: @escaping () -> Destination
     ) {
         self.icon = icon
@@ -62,7 +60,7 @@ struct SettingsLinkRow<Destination: View>: View {
                 icon: icon,
                 title: title,
                 value: value,
-                showChevron: true,
+                showChevron: false,
                 tintColor: tintColor
             )
         }
@@ -80,7 +78,7 @@ struct SettingsActionRow: View {
     init(
         icon: String,
         title: String,
-        tintColor: Color = .linearText,
+        tintColor: Color = .primary,
         action: @escaping () -> Void
     ) {
         self.icon = icon
@@ -98,7 +96,6 @@ struct SettingsActionRow: View {
                 tintColor: tintColor
             )
         }
-        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -136,8 +133,6 @@ struct SettingsSectionBuilder {
                 showChevron: false
             )
 
-            DSDivider().insetted(16)
-
             SettingsActionRow(
                 icon: "person.circle",
                 title: "Profile Settings",
@@ -156,8 +151,6 @@ struct SettingsSectionBuilder {
                 title: "Active Sessions",
                 action: onActiveSessions
             )
-
-            DSDivider().insetted(16)
 
             SettingsActionRow(
                 icon: "lock.rotation",
@@ -178,8 +171,6 @@ struct SettingsSectionBuilder {
                 action: onExportData
             )
 
-            DSDivider().insetted(16)
-
             SettingsActionRow(
                 icon: "trash",
                 title: "Delete Account",
@@ -191,24 +182,22 @@ struct SettingsSectionBuilder {
 }
 
 #Preview {
-    ScrollView {
-        VStack(spacing: 20) {
-            SettingsSectionBuilder.profileSection(
-                email: "user@example.com",
-                onProfileSettings: { /* Profile settings action */ }
-            )
+    List {
+        SettingsSectionBuilder.profileSection(
+            email: "user@example.com",
+            onProfileSettings: { }
+        )
 
-            SettingsSectionBuilder.securitySection(
-                onActiveSessions: { /* Active sessions action */ },
-                onChangePassword: { /* Change password action */ }
-            )
+        SettingsSectionBuilder.securitySection(
+            onActiveSessions: { },
+            onChangePassword: { }
+        )
 
-            SettingsSectionBuilder.dangerSection(
-                onExportData: { /* Export data action */ },
-                onDeleteAccount: { /* Delete account action */ }
-            )
-        }
-        .padding()
+        SettingsSectionBuilder.dangerSection(
+            onExportData: { },
+            onDeleteAccount: { }
+        )
     }
-    .background(Color.black)
+    .listStyle(.insetGrouped)
+    .preferredColorScheme(.dark)
 }

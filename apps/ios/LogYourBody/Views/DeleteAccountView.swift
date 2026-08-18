@@ -22,8 +22,6 @@ enum AccountDeletionConfirmationPolicy {
 
 struct DeleteAccountView: View {
     @EnvironmentObject var authManager: AuthManager
-    @Environment(\.theme)
-    private var theme
     @State private var showConfirmation = false
     @State private var confirmationText = ""
     @State private var isDeleting = false
@@ -42,31 +40,101 @@ struct DeleteAccountView: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.jovieCanvas
-                .ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
-                    deletionHeader
-                    deletionSummary
-                    accountBoundaryNotice
-                    confirmationSection
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Delete account?")
+                        .font(.title2.weight(.bold))
+                    Text(
+                        "This permanently deletes your LogYourBody account, measurements, and uploaded photos. " +
+                            "Apple Health remains separate."
+                    )
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.horizontal, JovieTokens.screenInset)
-                .padding(.top, JovieTokens.sectionGap)
-                .padding(.bottom, 24)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDismissesKeyboard(.interactively)
 
+            SettingsSection(header: "What will be deleted") {
+                DataInfoRow(
+                    icon: "scalemass",
+                    title: "Body records",
+                    description: "Weight, body composition, and measurements",
+                    iconColor: .red
+                )
+
+                DataInfoRow(
+                    icon: "photo.on.rectangle",
+                    title: "Progress data",
+                    description: "Photos, daily logs, and notes stored in LogYourBody",
+                    iconColor: .red
+                )
+
+                DataInfoRow(
+                    icon: "person.crop.circle",
+                    title: "Account data",
+                    description: "Profile, goals, preferences, and local app data",
+                    iconColor: .red
+                )
+            }
+
+            Section {
+                Label("Apple Health data stays in the Health app.", systemImage: "heart.text.square")
+                Label(
+                    "Deleting your account does not cancel an App Store subscription. Manage subscriptions in the App Store.",
+                    systemImage: "creditcard"
+                )
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
+
+            SettingsSection(
+                header: "Confirm permanent deletion",
+                footer: "Type \"\(confirmationPhrase)\" exactly to enable account deletion."
+            ) {
+                TextField("Type \(confirmationPhrase)", text: $confirmationText)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled(true)
+                    .focused($isTextFieldFocused)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        isTextFieldFocused = false
+                    }
+                    .accessibilityLabel("Deletion confirmation")
+                    .accessibilityHint("Type DELETE exactly to enable account deletion.")
+                    .accessibilityIdentifier("delete_account_confirmation_field")
+
+                if let confirmationValidationMessage {
+                    Label(confirmationValidationMessage, systemImage: "exclamationmark.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("delete_account_confirmation_error")
+                }
+            }
+
+            Section {
+                Button("Delete account", role: .destructive) {
+                    isTextFieldFocused = false
+                    deleteAccount()
+                }
+                .disabled(!hasValidConfirmation || isDeleting)
+                .accessibilityIdentifier("delete_account_confirm_button")
+                .accessibilityHint(
+                    hasValidConfirmation
+                        ? "Shows one final confirmation before permanently deleting your account."
+                        : "Type DELETE exactly to enable this action."
+                )
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.interactively)
+        .overlay {
             if isDeleting {
                 LoadingOverlay(message: "Deleting your account...")
             }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            deleteAction
         }
         .navigationTitle("Delete Account")
         .navigationBarTitleDisplayMode(.inline)
@@ -88,145 +156,6 @@ struct DeleteAccountView: View {
             }
         }
         .worldClassScreen(.deleteAccount)
-    }
-
-    private var deletionHeader: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Delete account?")
-                .font(.title2.weight(.bold))
-                .foregroundColor(.jovieText)
-
-            Text(
-                "This permanently deletes your LogYourBody account, measurements, and uploaded photos. " +
-                    "Apple Health remains separate."
-            )
-                .font(.body)
-                .foregroundColor(.jovieTextSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private var deletionSummary: some View {
-        SettingsSection(header: "What will be deleted") {
-            VStack(spacing: 0) {
-                DataInfoRow(
-                    icon: "scalemass",
-                    title: "Body records",
-                    description: "Weight, body composition, and measurements",
-                    iconColor: theme.colors.error
-                )
-
-                Divider()
-
-                DataInfoRow(
-                    icon: "photo.on.rectangle",
-                    title: "Progress data",
-                    description: "Photos, daily logs, and notes stored in LogYourBody",
-                    iconColor: theme.colors.error
-                )
-
-                Divider()
-
-                DataInfoRow(
-                    icon: "person.crop.circle",
-                    title: "Account data",
-                    description: "Profile, goals, preferences, and local app data",
-                    iconColor: theme.colors.error
-                )
-            }
-        }
-    }
-
-    private var accountBoundaryNotice: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Apple Health data stays in the Health app.", systemImage: "heart.text.square")
-            Label(
-                "Deleting your account does not cancel an App Store subscription. Manage subscriptions in the App Store.",
-                systemImage: "creditcard"
-            )
-        }
-        .font(.footnote)
-        .foregroundColor(.jovieTextSecondary)
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
-                .fill(Color.jovieSurfaceElevated)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
-                .stroke(Color.jovieHairline, lineWidth: 1)
-        )
-        .accessibilityElement(children: .combine)
-    }
-
-    private var confirmationSection: some View {
-        SettingsSection(
-            header: "Confirm permanent deletion",
-            footer: "Type \"\(confirmationPhrase)\" exactly to enable account deletion."
-        ) {
-            VStack(alignment: .leading, spacing: 8) {
-                TextField("Type \(confirmationPhrase)", text: $confirmationText)
-                    .textFieldStyle(.plain)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled(true)
-                    .focused($isTextFieldFocused)
-                    .submitLabel(.done)
-                    .onSubmit {
-                        isTextFieldFocused = false
-                    }
-                    .settingsInputStyle()
-                    .frame(minHeight: JovieTokens.minimumHitTarget)
-                    .accessibilityLabel("Deletion confirmation")
-                    .accessibilityHint("Type DELETE exactly to enable account deletion.")
-                    .accessibilityIdentifier("delete_account_confirmation_field")
-
-                if let confirmationValidationMessage {
-                    Label(confirmationValidationMessage, systemImage: "exclamationmark.circle.fill")
-                        .font(.footnote)
-                        .foregroundColor(theme.colors.error)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("delete_account_confirmation_error")
-                }
-            }
-            .padding(.horizontal, theme.spacing.md)
-            .padding(.vertical, theme.spacing.sm)
-        }
-    }
-
-    private var deleteAction: some View {
-        VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.jovieHairline)
-                .frame(height: 1)
-
-            BaseButton(
-                "Delete account",
-                configuration: ButtonConfiguration(
-                    style: hasValidConfirmation
-                        ? .custom(background: theme.colors.error, foreground: .jovieText)
-                        : .custom(background: theme.colors.interactiveDisabled, foreground: .jovieTextSecondary),
-                    isLoading: isDeleting,
-                    isEnabled: hasValidConfirmation,
-                    fullWidth: true,
-                    cornerRadius: JovieTokens.controlRadius
-                ),
-                action: {
-                    isTextFieldFocused = false
-                    deleteAccount()
-                }
-            )
-            .accessibilityIdentifier("delete_account_confirm_button")
-            .accessibilityHint(
-                hasValidConfirmation
-                    ? "Shows one final confirmation before permanently deleting your account."
-                    : "Type DELETE exactly to enable this action."
-            )
-            .padding(.horizontal, JovieTokens.screenInset)
-            .padding(.vertical, 12)
-        }
-        .background(Color.jovieCanvas.opacity(0.96).ignoresSafeArea(edges: .bottom))
     }
 
     private func deleteAccount() {

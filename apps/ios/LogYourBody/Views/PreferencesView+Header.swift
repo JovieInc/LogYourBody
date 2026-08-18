@@ -5,85 +5,68 @@
 import SwiftUI
 
 extension PreferencesView {
+    @ViewBuilder
     var settingsLauncher: some View {
-        VStack(spacing: theme.spacing.sectionSpacing) {
+        Section {
             heroHeader
+        }
 
-            SettingsSection(header: "Personal") {
-                VStack(spacing: 0) {
-                    SettingsNavigationLink(
-                        icon: "person.crop.circle",
-                        title: "Profile",
-                        subtitle: "Personal details and profile photo"
-                    ) {
-                        SettingsDetailScreen(title: "Profile") {
-                            VStack(spacing: theme.spacing.sectionSpacing) {
-                                accountSection
-                                profileSection
-                            }
-                        }
-                    }
-                    .accessibilityIdentifier("settings_profile_link")
-
-                    DSDivider().insetted(16)
-
-                    SettingsNavigationLink(
-                        icon: "target",
-                        title: "Tracking",
-                        subtitle: "Goals, units, and reminders"
-                    ) {
-                        SettingsDetailScreen(title: "Tracking") {
-                            VStack(spacing: theme.spacing.sectionSpacing) {
-                                trackingGoalsSection
-                                remindersSection
-                            }
-                        }
-                        .worldClassScreen(.trackingAndGoals)
-                    }
-                    .accessibilityIdentifier("settings_tracking_link")
-
-                    DSDivider().insetted(16)
-
-                    integrationsLauncherRow
-                        .accessibilityIdentifier("settings_integrations_link")
+        SettingsSection(header: "Personal") {
+            SettingsNavigationLink(
+                icon: "person.crop.circle",
+                title: "Profile",
+                subtitle: "Personal details and profile photo"
+            ) {
+                SettingsDetailScreen(title: "Profile") {
+                    accountSection
+                    profileSection
                 }
             }
+            .accessibilityIdentifier("settings_profile_link")
 
-            SettingsSection(header: "Account & data") {
-                VStack(spacing: 0) {
-                    SettingsNavigationLink(
-                        icon: "person.badge.key",
-                        title: "Account & subscription",
-                        subtitle: accountSubscriptionSummary
-                    ) {
-                        SettingsDetailScreen(title: "Account & subscription") {
-                            VStack(spacing: theme.spacing.sectionSpacing) {
-                                subscriptionSection
-                                advancedSection
-                                securitySection
-                            }
-                        }
-                    }
-                    .accessibilityIdentifier("settings_account_subscription_link")
+            SettingsNavigationLink(
+                icon: "target",
+                title: "Tracking",
+                subtitle: "Goals, units, and reminders"
+            ) {
+                SettingsDetailScreen(title: "Tracking") {
+                    trackingGoalsSection
+                    remindersSection
+                }
+                .worldClassScreen(.trackingAndGoals)
+            }
+            .accessibilityIdentifier("settings_tracking_link")
 
-                    DSDivider().insetted(16)
+            integrationsLauncherRow
+                .accessibilityIdentifier("settings_integrations_link")
+        }
 
-                    SettingsNavigationLink(
-                        icon: "hand.raised",
-                        title: "Privacy & data",
-                        subtitle: "Photo handling and account deletion"
-                    ) {
-                        SettingsDetailScreen(title: "Privacy & data") {
-                            VStack(spacing: theme.spacing.sectionSpacing) {
-                                photosSection
-                                dangerSection
-                            }
-                        }
-                        .worldClassScreen(.privacyAndData)
-                    }
-                    .accessibilityIdentifier("settings_privacy_data_link")
+        SettingsSection(header: "Account & data") {
+            SettingsNavigationLink(
+                icon: "person.badge.key",
+                title: "Account & subscription",
+                subtitle: accountSubscriptionSummary
+            ) {
+                SettingsDetailScreen(title: "Account & subscription") {
+                    subscriptionSection
+                    advancedSection
+                    securitySection
                 }
             }
+            .accessibilityIdentifier("settings_account_subscription_link")
+
+            SettingsNavigationLink(
+                icon: "hand.raised",
+                title: "Privacy & data",
+                subtitle: "Photo handling and account deletion"
+            ) {
+                SettingsDetailScreen(title: "Privacy & data") {
+                    photosSection
+                    dangerSection
+                }
+                .worldClassScreen(.privacyAndData)
+            }
+            .accessibilityIdentifier("settings_privacy_data_link")
         }
     }
 
@@ -97,44 +80,44 @@ extension PreferencesView {
     var heroHeader: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: theme.spacing.md) {
+                VStack(alignment: .leading, spacing: 12) {
                     heroAvatar
                     heroIdentityText
                     statusBadge
                 }
             } else {
-                VStack(spacing: theme.spacing.md) {
-                    HStack(alignment: .center, spacing: theme.spacing.md) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 12) {
                         heroAvatar
                         heroIdentityText
-                        Spacer()
+                        Spacer(minLength: 0)
                     }
 
                     statusBadge
                 }
             }
         }
-        .padding(.vertical, theme.spacing.xs)
+        .accessibilityElement(children: .combine)
     }
 
     var heroIdentityText: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.xxs) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(userDisplayName)
-                .font(theme.typography.headlineMedium)
-                .foregroundColor(theme.colors.text)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(userEmail)
-                .font(theme.typography.bodySmall)
-                .foregroundColor(theme.colors.textSecondary)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                 .minimumScaleFactor(0.82)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let memberSinceText {
                 Text(memberSinceText)
-                    .font(theme.typography.captionMedium)
-                    .foregroundColor(theme.colors.textSecondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -143,66 +126,46 @@ extension PreferencesView {
     var statusBadge: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: theme.spacing.xs) {
-                    HStack(spacing: theme.spacing.xs) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
                         Circle()
-                            .fill(subscriptionManager.isSubscribed ? theme.colors.success : theme.colors.warning)
+                            .fill(subscriptionManager.isSubscribed ? Color.green : Color.orange)
                             .frame(width: 8, height: 8)
 
                         Text(subscriptionStatusText)
-                            .font(theme.typography.captionLarge)
-                            .foregroundColor(theme.colors.textSecondary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
 
                     if let planDisplay = subscriptionPlanDisplay {
                         Text(planDisplay)
-                            .font(theme.typography.captionLarge)
-                            .foregroundColor(theme.colors.textSecondary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             } else {
-                HStack(spacing: theme.spacing.xs) {
+                HStack(spacing: 6) {
                     Circle()
-                        .fill(subscriptionManager.isSubscribed ? theme.colors.success : theme.colors.warning)
+                        .fill(subscriptionManager.isSubscribed ? Color.green : Color.orange)
                         .frame(width: 8, height: 8)
 
                     Text(subscriptionStatusText)
-                        .font(theme.typography.captionLarge)
-                        .foregroundColor(theme.colors.textSecondary)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
 
                     if let planDisplay = subscriptionPlanDisplay {
                         Text("•")
-                            .foregroundColor(theme.colors.textTertiary)
+                            .foregroundStyle(.tertiary)
                         Text(planDisplay)
-                            .font(theme.typography.captionLarge)
-                            .foregroundColor(theme.colors.textSecondary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-    }
-
-    var compactHeader: some View {
-        VStack(spacing: 0) {
-            HStack {
-                heroAvatarSmall
-                Text(userDisplayName)
-                    .font(theme.typography.labelLarge)
-                    .foregroundColor(theme.colors.text)
-                    .lineLimit(1)
-                Spacer()
-            }
-            .padding(.horizontal, theme.spacing.screenPadding)
-            .padding(.top, topSafeArea + theme.spacing.xs)
-            .padding(.bottom, theme.spacing.sm)
-            .background(theme.colors.background.opacity(0.95))
-            .opacity(isCompactHeaderVisible ? 1 : 0)
-        }
-        .ignoresSafeArea(edges: .top)
-        .animation(theme.animation.fast, value: isCompactHeaderVisible)
     }
 
     var heroAvatar: some View {
@@ -225,43 +188,24 @@ extension PreferencesView {
 
             if isUploadingPhoto {
                 Circle()
-                    .fill(theme.colors.background.opacity(0.58))
+                    .fill(.black.opacity(0.45))
                     .frame(width: 72, height: 72)
 
                 ProgressView(value: avatarUploadProgress)
-                    .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.text))
+                    .progressViewStyle(CircularProgressViewStyle())
                     .scaleEffect(0.8)
             }
         }
-    }
-
-    var heroAvatarSmall: some View {
-        ZStack {
-            if let profileAvatarURLString,
-               let url = URL(string: profileAvatarURLString) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
-                    avatarPlaceholder
-                }
-                .frame(width: 32, height: 32)
-                .clipShape(Circle())
-            } else {
-                avatarPlaceholder
-                    .frame(width: 32, height: 32)
-            }
-        }
+        .accessibilityHidden(true)
     }
 
     var avatarPlaceholder: some View {
         Circle()
-            .fill(theme.colors.surfaceTertiary)
+            .fill(.quaternary)
             .overlay(
                 Text(userInitials)
-                    .font(theme.typography.headlineMedium)
-                    .foregroundColor(theme.colors.text)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
             )
     }
 }

@@ -6,19 +6,44 @@ import SwiftUI
 
 private enum SettingsLayout {
     static let rowMinHeight: CGFloat = max(52, JovieTokens.minimumHitTarget)
-    static let iconSize: CGFloat = 20
     static let iconFrame: CGFloat = 24
+}
+
+// MARK: - Settings Surface Policy
+
+enum SettingsSurfacePolicy {
+    static let settingsScreen = WorldClassScreen.settings
+
+    static let rootAccessibilityIdentifiers = [
+        "settings_profile_link",
+        "settings_tracking_link",
+        "settings_integrations_link",
+        "settings_account_subscription_link",
+        "settings_privacy_data_link",
+        WorldClassScreen.settings.accessibilityIdentifier
+    ]
+
+    static let nestedAccessibilityIdentifiers = [
+        "settings_logout_button",
+        "settings_profile_height_row",
+        "settings_units_row",
+        "settings_step_goal_row",
+        "settings_daily_weigh_in_reminder_toggle",
+        "settings_daily_weigh_in_reminder_time_picker",
+        "settings_subscription_status_row",
+        "settings_manage_subscription_button",
+        "settings_restore_purchases_button",
+        "settings_goal_editor_sheet",
+        "settings_goal_editor_text_field"
+    ]
 }
 
 // MARK: - Section Component
 
 struct SettingsSection<Content: View>: View {
-    @Environment(\.theme)
-    private var theme
-
     let header: String?
     let footer: String?
-    @ViewBuilder let content: Content
+    let content: Content
 
     init(
         header: String? = nil,
@@ -31,35 +56,30 @@ struct SettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if let header = header {
-                HStack {
-                    Text(header)
-                        .font(theme.typography.captionLarge.weight(.semibold))
-                        .foregroundColor(theme.colors.textSecondary)
-                        .textCase(.uppercase)
-                        .tracking(0.5)
-                    Spacer()
-                }
-                .padding(.horizontal, 2)
-                .padding(.bottom, theme.spacing.xs)
-            }
-
-            VStack(spacing: 0) {
+        switch (header, footer) {
+        case let (header?, footer?):
+            Section {
                 content
-            }
-            .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
-                    .stroke(theme.colors.border.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
-            }
-
-            if let footer = footer {
+            } header: {
+                Text(header)
+            } footer: {
                 Text(footer)
-                    .font(theme.typography.captionMedium)
-                    .foregroundColor(theme.colors.textSecondary)
-                    .padding(.horizontal, theme.spacing.md)
-                    .padding(.top, theme.spacing.xs)
+            }
+        case let (header?, nil):
+            Section {
+                content
+            } header: {
+                Text(header)
+            }
+        case let (nil, footer?):
+            Section {
+                content
+            } footer: {
+                Text(footer)
+            }
+        case (nil, nil):
+            Section {
+                content
             }
         }
     }
@@ -68,8 +88,6 @@ struct SettingsSection<Content: View>: View {
 // MARK: - Row Component
 
 struct SettingsRow: View {
-    @Environment(\.theme)
-    private var theme
     @Environment(\.dynamicTypeSize)
     private var dynamicTypeSize
 
@@ -105,31 +123,28 @@ struct SettingsRow: View {
     var body: some View {
         Group {
             if usesStackedValueLayout, let value {
-                VStack(alignment: .leading, spacing: theme.spacing.xs) {
-                    HStack(spacing: theme.spacing.sm) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 12) {
                         leadingContent
-
-                        Spacer(minLength: theme.spacing.xs)
-
+                        Spacer(minLength: 8)
                         disclosureIndicator
                     }
 
                     Text(value)
-                        .font(theme.typography.captionLarge)
-                        .foregroundColor(theme.colors.textSecondary)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.leading, valueLeadingInset)
                 }
             } else {
-                HStack(spacing: theme.spacing.sm) {
+                HStack(spacing: 12) {
                     leadingContent
-
-                    Spacer(minLength: theme.spacing.xs)
+                    Spacer(minLength: 8)
 
                     if let value {
                         Text(value)
-                            .font(theme.typography.captionLarge)
-                            .foregroundColor(theme.colors.textSecondary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.82)
                     }
@@ -138,8 +153,6 @@ struct SettingsRow: View {
                 }
             }
         }
-        .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
         .frame(minHeight: SettingsLayout.rowMinHeight)
         .contentShape(Rectangle())
     }
@@ -149,29 +162,30 @@ struct SettingsRow: View {
     }
 
     private var valueLeadingInset: CGFloat {
-        icon == nil ? 0 : SettingsLayout.iconFrame + theme.spacing.sm
+        icon == nil ? 0 : SettingsLayout.iconFrame + 12
     }
 
     private var leadingContent: some View {
-        HStack(spacing: theme.spacing.sm) {
+        HStack(spacing: 12) {
             if let icon {
                 Image(systemName: icon)
-                    .font(theme.typography.headlineSmall)
-                    .foregroundColor(resolvedTint)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(resolvedTint)
                     .frame(width: SettingsLayout.iconFrame)
+                    .accessibilityHidden(true)
             }
 
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
                 Text(title)
-                    .font(theme.typography.labelLarge)
-                    .foregroundColor(resolvedTint)
+                    .font(.body)
+                    .foregroundStyle(resolvedTint)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let subtitle {
                     Text(subtitle)
-                        .font(theme.typography.captionLarge)
-                        .foregroundColor(subtitleColor ?? theme.colors.textSecondary)
+                        .font(.subheadline)
+                        .foregroundStyle(subtitleColor ?? .secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -185,12 +199,13 @@ struct SettingsRow: View {
         if showChevron {
             Image(systemName: isExternal ? "arrow.up.right.square" : "chevron.right")
                 .font(.caption2.weight(.semibold))
-                .foregroundColor(theme.colors.textTertiary)
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
     }
 
     private var resolvedTint: Color {
-        tintColor ?? theme.colors.text
+        tintColor ?? .primary
     }
 }
 
@@ -227,7 +242,7 @@ struct SettingsNavigationLink<Destination: View>: View {
                 title: title,
                 subtitle: subtitle,
                 value: value,
-                showChevron: true,
+                showChevron: false,
                 tintColor: tintColor
             )
         }
@@ -239,8 +254,6 @@ struct SettingsNavigationLink<Destination: View>: View {
 struct SettingsBackButton: View {
     @Environment(\.dismiss)
     private var dismiss
-    @Environment(\.theme)
-    private var theme
 
     var body: some View {
         Button {
@@ -248,7 +261,7 @@ struct SettingsBackButton: View {
         } label: {
             Image(systemName: "chevron.left")
                 .font(.body.weight(.semibold))
-                .foregroundColor(theme.colors.text)
+                .foregroundStyle(.primary)
                 .frame(
                     width: JovieTokens.minimumHitTarget,
                     height: JovieTokens.minimumHitTarget
@@ -262,11 +275,8 @@ struct SettingsBackButton: View {
 }
 
 struct SettingsDetailScreen<Content: View>: View {
-    @Environment(\.theme)
-    private var theme
-
     let title: String
-    @ViewBuilder let content: Content
+    let content: Content
 
     init(
         title: String,
@@ -277,33 +287,18 @@ struct SettingsDetailScreen<Content: View>: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: theme.spacing.sectionSpacing) {
-                content
-            }
-            .padding(.horizontal, theme.spacing.screenPadding)
-            .padding(.vertical, theme.spacing.md)
+        List {
+            content
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .settingsBackground()
+        .listStyle(.insetGrouped)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                SettingsBackButton()
-            }
-        }
     }
 }
 
 // MARK: - Toggle Row
 
 struct SettingsToggleRow: View {
-    @Environment(\.theme)
-    private var theme
     @Environment(\.dynamicTypeSize)
     private var dynamicTypeSize
 
@@ -331,80 +326,50 @@ struct SettingsToggleRow: View {
     }
 
     var body: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: theme.spacing.sm) {
-                    toggleLabel
-
-                    toggle
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+        Toggle(isOn: $isOn) {
+            HStack(spacing: 12) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(resolvedTint)
+                        .frame(width: SettingsLayout.iconFrame)
+                        .accessibilityHidden(true)
                 }
-            } else {
-                HStack(spacing: theme.spacing.sm) {
-                    toggleLabel
 
-                    Spacer(minLength: theme.spacing.xs)
+                VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
+                    Text(title)
+                        .font(.body)
+                        .foregroundStyle(resolvedTint)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    toggle
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
-        .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
         .frame(minHeight: SettingsLayout.rowMinHeight)
+        .tint(.accentColor)
+        .accessibilityLabel(title)
+        .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityHint(subtitle ?? "")
         .onChange(of: isOn) { _, newValue in
             onToggle?(newValue)
         }
     }
 
-    private var toggleLabel: some View {
-        HStack(spacing: theme.spacing.sm) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(theme.typography.headlineSmall)
-                    .foregroundColor(resolvedTint)
-                    .frame(width: SettingsLayout.iconFrame)
-            }
-
-            VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
-                Text(title)
-                    .font(theme.typography.labelLarge)
-                    .foregroundColor(resolvedTint)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let subtitle {
-                    Text(subtitle)
-                        .font(theme.typography.captionLarge)
-                        .foregroundColor(theme.colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-        .layoutPriority(1)
-    }
-
-    private var toggle: some View {
-        Toggle(title, isOn: $isOn)
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .accessibilityLabel(title)
-            .accessibilityValue(isOn ? "On" : "Off")
-            .accessibilityHint(subtitle ?? "")
-            .tint(theme.colors.info)
-    }
-
     private var resolvedTint: Color {
-        tintColor ?? theme.colors.text
+        tintColor ?? .primary
     }
 }
 
 // MARK: - Button Row
 
 struct SettingsButtonRow: View {
-    @Environment(\.theme)
-    private var theme
-
     let icon: String?
     let title: String
     let role: ButtonRole?
@@ -424,22 +389,19 @@ struct SettingsButtonRow: View {
 
     var body: some View {
         Button(role: role, action: action) {
-            SettingsRow(
-                icon: icon,
-                title: title,
-                showChevron: false,
-                tintColor: role == .destructive ? theme.colors.error : nil
-            )
+            if let icon {
+                Label(title, systemImage: icon)
+            } else {
+                Text(title)
+            }
         }
+        .frame(minHeight: SettingsLayout.rowMinHeight, alignment: .leading)
     }
 }
 
 // MARK: - Picker Row
 
 struct SettingsPickerRow<SelectionValue: Hashable>: View {
-    @Environment(\.theme)
-    private var theme
-
     let icon: String?
     let title: String
     @Binding var selection: SelectionValue
@@ -451,22 +413,13 @@ struct SettingsPickerRow<SelectionValue: Hashable>: View {
                 Text(option.label).tag(option.value)
             }
         } label: {
-            HStack(spacing: theme.spacing.sm) {
-                if let icon = icon {
-                    Image(systemName: icon)
-                        .font(theme.typography.headlineSmall)
-                        .foregroundColor(theme.colors.text)
-                        .frame(width: SettingsLayout.iconFrame)
-                }
-
+            if let icon {
+                Label(title, systemImage: icon)
+            } else {
                 Text(title)
-                    .font(theme.typography.labelLarge)
-                    .foregroundColor(theme.colors.text)
             }
         }
         .pickerStyle(.menu)
-        .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
         .frame(minHeight: SettingsLayout.rowMinHeight)
     }
 }
@@ -474,9 +427,6 @@ struct SettingsPickerRow<SelectionValue: Hashable>: View {
 // MARK: - Success Overlay
 
 struct SuccessOverlay: View {
-    @Environment(\.theme)
-    private var theme
-
     @Binding var isShowing: Bool
     let message: String
     let icon: String
@@ -496,27 +446,17 @@ struct SuccessOverlay: View {
 
     var body: some View {
         if isShowing {
-            VStack(spacing: theme.spacing.md) {
+            VStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(theme.typography.displayMedium)
-                    .foregroundColor(theme.colors.success)
+                    .font(.largeTitle)
+                    .foregroundStyle(.green)
 
                 Text(message)
-                    .font(theme.typography.headlineSmall)
-                    .foregroundColor(theme.colors.text)
+                    .font(.headline)
                     .multilineTextAlignment(.center)
             }
-            .padding(theme.spacing.xl)
-            .systemBGlassSurface(
-                cornerRadius: theme.radius.lg,
-                tint: theme.colors.text,
-                tintOpacity: 0.055,
-                borderColor: theme.colors.border,
-                borderOpacity: 0.8,
-                shadowOpacity: 0.32,
-                shadowRadius: 20,
-                shadowY: 10
-            )
+            .padding(24)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .transition(.scale.combined(with: .opacity))
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + autoDismissDelay) {
@@ -532,9 +472,6 @@ struct SuccessOverlay: View {
 // MARK: - Loading Overlay
 
 struct LoadingOverlay: View {
-    @Environment(\.theme)
-    private var theme
-
     let message: String
     let progress: Double?
 
@@ -545,32 +482,23 @@ struct LoadingOverlay: View {
 
     var body: some View {
         ZStack {
-            theme.colors.background.opacity(0.58)
+            Color.black.opacity(0.45)
                 .ignoresSafeArea()
 
-            VStack(spacing: theme.spacing.lg) {
-                if let progress = progress {
+            VStack(spacing: 16) {
+                if let progress {
                     ProgressView(value: progress)
                         .progressViewStyle(.linear)
-                        .tint(theme.colors.primary)
                 } else {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.primary))
-                        .scaleEffect(1.5)
+                        .progressViewStyle(.circular)
                 }
 
                 Text(message)
-                    .font(theme.typography.headlineSmall)
-                    .foregroundColor(theme.colors.text)
+                    .font(.headline)
             }
-            .padding(theme.spacing.xl)
-            .systemBGlassSurface(
-                cornerRadius: theme.radius.lg,
-                tint: theme.colors.text,
-                tintOpacity: 0.055,
-                borderColor: theme.colors.border,
-                borderOpacity: 0.8
-            )
+            .padding(24)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 }
@@ -578,9 +506,6 @@ struct LoadingOverlay: View {
 // MARK: - Empty State
 
 struct SettingsEmptyState: View {
-    @Environment(\.theme)
-    private var theme
-
     let icon: String
     let title: String
     let message: String
@@ -590,7 +515,7 @@ struct SettingsEmptyState: View {
         icon: String,
         title: String,
         message: String,
-        iconColor: Color = DefaultTheme().colors.textSecondary
+        iconColor: Color = .secondary
     ) {
         self.icon = icon
         self.title = title
@@ -599,31 +524,19 @@ struct SettingsEmptyState: View {
     }
 
     var body: some View {
-        VStack(spacing: theme.spacing.md) {
-            Image(systemName: icon)
-                .font(theme.typography.displayLarge)
-                .foregroundColor(iconColor)
-
-            Text(title)
-                .font(theme.typography.headlineSmall)
-                .foregroundColor(theme.colors.text)
-
+        ContentUnavailableView {
+            Label(title, systemImage: icon)
+                .foregroundStyle(iconColor)
+        } description: {
             Text(message)
-                .font(theme.typography.bodySmall)
-                .foregroundColor(theme.colors.textSecondary)
-                .multilineTextAlignment(.center)
         }
-        .padding(theme.spacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 }
 
 // MARK: - Data Info Row
 
 struct DataInfoRow: View {
-    @Environment(\.theme)
-    private var theme
-
     let icon: String
     let title: String
     let description: String?
@@ -633,7 +546,7 @@ struct DataInfoRow: View {
         icon: String,
         title: String,
         description: String? = nil,
-        iconColor: Color = DefaultTheme().colors.primary
+        iconColor: Color = .accentColor
     ) {
         self.icon = icon
         self.title = title
@@ -642,30 +555,24 @@ struct DataInfoRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: theme.spacing.md) {
-            Image(systemName: icon)
-                .font(theme.typography.headlineMedium)
-                .foregroundColor(iconColor)
-                .frame(width: 32)
-
+        Label {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(theme.typography.labelLarge)
-                    .foregroundColor(theme.colors.text)
+                    .font(.body)
+                    .foregroundStyle(.primary)
 
-                if let description = description {
+                if let description {
                     Text(description)
-                        .font(theme.typography.captionLarge)
-                        .foregroundColor(theme.colors.textSecondary)
-                        .lineLimit(2)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-
-            Spacer()
+        } icon: {
+            Image(systemName: icon)
+                .foregroundStyle(iconColor)
         }
-        .padding(.horizontal, theme.spacing.md)
-        .padding(.vertical, theme.spacing.sm)
-        .frame(minHeight: SettingsLayout.rowMinHeight)
+        .frame(minHeight: SettingsLayout.rowMinHeight, alignment: .leading)
     }
 }
 
@@ -702,55 +609,28 @@ private struct SettingsRowStyleModifier: ViewModifier {
 }
 
 private struct SettingsCardStyleModifier: ViewModifier {
-    @Environment(\.theme)
-    private var theme
-
     func body(content: Content) -> some View {
-        content.systemBGlassSurface(
-            cornerRadius: theme.radius.card,
-            tint: theme.colors.text,
-            tintOpacity: 0.045,
-            borderColor: theme.colors.border,
-            borderOpacity: 0.75
-        )
+        content
     }
 }
 
 private struct SettingsSectionStyleModifier: ViewModifier {
-    @Environment(\.theme)
-    private var theme
-
     func body(content: Content) -> some View {
-        content.padding(.horizontal, theme.spacing.screenPadding)
+        content
     }
 }
 
 private struct SettingsBackgroundModifier: ViewModifier {
-    @Environment(\.theme)
-    private var theme
-
     func body(content: Content) -> some View {
-        content.background(theme.colors.background.ignoresSafeArea())
+        content
     }
 }
 
 private struct SettingsInputStyleModifier: ViewModifier {
-    @Environment(\.theme)
-    private var theme
-
     func body(content: Content) -> some View {
         content
-            .font(theme.typography.bodyMedium)
-            .foregroundColor(theme.colors.text)
-            .tint(theme.colors.primary)
-            .padding(.horizontal, theme.spacing.md)
-            .padding(.vertical, theme.spacing.sm)
-            .systemBGlassSurface(
-                cornerRadius: theme.radius.input,
-                tint: theme.colors.text,
-                tintOpacity: 0.045,
-                borderColor: theme.colors.border,
-                borderOpacity: 0.75
-            )
+            .font(.body)
+            .foregroundStyle(.primary)
+            .tint(.accentColor)
     }
 }

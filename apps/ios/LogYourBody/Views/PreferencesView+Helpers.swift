@@ -60,14 +60,6 @@ extension PreferencesView {
         return convertHeightToCurrentSystem(height: height, fromUnit: unit)
     }
 
-    var topSafeArea: CGFloat {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first { $0.isKeyWindow }?
-            .safeAreaInsets.top ?? 0
-    }
-
     func handleHealthSyncToggle(to newValue: Bool) {
         if newValue {
             Task {

@@ -7,8 +7,6 @@ import UIKit
 
 struct IntegrationsView: View {
     @EnvironmentObject var authManager: AuthManager
-    @Environment(\.theme)
-    private var theme
     @StateObject private var healthKitManager = HealthKitManager.shared
     @AppStorage(Constants.healthKitSyncEnabledKey) private var healthKitSyncEnabled = true
     @State private var showHealthKitConnect = false
@@ -21,30 +19,17 @@ struct IntegrationsView: View {
     @State private var progressPhotoCount = 0
     @State private var featureGateRefreshToken = UUID()
     var body: some View {
-        ScrollView {
-            VStack(spacing: theme.spacing.sectionSpacing) {
-                healthAndFitnessSection
-                if isBulkProgressPhotoImportEnabled {
-                    photoImportSection
-                }
-                dataExportSection
+        List {
+            healthAndFitnessSection
+            if isBulkProgressPhotoImportEnabled {
+                photoImportSection
             }
-            .padding(.horizontal, theme.spacing.screenPadding)
-            .padding(.top, theme.spacing.md)
-            .padding(.bottom, 40)
+            dataExportSection
         }
+        .listStyle(.insetGrouped)
         .scrollBounceBehavior(.basedOnSize)
-        .settingsBackground()
         .navigationTitle("Integrations")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                SettingsBackButton()
-            }
-        }
         .alert("Apple Health access is needed", isPresented: $showHealthKitConnect) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -76,103 +61,89 @@ struct IntegrationsView: View {
             header: "Health & Fitness",
             footer: "Control data connections and sync."
         ) {
-            VStack(spacing: 0) {
-                // Apple Health
-                if healthKitManager.isHealthKitAvailable {
-                    ViewThatFits(in: .horizontal) {
-                        appleHealthConnectionRow
-                        appleHealthConnectionStack
-                    }
-                    .padding(.horizontal, theme.spacing.md)
-                    .frame(minHeight: JovieTokens.minimumHitTarget)
+            if healthKitManager.isHealthKitAvailable {
+                ViewThatFits(in: .horizontal) {
+                    appleHealthConnectionRow
+                    appleHealthConnectionStack
+                }
 
-                    if healthKitManager.isAuthorized {
-                        Divider()
-
-                        // Enable Sync Toggle
-                        SettingsToggleRow(
-                            icon: "arrow.triangle.2.circlepath",
-                            title: "Enable Sync",
-                            isOn: $healthKitSyncEnabled,
-                            subtitle: "Keep weight and steps up to date"
-                        )
-                        .onChange(of: healthKitSyncEnabled) { _, newValue in
-                            if newValue {
-                                Task {
-                                    let authorized = await healthKitManager.requestAuthorization()
-                                    if authorized {
-                                        await HealthSyncCoordinator.shared
-                                            .configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
-                                    } else {
-                                        await MainActor.run {
-                                            healthKitSyncEnabled = false
-                                            showHealthKitConnect = true
-                                        }
+                if healthKitManager.isAuthorized {
+                    SettingsToggleRow(
+                        icon: "arrow.triangle.2.circlepath",
+                        title: "Enable Sync",
+                        isOn: $healthKitSyncEnabled,
+                        subtitle: "Keep weight and steps up to date"
+                    )
+                    .onChange(of: healthKitSyncEnabled) { _, newValue in
+                        if newValue {
+                            Task {
+                                let authorized = await healthKitManager.requestAuthorization()
+                                if authorized {
+                                    await HealthSyncCoordinator.shared
+                                        .configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
+                                } else {
+                                    await MainActor.run {
+                                        healthKitSyncEnabled = false
+                                        showHealthKitConnect = true
                                     }
                                 }
                             }
                         }
-
-                        Divider()
-
-                        Button {
-                            Task { @MainActor in
-                                await syncAllHealthData()
-                            }
-                        } label: {
-                            SettingsRow(
-                                icon: "arrow.triangle.2.circlepath",
-                                title: isSyncingHealthKit ? "Syncing historical data" : "Sync all historical data",
-                                subtitle: healthSyncStatusMessage,
-                                subtitleColor: healthSyncStatusIsError ? theme.colors.error : nil,
-                                showChevron: false
-                            )
-                        }
-                        .disabled(isSyncingHealthKit)
-                        .accessibilityHint("Syncs your historical Apple Health data now.")
-                        .accessibilityIdentifier("integrations_health_sync_all_button")
                     }
-                } else {
-                    DataInfoRow(
-                        icon: "exclamationmark.triangle",
-                        title: "Apple Health isn’t available",
-                        description: "This device doesn’t support Apple Health.",
-                        iconColor: theme.colors.warning
-                    )
-                }
 
-                if Constants.isBodySpecEnabled {
-                    Divider()
-
-                    NavigationLink(
-                        destination: BodySpecIntegrationView()
-                            .environmentObject(authManager)
-                    ) {
+                    Button {
+                        Task { @MainActor in
+                            await syncAllHealthData()
+                        }
+                    } label: {
                         SettingsRow(
-                            icon: "waveform.path.ecg",
-                            title: "BodySpec",
-                            subtitle: "DEXA scans",
-                            value: bodySpecSyncStatusText,
-                            showChevron: true,
-                            tintColor: theme.colors.text
+                            icon: "arrow.triangle.2.circlepath",
+                            title: isSyncingHealthKit ? "Syncing historical data" : "Sync all historical data",
+                            subtitle: healthSyncStatusMessage,
+                            subtitleColor: healthSyncStatusIsError ? .red : nil,
+                            showChevron: false
                         )
                     }
-                    .accessibilityIdentifier("integrations_bodyspec_link")
+                    .foregroundStyle(.primary)
+                    .disabled(isSyncingHealthKit)
+                    .accessibilityHint("Syncs your historical Apple Health data now.")
+                    .accessibilityIdentifier("integrations_health_sync_all_button")
                 }
+            } else {
+                DataInfoRow(
+                    icon: "exclamationmark.triangle",
+                    title: "Apple Health isn’t available",
+                    description: "This device doesn’t support Apple Health.",
+                    iconColor: .orange
+                )
+            }
+
+            if Constants.isBodySpecEnabled {
+                NavigationLink(
+                    destination: BodySpecIntegrationView()
+                        .environmentObject(authManager)
+                ) {
+                    SettingsRow(
+                        icon: "waveform.path.ecg",
+                        title: "BodySpec",
+                        subtitle: "DEXA scans",
+                        value: bodySpecSyncStatusText,
+                        showChevron: false
+                    )
+                }
+                .accessibilityIdentifier("integrations_bodyspec_link")
             }
         }
     }
 
     private var appleHealthConnectionRow: some View {
-        HStack(spacing: theme.spacing.sm) {
+        HStack(spacing: 12) {
             Image(systemName: "heart.fill")
-                .foregroundColor(theme.colors.error)
-                .font(theme.typography.headlineSmall)
+                .foregroundStyle(.red)
                 .frame(width: 24)
+                .accessibilityHidden(true)
 
             Text("Apple Health")
-                .font(theme.typography.labelLarge)
-                .foregroundColor(theme.colors.text)
 
             Spacer()
 
@@ -181,16 +152,14 @@ struct IntegrationsView: View {
     }
 
     private var appleHealthConnectionStack: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.sm) {
-            HStack(spacing: theme.spacing.sm) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
                 Image(systemName: "heart.fill")
-                    .foregroundColor(theme.colors.error)
-                    .font(theme.typography.headlineSmall)
+                    .foregroundStyle(.red)
                     .frame(width: 24)
+                    .accessibilityHidden(true)
 
                 Text("Apple Health")
-                    .font(theme.typography.labelLarge)
-                    .foregroundColor(theme.colors.text)
             }
 
             healthConnectionStatus
@@ -202,8 +171,8 @@ struct IntegrationsView: View {
     private var healthConnectionStatus: some View {
         if healthKitManager.isAuthorized {
             Label("Connected", systemImage: "checkmark.circle.fill")
-                .font(theme.typography.captionLarge)
-                .foregroundColor(theme.colors.success)
+                .font(.subheadline)
+                .foregroundStyle(.green)
                 .labelStyle(.titleAndIcon)
                 .accessibilityLabel("Apple Health connected")
         } else {
@@ -212,20 +181,11 @@ struct IntegrationsView: View {
                     await connectAppleHealth()
                 }
             } label: {
-                HStack(spacing: theme.spacing.xs) {
-                    if isConnectingHealthKit {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(.jovieActionText)
-                    }
-
-                    Text(isConnectingHealthKit ? "Connecting" : "Connect")
-                        .font(theme.typography.labelMedium.weight(.semibold))
+                if isConnectingHealthKit {
+                    ProgressView()
+                } else {
+                    Text("Connect")
                 }
-                .foregroundColor(.jovieActionText)
-                .padding(.horizontal, theme.spacing.md)
-                .frame(minHeight: JovieTokens.minimumHitTarget)
-                .background(Color.jovieAction, in: Capsule())
             }
             .disabled(isConnectingHealthKit)
             .accessibilityLabel("Connect Apple Health")
@@ -247,7 +207,7 @@ struct IntegrationsView: View {
                     title: "Import Progress Photos",
                     subtitle: "Choose photos from your library",
                     value: "Scan library",
-                    showChevron: true
+                    showChevron: false
                 )
                 .accessibilityIdentifier("integrations_bulk_photo_import_link")
             }
@@ -264,7 +224,7 @@ struct IntegrationsView: View {
                     icon: "doc.text",
                     title: "Export Data",
                     value: "CSV",
-                    showChevron: true
+                    showChevron: false
                 )
             }
         }
