@@ -22,6 +22,7 @@ JOV-4831 / PR #903 owns the remaining Neon schema/sync/delete cutover, including
 ```
 apps/ios          Native SwiftUI app
 apps/web          Next.js marketing / legal / first-party API
+agent/            Local Vercel Eve gym-dogfood scaffold (not internal Eve)
 packages/         product-registry, shared-lib, design-tokens
 supabase/         Legacy photo/export/deletion functions until JOV-4831 cutover
 ```
@@ -46,6 +47,9 @@ From the repo root (pnpm + Turborepo):
 - `pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm build`
 - `pnpm product:check` after registry or public-copy changes
 - `pnpm ios` to open the Xcode project
+- `pnpm eve:info` / `eve:build` / `eve:dev` run the local **Vercel Eve**
+  gym-dogfood agent. The CLI needs Node 24+; this repo stays on Node 20 for
+  web/CI. See [docs/product/vercel-eve-gym-dogfood.md](docs/product/vercel-eve-gym-dogfood.md).
 
 ## License
 
