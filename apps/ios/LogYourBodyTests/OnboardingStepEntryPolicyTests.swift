@@ -162,4 +162,38 @@ final class OnboardingStepEntryPolicyTests: XCTestCase {
         XCTAssertFalse(canContinue(.height, heightText: "99"))
         XCTAssertTrue(canContinue(.height))
     }
+
+    func testLastStepInvariantKeepsPaywallDestinationAndDraftName() {
+        XCTAssertEqual(OnboardingTerminalStepPolicy.destinationAfterSuccessfulCompletion, .paywall)
+        XCTAssertEqual(
+            OnboardingTerminalStepPolicy.resolvedFullName(
+                firstName: " Avery ",
+                lastName: " Stone ",
+                existingFullName: nil,
+                fallbackName: nil
+            ),
+            "Avery Stone"
+        )
+        XCTAssertEqual(
+            OnboardingTerminalStepPolicy.resolvedFullName(
+                firstName: " ",
+                lastName: "",
+                existingFullName: nil,
+                fallbackName: "Hidden Apple Name"
+            ),
+            "Hidden Apple Name"
+        )
+        XCTAssertEqual(
+            OnboardingTerminalStepPolicy.durableSaveErrorMessage,
+            "We couldn't save your setup. Check your connection and try again."
+        )
+        XCTAssertEqual(
+            WorldClassScreen.firstProgressPhoto.accessibilityIdentifier,
+            "world_class_screen_firstProgressPhoto"
+        )
+        XCTAssertEqual(
+            WorldClassScreen.completeProfile.accessibilityIdentifier,
+            "world_class_screen_completeProfile"
+        )
+    }
 }

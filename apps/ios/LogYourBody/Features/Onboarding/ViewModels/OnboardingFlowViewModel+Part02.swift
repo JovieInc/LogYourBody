@@ -1,6 +1,38 @@
 import SwiftUI
 import Combine
 
+enum OnboardingTerminalStepPolicy {
+    static let durableSaveErrorMessage =
+        "We couldn't save your setup. Check your connection and try again."
+
+    static var destinationAfterSuccessfulCompletion: OnboardingFlowViewModel.Step {
+        .paywall
+    }
+
+    static func resolvedFullName(
+        firstName: String,
+        lastName: String,
+        existingFullName: String?,
+        fallbackName: String?
+    ) -> String? {
+        let drafted = [firstName, lastName]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        if !drafted.isEmpty {
+            return drafted
+        }
+
+        let existing = existingFullName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !existing.isEmpty {
+            return existingFullName
+        }
+
+        let fallback = fallbackName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return fallback.isEmpty ? nil : fallbackName
+    }
+}
+
 extension OnboardingFlowViewModel {
 func hydrateProfileDetailsDraftIfNeeded(from user: User?) {
         guard !hasHydratedProfileDetailsDraft else { return }
@@ -91,7 +123,6 @@ func applyFirstPhotoUITestFixtureIfNeeded() {
 @discardableResult
     func completeOnboardingIfNeeded() async -> Bool {
         guard entryContext == .authenticated else { return true }
-        guard !hasMarkedOnboardingComplete else { return true }
         guard !isOnboardingCompletionInFlight else { return false }
         isOnboardingCompletionInFlight = true
         isCompletingOnboarding = true
@@ -101,16 +132,18 @@ func applyFirstPhotoUITestFixtureIfNeeded() {
         }
 
         let updates = buildOnboardingProfileUpdates()
-        do {
-            try await profileUpdateHandler(updates)
-        } catch {
-            let message = "We couldn't save your setup. Check your connection and try again."
-            errorMessage = message
-            firstPhotoErrorMessage = message
-            return false
+        if !hasMarkedOnboardingComplete {
+            do {
+                try await profileUpdateHandler(updates)
+            } catch {
+                let message = OnboardingTerminalStepPolicy.durableSaveErrorMessage
+                errorMessage = message
+                firstPhotoErrorMessage = message
+                return false
+            }
+            hasMarkedOnboardingComplete = true
         }
 
-        hasMarkedOnboardingComplete = true
         applyCompletedOnboardingLocally(with: updates)
         OnboardingStateManager.shared.markCompleted(userId: AuthManager.shared.currentUser?.id)
         UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)
@@ -142,11 +175,17 @@ func applyCompletedOnboardingLocally(with updates: [String: Any]) {
         guard var currentUser = AuthManager.shared.currentUser else { return }
 
         let existingProfile = currentUser.profile
+        let resolvedFullName = OnboardingTerminalStepPolicy.resolvedFullName(
+            firstName: profileFirstName,
+            lastName: profileLastName,
+            existingFullName: existingProfile?.fullName,
+            fallbackName: currentUser.name
+        )
         let updatedProfile = UserProfile(
             id: existingProfile?.id ?? currentUser.id,
             email: existingProfile?.email ?? currentUser.email,
             username: existingProfile?.username,
-            fullName: existingProfile?.fullName ?? currentUser.name,
+            fullName: resolvedFullName,
             dateOfBirth: updates["dateOfBirth"] as? Date ?? existingProfile?.dateOfBirth,
             height: updates["height"] as? Double ?? existingProfile?.height,
             heightUnit: updates["heightUnit"] as? String ?? existingProfile?.heightUnit,
@@ -158,6 +197,7 @@ func applyCompletedOnboardingLocally(with updates: [String: Any]) {
         )
 
         currentUser.profile = updatedProfile
+        currentUser.name = resolvedFullName ?? currentUser.name
         currentUser.onboardingCompleted = true
         AuthManager.shared.currentUser = currentUser
     }
