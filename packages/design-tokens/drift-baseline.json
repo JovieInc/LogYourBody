@@ -1,4 +1,19 @@
 {
   "version": 1,
-  "drift": []
+  "drift": [
+    {
+      "token": "color.semantic.background",
+      "platform": "ios",
+      "target": "colors.background",
+      "canonical": "#000000",
+      "actual": "#08090a"
+    },
+    {
+      "token": "color.semantic.card",
+      "platform": "ios",
+      "target": "colors.surface",
+      "canonical": "#0b0b0b",
+      "actual": "#0f1011"
+    }
+  ]
 }

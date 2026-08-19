@@ -156,6 +156,17 @@ function loadIosTokens() {
     }
   }
 
+  // JoviePalette hex constants (canvasHex, surfaceHex, ...)
+  const joviePalette = {};
+  const paletteBlock = extractBlock(theme, /enum JoviePalette/);
+  if (paletteBlock) {
+    for (const match of paletteBlock.matchAll(
+      /static let (\w+) = "#([0-9a-fA-F]{3,8})"/g,
+    )) {
+      joviePalette[match[1]] = normalizeHex(`#${match[2]}`);
+    }
+  }
+
   function parseNumericBlock(block) {
     const values = {};
     if (!block) return values;
@@ -189,6 +200,11 @@ function loadIosTokens() {
     for (const match of colorsBlock.matchAll(/(\w+): \.(\w+)(?:\.opacity\([\d.]+\))?,/g)) {
       if (!(match[1] in colors) && match[2] in namedColors) {
         colors[match[1]] = namedColors[match[2]];
+      }
+    }
+    for (const match of colorsBlock.matchAll(/(\w+): Color\(hex: JoviePalette\.(\w+)\)/g)) {
+      if (!(match[1] in colors) && match[2] in joviePalette) {
+        colors[match[1]] = joviePalette[match[2]];
       }
     }
   }
