@@ -265,6 +265,8 @@ final class GoldenPathTests: XCTestCase {
         XCTAssertTrue(HomeChatChromePolicy.pinsComposerOnHome)
         XCTAssertFalse(HomeChatChromePolicy.showsTabBarOnHome)
         XCTAssertFalse(HomeChatChromePolicy.showsChatAsPeerNavigation)
+        XCTAssertFalse(HomeChatChromePolicy.showsTopSegmentedTabs)
+        XCTAssertTrue(HomeChatChromePolicy.usesJovieSwipeStructure)
 
         // 2-3. Sign in + subscribe: gates open only when every requirement is met.
         let user = makeCompleteUser()

@@ -133,7 +133,7 @@ def write_outputs(artifact_dir: Path, violations: list[AuditViolation]) -> None:
                 "- Dashboard/HUD launch surfaces stay on theme-backed glass or flat surface treatments.",
                 "- Timeline/Stats swipe navigation changes page on release, not during drag updates.",
                 "- Paid users default directly into the timeline HUD without a Statsig or legacy fallback gate.",
-                "- Chat remains a peer navigation tab and never replaces the body-history shell.",
+                "- Chat composer stays pinned to the home hero; Timeline/Stats use Jovie swipe and menu, not top tabs.",
             ]
         )
 

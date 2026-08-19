@@ -283,7 +283,7 @@ fi
   printf -- '- Destination: `%s`\n' "$DESTINATION"
   printf -- '- Static UI regression audit: `launch-ui-regression-audit.md`\n'
   printf -- '- Unit coverage: photo timeline HUD launch policy, Body Score share card layout\n'
-  printf -- '- UI coverage: Timeline/Stats/Chat peer navigation, one timeline scrubber, home/analytics/onboarding/share screenshot attachments\n'
+  printf -- '- UI coverage: home hero + chat composer, Jovie swipe/menu Timeline/Stats, one timeline scrubber, home/analytics/onboarding/share screenshot attachments\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
   printf -- '- Build strategy: one `build-for-testing`, unit selectors in one `test-without-building` run, and one composite launch-quality UI selector that captures all required screenshot surfaces with simulator parallelism disabled\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"

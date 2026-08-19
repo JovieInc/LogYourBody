@@ -43,6 +43,7 @@ REQUIRED_IDS=(
   launch_timeline_scrubber
   photo_timeline_root_page_timeline
   photo_timeline_root_page_analytics
+  photo_timeline_root_menu
   home_chat_composer_dock
   photo_timeline_stats_metric_card_weight
   dashboard_home_timeline_hero

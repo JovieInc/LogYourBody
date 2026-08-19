@@ -88,6 +88,8 @@ struct DashboardViewLiquid: View {
     @State private var isPhotosTabEnabled = true
     @State var selectedPhotoTimelineRootPage: PhotoTimelineRootPage = .timeline
     @State var isHomeChatExpanded = false
+    @State var isShowingPhotoTimelineMenu = false
+    @State var isPhotoTimelineSettingsPresented = false
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
     @State private var isStatsDestinationActive = false
