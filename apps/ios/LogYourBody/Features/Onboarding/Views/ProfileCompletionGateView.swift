@@ -19,6 +19,8 @@ struct ProfileCompletionGateView: View {
         BodyScoreProfileDetailsView(viewModel: viewModel)
             .environmentObject(authManager)
             .onAppear {
+                guard !viewModel.hasMarkedOnboardingComplete else { return }
+                guard viewModel.currentStep != .paywall else { return }
                 if viewModel.currentStep != .profileDetails {
                     viewModel.currentStep = .profileDetails
                 }

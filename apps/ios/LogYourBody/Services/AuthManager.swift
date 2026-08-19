@@ -172,11 +172,11 @@ private struct BetterAuthResponse: Decodable {
     var resolvedAccessToken: String? { accessToken ?? token }
 }
 
-private struct ProductProfileEnvelope: Decodable {
+struct ProductProfileEnvelope: Decodable {
     let profile: ProductProfilePayload
 }
 
-private struct ProductProfilePayload: Decodable {
+struct ProductProfilePayload: Decodable {
     let id: String
     let email: String?
     let username: String?
@@ -801,36 +801,86 @@ final class AuthManager: NSObject, ObservableObject {
         }
 
         if http.statusCode == 204 {
-            return ProductProfileEnvelope(profile: ProductProfilePayload(
-                id: currentUser?.id ?? "",
-                email: currentUser?.email,
-                username: nil,
-                fullName: currentUser?.name,
-                dateOfBirth: nil,
-                height: nil,
-                heightUnit: nil,
-                gender: nil,
-                activityLevel: nil,
-                goalWeight: nil,
-                goalWeightUnit: nil,
-                onboardingCompleted: nil,
-                legalAcceptedAt: nil
-            ))
+            return fallbackProductProfileEnvelope()
         }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .formatted(Self.productDateFormatter)
-        return try decoder.decode(ProductProfileEnvelope.self, from: data)
+        do {
+            return try Self.decodeProductProfileEnvelope(from: data)
+        } catch {
+            // A 2xx write already landed. Failing closed on a date-format
+            // mismatch would strand the last onboarding step on a false error.
+            if method == "PATCH" {
+                return fallbackProductProfileEnvelope()
+            }
+            throw AuthError.server("Your LogYourBody profile could not be updated.")
+        }
     }
 
-    nonisolated private static let productDateFormatter: DateFormatter = {
+    private func fallbackProductProfileEnvelope() -> ProductProfileEnvelope {
+        ProductProfileEnvelope(profile: ProductProfilePayload(
+            id: currentUser?.id ?? "",
+            email: currentUser?.email,
+            username: currentUser?.profile?.username,
+            fullName: currentUser?.profile?.fullName ?? currentUser?.name,
+            dateOfBirth: currentUser?.profile?.dateOfBirth,
+            height: currentUser?.profile?.height,
+            heightUnit: currentUser?.profile?.heightUnit,
+            gender: currentUser?.profile?.gender,
+            activityLevel: currentUser?.profile?.activityLevel,
+            goalWeight: currentUser?.profile?.goalWeight,
+            goalWeightUnit: currentUser?.profile?.goalWeightUnit,
+            onboardingCompleted: currentUser?.onboardingCompleted ?? currentUser?.profile?.onboardingCompleted,
+            legalAcceptedAt: nil
+        ))
+    }
+
+    nonisolated static let productDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .iso8601)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
         return formatter
     }()
+
+    nonisolated static func iso8601Date(from raw: String) -> Date? {
+        let withFractional = ISO8601DateFormatter()
+        withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = withFractional.date(from: raw) {
+            return date
+        }
+
+        let internet = ISO8601DateFormatter()
+        internet.formatOptions = [.withInternetDateTime]
+        return internet.date(from: raw)
+    }
+
+    nonisolated static func parseProductProfileDate(_ raw: String) -> Date? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.count >= 10,
+           let day = productDateFormatter.date(from: String(trimmed.prefix(10))) {
+            return day
+        }
+        return iso8601Date(from: trimmed)
+    }
+
+    nonisolated static func decodeProductProfileEnvelope(from data: Data) throws -> ProductProfileEnvelope {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let raw = try container.decode(String.self)
+            if let date = parseProductProfileDate(raw) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unrecognized profile date: \(raw)"
+            )
+        }
+        return try decoder.decode(ProductProfileEnvelope.self, from: data)
+    }
 
     nonisolated static func normalizedProductProfilePayload(
         _ updates: [String: Any]

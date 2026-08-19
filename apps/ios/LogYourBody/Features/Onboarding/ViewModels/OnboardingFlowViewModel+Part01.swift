@@ -81,6 +81,9 @@ func goToNextStep() {
             if includesFirstPhotoStep {
                 currentStep = .firstPhoto
             } else {
+                if hasMarkedOnboardingComplete {
+                    currentStep = .paywall
+                }
                 Task {
                     await finishOnboardingAndShowPaywall(from: previousStep)
                 }

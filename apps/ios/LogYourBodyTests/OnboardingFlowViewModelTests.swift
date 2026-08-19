@@ -290,6 +290,94 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.includesFirstPhotoStep)
     }
 
+    func testLastStepDoesNotRewriteProfileAfterSuccessfulCompletion() async {
+        var updateAttempts = 0
+        let viewModel = OnboardingFlowViewModel(
+            includesFirstPhotoStep: false,
+            profileUpdateHandler: { _ in
+                updateAttempts += 1
+            }
+        )
+        viewModel.currentStep = .profileDetails
+        viewModel.hasMarkedOnboardingComplete = true
+
+        viewModel.goToNextStep()
+        await viewModel.finishOnboardingAndShowPaywall()
+
+        XCTAssertEqual(viewModel.currentStep, OnboardingTerminalStepPolicy.destinationAfterSuccessfulCompletion)
+        XCTAssertEqual(updateAttempts, 0)
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertNil(viewModel.firstPhotoErrorMessage)
+    }
+
+    func testLastStepCompletionAppliesDraftFullNameSoProfileGateDoesNotReopen() async {
+        let userId = "onboarding-last-step-name-\(UUID().uuidString)"
+        let previousUser = AuthManager.shared.currentUser
+        let previousSession = AuthManager.shared.authSession
+
+        defer {
+            AuthManager.shared.currentUser = previousUser
+            AuthManager.shared.authSession = previousSession
+            OnboardingProgressStore.shared.clearProgress(for: userId)
+        }
+
+        AuthManager.shared.currentUser = User(
+            id: userId,
+            email: "last-step@example.com",
+            name: nil,
+            profile: UserProfile(
+                id: userId,
+                email: "last-step@example.com",
+                username: nil,
+                fullName: nil,
+                dateOfBirth: nil,
+                height: nil,
+                heightUnit: nil,
+                gender: nil,
+                activityLevel: nil,
+                goalWeight: nil,
+                goalWeightUnit: nil,
+                onboardingCompleted: false
+            ),
+            onboardingCompleted: false
+        )
+        AuthManager.shared.authSession = .localFixture(
+            subject: userId,
+            email: AuthManager.shared.currentUser?.email ?? "onboarding@example.com",
+            name: AuthManager.shared.currentUser?.name
+        )
+
+        let viewModel = OnboardingFlowViewModel(
+            includesFirstPhotoStep: true,
+            profileUpdateHandler: { _ in }
+        )
+        viewModel.currentStep = .firstPhoto
+        viewModel.hasHydratedProfileDetailsDraft = true
+        viewModel.profileFirstName = "Avery"
+        viewModel.profileLastName = "Stone"
+        viewModel.profileDateOfBirth = Date(timeIntervalSince1970: 631_152_000)
+        viewModel.profileBiologicalSex = .female
+        viewModel.profileHeightUnit = .centimeters
+        viewModel.profileHeightCentimetersText = "170"
+
+        await viewModel.completeFirstPhotoStep()
+
+        XCTAssertEqual(viewModel.currentStep, OnboardingTerminalStepPolicy.destinationAfterSuccessfulCompletion)
+        XCTAssertEqual(AuthManager.shared.currentUser?.name, "Avery Stone")
+        XCTAssertEqual(AuthManager.shared.currentUser?.profile?.fullName, "Avery Stone")
+        XCTAssertTrue(AuthManager.shared.currentUser?.onboardingCompleted == true)
+        XCTAssertTrue(ProfileCompletionPolicy.isComplete(user: AuthManager.shared.currentUser))
+        XCTAssertEqual(
+            WorldClassScreen.firstProgressPhoto.accessibilityIdentifier,
+            "world_class_screen_firstProgressPhoto"
+        )
+        XCTAssertEqual(
+            WorldClassScreen.completeProfile.accessibilityIdentifier,
+            "world_class_screen_completeProfile"
+        )
+        XCTAssertEqual(WorldClassScreen.paywall.accessibilityIdentifier, "world_class_screen_paywall")
+    }
+
     func testProfileDetailsCompletesOnboardingWhenFirstPhotoDisabled() async {
         let viewModel = OnboardingFlowViewModel(
             includesFirstPhotoStep: false,
