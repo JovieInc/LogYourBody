@@ -1,13 +1,46 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 const deployWorkflow = readFileSync(`${repoRoot}/.github/workflows/deploy.yml`, 'utf8');
 const webReleaseLoop = readFileSync(`${repoRoot}/.github/workflows/web-release-loop.yml`, 'utf8');
+const neonMigrateCliPath = join(repoRoot, 'apps/web/scripts/apply-neon-migrations.ts');
+
+const serverOnlyImport =
+  /(?:^|\n)\s*(?:import\s+['"]server-only['"]|import\s+[^;]*\sfrom\s+['"]server-only['"]|require\(\s*['"]server-only['"]\s*\))/;
+const relativeSpecifier = /(?:from\s+|import\(\s*|require\(\s*)['"](\.\.?\/[^'"]+)['"]/g;
+
+function resolveLocalModule(fromFile: string, specifier: string): string | undefined {
+  const base = join(dirname(fromFile), specifier);
+  const candidates = extname(base)
+    ? [base]
+    : [`${base}.ts`, `${base}.tsx`, `${base}.js`, `${base}.mjs`, join(base, 'index.ts')];
+
+  return candidates.find((candidate) => existsSync(candidate));
+}
+
+function collectLocalModuleGraph(entryPath: string): string[] {
+  const visited = new Set<string>();
+  const queue = [entryPath];
+
+  while (queue.length > 0) {
+    const current = queue.pop();
+    if (!current || visited.has(current)) continue;
+    visited.add(current);
+
+    const source = readFileSync(current, 'utf8');
+    for (const match of source.matchAll(relativeSpecifier)) {
+      const resolved = resolveLocalModule(current, match[1]);
+      if (resolved) queue.push(resolved);
+    }
+  }
+
+  return [...visited];
+}
 
 const requiredVariables = ['DATABASE_URL', 'OPENAI_API_KEY', 'CRON_SECRET'] as const;
 const ripgrepInvocation = /(^|[\s;`])rg(\s|$)/m;
@@ -77,5 +110,57 @@ describe('deploy Vercel env verify uses POSIX grep', () => {
     expect(listed).toContain('sk-test-do-not-print');
     expect(quiet).toBe('');
     expect(hasRequiredVariable(envFile, 'MISSING_KEY')).toBe(false);
+  });
+});
+
+describe('deploy neon migrate CLI stays runnable from GitHub Actions', () => {
+  it('does not import server-only and stays fail-closed', () => {
+    const graph = collectLocalModuleGraph(neonMigrateCliPath);
+    expect(graph).toContain(neonMigrateCliPath);
+
+    for (const modulePath of graph) {
+      expect(readFileSync(modulePath, 'utf8')).not.toMatch(serverOnlyImport);
+    }
+
+    const migrateCli = readFileSync(neonMigrateCliPath, 'utf8');
+    expect(migrateCli).toContain('process.env.DATABASE_URL');
+    expect(migrateCli).toContain("throw new Error('Missing DATABASE_URL')");
+    expect(migrateCli).toContain("await sql.query('begin')");
+    expect(migrateCli).toContain("await sql.query('commit')");
+    expect(migrateCli).toContain("await sql.query('rollback')");
+
+    expect(deployWorkflow).toContain('Apply product database migrations');
+    expect(deployWorkflow).toContain('test -n "$DATABASE_URL"');
+    expect(deployWorkflow).toContain('pnpm --filter logyourbody db:apply:neon');
+  });
+
+  it('fails closed on missing DATABASE_URL instead of throwing server-only', () => {
+    let stdout = '';
+    let stderr = '';
+    let status = 0;
+
+    try {
+      stdout = execFileSync('pnpm', ['exec', 'tsx', 'scripts/apply-neon-migrations.ts'], {
+        cwd: join(repoRoot, 'apps/web'),
+        env: {
+          ...process.env,
+          DATABASE_URL: '',
+        },
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      const failure = error as { status?: number; stdout?: string; stderr?: string };
+      status = failure.status ?? 1;
+      stdout = failure.stdout ?? '';
+      stderr = failure.stderr ?? '';
+    }
+
+    const output = `${stdout}\n${stderr}`;
+    expect(status).not.toBe(0);
+    expect(output).toContain('Missing DATABASE_URL');
+    expect(output).not.toContain(
+      'This module cannot be imported from a Client Component module',
+    );
   });
 });

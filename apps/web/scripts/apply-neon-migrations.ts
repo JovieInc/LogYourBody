@@ -1,5 +1,4 @@
-import 'server-only';
-
+// GitHub Actions runs this with Node/tsx; `server-only` throws outside Next.js.
 import { neon } from '@neondatabase/serverless';
 import * as dotenv from 'dotenv';
 import * as fs from 'node:fs/promises';
