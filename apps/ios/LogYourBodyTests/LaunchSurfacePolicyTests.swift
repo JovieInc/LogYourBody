@@ -39,6 +39,94 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertNotNil(ChatComposerGeometry.transitionAnimation(reduceMotion: false))
     }
 
+    func testHomeChatChromePinsComposerAndDropsPeerChatTab() {
+        XCTAssertTrue(HomeChatChromePolicy.pinsComposerOnHome)
+        XCTAssertFalse(HomeChatChromePolicy.showsTabBarOnHome)
+        XCTAssertFalse(HomeChatChromePolicy.showsChatAsPeerNavigation)
+        XCTAssertFalse(HomeChatChromePolicy.showsTopSegmentedTabs)
+        XCTAssertTrue(HomeChatChromePolicy.usesJovieSwipeStructure)
+        XCTAssertTrue(HomeChatChromePolicy.shouldExpandChat(afterSendingUserMessage: true))
+        XCTAssertFalse(HomeChatChromePolicy.shouldExpandChat(afterSendingUserMessage: false))
+        XCTAssertTrue(HomeChatChromePolicy.shouldShowComposer(isChatExpanded: false, isOnStats: false))
+        XCTAssertFalse(HomeChatChromePolicy.shouldShowComposer(isChatExpanded: false, isOnStats: true))
+        XCTAssertTrue(HomeChatChromePolicy.shouldShowComposer(isChatExpanded: true, isOnStats: true))
+        XCTAssertEqual(
+            HomeChatChromePolicy.worldClassScreen(isChatExpanded: false, selected: .photoTimeline),
+            .photoTimeline
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.worldClassScreen(isChatExpanded: true, selected: .photoTimeline),
+            .chat
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.worldClassScreen(isChatExpanded: false, selected: .stats),
+            .stats
+        )
+    }
+
+    func testHomeSwipeMatchesJovieEdgeAndPageRules() {
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: 80,
+                translationY: 10,
+                startX: 20,
+                isOnStats: false,
+                isChatExpanded: false
+            ),
+            .menu
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: -90,
+                translationY: 8,
+                startX: 180,
+                isOnStats: false,
+                isChatExpanded: false
+            ),
+            .stats
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: 90,
+                translationY: 8,
+                startX: 180,
+                isOnStats: true,
+                isChatExpanded: false
+            ),
+            .home
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: 90,
+                translationY: 8,
+                startX: 180,
+                isOnStats: false,
+                isChatExpanded: true
+            ),
+            .collapseChat
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: 40,
+                translationY: 8,
+                startX: 20,
+                isOnStats: false,
+                isChatExpanded: false
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: -90,
+                translationY: 120,
+                startX: 180,
+                isOnStats: false,
+                isChatExpanded: false
+            ),
+            .none
+        )
+    }
+
     func testJovieSessionPolicyRequiresNonEmptyAccessToken() {
         XCTAssertFalse(JovieSessionPolicy.isSignedIn(nil))
         XCTAssertFalse(

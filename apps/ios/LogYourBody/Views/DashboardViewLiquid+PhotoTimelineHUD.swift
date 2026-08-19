@@ -47,83 +47,208 @@ extension DashboardViewLiquid {
     var photoTimelineRoot: some View {
         VStack(spacing: 0) {
             photoTimelineRootNavigation
-                .padding(.horizontal, 20)
+                .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.top, 8)
                 .padding(.bottom, 4)
+                .contentShape(Rectangle())
+                .highPriorityGesture(photoTimelineSwipe)
 
-            ZStack {
-                switch selectedPhotoTimelineRootPage {
-                case .timeline:
-                    ZStack {
-                        timelineAccessibilityMarker(
-                            id: "photo_timeline_root_page_timeline",
-                            label: "Timeline page"
-                        )
-                        if bodyMetrics.isEmpty {
-                            photoTimelineHUDEmptyState
-                        } else {
-                            photoTimelineHUD
-                        }
+            photoTimelineHomeContent
+                .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)
+                .opacity(isHomeChatExpanded ? 0 : 1)
+                .allowsHitTesting(!isHomeChatExpanded)
+                .accessibilityHidden(isHomeChatExpanded)
+                .clipped()
+
+            if HomeChatChromePolicy.shouldShowComposer(
+                isChatExpanded: isHomeChatExpanded,
+                isOnStats: selectedPhotoTimelineRootPage == .analytics
+            ) {
+                ChatTabView(
+                    showsTranscript: isHomeChatExpanded,
+                    onExpandRequest: {
+                        isHomeChatExpanded = true
                     }
-                case .analytics:
-                    ZStack {
-                        timelineAccessibilityMarker(
-                            id: "photo_timeline_root_page_analytics",
-                            label: "Stats page"
-                        )
-                        photoTimelineAnalyticsPage
-                    }
-                case .chat:
-                    ZStack {
-                        timelineAccessibilityMarker(
-                            id: "photo_timeline_root_page_chat",
-                            label: "Chat page"
-                        )
-                        ChatTabView()
+                )
+                .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? .infinity : nil)
+            }
+        }
+        .worldClassScreen(
+            HomeChatChromePolicy.worldClassScreen(
+                isChatExpanded: isHomeChatExpanded,
+                selected: selectedPhotoTimelineRootPage.worldClassScreen
+            )
+        )
+        .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
+            isHomeChatExpanded = false
+        }
+        .overlay(alignment: .leading) {
+            Color.clear
+                .frame(width: 20)
+                .padding(.top, 56)
+                .contentShape(Rectangle())
+                .highPriorityGesture(photoTimelineSwipe)
+                .accessibilityHidden(true)
+        }
+        .fullScreenCover(isPresented: $isShowingPhotoTimelineMenu) {
+            PhotoTimelineNavigationMenu(
+                selected: selectedPhotoTimelineRootPage,
+                onSelect: { page in
+                    selectedPhotoTimelineRootPage = page
+                    isHomeChatExpanded = false
+                    isShowingPhotoTimelineMenu = false
+                },
+                onOpenSettings: {
+                    isShowingPhotoTimelineMenu = false
+                    isPhotoTimelineSettingsPresented = true
+                },
+                onClose: {
+                    isShowingPhotoTimelineMenu = false
+                }
+            )
+        }
+        .navigationDestination(isPresented: $isPhotoTimelineSettingsPresented) {
+            PreferencesView()
+                .environmentObject(authManager)
+        }
+    }
+
+    @ViewBuilder
+    private var photoTimelineHomeContent: some View {
+        ZStack {
+            switch selectedPhotoTimelineRootPage {
+            case .timeline, .chat:
+                ZStack {
+                    timelineAccessibilityMarker(
+                        id: "photo_timeline_root_page_timeline",
+                        label: "Timeline page"
+                    )
+                    if bodyMetrics.isEmpty {
+                        photoTimelineHUDEmptyState
+                    } else {
+                        photoTimelineHUD
                     }
                 }
+            case .analytics:
+                ZStack {
+                    timelineAccessibilityMarker(
+                        id: "photo_timeline_root_page_analytics",
+                        label: "Stats page"
+                    )
+                    photoTimelineAnalyticsPage
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
         }
-        .worldClassScreen(selectedPhotoTimelineRootPage.worldClassScreen)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+    }
+
+    private var photoTimelineToolbarTitle: String {
+        if isHomeChatExpanded {
+            return "Chat"
+        }
+
+        switch selectedPhotoTimelineRootPage {
+        case .timeline, .chat:
+            return "Home"
+        case .analytics:
+            return "Stats"
+        }
     }
 
     private var photoTimelineRootNavigation: some View {
-        HStack(spacing: 12) {
-            JovieSegmentedControl(
-                selection: $selectedPhotoTimelineRootPage,
-                items: [.timeline, .analytics, .chat],
-                title: { $0.navigationTitle },
-                accessibilityLabel: { $0.navigationTitle },
-                accessibilityHint: { "Shows the \($0.navigationTitle.lowercased()) page" },
-                accessibilityIdentifier: { $0.accessibilityIdentifier },
-                selectedTint: theme.colors.text,
-                selectedForeground: theme.colors.background,
-                unselectedForeground: theme.colors.textSecondary,
-                onSelection: { _ in HapticManager.shared.selection() }
-            )
-
-            Spacer(minLength: 0)
-
-            NavigationLink {
-                PreferencesView()
-                    .environmentObject(authManager)
+        HStack(spacing: JovieTokens.itemGap) {
+            Button {
+                isShowingPhotoTimelineMenu = true
             } label: {
-                Image(systemName: "gearshape")
+                Image(systemName: "line.3.horizontal")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(theme.colors.textSecondary)
+                    .foregroundStyle(theme.colors.text)
                     .frame(width: 32, height: 32)
                     .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
-                    .frame(width: 44, height: 44)
+                    .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
             }
-            .accessibilityLabel("Settings")
-            .accessibilityHint("Opens account and app settings")
-            .accessibilityIdentifier("photo_timeline_root_settings")
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open Menu")
+            .accessibilityHint("Opens Timeline, Stats, and Settings")
+            .accessibilityIdentifier("photo_timeline_root_menu")
+
+            VStack(spacing: 2) {
+                Text(photoTimelineToolbarTitle)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(theme.colors.text)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+
+            if isHomeChatExpanded {
+                Button {
+                    isHomeChatExpanded = false
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(theme.colors.text)
+                        .frame(width: 32, height: 32)
+                        .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close chat")
+                .accessibilityHint("Returns to the home hero and composer")
+                .accessibilityIdentifier("home_chat_collapse")
+            } else {
+                NavigationLink {
+                    PreferencesView()
+                        .environmentObject(authManager)
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .frame(width: 32, height: 32)
+                        .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                }
+                .accessibilityLabel("Settings")
+                .accessibilityHint("Opens account and app settings")
+                .accessibilityIdentifier("photo_timeline_root_settings")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .topLeading) {
             timelineAccessibilityMarker(id: "photo_timeline_root_nav", label: "Timeline navigation")
+        }
+    }
+
+    private var photoTimelineSwipe: some Gesture {
+        DragGesture(minimumDistance: 30)
+            .onEnded { value in
+                applyPhotoTimelineSwipe(value)
+            }
+    }
+
+    private func applyPhotoTimelineSwipe(_ value: DragGesture.Value) {
+        let destination = HomeChatChromePolicy.swipeDestination(
+            translationX: value.translation.width,
+            translationY: value.translation.height,
+            startX: value.startLocation.x,
+            isOnStats: selectedPhotoTimelineRootPage == .analytics,
+            isChatExpanded: isHomeChatExpanded
+        )
+
+        switch destination {
+        case .menu:
+            isShowingPhotoTimelineMenu = true
+        case .stats:
+            selectedPhotoTimelineRootPage = .analytics
+            isHomeChatExpanded = false
+            HapticManager.shared.selection()
+        case .home:
+            selectedPhotoTimelineRootPage = .timeline
+            HapticManager.shared.selection()
+        case .collapseChat:
+            isHomeChatExpanded = false
+        case .none:
+            break
         }
     }
 
@@ -337,6 +462,114 @@ extension DashboardViewLiquid {
         .accessibilityLabel("Add photo")
         .accessibilityHint("Opens progress photo options")
         .accessibilityIdentifier("photo_timeline_hud_empty_add_photo_button")
+    }
+}
+
+private struct PhotoTimelineNavigationMenu: View {
+    @Environment(\.theme) private var theme
+
+    let selected: DashboardViewLiquid.PhotoTimelineRootPage
+    let onSelect: (DashboardViewLiquid.PhotoTimelineRootPage) -> Void
+    let onOpenSettings: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        ZStack {
+            theme.colors.background.ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
+                HStack {
+                    Text("LogYourBody")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(theme.colors.text)
+
+                    Spacer()
+
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(theme.colors.text)
+                            .frame(width: 32, height: 32)
+                            .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
+                            .frame(
+                                width: JovieTokens.minimumHitTarget,
+                                height: JovieTokens.minimumHitTarget
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close Menu")
+                    .accessibilityIdentifier("photo_timeline_menu_close")
+                }
+
+                VStack(spacing: JovieTokens.tightGap) {
+                    menuRow(
+                        title: "Timeline",
+                        systemImage: "photo.on.rectangle",
+                        page: .timeline
+                    )
+                    menuRow(
+                        title: "Stats",
+                        systemImage: "chart.line.uptrend.xyaxis",
+                        page: .analytics
+                    )
+                    Button(action: onOpenSettings) {
+                        menuLabel(
+                            title: "Settings",
+                            systemImage: "gearshape",
+                            isSelected: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Settings")
+                    .accessibilityIdentifier("photo_timeline_menu_settings")
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.top, 48)
+            .padding(.bottom, JovieTokens.sectionGap)
+        }
+        .accessibilityIdentifier("photo_timeline_menu")
+    }
+
+    private func menuRow(
+        title: String,
+        systemImage: String,
+        page: DashboardViewLiquid.PhotoTimelineRootPage
+    ) -> some View {
+        Button {
+            onSelect(page)
+        } label: {
+            menuLabel(
+                title: title,
+                systemImage: systemImage,
+                isSelected: selected == page || (page == .timeline && selected == .chat)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(page.accessibilityIdentifier)
+    }
+
+    private func menuLabel(title: String, systemImage: String, isSelected: Bool) -> some View {
+        HStack(spacing: JovieTokens.itemGap) {
+            Image(systemName: systemImage)
+                .frame(width: 22)
+
+            Text(title)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 18, weight: .semibold))
+        .foregroundStyle(isSelected ? theme.colors.text : theme.colors.textSecondary)
+        .padding(.vertical, 13)
+        .padding(.horizontal, JovieTokens.compactInset)
+        .background(
+            isSelected ? theme.colors.surface : Color.clear,
+            in: RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+        )
     }
 }
 

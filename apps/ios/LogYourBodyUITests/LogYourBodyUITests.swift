@@ -287,9 +287,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists)
 
-        let statsButton = app.buttons["Stats"]
-        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
-        statsButton.tap()
+        openStatsPage(in: app)
 
         let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
         if !analyticsPage.waitForExistence(timeout: 6) {
@@ -324,7 +322,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.firstMatch.exists)
     }
 
-    func testChatIsAPeerTabWithoutReplacingTimelineNavigation() throws {
+    func testHomePinsChatComposerWithoutTabBar() throws {
         let app = XCUIApplication()
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
@@ -333,20 +331,32 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 8))
-        XCTAssertTrue(app.buttons["Timeline"].exists)
-        XCTAssertTrue(app.buttons["Stats"].exists)
-        XCTAssertTrue(app.buttons["Chat"].exists)
+        XCTAssertTrue(app.buttons["Open Menu"].exists)
         XCTAssertTrue(app.buttons["Settings"].exists)
+        XCTAssertFalse(app.buttons["Chat"].exists)
         XCTAssertFalse(app.buttons["Open sidebar"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["chat_sidebar"].exists)
         XCTAssertFalse(app.tabBars.firstMatch.exists)
 
-        try openChatTab(in: app)
-        attachScreenshot(named: "timeline-chat-peer-navigation", from: app)
+        try waitForHomeChatComposer(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["home_chat_composer_dock"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].exists)
+        attachScreenshot(named: "home-chat-composer-dock", from: app)
 
-        app.buttons["Timeline"].tap()
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        prompt.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 10))
+        attachScreenshot(named: "home-chat-expanded-transcript", from: app)
+
+        let closeChat = app.buttons["Close chat"]
+        XCTAssertTrue(closeChat.waitForExistence(timeout: 5))
+        closeChat.tap()
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_scrubber"].exists)
+        XCTAssertTrue(app.textFields["chat_composer"].exists)
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
     }
 
     func testChatStreamsFixtureAnswer() throws {
@@ -356,7 +366,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatFirstFixture"
         ])
 
-        try openChatTab(in: app)
+        try waitForHomeChatComposer(in: app)
         XCTAssertFalse(app.tabBars.firstMatch.exists)
 
         let prompt = app.buttons["How am I doing?"]
@@ -382,7 +392,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatErrorFixture"
         ])
 
-        try openChatTab(in: app)
+        try waitForHomeChatComposer(in: app)
 
         let prompt = app.buttons["How am I doing?"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 12))
@@ -405,7 +415,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatOfflineFixture"
         ])
 
-        try openChatTab(in: app)
+        try waitForHomeChatComposer(in: app)
 
         let offlineCopy = app.staticTexts["You’re offline. Reconnect, then try again."]
         XCTAssertTrue(offlineCopy.waitForExistence(timeout: 12))
@@ -429,7 +439,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatSlowFixture"
         ])
 
-        try openChatTab(in: app)
+        try waitForHomeChatComposer(in: app)
 
         let prompt = app.buttons["How am I doing?"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 12))
@@ -459,7 +469,7 @@ final class LogYourBodyUITests: XCTestCase {
             "-lybUITestChatFirstFixture"
         ])
 
-        try openChatTab(in: app)
+        try waitForHomeChatComposer(in: app)
 
         let composer = app.textFields["chat_composer"]
         let shell = app.descendants(matching: .any)["chat_composer_shell"]
@@ -681,9 +691,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
 
-        let statsButton = app.buttons["Stats"]
-        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
-        statsButton.tap()
+        openStatsPage(in: app)
 
         let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
         XCTAssertTrue(analyticsPage.waitForExistence(timeout: 8))
@@ -745,9 +753,11 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertLessThanOrEqual(timeline.frame.maxX, windowFrame.maxX + 1)
 
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
-        let statsButton = app.buttons["Stats"]
-        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
-        XCTAssertLessThan(statsButton.frame.midY, windowFrame.height * 0.18)
+        let menuButton = app.buttons["Open Menu"]
+        XCTAssertTrue(menuButton.waitForExistence(timeout: 5))
+        XCTAssertLessThan(menuButton.frame.midY, windowFrame.height * 0.18)
+        XCTAssertFalse(app.buttons["Chat"].exists)
+        XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 5))
         attachScreenshot(named: "launch-quality-home-timeline", from: app)
     }
 
@@ -765,9 +775,15 @@ final class LogYourBodyUITests: XCTestCase {
             app.swipeUp()
         }
         XCTAssertTrue(scrubber.waitForExistence(timeout: 5))
-        try openChatTab(in: app)
-        attachScreenshot(named: "launch-quality-chat-tab", from: app)
-        app.buttons["Timeline"].tap()
+        try waitForHomeChatComposer(in: app)
+        attachScreenshot(named: "launch-quality-chat-composer", from: app)
+        let prompt = app.buttons["How am I doing?"]
+        if prompt.waitForExistence(timeout: 5) {
+            prompt.tap()
+            _ = app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8)
+            attachScreenshot(named: "launch-quality-chat-tab", from: app)
+        }
+        collapseHomeChat(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
 
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
@@ -848,9 +864,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 10))
 
-        let statsButton = app.buttons["Stats"]
-        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
-        statsButton.tap()
+        openStatsPage(in: app)
 
         let insight = app.descendants(matching: .any)["photo_timeline_hud_phase_insight"]
         scrollUntilExists(insight, in: app)
@@ -873,9 +887,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
 
-        let statsButton = app.buttons["Stats"]
-        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
-        statsButton.tap()
+        openStatsPage(in: app)
 
         let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
         scrollUntilExists(prompt, in: app)
@@ -911,9 +923,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
 
-        let statsButton = app.buttons["Stats"]
-        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
-        statsButton.tap()
+        openStatsPage(in: app)
 
         let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
         scrollUntilExists(prompt, in: app)
@@ -1049,26 +1059,22 @@ final class LogYourBodyUITests: XCTestCase {
                 app.descendants(matching: .any)["photo_timeline_root_page_timeline"],
                 app.descendants(matching: .any)["launch_timeline_surface"],
                 app.descendants(matching: .any)["dashboard_home_timeline_hero"],
-                app.buttons["Stats"],
+                app.buttons["Open Menu"],
                 app.staticTexts["Start with a photo"]
             ],
             timeout: timeout
         )
     }
 
-    private func openChatTab(in app: XCUIApplication) throws {
+    private func waitForHomeChatComposer(in app: XCUIApplication) throws {
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
 
-        let chatButton = app.buttons["Chat"]
-        XCTAssertTrue(chatButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(chatButton.isHittable)
-        chatButton.tap()
-
-        XCTAssertTrue(
-            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 10)
-        )
-        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_chat"].exists)
+        let composer = app.textFields["chat_composer"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["home_chat_composer_dock"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["chat_sidebar"].exists)
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
+        XCTAssertFalse(app.buttons["Chat"].exists)
     }
 
     private func waitForOneOf(_ elements: [XCUIElement], timeout: TimeInterval) -> Bool {
@@ -1085,6 +1091,38 @@ final class LogYourBodyUITests: XCTestCase {
         return elements.contains(where: { $0.exists })
     }
 
+    private func openPhotoTimelineMenu(in app: XCUIApplication) {
+        let menu = app.buttons["Open Menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 5))
+    }
+
+    private func openStatsPage(in app: XCUIApplication) {
+        if app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists {
+            return
+        }
+
+        openPhotoTimelineMenu(in: app)
+        let stats = app.buttons["Stats"]
+        XCTAssertTrue(stats.waitForExistence(timeout: 5))
+        stats.tap()
+    }
+
+    private func collapseHomeChat(in app: XCUIApplication) {
+        let closeChat = app.buttons["Close chat"]
+        if closeChat.waitForExistence(timeout: 2) {
+            closeChat.tap()
+            return
+        }
+
+        openPhotoTimelineMenu(in: app)
+        let timeline = app.buttons["Timeline"]
+        if timeline.waitForExistence(timeout: 3) {
+            timeline.tap()
+        }
+    }
+
     private func exerciseTimelineRootNavigation(in app: XCUIApplication) throws {
         let timelinePage = app.descendants(matching: .any)["photo_timeline_root_page_timeline"]
         XCTAssertTrue(timelinePage.waitForExistence(timeout: 5))
@@ -1095,13 +1133,12 @@ final class LogYourBodyUITests: XCTestCase {
 
         let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
         if !analyticsPage.waitForExistence(timeout: 5) {
-            let statsButton = app.buttons["Stats"]
-            XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
-            statsButton.tap()
+            openStatsPage(in: app)
         }
 
         XCTAssertTrue(analyticsPage.waitForExistence(timeout: 8))
 
+        openPhotoTimelineMenu(in: app)
         let timelineButton = app.buttons["Timeline"]
         XCTAssertTrue(timelineButton.waitForExistence(timeout: 5))
         timelineButton.tap()
@@ -1230,10 +1267,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists)
 
-        let statsButton = app.buttons["Stats"]
-        XCTAssertTrue(statsButton.waitForExistence(timeout: 5))
-        XCTAssertLessThan(statsButton.frame.midY, app.windows.firstMatch.frame.height * 0.18)
-        statsButton.tap()
+        openStatsPage(in: app)
 
         let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
         if !analyticsPage.waitForExistence(timeout: 6) {

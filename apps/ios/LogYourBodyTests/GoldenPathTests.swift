@@ -260,8 +260,13 @@ final class GoldenPathTests: XCTestCase {
     // MARK: - Stage 7 · The full journey, end to end
 
     func testGP7_FullGoldenPathEndToEnd() {
-        // 1. Launch: the paid surface is the photo timeline HUD, with Chat as a peer tab.
+        // 1. Launch: the paid surface is the photo timeline HUD, with chat composer as bottom chrome.
         XCTAssertEqual(PaidAppSurfacePolicy.surface(), .photoTimelineHUD)
+        XCTAssertTrue(HomeChatChromePolicy.pinsComposerOnHome)
+        XCTAssertFalse(HomeChatChromePolicy.showsTabBarOnHome)
+        XCTAssertFalse(HomeChatChromePolicy.showsChatAsPeerNavigation)
+        XCTAssertFalse(HomeChatChromePolicy.showsTopSegmentedTabs)
+        XCTAssertTrue(HomeChatChromePolicy.usesJovieSwipeStructure)
 
         // 2-3. Sign in + subscribe: gates open only when every requirement is met.
         let user = makeCompleteUser()
