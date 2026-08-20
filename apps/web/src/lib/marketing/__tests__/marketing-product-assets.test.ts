@@ -24,11 +24,11 @@ describe('canonical marketing product assets', () => {
   it('requires a recent canonical product capture for marketing use', () => {
     const ageMs = Date.now() - Date.parse(productAssets.weightLog.capturedAt);
     expect(ageMs).toBeGreaterThanOrEqual(0);
-    expect(ageMs).toBeLessThanOrEqual(90 * 24 * 60 * 60 * 1000);
+    expect(ageMs).toBeLessThanOrEqual(60 * 24 * 60 * 60 * 1000);
   });
 
   it('records actual PNG dimensions instead of advertising a viewport guess', () => {
-    expect(productAssets.weightLog).toEqual(expect.objectContaining({ width: 1242, height: 2688 }));
+    expect(productAssets.weightLog).toEqual(expect.objectContaining({ width: 1320, height: 2868 }));
     expect(productAssets.appIcon).toEqual(expect.objectContaining({ width: 1024, height: 1024 }));
   });
 });

@@ -740,7 +740,8 @@ final class LogYourBodyUITests: XCTestCase {
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhaseInsightFixture",
-            "-lybUITestGlp1WeeklyCheckInFixture"
+            "-lybUITestGlp1WeeklyCheckInFixture",
+            "-lybUITestChatFirstFixture"
         ])
 
         let timeline = app.descendants(matching: .any)["launch_timeline_surface"]

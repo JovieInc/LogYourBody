@@ -389,6 +389,10 @@ export const endpoints = {
       reason: 'Vitest documentation links.',
     },
     {
+      value: 'https://eve.dev',
+      reason: 'Official external eve agent framework documentation.',
+    },
+    {
       value: 'https://playwright.dev',
       reason: 'Playwright documentation links.',
     },

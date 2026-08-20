@@ -13,7 +13,7 @@ LogYourBody/
 ├── apps/
 │   ├── ios/           # Native iOS app (SwiftUI, Swift 5.9+)
 │   └── web/           # Next.js marketing/legal/API surface
-├── agent/             # Local Vercel Eve gym-dogfood scaffold (not internal Eve)
+├── agent/             # External eve.dev backend definition for core chat
 ├── packages/          # Shared packages and libraries
 │   ├── design-tokens/ # Shared design tokens
 │   ├── product-registry/ # Canonical product identity and endpoints
@@ -23,9 +23,10 @@ LogYourBody/
 └── docs/              # Project documentation
 ```
 
-`agent/` is **Vercel Eve** (https://vercel.com/docs/eve): a Tim-only local
-discovery companion. It is not the Summer / Jovie internal Eve persona. See
-[`docs/product/vercel-eve-gym-dogfood.md`](docs/product/vercel-eve-gym-dogfood.md).
+`agent/` is the external [eve.dev](https://eve.dev/) backend definition for
+LogYourBody core chat. It is not Jovie's internally named Eve agent/product,
+and the native SwiftUI client does not embed this TypeScript runtime. See
+[`docs/architecture/eve-core-chat-migration.md`](docs/architecture/eve-core-chat-migration.md).
 
 ### Monorepo Setup
 

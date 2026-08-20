@@ -13,7 +13,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:ci": "turbo run test",
+    "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
     "web": "pnpm --filter logyourbody dev",
     "db:migrate": "scripts/web/create-migration.sh",
     "db:schema:check": "bash scripts/supabase/check-schema-drift.sh",
@@ -35,9 +35,10 @@
     "check:vendor-boundaries": "node scripts/check-vendor-boundaries.js",
     "check:supabase-migrations": "node scripts/check-supabase-migration-drift.js",
     "sync:main": "bash scripts/sync-main.sh",
-    "eve:info": "eve info",
-    "eve:build": "eve build",
-    "eve:dev": "eve dev"
+    "eve:info": "bash scripts/eve/run-node24.sh info",
+    "eve:build": "bash scripts/eve/run-node24.sh build",
+    "eve:dev": "bash scripts/eve/run-node24.sh dev",
+    "eve:smoke": "bash scripts/eve/local-smoke.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
