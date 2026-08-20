@@ -7,7 +7,7 @@ import {
 
 export default defineDynamic({
   events: {
-    'session.started': (_event, ctx) => {
+    'turn.started': (_event, ctx) => {
       const state =
         process.env.LYB_EVE_LOCAL_SMOKE === '1'
           ? localConnectionFixture()

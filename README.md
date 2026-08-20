@@ -12,7 +12,7 @@ The native paid iOS app is the default product. Web is marketing, legal, support
 | Cloud data    | Neon via first-party bearer APIs. Native never connects to Postgres.                                              |
 | Device data   | Core Data                                                                                                         |
 | Product shell | Timeline is paid home. Stats and Chat are peers.                                                                  |
-| Chat          | LYB-5 bearer API (`/api/auth/mobile/chat/v1`)                                                                     |
+| Chat          | LYB-5 bearer API (`/api/auth/mobile/chat/v1`); external eve.dev backend migration stays behind this contract     |
 | Photos        | Cloudflare R2 via first-party signed PUTs. Neon stores the public URL, not the bytes.                             |
 
 JOV-4831 / PR #903 owns the remaining Neon schema/sync/delete cutover, including retiring leftover Supabase photo/export/deletion helpers.
@@ -22,7 +22,7 @@ JOV-4831 / PR #903 owns the remaining Neon schema/sync/delete cutover, including
 ```
 apps/ios          Native SwiftUI app
 apps/web          Next.js marketing / legal / first-party API
-agent/            Local Vercel Eve gym-dogfood scaffold (not internal Eve)
+agent/            External eve.dev backend definition for core chat
 packages/         product-registry, shared-lib, design-tokens
 supabase/         Legacy photo/export/deletion functions until JOV-4831 cutover
 ```
@@ -47,9 +47,10 @@ From the repo root (pnpm + Turborepo):
 - `pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm build`
 - `pnpm product:check` after registry or public-copy changes
 - `pnpm ios` to open the Xcode project
-- `pnpm eve:info` / `eve:build` / `eve:dev` run the local **Vercel Eve**
-  gym-dogfood agent. The CLI needs Node 24+; this repo stays on Node 20 for
-  web/CI. See [docs/product/vercel-eve-gym-dogfood.md](docs/product/vercel-eve-gym-dogfood.md).
+- `pnpm eve:info` / `eve:build` / `eve:dev` run the external eve.dev core-chat
+  backend definition through isolated Node 24; the web app remains on Node 20.
+- `pnpm eve:smoke` runs credential-free connected and unconnected boundary
+  evals. See [the migration boundary](docs/architecture/eve-core-chat-migration.md).
 
 ## License
 
