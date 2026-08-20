@@ -239,10 +239,10 @@
         "locale": "en-US",
         "path": "apps/ios/fastlane/screenshots/en-US/01_APP_IPHONE_65.png",
         "filename": "01_APP_IPHONE_65.png",
-        "width": 1242,
-        "height": 2688,
+        "width": 1320,
+        "height": 2868,
         "hasAlpha": false,
-        "gitBlobSha": "7d2db86054ab94902e8ed8e8fc46b58f5b109033",
+        "gitBlobSha": "945a50cfcfe9b753f571c726012af0b580fa5e20",
         "sourceKind": "ios-fastlane-capture",
         "truthStatus": "real-app-capture"
       },
