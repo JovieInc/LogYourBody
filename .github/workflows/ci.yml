@@ -50,7 +50,7 @@ jobs:
             changed_files=$(git diff --name-only "$diff_base" "$HEAD_SHA")
           fi
 
-          web_pattern='^(apps/web/|packages/|\.github/actions/|\.github/scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|scripts/(supabase|web)/|supabase/|turbo\.json$)'
+          web_pattern='^(agent/|evals/|apps/web/|packages/|\.github/actions/|\.github/scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|scripts/(eve|supabase|web)/|supabase/|turbo\.json$)'
           ios_pattern='^(apps/ios/|\.github/actions/setup-ios-build/|\.github/workflows/ci\.yml$|\.github/workflows/ios[^/]*\.yml$|scripts/ios/|package\.json$)'
 
           if printf '%s\n' "$changed_files" | grep -Eq "$web_pattern"; then

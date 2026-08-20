@@ -13,7 +13,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:ci": "turbo run test",
+    "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
     "web": "pnpm --filter logyourbody dev",
     "db:migrate": "scripts/web/create-migration.sh",
     "db:schema:check": "bash scripts/supabase/check-schema-drift.sh",

@@ -26,7 +26,7 @@ SwiftUI Chat -> LogYourBody first-party API -> eve runtime -> authorized product
 
 ## First implementation slice
 
-This slice turns the repository's agent definition into the core-chat contract, adds dynamic connected/unconnected instructions, explicitly disables general-purpose shell/file/web/delegation tools, and authors a loopback-only eve channel that fails closed elsewhere. Credential-free eve evals exercise both account states and durable two-turn continuity.
+This slice turns the repository's agent definition into the core-chat contract, adds dynamic connected/unconnected instructions, explicitly disables general-purpose shell/file/web/delegation tools, and authors an eve channel that fails closed by default. Loopback authentication requires an explicit non-production opt-in. Credential-free eve evals exercise both account states and durable two-turn continuity.
 
 No health-data tool, production route authentication, account-connection mutation, deployment, or mobile protocol change is included. The existing first-party chat route and model adapter remain active.
 
