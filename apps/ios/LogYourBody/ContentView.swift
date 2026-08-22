@@ -299,7 +299,7 @@ struct ContentView: View {
     private var loadingOverlay: some View {
         Group {
             if !isLoadingComplete && loadingManager.progress < 1.0 {
-                LoadingView(
+                LoadingScreen(
                     progress: $loadingManager.progress,
                     loadingStatus: $loadingManager.loadingStatus,
                     onComplete: {
