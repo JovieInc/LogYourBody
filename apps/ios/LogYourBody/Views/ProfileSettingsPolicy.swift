@@ -7,8 +7,9 @@ import Foundation
 /// Shared profile-name, height, and age formatting used by settings tests
 /// and any remaining profile-editor surfaces.
 ///
-/// Production profile editing lives in `PreferencesView` sheets. The old
-/// `ProfileSettingsViewV2` screen was unused and has been removed.
+/// Production profile editing lives in `PreferencesView` sheets
+/// (`ProfileNameEditorSheet`, `DatePickerSheet`, `ProfileHeightPickerSheet`).
+/// The unused `ProfileSettingsViewV2` screen has been removed.
 enum ProfileSettingsPolicy {
     /// Joins first/last names into a display name, trimming blanks and dropping empty parts.
     static func joinedDisplayName(first: String, last: String) -> String {

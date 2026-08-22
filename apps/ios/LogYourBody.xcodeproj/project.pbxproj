@@ -297,6 +297,7 @@
 		ADDC47CE2E2D89F3003C97E7 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AEF2E15FA5C002376C6 /* Constants.swift */; };
 		ADDC47D02E2D89F3003C97E7 /* SecuritySessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA922F02E22E7D500B82C49 /* SecuritySessionsView.swift */; };
 		ADDC47D12E2D89F3003C97E7 /* ProfileSettingsPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8552532E19A2A1003552EE /* ProfileSettingsPolicy.swift */; };
+		AD3148D12F0C000200ABCDEF /* ProfileSettingsEditorSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3148C12F0C000200ABCDEF /* ProfileSettingsEditorSheets.swift */; };
 		ADDC47DE2E2D89F3003C97E7 /* IntegrationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D3892E24A566001F82A8 /* IntegrationsView.swift */; };
 		ADDC47E02E2D89F3003C97E7 /* BulkPhotoImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD933DFC2E249DAD00801078 /* BulkPhotoImportView.swift */; };
 		ADDC47E12E2D89F3003C97E7 /* DeleteAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AFE2E15FA5C002376C6 /* DeleteAccountView.swift */; };
@@ -633,6 +634,7 @@
 		AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		AD8056FC2E25F5180028C0DD /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		AD8552532E19A2A1003552EE /* ProfileSettingsPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsPolicy.swift; sourceTree = "<group>"; };
+		AD3148C12F0C000200ABCDEF /* ProfileSettingsEditorSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsEditorSheets.swift; sourceTree = "<group>"; };
 		AD8552552E19A5B5003552EE /* RealtimeSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeSyncManager.swift; sourceTree = "<group>"; };
 		AD85525D2E19DC01003552EE /* AppVersionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVersionManager.swift; sourceTree = "<group>"; };
 		AD85525F2E19DC44003552EE /* Changelog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Changelog.swift; sourceTree = "<group>"; };
@@ -1361,6 +1363,7 @@
 				ADDC48772E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift */,
 				ADA922F02E22E7D500B82C49 /* SecuritySessionsView.swift */,
 				AD8552532E19A2A1003552EE /* ProfileSettingsPolicy.swift */,
+				AD3148C12F0C000200ABCDEF /* ProfileSettingsEditorSheets.swift */,
 				ADE6D3892E24A566001F82A8 /* IntegrationsView.swift */,
 				AD933DFC2E249DAD00801078 /* BulkPhotoImportView.swift */,
 				AD723AFE2E15FA5C002376C6 /* DeleteAccountView.swift */,
@@ -2111,6 +2114,7 @@
 				ADDC47CE2E2D89F3003C97E7 /* Constants.swift in Sources */,
 				ADDC47D02E2D89F3003C97E7 /* SecuritySessionsView.swift in Sources */,
 				ADDC47D12E2D89F3003C97E7 /* ProfileSettingsPolicy.swift in Sources */,
+				AD3148D12F0C000200ABCDEF /* ProfileSettingsEditorSheets.swift in Sources */,
 				ADA6003C2ED27D0000088042 /* PreAuthOnboardingStore.swift in Sources */,
 				ADA600472ED375EE00088042 /* GlobalTimelineModels.swift in Sources */,
 				ADA600482ED375EE00088042 /* Glp1Medication.swift in Sources */,
