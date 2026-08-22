@@ -214,7 +214,7 @@ candidate (propose deletion, not tests).
 | Surface                                                                       | File                                | Risk | Layer           | Status / existing                                                                                               |
 | ----------------------------------------------------------------------------- | ----------------------------------- | ---- | --------------- | --------------------------------------------------------------------------------------------------------------- |
 | `PreferencesView` (hub)                                                       | `Views/PreferencesView.swift`       | M    | unit + XCUITest | 🔶 UI settings fixtures, `DailyReminderPolicyTests`                                                             |
-| `ProfileSettingsViewV2` (+2 picker sheets)                                    | `Views/ProfileSettingsViewV2.swift` | M    | unit            | 🔶 `ProfileSettingsPolicyTests`                                                                                 |
+| `PreferencesView` profile editor sheets                                       | `Views/ProfileSettingsEditorSheets.swift` | M    | unit            | 🔶 `ProfileSettingsPolicyTests`; name/DOB/height sheets used by PreferencesView                       |
 | `PreferenceGoalEditorSheet`                                                   | `Views/PreferenceGoalEditing.swift` | M    | unit            | 🔶 `PreferenceGoalValidatorTests`, UI goal-editor tests                                                         |
 | `SecuritySessionsView`                                                        | `Views/SecuritySessionsView.swift`  | M    | unit            | 🔶 `SessionListOrderingTests` (view states declarative; no HTTP boundary — sessions synthesized locally)        |
 | `DeleteAccountView`                                                           | `Views/DeleteAccountView.swift`     | H    | integration     | 🔶 `AccountDeletionCleanupServiceTests` (service-level), `AccountDeletionConfirmationPolicyTests` (view gating) |
@@ -264,7 +264,7 @@ candidate (propose deletion, not tests).
 | `Glp1AddMedicationView`                            | `Views/AddEntrySheet.swift`                  | M    | unit                          | 🔶 `Glp1CardAndCatalogTests`, UI fixture                            |
 | `EditEntrySheet`                                   | `Views/EditEntrySheet.swift`                 | —    | —                             | 🗑 orphaned (GLP-1 dose editing lives in AddEntrySheet)             |
 | `BugReportPromptSheet`/`BugReportFormView`         | `Views/BugReportViews.swift`                 | L    | unit                          | ❌                                                                  |
-| `LoadingView`                                      | `Views/LoadingView.swift`                    | L    | unit                          | 🔶 manager-level only                                               |
+| `LoadingScreen`                                    | `DesignSystem/Organisms/LoadingScreen.swift`  | L    | unit                          | 🔶 manager-level only; launch overlay uses LoadingScreen directly   |
 | `ImageProcessingStatusView`                        | `Components/ImageProcessingStatusView.swift` | —    | —                             | 🗑 orphaned                                                         |
 
 ---
@@ -375,7 +375,7 @@ Each deletion PR must verify no caller + remove from pbxproj.
 | 7     | BodySpec: API client contract + auth manager + IntegrationsView policy                                                                                                                              | integration      |
 | 8     | App Intents logging path                                                                                                                                                                            | integration      |
 | 9     | Onboarding: step-policy gaps + XCUITest golden path (hook→reveal)                                                                                                                                   | unit+XCUITest    |
-| 10    | Settings: ProfileSettingsViewV2, SecuritySessionsView, DeleteAccountView flow, ExportDataView CSV                                                                                                   | unit+integration |
+| 10    | Settings: PreferencesView profile editors, SecuritySessionsView, DeleteAccountView flow, ExportDataView CSV                                                                                         | unit+integration |
 | 11    | B.2 medium sweep (analytics/error/bug-report adapters, device normalization, Vision pipeline, timeline helpers, models)                                                                             | unit             |
 | 12    | B.3 low sweep + dead-code deletion PRs                                                                                                                                                              | unit/chore       |
 | 13    | Final: duration report review, verify ≥70% overall / ≥80% patch floors, golden-path XCUITest gap-fill                                                                                               | verification     |
@@ -398,7 +398,7 @@ Progress tracker: mark batches here as PRs merge.
 - Onboarding hook→reveal XCUITest golden path (batch 9 deferral): this PR —
   `OnboardingGoldenPathUITests` drives the fixture-provisioned flow through
   hook, basics, height, manual entry, weight, body fat, and reveal.
-- Batch 10 — settings cluster (ProfileSettingsViewV2, SecuritySessionsView,
+- Batch 10 — settings cluster (PreferencesView profile editors, SecuritySessionsView,
   DeleteAccountView gating, ExportDataView CSV): ✅ #492
 - Batch 11a — vendor adapters + timeline helpers: ✅ #493
 - Batch 11b — Vision/photo pipeline: this PR (`ImageProcessingServiceTests`,

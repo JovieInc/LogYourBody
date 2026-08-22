@@ -6,7 +6,7 @@ import SwiftUI
 import Vision
 import UIKit
 
-// MARK: - Temporary Glass Card (until UIComponents.swift is added to project)
+// MARK: - Progress photo glass card
 struct ProgressPhotoGlassCard<Content: View>: View {
     let content: Content
     var cornerRadius: CGFloat = 16
