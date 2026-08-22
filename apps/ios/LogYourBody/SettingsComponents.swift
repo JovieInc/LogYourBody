@@ -13,6 +13,15 @@ private enum SettingsLayout {
 
 enum SettingsSurfacePolicy {
     static let settingsScreen = WorldClassScreen.settings
+    static let editProfileScreen = WorldClassScreen.editProfile
+
+    static let profileNameRowIdentifier = "settings_profile_name_row"
+    static let profileDateOfBirthRowIdentifier = "settings_profile_date_of_birth_row"
+    static let profileHeightRowIdentifier = "settings_profile_height_row"
+    static let profileNameEditorIdentifier = "profile_name_editor"
+    static let profileDateOfBirthEditorIdentifier = "profile_date_of_birth_editor"
+    static let profileHeightEditorIdentifier = "profile_height_editor"
+    static let profileEditorCancelIdentifier = "profile_editor_cancel_button"
 
     static let rootAccessibilityIdentifiers = [
         "settings_profile_link",
@@ -23,9 +32,19 @@ enum SettingsSurfacePolicy {
         WorldClassScreen.settings.accessibilityIdentifier
     ]
 
+    static let profileEditorAccessibilityIdentifiers = [
+        WorldClassScreen.editProfile.accessibilityIdentifier,
+        profileNameEditorIdentifier,
+        profileDateOfBirthEditorIdentifier,
+        profileHeightEditorIdentifier,
+        profileEditorCancelIdentifier
+    ]
+
     static let nestedAccessibilityIdentifiers = [
         "settings_logout_button",
-        "settings_profile_height_row",
+        profileNameRowIdentifier,
+        profileDateOfBirthRowIdentifier,
+        profileHeightRowIdentifier,
         "settings_units_row",
         "settings_step_goal_row",
         "settings_daily_weigh_in_reminder_toggle",
@@ -35,7 +54,7 @@ enum SettingsSurfacePolicy {
         "settings_restore_purchases_button",
         "settings_goal_editor_sheet",
         "settings_goal_editor_text_field"
-    ]
+    ] + profileEditorAccessibilityIdentifiers
 }
 
 // MARK: - Section Component

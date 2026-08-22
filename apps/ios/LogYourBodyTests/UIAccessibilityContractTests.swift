@@ -42,6 +42,13 @@ final class UIAccessibilityContractTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(required.count, 40)
         XCTAssertEqual(Set(required).count, required.count, "Identifier contract contains duplicates")
         XCTAssertTrue(required.contains("settings_profile_link"))
+        XCTAssertTrue(required.contains("settings_profile_name_row"))
+        XCTAssertTrue(required.contains("settings_profile_date_of_birth_row"))
+        XCTAssertTrue(required.contains("profile_name_editor"))
+        XCTAssertTrue(required.contains("profile_date_of_birth_editor"))
+        XCTAssertTrue(required.contains("profile_height_editor"))
+        XCTAssertTrue(required.contains("profile_editor_cancel_button"))
+        XCTAssertTrue(required.contains(WorldClassScreen.editProfile.accessibilityIdentifier))
         XCTAssertTrue(required.contains("continueWithAppleButton"))
         XCTAssertTrue(required.contains("launch_timeline_surface"))
         XCTAssertTrue(required.contains("paywall_purchase_button"))
@@ -86,9 +93,14 @@ enum UIAccessibilityContract {
         "settings_goal_editor_error",
         "settings_weight_goal_reset_button",
         "settings_profile_height_row",
+        "settings_profile_name_row",
+        "settings_profile_date_of_birth_row",
         "settings_integrations_link",
         "profile_editor_cancel_button",
+        "profile_name_editor",
+        "profile_date_of_birth_editor",
         "profile_height_editor",
+        "world_class_screen_editProfile",
         "launch_timeline_surface",
         "launch_timeline_scrubber",
         "photo_timeline_root_page_timeline",

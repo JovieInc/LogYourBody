@@ -4,6 +4,22 @@
 //
 import SwiftUI
 
+/// Shared toolbar chrome for the live PreferencesView profile sheets.
+enum ProfileEditorSheetChrome {
+    static func cancelButton(action: @escaping () -> Void) -> some View {
+        Button("Cancel", action: action)
+            .jovieTouchTarget()
+            .accessibilityIdentifier(SettingsSurfacePolicy.profileEditorCancelIdentifier)
+    }
+
+    static func doneButton(isEnabled: Bool = true, action: @escaping () -> Void) -> some View {
+        Button("Done", action: action)
+            .fontWeight(.medium)
+            .disabled(!isEnabled)
+            .jovieTouchTarget()
+    }
+}
+
 /// Height editor used by `PreferencesView` profile sheets.
 struct ProfileHeightPickerSheet: View {
     @Binding var heightCm: Int
@@ -20,15 +36,20 @@ struct ProfileHeightPickerSheet: View {
                     Text("Metric (cm)").tag(true)
                 }
                 .pickerStyle(.menu)
+                .frame(minHeight: JovieTokens.minimumHitTarget)
 
                 Section {
-                    Text(formattedHeight)
-                        .font(.title.weight(.semibold))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    Text(alternateHeight)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                    VStack(spacing: JovieTokens.tightGap) {
+                        Text(formattedHeight)
+                            .font(.title.weight(.semibold))
+                            .frame(maxWidth: .infinity, alignment: .center)
+                        Text(alternateHeight)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                    .padding(.vertical, JovieTokens.tightGap)
+                    .accessibilityElement(children: .combine)
                 }
 
                 Section {
@@ -39,23 +60,19 @@ struct ProfileHeightPickerSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .frame(minWidth: 68, minHeight: JovieTokens.minimumHitTarget)
+                    ProfileEditorSheetChrome.cancelButton(action: dismiss.callAsFunction)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    ProfileEditorSheetChrome.doneButton {
                         hasChanges = true
                         onCommit?()
                         dismiss()
                     }
-                    .fontWeight(.medium)
-                    .jovieTouchTarget()
                 }
             }
-            .accessibilityIdentifier("profile_height_editor")
+            .accessibilityIdentifier(SettingsSurfacePolicy.profileHeightEditorIdentifier)
         }
+        .worldClassScreen(.editProfile)
     }
 
     private var heightPicker: some View {
@@ -93,7 +110,7 @@ struct ProfileHeightPickerSheet: View {
             }
         )
 
-        return HStack {
+        return HStack(spacing: JovieTokens.itemGap) {
             Picker("Feet", selection: feetBinding) {
                 ForEach(3...8, id: \.self) { value in
                     Text("\(value) ft").tag(value)
@@ -134,34 +151,40 @@ struct DatePickerSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                DatePicker(
-                    "Date of Birth",
-                    selection: $date,
-                    in: ...Date(),
-                    displayedComponents: .date
-                )
-                .datePickerStyle(.wheel)
-                .labelsHidden()
+                Section {
+                    Text(date.formatted(date: .long, time: .omitted))
+                        .font(.title.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, JovieTokens.tightGap)
+                }
+
+                Section {
+                    DatePicker(
+                        "Date of Birth",
+                        selection: $date,
+                        in: ...Date(),
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.wheel)
+                    .labelsHidden()
+                }
             }
             .navigationTitle("Date of Birth")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .frame(minWidth: 68, minHeight: JovieTokens.minimumHitTarget)
+                    ProfileEditorSheetChrome.cancelButton(action: dismiss.callAsFunction)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    ProfileEditorSheetChrome.doneButton {
                         hasChanges = true
                         onCommit?()
                         dismiss()
                     }
-                    .fontWeight(.medium)
-                    .jovieTouchTarget()
                 }
             }
+            .accessibilityIdentifier(SettingsSurfacePolicy.profileDateOfBirthEditorIdentifier)
         }
+        .worldClassScreen(.editProfile)
     }
 }
