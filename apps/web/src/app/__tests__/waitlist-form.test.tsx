@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { analytics } from '@/lib/analytics';
 import { WaitlistForm } from '../WaitlistForm';
+import { waitlistLandingCopy } from '../waitlist-copy';
 
 jest.mock('@/lib/analytics', () => ({
   analytics: { track: jest.fn() },
@@ -61,5 +62,57 @@ describe('WaitlistForm', () => {
     await waitFor(() =>
       expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', { outcome: 'invalid' }),
     );
+  });
+
+  it('returns server-side validation feedback to an editable form', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ success: false }),
+    });
+    render(<WaitlistForm />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
+      target: { value: 'invalid@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address.');
+    expect(screen.getByRole('button', { name: 'Request early access' })).toBeEnabled();
+    expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', { outcome: 'invalid' });
+  });
+
+  it('announces a rate limit without exposing implementation details', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: async () => ({ success: false }),
+    });
+    render(<WaitlistForm />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
+      target: { value: 'person@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(waitlistLandingCopy.errorMessage);
+    expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
+      outcome: 'rate_limited',
+    });
+  });
+
+  it('announces a recoverable error when the request fails', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('offline'));
+    render(<WaitlistForm />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
+      target: { value: 'person@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(waitlistLandingCopy.errorMessage);
+    expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
+      outcome: 'server_error',
+    });
   });
 });
