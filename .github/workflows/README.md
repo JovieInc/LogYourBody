@@ -74,6 +74,8 @@ Reusable/manual iOS release loop for TestFlight/App Store release paths.
 
 Reusable TestFlight deployment workflow.
 
+Upload no longer blocks the job on App Store Connect processing. After the IPA is accepted, `distribute_testflight` waits and assigns groups. If that wait times out, re-run this workflow with `resume_only` plus the same `version_name` / `build_number` instead of building a new timestamped binary. Job timeout is 90 minutes.
+
 Release workflows are app-specific and can be stricter than PR CI because they run after a change has already cleared the merge contract.
 
 ## Scheduled and Security Workflows

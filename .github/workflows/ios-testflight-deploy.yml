@@ -31,6 +31,11 @@ on:
         required: false
         type: string
         default: 'development'
+      resume_only:
+        description: 'Skip IPA upload and wait/distribute an already-uploaded build_number'
+        required: false
+        type: boolean
+        default: false
     secrets:
       MATCH_PASSWORD:
         required: true
@@ -49,6 +54,36 @@ on:
       APP_STORE_APP_ID:
         required: false
 
+  workflow_dispatch:
+    inputs:
+      distribution_group:
+        description: 'TestFlight distribution group'
+        required: true
+        type: choice
+        options:
+          - alpha
+          - beta
+          - production
+        default: production
+      build_number:
+        description: 'Already-uploaded CFBundleVersion to wait on and distribute'
+        required: true
+        type: string
+      version_name:
+        description: 'Marketing version of the uploaded build'
+        required: true
+        type: string
+      resume_only:
+        description: 'Skip IPA upload; wait for ASC processing and assign groups'
+        required: true
+        type: boolean
+        default: true
+      environment:
+        description: 'GitHub environment'
+        required: false
+        type: string
+        default: production-testflight
+
 env:
   LOGYOURBODY_APP_IDENTIFIER: com.logyourbody.app
   LOGYOURBODY_APP_STORE_APP_ID: "6755209876"
@@ -57,8 +92,10 @@ jobs:
   deploy-testflight:
     name: Deploy to TestFlight (${{ inputs.distribution_group }})
     runs-on: macos-26
-    # App Store Connect processing is variable; Pilot waits before assigning external groups.
-    timeout-minutes: 60
+    # Receipt: run 31306434865 cancelled after 60m waiting on ASC processing.
+    # Upload returns after transport; distribute_testflight waits and can be resumed
+    # for the same version/build without rebuilding a timestamped IPA.
+    timeout-minutes: 90
     permissions:
       contents: write
     environment:
@@ -69,6 +106,7 @@ jobs:
     - uses: actions/checkout@v6
     
     - name: Download build artifact
+      if: ${{ !inputs.resume_only }}
       uses: actions/download-artifact@v4
       with:
         name: ${{ inputs.artifact_name }}
@@ -132,6 +170,7 @@ jobs:
         echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> "$GITHUB_ENV"
     
     - name: Sync Certificates with Match
+      if: ${{ !inputs.resume_only }}
       uses: ./.github/actions/sync-match
       with:
         match_password: ${{ secrets.MATCH_PASSWORD }}
@@ -228,6 +267,7 @@ jobs:
         echo "✅ Production release checks passed"
     
     - name: Upload to TestFlight
+      if: ${{ !inputs.resume_only }}
       run: |
         cd apps/ios
         
@@ -249,13 +289,41 @@ jobs:
         bundle exec fastlane upload_testflight \
           ipa_path:"$IPA_PATH" \
           groups:"$TESTFLIGHT_GROUPS" \
-          changelog_file:"$CHANGELOG_PATH"
+          changelog_file:"$CHANGELOG_PATH" \
+          skip_waiting_for_build_processing:true
       env:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         APP_IDENTIFIER: ${{ env.LOGYOURBODY_APP_IDENTIFIER }}
         APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
         FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "180"
         FASTLANE_XCODEBUILD_SETTINGS_RETRIES: "10"
+
+    - name: Wait for processing and assign groups
+      env:
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        APP_IDENTIFIER: ${{ env.LOGYOURBODY_APP_IDENTIFIER }}
+        APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
+        VERSION_NAME: ${{ inputs.version_name }}
+        BUILD_NUMBER: ${{ inputs.build_number }}
+      run: |
+        cd apps/ios
+
+        CHANGELOG_PATH="$PWD/release_notes.txt"
+        if [ ! -f "$CHANGELOG_PATH" ]; then
+          echo "::error::Release notes file not found at $CHANGELOG_PATH"
+          exit 1
+        fi
+
+        if [ -z "$VERSION_NAME" ] || [ -z "$BUILD_NUMBER" ]; then
+          echo "::error::version_name and build_number are required to wait on TestFlight processing without rebuilding"
+          exit 1
+        fi
+
+        bundle exec fastlane distribute_testflight \
+          groups:"$TESTFLIGHT_GROUPS" \
+          changelog_file:"$CHANGELOG_PATH" \
+          version_name:"$VERSION_NAME" \
+          build_number:"$BUILD_NUMBER"
     
     - name: Post deployment notification
       if: success()

@@ -162,16 +162,45 @@
 
   desc "Upload existing IPA to TestFlight"
   lane :upload_testflight do |options|
-    # Setup App Store Connect API authentication
     setup_app_store_connect_api
-    
-    # Upload IPA
+
+    skip_waiting = options[:skip_waiting_for_build_processing]
+    skip_waiting = skip_waiting.nil? ? false : skip_waiting
+    if skip_waiting != true && skip_waiting != false
+      normalized = skip_waiting.to_s.strip.downcase
+      skip_waiting = %w[true 1 yes y on].include?(normalized)
+    end
+
     upload_to_testflight(
       **testflight_upload_options.call(
         ipa: options[:ipa_path],
         groups: options[:groups] ? options[:groups].split(",") : ["Beta Testers"],
         changelog: options[:changelog_file] ? File.read(options[:changelog_file]) : "New build",
-        distribute_external: true
+        distribute_external: true,
+        skip_waiting_for_build_processing: skip_waiting
+      )
+    )
+  end
+
+  desc "Wait for an already-uploaded TestFlight build and assign groups"
+  lane :distribute_testflight do |options|
+    setup_app_store_connect_api
+
+    version_name = options[:version_name].to_s.strip
+    build_number = options[:build_number].to_s.strip
+    UI.user_error!("version_name is required to resume TestFlight processing") if version_name.empty?
+    UI.user_error!("build_number is required to resume TestFlight processing") if build_number.empty?
+
+    upload_to_testflight(
+      **testflight_upload_options.call(
+        ipa: nil,
+        groups: options[:groups] ? options[:groups].split(",") : ["Beta Testers"],
+        changelog: options[:changelog_file] && File.exist?(options[:changelog_file].to_s) ? File.read(options[:changelog_file]) : options[:changelog],
+        distribute_external: true,
+        skip_waiting_for_build_processing: false,
+        distribute_only: true,
+        app_version: version_name,
+        build_number: build_number
       )
     )
   end
