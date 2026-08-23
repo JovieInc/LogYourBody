@@ -61,6 +61,7 @@ extension PreferencesView {
         ) {
             beginProfileEditor(.fullName)
         }
+        .accessibilityIdentifier(SettingsSurfacePolicy.profileNameRowIdentifier)
     }
 
     var profileDateOfBirthRow: some View {
@@ -71,6 +72,7 @@ extension PreferencesView {
         ) {
             beginProfileEditor(.dateOfBirth)
         }
+        .accessibilityIdentifier(SettingsSurfacePolicy.profileDateOfBirthRowIdentifier)
     }
 
     var profileHeightRow: some View {
@@ -81,7 +83,7 @@ extension PreferencesView {
         ) {
             beginProfileEditor(.height)
         }
-        .accessibilityIdentifier("settings_profile_height_row")
+        .accessibilityIdentifier(SettingsSurfacePolicy.profileHeightRowIdentifier)
     }
 
     func profileRow(
@@ -233,27 +235,29 @@ struct ProfileNameEditorSheet: View {
                         .textContentType(.name)
                         .focused($isFocused)
                         .onChange(of: name) { _, _ in hasChanges = true }
+                        .frame(minHeight: JovieTokens.minimumHitTarget)
                 }
             }
             .navigationTitle("Full Name")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .jovieTouchTarget()
+                    ProfileEditorSheetChrome.cancelButton(action: dismiss.callAsFunction)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    ProfileEditorSheetChrome.doneButton(
+                        isEnabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ) {
                         onCommit()
                         dismiss()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .jovieTouchTarget()
                 }
             }
             .onAppear {
                 isFocused = true
             }
+            .accessibilityIdentifier(SettingsSurfacePolicy.profileNameEditorIdentifier)
         }
+        .worldClassScreen(.editProfile)
     }
 }
