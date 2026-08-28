@@ -343,27 +343,31 @@ struct LogYourBodyWhatsNewView: View {
         items.first?.evidence
     }
 
+    private var releaseMetadata: [ReleaseReviewMetadataField] {
+        releaseEvidence.map(ReleaseReviewCatalog.metadata) ?? []
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
-            HStack {
-                VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
-                    Text("What’s New")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(Color.appTextPrimary)
-                    if let releaseEvidence {
-                        Text("Version \(releaseEvidence.version) · Build \(releaseEvidence.build)")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.appTextSecondary)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("What’s New")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(Color.appTextPrimary)
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: JovieTokens.itemGap) {
+                        releaseMetadataFields
                     }
-                    Text("See what changed, then open it in the app.")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.appTextSecondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        releaseMetadataFields
+                    }
                 }
-                Spacer()
-                Image(systemName: "sparkles")
-                    .font(.title2)
-                    .foregroundStyle(Color.appPrimary)
-                    .accessibilityHidden(true)
+                .padding(.top, 4)
+
+                Text("See what changed in this build.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.appTextTertiary)
+                    .padding(.top, JovieTokens.tightGap)
             }
 
             VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
@@ -375,10 +379,6 @@ struct LogYourBodyWhatsNewView: View {
 
                         Text(item.summary)
                             .font(.body)
-                            .foregroundStyle(Color.appTextSecondary)
-
-                        Text("Opens \(item.evidence.destination.customerLabel)")
-                            .font(.caption)
                             .foregroundStyle(Color.appTextSecondary)
 
                         StandardButton(item.actionTitle) {
@@ -408,6 +408,33 @@ struct LogYourBodyWhatsNewView: View {
         .accessibilityLabel("What’s New")
         .onAppear(perform: onSeen)
         .worldClassScreen(.whatsNew)
+    }
+
+    @ViewBuilder
+    private var releaseMetadataFields: some View {
+        ForEach(releaseMetadata) { field in
+            ReleaseReviewMetadataFieldView(field: field)
+        }
+    }
+}
+
+private struct ReleaseReviewMetadataFieldView: View {
+    let field: ReleaseReviewMetadataField
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(field.label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.appTextTertiary)
+                .accessibilityIdentifier("whats-new-metadata-\(field.id)-label")
+
+            Text(field.value)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(Color.appTextSecondary)
+                .accessibilityIdentifier("whats-new-metadata-\(field.id)-value")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(field.label) \(field.value)")
     }
 }
 

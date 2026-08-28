@@ -30,7 +30,10 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testWhatsNewFixtureRendersTheRedesignedReleaseSurface() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestResetWhatsNewReviewState"
+        ]
         app.launch()
 
         XCTAssertTrue(
@@ -39,6 +42,12 @@ final class LogYourBodyUITests: XCTestCase {
         )
         XCTAssertTrue(app.staticTexts["What’s New"].exists)
         XCTAssertTrue(app.staticTexts["Your progress, in one place"].exists)
+        XCTAssertTrue(app.staticTexts["whats-new-metadata-version-label"].exists)
+        XCTAssertTrue(app.staticTexts["whats-new-metadata-version-value"].exists)
+        XCTAssertTrue(app.staticTexts["whats-new-metadata-build-label"].exists)
+        XCTAssertTrue(app.staticTexts["whats-new-metadata-build-value"].exists)
+        XCTAssertFalse(app.staticTexts["Opens Timeline"].exists)
+        attachScreenshot(named: "whats-new-corrected-hierarchy", from: app)
 
         let reviewButton = app.buttons["whats-new-review-photo-timeline-review"]
         XCTAssertTrue(reviewButton.isHittable)
@@ -51,6 +60,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["world_class_screen_whatsNew"].exists)
 
         app.terminate()
+        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
         app.launch()
         XCTAssertTrue(
             app.descendants(matching: .any)["photo_timeline_root_page_timeline"]

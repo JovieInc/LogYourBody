@@ -405,6 +405,9 @@ struct LogYourBodyApp: App {
     @discardableResult
     private func applyPaidMVPUITestFixtureIfNeeded() async -> Bool {
         let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-lybUITestResetWhatsNewReviewState") {
+            ReleaseReviewStateStore().reset()
+        }
         let usesPaidFixture = arguments.contains("-lybUITestPaidMVPFixture")
         let usesWeightLoggerFixture = arguments.contains("-lybUITestWeightLoggerMVPFixture")
         let usesPaywallFixture = arguments.contains("-lybUITestPaywallFixture")

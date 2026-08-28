@@ -122,4 +122,52 @@ final class AppVersionTests: XCTestCase {
         XCTAssertFalse(item.evidenceToken.localizedCaseInsensitiveContains("github"))
         XCTAssertFalse(item.evidenceToken.localizedCaseInsensitiveContains("ci"))
     }
+
+    func testReleaseReviewCatalogKeepsMetadataSemanticsAndCTAExplanationDistinct() throws {
+        let item = try XCTUnwrap(ReleaseReviewCatalog.items(version: "2.4", build: "2407").first)
+        let metadata = ReleaseReviewCatalog.metadata(for: item.evidence)
+
+        XCTAssertEqual(metadata.map(\.label), ["Version", "Build"])
+        XCTAssertEqual(metadata.map(\.value), ["2.4", "2407"])
+        XCTAssertTrue(ReleaseReviewContentPolicy.violations(metadata: metadata, items: [item]).isEmpty)
+    }
+
+    func testReleaseReviewContentPolicyRejectsMergedMetadataSemantics() throws {
+        let item = try XCTUnwrap(ReleaseReviewCatalog.items(version: "2.4", build: "2407").first)
+        let deliberatelyInvalidField = ReleaseReviewMetadataField(
+            id: "version",
+            label: "Version",
+            value: "2.4",
+            labelRole: .value,
+            valueRole: .value
+        )
+
+        XCTAssertEqual(
+            ReleaseReviewContentPolicy.violations(
+                metadata: [deliberatelyInvalidField],
+                items: [item]
+            ),
+            [.mergedMetadataSemantics(fieldID: "version")],
+            "A label and value rendered with the same semantic role must fail review."
+        )
+    }
+
+    func testReleaseReviewContentPolicyRejectsAdjacentCTARedundancy() throws {
+        let item = try XCTUnwrap(ReleaseReviewCatalog.items(version: "2.4", build: "2407").first)
+        let deliberatelyInvalidItem = ReleaseReviewItem(
+            id: item.id,
+            evidence: item.evidence,
+            title: item.title,
+            summary: item.summary,
+            symbolName: item.symbolName,
+            actionTitle: item.actionTitle,
+            adjacentActionDescription: "Opens Timeline"
+        )
+
+        XCTAssertEqual(
+            ReleaseReviewContentPolicy.violations(metadata: [], items: [deliberatelyInvalidItem]),
+            [.redundantAdjacentAction(itemID: item.id)],
+            "Adjacent explanation must not restate its CTA destination or action."
+        )
+    }
 }
