@@ -30,19 +30,36 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testWhatsNewFixtureRendersTheRedesignedReleaseSurface() throws {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "-lybUITestPhotoTimelineHUDFixture",
-            "-lyb.whatsNew.lastPresentedVersion",
-            "0"
-        ]
+        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
         app.launch()
 
         XCTAssertTrue(
             app.descendants(matching: .any)["world_class_screen_whatsNew"]
                 .waitForExistence(timeout: 20)
         )
-        XCTAssertTrue(app.staticTexts["A clearer view of progress."].exists)
-        XCTAssertTrue(app.buttons["Done"].isHittable)
+        XCTAssertTrue(app.staticTexts["What’s New"].exists)
+        XCTAssertTrue(app.staticTexts["Your progress, in one place"].exists)
+
+        let reviewButton = app.buttons["whats-new-review-photo-timeline-review"]
+        XCTAssertTrue(reviewButton.isHittable)
+        reviewButton.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["photo_timeline_root_page_timeline"]
+                .waitForExistence(timeout: 8)
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["world_class_screen_whatsNew"].exists)
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["photo_timeline_root_page_timeline"]
+                .waitForExistence(timeout: 8)
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["world_class_screen_whatsNew"].exists,
+            "A reviewed item must not reappear on the next app open."
+        )
     }
 
     func testPaidMVPWeightEntrySavesWithKeyboardOpen() throws {

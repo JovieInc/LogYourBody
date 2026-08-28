@@ -18,6 +18,7 @@ struct DashboardViewLiquid: View {
     }
 
     let layoutMode: LayoutMode
+    @Binding private var releaseReviewDestination: ReleaseReviewDestination?
 
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
@@ -104,8 +105,12 @@ struct DashboardViewLiquid: View {
     @State var addEntryInitialTab = 0
     @State var addEntryIncludesGlp1Entry = false
 
-    init(layoutMode: LayoutMode = .photoTimelineHUD) {
+    init(
+        layoutMode: LayoutMode = .photoTimelineHUD,
+        releaseReviewDestination: Binding<ReleaseReviewDestination?> = .constant(nil)
+    ) {
         self.layoutMode = layoutMode
+        _releaseReviewDestination = releaseReviewDestination
 
         #if DEBUG
         let opensAnalyticsPage = ProcessInfo.processInfo.arguments.contains("-lybUITestPhotoTimelineAnalyticsFixture")
@@ -200,6 +205,7 @@ struct DashboardViewLiquid: View {
         let withLifecycle = base
             .onAppear {
                 LaunchMetrics.markFirstDashboardFrame()
+                openReleaseReviewDestinationIfNeeded()
                 Task { @MainActor in
                     await Task.yield()
                     handleOnAppear()
@@ -245,6 +251,9 @@ struct DashboardViewLiquid: View {
                 if newTab == .photos {
                     AppServicePorts.analyticsTracker.track(event: "photos_tab_opened")
                 }
+            }
+            .onChange(of: releaseReviewDestination) { _, _ in
+                openReleaseReviewDestinationIfNeeded()
             }
             .onReceive(NotificationCenter.default.publisher(for: .bodyScoreUpdated)) { _ in
                 bodyScoreRefreshToken = UUID()
@@ -302,6 +311,20 @@ struct DashboardViewLiquid: View {
             }
 
         return withSheetsAndNavigation
+    }
+
+    private func openReleaseReviewDestinationIfNeeded() {
+        guard let destination = releaseReviewDestination else { return }
+
+        switch destination {
+        case .timeline:
+            selectedPhotoTimelineRootPage = .timeline
+            isHomeChatExpanded = false
+            isMetricDetailActive = false
+            isStatsDestinationActive = false
+        }
+
+        releaseReviewDestination = nil
     }
 
     @ViewBuilder
