@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { analytics } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
@@ -134,8 +133,8 @@ export function WaitlistForm() {
           }}
           disabled={submitState === 'submitting' || submitState === 'success'}
           aria-invalid={Boolean(fieldError)}
-          aria-describedby="waitlist-status waitlist-consent"
-          className="placeholder:text-white/38 min-h-[54px] w-full rounded-full border border-white/20 bg-black/55 px-6 text-base text-white shadow-[0_18px_60px_rgba(0,0,0,0.22)] outline-none backdrop-blur-xl transition-[border-color,background-color,box-shadow] hover:border-white/35 hover:bg-black/65 focus:border-white/60 focus:bg-black/70 focus:ring-2 focus:ring-sky-400/30 disabled:opacity-60 sm:min-h-[58px]"
+          aria-describedby="waitlist-status"
+          className="placeholder:text-white/38 min-h-11 w-full rounded-full border border-white/20 bg-black/55 px-5 text-sm text-white shadow-[0_18px_60px_rgba(0,0,0,0.22)] outline-none backdrop-blur-xl transition-[border-color,background-color,box-shadow] hover:border-white/35 hover:bg-black/65 focus:border-white/60 focus:bg-black/70 focus:ring-2 focus:ring-sky-400/30 disabled:opacity-60"
         />
         <div className="pointer-events-none absolute -left-[10000px]" aria-hidden="true">
           <label htmlFor="waitlist-website">Website</label>
@@ -150,9 +149,11 @@ export function WaitlistForm() {
         <button
           type="submit"
           disabled={submitState === 'submitting' || submitState === 'success'}
-          className="inline-flex min-h-[54px] items-center justify-center rounded-full bg-white px-8 text-base font-semibold text-black shadow-[0_18px_55px_rgba(0,0,0,0.24)] transition-[background-color,transform,box-shadow] hover:-translate-y-0.5 hover:bg-sky-50 hover:shadow-[0_22px_65px_rgba(0,0,0,0.34)] focus:outline-none focus:ring-2 focus:ring-sky-300 focus:ring-offset-2 focus:ring-offset-black active:translate-y-0 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[58px]"
+          className="group inline-flex min-h-11 items-center justify-center rounded-full p-1.5 text-sm font-semibold text-black outline-none disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitState === 'submitting' ? 'Joining…' : waitlistLandingCopy.submitLabel}
+          <span className="inline-flex h-8 w-full items-center justify-center rounded-full bg-white px-6 shadow-[0_18px_55px_rgba(0,0,0,0.24)] transition-[background-color,transform,box-shadow] group-hover:-translate-y-0.5 group-hover:bg-sky-50 group-hover:shadow-[0_22px_65px_rgba(0,0,0,0.34)] group-focus-visible:ring-2 group-focus-visible:ring-sky-300 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-black group-active:translate-y-0 group-active:scale-[0.985]">
+            {submitState === 'submitting' ? 'Joining…' : waitlistLandingCopy.submitLabel}
+          </span>
         </button>
       </form>
 
@@ -175,20 +176,6 @@ export function WaitlistForm() {
           </p>
         ) : null}
       </div>
-
-      <p
-        id="waitlist-consent"
-        className="text-white/48 mt-1 max-w-lg text-[11px] leading-4 sm:mt-2 sm:text-xs sm:leading-5"
-      >
-        Join to receive early-access and TestFlight invitations. Unsubscribe anytime. See our{' '}
-        <Link
-          href="/privacy"
-          className="text-white/65 underline decoration-white/25 underline-offset-2 hover:text-white"
-        >
-          privacy policy
-        </Link>
-        .
-      </p>
     </div>
   );
 }

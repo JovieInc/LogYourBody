@@ -161,7 +161,7 @@ export function MinimalWaitlistLanding() {
                 single day.
               </p>
               <div className="mt-12 flex items-center gap-4 text-sm text-white/50">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.7)]" />
+                <span className="h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_18px_rgba(125,211,252,0.65)]" />
                 Real iPhone product capture
               </div>
             </div>
@@ -220,9 +220,9 @@ export function MinimalWaitlistLanding() {
             </p>
             <a
               href="#early-access"
-              className="mt-9 inline-flex min-h-14 items-center justify-center rounded-full bg-white px-9 text-base font-semibold text-black transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-4 focus-visible:ring-offset-[#050608] active:translate-y-0"
+              className="mt-9 inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-white/70 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-4 focus-visible:ring-offset-[#050608]"
             >
-              Request early access
+              Back to email <span aria-hidden="true">&#8593;</span>
             </a>
           </div>
         </section>
