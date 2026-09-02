@@ -3,6 +3,9 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  merge_group:
+    branches: [main]
+    types: [checks_requested]
   push:
     branches: [main]
 
@@ -15,7 +18,7 @@ concurrency:
         && github.sha
         || github.ref
     }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.event_name != 'merge_group' && github.ref != 'refs/heads/main' }}
 
 jobs:
   detect-changes:
@@ -30,11 +33,14 @@ jobs:
       - name: Verify workflow concurrency policy
         run: node .github/scripts/verify-workflow-concurrency.mjs
 
+      - name: Verify repository merge queue policy
+        run: node --test .github/scripts/verify-merge-queue-policy.test.mjs
+
       - name: Detect changed surfaces locally
         id: filter
         env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.sha }}
         run: |
           set -euo pipefail
           if [[ "$BASE_SHA" =~ ^0+$ ]]; then
@@ -211,6 +217,22 @@ jobs:
     steps:
       - name: Check results
         run: |
+          assert_expected_result() {
+            local job_name="$1"
+            local changed="$2"
+            local result="$3"
+            local expected="skipped"
+
+            if [[ "$changed" == "true" ]]; then
+              expected="success"
+            fi
+
+            if [[ "$result" != "$expected" ]]; then
+              echo "::error::$job_name result was '$result'; expected '$expected' (changed=$changed)"
+              return 1
+            fi
+          }
+
           {
             echo "## CI Summary"
             echo ""
@@ -220,10 +242,10 @@ jobs:
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # Check if any required jobs failed
-          if [[ "${{ needs.js.result }}" == "failure" ]] || \
-             [[ "${{ needs.ios.result }}" == "failure" ]] || \
-             [[ "${{ needs.ios_quality.result }}" == "failure" ]]; then
+          if [[ "${{ needs.detect-changes.result }}" != "success" ]] || \
+             ! assert_expected_result "JavaScript/TypeScript" "${{ needs.detect-changes.outputs.web }}" "${{ needs.js.result }}" || \
+             ! assert_expected_result "iOS" "${{ needs.detect-changes.outputs.ios }}" "${{ needs.ios.result }}" || \
+             ! assert_expected_result "iOS Launch Quality Gate" "${{ needs.detect-changes.outputs.ios }}" "${{ needs.ios_quality.result }}"; then
             echo "❌ One or more CI jobs failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
