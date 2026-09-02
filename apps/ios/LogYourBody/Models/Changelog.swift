@@ -3,162 +3,252 @@
 // LogYourBody
 //
 import Foundation
-import SwiftUI
 
-struct ChangelogEntry {
+/// The installed binary evidence required before a review item may be shown.
+/// This intentionally models customer-visible runtime provenance, not a PR,
+/// commit, CI run, or deployment claim.
+struct ReleaseReviewEvidence: Equatable {
+    let product: String
     let version: String
-    let date: Date
-    let changes: [Change]
+    let build: String
+    let destination: ReleaseReviewDestination
 
-    struct Change {
-        enum ChangeType {
-            case feature
-            case improvement
-            case bugfix
-            case performance
-
-            var icon: String {
-                switch self {
-                case .feature: return "sparkles"
-                case .improvement: return "arrow.up.circle.fill"
-                case .bugfix: return "ladybug.fill"
-                case .performance: return "speedometer"
-                }
-            }
-
-            var color: String {
-                switch self {
-                case .feature: return "blue"
-                case .improvement: return "green"
-                case .bugfix: return "red"
-                case .performance: return "orange"
-                }
-            }
-        }
-
-        let type: ChangeType
-        let description: String
+    func matches(version installedVersion: String, build installedBuild: String) -> Bool {
+        version == installedVersion && build == installedBuild
     }
 }
 
-class ChangelogManager {
-    static let shared = ChangelogManager()
+enum ReleaseReviewDestination: String, Equatable {
+    case timeline = "logyourbody://timeline"
 
-    private init() {}
-
-    // Add new versions at the top
-    private let hardcodedEntries: [ChangelogEntry] = [
-        ChangelogEntry(
-            version: "1.4.0",
-            date: Date(timeIntervalSince1970: 1_720_656_000), // July 11, 2025 (today)
-            changes: [
-                .init(type: .feature, description: "Fast phone verification with one-time codes"),
-                .init(type: .feature, description: "Redesigned photo carousel with 16:9 aspect ratio"),
-                .init(type: .improvement, description: "Monochrome gauge design for cleaner UI"),
-                .init(type: .improvement, description: "Lightweight date slider with snap-to-value"),
-                .init(type: .improvement, description: "Floating navigation bar without background"),
-                .init(type: .bugfix, description: "Fixed progress photo zooming issues"),
-                .init(type: .performance, description: "Optimized image loading in carousel")
-            ]
-        ),
-        ChangelogEntry(
-            version: "1.3.0",
-            date: Date(timeIntervalSince1970: 1_719_792_000), // July 1, 2025
-            changes: [
-                .init(type: .feature, description: "AI-powered background removal for progress photos"),
-                .init(type: .feature, description: "Advanced body composition analytics"),
-                .init(type: .improvement, description: "Premium dashboard UI overhaul"),
-                .init(type: .improvement, description: "Enhanced onboarding flow"),
-                .init(type: .bugfix, description: "Fixed Core Data sync issues"),
-                .init(type: .performance, description: "Faster photo processing")
-            ]
-        ),
-        ChangelogEntry(
-            version: "1.2.0",
-            date: Date(timeIntervalSince1970: 1_718_928_000), // June 21, 2025
-            changes: [
-                .init(type: .feature, description: "Import all historical data from HealthKit"),
-                .init(type: .feature, description: "What's New section in Settings"),
-                .init(type: .improvement, description: "Moved sync status banner to bottom of screen"),
-                .init(type: .improvement, description: "Bottom-justified metrics for better visibility"),
-                .init(type: .bugfix, description: "Fixed pending sync count for HealthKit imports"),
-                .init(type: .bugfix, description: "Fixed infinite sync loop"),
-                .init(type: .performance, description: "Added automatic cache clearing on app updates"),
-                .init(type: .performance, description: "Improved database optimization")
-            ]
-        ),
-        ChangelogEntry(
-            version: "1.1.0",
-            date: Date(timeIntervalSince1970: 1_717_718_400), // June 7, 2025
-            changes: [
-                .init(type: .feature, description: "Redesigned profile settings with greyscale theme"),
-                .init(type: .feature, description: "Real-time sync with cloud storage"),
-                .init(type: .improvement, description: "Enhanced HealthKit integration"),
-                .init(type: .improvement, description: "Better error handling for sync operations"),
-                .init(type: .bugfix, description: "Fixed weight unit conversion issues"),
-                .init(type: .bugfix, description: "Resolved app icon transparency for App Store")
-            ]
-        ),
-        ChangelogEntry(
-            version: "1.0.0",
-            date: Date(timeIntervalSince1970: 1_716_508_800), // May 24, 2025
-            changes: [
-                .init(type: .feature, description: "Initial release"),
-                .init(type: .feature, description: "Track body weight and body fat percentage"),
-                .init(type: .feature, description: "HealthKit integration for automatic syncing"),
-                .init(type: .feature, description: "Beautiful charts and visualizations"),
-                .init(type: .feature, description: "Secure first-party authentication"),
-                .init(type: .feature, description: "Cross-platform sync with web app")
-            ]
-        )
-    ]
-
-    /// Get all entries, ensuring the current app version is included
-    var entries: [ChangelogEntry] {
-        let currentVersion = AppVersion.current
-
-        // Check if current version already exists in hardcoded entries
-        if hardcodedEntries.first?.version == currentVersion {
-            return hardcodedEntries
+    var customerLabel: String {
+        switch self {
+        case .timeline:
+            return "Timeline"
         }
+    }
+}
 
-        // If current version is newer, add a placeholder entry
-        var allEntries = hardcodedEntries
+enum ReleaseReviewMetadataRole: Equatable {
+    case label
+    case value
+}
 
-        // Only add if current version is newer than the latest hardcoded version
-        if let latestVersion = hardcodedEntries.first?.version,
-           currentVersion.compare(latestVersion, options: NSString.CompareOptions.numeric) == .orderedDescending {
-            let placeholderEntry = ChangelogEntry(
-                version: currentVersion,
-                date: Date(),
-                changes: [
-                    .init(type: .feature, description: "New features and improvements in this version")
-                ]
+/// A typed label/value pair prevents release evidence from collapsing into an
+/// undifferentiated sentence in customer-facing UI.
+struct ReleaseReviewMetadataField: Identifiable, Equatable {
+    let id: String
+    let label: String
+    let value: String
+    let labelRole: ReleaseReviewMetadataRole
+    let valueRole: ReleaseReviewMetadataRole
+
+    init(
+        id: String,
+        label: String,
+        value: String,
+        labelRole: ReleaseReviewMetadataRole = .label,
+        valueRole: ReleaseReviewMetadataRole = .value
+    ) {
+        self.id = id
+        self.label = label
+        self.value = value
+        self.labelRole = labelRole
+        self.valueRole = valueRole
+    }
+}
+
+struct ReleaseReviewItem: Identifiable, Equatable {
+    let id: String
+    let evidence: ReleaseReviewEvidence
+    let title: String
+    let summary: String
+    let symbolName: String
+    let actionTitle: String
+    let adjacentActionDescription: String?
+
+    init(
+        id: String,
+        evidence: ReleaseReviewEvidence,
+        title: String,
+        summary: String,
+        symbolName: String,
+        actionTitle: String,
+        adjacentActionDescription: String? = nil
+    ) {
+        self.id = id
+        self.evidence = evidence
+        self.title = title
+        self.summary = summary
+        self.symbolName = symbolName
+        self.actionTitle = actionTitle
+        self.adjacentActionDescription = adjacentActionDescription
+    }
+
+    /// Stable across later builds so an already-reviewed change does not
+    /// become new again merely because the binary was rebuilt.
+    var reviewToken: String {
+        "\(evidence.product):\(id)"
+    }
+
+    /// Exact installed-build identity retained separately from lifecycle state.
+    var evidenceToken: String {
+        "\(reviewToken)@\(evidence.version)+\(evidence.build)#\(evidence.destination.rawValue)"
+    }
+}
+
+enum ReleaseReviewCatalog {
+    static func metadata(for evidence: ReleaseReviewEvidence) -> [ReleaseReviewMetadataField] {
+        [
+            ReleaseReviewMetadataField(id: "version", label: "Version", value: evidence.version),
+            ReleaseReviewMetadataField(id: "build", label: "Build", value: evidence.build)
+        ]
+    }
+
+    /// Items compiled into this app line. The release evidence is taken from
+    /// the installed bundle, so a surfaced item always names the exact binary
+    /// the customer is using. Distribution remains a separate release proof.
+    static func items(version: String, build: String) -> [ReleaseReviewItem] {
+        [
+            ReleaseReviewItem(
+                id: "photo-timeline-review",
+                evidence: ReleaseReviewEvidence(
+                    product: "logyourbody",
+                    version: version,
+                    build: build,
+                    destination: .timeline
+                ),
+                title: "Your progress, in one place",
+                summary: "Review photos, weight, and body-fat context together on your timeline.",
+                symbolName: "rectangle.stack",
+                actionTitle: "Open timeline"
             )
-            allEntries.insert(placeholderEntry, at: 0)
+        ]
+    }
+}
+
+enum ReleaseReviewContentViolation: Equatable {
+    case mergedMetadataSemantics(fieldID: String)
+    case redundantAdjacentAction(itemID: String)
+}
+
+enum ReleaseReviewContentPolicy {
+    static func violations(
+        metadata: [ReleaseReviewMetadataField],
+        items: [ReleaseReviewItem]
+    ) -> [ReleaseReviewContentViolation] {
+        let metadataViolations: [ReleaseReviewContentViolation] = metadata.compactMap { field in
+            field.labelRole == field.valueRole
+                ? .mergedMetadataSemantics(fieldID: field.id)
+                : nil
         }
-
-        return allEntries
-    }
-
-    /// Get changelog entries since a specific version
-    func entriesSince(version: String) -> [ChangelogEntry] {
-        guard let index = entries.firstIndex(where: { $0.version == version }) else {
-            return entries // Return all if version not found
+        let actionViolations: [ReleaseReviewContentViolation] = items.compactMap { item in
+            hasRedundantAdjacentActionCopy(item)
+                ? .redundantAdjacentAction(itemID: item.id)
+                : nil
         }
-        return Array(entries.prefix(index))
+        return metadataViolations + actionViolations
     }
 
-    /// Check if there are new updates since last viewed version
-    func hasNewUpdates() -> Bool {
-        let lastViewedVersion = UserDefaults.standard.string(forKey: Constants.lastViewedChangelogVersionKey) ?? "0.0.0"
-        return entries.first?.version != lastViewedVersion
+    private static func hasRedundantAdjacentActionCopy(_ item: ReleaseReviewItem) -> Bool {
+        guard let description = item.adjacentActionDescription else { return false }
+
+        let normalizedDescription = normalize(description)
+        let normalizedAction = normalize(item.actionTitle)
+        let normalizedDestination = normalize(item.evidence.destination.customerLabel)
+        let repeatsAction = normalizedDescription.contains(normalizedAction)
+        let repeatsOpenDestination = normalizedDescription.contains("open \(normalizedDestination)")
+
+        return repeatsAction || repeatsOpenDestination
     }
 
-    /// Mark changelog as viewed
-    func markAsViewed() {
-        if let latestVersion = entries.first?.version {
-            UserDefaults.standard.set(latestVersion, forKey: Constants.lastViewedChangelogVersionKey)
+    private static func normalize(_ value: String) -> String {
+        let words = value
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .map { $0 == "opens" ? "open" : $0 }
+        return words.joined(separator: " ")
+    }
+}
+
+struct ReleaseReviewState: Equatable {
+    var seenEvidenceTokens: Set<String> = []
+    var reviewedTokens: Set<String> = []
+
+    mutating func recordSeen(_ item: ReleaseReviewItem) {
+        seenEvidenceTokens.insert(item.evidenceToken)
+    }
+
+    mutating func recordReviewed(_ item: ReleaseReviewItem) {
+        recordSeen(item)
+        reviewedTokens.insert(item.reviewToken)
+    }
+
+    func hasSeen(_ item: ReleaseReviewItem) -> Bool {
+        seenEvidenceTokens.contains(item.evidenceToken)
+    }
+
+    func hasReviewed(_ item: ReleaseReviewItem) -> Bool {
+        reviewedTokens.contains(item.reviewToken)
+    }
+}
+
+final class ReleaseReviewStateStore {
+    private enum Key {
+        static let seen = "lyb.releaseReview.seenEvidenceTokens"
+        static let reviewed = "lyb.releaseReview.reviewedTokens"
+    }
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    var state: ReleaseReviewState {
+        ReleaseReviewState(
+            seenEvidenceTokens: Set(defaults.stringArray(forKey: Key.seen) ?? []),
+            reviewedTokens: Set(defaults.stringArray(forKey: Key.reviewed) ?? [])
+        )
+    }
+
+    func recordSeen(_ item: ReleaseReviewItem) {
+        var updatedState = state
+        updatedState.recordSeen(item)
+        persist(updatedState)
+    }
+
+    func recordReviewed(_ item: ReleaseReviewItem) {
+        var updatedState = state
+        updatedState.recordReviewed(item)
+        persist(updatedState)
+    }
+
+    func reset() {
+        defaults.removeObject(forKey: Key.seen)
+        defaults.removeObject(forKey: Key.reviewed)
+    }
+
+    private func persist(_ state: ReleaseReviewState) {
+        defaults.set(state.seenEvidenceTokens.sorted(), forKey: Key.seen)
+        defaults.set(state.reviewedTokens.sorted(), forKey: Key.reviewed)
+    }
+}
+
+enum ReleaseReviewPresentationPolicy {
+    static func pendingItems(
+        from items: [ReleaseReviewItem],
+        installedVersion: String,
+        installedBuild: String,
+        reviewedTokens: Set<String>,
+        isEligible: Bool
+    ) -> [ReleaseReviewItem] {
+        guard isEligible else { return [] }
+
+        return items.filter { item in
+            item.evidence.matches(version: installedVersion, build: installedBuild) &&
+                !reviewedTokens.contains(item.reviewToken)
         }
     }
 }

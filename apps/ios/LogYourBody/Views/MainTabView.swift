@@ -10,20 +10,36 @@ struct MainTabView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     @State private var selectedSurface: PaidAppSurface = PaidAppSurfacePolicy.surface()
+    @Binding private var releaseReviewDestination: ReleaseReviewDestination?
+
+    init(releaseReviewDestination: Binding<ReleaseReviewDestination?> = .constant(nil)) {
+        _releaseReviewDestination = releaseReviewDestination
+    }
 
     var body: some View {
         NavigationStack {
             switch selectedSurface {
             case .photoTimelineHUD:
-                DashboardViewLiquid(layoutMode: .photoTimelineHUD)
+                DashboardViewLiquid(
+                    layoutMode: .photoTimelineHUD,
+                    releaseReviewDestination: $releaseReviewDestination
+                )
             case .legacyFullDashboardBeta:
-                DashboardViewLiquid(layoutMode: .legacyTabbed)
+                DashboardViewLiquid(
+                    layoutMode: .legacyTabbed,
+                    releaseReviewDestination: $releaseReviewDestination
+                )
             case .weightLoggerMVP:
                 PaidWeightLoggerMVPView()
             }
         }
         .onAppear {
             updateSelectedSurface()
+        }
+        .onChange(of: releaseReviewDestination) { _, destination in
+            if destination == .timeline {
+                selectedSurface = .photoTimelineHUD
+            }
         }
     }
 

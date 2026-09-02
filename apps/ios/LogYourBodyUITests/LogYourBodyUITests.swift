@@ -32,8 +32,7 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = [
             "-lybUITestPhotoTimelineHUDFixture",
-            "-lyb.whatsNew.lastPresentedVersion",
-            "0"
+            "-lybUITestResetWhatsNewReviewState"
         ]
         app.launch()
 
@@ -41,8 +40,36 @@ final class LogYourBodyUITests: XCTestCase {
             app.descendants(matching: .any)["world_class_screen_whatsNew"]
                 .waitForExistence(timeout: 20)
         )
-        XCTAssertTrue(app.staticTexts["A clearer view of progress."].exists)
-        XCTAssertTrue(app.buttons["Done"].isHittable)
+        XCTAssertTrue(app.staticTexts["What’s New"].exists)
+        XCTAssertTrue(app.staticTexts["Your progress, in one place"].exists)
+        XCTAssertTrue(app.staticTexts["whats-new-metadata-version-label"].exists)
+        XCTAssertTrue(app.staticTexts["whats-new-metadata-version-value"].exists)
+        XCTAssertTrue(app.staticTexts["whats-new-metadata-build-label"].exists)
+        XCTAssertTrue(app.staticTexts["whats-new-metadata-build-value"].exists)
+        XCTAssertFalse(app.staticTexts["Opens Timeline"].exists)
+        attachScreenshot(named: "whats-new-corrected-hierarchy", from: app)
+
+        let reviewButton = app.buttons["whats-new-review-photo-timeline-review"]
+        XCTAssertTrue(reviewButton.isHittable)
+        reviewButton.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["photo_timeline_root_page_timeline"]
+                .waitForExistence(timeout: 8)
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["world_class_screen_whatsNew"].exists)
+
+        app.terminate()
+        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
+        app.launch()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["photo_timeline_root_page_timeline"]
+                .waitForExistence(timeout: 8)
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["world_class_screen_whatsNew"].exists,
+            "A reviewed item must not reappear on the next app open."
+        )
     }
 
     func testPaidMVPWeightEntrySavesWithKeyboardOpen() throws {

@@ -80,8 +80,10 @@ struct ContentView: View {
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
     @State private var showWhatsNew = false
-    @AppStorage("lyb.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion: String?
+    @State private var releaseReviewItems: [ReleaseReviewItem] = []
+    @State private var releaseReviewDestination: ReleaseReviewDestination?
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
+    private let releaseReviewStateStore = ReleaseReviewStateStore()
 
     private var suppressWhatsNewForUITests: Bool {
         ProcessInfo.processInfo.arguments.contains("-lybUITestSuppressWhatsNew")
@@ -93,8 +95,18 @@ struct ContentView: View {
         _loadingManager = StateObject(wrappedValue: LoadingManager(authManager: AuthManager.shared))
     }
 
-    private func markWhatsNewPresented() {
-        lastPresentedWhatsNewVersion = AppVersion.current
+    private var currentReleaseReviewCatalog: [ReleaseReviewItem] {
+        ReleaseReviewCatalog.items(version: AppVersion.current, build: AppVersion.build)
+    }
+
+    private func markReleaseReviewSeen() {
+        releaseReviewItems.forEach(releaseReviewStateStore.recordSeen)
+    }
+
+    private func reviewReleaseItem(_ item: ReleaseReviewItem) {
+        releaseReviewStateStore.recordReviewed(item)
+        releaseReviewDestination = item.evidence.destination
+        showWhatsNew = false
     }
 
     private func applyProfileCompletionIfNeeded(_ completionFlag: Bool?) {
@@ -164,8 +176,12 @@ struct ContentView: View {
             )
             .interactiveDismissDisabled(true) // Prevent dismissing without accepting
         }
-        .sheet(isPresented: $showWhatsNew, onDismiss: markWhatsNewPresented) {
-            LogYourBodyWhatsNewView(version: AppVersion.current)
+        .sheet(isPresented: $showWhatsNew) {
+            LogYourBodyWhatsNewView(
+                items: releaseReviewItems,
+                onSeen: markReleaseReviewSeen,
+                onReview: reviewReleaseItem
+            )
         }
         .onAppear {
             // Initialize onboarding status
@@ -188,12 +204,17 @@ struct ContentView: View {
                 isLoadingComplete &&
                 hasCompletedOnboarding &&
                 !shouldShowProfileCompletion &&
+                subscriptionManager.isSubscribed &&
+                !shouldShowDailyReminderPrompt &&
                 !suppressWhatsNewForUITests
-            showWhatsNew = WhatsNewPresentationPolicy.shouldPresent(
-                currentVersion: AppVersion.current,
-                lastPresentedVersion: lastPresentedWhatsNewVersion,
+            releaseReviewItems = ReleaseReviewPresentationPolicy.pendingItems(
+                from: currentReleaseReviewCatalog,
+                installedVersion: AppVersion.current,
+                installedBuild: AppVersion.build,
+                reviewedTokens: releaseReviewStateStore.state.reviewedTokens,
                 isEligible: isEligible
             )
+            showWhatsNew = !releaseReviewItems.isEmpty
         }
         .onChange(of: loadingManager.isLoading) { _, _ in
             completeLaunchOverlayIfReady()
@@ -273,7 +294,7 @@ struct ContentView: View {
             } else if shouldShowDailyReminderPrompt {
                 DailyWeighInReminderPromptView(notificationManager: notificationManager)
             } else {
-                MainTabView()
+                MainTabView(releaseReviewDestination: $releaseReviewDestination)
                     .onAppear {
                         AppServicePorts.analyticsTracker.track(event: "dashboard_view")
                     }
@@ -312,61 +333,108 @@ struct ContentView: View {
     }
 }
 
-struct WhatsNewPresentationPolicy {
-    static func shouldPresent(
-        currentVersion: String,
-        lastPresentedVersion: String?,
-        isEligible: Bool
-    ) -> Bool {
-        isEligible && currentVersion != lastPresentedVersion
-    }
-}
-
-private struct LogYourBodyWhatsNewView: View {
-    let version: String
+struct LogYourBodyWhatsNewView: View {
+    let items: [ReleaseReviewItem]
+    let onSeen: () -> Void
+    let onReview: (ReleaseReviewItem) -> Void
     @Environment(\.dismiss) private var dismiss
+
+    private var releaseEvidence: ReleaseReviewEvidence? {
+        items.first?.evidence
+    }
+
+    private var releaseMetadata: [ReleaseReviewMetadataField] {
+        releaseEvidence.map(ReleaseReviewCatalog.metadata) ?? []
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
-            HStack {
-                VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
-                    Text("A clearer view of progress.")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(Color.appTextPrimary)
-                    Text("Version \(version)")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.appTextSecondary)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("What’s New")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(Color.appTextPrimary)
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: JovieTokens.itemGap) {
+                        releaseMetadataFields
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        releaseMetadataFields
+                    }
                 }
-                Spacer()
-                Image(systemName: "sparkles")
-                    .font(.title2)
-                    .foregroundStyle(Color.appPrimary)
-                    .accessibilityHidden(true)
+                .padding(.top, 4)
+
+                Text("See what changed in this build.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.appTextTertiary)
+                    .padding(.top, JovieTokens.tightGap)
             }
 
-            VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
-                Label("Body Score now explains what changed and why it matters.", systemImage: "chart.line.uptrend.xyaxis")
-                Label("Metric detail separates measured and interpolated values.", systemImage: "waveform.path.ecg")
-                Label("Settings puts privacy, exports, and recovery in one scan.", systemImage: "hand.raised")
+            VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
+                ForEach(items) { item in
+                    VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+                        Label(item.title, systemImage: item.symbolName)
+                            .font(.headline)
+                            .foregroundStyle(Color.appTextPrimary)
+
+                        Text(item.summary)
+                            .font(.body)
+                            .foregroundStyle(Color.appTextSecondary)
+
+                        StandardButton(item.actionTitle) {
+                            onReview(item)
+                        }
+                        .accessibilityIdentifier("whats-new-review-\(item.id)")
+                    }
+                }
             }
-            .font(.body)
-            .foregroundStyle(Color.appTextSecondary)
 
             Spacer(minLength: 0)
 
-            StandardButton("Done") {
+            Button("Not now") {
                 dismiss()
             }
-            .accessibilityIdentifier("whats-new-done")
+            .font(.body.weight(.semibold))
+            .foregroundStyle(Color.appTextSecondary)
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("whats-new-not-now")
         }
         .padding(JovieTokens.screenInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.appBackground)
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("What’s New, version \(version)")
+        .accessibilityLabel("What’s New")
+        .onAppear(perform: onSeen)
         .worldClassScreen(.whatsNew)
+    }
+
+    @ViewBuilder
+    private var releaseMetadataFields: some View {
+        ForEach(releaseMetadata) { field in
+            ReleaseReviewMetadataFieldView(field: field)
+        }
+    }
+}
+
+private struct ReleaseReviewMetadataFieldView: View {
+    let field: ReleaseReviewMetadataField
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(field.label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.appTextTertiary)
+                .accessibilityIdentifier("whats-new-metadata-\(field.id)-label")
+
+            Text(field.value)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(Color.appTextSecondary)
+                .accessibilityIdentifier("whats-new-metadata-\(field.id)-value")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(field.label) \(field.value)")
     }
 }
 
