@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "repository": "JovieInc/LogYourBody",
+  "target_ref": "refs/heads/main",
+  "required_status_check": "CI Summary",
+  "merge_queue": {
+    "required": true,
+    "merge_method": "MERGE",
+    "max_entries_to_build": 5,
+    "min_entries_to_merge": 1,
+    "max_entries_to_merge": 5,
+    "min_entries_to_merge_wait_minutes": 5,
+    "grouping_strategy": "ALLGREEN",
+    "check_response_timeout_minutes": 60
+  },
+  "auto_enrollment": {
+    "workflow": ".github/workflows/native-merge-queue.yml",
+    "certification_label": "machine-certified",
+    "exact_head_required": true,
+    "same_repository_only": true,
+    "drafts_allowed": false
+  }
+}

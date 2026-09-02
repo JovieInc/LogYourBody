@@ -1,0 +1,97 @@
+name: Native Merge Queue Enrollment
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: native-merge-queue-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  enroll:
+    name: Enroll exact certified head
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enqueue eligible pull request
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const recordOutcome = async (status, reason, details = '') => {
+              core.notice(`${status}: ${reason}${details ? ` (${details})` : ''}`);
+              await core.summary
+                .addHeading('Native merge queue enrollment')
+                .addTable([
+                  [{ data: 'Status', header: true }, status],
+                  [{ data: 'Reason', header: true }, reason],
+                  [{ data: 'CI head', header: true }, run.head_sha],
+                  [{ data: 'Details', header: true }, details || 'none'],
+                ])
+                .write();
+            };
+
+            if (run.conclusion !== 'success') {
+              await recordOutcome('NOT_ELIGIBLE', 'CI did not pass', run.conclusion);
+              return;
+            }
+
+            if (run.pull_requests.length !== 1) {
+              await recordOutcome(
+                'NOT_ELIGIBLE',
+                'CI run did not resolve to exactly one pull request',
+                `count=${run.pull_requests.length}`,
+              );
+              return;
+            }
+
+            const associated = run.pull_requests[0];
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: associated.number,
+            });
+
+            if (pull.base.ref !== 'main' || pull.draft || pull.state !== 'open') {
+              await recordOutcome('NOT_ELIGIBLE', 'Pull request is not open and ready for main');
+              return;
+            }
+            if (pull.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              await recordOutcome('NOT_ELIGIBLE', 'Fork pull requests cannot auto-enroll');
+              return;
+            }
+            if (pull.head.sha !== run.head_sha) {
+              await recordOutcome('STALE', 'Exact-head CI proof no longer matches the PR', pull.head.sha);
+              return;
+            }
+            if (!pull.labels.some(({ name }) => name === 'machine-certified')) {
+              await recordOutcome('NOT_ELIGIBLE', 'The machine-certified label is absent');
+              return;
+            }
+
+            const result = await github.graphql(`
+              mutation Enqueue($pullRequestId: ID!, $expectedHeadOid: GitObjectID!) {
+                enqueuePullRequest(input: {
+                  pullRequestId: $pullRequestId
+                  expectedHeadOid: $expectedHeadOid
+                }) {
+                  mergeQueueEntry { id position }
+                }
+              }
+            `, {
+              pullRequestId: pull.node_id,
+              expectedHeadOid: pull.head.sha,
+            });
+
+            await recordOutcome(
+              'ENQUEUED',
+              `Pull request #${pull.number} entered the repository-native queue`,
+              `entry=${result.enqueuePullRequest.mergeQueueEntry.id} position=${result.enqueuePullRequest.mergeQueueEntry.position}`,
+            );

@@ -18,8 +18,14 @@ if (!ci.includes("github.ref == 'refs/heads/main'")) {
 if (!ci.includes('github.sha')) {
   failures.push('ci.yml must key main-branch concurrency by github.sha.');
 }
-if (!ci.includes("cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}")) {
-  failures.push('ci.yml must keep PR cancellation while preserving main runs.');
+if (
+  !ci.includes(
+    "cancel-in-progress: ${{ github.event_name != 'merge_group' && github.ref != 'refs/heads/main' }}",
+  )
+) {
+  failures.push(
+    'ci.yml must keep PR cancellation while preserving main and merge-group runs.',
+  );
 }
 if (!ci.includes('node .github/scripts/verify-workflow-concurrency.mjs')) {
   failures.push('ci.yml must run the workflow concurrency verifier.');
