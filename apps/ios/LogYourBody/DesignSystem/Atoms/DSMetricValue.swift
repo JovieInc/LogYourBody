@@ -10,7 +10,7 @@ import SwiftUI
 struct DSMetricValue: View {
     let value: String
     let unit: String?
-    var size: Font = Font.jovieDisplay
+    var size: Font = .jovieDisplay
     var color: Color = .appText
     var unitSize: Font = .system(size: 16, weight: .medium)
     var spacing: CGFloat = 2
