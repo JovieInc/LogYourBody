@@ -223,7 +223,7 @@ private struct ChangeItem: View {
 
     private var changeColor: Color {
         guard let isPositive = isPositive else { return .appTextSecondary }
-        return isPositive ? .green : .red
+        return isPositive ? Color.appSuccess : Color.appError
     }
 
     private var changeIcon: String {

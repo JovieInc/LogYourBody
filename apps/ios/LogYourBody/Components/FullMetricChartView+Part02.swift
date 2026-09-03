@@ -175,7 +175,7 @@ func sourceLabel(for source: MetricEntrySourceType) -> String {
         case .healthKit:
             Image(systemName: "heart.fill")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.red)
+                .foregroundColor(Color.appError)
         case .manual:
             Image("AppIcon")
                 .resizable()

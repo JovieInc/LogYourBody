@@ -223,7 +223,7 @@ struct ErrorView: View {
             // Error icon
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.red)
+                .foregroundColor(Color.appError)
                 .padding(.bottom, 8)
 
             // Error message

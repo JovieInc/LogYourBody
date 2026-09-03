@@ -194,7 +194,7 @@ struct BodySpecIntegrationView: View {
 
     private var connectionTint: Color {
         if !isConfigured { return Color.appWarning }
-        return isConnected ? .green : .secondary
+        return isConnected ? Color.appSuccess : .secondary
     }
 
     private var connectionTitle: String {

@@ -149,7 +149,7 @@ struct ErrorBanner: ViewModifier {
                 }
                 .foregroundColor(.white)
                 .padding(12)
-                .background(Color.red)
+                .background(Color.appError)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
 
