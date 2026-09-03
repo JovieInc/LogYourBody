@@ -24,6 +24,16 @@ final class JovieTokensTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(JovieTokens.controlHeight, JovieTokens.minimumHitTarget)
     }
 
+    func testLockedAtomsStayLocked() {
+        // native-swift-locked-atoms-v1: ActionButton 32 / 510 / r999, type 28 / 620.
+        XCTAssertEqual(JovieTokens.actionControlHeight, 32)
+        XCTAssertEqual(JovieTokens.actionLabelWeight, .medium)
+        XCTAssertEqual(JovieTokens.actionRadius, 999)
+        XCTAssertEqual(JovieTokens.displayTypeSize, 28)
+        XCTAssertEqual(JovieTokens.displayTypeWeight, .semibold)
+        XCTAssertGreaterThanOrEqual(JovieTokens.minimumHitTarget, 44)
+    }
+
     func testMotionAndHairlineTokensStayStable() {
         XCTAssertEqual(JovieTokens.hairlineOpacity, 0.72)
         XCTAssertEqual(JovieTokens.ambientAccentOpacity, 0.08)

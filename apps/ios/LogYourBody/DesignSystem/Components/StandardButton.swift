@@ -22,11 +22,8 @@ enum ButtonSize {
     case large
 
     var height: CGFloat {
-        switch self {
-        case .small: return 36
-        case .medium: return 44
-        case .large: return 56
-        }
+        // Locked ActionButton atom: one 32pt visible height for the CTA family.
+        JovieTokens.actionControlHeight
     }
 
     var horizontalPadding: CGFloat {

@@ -394,7 +394,7 @@ extension DashboardViewLiquid {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Start with a photo")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(Font.jovieDisplay)
                         .foregroundColor(theme.colors.text)
 
                     Text("Add a progress photo or weight entry to build your body-composition timeline.")
