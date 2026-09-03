@@ -129,7 +129,7 @@ extension PreferencesView {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(subscriptionManager.isSubscribed ? Color.green : Color.orange)
+                            .fill(subscriptionManager.isSubscribed ? Color.appSuccess : Color.appWarning)
                             .frame(width: 8, height: 8)
 
                         Text(subscriptionStatusText)
@@ -147,7 +147,7 @@ extension PreferencesView {
             } else {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(subscriptionManager.isSubscribed ? Color.green : Color.orange)
+                        .fill(subscriptionManager.isSubscribed ? Color.appSuccess : Color.appWarning)
                         .frame(width: 8, height: 8)
 
                     Text(subscriptionStatusText)

@@ -100,7 +100,7 @@ struct IntegrationsView: View {
                             icon: "arrow.triangle.2.circlepath",
                             title: isSyncingHealthKit ? "Syncing historical data" : "Sync all historical data",
                             subtitle: healthSyncStatusMessage,
-                            subtitleColor: healthSyncStatusIsError ? .red : nil,
+                            subtitleColor: healthSyncStatusIsError ? Color.appError : nil,
                             showChevron: false
                         )
                     }
@@ -139,7 +139,7 @@ struct IntegrationsView: View {
     private var appleHealthConnectionRow: some View {
         HStack(spacing: 12) {
             Image(systemName: "heart.fill")
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.appError)
                 .frame(width: 24)
                 .accessibilityHidden(true)
 
@@ -155,7 +155,7 @@ struct IntegrationsView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 Image(systemName: "heart.fill")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.appError)
                     .frame(width: 24)
                     .accessibilityHidden(true)
 

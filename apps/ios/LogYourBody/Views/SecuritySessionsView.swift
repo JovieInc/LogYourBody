@@ -238,7 +238,7 @@ struct SessionRowView: View {
                     if !session.isCurrentSession {
                         Button(action: onRevoke) {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Color.appError)
                         }
                         .buttonStyle(.borderless)
                     } else if !session.ipAddress.isEmpty {
@@ -282,7 +282,7 @@ struct SessionRowView: View {
     }
 
     private var iconColor: Color {
-        session.isCurrentSession ? .green : .accentColor
+        session.isCurrentSession ? Color.appSuccess : .accentColor
     }
 
     private var iconBackgroundColor: Color {

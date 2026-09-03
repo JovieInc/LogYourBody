@@ -22,9 +22,9 @@ struct DSTrendIndicator: View {
         func color(for trend: Double) -> Color {
             switch self {
             case .positive:
-                return trend > 0 ? .green : (trend < 0 ? .red : .appTextSecondary)
+                return trend > 0 ? Color.appSuccess : (trend < 0 ? Color.appError : .appTextSecondary)
             case .negative:
-                return trend < 0 ? .green : (trend > 0 ? .red : .appTextSecondary)
+                return trend < 0 ? Color.appSuccess : (trend > 0 ? Color.appError : .appTextSecondary)
             case .neutral:
                 return .appTextSecondary
             }

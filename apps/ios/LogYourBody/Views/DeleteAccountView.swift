@@ -108,7 +108,7 @@ struct DeleteAccountView: View {
                 if let confirmationValidationMessage {
                     Label(confirmationValidationMessage, systemImage: "exclamationmark.circle.fill")
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.appError)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("delete_account_confirmation_error")
                 }

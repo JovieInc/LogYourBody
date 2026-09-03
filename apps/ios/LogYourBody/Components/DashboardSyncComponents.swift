@@ -95,7 +95,7 @@ struct DashboardSyncDetailsSheet: View {
                     Section(header: Text("Last Error")) {
                         Text(error)
                             .font(.footnote)
-                            .foregroundColor(.red)
+                            .foregroundColor(Color.appError)
                     }
                 }
             }
@@ -193,7 +193,7 @@ struct DashboardSyncDetailsSheet: View {
                 Text("Authorization")
                 Spacer()
                 Text(healthKitManager.isAuthorized ? "Authorized" : "Not authorized")
-                    .foregroundColor(healthKitManager.isAuthorized ? .green : .orange)
+                    .foregroundColor(healthKitManager.isAuthorized ? Color.appSuccess : Color.appWarning)
             }
 
             if healthKitManager.isImporting {

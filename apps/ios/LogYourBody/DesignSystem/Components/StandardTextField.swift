@@ -246,7 +246,7 @@ struct TextArea: View {
                         Text(error)
                             .font(.caption)
                     }
-                    .foregroundColor(.red)
+                    .foregroundColor(Color.appError)
                 }
 
                 Spacer()
@@ -256,7 +256,7 @@ struct TextArea: View {
                     Text("\(text.count)/\(limit)")
                         .font(.caption2)
                         .foregroundColor(
-                            text.count > limit ? .red : Color.secondary.opacity(0.6)
+                            text.count > limit ? Color.appError : Color.secondary.opacity(0.6)
                         )
                 }
             }
