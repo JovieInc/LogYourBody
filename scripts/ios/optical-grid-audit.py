@@ -42,7 +42,9 @@ RAW_HEX = re.compile(r'Color\(hex:\s*"#')
 SYSTEM_COLOR = re.compile(
     r"(\bColor\.|(?<![\w.])\.)(green|orange|blue|purple|red|yellow|mint|teal|cyan|indigo|pink)\b"
 )
-SYSTEM_COLOR_EXCLUDE = re.compile(r"UIColor|\(red:|components\.|\.(red|green|blue)\s*[:=]|\.red\)$")
+SYSTEM_COLOR_EXCLUDE = re.compile(
+    r"UIColor|\(red:|components\.|case\s+\.(red|green|blue|orange|yellow|purple|pink|teal)\b|\.(red|green|blue)\s*=[^=]"
+)
 DISPLAY_WEIGHT = re.compile(r"size:\s*28,\s*weight:\s*\.bold\b")
 
 
