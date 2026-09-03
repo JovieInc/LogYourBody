@@ -9,8 +9,8 @@ a slice has intentionally removed drift (the baseline must never grow).
 Detector classes (native D4 "second scale" from the reviewed invariant):
 - spacing_scale     `.padding(N)` / `.padding(.edge, N)` / `spacing: N` where N is
                     not on the 4px scale (0, 1, 2 hairlines allowed).
-- radius_scale      `cornerRadius: N` / `.cornerRadius(N)` off the 4px scale
-                    (0, 2 hairline and 999 pill allowed).
+- radius_scale      `cornerRadius: N` / `.cornerRadius(N)` off the System B radius
+                    scale (2/4/10/14/48) and 4px grid; 0/1 hairline, 999 pill allowed.
 - raw_hex_color     `Color(hex: "...")` outside the two token homes.
 - system_color      raw SwiftUI system colours (.green/.red/.orange/...) instead of
                     palette tokens (palette-core-accents-v1: success is blue).
@@ -58,8 +58,12 @@ def on_spacing_scale(value: float) -> bool:
     return value in (0, 1, 2) or value % 4 == 0
 
 
+# System B radius scale (2/4/10/14/48) plus the 4px grid; 0/1 hairlines, 999 pill.
+RADIUS_SCALE = {0, 1, 2, 10, 14, 999}
+
+
 def on_radius_scale(value: float) -> bool:
-    return value in (0, 2, 999) or value % 4 == 0
+    return value in RADIUS_SCALE or value % 4 == 0
 
 
 def scan(root: Path) -> list[Finding]:
