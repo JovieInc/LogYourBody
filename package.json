@@ -30,7 +30,6 @@
     "ios:ettrace-profile": "bash scripts/ios/ettrace-profile.sh",
     "ios:quality-gate": "bash scripts/ios/quality-gate.sh",
     "ios:verify-ui": "bash scripts/ios/verify-ui.sh",
-    "ios:optical-grid-audit": "python3 scripts/ios/optical-grid-audit.py",
     "product:generate": "pnpm --filter @jovieinc/product-registry generate",
     "product:check": "pnpm --filter @jovieinc/product-registry test",
     "check:vendor-boundaries": "node scripts/check-vendor-boundaries.js",

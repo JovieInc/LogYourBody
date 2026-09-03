@@ -99,7 +99,10 @@ def counts_by_file(findings: list[Finding]) -> dict[str, dict[str, int]]:
 def load_baseline(path: Path) -> dict[str, dict[str, int]]:
     if not path.exists():
         return {}
-    payload = json.loads(path.read_text())
+    text = path.read_text().strip()
+    if not text:
+        return {}
+    payload = json.loads(text)
     return payload.get("counts", {})
 
 
