@@ -174,7 +174,7 @@ struct SettingsSectionBuilder {
             SettingsActionRow(
                 icon: "trash",
                 title: "Delete Account",
-                tintColor: .red,
+                tintColor: Color.appError,
                 action: onDeleteAccount
             )
         }

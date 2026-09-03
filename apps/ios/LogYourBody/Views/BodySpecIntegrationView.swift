@@ -116,7 +116,7 @@ struct BodySpecIntegrationView: View {
                     icon: "checkmark.circle",
                     title: "Sync complete",
                     description: lastSyncSummary,
-                    iconColor: .green
+                    iconColor: Color.appSuccess
                 )
             }
         }
@@ -139,7 +139,7 @@ struct BodySpecIntegrationView: View {
                     icon: "exclamationmark.triangle",
                     title: "Couldn’t load scans",
                     description: recentScansError,
-                    iconColor: .orange
+                    iconColor: Color.appWarning
                 )
 
                 Button {
@@ -174,7 +174,7 @@ struct BodySpecIntegrationView: View {
                 icon: "exclamationmark.triangle",
                 title: "BodySpec couldn’t finish",
                 description: message,
-                iconColor: .red
+                iconColor: Color.appError
             )
 
             if recoveryAction != nil {
@@ -193,7 +193,7 @@ struct BodySpecIntegrationView: View {
     }
 
     private var connectionTint: Color {
-        if !isConfigured { return .orange }
+        if !isConfigured { return Color.appWarning }
         return isConnected ? .green : .secondary
     }
 

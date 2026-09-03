@@ -61,13 +61,13 @@ struct DashboardSyncBanner: View {
         switch style {
         case .error:
             return LinearGradient(
-                colors: [Color.red.opacity(0.9), Color.red.opacity(0.7)],
+                colors: [Color.appError.opacity(0.9), Color.appError.opacity(0.7)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
         case .success:
             return LinearGradient(
-                colors: [Color.green.opacity(0.85), Color.green.opacity(0.7)],
+                colors: [Color.appSuccess.opacity(0.85), Color.appSuccess.opacity(0.7)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
@@ -290,8 +290,8 @@ struct DashboardSyncDetailsSheet: View {
 
     private var statusColor: Color {
         switch syncManager.syncStatus {
-        case .error: .red
-        case .offline: .orange
+        case .error: Color.appError
+        case .offline: Color.appWarning
         case .success, .syncing, .idle: .primary
         }
     }

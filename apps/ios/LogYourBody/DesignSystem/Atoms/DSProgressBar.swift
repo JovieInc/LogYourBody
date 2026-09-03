@@ -80,13 +80,13 @@ struct DSProgressBar: View {
             )
             DSProgressBar(
                 progress: 0.5,
-                backgroundColor: .red.opacity(0.2),
-                foregroundColor: .red
+                backgroundColor: Color.appError.opacity(0.2),
+                foregroundColor: Color.appError
             )
             DSProgressBar(
                 progress: 0.9,
-                backgroundColor: .green.opacity(0.2),
-                foregroundColor: .green
+                backgroundColor: Color.appSuccess.opacity(0.2),
+                foregroundColor: Color.appSuccess
             )
         }
     }

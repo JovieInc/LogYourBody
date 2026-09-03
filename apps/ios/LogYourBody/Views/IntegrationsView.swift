@@ -114,7 +114,7 @@ struct IntegrationsView: View {
                     icon: "exclamationmark.triangle",
                     title: "Apple Health isn’t available",
                     description: "This device doesn’t support Apple Health.",
-                    iconColor: .orange
+                    iconColor: Color.appWarning
                 )
             }
 
@@ -172,7 +172,7 @@ struct IntegrationsView: View {
         if healthKitManager.isAuthorized {
             Label("Connected", systemImage: "checkmark.circle.fill")
                 .font(.subheadline)
-                .foregroundStyle(.green)
+                .foregroundStyle(Color.appSuccess)
                 .labelStyle(.titleAndIcon)
                 .accessibilityLabel("Apple Health connected")
         } else {

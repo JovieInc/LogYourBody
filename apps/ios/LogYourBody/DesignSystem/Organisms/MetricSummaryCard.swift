@@ -565,7 +565,7 @@ struct MetricCardButtonStyle: ButtonStyle {
             Button(action: {}, label: {
                 MetricSummaryCard(
                     icon: "flame.fill",
-                    accentColor: .orange,
+                    accentColor: Color.appWarning,
                     state: .data(
                         MetricSummaryCard.Content(
                             title: "Steps",
@@ -587,13 +587,13 @@ struct MetricCardButtonStyle: ButtonStyle {
 
             MetricSummaryCard(
                 icon: "figure.stand",
-                accentColor: .purple,
+                accentColor: Color.linearPurple,
                 state: .loading
             )
 
             MetricSummaryCard(
                 icon: "percent",
-                accentColor: .teal,
+                accentColor: Color.appPrimary,
                 state: .empty(
                     message: "Log your body fat to see trends and insights.",
                     action: MetricSummaryCard.CardAction(title: "Add measurement", handler: {})
@@ -602,7 +602,7 @@ struct MetricCardButtonStyle: ButtonStyle {
 
             MetricSummaryCard(
                 icon: "figure.arms.open",
-                accentColor: .pink,
+                accentColor: Color.metricAccentBodyFat,
                 state: .error(
                     message: "We couldn’t load FFMI data.",
                     action: MetricSummaryCard.CardAction(title: "Retry", handler: {})

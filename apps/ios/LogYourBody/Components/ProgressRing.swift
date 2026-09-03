@@ -112,7 +112,7 @@ struct ProgressRing: View {
                 progress: 0.92,
                 size: 60,
                 lineWidth: 6,
-                accentColor: .green
+                accentColor: Color.appSuccess
             )
         }
     }

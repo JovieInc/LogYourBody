@@ -60,21 +60,21 @@ struct DeleteAccountView: View {
                     icon: "scalemass",
                     title: "Body records",
                     description: "Weight, body composition, and measurements",
-                    iconColor: .red
+                    iconColor: Color.appError
                 )
 
                 DataInfoRow(
                     icon: "photo.on.rectangle",
                     title: "Progress data",
                     description: "Photos, daily logs, and notes stored in LogYourBody",
-                    iconColor: .red
+                    iconColor: Color.appError
                 )
 
                 DataInfoRow(
                     icon: "person.crop.circle",
                     title: "Account data",
                     description: "Profile, goals, preferences, and local app data",
-                    iconColor: .red
+                    iconColor: Color.appError
                 )
             }
 

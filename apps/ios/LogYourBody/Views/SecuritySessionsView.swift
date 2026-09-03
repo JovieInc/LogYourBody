@@ -50,7 +50,7 @@ struct SecuritySessionsView: View {
                         icon: "checkmark.shield.fill",
                         title: "Only this device",
                         message: "No other devices are signed in.",
-                        iconColor: .green
+                        iconColor: Color.appSuccess
                     )
                 }
             } else if !sessions.isEmpty {
@@ -217,10 +217,10 @@ struct SessionRowView: View {
                             if session.isCurrentSession {
                                 Text("THIS DEVICE")
                                     .font(.caption2.weight(.bold))
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(Color.appSuccess)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(.green.opacity(0.15), in: Capsule())
+                                    .background(Color.appSuccess.opacity(0.15), in: Capsule())
                             }
                         }
 
@@ -286,7 +286,7 @@ struct SessionRowView: View {
     }
 
     private var iconBackgroundColor: Color {
-        session.isCurrentSession ? .green.opacity(0.15) : .accentColor.opacity(0.15)
+        session.isCurrentSession ? Color.appSuccess.opacity(0.15) : .accentColor.opacity(0.15)
     }
 
     private func timeAgoString(from date: Date) -> String {

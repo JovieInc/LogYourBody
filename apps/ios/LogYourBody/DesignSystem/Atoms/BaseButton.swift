@@ -31,7 +31,7 @@ struct ButtonConfiguration {
             case .primary: return .jovieAction
             case .secondary: return .appCard
             case .tertiary: return .appCard
-            case .destructive: return .red
+            case .destructive: return Color.appError
             case .ghost: return .clear
             case .social: return .white
             case .custom(let bg, _): return bg

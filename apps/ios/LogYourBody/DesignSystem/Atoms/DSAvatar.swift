@@ -107,15 +107,15 @@ struct DSAvatar: View {
                 url: nil,
                 name: "Gold Member",
                 size: 48,
-                backgroundColor: .orange,
-                borderColor: .yellow,
+                backgroundColor: Color.appWarning,
+                borderColor: Color.appWarning,
                 borderWidth: 3
             )
             DSAvatar(
                 url: nil,
                 name: "VIP",
                 size: 48,
-                backgroundColor: .purple,
+                backgroundColor: Color.linearPurple,
                 borderColor: .white.opacity(0.5),
                 borderWidth: 1
             )
@@ -142,7 +142,7 @@ struct DSAvatar: View {
                 url: "",
                 name: "Empty URL",
                 size: 48,
-                backgroundColor: .red
+                backgroundColor: Color.appError
             )
         }
     }

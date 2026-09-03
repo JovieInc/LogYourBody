@@ -265,7 +265,7 @@ struct TextArea: View {
 
     private var borderColor: Color {
         if errorMessage != nil {
-            return .red
+            return Color.appError
         } else if isFocused {
             return Color.appPrimary
         } else {

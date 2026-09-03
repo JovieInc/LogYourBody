@@ -319,7 +319,7 @@ struct Glp1AddMedicationView: View {
                                                 if preset.isCompounded {
                                                     Text("Compounded")
                                                         .font(.appCaption)
-                                                        .foregroundColor(.orange)
+                                                        .foregroundColor(Color.appWarning)
                                                 }
 
                                                 Spacer()

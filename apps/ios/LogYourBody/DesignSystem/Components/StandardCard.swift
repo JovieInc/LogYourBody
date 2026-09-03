@@ -209,7 +209,7 @@ struct MetricCard: View {
                     if isEstimated {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(.orange)
+                            .foregroundColor(Color.appWarning)
                     }
                 }
 
@@ -394,7 +394,7 @@ struct StandardCard_Previews: PreviewProvider {
                     // Info card
                     InfoCard(
                         icon: "lightbulb.fill",
-                        iconColor: .yellow,
+                        iconColor: Color.appWarning,
                         title: "Pro Tip",
                         description: "Track your measurements at the same time each day for more consistent results."
                     )

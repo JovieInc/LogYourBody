@@ -34,16 +34,16 @@ struct DSInterpolationIcon: View {
         }
 
         guard let level = confidenceLevel else {
-            return .orange
+            return Color.appWarning
         }
 
         switch level {
         case .high:
-            return .green.opacity(0.8)
+            return Color.appSuccess.opacity(0.8)
         case .medium:
-            return .orange.opacity(0.8)
+            return Color.appWarning.opacity(0.8)
         case .low:
-            return .red.opacity(0.7)
+            return Color.appError.opacity(0.7)
         }
     }
 
