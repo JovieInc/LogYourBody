@@ -169,7 +169,7 @@ struct OnboardingBadge: View {
         Text(text.uppercased())
             .font(theme.typography.labelSmall)
             .foregroundStyle(theme.colors.primary)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 4)
             .background(
                 Capsule(style: .continuous)
@@ -235,7 +235,7 @@ struct FFMIInfoLink: View {
                 HapticManager.shared.selection()
             },
             label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "questionmark.circle")
                         .font(.system(.footnote, design: .default).weight(.semibold))
                     Text("What's FFMI?")

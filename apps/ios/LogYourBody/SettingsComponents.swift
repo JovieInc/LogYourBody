@@ -142,7 +142,7 @@ struct SettingsRow: View {
     var body: some View {
         Group {
             if usesStackedValueLayout, let value {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
                         leadingContent
                         Spacer(minLength: 8)

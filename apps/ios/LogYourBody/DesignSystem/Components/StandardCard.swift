@@ -157,9 +157,9 @@ struct MetricCard: View {
 
         var color: Color {
             switch self {
-            case .up: return Color(hex: "#4CAF50")
-            case .down: return Color(hex: "#F44336")
-            case .neutral: return Color(hex: "#9CA0A8")
+            case .up: return Color.appSuccess
+            case .down: return Color.appError
+            case .neutral: return Color.appTextSecondary
             }
         }
     }

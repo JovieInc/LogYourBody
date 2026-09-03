@@ -52,7 +52,7 @@ struct CoreMetricsRow: View {
                     )
                     .scaleEffect(displayMode == .bodyFatChart ? 1.05 : 1.0)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18)
+                        RoundedRectangle(cornerRadius: 20)
                             .stroke(displayMode == .bodyFatChart ? Color.liquidAccent : Color.clear, lineWidth: 2)
                     )
                 } else {
@@ -98,7 +98,7 @@ struct CoreMetricsRow: View {
                     )
                     .scaleEffect(displayMode == .weightChart ? 1.05 : 1.0)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18)
+                        RoundedRectangle(cornerRadius: 20)
                             .stroke(displayMode == .weightChart ? Color.liquidAccent : Color.clear, lineWidth: 2)
                     )
                 } else {

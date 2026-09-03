@@ -158,7 +158,7 @@ struct DashboardContent: View {
                 .frame(width: 44, height: 44)
                 .dashboardChromeGlass(
                     in: Circle(),
-                    cornerRadius: 22,
+                    cornerRadius: 24,
                     tint: displayMode == .photo ? Color.appPrimary : .white,
                     tintOpacity: displayMode == .photo ? 0.28 : 0.12
                 )
@@ -191,7 +191,7 @@ struct DashboardContent: View {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white)
                     .frame(width: 36, height: 36)
-                    .dashboardChromeGlass(in: Circle(), cornerRadius: 18)
+                    .dashboardChromeGlass(in: Circle(), cornerRadius: 20)
             }
         }
     }

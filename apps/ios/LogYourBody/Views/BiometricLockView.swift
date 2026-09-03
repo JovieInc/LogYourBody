@@ -115,7 +115,7 @@ struct BiometricLockView: View {
                 .frame(width: 88, height: 88)
                 .accessibilityHidden(true)
 
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Text(isAuthenticating ? biometricScanningText : "\(biometricType.title) is ready")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(Color.jovieText)

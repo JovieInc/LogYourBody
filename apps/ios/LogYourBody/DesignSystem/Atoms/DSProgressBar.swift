@@ -44,7 +44,7 @@ struct DSProgressBar: View {
 // MARK: - Preview
 
 #Preview {
-    VStack(spacing: 30) {
+    VStack(spacing: 32) {
         VStack(spacing: 16) {
             Text("Different Progress Values")
                 .font(.headline)

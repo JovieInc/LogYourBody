@@ -127,7 +127,7 @@ struct DailyWeighInReminderPromptView: View {
     }
 
     private var permissionRecoveryNotice: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: "bell.slash.fill")
                 .foregroundColor(.warning)
                 .accessibilityHidden(true)
@@ -150,7 +150,7 @@ struct DailyWeighInReminderPromptView: View {
                 .frame(minHeight: JovieTokens.minimumHitTarget)
             }
         }
-        .padding(14)
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
                 .fill(Color.jovieSurfaceElevated)

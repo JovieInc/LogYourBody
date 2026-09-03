@@ -64,7 +64,7 @@ struct DSMetricGauge: View {
 
 #Preview {
     VStack(spacing: 40) {
-        HStack(spacing: 30) {
+        HStack(spacing: 32) {
             DSMetricGauge(
                 value: 7_500,
                 maxValue: 10_000,

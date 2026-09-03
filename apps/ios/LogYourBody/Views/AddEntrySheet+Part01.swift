@@ -218,7 +218,7 @@ var body: some View {
                             Button {
                                 isPresentingGlp1AddMedication = true
                             } label: {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "plus")
                                     Text("Add")
                                 }
@@ -419,7 +419,7 @@ var glp1DoseHistorySection: some View {
             }
 
             if recentGlp1DoseLogs.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("No doses logged yet")
                         .font(.appBody)
                         .foregroundColor(.appText)
@@ -428,7 +428,7 @@ var glp1DoseHistorySection: some View {
                         .font(.appBodySmall)
                         .foregroundColor(.appTextSecondary)
                 }
-                .padding(14)
+                .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.appCard)
                 .cornerRadius(Constants.cornerRadius)
@@ -491,7 +491,7 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
             .accessibilityLabel("Delete dose")
             .accessibilityIdentifier("glp1DoseHistoryDeleteButton")
         }
-        .padding(14)
+        .padding(16)
     }
 
 // MARK: - Weight Entry View

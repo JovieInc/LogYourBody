@@ -349,7 +349,7 @@ struct DashboardViewLiquid: View {
                 syncStatusBanner
             },
             metricContent: {
-                VStack(spacing: 14) {
+                VStack(spacing: 16) {
                     homeModeSwitch
                         .padding(.horizontal, 20)
 

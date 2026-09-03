@@ -218,7 +218,7 @@ struct SessionRowView: View {
                                 Text("THIS DEVICE")
                                     .font(.caption2.weight(.bold))
                                     .foregroundStyle(Color.appSuccess)
-                                    .padding(.horizontal, 6)
+                                    .padding(.horizontal, 8)
                                     .padding(.vertical, 2)
                                     .background(Color.appSuccess.opacity(0.15), in: Capsule())
                             }

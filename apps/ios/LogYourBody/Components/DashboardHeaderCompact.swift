@@ -85,7 +85,7 @@ struct DashboardHeaderCompact: View {
                         NavigationLink(destination: PreferencesView()) {
                             Text("Add age")
                                 .font(.system(size: 12, weight: .medium))
-                                .padding(.horizontal, 10)
+                                .padding(.horizontal, 12)
                                 .padding(.vertical, 4)
                                 .foregroundColor(Color.liquidTextPrimary.opacity(0.8))
                                 .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
@@ -100,7 +100,7 @@ struct DashboardHeaderCompact: View {
                         NavigationLink(destination: PreferencesView()) {
                             Text("Add height")
                                 .font(.system(size: 12, weight: .medium))
-                                .padding(.horizontal, 10)
+                                .padding(.horizontal, 12)
                                 .padding(.vertical, 4)
                                 .foregroundColor(Color.liquidTextPrimary.opacity(0.8))
                                 .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
@@ -156,14 +156,14 @@ struct DashboardHeaderCompact: View {
         Button {
             onShowSyncDetails()
         } label: {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
                 Image(systemName: syncStatusSymbolName)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(syncStatusColor)
                     .frame(width: 20, height: 20)
                     .padding(.top, 1)
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(syncStatusTitle)
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(Color.liquidTextPrimary)
@@ -179,11 +179,11 @@ struct DashboardHeaderCompact: View {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
                     .foregroundColor(Color.liquidTextPrimary.opacity(0.55))
-                    .padding(.top, 3)
+                    .padding(.top, 4)
             }
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.vertical, 12)
             .dashboardChromeGlass(
                 in: RoundedRectangle(cornerRadius: 14, style: .continuous),
                 cornerRadius: 14,

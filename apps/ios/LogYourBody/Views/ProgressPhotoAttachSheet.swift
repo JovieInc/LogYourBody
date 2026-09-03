@@ -354,7 +354,7 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private var actionPane: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             AppPhotosPicker(maxSelectionCount: 1) { assets in
                 await MainActor.run {
                     loadSelectedPhoto(assets.first)
@@ -587,7 +587,7 @@ struct ProgressPhotoAttachSheet: View {
             context.cgContext.setFillColor(CGColor(red: 0.26, green: 0.27, blue: 0.30, alpha: 1))
             let bodyPath = UIBezierPath(
                 roundedRect: CGRect(x: 250, y: 430, width: 400, height: 570),
-                cornerRadius: 170
+                cornerRadius: 172
             )
             context.cgContext.addPath(bodyPath.cgPath)
             context.cgContext.fillPath()

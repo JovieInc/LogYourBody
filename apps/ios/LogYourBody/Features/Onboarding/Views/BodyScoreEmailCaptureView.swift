@@ -46,7 +46,7 @@ struct BodyScoreEmailCaptureView: View {
                             Button {
                                 toggleWhyEmail()
                             } label: {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "info.circle")
                                         .font(.system(.footnote, design: .default).weight(.semibold))
                                     Text("Used for account recovery and essential service messages.")

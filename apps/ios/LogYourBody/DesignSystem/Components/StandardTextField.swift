@@ -230,9 +230,9 @@ struct TextArea: View {
             }
             .padding(8)
             .background(Color.appCard)
-            .cornerRadius(6)
+            .cornerRadius(8)
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 8)
                     .stroke(borderColor, lineWidth: borderWidth)
             )
 

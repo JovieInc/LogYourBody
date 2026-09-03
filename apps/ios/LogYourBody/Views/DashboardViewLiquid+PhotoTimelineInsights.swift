@@ -16,7 +16,7 @@ extension DashboardViewLiquid {
                         .fill(phaseInsightColor(for: insight.kind).opacity(0.15))
                 )
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     Text(insight.title)
                         .font(.system(size: 15, weight: .semibold))
@@ -27,7 +27,7 @@ extension DashboardViewLiquid {
                             .font(.system(size: 11, weight: .bold))
                             .monospacedDigit()
                             .foregroundColor(phaseInsightColor(for: insight.kind))
-                            .padding(.horizontal, 7)
+                            .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(
                                 Capsule()
@@ -51,7 +51,7 @@ extension DashboardViewLiquid {
 
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(16)
         .dashboardContentSurface(cornerRadius: theme.radius.card, border: theme.colors.border)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("photo_timeline_hud_phase_insight")
@@ -77,7 +77,7 @@ extension DashboardViewLiquid {
                             .fill(glp1WeeklyCheckInColor(for: summary.status).opacity(0.15))
                     )
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
                         Text(summary.title)
                             .font(.system(size: 15, weight: .semibold))
@@ -88,7 +88,7 @@ extension DashboardViewLiquid {
                                 .font(.system(size: 11, weight: .bold))
                                 .monospacedDigit()
                                 .foregroundColor(glp1WeeklyCheckInColor(for: summary.status))
-                                .padding(.horizontal, 7)
+                                .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(
                                     Capsule()
@@ -112,7 +112,7 @@ extension DashboardViewLiquid {
                     .padding(.vertical, 8)
                     .background(Capsule().fill(theme.colors.text))
             }
-            .padding(14)
+            .padding(16)
             .dashboardContentSurface(cornerRadius: theme.radius.card, border: theme.colors.border)
         }
         .buttonStyle(.plain)

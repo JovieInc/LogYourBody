@@ -42,7 +42,7 @@ struct DeleteAccountView: View {
     var body: some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text("Delete account?")
                         .font(.title2.weight(.bold))
                     Text(

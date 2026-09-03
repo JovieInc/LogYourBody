@@ -281,7 +281,7 @@ struct Glp1AddMedicationView: View {
                                             Text(filter.label)
                                                 .font(.appBodySmall)
                                                 .padding(.horizontal, 12)
-                                                .padding(.vertical, 6)
+                                                .padding(.vertical, 8)
                                                 .background(isSelected ? Color.appPrimary : Color.appCard)
                                                 .foregroundColor(isSelected ? .black : .appText)
                                                 .cornerRadius(999)
@@ -308,7 +308,7 @@ struct Glp1AddMedicationView: View {
                                     Button {
                                         selectedPreset = preset
                                     } label: {
-                                        VStack(alignment: .leading, spacing: 6) {
+                                        VStack(alignment: .leading, spacing: 8) {
                                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                                 brandIcon(for: preset)
 
@@ -324,7 +324,7 @@ struct Glp1AddMedicationView: View {
 
                                                 Spacer()
 
-                                                HStack(spacing: 6) {
+                                                HStack(spacing: 8) {
                                                     Image(
                                                         systemName: preset.route.lowercased() == "oral" ? "pills.fill" : "syringe"
                                                     )
@@ -349,7 +349,7 @@ struct Glp1AddMedicationView: View {
                                                 Spacer(minLength: 0)
                                             }
                                         }
-                                        .padding(.vertical, 6)
+                                        .padding(.vertical, 8)
                                         .contentShape(Rectangle())
                                         .background(
                                             RoundedRectangle(cornerRadius: 12)
@@ -409,7 +409,7 @@ struct Glp1AddMedicationView: View {
                             .frame(maxWidth: .infinity)
                             .disabled(!customCompoundCanSave || isSaving)
                         }
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 8)
                     }
                 }
                 .listStyle(.insetGrouped)

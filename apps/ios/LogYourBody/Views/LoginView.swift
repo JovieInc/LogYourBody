@@ -106,7 +106,7 @@ struct LoginView: View {
 
     private var appleSignInControl: some View {
         Button(action: authenticate) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 if isLoading {
                     ProgressView()
                         .progressViewStyle(.circular)

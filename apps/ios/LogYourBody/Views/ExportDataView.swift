@@ -206,7 +206,7 @@ struct ExportDataView: View {
             Color.black.opacity(0.45)
                 .ignoresSafeArea()
 
-            VStack(spacing: 14) {
+            VStack(spacing: 16) {
                 ProgressView()
                     .scaleEffect(1.2)
 

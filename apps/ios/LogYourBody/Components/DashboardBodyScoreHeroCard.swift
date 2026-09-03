@@ -62,7 +62,7 @@ struct DashboardBodyScoreHeroCard: View {
     let onTapWeight: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 24) {
                 gaugeAndSummary
 
                 HStack(spacing: 12) {
@@ -95,14 +95,14 @@ struct DashboardBodyScoreHeroCard: View {
     }
 
     private var gaugeAndSummary: some View {
-        HStack(alignment: .center, spacing: 18) {
+        HStack(alignment: .center, spacing: 20) {
             BodyScoreGaugeView(score: score, scoreText: scoreText)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     onTapBodyScore?()
                 }
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("Body Score")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(Color.white.opacity(0.62))
@@ -113,7 +113,7 @@ struct DashboardBodyScoreHeroCard: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let deltaText {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: deltaIcon(for: deltaText))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(deltaColor(for: deltaText).opacity(0.8))
@@ -122,7 +122,7 @@ struct DashboardBodyScoreHeroCard: View {
                             .foregroundColor(deltaColor(for: deltaText).opacity(0.9))
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 8)
                     .dashboardChromeGlass(
                         in: Capsule(style: .continuous),
                         cornerRadius: 999,
@@ -152,7 +152,7 @@ struct DashboardBodyScoreHeroCard: View {
     }
 
     private func heroStatTile(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
             DSMetricLabel(
                 text: title.uppercased(),
                 size: .system(size: 12),

@@ -137,7 +137,7 @@ struct CompactLoadingScreen: View {
         Color.appBackground
             .ignoresSafeArea()
 
-        VStack(spacing: 30) {
+        VStack(spacing: 32) {
             // Simple loading
             CompactLoadingScreen(
                 isLoading: .constant(true),
