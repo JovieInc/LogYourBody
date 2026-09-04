@@ -806,11 +806,14 @@ final class LogYourBodyUITests: XCTestCase {
         try waitForHomeChatComposer(in: app)
         attachScreenshot(named: "launch-quality-chat-composer", from: app)
         let prompt = app.buttons["How am I doing?"]
-        if prompt.waitForExistence(timeout: 5) {
-            prompt.tap()
-            _ = app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8)
-            attachScreenshot(named: "launch-quality-chat-tab", from: app)
-        }
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5), "Critical chat prompt must be available")
+        XCTAssertTrue(prompt.isHittable, "Critical chat prompt must be tappable")
+        prompt.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8),
+            "Critical chat prompt must open the chat root"
+        )
+        attachScreenshot(named: "launch-quality-chat-tab", from: app)
         collapseHomeChat(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
 

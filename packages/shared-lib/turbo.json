@@ -1,0 +1,13 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/ios/launch-quality-audit.sh",
+        "$TURBO_ROOT$/scripts/ios/launch-quality-evidence.py",
+        "$TURBO_ROOT$/scripts/ios/test_launch_quality_evidence.py"
+      ]
+    }
+  }
+}

@@ -26,7 +26,15 @@ if [[ "$ARTIFACT_DIR" != /* ]]; then
   ARTIFACT_DIR="$ROOT_DIR/$ARTIFACT_DIR"
 fi
 
+if [[ -d "$ARTIFACT_DIR" && -n "$(ls -A "$ARTIFACT_DIR")" ]]; then
+  echo "Refusing to reuse nonempty launch-quality artifact directory: $ARTIFACT_DIR" >&2
+  exit 65
+fi
 mkdir -p "$ARTIFACT_DIR"
+AUDIT_STARTED_AT="$(date +%s)"
+# Record source identity without implying an authenticated production build.
+git -C "$ROOT_DIR" rev-parse HEAD > "$ARTIFACT_DIR/source-revision.txt"
+git -C "$ROOT_DIR" diff HEAD --binary > "$ARTIFACT_DIR/source-working-tree.patch"
 
 bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
 
@@ -109,7 +117,9 @@ run_xcodebuild_test() {
 
   for attempt in 1 2; do
     cleanup_booted_simulator_apps
-    rm -rf "$result_bundle"
+    if [[ -e "$result_bundle" ]]; then
+      mv "$result_bundle" "${result_bundle%.xcresult}.attempt-$((attempt - 1)).xcresult"
+    fi
 
     echo "Running $label (attempt $attempt)" | tee -a "$log_file"
     xcodebuild_command=(
@@ -146,42 +156,11 @@ run_xcodebuild_test() {
   done
 }
 
-assert_xcresult_has_test_cases() {
-  local label="$1"
-  local result_bundle="$2"
-  local case_count
-
-  if [[ ! -d "$result_bundle" ]]; then
-    echo "Missing xcresult bundle for $label: $result_bundle" >&2
-    exit 66
-  fi
-
-  case_count="$(
-    xcrun xcresulttool get test-results tests \
-      --path "$result_bundle" \
-      --format json |
-      python3 -c '
-import json
-import sys
-
-payload = json.load(sys.stdin)
-
-def count_cases(node):
-    count = 1 if node.get("nodeType") == "Test Case" else 0
-    for child in node.get("children", []):
-        count += count_cases(child)
-    return count
-
-print(sum(count_cases(root) for root in payload.get("testNodes", [])))
-'
-  )"
-
-  if [[ "$case_count" == "0" ]]; then
-    echo "$label executed 0 XCTest cases; check -only-testing selectors and Xcode target membership." >&2
-    exit 65
-  fi
-
-  echo "$label executed $case_count XCTest case(s)."
+assert_xcresult_evidence() {
+  local result_bundle="$1"
+  shift
+  python3 "$ROOT_DIR/scripts/ios/launch-quality-evidence.py" \
+    --bundle "$result_bundle" --started-at "$AUDIT_STARTED_AT" "$@"
 }
 
 build_for_testing_once() {
@@ -220,10 +199,15 @@ run_ui_test_group() {
   local log_file="$ARTIFACT_DIR/$label.log"
   local test_name
   local -a only_testing_args=()
+  local -a evidence_args=()
   shift
 
   for test_name in "$@"; do
     only_testing_args+=("-only-testing:LogYourBodyUITests/LogYourBodyUITests/$test_name")
+    evidence_args+=(--expected-test "LogYourBodyUITests/$test_name()")
+    if [[ "$test_name" == "testLaunchQualityGateCapturesCriticalSurfaces" ]]; then
+      evidence_args+=(--critical-captures)
+    fi
   done
 
   UI_RESULT_BUNDLES+=("$result_bundle")
@@ -232,7 +216,7 @@ run_ui_test_group() {
     "$result_bundle" \
     "$log_file" \
     "${only_testing_args[@]}"
-  assert_xcresult_has_test_cases "$label" "$result_bundle"
+  assert_xcresult_evidence "$result_bundle" "${evidence_args[@]}"
 }
 
 cd "$IOS_DIR"
@@ -259,8 +243,7 @@ run_xcodebuild_test \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
   -only-testing:LogYourBodyTests
-assert_xcresult_has_test_cases \
-  "launch-quality-unit-tests" \
+assert_xcresult_evidence \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult"
 
 UI_RESULT_BUNDLES=()
@@ -283,7 +266,10 @@ fi
   printf -- '- Destination: `%s`\n' "$DESTINATION"
   printf -- '- Static UI regression audit: `launch-ui-regression-audit.md`\n'
   printf -- '- Unit coverage: photo timeline HUD launch policy, Body Score share card layout\n'
-  printf -- '- UI coverage: home hero + chat composer, Jovie swipe/menu Timeline/Stats, one timeline scrubber, home/analytics/onboarding/share screenshot attachments\n'
+  printf -- '- Fixture UI coverage: home hero + chat composer, Jovie swipe/menu Timeline/Stats, one timeline scrubber, home/analytics/onboarding/share screenshot attachments\n'
+  printf -- '- Evidence scope: `fixture_ui`; injected auth and entitlement state. Real Sign in with Apple, purchase, and restore remain `not_verified`.\n'
+  printf -- '- Required passing test IDs and seven screenshot hashes: `launch-quality-ui-critical-surfaces.evidence.json`. First failed attempt bundles are retained.\n'
+  printf -- '- Source: `source-revision.txt` plus `source-working-tree.patch`; this is not exact deployed-build certification.\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
   printf -- '- Build strategy: one `build-for-testing`, unit selectors in one `test-without-building` run, and one composite launch-quality UI selector that captures all required screenshot surfaces with simulator parallelism disabled\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
