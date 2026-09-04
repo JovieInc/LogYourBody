@@ -134,7 +134,7 @@ export function WaitlistForm() {
           disabled={submitState === 'submitting' || submitState === 'success'}
           aria-invalid={Boolean(fieldError)}
           aria-describedby="waitlist-status"
-          className="placeholder:text-white/38 min-h-11 w-full rounded-full border border-white/20 bg-black/55 px-5 text-sm text-white shadow-[0_18px_60px_rgba(0,0,0,0.22)] outline-none backdrop-blur-xl transition-[border-color,background-color,box-shadow] hover:border-white/35 hover:bg-black/65 focus:border-white/60 focus:bg-black/70 focus:ring-2 focus:ring-sky-400/30 disabled:opacity-60"
+          className="focus:ring-[var(--landing-accent,#11afff)]/50 min-h-11 w-full rounded-full border border-white/20 bg-black/55 px-5 text-sm text-white shadow-[0_18px_60px_rgba(0,0,0,0.22)] outline-none backdrop-blur-xl transition-[border-color,background-color,box-shadow] placeholder:text-white/60 hover:border-white/35 hover:bg-black/65 focus:border-white/60 focus:bg-black/70 focus:ring-2 disabled:opacity-60"
         />
         <div className="pointer-events-none absolute -left-[10000px]" aria-hidden="true">
           <label htmlFor="waitlist-website">Website</label>
@@ -149,24 +149,26 @@ export function WaitlistForm() {
         <button
           type="submit"
           disabled={submitState === 'submitting' || submitState === 'success'}
-          className="group inline-flex min-h-11 items-center justify-center rounded-full p-1.5 text-sm font-semibold text-black outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="group inline-flex min-h-11 items-center justify-center rounded-full p-1.5 text-sm font-[510] text-black outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-52"
         >
-          <span className="inline-flex h-8 w-full items-center justify-center rounded-full bg-white px-6 shadow-[0_18px_55px_rgba(0,0,0,0.24)] transition-[background-color,transform,box-shadow] group-hover:-translate-y-0.5 group-hover:bg-sky-50 group-hover:shadow-[0_22px_65px_rgba(0,0,0,0.34)] group-focus-visible:ring-2 group-focus-visible:ring-sky-300 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-black group-active:translate-y-0 group-active:scale-[0.985]">
+          <span className="inline-flex h-8 w-full items-center justify-center rounded-full bg-white px-6 shadow-[0_18px_55px_rgba(0,0,0,0.24)] transition-[background-color,transform,box-shadow] group-hover:bg-sky-50 group-hover:shadow-[0_22px_65px_rgba(0,0,0,0.34)] group-focus-visible:ring-2 group-focus-visible:ring-[var(--landing-accent,#11afff)] group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-black motion-safe:group-hover:-translate-y-0.5 motion-safe:group-active:translate-y-0 motion-safe:group-active:scale-[0.985]">
             {submitState === 'submitting' ? 'Joining…' : waitlistLandingCopy.submitLabel}
           </span>
         </button>
       </form>
 
-      <div id="waitlist-status" className="mt-2 min-h-5 sm:mt-3 sm:min-h-6" aria-live="polite">
+      <div id="waitlist-status" className="mt-2 min-h-10 sm:mt-3" aria-live="polite">
         {fieldError ? (
-          <p className="text-sm text-rose-300" role="alert">
+          <p className="text-sm text-[var(--landing-error,#ff677d)]" role="alert">
             {fieldError}
           </p>
         ) : submitState === 'success' || submitState === 'error' ? (
           <p
             className={cn(
               'text-sm',
-              submitState === 'error' ? 'text-rose-300' : 'text-emerald-300',
+              submitState === 'error'
+                ? 'text-[var(--landing-error,#ff677d)]'
+                : 'text-[var(--landing-accent,#11afff)]',
             )}
             role="status"
           >
