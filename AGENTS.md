@@ -40,7 +40,7 @@ and the native SwiftUI client does not embed this TypeScript runtime. See
 - **Platforms**: Native iOS app (SwiftUI, Swift 5.9+) and Next.js web app share Jovie Better Auth (`logyourbody-ios` / `logyourbody-web`).
 - **Key Stacks**:
   - **Authentication**: Jovie Better Auth issuer with Sign in with Apple. No Clerk.
-  - **Design System**: iOS 26 Liquid Glass with graceful fallbacks.
+  - **Design System**: Jovie design system atoms only — ActionButton 32/510/r999, display type 28/620, splash B, Noir Ion night-dj palette, 4px optical grid. No second design system; Liquid Glass surfaces are legacy and are being removed.
   - **Data**: Core Data is the device source of truth. Neon via first-party bearer APIs is the cloud data plane. Native never connects to Postgres.
   - **Feature Flags**: Statsig for controlled rollouts and A/B testing.
 
@@ -59,13 +59,15 @@ The canonical product and brand standards are:
 - Use scientific literature as the evidence source. Practitioners and creators may interpret research but do not replace it.
 
 - Treat the native paid iOS app as the only default product surface until usage proves otherwise.
-- Core product promise: answer "How am I doing?" from weight, body-composition, HealthKit, and progress-photo data with minimal user input.
+- Core product promise: answer "How am I doing?" and "What do I do next?" for a person training for aesthetics — a visual body timeline plus a science-backed hypertrophy coach, with minimal user input.
 - Design should follow the Joby/Jovie-style system: dark-only, clean, concise, generous white space, pill-shaped auth controls, neutral surfaces, and Geist-like accent colors only where they communicate metric meaning or state.
 - Do not build a web app before the product has at least 1,000 activated iOS users, or 250 paying subscribers plus repeated web-access requests. Web work before then is limited to marketing, legal, support, and billing/account surfaces that unblock iOS.
 - Do not build an Apple Watch app unless users explicitly ask for it. Initial Watch scope is read-only basic stats and trend direction.
 - Do not build iPad-specific layouts unless there is clear user pull, a measurable kiosk experiment, or enough active iPad usage to justify it. Target future landscape layout: photo left, stats right, timeline along the bottom.
-- AI starts as short deterministic insight, not chat: classify cutting, maintenance, or gaining from trends and warn when a phase has likely gone too long. Jovie-style chat comes later only after the timeline is retained and users ask for recommendations.
-- Do not build a food logger or workout tracker. This app is a body-composition heads-up display for people who already have those systems.
+- AI is the coach. Chat is an evidence-gated hypertrophy coach backed by a deterministic, server-side hypertrophy programming engine (mesocycles, per-muscle-group volume landmarks, RIR progression, deload, autoregulation from soreness/pump/performance/joint-pain feedback). The model narrates and explains engine output; it never invents sets, reps, loads, RIR, or volume targets, and every recommendation follows the evidence-and-recommendation standard.
+- Training logging exists only in service of the coach: sets, loads, RIR, and per-muscle-group feedback, logged by tap or by voice. Do not build a general workout tracker (social feeds, leaderboards, gamification, exercise encyclopedias) and do not build a food logger.
+- The reference programming methodology is public research and coaching literature. Never write third-party app or coach names into code, docs, tests, or issue bodies in this repository; call it the hypertrophy programming engine.
+- Voice is one global entry point (a single Talk affordance, no composer microphone). Speech recognition runs on-device or the voice path is disabled with a named reason; no realtime voice provider SDK enters the repository until the founder decision gate approves one.
 
 ---
 
