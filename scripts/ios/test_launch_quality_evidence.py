@@ -22,6 +22,7 @@ class EvidenceTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.bundle = self.root / 'critical.xcresult'
         self.bundle.mkdir()
+        self.bundle.with_suffix('.log').write_text('Running critical (attempt 1)\n')
         self.payload = {'testNodes': [{'nodeType': 'UI test bundle', 'children': [
             {'nodeType': 'Test Case', 'nodeIdentifier': evidence.CRITICAL_TEST, 'result': 'Passed'}
         ]}], 'devices': [{'deviceId': 'simulator', 'osVersion': '26.5'}]}
@@ -145,6 +146,14 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(len(receipt['captures']), 7)
         self.assertEqual(receipt['devices'], self.payload['devices'])
 
+    def test_retry_without_first_result_bundle_still_reports_recovery(self):
+        self.bundle.with_suffix('.log').write_text('Retrying critical after simulator launch failure\n')
+        with patch.object(evidence, 'run_json', return_value=self.payload):
+            self.assertEqual(self.run_main(critical=False), 0)
+        receipt = json.loads(self.bundle.with_suffix('.evidence.json').read_text())
+        self.assertTrue(receipt['recoveredAfterRetry'])
+        self.assertIsNone(receipt['priorAttemptBundle'])
+
     def test_cli_rejects_partial_capture_and_removes_stale_pass(self):
         output = self.bundle.with_suffix('.evidence.json')
         output.write_text('{"status":"passed"}')
@@ -171,8 +180,14 @@ class EvidenceTests(unittest.TestCase):
     def test_unit_receipt_does_not_claim_ui_evidence(self):
         with patch.object(evidence, 'run_json', return_value=self.payload):
             self.assertEqual(self.run_main(critical=False), 0)
-        self.assertEqual(json.loads(self.bundle.with_suffix('.evidence.json').read_text())['evidenceKind'],
-                         'unit_tests')
+        receipt = json.loads(self.bundle.with_suffix('.evidence.json').read_text())
+        self.assertEqual(receipt['evidenceKind'], 'unit_tests')
+        self.assertFalse(receipt['recoveredAfterRetry'])
+        self.bundle.with_suffix('.log').unlink()
+        with patch.object(evidence, 'run_json', return_value=self.payload):
+            self.assertEqual(self.run_main(critical=False), 0)
+        receipt = json.loads(self.bundle.with_suffix('.evidence.json').read_text())
+        self.assertEqual(receipt['recoveredAfterRetry'], 'unknown')
 
     def test_real_xcresult_invocation_uses_current_json_api(self):
         with patch.object(evidence.subprocess, 'check_output', return_value='{}') as command:

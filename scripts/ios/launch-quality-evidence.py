@@ -99,6 +99,17 @@ def main():
         payload = run_json('get', 'test-results', 'tests', '--path', str(args.bundle))
         cases = validate_cases(payload, args.expected_test)
         prior_attempt = args.bundle.with_name(args.bundle.stem + '.attempt-1.xcresult')
+        attempt_log = args.bundle.with_suffix('.log')
+        retried = f'Retrying {args.bundle.stem} after simulator launch failure'
+        recovered_after_retry = 'unknown'
+        if prior_attempt.is_dir():
+            recovered_after_retry = True
+        elif attempt_log.is_file():
+            log_text = attempt_log.read_text()
+            if retried in log_text:
+                recovered_after_retry = True
+            elif f'Running {args.bundle.stem} (attempt 1)' in log_text:
+                recovered_after_retry = False
         source_revision = args.bundle.parent / 'source-revision.txt'
         source_patch = args.bundle.parent / 'source-working-tree.patch'
         receipt = {
@@ -108,7 +119,7 @@ def main():
             'generatedAt': datetime.now(timezone.utc).isoformat(),
             'startedAt': args.started_at,
             'resultBundle': str(args.bundle),
-            'recoveredAfterRetry': prior_attempt.is_dir(),
+            'recoveredAfterRetry': recovered_after_retry,
             'priorAttemptBundle': str(prior_attempt) if prior_attempt.is_dir() else None,
             'sourceRevision': source_revision.read_text().strip() if source_revision.is_file() else 'unknown',
             'sourcePatchSha256': digest(source_patch) if source_patch.is_file() else 'unknown',
