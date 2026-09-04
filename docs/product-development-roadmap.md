@@ -4,7 +4,7 @@ Last updated: 2026-06-05
 
 ## Operating Principle
 
-LogYourBody is an iOS-first paid product. It should not become another food logger, workout tracker, or dashboard suite. The job is to answer one question with almost no input:
+LogYourBody is an iOS-first paid product: a visual body timeline plus a science-backed hypertrophy coach, built for people training for aesthetics. It should not become a food logger, a general workout tracker, or a dashboard suite. The job is to answer two questions with almost no input:
 
 > How am I doing?
 
@@ -129,11 +129,11 @@ First AI-adjacent surface:
 - Warn when a cut or bulk has likely gone on too long.
 - Keep copy short and non-medical.
 
-Only consider a Jovie-style chat after the core timeline is retained and users are asking for interactive recommendations. The app should "just tell me" before it asks the user to have a conversation.
+Chat is the coach. It is backed by a deterministic hypertrophy programming engine on the server; the model narrates and explains engine output and never invents sets, reps, loads, RIR, or volume targets. The next workout renders as one editorial card in chat. The app should still "just tell me" before it asks the user to have a conversation.
 
 ### Food And Workouts
 
-Do not build a food logger or workout tracker. This product is for people who already have those systems and want a body-composition HUD.
+Do not build a food logger. Training logging (sets, loads, RIR, per-muscle-group feedback, by tap or voice) exists only in service of the hypertrophy coach — no general workout-tracker features, social feeds, or gamification.
 
 ## Agent Build Rules
 
