@@ -115,6 +115,10 @@ export const logYourBody = {
       { value: 'https://github.com/getsentry/sentry-cocoa', reason: 'SPM dependency repository.' },
       { value: 'https://github.com/statsig-io/statsig-kit', reason: 'SPM dependency repository.' },
       { value: 'https://github.com/realm/SwiftLint', reason: 'SwiftLint build-tool repository.' },
+      {
+        value: 'https://github.com/SvenTiigi/WhatsNewKit',
+        reason: 'Researched and rejected option in whats-new-review-contract.md; not a runtime dependency.',
+      },
       { value: 'https://github.com/JovieInc/certificates', reason: 'Fastlane Match certificates repository.' },
       { value: 'https://github.com/supabase/supabase-swift', reason: 'OSS attribution in open-source-licenses.md.' },
       { value: 'https://github.com/clerk/clerk-ios', reason: 'Historical audit/docs remnants; Clerk is not a runtime dependency.' },
