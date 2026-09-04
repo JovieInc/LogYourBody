@@ -26,7 +26,7 @@ Prioritize outcomes the product can measure or support responsibly:
 
 Useful outcomes include weight and body-fat trends, FFMI/FMI, lean mass, waist and other circumferences, ratios, progress photos, and sustainable rates of change. Always label whether a value is measured, estimated, interpolated, a population reference, or a user-owned target.
 
-We do not optimize for exhaustion, punishment, athletic performance, entertainment, burning calories, earning food, or making a plan harder than necessary. LogYourBody is not a food logger or workout tracker.
+We do not optimize for exhaustion, punishment, athletic performance, entertainment, burning calories, earning food, or making a plan harder than necessary. LogYourBody is not a food logger or a general workout tracker; training is logged only in service of the hypertrophy coach.
 
 ## Individualization and Inclusion
 
