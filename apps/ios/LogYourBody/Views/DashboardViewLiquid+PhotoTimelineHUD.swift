@@ -197,20 +197,10 @@ extension DashboardViewLiquid {
                 .accessibilityHint("Returns to the home hero and composer")
                 .accessibilityIdentifier("home_chat_collapse")
             } else {
-                NavigationLink {
-                    PreferencesView()
-                        .environmentObject(authManager)
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(theme.colors.textSecondary)
-                        .frame(width: 32, height: 32)
-                        .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
-                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
-                }
-                .accessibilityLabel("Settings")
-                .accessibilityHint("Opens account and app settings")
-                .accessibilityIdentifier("photo_timeline_root_settings")
+                Color.clear
+                    .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
