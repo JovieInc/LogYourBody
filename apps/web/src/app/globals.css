@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '../../../../packages/design-tokens/web/jovie-typography.css';
 
 @config '../../tailwind.config.ts';
 
@@ -124,14 +125,8 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family:
-      'Inter',
-      system-ui,
-      -apple-system,
-      sans-serif;
-    font-feature-settings:
-      'rlig' 1,
-      'calt' 1;
+    font-family: var(--font-body);
+    font-feature-settings: var(--font-features);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -227,4 +222,9 @@
 .lyb-landing {
   --landing-accent: #11afff;
   --landing-error: #ff677d;
+}
+
+/* Shared marketing roles: editorial headings differ from body/UI, not from product identity. */
+.lyb-landing :is(h1, h2, h3, h4) {
+  font-family: var(--font-display);
 }

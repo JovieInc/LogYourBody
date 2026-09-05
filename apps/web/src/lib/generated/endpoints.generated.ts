@@ -298,6 +298,27 @@ export const endpoints = {
       reason: 'Xcode tooling reference in gitignore boilerplate.',
     },
     {
+      value: 'https://github.com/rsms/inter',
+      reason: 'Inter font attribution and license reference for the shared typography projection.',
+    },
+    {
+      value: 'https://github.com/rsms/inter/blob/master/LICENSE.txt',
+      reason: 'Inter SIL Open Font License reference for the shared typography projection.',
+    },
+    {
+      value: 'http://scripts.sil.org/OFL',
+      reason:
+        'Inter SIL Open Font License FAQ reference bundled with the shared typography assets.',
+    },
+    {
+      value: 'https://www.fontshare.com/fonts/satoshi',
+      reason: 'Satoshi font provenance reference for the shared typography projection.',
+    },
+    {
+      value: 'https://www.fontshare.com/licenses/itf-ffl',
+      reason: 'Satoshi ITF Free Font License reference for the shared typography projection.',
+    },
+    {
       value: 'https://github.com/',
       reason: 'CI scripts build repo URLs as https://github.com/${repository}.',
     },
