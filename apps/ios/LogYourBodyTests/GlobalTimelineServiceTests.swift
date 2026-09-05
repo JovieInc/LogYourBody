@@ -213,6 +213,147 @@ final class GlobalTimelineServiceTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testUnchangedTimelineContentDoesNotRebuildBucketsDuringScrub() throws {
+        var builds = 0
+        let store = GlobalTimelineStore(service: service) { scale, metrics, daily, height in
+            builds += 1
+            return self.service.makeBuckets(for: scale, metrics: metrics, dailyMetrics: daily, heightInches: height)
+        }
+        let date = makeDate(year: 2_026, month: 4, day: 8)
+        let metrics = [makeTimelineMetric(date: date, weight: 80, bodyFatPercentage: 20)]
+        store.updateMetrics(metrics, heightInches: 70)
+        let bucket = try XCTUnwrap(store.weeklyBuckets.first)
+        builds = 0
+
+        for tick in 0..<100 {
+            store.updateCursor(GlobalTimelineCursor(
+                date: date.addingTimeInterval(Double(tick)), scale: .week, bucketId: bucket.id
+            ))
+            store.updateMetrics(metrics, heightInches: 70)
+        }
+
+        XCTAssertEqual(builds, 0, "Selection and identical content must reuse the existing buckets")
+        XCTAssertEqual(store.cursor?.date, date.addingTimeInterval(99))
+
+        store.updateCursor(GlobalTimelineCursor(date: date, scale: .week, bucketId: "removed"))
+        store.updateMetrics(metrics, heightInches: 70)
+        XCTAssertEqual(builds, 0)
+        XCTAssertEqual(store.cursor?.bucketId, bucket.id)
+    }
+
+    @MainActor
+    func testRepeatedThousandMeasurementRefreshStaysWithinScrubBudget() {
+        let store = GlobalTimelineStore(service: service)
+        let start = makeDate(year: 2_026, month: 1, day: 1)
+        let metrics = (0..<1_000).map { index in
+            makeTimelineMetric(date: start.addingTimeInterval(Double(index) * 86_400), weight: 80)
+        }
+        store.updateMetrics(metrics, heightInches: 70)
+        let clockStart = ProcessInfo.processInfo.systemUptime
+        for _ in 0..<100 {
+            store.updateMetrics(metrics, heightInches: 70)
+        }
+        let elapsed = ProcessInfo.processInfo.systemUptime - clockStart
+        let timing = XCTAttachment(string: "100 refreshes of 1,000 measurements: \(elapsed) seconds")
+        timing.name = "Timeline cache timing"
+        timing.lifetime = .keepAlways
+        add(timing)
+        XCTAssertLessThan(elapsed, 1, "Repeated content refreshes must average less than 10 ms")
+    }
+
+    @MainActor
+    func testStoreInvalidatesCorrectedMeasurementAndHeightWithoutTimestampChange() throws {
+        let store = GlobalTimelineStore(service: service)
+        let date = makeDate(year: 2_026, month: 4, day: 8)
+        let original = makeTimelineMetric(id: "same", date: date, weight: 80, bodyFatPercentage: 20)
+        let corrected = makeTimelineMetric(
+            id: "same", date: date, weight: 82, bodyFatPercentage: 18,
+            bodyFatMethod: "visual_estimate", photoUrl: "https://example.com/corrected.jpg"
+        )
+        store.updateMetrics([original], heightInches: 70)
+        let initialFFMI = try XCTUnwrap(store.monthlyBuckets.first?.metrics.ffmi.value)
+        store.updateMetrics([corrected], heightInches: 70)
+        let snapshot = try XCTUnwrap(store.monthlyBuckets.first?.metrics)
+        XCTAssertEqual(snapshot.weight.value, 82)
+        XCTAssertEqual(snapshot.bodyFat.value, 18)
+        XCTAssertEqual(snapshot.bodyFat.presence, .estimated)
+        XCTAssertEqual(snapshot.canonicalPhotoId, corrected.photoUrl)
+        XCTAssertNotEqual(snapshot.ffmi.value, initialFFMI)
+
+        store.updateMetrics([corrected], heightInches: 76)
+        XCTAssertNotEqual(store.monthlyBuckets.first?.metrics.ffmi.value, snapshot.ffmi.value)
+        store.updateMetrics([corrected], heightInches: nil)
+        XCTAssertNil(store.monthlyBuckets.first?.metrics.ffmi.value)
+    }
+
+    @MainActor
+    func testStoreInvalidatesWhenInterpolationTimeZoneChanges() {
+        let originalZone = NSTimeZone.default
+        defer { NSTimeZone.default = originalZone }
+        NSTimeZone.default = TimeZone(secondsFromGMT: 0)!
+        var builds = 0
+        let store = GlobalTimelineStore(service: service) { scale, metrics, daily, height in
+            builds += 1
+            return self.service.makeBuckets(for: scale, metrics: metrics, dailyMetrics: daily, heightInches: height)
+        }
+        let metric = makeTimelineMetric(date: makeDate(year: 2_026, month: 4, day: 8), weight: 80)
+        store.updateMetrics([metric])
+        builds = 0
+        NSTimeZone.default = TimeZone(secondsFromGMT: 18_000)!
+        store.updateMetrics([metric])
+        XCTAssertEqual(builds, 3)
+    }
+
+    @MainActor
+    func testStoreInvalidatesStepEditsDatesAndEmptyHistory() throws {
+        let store = GlobalTimelineStore(service: service)
+        let april = makeDate(year: 2_026, month: 4, day: 8)
+        let may = makeDate(year: 2_026, month: 5, day: 8)
+        store.updateMetrics([], dailyMetrics: [makeTimelineDailyMetric(id: "same", date: april, steps: 100)])
+        XCTAssertEqual(store.monthlyBuckets.first?.metrics.steps.value, 100)
+        store.updateMetrics([], dailyMetrics: [makeTimelineDailyMetric(id: "same", date: april, steps: 200)])
+        XCTAssertEqual(store.monthlyBuckets.first?.metrics.steps.value, 200)
+        store.updateMetrics([], dailyMetrics: [makeTimelineDailyMetric(id: "same", date: may, steps: 200)])
+        XCTAssertEqual(store.monthlyBuckets.map(\.id), ["2026-M05"])
+        XCTAssertEqual(store.cursor?.bucketId, store.weeklyBuckets.last?.id)
+
+        store.updateMetrics([])
+        XCTAssertTrue(store.weeklyBuckets.isEmpty)
+        XCTAssertTrue(store.monthlyBuckets.isEmpty)
+        XCTAssertTrue(store.yearlyBuckets.isEmpty)
+        XCTAssertNil(store.cursor)
+    }
+
+    func testBucketSweepAssignsBoundariesOnceAcrossEveryScale() throws {
+        let date = makeDate(year: 2_026, month: 4, day: 8)
+        let cases: [(GlobalTimelineScale, Calendar.Component)] = [(.week, .weekOfYear), (.month, .month), (.year, .year)]
+        for (scale, component) in cases {
+            let interval = try XCTUnwrap(calendar.dateInterval(of: component, for: date))
+            let dates = [interval.start.addingTimeInterval(-1), interval.start,
+                         interval.end.addingTimeInterval(-1), interval.end]
+            let metrics = dates.enumerated().map { index, date in
+                makeTimelineMetric(date: date, weight: Double((index + 1) * 10), photoUrl: "photo-\(index)")
+            }
+            let daily = dates.enumerated().map { index, date in
+                makeTimelineDailyMetric(date: date, steps: (index + 1) * 10)
+            }
+            let ignoredDate = interval.start.addingTimeInterval(-86_400 * 400)
+            let buckets = service.makeBuckets(
+                for: scale,
+                metrics: [makeTimelineMetric(date: ignoredDate)] + metrics.reversed(),
+                dailyMetrics: [makeTimelineDailyMetric(date: ignoredDate, steps: 0)] + daily.reversed()
+            )
+            let middle = try XCTUnwrap(buckets.first { $0.startDate == interval.start })
+            XCTAssertEqual(middle.metrics.weight.value, 25)
+            XCTAssertEqual(middle.metrics.steps.value, 50)
+            XCTAssertEqual(middle.metrics.photoCount, 2)
+            XCTAssertEqual(buckets.reduce(0) { $0 + $1.metrics.photoCount }, 4)
+            XCTAssertEqual(buckets.last?.metrics.weight.value, 40)
+            XCTAssertEqual(buckets.last?.metrics.steps.value, 40)
+        }
+    }
+
     private func makeDate(year: Int, month: Int, day: Int) -> Date {
         calendar.date(from: DateComponents(
             timeZone: calendar.timeZone,
@@ -224,6 +365,7 @@ final class GlobalTimelineServiceTests: XCTestCase {
     }
 
     private func makeTimelineMetric(
+        id: String = UUID().uuidString,
         date: Date,
         weight: Double? = nil,
         bodyFatPercentage: Double? = nil,
@@ -231,7 +373,7 @@ final class GlobalTimelineServiceTests: XCTestCase {
         photoUrl: String? = nil
     ) -> BodyMetrics {
         BodyMetrics(
-            id: UUID().uuidString,
+            id: id,
             userId: "timeline-user",
             date: date,
             weight: weight,
@@ -249,9 +391,11 @@ final class GlobalTimelineServiceTests: XCTestCase {
         )
     }
 
-    private func makeTimelineDailyMetric(date: Date, steps: Int) -> DailyMetrics {
+    private func makeTimelineDailyMetric(
+        id: String = UUID().uuidString, date: Date, steps: Int
+    ) -> DailyMetrics {
         DailyMetrics(
-            id: UUID().uuidString,
+            id: id,
             userId: "timeline-user",
             date: date,
             steps: steps,
