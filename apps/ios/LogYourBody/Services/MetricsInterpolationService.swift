@@ -60,7 +60,7 @@ class MetricsInterpolationService {
         /// Returns a recency-weighted "trend" weight using an exponential moving average
         /// over a daily weight series (with linear interpolation for missing days).
         func trendWeight(for date: Date) -> InterpolatedMetric? {
-            guard let firstMetric = metrics.first else { return nil }
+            guard let firstMetric = metrics.first, date >= firstMetric.date else { return nil }
 
             let targetDay = calendar.startOfDay(for: date)
             let firstDay = calendar.startOfDay(for: firstMetric.date)
@@ -85,7 +85,9 @@ class MetricsInterpolationService {
             }
 
             while currentDay <= targetDay {
-                guard let weightResult = estimate(for: currentDay) else {
+                // Seed the first day at its actual measurement time, not an earlier midnight.
+                let sampleDate = currentDay == firstDay ? firstMetric.date : currentDay
+                guard let weightResult = estimate(for: sampleDate) else {
                     guard let nextDay = calendar.date(byAdding: .day, value: 1, to: currentDay) else {
                         break
                     }
