@@ -8,10 +8,36 @@ final class GlobalTimelineStore: ObservableObject {
     @Published private(set) var monthlyBuckets: [GlobalTimelineBucket] = []
     @Published private(set) var yearlyBuckets: [GlobalTimelineBucket] = []
 
-    private let service: GlobalTimelineService
+    typealias BucketBuilder = (GlobalTimelineScale, [BodyMetrics], [DailyMetrics], Double?) -> [GlobalTimelineBucket]
 
-    init(service: GlobalTimelineService = GlobalTimelineService()) {
-        self.service = service
+    private let buildBuckets: BucketBuilder
+    private var contentSignature: ContentSignature?
+
+    private struct ContentSignature: Equatable {
+        let metrics: [BodyMetrics]
+        let dailyMetrics: [DailySignature]
+        let heightInches: Double?
+        let interpolationCalendar: Calendar
+    }
+
+    private struct DailySignature: Equatable {
+        let id: String
+        let userId: String
+        let date: Date
+        let steps: Int?
+
+        init(_ metric: DailyMetrics) {
+            id = metric.id
+            userId = metric.userId
+            date = metric.date
+            steps = metric.steps
+        }
+    }
+
+    init(service: GlobalTimelineService = GlobalTimelineService(), bucketBuilder: BucketBuilder? = nil) {
+        self.buildBuckets = bucketBuilder ?? { scale, metrics, dailyMetrics, heightInches in
+            service.makeBuckets(for: scale, metrics: metrics, dailyMetrics: dailyMetrics, heightInches: heightInches)
+        }
     }
 
     // MARK: - Public API
@@ -21,29 +47,27 @@ final class GlobalTimelineStore: ObservableObject {
         dailyMetrics: [DailyMetrics] = [],
         heightInches: Double? = nil
     ) {
-        weeklyBuckets = service.makeBuckets(
-            for: .week,
+        // Compare values, not just IDs or timestamps: imports can correct an
+        // existing measurement without changing either. Selection is not content.
+        let signature = ContentSignature(
             metrics: metrics,
-            dailyMetrics: dailyMetrics,
-            heightInches: heightInches
+            dailyMetrics: dailyMetrics.map(DailySignature.init),
+            heightInches: heightInches,
+            interpolationCalendar: .current
         )
-        monthlyBuckets = service.makeBuckets(
-            for: .month,
-            metrics: metrics,
-            dailyMetrics: dailyMetrics,
-            heightInches: heightInches
-        )
-        yearlyBuckets = service.makeBuckets(
-            for: .year,
-            metrics: metrics,
-            dailyMetrics: dailyMetrics,
-            heightInches: heightInches
-        )
+        if signature != contentSignature {
+            contentSignature = signature
+            weeklyBuckets = buildBuckets(.week, metrics, dailyMetrics, heightInches)
+            monthlyBuckets = buildBuckets(.month, metrics, dailyMetrics, heightInches)
+            yearlyBuckets = buildBuckets(.year, metrics, dailyMetrics, heightInches)
+        }
 
-        if cursor == nil {
-            cursor = service.makeInitialCursor(for: metrics, dailyMetrics: dailyMetrics)
-        } else if let currentCursor = cursor, bucket(for: currentCursor) == nil {
-            cursor = service.makeInitialCursor(for: metrics, dailyMetrics: dailyMetrics)
+        if cursor.flatMap({ bucket(for: $0) }) == nil {
+            // The weekly buckets already contain everything needed for the
+            // initial cursor; avoid constructing the same scale a fourth time.
+            cursor = weeklyBuckets.last.map {
+                GlobalTimelineCursor(date: $0.endDate, scale: .week, bucketId: $0.id)
+            }
         }
     }
 
