@@ -468,7 +468,7 @@ struct SuccessOverlay: View {
             VStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.largeTitle)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.appSuccess)
 
                 Text(message)
                     .font(.headline)

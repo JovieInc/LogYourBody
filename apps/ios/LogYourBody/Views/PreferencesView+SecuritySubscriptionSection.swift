@@ -38,7 +38,7 @@ extension PreferencesView {
             icon: "crown.fill",
             title: subscriptionStatusText,
             subtitle: subscriptionPlanDisplay,
-            tintColor: subscriptionManager.isSubscribed ? nil : .orange
+            tintColor: subscriptionManager.isSubscribed ? nil : Color.appWarning
         )
         .accessibilityIdentifier("settings_subscription_status_row")
     }

@@ -657,7 +657,7 @@ struct PhotoGridItem: View {
                             Spacer()
                             Image(systemName: "star.fill")
                                 .font(.caption)
-                                .foregroundColor(.yellow)
+                                .foregroundColor(Color.appWarning)
                                 .padding(8)
                         }
                         Spacer()

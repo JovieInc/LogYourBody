@@ -288,7 +288,7 @@ struct SettingsRow_Previews: PreviewProvider {
                         leading: AnyView(
                             Image(systemName: "figure.run")
                                 .font(.title3)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Color.appWarning)
                         ),
                         trailing: AnyView(
                             Text("2h ago")
@@ -303,7 +303,7 @@ struct SettingsRow_Previews: PreviewProvider {
                         leading: AnyView(
                             Image(systemName: "scalemass")
                                 .font(.title3)
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(Color.appPrimary)
                         ),
                         trailing: AnyView(
                             Text("Yesterday")

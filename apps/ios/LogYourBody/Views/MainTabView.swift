@@ -348,14 +348,14 @@ private struct PaidWeightLoggerMVPView: View {
             if let weightValidationMessage {
                 Label(weightValidationMessage, systemImage: "exclamationmark.circle.fill")
                     .font(.footnote.weight(.medium))
-                    .foregroundColor(.orange)
+                    .foregroundColor(Color.appWarning)
                     .accessibilityIdentifier("mvp_weight_validation_message")
             }
 
             if let savedMessage {
                 Label(savedMessage, systemImage: "checkmark.circle.fill")
                     .font(.footnote.weight(.medium))
-                    .foregroundColor(.green)
+                    .foregroundColor(Color.appSuccess)
                     .accessibilityIdentifier("mvp_weight_saved_message")
             }
 
@@ -489,15 +489,15 @@ private struct PaidWeightLoggerMVPView: View {
     private var syncStatusColor: Color {
         switch realtimeSyncManager.syncStatus {
         case .success:
-            return .green
+            return Color.appSuccess
         case .syncing:
             return .appPrimary
         case .error:
-            return .orange
+            return Color.appWarning
         case .offline:
             return .gray
         case .idle:
-            return realtimeSyncManager.pendingSyncCount > 0 ? .orange : .green
+            return realtimeSyncManager.pendingSyncCount > 0 ? Color.appWarning : Color.appSuccess
         }
     }
 
@@ -788,7 +788,7 @@ struct ChatTabView: View {
                     .accessibilityLabel("Loading conversation")
             } else {
                 Circle()
-                    .fill(chatErrorMessage == nil ? theme.colors.accentTeal : Color.orange)
+                    .fill(chatErrorMessage == nil ? theme.colors.accentTeal : Color.appWarning)
                     .frame(width: 8, height: 8)
                     .accessibilityHidden(true)
             }
@@ -887,7 +887,7 @@ struct ChatTabView: View {
             if let chatErrorMessage {
                 HStack(alignment: .center, spacing: 10) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(Color.orange)
+                        .foregroundStyle(Color.appWarning)
 
                     Text(chatErrorMessage)
                         .font(.system(size: 13, weight: .medium))

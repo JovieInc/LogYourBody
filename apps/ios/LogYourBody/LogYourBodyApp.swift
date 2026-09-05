@@ -143,7 +143,7 @@ private struct PersistentStoreRecoveryView: View {
             VStack(spacing: 20) {
                 Image(systemName: "externaldrive.badge.exclamationmark")
                     .font(.system(size: 42))
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(Color.appWarning)
                     .accessibilityHidden(true)
 
                 Text("Your data couldn’t be opened")

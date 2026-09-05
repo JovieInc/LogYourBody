@@ -306,7 +306,7 @@ struct FrostedTabItem: View {
                 // print("Tapped")
             }
 
-            GlassChip(icon: "flame.fill", text: "12.1% BF", color: .orange)
+            GlassChip(icon: "flame.fill", text: "12.1% BF", color: Color.appWarning)
         }
         .padding()
     }

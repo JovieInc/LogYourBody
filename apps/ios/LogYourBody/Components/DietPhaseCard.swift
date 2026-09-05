@@ -30,9 +30,9 @@ struct DietPhaseCard: View {
 
         var color: Color {
             switch self {
-            case .bulk: return Color.blue
-            case .cut: return Color.orange
-            case .maintenance: return Color.green
+            case .bulk: return Color.appPrimary
+            case .cut: return Color.appWarning
+            case .maintenance: return Color.appSuccess
             }
         }
     }
@@ -223,7 +223,7 @@ private struct ChangeItem: View {
 
     private var changeColor: Color {
         guard let isPositive = isPositive else { return .appTextSecondary }
-        return isPositive ? .green : .red
+        return isPositive ? Color.appSuccess : Color.appError
     }
 
     private var changeIcon: String {

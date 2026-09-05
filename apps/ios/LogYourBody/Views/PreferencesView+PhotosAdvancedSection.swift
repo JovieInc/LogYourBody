@@ -47,7 +47,7 @@ extension PreferencesView {
                     title: "Delete account",
                     subtitle: "Permanently remove your account and data.",
                     showChevron: false,
-                    tintColor: .red
+                    tintColor: Color.appError
                 )
             }
             .accessibilityLabel("Delete account")
