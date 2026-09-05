@@ -187,6 +187,32 @@ final class GlobalTimelineServiceTests: XCTestCase {
         XCTAssertEqual(april.metrics.ffmi.presence, .estimated)
     }
 
+    func testTimelineFFMIMatchesHomeAndBodyScoreAcrossHeights() throws {
+        let date = Calendar.current.startOfDay(for: makeDate(year: 2_026, month: 4, day: 8))
+        let metric = makeTimelineMetric(date: date, weight: 77.3, bodyFatPercentage: 12.1)
+
+        for heightCm in [165.0, 180.0, 193.0] {
+            let heightInches = heightCm / 2.54
+            let buckets = service.makeBuckets(
+                for: .month, metrics: [metric], dailyMetrics: [], heightInches: heightInches
+            )
+            let timelineFFMI = try XCTUnwrap(buckets.first?.metrics.ffmi.value)
+            let homeFFMI = try XCTUnwrap(MetricsInterpolationService.shared.estimateFFMI(
+                for: date, metrics: [metric], heightInches: heightInches
+            )).value
+            let input = BodyScoreInput(
+                sex: .male,
+                height: HeightValue(value: heightCm, unit: .centimeters),
+                weight: WeightValue(value: 77.3, unit: .kilograms),
+                bodyFat: BodyFatValue(percentage: 12.1, source: .manualValue)
+            )
+            let score = try BodyScoreCalculator().calculateScore(context: .init(input: input))
+
+            XCTAssertEqual(timelineFFMI, homeFFMI, accuracy: 0.001, "Height: \(heightCm)")
+            XCTAssertEqual(timelineFFMI, score.ffmi, accuracy: 0.001, "Height: \(heightCm)")
+        }
+    }
+
     private func makeDate(year: Int, month: Int, day: Int) -> Date {
         calendar.date(from: DateComponents(
             timeZone: calendar.timeZone,
