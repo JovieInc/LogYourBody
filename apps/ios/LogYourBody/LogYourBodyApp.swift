@@ -483,19 +483,6 @@ struct LogYourBodyApp: App {
             goalWeightUnit: "kg",
             onboardingCompleted: !usesBodyScoreOnboardingFixture
         )
-        authManager.currentUser = User(
-            id: userId,
-            email: fixtureEmail,
-            name: fixtureName,
-            profile: profile,
-            onboardingCompleted: !usesBodyScoreOnboardingFixture
-        )
-        authManager.authSession = .localFixture(
-            subject: userId,
-            email: fixtureEmail,
-            name: fixtureName
-        )
-        authManager.isAuthProviderLoaded = true
         subscriptionManager.isSubscribed = isSubscribed
         subscriptionManager.customerInfo = nil
         subscriptionManager.currentOffering = nil
@@ -534,6 +521,23 @@ struct LogYourBodyApp: App {
             !arguments.contains("-lybUITestGlp1EmptyMedicationFixture") {
             await seedGlp1WeeklyCheckInUITestFixtureData(userId: userId)
         }
+
+        // Publish the authenticated fixture only after its data and service
+        // state are ready. Otherwise the dashboard can load a partially seeded
+        // history while the remaining Core Data saves are still suspended.
+        authManager.currentUser = User(
+            id: userId,
+            email: fixtureEmail,
+            name: fixtureName,
+            profile: profile,
+            onboardingCompleted: !usesBodyScoreOnboardingFixture
+        )
+        authManager.authSession = .localFixture(
+            subject: userId,
+            email: fixtureEmail,
+            name: fixtureName
+        )
+        authManager.isAuthProviderLoaded = true
 
         return true
     }
@@ -582,6 +586,14 @@ struct LogYourBodyApp: App {
                 markAsSynced: entry.source != "manual"
             )
         }
+
+        let savedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+        let savedIds = savedMetrics.compactMap { $0.toBodyMetrics()?.id }
+        let expectedIds = Set(entries.map { "ui_test_full_dashboard_metric_\($0.daysAgo)" })
+        precondition(
+            savedIds.count == entries.count && Set(savedIds) == expectedIds,
+            "Dashboard UI fixture expected \(entries.count) saved measurements, found \(savedIds.count)"
+        )
     }
 
     private func seedGlp1WeeklyCheckInUITestFixtureData(userId: String) async {

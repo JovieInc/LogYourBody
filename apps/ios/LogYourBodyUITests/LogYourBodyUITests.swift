@@ -816,13 +816,10 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "launch-quality-chat-tab", from: app)
         collapseHomeChat(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
+    }
 
-        launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
-        try assertAndCaptureOnboardingFixedCTA(in: app)
-
-        launch(app, with: ["-lybUITestBodyScoreFirstPhotoFixture"])
-        try assertAndCaptureOnboardingFirstPhotoCTA(in: app)
-
+    func testLaunchQualityGateCapturesTimelineSurfaces() throws {
+        let app = XCUIApplication()
         launch(
             app,
             with: [
@@ -834,7 +831,8 @@ final class LogYourBodyUITests: XCTestCase {
         try assertAndCaptureTimelineHomeSurface(in: app)
         try assertAndCaptureBodyScoreShareSheet(in: app)
 
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        // Preserve the loaded history and selected snapshot across all three
+        // surfaces; a relaunch briefly exposes only the newest measurement.
         try assertAndCaptureTimelineAnalytics(in: app)
     }
 
@@ -1236,17 +1234,19 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertLessThanOrEqual(timeline.frame.maxX, windowFrame.maxX + 1)
 
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+        _ = try homeFFMIValue(in: app)
         attachScreenshot(named: "launch-quality-home-timeline", from: app)
     }
 
     private func assertAndCaptureBodyScoreShareSheet(in app: XCUIApplication) throws {
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+        let homeFFMI = try homeFFMIValue(in: app)
 
         let timeline = app.descendants(matching: .any)["launch_timeline_surface"]
         XCTAssertTrue(timeline.waitForExistence(timeout: 20))
 
         let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
-        XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(shareButton.exists || shareButton.waitForExistence(timeout: 5))
         scrollUntilHittable(shareButton, in: app)
         XCTAssertTrue(shareButton.isHittable)
         shareButton.tap()
@@ -1267,7 +1267,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["body_score_share_system_button"].exists)
 
         let closeButton = app.descendants(matching: .any)["body_score_share_close_button"]
-        XCTAssertTrue(closeButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(closeButton.exists || closeButton.waitForExistence(timeout: 3))
         XCTAssertTrue(closeButton.isHittable, "Close must stay tappable outside the safe-area notch")
 
         let cardFrame = shareCard.frame
@@ -1279,6 +1279,20 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertGreaterThan(cardFrame.height, cardFrame.width * 1.18)
         XCTAssertGreaterThan(cardFrame.minY, windowFrame.minY + 72)
         XCTAssertLessThanOrEqual(cardFrame.maxY, windowFrame.maxY - 72)
+        let includedControls = app.staticTexts["Included on card"]
+        includedControls.tap()
+        let includeFFMI = app.switches["FFMI"]
+        XCTAssertTrue(includeFFMI.exists || includeFFMI.waitForExistence(timeout: 5))
+        if includeFFMI.value as? String != "1" {
+            includeFFMI.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        }
+        XCTAssertEqual(includeFFMI.value as? String, "1", "FFMI must be opted into the shared card")
+        includedControls.tap()
+        let sharedFFMI = shareCard.descendants(matching: .any).matching(
+            NSPredicate(format: "label MATCHES %@", #"^FFMI[,\s]+[0-9].*"#)
+        ).firstMatch
+        XCTAssertTrue(sharedFFMI.exists || sharedFFMI.waitForExistence(timeout: 5))
+        XCTAssertEqual(try ffmiValue(from: sharedFFMI), homeFFMI, "Share must use the same snapshot FFMI as Home")
         attachScreenshot(named: "launch-quality-body-score-share", from: app)
 
         // Escape path: Close must actually dismiss the full-screen overlay.
@@ -1295,38 +1309,66 @@ final class LogYourBodyUITests: XCTestCase {
 
     private func assertAndCaptureTimelineAnalytics(in app: XCUIApplication) throws {
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        let homeFFMI = try homeFFMIValue(in: app)
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists)
 
         openStatsPage(in: app)
 
         let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
-        if !analyticsPage.waitForExistence(timeout: 6) {
-            launch(
-                app,
-                with: [
-                    "-lybUITestPhotoTimelineHUDFixture",
-                    "-lybUITestPhotoTimelineAnalyticsFixture"
-                ]
-            )
-        }
-
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 10))
+        XCTAssertTrue(analyticsPage.exists || analyticsPage.waitForExistence(timeout: 10),
+                      "Stats must be reached through the menu without relaunching the app")
         let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]
-        XCTAssertTrue(presenceSummary.waitForExistence(timeout: 5))
+        XCTAssertTrue(presenceSummary.exists || presenceSummary.waitForExistence(timeout: 5))
         XCTAssertTrue(presenceSummary.label.contains("Measured"))
         XCTAssertTrue(presenceSummary.label.contains("Interpolated"))
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_stack"].exists)
         let weightCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"]
-        XCTAssertTrue(weightCard.waitForExistence(timeout: 10))
+        XCTAssertTrue(weightCard.exists || weightCard.waitForExistence(timeout: 10))
         let bodyFatCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_body_fat"]
-        XCTAssertTrue(bodyFatCard.waitForExistence(timeout: 5))
+        XCTAssertTrue(bodyFatCard.exists || bodyFatCard.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Timeline states"].exists)
         attachScreenshot(named: "launch-quality-analytics", from: app)
         let ffmiCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_ffmi"]
         scrollUntilExists(ffmiCard, in: app)
-        XCTAssertTrue(ffmiCard.waitForExistence(timeout: 5))
+        XCTAssertTrue(ffmiCard.exists || ffmiCard.waitForExistence(timeout: 5))
+        XCTAssertEqual(try ffmiValue(from: ffmiCard), homeFFMI, "Stats must use the same snapshot FFMI as Home")
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
+    }
+
+    private func homeFFMIValue(in app: XCUIApplication) throws -> String {
+        // The dashboard deliberately paints the newest measurement before
+        // hydrating history. Compare one fully loaded five-measurement fixture,
+        // not values computed from different histories during startup.
+        let handle = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "Timeline scrubber")
+        ).firstMatch
+        let historyLoaded = NSPredicate(format: "value ENDSWITH %@", "of 5")
+        let ready = XCTNSPredicateExpectation(predicate: historyLoaded, object: handle)
+        let result = XCTWaiter.wait(for: [ready], timeout: 10)
+        if result != .completed {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "ffmi-history-readiness-hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertEqual(result, .completed, "FFMI parity requires the complete fixture history")
+        let metric = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "FFMI ")).firstMatch
+        XCTAssertTrue(metric.exists || metric.waitForExistence(timeout: 10))
+        return try ffmiValue(from: metric)
+    }
+
+    private func ffmiValue(from element: XCUIElement) throws -> String {
+        // Read the headline immediately following the title, not a matching
+        // number in a delta, chart label or average elsewhere in the card.
+        let label = element.label
+        let expression = try NSRegularExpression(pattern: #"^FFMI[,\s]+([0-9]+(?:\.[0-9]+)?)"#)
+        let match = try XCTUnwrap(
+            expression.firstMatch(in: label, range: NSRange(label.startIndex..., in: label)),
+            "Expected a displayed FFMI headline, got: \(label)"
+        )
+        let range = try XCTUnwrap(Range(match.range(at: 1), in: label))
+        return String(label[range])
     }
 
     private func openIntegrations(in app: XCUIApplication) throws {
