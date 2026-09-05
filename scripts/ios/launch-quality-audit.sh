@@ -10,6 +10,7 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$IOS_DIR/test_results/launch-quality-audit/$STAMP}"
 RUN_SWIFTLINT="${RUN_SWIFTLINT:-true}"
 RUN_STATIC_UI_REGRESSION_AUDIT="${RUN_STATIC_UI_REGRESSION_AUDIT:-true}"
+RUN_OPTICAL_GRID_AUDIT="${RUN_OPTICAL_GRID_AUDIT:-true}"
 RUN_RUNTIME_WARNING_AUDIT="${RUN_RUNTIME_WARNING_AUDIT:-true}"
 FAIL_ON_RUNTIME_WARNINGS="${FAIL_ON_RUNTIME_WARNINGS:-false}"
 XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO}"
@@ -234,6 +235,17 @@ else
   echo "Skipping static launch UI regression audit" | tee "$ARTIFACT_DIR/launch-ui-regression-audit.log"
 fi
 
+if [[ "$RUN_OPTICAL_GRID_AUDIT" == "true" ]]; then
+  # optical-grid-consistent-v1: shrink-only drift ratchet against
+  # scripts/ios/optical-grid-baseline.json (spacing, radius, palette, type).
+  python3 "$ROOT_DIR/scripts/ios/optical-grid-audit.py" \
+    --root "$ROOT_DIR" \
+    --artifact-dir "$ARTIFACT_DIR" |
+    tee "$ARTIFACT_DIR/optical-grid-audit.log"
+else
+  echo "Skipping optical grid audit" | tee "$ARTIFACT_DIR/optical-grid-audit.log"
+fi
+
 build_for_testing_once
 
 # The whole unit target is the gate: every journey test in docs/USER_JOURNEYS.md
@@ -265,6 +277,7 @@ fi
   printf '# iOS Launch Quality Audit\n\n'
   printf -- '- Destination: `%s`\n' "$DESTINATION"
   printf -- '- Static UI regression audit: `launch-ui-regression-audit.md`\n'
+  printf -- '- Optical grid drift ratchet: `optical-grid-audit.md`\n'
   printf -- '- Unit coverage: photo timeline HUD launch policy, Body Score share card layout\n'
   printf -- '- Fixture UI coverage: home hero + chat composer, Jovie swipe/menu Timeline/Stats, one timeline scrubber, home/analytics/onboarding/share screenshot attachments\n'
   printf -- '- Evidence scope: `fixture_ui`; injected auth and entitlement state. Real Sign in with Apple, purchase, and restore remain `not_verified`.\n'
