@@ -1,0 +1,17 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/ios/launch-quality-audit.sh",
+        "$TURBO_ROOT$/scripts/ios/launch-quality-evidence.py",
+        "$TURBO_ROOT$/scripts/ios/test_launch_quality_evidence.py",
+        "$TURBO_ROOT$/.github/workflows/deploy.yml",
+        "$TURBO_ROOT$/apps/ios/fastlane/Fastfile",
+        "$TURBO_ROOT$/apps/ios/fastlane/Fastfile.release",
+        "$TURBO_ROOT$/.github/workflows/ios-testflight-deploy.yml"
+      ]
+    }
+  }
+}
