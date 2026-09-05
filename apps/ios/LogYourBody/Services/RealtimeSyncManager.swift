@@ -29,7 +29,7 @@ class RealtimeSyncManager: ObservableObject {
     // MARK: - Private Properties
     nonisolated let coreDataManager: CoreDataManager
     nonisolated let authManager: AuthManager
-    nonisolated let supabaseManager: SupabaseManager
+    nonisolated let productAPIClient: ProductAPIClient
     let networkMonitor: NWPathMonitor
 
     var syncTimer: Timer?
@@ -75,7 +75,7 @@ class RealtimeSyncManager: ObservableObject {
     init() {
         coreDataManager = CoreDataManager.shared
         authManager = AuthManager.shared
-        supabaseManager = SupabaseManager.shared
+        productAPIClient = ProductAPIClient.shared
         networkMonitor = NWPathMonitor()
 
         setupNetworkMonitoring()
@@ -87,12 +87,12 @@ class RealtimeSyncManager: ObservableObject {
     init(
         coreDataManager: CoreDataManager,
         authManager: AuthManager,
-        supabaseManager: SupabaseManager,
+        productAPIClient: ProductAPIClient,
         networkMonitor: NWPathMonitor = NWPathMonitor()
     ) {
         self.coreDataManager = coreDataManager
         self.authManager = authManager
-        self.supabaseManager = supabaseManager
+        self.productAPIClient = productAPIClient
         self.networkMonitor = networkMonitor
     }
 }

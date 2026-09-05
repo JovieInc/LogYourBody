@@ -198,7 +198,7 @@ No changes required - all existing components continue to work as legacy wrapper
     - Edit first/last name and consolidated display name
     - Edit date of birth, height (metric/imperial), and biological sex
     - Manage profile photo upload
-    - Drive profile persistence via `AuthManager` + Core Data + Supabase
+    - Drive profile persistence via `AuthManager` + Core Data + first-party API
   - Presentation:
     - Presented as a sheet from `PreferencesView` when the user taps
       **Full name**, **Date of birth**, or **Height** in the Profile section.

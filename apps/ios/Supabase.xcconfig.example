@@ -1,9 +1,0 @@
-// Supabase Configuration Example
-// Copy this file to Supabase.xcconfig and fill in your actual values
-// Do not commit Supabase.xcconfig to version control
-
-// Supabase URL
-SUPABASE_URL = https://your-project.supabase.co
-
-// Supabase Anonymous Key
-SUPABASE_ANON_KEY = your-anon-key-here

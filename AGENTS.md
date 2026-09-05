@@ -18,7 +18,7 @@ LogYourBody/
 │   ├── design-tokens/ # Shared design tokens
 │   ├── product-registry/ # Canonical product identity and endpoints
 │   └── shared-lib/    # CI policy / migration guards
-├── supabase/          # Legacy photo/export/deletion functions (JOV-4831 owns cutover)
+├── apps/web/db/       # Canonical Neon migrations
 ├── .github/           # GitHub Actions workflows and configurations
 └── docs/              # Project documentation
 ```
@@ -415,7 +415,6 @@ The sections below provide platform-specific details for iOS and web development
 ### Important Files
 
 - `LogYourBody.xcodeproj` - Xcode project file
-- `Supabase.xcconfig` - Supabase configuration (not in git)
 - `LogYourBody/Config.xcconfig` - App configuration (not in git)
 - `CLAUDE.md` - Legacy iOS-specific AI assistant context (all guidance now mirrored here)
 
@@ -531,7 +530,6 @@ pnpm --filter apps/web build
 
 - iOS: Core Data is the device source of truth
 - Cloud: Neon via first-party bearer APIs (native never talks to Postgres)
-- Legacy Supabase remains only for photo processing / export / account-deletion helpers until JOV-4831 completes cutover
 
 ## Testing
 
@@ -680,13 +678,13 @@ All external services (feature flags, analytics, email/notifications, payments, 
 
 - iOS: Use Xcode debugger and Instruments
 - Web: Chrome DevTools, React Developer Tools
-- Both: Check Supabase logs for backend issues
+- Both: Check first-party API and Neon logs for backend issues
 
 ### Performance
 
 - iOS: Profile with Instruments, optimize Core Data queries
 - Web: Use Lighthouse, optimize bundle size
-- Both: Monitor Supabase query performance
+- Both: Monitor Neon query performance
 
 ---
 

@@ -16,10 +16,10 @@ class PhotoUploadManager: ObservableObject {
     @Published var currentUploadTask: UploadTask?
 
     private let authManager = AuthManager.shared
-    private let supabaseManager = SupabaseManager.shared
+    private let productAPIClient = ProductAPIClient.shared
     private let coreDataManager = CoreDataManager.shared
-    private let supabaseTokenProvider: () async -> String?
-    private let supabaseBaseURL: String
+    private let accessTokenProvider: () async -> String?
+    private let apiBaseURL: String
     private let storageSessionProvider: () -> URLSession
     private let functionSessionProvider: () -> URLSession
     private var uploadCancellables = Set<AnyCancellable>()
@@ -64,8 +64,8 @@ class PhotoUploadManager: ObservableObject {
     }
 
     private init() {
-        supabaseTokenProvider = { await AuthManager.shared.getAccessToken() }
-        supabaseBaseURL = Configuration.apiBaseURL
+        accessTokenProvider = { await AuthManager.shared.getAccessToken() }
+        apiBaseURL = Configuration.apiBaseURL
         storageSessionProvider = {
             let configuration = URLSessionConfiguration.default
             configuration.timeoutIntervalForRequest = 60.0 // 60 seconds
@@ -83,19 +83,19 @@ class PhotoUploadManager: ObservableObject {
     /// wires `AuthManager`, `Configuration.apiBaseURL`, and the production
     /// sessions.
     init(
-        supabaseTokenProvider: @escaping () async -> String?,
-        supabaseBaseURL: String,
+        accessTokenProvider: @escaping () async -> String?,
+        apiBaseURL: String,
         storageSession: URLSession,
         functionSession: URLSession
     ) {
-        self.supabaseTokenProvider = supabaseTokenProvider
-        self.supabaseBaseURL = supabaseBaseURL
+        self.accessTokenProvider = accessTokenProvider
+        self.apiBaseURL = apiBaseURL
         storageSessionProvider = { storageSession }
         functionSessionProvider = { functionSession }
     }
 
     private func mapUploadEndpointError(_ error: Error, action: String) -> PhotoError {
-        if error is SupabaseError {
+        if error is ProductAPIError {
             return .uploadFailed("\(action) is temporarily unavailable. Please try again.")
         }
 
@@ -136,7 +136,7 @@ class PhotoUploadManager: ObservableObject {
     }
 
     private func authenticatedJWT() async throws -> String {
-        guard let token = await supabaseTokenProvider() else {
+        guard let token = await accessTokenProvider() else {
             throw PhotoError.notAuthenticated
         }
 
@@ -346,7 +346,7 @@ class PhotoUploadManager: ObservableObject {
         byteSize: Int
     ) async throws -> RemotePhotoUploadTicket {
         let token = try await authenticatedJWT()
-        let base = supabaseBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let base = apiBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard let url = URL(string: "\(base)/api/auth/mobile/photos") else {
             throw PhotoError.uploadFailed("Photo upload is temporarily unavailable. Please try again.")
         }
@@ -435,7 +435,7 @@ class PhotoUploadManager: ObservableObject {
             throw PhotoError.uploadFailed("Photo upload is temporarily unavailable. Please try again.")
         }
 
-        let apiHost = URL(string: supabaseBaseURL)?.host?.lowercased()
+        let apiHost = URL(string: apiBaseURL)?.host?.lowercased()
         let isCloudflareR2 = host == "r2.cloudflarestorage.com" ||
             host.hasSuffix(".r2.cloudflarestorage.com")
         let isFirstPartyAPIHost = apiHost.map { host == $0 } ?? false

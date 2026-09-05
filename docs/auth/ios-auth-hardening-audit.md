@@ -1,8 +1,8 @@
 # iOS shared identity security notes
 
-The iOS identity boundary is `AuthManager`. Product, sync, photo, and Supabase
-code obtain an access token through that app-owned boundary; no vendor SDK is
-imported by product code.
+The iOS identity boundary is `AuthManager`. Product, sync, and photo code obtain
+an access token through that app-owned boundary; no vendor SDK is imported by
+product code.
 
 Controls:
 
@@ -20,7 +20,6 @@ Controls:
 - Google, SMS, email OTP, and password authentication are absent from the
   current product surface. Twilio funding and credential rollout are deferred.
 
-Jovie access tokens are accepted only by LYB/Jovie first-party APIs. The legacy
-Supabase data plane is fail-closed during the Neon cutover and must not receive
-or attempt to validate a Jovie token. See `shared-identity-architecture.md` and
-`ios-apple-auth-smoke-test.md` for rollout proof.
+Jovie access tokens are accepted only by LYB/Jovie first-party APIs backed by
+Neon. See `shared-identity-architecture.md` and `ios-apple-auth-smoke-test.md`
+for rollout proof.

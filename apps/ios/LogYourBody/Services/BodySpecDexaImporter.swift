@@ -142,7 +142,7 @@ actor BodySpecDexaImporter {
                 RealtimeSyncManager.shared.syncIfNeeded()
             }
 
-            // Best-effort upsert of DEXA metadata to Supabase
+            // Best-effort upsert of DEXA metadata to ProductAPI
             let dexaResult = DexaResult(
                 id: UUID().uuidString,
                 userId: userId,

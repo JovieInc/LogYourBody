@@ -102,7 +102,6 @@ function collectStrings(value, out = []) {
 }
 
 const registered = collectStrings(endpoints);
-registered.push(`https://${endpoints.vendor.supabaseProjectRef}.supabase.co`);
 
 const urlValues = []; // full scheme://... values -> exact or path-prefix match
 const hostValues = []; // bare hosts -> host-suffix match
@@ -176,9 +175,6 @@ function isFixtureSafe(literal) {
   if (host === 'example.com' || host.endsWith('.example.com')) return true;
   if (host === 'bodyspec.test' || host.endsWith('.bodyspec.test')) return true;
   if (host === 'ingest.sentry.io' || host.endsWith('.ingest.sentry.io')) return true;
-  if (host === 'supabase.co' || host.endsWith('.supabase.co')) {
-    return /placeholder|example|local-build|test|proj/.test(host);
-  }
   return false;
 }
 

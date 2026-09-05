@@ -72,7 +72,7 @@ We ask that you:
 
 LogYourBody implements several security measures:
 
-- **Authentication**: Secure user authentication via Supabase Auth
+- **Authentication**: Secure user authentication via Jovie Better Auth
 - **Data Encryption**: All data is encrypted in transit and at rest
 - **Access Control**: Row Level Security (RLS) policies protect user data
 - **Input Validation**: All user inputs are validated and sanitized
@@ -84,7 +84,7 @@ LogYourBody implements several security measures:
 
 We rely on several third-party services:
 
-- **Supabase**: Database and authentication
+- **Neon**: Product database hosting
 - **Stripe**: Payment processing
 - **RevenueCat**: Subscription management
 - **Vercel**: Hosting and deployment

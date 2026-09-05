@@ -79,7 +79,7 @@ final class PhotoUploadManagerTests: XCTestCase {
 
     // MARK: - First-party photo store fail-closed
 
-    func testRemotePhotoStoreUnavailableFailsClosedWithoutSupabaseStorage() async throws {
+    func testRemotePhotoStoreUnavailableFailsClosedWithoutProductAPIStorage() async throws {
         let userId = "photo_upload_user_\(UUID().uuidString)"
         let metricId = UUID().uuidString
         let metrics = try await seedPhotoPlaceholder(id: metricId, userId: userId)
@@ -180,7 +180,7 @@ final class PhotoUploadManagerTests: XCTestCase {
 
     // MARK: - Cloudflare R2 upload
 
-    func testSignedR2PutPersistsPhotoURLWithoutSupabaseStorage() async throws {
+    func testSignedR2PutPersistsPhotoURLWithoutProductAPIStorage() async throws {
         let userId = "photo_r2_user_\(UUID().uuidString)"
         let metricId = UUID().uuidString
         let metrics = try await seedPhotoPlaceholder(id: metricId, userId: userId)
@@ -315,8 +315,8 @@ final class PhotoUploadManagerTests: XCTestCase {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         let session = URLSession(configuration: configuration)
         return PhotoUploadManager(
-            supabaseTokenProvider: { token },
-            supabaseBaseURL: "https://\(PhotoUploadStubURLProtocol.stubHost)",
+            accessTokenProvider: { token },
+            apiBaseURL: "https://\(PhotoUploadStubURLProtocol.stubHost)",
             storageSession: session,
             functionSession: session
         )

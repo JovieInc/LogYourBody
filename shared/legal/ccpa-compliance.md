@@ -175,7 +175,6 @@ Sensitive information we collect:
 
 - **Jovie**: Authentication services
 - **Neon**: Database hosting
-- **Supabase**: Legacy photo processing and account-deletion helpers
 - **Cloudflare R2**: Progress-photo storage
 - **AWS**: Cloud infrastructure
 - **RevenueCat**: Subscription and purchase entitlements

@@ -20,15 +20,10 @@
     "prepush": "pnpm run check",
     "db:migrate": "../../scripts/web/create-migration.sh",
     "db:apply:neon": "tsx scripts/apply-neon-migrations.ts",
-    "db:push": "supabase --workdir ../../supabase db push",
-    "db:push:local": "supabase --workdir ../../supabase db push --local",
-    "db:status": "supabase --workdir ../../supabase db remote list",
     "test:e2e": "playwright test",
     "test:visual-qa": "playwright test --config playwright.config.visual-qa.ts",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:update": "playwright test --update-snapshots",
-    "seed": "tsx scripts/seed-database.ts",
-    "test:seed": "tsx scripts/test-seeded-users.ts"
+    "test:e2e:update": "playwright test --update-snapshots"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
@@ -64,8 +59,6 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@radix-ui/react-visually-hidden": "^1.2.3",
     "@statsig/js-client": "^3.30.0",
-    "@supabase/ssr": "^0.6.1",
-    "@supabase/supabase-js": "^2.51.0",
     "@tailwindcss/postcss": "^4.1.11",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/react-query": "^5.83.0",

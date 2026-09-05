@@ -327,7 +327,7 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         XCTAssertEqual(metrics.filter { $0.dataSource == BodyMetricSource.bodySpecDexa.rawValue }.count, 1)
     }
 
-    func testUpdateOrCreateBodyMetric_MapsSupabasePayload() async throws {
+    func testUpdateOrCreateBodyMetric_MapsProductAPIPayload() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -348,7 +348,7 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
             "muscle_mass": 35.0,
             "bone_mass": 4.2,
             "photo_url": "https://example.com/photo.jpg",
-            "notes": "supabase-mapped",
+            "notes": "productAPI-mapped",
             "data_source": "HealthKit",
             "source_metadata": [
                 "sample_id": "hk-sample-123",
@@ -382,7 +382,7 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         XCTAssertEqual(bone, 4.2, accuracy: 0.001)
 
         XCTAssertEqual(metric.photoUrl, "https://example.com/photo.jpg")
-        XCTAssertEqual(metric.notes, "supabase-mapped")
+        XCTAssertEqual(metric.notes, "productAPI-mapped")
         XCTAssertEqual(metric.dataSource, "healthkit")
         XCTAssertEqual(metric.sourceMetadata?.sampleId, "hk-sample-123")
         XCTAssertEqual(metric.sourceMetadata?.deviceModel, "Withings Body Scan")

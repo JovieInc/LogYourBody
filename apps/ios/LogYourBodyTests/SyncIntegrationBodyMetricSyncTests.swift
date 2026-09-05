@@ -180,7 +180,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertEqual(nextDayMetric.bodyFatMethod, "HealthKit")
     }
 
-    func testSyncLocalChanges_UsesSupabaseAndMarksBodyMetricSynced() async throws {
+    func testSyncLocalChanges_UsesProductAPIAndMarksBodyMetricSynced() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -211,20 +211,20 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
 
         try await coreData.saveBodyMetricsAndWait(metricModel, userId: userId)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await Task.detached {
             try await manager.syncLocalChanges(token: "test-token")
         }.value
 
-        // Verify Supabase payload
-        XCTAssertEqual(stubSupabase.bodyMetricsBatches.count, 1)
-        guard let batch = stubSupabase.bodyMetricsBatches.first,
+        // Verify ProductAPI payload
+        XCTAssertEqual(stubProductAPI.bodyMetricsBatches.count, 1)
+        guard let batch = stubProductAPI.bodyMetricsBatches.first,
               let payload = batch.first else {
             XCTFail("No body metrics batch captured")
             return
@@ -284,18 +284,18 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
 
         try await coreData.saveBodyMetricsAndWait(metricModel, userId: userId)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await Task.detached {
             try await manager.syncLocalChanges(token: "test-token")
         }.value
 
-        let payload = try XCTUnwrap(stubSupabase.bodyMetricsBatches.first?.first)
+        let payload = try XCTUnwrap(stubProductAPI.bodyMetricsBatches.first?.first)
         XCTAssertEqual(payload["id"] as? String, id)
         XCTAssertTrue(payload["weight"] is NSNull, "Missing weight must be JSON null, not 0")
         XCTAssertTrue(payload["notes"] is NSNull)
@@ -348,16 +348,16 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         try await coreData.saveBodyMetricsAndWait(activeMetric, userId: activeUserId)
         try await coreData.saveBodyMetricsAndWait(otherMetric, userId: otherUserId)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(for: activeUserId, token: "test-token")
 
-        let syncedPayloads = stubSupabase.bodyMetricsBatches.flatMap { $0 }
+        let syncedPayloads = stubProductAPI.bodyMetricsBatches.flatMap { $0 }
         XCTAssertEqual(syncedPayloads.count, 1)
         XCTAssertEqual(syncedPayloads.first?["id"] as? String, activeMetricId)
         XCTAssertEqual(syncedPayloads.first?["user_id"] as? String, activeUserId)
@@ -395,7 +395,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         let manager = RealtimeSyncManager(
             coreDataManager: CoreDataManager.shared,
             authManager: authManager,
-            supabaseManager: StubSupabaseManager()
+            productAPIClient: StubProductAPIClient()
         )
         manager.isOnline = false
 
@@ -461,7 +461,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         let manager = RealtimeSyncManager(
             coreDataManager: CoreDataManager.shared,
             authManager: authManager,
-            supabaseManager: StubSupabaseManager()
+            productAPIClient: StubProductAPIClient()
         )
         manager.isOnline = false
         let operation = RealtimeSyncManager.SyncOperation(
@@ -523,7 +523,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         let manager = RealtimeSyncManager(
             coreDataManager: CoreDataManager.shared,
             authManager: authManager,
-            supabaseManager: StubSupabaseManager()
+            productAPIClient: StubProductAPIClient()
         )
 
         let deleted = await manager.deleteBodyMetric(id: UUID().uuidString)
@@ -561,19 +561,19 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         let didMarkDeleted = await coreData.markBodyMetricDeleted(id: id)
         XCTAssertTrue(didMarkDeleted)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        XCTAssertTrue(stubSupabase.bodyMetricsBatches.isEmpty)
-        XCTAssertEqual(stubSupabase.deletedRecords.count, 1)
-        XCTAssertEqual(stubSupabase.deletedRecords.first?.table, "body_metrics")
-        XCTAssertEqual(stubSupabase.deletedRecords.first?.id, id)
+        XCTAssertTrue(stubProductAPI.bodyMetricsBatches.isEmpty)
+        XCTAssertEqual(stubProductAPI.deletedRecords.count, 1)
+        XCTAssertEqual(stubProductAPI.deletedRecords.first?.table, "body_metrics")
+        XCTAssertEqual(stubProductAPI.deletedRecords.first?.id, id)
 
         let unsynced = await coreData.fetchUnsyncedEntries()
         let unsyncedForUser = unsynced.bodyMetrics.filter { $0.userId == userId }
@@ -595,17 +595,17 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         let snapshot = try await coreData.fetchPendingLocalSyncSnapshot(for: userId)
         XCTAssertEqual(snapshot.bodyMetrics.map(\.id), [result.metrics.id])
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        XCTAssertTrue(stubSupabase.bodyMetricsBatches.isEmpty)
-        XCTAssertTrue(stubSupabase.deletedRecords.isEmpty)
+        XCTAssertTrue(stubProductAPI.bodyMetricsBatches.isEmpty)
+        XCTAssertTrue(stubProductAPI.deletedRecords.isEmpty)
         let cachedMetric = await cachedBodyMetric(id: result.metrics.id)
         XCTAssertNil(cachedMetric)
 
@@ -629,17 +629,17 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
 
         XCTAssertTrue(markedInFlight)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        XCTAssertTrue(stubSupabase.bodyMetricsBatches.isEmpty)
-        XCTAssertTrue(stubSupabase.deletedRecords.isEmpty)
+        XCTAssertTrue(stubProductAPI.bodyMetricsBatches.isEmpty)
+        XCTAssertTrue(stubProductAPI.deletedRecords.isEmpty)
         let cachedMetric = await cachedBodyMetric(id: result.metrics.id)
         XCTAssertEqual(cachedMetric?.syncStatus, CoreDataManager.photoUploadInFlightSyncStatus)
 
@@ -665,17 +665,17 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
 
         XCTAssertTrue(markedCommitted)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        XCTAssertTrue(stubSupabase.bodyMetricsBatches.isEmpty)
-        XCTAssertTrue(stubSupabase.deletedRecords.isEmpty)
+        XCTAssertTrue(stubProductAPI.bodyMetricsBatches.isEmpty)
+        XCTAssertTrue(stubProductAPI.deletedRecords.isEmpty)
         let cachedMetric = await cachedBodyMetric(id: result.metrics.id)
         XCTAssertEqual(cachedMetric?.syncStatus, CoreDataManager.photoUploadStorageCommittedSyncStatus)
         XCTAssertEqual(cachedMetric?.originalPhotoUrl, storagePath)
@@ -714,17 +714,17 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertEqual(cachedBeforeSync?.photoUrl, processedUrl)
         XCTAssertEqual(cachedBeforeSync?.syncStatus, "pending")
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        XCTAssertEqual(stubSupabase.bodyMetricsBatches.count, 1)
-        let payload = try XCTUnwrap(stubSupabase.bodyMetricsBatches.first?.first)
+        XCTAssertEqual(stubProductAPI.bodyMetricsBatches.count, 1)
+        let payload = try XCTUnwrap(stubProductAPI.bodyMetricsBatches.first?.first)
         XCTAssertEqual(payload["id"] as? String, result.metrics.id)
         XCTAssertEqual(payload["photo_url"] as? String, processedUrl)
 

@@ -3,15 +3,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import LogPage from '../page';
 import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 
 // Mock dependencies
 jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation');
-jest.mock('@/lib/supabase/client', () => ({
-  createClient: jest.fn(),
-}));
-
 jest.mock('../page', () => {
   const React = require('react') as typeof import('react');
   const { useRouter } = require('next/navigation') as typeof import('next/navigation');
@@ -104,26 +99,6 @@ describe('Mobile Log Page', () => {
     (useRouter as jest.Mock).mockReturnValue({
       push: mockPush,
       back: mockBack,
-    });
-    (createClient as jest.Mock).mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: {
-                id: 'user-123',
-                gender: 'male',
-                height: 71,
-                settings: {
-                  units: { weight: 'lbs', height: 'ft' },
-                },
-              },
-              error: null,
-            }),
-          }),
-        }),
-        insert: jest.fn().mockResolvedValue({ data: {}, error: null }),
-      }),
     });
   });
 
@@ -246,41 +221,6 @@ describe('Mobile Log Page', () => {
   });
 
   it('should handle quick add mode for returning users', async () => {
-    // Mock user with previous data
-    (createClient as jest.Mock).mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: {
-                id: 'user-123',
-                gender: 'male',
-                height: 71,
-                settings: {
-                  units: { weight: 'lbs', height: 'ft' },
-                },
-                last_body_fat_percentage: 25.5,
-                last_body_fat_method: 'navy',
-              },
-              error: null,
-            }),
-            order: jest.fn().mockReturnValue({
-              limit: jest.fn().mockResolvedValue({
-                data: [
-                  {
-                    body_fat_percentage: 25.5,
-                    body_fat_method: 'navy',
-                  },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-        }),
-        insert: jest.fn().mockResolvedValue({ data: {}, error: null }),
-      }),
-    });
-
     render(<LogPage />);
 
     await waitFor(() => {

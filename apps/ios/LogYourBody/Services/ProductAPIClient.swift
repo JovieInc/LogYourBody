@@ -1,17 +1,48 @@
 //
-// SupabaseManager.swift
+// ProductAPIClient.swift
 // LogYourBody
 //
 import Foundation
 import SwiftUI
 
+enum ProductAPIError: LocalizedError, Equatable {
+    case notAuthenticated
+    case tokenGenerationFailed
+    case invalidResponse
+    case networkError
+    case unauthorized
+    case httpError(Int)
+    case requestFailed
+    case invalidData
+    case invalidConfiguration
+
+    var errorDescription: String? {
+        switch self {
+        case .notAuthenticated:
+            return "User is not authenticated"
+        case .tokenGenerationFailed:
+            return "Failed to generate authentication token"
+        case .invalidResponse:
+            return "Invalid response from server"
+        case .networkError:
+            return "Network connection error"
+        case .unauthorized:
+            return "Unauthorized access"
+        case .httpError(let code):
+            return "Server error: \(code)"
+        case .requestFailed:
+            return "Request failed"
+        case .invalidData:
+            return "Invalid data"
+        case .invalidConfiguration:
+            return "Invalid server configuration"
+        }
+    }
+}
 
 @MainActor
-class SupabaseManager: ObservableObject {
-    static let shared = SupabaseManager()
-
-    let supabaseURL = Constants.supabaseURL
-    let supabaseAnonKey = Constants.supabaseAnonKey
+class ProductAPIClient: ObservableObject {
+    static let shared = ProductAPIClient()
 
     lazy var session: URLSession = {
         let configuration = URLSessionConfiguration.default
@@ -34,7 +65,7 @@ class SupabaseManager: ObservableObject {
             string += "?\(query)"
         }
         guard let url = URL(string: string) else {
-            throw SupabaseError.invalidConfiguration
+            throw ProductAPIError.invalidConfiguration
         }
         return url
     }
@@ -56,14 +87,14 @@ class SupabaseManager: ObservableObject {
 
     func requireHTTPSuccess(_ response: URLResponse, data: Data = Data()) throws -> HTTPURLResponse {
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError
+            throw ProductAPIError.networkError
         }
         if httpResponse.statusCode == 401 {
-            throw SupabaseError.unauthorized
+            throw ProductAPIError.unauthorized
         }
         guard (200...299).contains(httpResponse.statusCode) else {
             _ = data
-            throw SupabaseError.httpError(httpResponse.statusCode)
+            throw ProductAPIError.httpError(httpResponse.statusCode)
         }
         return httpResponse
     }
@@ -196,7 +227,7 @@ class SupabaseManager: ObservableObject {
         }
 
         guard JSONSerialization.isValidJSONObject(body) else {
-            throw SupabaseError.invalidData
+            throw ProductAPIError.invalidData
         }
         return body
     }
@@ -229,7 +260,7 @@ class SupabaseManager: ObservableObject {
 
     func endActiveGlp1Medications(userId: String, endedAt: Date) async throws {
         _ = userId
-        let jwt = try await getSupabaseJWT()
+        let jwt = try await getAccessToken()
         let url = try productAPIURL("/api/auth/mobile/sync/v1/glp1-medications")
         let formatter = ISO8601DateFormatter()
         let body = try JSONSerialization.data(withJSONObject: [

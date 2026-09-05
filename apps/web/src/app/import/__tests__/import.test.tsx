@@ -9,20 +9,6 @@ jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
-jest.mock('@/lib/supabase/client', () => ({
-  createClient: jest.fn(() => ({
-    from: jest.fn(() => ({
-      insert: jest.fn(() => ({ error: null })),
-    })),
-    storage: {
-      from: jest.fn(() => ({
-        upload: jest.fn(() => ({ data: {}, error: null })),
-        getPublicUrl: jest.fn(() => ({ data: { publicUrl: 'https://example.com/photo.jpg' } })),
-      })),
-    },
-  })),
-}));
-
 // Mock exifr
 jest.mock('exifr', () => ({
   parse: jest.fn(() =>

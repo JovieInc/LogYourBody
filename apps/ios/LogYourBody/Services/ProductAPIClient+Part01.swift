@@ -1,10 +1,10 @@
 import Foundation
 import SwiftUI
 
-extension SupabaseManager {
-    func getSupabaseJWT() async throws -> String {
+extension ProductAPIClient {
+    func getAccessToken() async throws -> String {
         guard let jwtString = await AuthManager.shared.getAccessToken() else {
-            throw SupabaseError.tokenGenerationFailed
+            throw ProductAPIError.tokenGenerationFailed
         }
         return jwtString
     }
@@ -69,13 +69,13 @@ extension SupabaseManager {
     }
 
     func fetchProfile(userId: String) async throws -> UserProfile? {
-        let jwt = try await getSupabaseJWT()
+        let jwt = try await getAccessToken()
         guard let data = try await fetchProfile(userId: userId, token: jwt) else { return nil }
         return userProfile(from: data)
     }
 
     func upsertProfile(_ profile: UserProfile) async throws {
-        let jwt = try await getSupabaseJWT()
+        let jwt = try await getAccessToken()
         var payload: [String: Any] = [:]
         if let fullName = profile.fullName { payload["fullName"] = fullName }
         if let dateOfBirth = profile.dateOfBirth { payload["dateOfBirth"] = dateOfBirth }
@@ -112,7 +112,7 @@ extension SupabaseManager {
     }
 
     func saveBodyMetrics(_ metrics: BodyMetrics) async throws {
-        let jwt = try await getSupabaseJWT()
+        let jwt = try await getAccessToken()
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let encoded = try encoder.encode(metrics)
@@ -123,7 +123,7 @@ extension SupabaseManager {
 
     func fetchDailyMetrics(userId: String, from date: Date) async throws -> [DailyMetrics] {
         _ = userId
-        let jwt = try await getSupabaseJWT()
+        let jwt = try await getAccessToken()
         let records = try await fetchDailyMetrics(userId: userId, since: date, token: jwt)
         let data = try JSONSerialization.data(withJSONObject: records)
         let decoder = JSONDecoder()
@@ -150,7 +150,7 @@ extension SupabaseManager {
         limit: Int? = nil
     ) async throws -> [T] {
         _ = userId
-        let jwt = try await getSupabaseJWT()
+        let jwt = try await getAccessToken()
         var query = "since=1970-01-01T00:00:00.000Z"
         if let limit {
             query += "&limit=\(limit)"
@@ -167,7 +167,7 @@ extension SupabaseManager {
     }
 
     private func postEncodable<T: Encodable>(_ value: T, collection: String) async throws {
-        let jwt = try await getSupabaseJWT()
+        let jwt = try await getAccessToken()
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let encoded = try encoder.encode(value)

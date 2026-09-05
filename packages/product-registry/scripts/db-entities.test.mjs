@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// DB entities drift guard. Table/bucket names referenced from Supabase edge
-// functions and web non-test code must exist in the canonical registry lists
+// DB entities drift guard. Table/bucket names referenced from web non-test
+// code must exist in the canonical registry lists
 // (endpoints.tables / endpoints.buckets). Catches the phantom-table class
 // (e.g. a sync manager writing to a `user_profiles` table that no migration
 // creates). Fixtures and tests are exempt. Runs in the package `test`
@@ -18,7 +18,7 @@ const { tables, buckets } = logYourBody.endpoints;
 
 const allowed = new Set([...tables, ...buckets]);
 const patterns = [
-  /\.from\(\s*['"]([\w]+)['"]/g, // supabase-js table or storage bucket
+  /\.from\(\s*['"]([\w]+)['"]/g, // database or storage adapter table/bucket
   /\binsert\s+into\s+(?:public\.)?["'`]?([a-z][a-z0-9_]*)["'`]?/g, // raw SQL
   /\btable\s+"([a-z][a-z0-9_]*)"/g, // DDL-style reference
 ];
@@ -34,7 +34,7 @@ async function filesIn(directory, extensions) {
   return files;
 }
 
-const roots = [resolve(repoRoot, 'supabase/functions'), resolve(repoRoot, 'apps/web/src')];
+const roots = [resolve(repoRoot, 'apps/web/src')];
 const files = (
   await Promise.all(roots.map((root) => filesIn(root, ['.ts', '.tsx'])))
 )

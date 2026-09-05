@@ -51,21 +51,3 @@ iOS requests a short-lived signed PUT from `POST /api/auth/mobile/photos`,
 writes JPEG/PNG/WebP bytes directly to R2, then persists the public URL on the
 local body-metrics row. Account deletion removes `progress-photos/<subject>/`
 when these variables are present.
-
-## Legacy migration variables
-
-The following variables are retained only while the remaining photo/storage,
-realtime-sync, and import compatibility code is migrated. They must not be
-added to new code, and they must not be used for authentication or new
-product-data writes:
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-SUPABASE_JWT_SECRET=...
-```
-
-Production and preview should set the canonical variables first, run the Neon
-migrations, and only then remove legacy variables after storage/sync cutover
-verification passes.

@@ -13,19 +13,15 @@ timestamps.
 
 ## Why
 
-- The historical LogYourBody Supabase production and development hosts no
-  longer resolve, so they cannot safely receive launch signups.
 - Jovie already operates Neon. A separate project preserves product isolation
   while avoiding another vendor account solely for one table.
 - The waitlist needs ordinary Postgres durability, uniqueness, and exportability;
-  it does not need Supabase Auth, Storage, Realtime, Functions, or a public Data
-  API.
+  it does not need a second identity, storage, realtime, or public data API.
 - The internal storage port keeps a later provider move local to one adapter.
 
-This is not a decision to migrate the native product to Neon. That migration
-would also need explicit replacements and verified cutovers for object storage,
-Realtime, Edge Functions, RLS/Data API behavior, and iOS sync. It should be
-evaluated as its own data-migration project before activated users depend on it.
+The native product also uses the same first-party Neon data plane through
+server-only APIs; its object storage and iOS sync boundaries remain explicitly
+verified.
 
 ## Invitation workflow
 

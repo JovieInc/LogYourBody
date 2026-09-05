@@ -63,7 +63,6 @@ export const endpoints = {
   ],
   buckets: ['photos'],
   vendor: {
-    supabaseProjectRef: 'ihivupqpctpkrgqgxfjf',
     cloudinary: {
       apiHost: 'api.cloudinary.com',
       deliveryHost: 'res.cloudinary.com',
@@ -142,10 +141,6 @@ export const endpoints = {
       reason: 'Fastlane Match certificates repository.',
     },
     {
-      value: 'https://github.com/supabase/supabase-swift',
-      reason: 'OSS attribution in open-source-licenses.md.',
-    },
-    {
       value: 'https://github.com/clerk/clerk-ios',
       reason: 'Historical audit/docs remnants; Clerk is not a runtime dependency.',
     },
@@ -186,10 +181,6 @@ export const endpoints = {
       reason: 'OSS attribution in open-source-licenses.md.',
     },
     {
-      value: 'https://github.com/supabase/supabase-js',
-      reason: 'OSS attribution in open-source-licenses.md.',
-    },
-    {
       value: 'https://github.com/clerk/javascript',
       reason: 'Historical audit/docs remnants; Clerk is not a runtime dependency.',
     },
@@ -216,14 +207,6 @@ export const endpoints = {
     {
       value: 'https://openapi.vercel.sh',
       reason: 'Vercel OpenAPI schema referenced by tooling.',
-    },
-    {
-      value: 'https://deno.land',
-      reason: 'Deno std module imports in Supabase edge functions.',
-    },
-    {
-      value: 'https://esm.sh',
-      reason: 'ESM CDN imports in Supabase edge functions.',
     },
     {
       value: 'https://api.cloudinary.com',
@@ -363,10 +346,6 @@ export const endpoints = {
       reason: 'CocoaPods guide link in gitignore boilerplate.',
     },
     {
-      value: 'https://supabase.com',
-      reason: 'Supabase docs and dashboard links.',
-    },
-    {
       value: 'https://cloudinary.com',
       reason: 'Cloudinary console link in edge-function docs.',
     },
@@ -462,27 +441,6 @@ export const endpoints = {
       value: 'https://e',
       reason: 'Compact fixture host in timeline scrub tests.',
     },
-    {
-      value: 'https://przjeunffnkjzxpykvjn.supabase.co',
-      reason: 'Existing dev Supabase project ref; do not add new ones.',
-    },
-    {
-      value: 'https://blhpuaqbbczzhsshumof.supabase.co',
-      reason: 'Existing dev Supabase project ref; do not add new ones.',
-    },
-    {
-      value: 'https://0fab5338-b5f2-48af-a596-591bb5b0a51c.supabase.co',
-      reason: 'Existing dev Supabase project ref; do not add new ones.',
-    },
-    {
-      value: 'https://170c7ac4-6923-4c10-b560-55d3f97e1370.supabase.co',
-      reason: 'Existing dev Supabase project ref; do not add new ones.',
-    },
-    {
-      value: 'https://378a4e19-4a7d-4c2d-9f54-a28537a0e1a8.supabase.co',
-      reason: 'Existing dev Supabase project ref; do not add new ones.',
-    },
   ],
 } as const;
-export const supabaseProjectUrl = 'https://ihivupqpctpkrgqgxfjf.supabase.co' as const;
 export type Endpoints = typeof endpoints;

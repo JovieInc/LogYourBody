@@ -11,7 +11,7 @@ import SwiftUI
 import UIKit
 @testable import LogYourBody
 
-final class StubSupabaseManager: SupabaseManager {
+final class StubProductAPIClient: ProductAPIClient {
     private(set) var bodyMetricsBatches: [[[String: Any]]] = []
     private(set) var dailyMetricsBatches: [[[String: Any]]] = []
     private(set) var profilePayloads: [[String: Any]] = []
