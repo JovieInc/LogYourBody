@@ -44,6 +44,8 @@ function collectLocalModuleGraph(entryPath: string): string[] {
 
 const requiredVariables = ['DATABASE_URL', 'OPENAI_API_KEY', 'CRON_SECRET'] as const;
 const ripgrepInvocation = /(^|[\s;`])rg(\s|$)/m;
+const vercelOrgId = 'team_bpNDbti6srVLYPKdmQLu4UgT';
+const vercelProjectId = 'prj_6seYBdTtY3TuFqrJek1puaFG6Trj';
 
 function hasRequiredVariable(envFile: string, requiredVariable: string): boolean {
   try {
@@ -76,6 +78,14 @@ describe('deploy Vercel env verify uses POSIX grep', () => {
     expect(deployWorkflow).toContain(`for required_variable in ${requiredVariables.join(' ')}`);
     for (const requiredVariable of requiredVariables) {
       expect(deployWorkflow).toContain(requiredVariable);
+    }
+  });
+
+  it('targets the canonical Vercel team and project in noninteractive CI', () => {
+    for (const workflow of [deployWorkflow, webReleaseLoop]) {
+      expect(workflow).toContain(`VERCEL_ORG_ID: ${vercelOrgId}`);
+      expect(workflow).toContain(`VERCEL_PROJECT_ID: ${vercelProjectId}`);
+      expect(workflow).toContain('--scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"');
     }
   });
 
@@ -159,8 +169,6 @@ describe('deploy neon migrate CLI stays runnable from GitHub Actions', () => {
     const output = `${stdout}\n${stderr}`;
     expect(status).not.toBe(0);
     expect(output).toContain('Missing DATABASE_URL');
-    expect(output).not.toContain(
-      'This module cannot be imported from a Client Component module',
-    );
+    expect(output).not.toContain('This module cannot be imported from a Client Component module');
   });
 });

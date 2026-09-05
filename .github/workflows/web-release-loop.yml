@@ -30,6 +30,9 @@ jobs:
     environment:
       name: Production
       url: https://logyourbody.com
+    env:
+      VERCEL_ORG_ID: team_bpNDbti6srVLYPKdmQLu4UgT
+      VERCEL_PROJECT_ID: prj_6seYBdTtY3TuFqrJek1puaFG6Trj
 
     steps:
       - uses: actions/checkout@v6
@@ -49,12 +52,12 @@ jobs:
           cache: 'pnpm'
 
       - name: Pull Vercel Environment
-        run: pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project
-        run: pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN" --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -66,7 +69,7 @@ jobs:
         id: deploy
         run: |
           # Deploy to production
-          DEPLOYMENT_URL="$(pnpm dlx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          DEPLOYMENT_URL="$(pnpm dlx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN" --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID")"
           echo "url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
 
           echo "✅ Deployed to production: $DEPLOYMENT_URL"
