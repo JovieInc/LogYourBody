@@ -40,6 +40,8 @@ jobs:
     timeout-minutes: 15
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: team_bpNDbti6srVLYPKdmQLu4UgT
+      VERCEL_PROJECT_ID: prj_6seYBdTtY3TuFqrJek1puaFG6Trj
     steps:
       - uses: actions/checkout@v4
 
@@ -66,7 +68,7 @@ jobs:
         run: cd apps/web && pnpm build
 
       - name: Pull Vercel environment
-        run: pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@latest pull --yes --environment=production --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
 
       - name: Verify authenticated chat runtime configuration
         run: |
@@ -89,12 +91,12 @@ jobs:
           pnpm --filter logyourbody db:apply:neon
 
       - name: Build Vercel output
-        run: pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@latest build --prod --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
 
       - name: Deploy to Vercel
         id: vercel-deploy
         run: |
-          DEPLOYMENT_URL=$(pnpm dlx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          DEPLOYMENT_URL=$(pnpm dlx vercel@latest deploy --prebuilt --prod --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID")
           echo "url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
           echo "Deployed to $DEPLOYMENT_URL"
 
