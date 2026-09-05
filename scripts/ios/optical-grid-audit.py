@@ -162,7 +162,7 @@ def main() -> int:
 
     if args.update_baseline:
         previous = load_baseline(baseline_path)
-        grew = regressions(current, previous) if previous else []
+        grew = regressions(current, previous) if baseline_path.exists() else []
         if grew:
             print("Refusing to grow the baseline:", file=sys.stderr)
             for problem in grew:
