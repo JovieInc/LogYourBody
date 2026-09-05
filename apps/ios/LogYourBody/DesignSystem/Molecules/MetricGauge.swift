@@ -43,7 +43,7 @@ struct DSMetricGauge: View {
                 DSMetricValue(
                     value: displayValue,
                     unit: unit,
-                    size: .system(size: 28, weight: .bold),
+                    size: Font.jovieDisplay,
                     color: .white,
                     unitSize: .system(size: 12, weight: .regular),
                     spacing: 0
