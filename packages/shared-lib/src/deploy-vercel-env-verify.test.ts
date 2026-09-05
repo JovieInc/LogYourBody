@@ -136,9 +136,13 @@ describe('deploy neon migrate CLI stays runnable from GitHub Actions', () => {
     const migrateCli = readFileSync(neonMigrateCliPath, 'utf8');
     expect(migrateCli).toContain('process.env.DATABASE_URL');
     expect(migrateCli).toContain("throw new Error('Missing DATABASE_URL')");
-    expect(migrateCli).toContain("await sql.query('begin')");
-    expect(migrateCli).toContain("await sql.query('commit')");
-    expect(migrateCli).toContain("await sql.query('rollback')");
+    expect(migrateCli).toContain('assertDirectNeonMigrationConnection(connectionString)');
+    expect(migrateCli).toContain('neonConfig.webSocketConstructor = WebSocket');
+    expect(migrateCli).toContain('new Client(connectionString)');
+    expect(migrateCli).toContain("await client.query('BEGIN')");
+    expect(migrateCli).toContain('await client.query(contents)');
+    expect(migrateCli).toContain("await client.query('COMMIT')");
+    expect(migrateCli).toContain("await client.query('ROLLBACK')");
 
     expect(deployWorkflow).toContain('Apply product database migrations');
     expect(deployWorkflow).toContain('test -n "$DATABASE_URL"');
