@@ -326,10 +326,12 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_stats"].exists)
-        let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]
-        XCTAssertTrue(presenceSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(presenceSummary.label.contains("Measured"))
-        XCTAssertTrue(presenceSummary.label.contains("Interpolated"))
+        XCTAssertFalse(app.staticTexts["Body trends"].exists)
+        XCTAssertFalse(
+            app.staticTexts["Four measurements. One direction. Open any metric for source, chart, and history."].exists
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_stats_presence_summary"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_stats_presence_legend"].exists)
         XCTAssertFalse(app.staticTexts["Timeline states"].exists)
         attachScreenshot(named: "launch-quality-analytics", from: app)
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
@@ -787,6 +789,22 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Chat"].exists)
         XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 5))
         attachScreenshot(named: "launch-quality-home-timeline", from: app)
+    }
+
+    func testStatsStartsWithMetricCardsWithoutDecorativeIntroduction() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestPhotoTimelineAnalyticsFixture"])
+        let stats = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
+        XCTAssertTrue(stats.waitForExistence(timeout: 12))
+        attachScreenshot(named: "stats-content-hierarchy", from: app)
+        XCTAssertFalse(app.staticTexts["Body trends"].exists)
+        XCTAssertFalse(
+            app.staticTexts["Four measurements. One direction. Open any metric for source, chart, and history."].exists
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_stats_presence_summary"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_stack"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_card_body_fat"].exists)
     }
 
     func testLaunchQualityGateCapturesCriticalSurfaces() throws {
@@ -1318,10 +1336,12 @@ final class LogYourBodyUITests: XCTestCase {
         let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
         XCTAssertTrue(analyticsPage.exists || analyticsPage.waitForExistence(timeout: 10),
                       "Stats must be reached through the menu without relaunching the app")
-        let presenceSummary = app.descendants(matching: .any)["photo_timeline_stats_presence_summary"]
-        XCTAssertTrue(presenceSummary.exists || presenceSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(presenceSummary.label.contains("Measured"))
-        XCTAssertTrue(presenceSummary.label.contains("Interpolated"))
+        XCTAssertFalse(app.staticTexts["Body trends"].exists)
+        XCTAssertFalse(
+            app.staticTexts["Four measurements. One direction. Open any metric for source, chart, and history."].exists
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_stats_presence_summary"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_stats_presence_legend"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_stack"].exists)
         let weightCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"]
         XCTAssertTrue(weightCard.exists || weightCard.waitForExistence(timeout: 10))
