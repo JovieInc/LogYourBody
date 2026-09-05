@@ -20,6 +20,14 @@ const ChatRequestSchema = z
   })
   .strict();
 
+type ChatStreamOutcome =
+  | 'started'
+  | 'completed'
+  | 'provider_error'
+  | 'completion_persistence_error'
+  | 'client_cancelled'
+  | 'failure_persistence_error';
+
 type ChatRouteDependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   conversations: ChatConversationPort;
@@ -28,6 +36,7 @@ type ChatRouteDependencies = {
   createModel: () => ChatModelPort;
   modelName: string;
   createLeaseToken: () => string;
+  reportStreamOutcome?: (outcome: ChatStreamOutcome) => void;
 };
 
 const encoder = new TextEncoder();
@@ -87,6 +96,15 @@ function replayResponse(input: {
 }
 
 export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
+  function reportStreamOutcome(outcome: ChatStreamOutcome) {
+    // Diagnostics receive only a fixed category, never messages, identity, or raw errors.
+    try {
+      dependencies.reportStreamOutcome?.(outcome);
+    } catch {
+      // An unavailable diagnostic sink must not interrupt the answer lifecycle.
+    }
+  }
+
   async function authorized(request: NextRequest) {
     return dependencies.authenticate(request);
   }
@@ -205,7 +223,9 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
             }),
           );
 
+          reportStreamOutcome('started');
           let content = '';
+          let persistingCompletion = false;
           let inputTokens: number | null = null;
           let outputTokens: number | null = null;
 
@@ -231,6 +251,7 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
             }
 
             if (!content.trim()) throw new Error('CHAT_EMPTY_RESPONSE');
+            persistingCompletion = true;
             const stored = await dependencies.conversations.completeTurn({
               subject: identity.sub,
               turnId: turn.turnId,
@@ -249,15 +270,28 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
                 replayed: false,
               }),
             );
+            reportStreamOutcome('completed');
           } catch {
             const cancelled = abortController.signal.aborted;
-            await dependencies.conversations.failTurn({
-              subject: identity.sub,
-              turnId: turn.turnId,
-              leaseToken,
-              status: cancelled ? 'cancelled' : 'failed',
-              failureCode: cancelled ? 'client_cancelled' : 'provider_error',
-            });
+            reportStreamOutcome(
+              cancelled
+                ? 'client_cancelled'
+                : persistingCompletion
+                  ? 'completion_persistence_error'
+                  : 'provider_error',
+            );
+            try {
+              await dependencies.conversations.failTurn({
+                subject: identity.sub,
+                turnId: turn.turnId,
+                leaseToken,
+                status: cancelled ? 'cancelled' : 'failed',
+                failureCode: cancelled ? 'client_cancelled' : 'provider_error',
+              });
+            } catch {
+              // Persistence failure cannot suppress the terminal client error.
+              reportStreamOutcome('failure_persistence_error');
+            }
             if (!cancelled) {
               controller.enqueue(
                 event('error', {
