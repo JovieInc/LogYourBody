@@ -111,12 +111,45 @@ final class HeroMetricInterpolationCacheTests: XCTestCase {
         }
     }
 
+    func testFirstTimestampedMeasurementSeedsTrendAndHeroFFMI() throws {
+        let noon = try XCTUnwrap(Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: Self.baseDate))
+        let metric = Self.metric(daysAgo: 0, weight: 80, bodyFat: 18, dateOverride: noon)
+        let context = try XCTUnwrap(service.makeWeightInterpolationContext(for: [metric]))
+        let trend = try XCTUnwrap(context.trendWeight(for: noon))
+        XCTAssertEqual(trend.value, 80)
+        XCTAssertFalse(trend.isInterpolated)
+        XCTAssertFalse(trend.isLastKnown)
+
+        let expected = try XCTUnwrap(UnitConversion.calculateFFMI(
+            weightKg: 80, bodyFatPercentage: 18, heightCm: heightInches * 2.54
+        ))
+        let cache = HeroMetricInterpolationCache(service: service)
+        let values = cache.values(for: metric, in: [metric], heightInches: heightInches)
+        XCTAssertEqual(try XCTUnwrap(values.ffmi), (expected * 10).rounded() / 10)
+    }
+
+    func testFirstDayTrendRemainsAvailableAfterLaterReadWithoutBackdating() throws {
+        let noon = try XCTUnwrap(Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: Self.baseDate))
+        let nextNoon = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: 1, to: noon))
+        let metrics = [
+            Self.metric(daysAgo: 1, weight: 80, bodyFat: 18, dateOverride: noon),
+            Self.metric(daysAgo: 0, weight: 84, bodyFat: 18, dateOverride: nextNoon)
+        ]
+        let context = try XCTUnwrap(service.makeWeightInterpolationContext(for: metrics))
+        XCTAssertNotNil(context.trendWeight(for: nextNoon))
+        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: noon)).value, 80)
+        XCTAssertNil(context.trendWeight(for: noon.addingTimeInterval(-1)))
+        XCTAssertNil(context.trendWeight(for: noon.addingTimeInterval(-86_400)))
+    }
+
     // MARK: - Fixtures
 
     private static let baseDate = Date(timeIntervalSinceReferenceDate: 700_000_000)
 
-    private static func metric(daysAgo: Int, weight: Double?, bodyFat: Double?) -> BodyMetrics {
-        let date = baseDate.addingTimeInterval(TimeInterval(-daysAgo) * 86_400)
+    private static func metric(
+        daysAgo: Int, weight: Double?, bodyFat: Double?, dateOverride: Date? = nil
+    ) -> BodyMetrics {
+        let date = dateOverride ?? baseDate.addingTimeInterval(TimeInterval(-daysAgo) * 86_400)
         return BodyMetrics(
             id: "metric-\(daysAgo)",
             userId: "user",
