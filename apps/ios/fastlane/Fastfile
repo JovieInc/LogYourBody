@@ -48,6 +48,7 @@ platform :ios do
       # Pilot cannot assign tester groups until Apple has processed the build.
       skip_waiting_for_build_processing: skip_waiting_for_build_processing,
       app_identifier: app_identifier.call,
+      app_platform: "ios",
       apple_id: app_store_app_id.call,
       team_id: ENV["APPLE_TEAM_ID"],
       groups: groups,

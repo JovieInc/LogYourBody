@@ -42,7 +42,7 @@ function BrandMark() {
 
 export function MinimalWaitlistLanding() {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#050608] text-[#f5f7f7]">
+    <div className="lyb-landing min-h-screen overflow-x-hidden bg-[#050608] text-[#f5f7f7]">
       <a
         href="#main-content"
         className="sr-only z-50 rounded-full bg-white px-4 py-2 text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
@@ -116,7 +116,7 @@ export function MinimalWaitlistLanding() {
           <div aria-hidden="true" className={styles.ambientOrb} />
           <div className="mx-auto w-full max-w-[1380px]">
             <div className={`${styles.reveal} grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-24`}>
-              <p className="pt-2 text-xs font-medium uppercase tracking-[0.2em] text-sky-300">
+              <p className="pt-2 text-xs font-medium uppercase tracking-[0.2em] text-[var(--landing-accent)]">
                 The whole picture
               </p>
               <div>
@@ -136,11 +136,11 @@ export function MinimalWaitlistLanding() {
                   key={signal.label}
                   className="group grid gap-2 border-b border-white/[0.12] py-6 transition-colors hover:border-white/30 sm:grid-cols-[64px_1fr_auto] sm:items-baseline sm:gap-6 sm:py-7"
                 >
-                  <span className="text-xs tabular-nums text-white/30">{signal.index}</span>
-                  <span className="text-[clamp(1.75rem,4vw,3.6rem)] font-medium tracking-[-0.045em] text-white/90 transition-transform duration-300 group-hover:translate-x-2">
+                  <span className="text-xs tabular-nums text-white/60">{signal.index}</span>
+                  <span className="text-[clamp(1.75rem,4vw,3.6rem)] font-medium tracking-[-0.045em] text-white/90 transition-transform duration-300 motion-safe:group-hover:translate-x-2">
                     {signal.label}
                   </span>
-                  <span className="text-sm text-white/40 sm:text-base">{signal.detail}</span>
+                  <span className="text-sm text-white/60 sm:text-base">{signal.detail}</span>
                 </li>
               ))}
             </ol>
@@ -150,7 +150,7 @@ export function MinimalWaitlistLanding() {
         <section className="relative border-b border-white/[0.08] bg-[#08090c] px-5 py-24 sm:px-8 sm:py-32 lg:px-12 lg:py-44">
           <div className="mx-auto grid w-full max-w-[1380px] gap-16 lg:grid-cols-[0.76fr_1.24fr] lg:items-start lg:gap-24">
             <div className="lg:sticky lg:top-28">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-sky-300">
+              <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--landing-accent)]">
                 Built for the check-in
               </p>
               <h2 className="mt-6 max-w-[10ch] text-balance text-[clamp(3rem,6vw,6.5rem)] font-medium leading-[0.92] tracking-[-0.065em]">
@@ -161,7 +161,7 @@ export function MinimalWaitlistLanding() {
                 single day.
               </p>
               <div className="mt-12 flex items-center gap-4 text-sm text-white/50">
-                <span className="h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_18px_rgba(125,211,252,0.65)]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--landing-accent)] shadow-[0_0_18px_rgba(17,175,255,0.65)]" />
                 Real iPhone product capture
               </div>
             </div>
@@ -209,7 +209,7 @@ export function MinimalWaitlistLanding() {
             ))}
           </svg>
           <div className={`${styles.reveal} mx-auto max-w-4xl`}>
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-sky-300">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--landing-accent)]">
               TestFlight access
             </p>
             <h2 className="mt-6 text-balance text-[clamp(3.25rem,8vw,8rem)] font-medium leading-[0.9] tracking-[-0.07em]">
@@ -220,7 +220,7 @@ export function MinimalWaitlistLanding() {
             </p>
             <a
               href="#early-access"
-              className="mt-9 inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-white/70 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-4 focus-visible:ring-offset-[#050608]"
+              className="mt-9 inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-white/70 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--landing-accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-[#050608]"
             >
               Back to email <span aria-hidden="true">&#8593;</span>
             </a>
