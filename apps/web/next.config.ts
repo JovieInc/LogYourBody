@@ -20,12 +20,6 @@ const nextConfig: NextConfig = {
       { pathname: '/marketing/**' },
       { pathname: '/product-screenshots/**' },
     ],
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**.supabase.co',
-      },
-    ],
   },
 
   // Add trailing slash for better Capacitor compatibility

@@ -88,7 +88,6 @@ export const logYourBody = {
     ],
     buckets: ['photos'],
     vendor: {
-      supabaseProjectRef: 'ihivupqpctpkrgqgxfjf',
       cloudinary: { apiHost: 'api.cloudinary.com', deliveryHost: 'res.cloudinary.com' },
       cloudflare: {
         r2ApiHost: 'r2.cloudflarestorage.com',
@@ -120,7 +119,6 @@ export const logYourBody = {
         reason: 'Researched and rejected option in whats-new-review-contract.md; not a runtime dependency.',
       },
       { value: 'https://github.com/JovieInc/certificates', reason: 'Fastlane Match certificates repository.' },
-      { value: 'https://github.com/supabase/supabase-swift', reason: 'OSS attribution in open-source-licenses.md.' },
       { value: 'https://github.com/clerk/clerk-ios', reason: 'Historical audit/docs remnants; Clerk is not a runtime dependency.' },
       { value: 'https://github.com/hmlongco/Factory', reason: 'OSS attribution in open-source-licenses.md.' },
       { value: 'https://github.com/auth0/SimpleKeychain', reason: 'OSS attribution in open-source-licenses.md.' },
@@ -131,7 +129,6 @@ export const logYourBody = {
       { value: 'https://github.com/tailwindlabs/tailwindcss', reason: 'OSS attribution in open-source-licenses.md.' },
       { value: 'https://github.com/radix-ui/primitives', reason: 'OSS attribution in open-source-licenses.md.' },
       { value: 'https://github.com/lucide-icons/lucide', reason: 'OSS attribution in open-source-licenses.md.' },
-      { value: 'https://github.com/supabase/supabase-js', reason: 'OSS attribution in open-source-licenses.md.' },
       { value: 'https://github.com/clerk/javascript', reason: 'Historical audit/docs remnants; Clerk is not a runtime dependency.' },
       { value: 'https://github.com/vercel/turbo', reason: 'OSS attribution in open-source-licenses.md.' },
       { value: 'https://github.com/eslint/eslint', reason: 'OSS attribution in open-source-licenses.md.' },
@@ -139,8 +136,6 @@ export const logYourBody = {
       { value: 'https://schema.org', reason: 'JSON-LD structured-data vocabulary.' },
       { value: 'https://rubygems.org', reason: 'Ruby dependency host referenced by iOS tooling docs.' },
       { value: 'https://openapi.vercel.sh', reason: 'Vercel OpenAPI schema referenced by tooling.' },
-      { value: 'https://deno.land', reason: 'Deno std module imports in Supabase edge functions.' },
-      { value: 'https://esm.sh', reason: 'ESM CDN imports in Supabase edge functions.' },
       { value: 'https://api.cloudinary.com', reason: 'Cloudinary upload/delete API used by edge functions.' },
       { value: 'https://res.cloudinary.com', reason: 'Cloudinary delivery host for processed photos.' },
       { value: 'https://play.google.com', reason: 'Future Play Store listing link.' },
@@ -178,7 +173,6 @@ export const logYourBody = {
       { value: 'https://fastlane.tools', reason: 'Fastlane docs links.' },
       { value: 'https://docs.fastlane.tools', reason: 'Fastlane docs links.' },
       { value: 'https://guides.cocoapods.org', reason: 'CocoaPods guide link in gitignore boilerplate.' },
-      { value: 'https://supabase.com', reason: 'Supabase docs and dashboard links.' },
       { value: 'https://cloudinary.com', reason: 'Cloudinary console link in edge-function docs.' },
       {
         value: 'https://developers.cloudflare.com',
@@ -209,26 +203,6 @@ export const logYourBody = {
       { value: 'https://linkedin.com/in/timwhite', reason: 'Founder social link.' },
       { value: 'https://smpl-x.is.tue.mpg.de', reason: 'SMPL-X body-model reference in avatar docs.' },
       { value: 'https://e', reason: 'Compact fixture host in timeline scrub tests.' },
-      {
-        value: 'https://przjeunffnkjzxpykvjn.supabase.co',
-        reason: 'Existing dev Supabase project ref; do not add new ones.',
-      },
-      {
-        value: 'https://blhpuaqbbczzhsshumof.supabase.co',
-        reason: 'Existing dev Supabase project ref; do not add new ones.',
-      },
-      {
-        value: 'https://0fab5338-b5f2-48af-a596-591bb5b0a51c.supabase.co',
-        reason: 'Existing dev Supabase project ref; do not add new ones.',
-      },
-      {
-        value: 'https://170c7ac4-6923-4c10-b560-55d3f97e1370.supabase.co',
-        reason: 'Existing dev Supabase project ref; do not add new ones.',
-      },
-      {
-        value: 'https://378a4e19-4a7d-4c2d-9f54-a28537a0e1a8.supabase.co',
-        reason: 'Existing dev Supabase project ref; do not add new ones.',
-      },
     ],
   },
   contacts: {

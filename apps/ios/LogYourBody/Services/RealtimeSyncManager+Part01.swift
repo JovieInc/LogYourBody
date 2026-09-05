@@ -213,9 +213,9 @@ func syncAll(onCompletion: (() -> Void)? = nil) {
                     onCompletion?()
                 }
             } catch {
-                if let supabaseError = error as? SupabaseError {
-                    if case .unauthorized = supabaseError {
-                        await self.authManager.handleSupabaseUnauthorized()
+                if let productAPIError = error as? ProductAPIError {
+                    if case .unauthorized = productAPIError {
+                        await self.authManager.handleProductAPIUnauthorized()
                     }
                 }
 
@@ -326,7 +326,7 @@ nonisolated func syncDeletedBodyMetricsBatch(
 
         do {
             for metric in metrics {
-                try await supabaseManager.deleteData(table: "body_metrics", id: metric.id, token: token)
+                try await productAPIClient.deleteData(table: "body_metrics", id: metric.id, token: token)
                 syncedIds.insert(metric.id)
             }
         } catch {
@@ -345,7 +345,7 @@ nonisolated func syncDeletedGlp1DoseLogsBatch(
 
         do {
             for log in logs {
-                try await supabaseManager.deleteData(table: "glp1_dose_logs", id: log.id, token: token)
+                try await productAPIClient.deleteData(table: "glp1_dose_logs", id: log.id, token: token)
                 syncedIds.insert(log.id)
             }
         } catch {
@@ -385,7 +385,7 @@ nonisolated func syncBodyMetricsBatch(_ metrics: [PendingBodyMetricSyncItem], to
                 ]
             }
 
-            let response = try await supabaseManager.upsertBodyMetricsBatch(metricsData, token: token)
+            let response = try await productAPIClient.upsertBodyMetricsBatch(metricsData, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedBodyMetrics", ids: syncedIds)
         }
@@ -439,7 +439,7 @@ nonisolated func syncDexaResultsBatch(_ results: [PendingDexaResultSyncItem], to
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload)
-            let response = try await supabaseManager.upsertData(table: "dexa_results", data: data, token: token)
+            let response = try await productAPIClient.upsertData(table: "dexa_results", data: data, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedDexaResult", ids: syncedIds)
         }
@@ -457,7 +457,7 @@ nonisolated func syncGlp1MedicationsBatch(
         for userId in Set(medications.map(\.userId)) {
             let userMeds = medications.filter { $0.userId == userId }
             let endDate = userMeds.compactMap { $0.endedAt }.max() ?? Date()
-            try await supabaseManager.endActiveGlp1Medications(userId: userId, endedAt: endDate)
+            try await productAPIClient.endActiveGlp1Medications(userId: userId, endedAt: endDate)
         }
 
         for batch in medications.chunked(into: batchSize) {
@@ -489,7 +489,7 @@ nonisolated func syncGlp1MedicationsBatch(
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload)
-            let response = try await supabaseManager.upsertData(table: "glp1_medications", data: data, token: token)
+            let response = try await productAPIClient.upsertData(table: "glp1_medications", data: data, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedGlp1Medication", ids: syncedIds)
         }
@@ -520,7 +520,7 @@ nonisolated func syncGlp1DoseLogsBatch(_ logs: [PendingGlp1DoseLogSyncItem], tok
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload)
-            let response = try await supabaseManager.upsertData(table: "glp1_dose_logs", data: data, token: token)
+            let response = try await productAPIClient.upsertData(table: "glp1_dose_logs", data: data, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedGlp1DoseLog", ids: syncedIds)
         }
@@ -543,7 +543,7 @@ nonisolated func syncDailyMetricsBatch(_ metrics: [PendingDailyMetricSyncItem], 
                 ]
             }
 
-            let response = try await supabaseManager.upsertDailyMetricsBatch(metricsData, token: token)
+            let response = try await productAPIClient.upsertDailyMetricsBatch(metricsData, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedDailyMetrics", ids: syncedIds)
         }
@@ -572,7 +572,7 @@ nonisolated func syncProfilesBatch(_ profiles: [PendingProfileSyncItem], token: 
                 profileData["height"] = height
             }
 
-            try await supabaseManager.updateProfile(profileData, token: token)
+            try await productAPIClient.updateProfile(profileData, token: token)
             await coreDataManager.markAsSynced(entityName: "CachedProfile", ids: [profile.id])
         }
     }
@@ -582,7 +582,7 @@ nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) 
         let lastSync = lastSync ?? Date().addingTimeInterval(-7 * 24 * 60 * 60) // Default to 1 week ago
 
         // Pull latest body metrics
-        let bodyMetrics = try await supabaseManager.fetchBodyMetrics(
+        let bodyMetrics = try await productAPIClient.fetchBodyMetrics(
             userId: userId,
             since: lastSync,
             token: token
@@ -593,7 +593,7 @@ nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) 
         }
 
         // Pull latest daily metrics
-        let dailyMetrics = try await supabaseManager.fetchDailyMetrics(
+        let dailyMetrics = try await productAPIClient.fetchDailyMetrics(
             userId: userId,
             since: lastSync,
             token: token
@@ -604,12 +604,12 @@ nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) 
         }
 
         // Pull profile updates
-        if let profileData = try await supabaseManager.fetchProfile(userId: userId, token: token) {
+        if let profileData = try await productAPIClient.fetchProfile(userId: userId, token: token) {
             coreDataManager.updateOrCreateProfile(from: profileData)
         }
 
         // Pull latest body metric timestamp
-        if let remoteLatest = try? await supabaseManager.fetchLatestBodyMetricTimestamp(
+        if let remoteLatest = try? await productAPIClient.fetchLatestBodyMetricTimestamp(
             userId: userId,
             token: token
         ) {

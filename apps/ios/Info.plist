@@ -39,13 +39,6 @@
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
 			</dict>
-			<key>ihivupqpctpkrgqgxfjf.supabase.co</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<false/>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-			</dict>
 		</dict>
 	</dict>
 	<key>UIApplicationSceneManifest</key>
@@ -74,10 +67,6 @@
 	<string>LogYourBody needs access to read your weight data from Apple Health to help track your fitness progress.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>LogYourBody needs permission to save your weight data to Apple Health to keep your health records in sync.</string>
-	<key>SUPABASE_URL</key>
-	<string>$(SUPABASE_URL)</string>
-	<key>SUPABASE_ANON_KEY</key>
-	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>API_BASE_URL_DEBUG</key>
 	<string>$(API_BASE_URL_DEBUG)</string>
 	<key>API_BASE_URL_RELEASE</key>

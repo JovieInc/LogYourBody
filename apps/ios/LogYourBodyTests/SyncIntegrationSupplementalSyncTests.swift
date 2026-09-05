@@ -82,7 +82,7 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         )
     }
 
-    func testSyncLocalChanges_UsesSupabaseAndMarksDailyMetricSynced() async throws {
+    func testSyncLocalChanges_UsesProductAPIAndMarksDailyMetricSynced() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -103,18 +103,18 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
 
         try await coreData.saveDailyMetricsAndWait(dailyModel, userId: userId)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        // Verify Supabase payload
-        XCTAssertEqual(stubSupabase.dailyMetricsBatches.count, 1)
-        guard let batch = stubSupabase.dailyMetricsBatches.first,
+        // Verify ProductAPI payload
+        XCTAssertEqual(stubProductAPI.dailyMetricsBatches.count, 1)
+        guard let batch = stubProductAPI.dailyMetricsBatches.first,
               let payload = batch.first else {
             XCTFail("No daily metrics batch captured")
             return
@@ -147,7 +147,7 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertTrue(unsyncedForUser.isEmpty)
     }
 
-    func testSyncLocalChanges_UsesSupabaseAndMarksGlp1DoseLogSynced() async throws {
+    func testSyncLocalChanges_UsesProductAPIAndMarksGlp1DoseLogSynced() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -173,17 +173,17 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
 
         try await coreData.saveGlp1DoseLogsAndWait([log], userId: userId, markAsSynced: false)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        XCTAssertEqual(stubSupabase.glp1DoseLogPayloads.count, 1)
-        let payload = try XCTUnwrap(stubSupabase.glp1DoseLogPayloads.first)
+        XCTAssertEqual(stubProductAPI.glp1DoseLogPayloads.count, 1)
+        let payload = try XCTUnwrap(stubProductAPI.glp1DoseLogPayloads.first)
         XCTAssertEqual(payload["id"] as? String, id)
         XCTAssertEqual(payload["user_id"] as? String, userId)
         XCTAssertEqual(payload["medication_id"] as? String, medicationId)
@@ -195,7 +195,7 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertTrue(remaining.isEmpty)
     }
 
-    func testSyncLocalChanges_UsesSupabaseAndMarksGlp1MedicationSynced() async throws {
+    func testSyncLocalChanges_UsesProductAPIAndMarksGlp1MedicationSynced() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -230,19 +230,19 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             }
         }
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        XCTAssertEqual(stubSupabase.endedActiveMedicationRequests.count, 1)
-        XCTAssertEqual(stubSupabase.endedActiveMedicationRequests.first?.userId, userId)
-        XCTAssertEqual(stubSupabase.glp1MedicationPayloads.count, 1)
-        let payload = try XCTUnwrap(stubSupabase.glp1MedicationPayloads.first)
+        XCTAssertEqual(stubProductAPI.endedActiveMedicationRequests.count, 1)
+        XCTAssertEqual(stubProductAPI.endedActiveMedicationRequests.first?.userId, userId)
+        XCTAssertEqual(stubProductAPI.glp1MedicationPayloads.count, 1)
+        let payload = try XCTUnwrap(stubProductAPI.glp1MedicationPayloads.first)
         XCTAssertEqual(payload["id"] as? String, id)
         XCTAssertEqual(payload["user_id"] as? String, userId)
         XCTAssertEqual(payload["display_name"] as? String, "Semaglutide")
@@ -253,7 +253,7 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertTrue(remaining.isEmpty)
     }
 
-    func testSyncLocalChanges_UsesSupabaseAndMarksDexaResultsSynced() async throws {
+    func testSyncLocalChanges_UsesProductAPIAndMarksDexaResultsSynced() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -293,18 +293,18 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             }
         }
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        // Verify Supabase payload
-        XCTAssertEqual(stubSupabase.dexaPayloads.count, 1)
-        guard let payload = stubSupabase.dexaPayloads.first else {
+        // Verify ProductAPI payload
+        XCTAssertEqual(stubProductAPI.dexaPayloads.count, 1)
+        guard let payload = stubProductAPI.dexaPayloads.first else {
             XCTFail("No Dexa payload captured")
             return
         }

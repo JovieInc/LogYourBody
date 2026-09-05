@@ -34,15 +34,6 @@ struct Constants {
         Configuration.isAuthConfigured
     }
 
-    // MARK: - Supabase Configuration (from Config.xcconfig via Info.plist)
-    static var supabaseURL: String {
-        Configuration.supabaseURL
-    }
-
-    static var supabaseAnonKey: String {
-        Configuration.supabaseAnonKey
-    }
-
     // MARK: - RevenueCat Configuration (from Config.xcconfig via Info.plist)
     static var revenueCatAPIKey: String {
         Configuration.revenueCatAPIKey

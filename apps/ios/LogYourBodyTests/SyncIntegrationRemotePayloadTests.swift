@@ -82,7 +82,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         )
     }
 
-    func testUpdateOrCreateDailyMetric_MapsSupabasePayload() async throws {
+    func testUpdateOrCreateDailyMetric_MapsProductAPIPayload() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -187,16 +187,16 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         let pendingProfile = try XCTUnwrap(snapshot.profiles.first { $0.id == userId })
         XCTAssertNil(pendingProfile.height)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        let payload = try XCTUnwrap(stubSupabase.profilePayloads.first)
+        let payload = try XCTUnwrap(stubProductAPI.profilePayloads.first)
         XCTAssertEqual(payload["id"] as? String, userId)
         XCTAssertNil(payload["height"])
         XCTAssertEqual(payload["height_unit"] as? String, "cm")

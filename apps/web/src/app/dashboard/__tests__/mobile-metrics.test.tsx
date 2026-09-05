@@ -1,18 +1,8 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import DashboardPage from '../page';
-import { useAuth } from '@/contexts/ProductAuthContext';
-import { useRouter } from 'next/navigation';
-import { getProfile } from '@/lib/profile';
-import { createClient } from '@/lib/supabase/client';
 
 // Mock dependencies
-jest.mock('@/contexts/ProductAuthContext');
-jest.mock('next/navigation');
-jest.mock('@/lib/profile');
-jest.mock('@/lib/supabase/client', () => ({
-  createClient: jest.fn(),
-}));
 jest.mock('@/components/MobileNavbar', () => ({
   MobileNavbar: () => <div data-testid="mobile-navbar" />,
 }));
@@ -104,59 +94,8 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 describe('Dashboard Mobile Metrics Display', () => {
-  const mockUser = { id: 'user-123', email: 'test@example.com' };
-  const mockProfile = {
-    id: 'user-123',
-    email: 'test@example.com',
-    full_name: 'Test User',
-    height: 71,
-    height_unit: 'ft',
-    gender: 'male',
-    date_of_birth: '1990-01-01',
-    settings: {
-      units: {
-        weight: 'lbs',
-        height: 'ft',
-        measurements: 'in',
-      },
-    },
-  };
-
-  const mockMetrics = [
-    {
-      id: '1',
-      user_id: 'user-123',
-      date: new Date().toISOString(),
-      weight: 165.5,
-      weight_unit: 'lbs',
-      body_fat_percentage: 25.5,
-      body_fat_method: 'navy',
-      lean_body_mass: 123.1,
-      ffmi: 18.7,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ];
-
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAuth as jest.Mock).mockReturnValue({
-      user: mockUser,
-      loading: false,
-    });
-    (useRouter as jest.Mock).mockReturnValue({
-      push: jest.fn(),
-    });
-    (getProfile as jest.Mock).mockResolvedValue(mockProfile);
-    (createClient as jest.Mock).mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            order: jest.fn().mockResolvedValue({ data: mockMetrics, error: null }),
-          }),
-        }),
-      }),
-    });
   });
 
   it('should display metrics with proper formatting on mobile', async () => {
@@ -266,26 +205,6 @@ describe('Dashboard Mobile Metrics Display', () => {
   });
 
   it('should display trend indicators with values', async () => {
-    // Mock metrics with previous data for trends
-    const metricsWithHistory = [
-      {
-        ...mockMetrics[0],
-        date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        weight: 168.0,
-      },
-      mockMetrics[0],
-    ];
-
-    (createClient as jest.Mock).mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            order: jest.fn().mockResolvedValue({ data: metricsWithHistory, error: null }),
-          }),
-        }),
-      }),
-    });
-
     render(<DashboardPage />);
 
     await screen.findByText('165.5');

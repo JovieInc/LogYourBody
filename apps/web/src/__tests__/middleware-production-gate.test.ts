@@ -88,7 +88,7 @@ describe('middleware production debug/test gate', () => {
     '/api/debug/auth',
     '/api/debug-pdf',
     '/api/test-openai',
-    '/test-identity-supabase',
+    '/test-identity-legacy',
     '/test',
     '/test-avatars',
     '/test-comprehensive',

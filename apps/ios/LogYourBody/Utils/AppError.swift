@@ -9,7 +9,7 @@ enum AppErrorSeverity {
 
 enum AppError: LocalizedError {
     case auth(AuthError)
-    case supabase(SupabaseError)
+    case productAPI(ProductAPIError)
     case photo(PhotoUploadManager.PhotoError)
     case healthKit(HealthKitError)
     case coreData(operation: String, underlying: Error?)
@@ -21,8 +21,8 @@ enum AppError: LocalizedError {
         switch self {
         case .auth(let authError):
             return authError.errorDescription
-        case .supabase(let supabaseError):
-            return supabaseError.errorDescription
+        case .productAPI(let productAPIError):
+            return productAPIError.errorDescription
         case .photo(let photoError):
             return photoError.errorDescription
         case .healthKit(let hkError):
@@ -42,7 +42,7 @@ enum AppError: LocalizedError {
         switch self {
         case .auth:
             return .error
-        case .supabase:
+        case .productAPI:
             return .error
         case .photo:
             return .warning
@@ -62,7 +62,7 @@ enum AppError: LocalizedError {
     var isUserFacing: Bool {
         switch self {
         case .auth,
-             .supabase,
+             .productAPI,
              .photo,
              .healthKit,
              .coreData,

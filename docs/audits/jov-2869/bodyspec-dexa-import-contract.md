@@ -30,4 +30,4 @@ Duplicate handling is deterministic:
 
 ## Done When
 
-DEXA scans can enter the local timeline and Supabase sync as auditable, additive metric events with predictable duplicate handling.
+DEXA scans can enter the local timeline and Neon-backed first-party sync as auditable, additive metric events with predictable duplicate handling.

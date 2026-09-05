@@ -18,7 +18,7 @@ class BackgroundPhotoUploadService: ObservableObject {
     @Published var currentUploadingPhoto: PhotoUploadTask?
 
     private let authManager = AuthManager.shared
-    private let supabaseManager = SupabaseManager.shared
+    private let productAPIClient = ProductAPIClient.shared
     private let coreDataManager = CoreDataManager.shared
     private var uploadCancellables = Set<AnyCancellable>()
     private var uploadTask: Task<Void, Never>?

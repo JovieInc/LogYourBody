@@ -77,7 +77,7 @@ final class BodyMetricLocalDateContractTests: XCTestCase {
         XCTAssertEqual(components.day, 9)
     }
 
-    func testBodyMetricsRoundTripsLocalDateToSupabaseKey() throws {
+    func testBodyMetricsRoundTripsLocalDateToProductAPIKey() throws {
         let calendar = try makeCalendar(timeZoneIdentifier: "America/Los_Angeles")
         let loggedAt = try makeDate(year: 2_026, month: 6, day: 9, hour: 23, minute: 58, calendar: calendar)
         let metric = makeMetric(date: loggedAt, localDate: "2026-06-09")

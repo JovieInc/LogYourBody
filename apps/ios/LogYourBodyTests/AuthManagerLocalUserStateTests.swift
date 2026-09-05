@@ -47,7 +47,7 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
         XCTAssertFalse(manager.isAuthenticated)
     }
 
-    func testHandleSupabaseUnauthorizedExpiresSessionWithoutRefreshToken() async {
+    func testHandleProductAPIUnauthorizedExpiresSessionWithoutRefreshToken() async {
         let manager = AuthManager()
         manager.authSession = .localFixture(subject: "test-user", email: "test@example.com")
         manager.currentUser = LocalUser(
@@ -58,7 +58,7 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
             profile: nil
         )
 
-        await manager.handleSupabaseUnauthorized()
+        await manager.handleProductAPIUnauthorized()
 
         XCTAssertEqual(manager.lastExitReason, .sessionExpired)
         XCTAssertFalse(manager.isAuthenticated)

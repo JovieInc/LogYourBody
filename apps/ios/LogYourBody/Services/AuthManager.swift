@@ -302,8 +302,6 @@ final class AuthManager: NSObject, ObservableObject {
         "jwt",
         "refreshToken",
         "session",
-        "supabaseAccessToken",
-        "supabaseRefreshToken",
         "userSession"
     ]
 
@@ -595,12 +593,6 @@ final class AuthManager: NSObject, ObservableObject {
         return await refreshAccessToken(using: session)
     }
 
-    func getSupabaseToken() async -> String? {
-        // Retired. Native sync uses getAccessToken() against first-party
-        // Neon APIs. Never forward a Jovie access token to supabase.co.
-        nil
-    }
-
     private func refreshAccessToken(using session: ProductAuthSession? = nil) async -> String? {
         if let refreshTask { return await refreshTask.value }
         guard let current = session ?? authSession else {
@@ -642,7 +634,7 @@ final class AuthManager: NSObject, ObservableObject {
         await performLogout(exitReason: .userInitiated)
     }
 
-    func handleSupabaseUnauthorized() async {
+    func handleProductAPIUnauthorized() async {
         guard isAuthenticated else { return }
         if await refreshAccessToken() == nil {
             await performLogout(exitReason: .sessionExpired)
@@ -888,7 +880,7 @@ final class AuthManager: NSObject, ObservableObject {
         // The mobile profile PATCH schema is `.strict()`. Unknown keys such as
         // `name` (legacy settings) 400 the entire save, so reuse the first-party
         // allowlist and map aliases before the request leaves the device.
-        try SupabaseManager.firstPartyProfilePatchBody(updates)
+        try ProductAPIClient.firstPartyProfilePatchBody(updates)
     }
 
     func deleteCurrentAccount() async throws {

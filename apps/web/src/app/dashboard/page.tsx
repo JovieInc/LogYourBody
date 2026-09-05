@@ -146,7 +146,7 @@ export default function DashboardPage() {
           });
         }
 
-        // Existing Supabase photo blobs were abandoned in the hard cut.
+        // Retired photo blobs are not included in the first-party data plane.
         setPhotosHistory([]);
         syncManager.syncIfNeeded();
       };

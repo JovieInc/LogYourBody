@@ -28,13 +28,13 @@ nonisolated func processPendingOperations(_ operations: [SyncOperation], token: 
             do {
                 switch operation.type {
                 case .insert, .update:
-                    try await supabaseManager.upsertData(
+                    try await productAPIClient.upsertData(
                         table: operation.tableName,
                         data: operation.data,
                         token: token
                     )
                 case .delete:
-                    try await supabaseManager.deleteData(
+                    try await productAPIClient.deleteData(
                         table: operation.tableName,
                         id: operation.id,
                         token: token

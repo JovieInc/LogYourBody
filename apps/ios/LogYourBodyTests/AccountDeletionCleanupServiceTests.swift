@@ -186,14 +186,11 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
             HealthKitDefaultsKey.lastObserverSyncDate.rawValue,
             HealthKitDefaultsKey.fullSyncCompleted.rawValue,
             "HasSyncedHistoricalSteps",
-            "lastSupabaseSyncDate",
             "lastHealthKitWeightSyncDate",
             "revenuecat_isSubscribed",
             "revenuecat_lastFetchTimestamp",
             "biometricLockEnabled",
-            "appleSignInName",
-            "supabaseAccessToken",
-            "supabaseRefreshToken"
+            "appleSignInName"
         ]
 
         for key in keys {

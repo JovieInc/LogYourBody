@@ -27,7 +27,6 @@ const swiftVendorModules = [
   { name: 'RevenueCat', modules: ['RevenueCat', 'RevenueCatUI'] },
   { name: 'Sentry', modules: ['Sentry'] },
   { name: 'Statsig', modules: ['Statsig'] },
-  { name: 'Supabase', modules: ['Supabase'] },
 ];
 
 const typescriptVendorModules = [
@@ -37,7 +36,6 @@ const typescriptVendorModules = [
   { name: 'RevenueCat', modules: ['revenuecat', 'react-native-purchases'] },
   { name: 'Sentry', prefixes: ['@sentry/'] },
   { name: 'Statsig', prefixes: ['@statsig/'] },
-  { name: 'Supabase', prefixes: ['@supabase/'] },
 ];
 
 const swiftAllowedBoundaries = [
@@ -55,10 +53,6 @@ const typescriptAllowedBoundaries = [
   {
     label: 'apps/web/src/lib/ports/**',
     test: (relativePath) => relativePath.startsWith('apps/web/src/lib/ports/'),
-  },
-  {
-    label: 'apps/web/src/lib/supabase/**',
-    test: (relativePath) => relativePath.startsWith('apps/web/src/lib/supabase/'),
   },
   {
     label: 'apps/web/src/lib/statsigAnalyticsAdapter.ts',

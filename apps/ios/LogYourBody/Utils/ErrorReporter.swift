@@ -42,8 +42,8 @@ final class ErrorReporter {
             return .auth
         case "sync":
             return .sync
-        case "supabase":
-            return .supabase
+        case "productAPI":
+            return .productAPI
         case "photos":
             return .photos
         case "coreData":

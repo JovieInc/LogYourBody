@@ -394,7 +394,7 @@ final class OnboardingFlowViewModelTests: XCTestCase {
     func testProfileDetailsDoesNotCompleteWhenDurableProfileWriteFails() async {
         let viewModel = OnboardingFlowViewModel(
             includesFirstPhotoStep: false,
-            profileUpdateHandler: { _ in throw SupabaseError.requestFailed }
+            profileUpdateHandler: { _ in throw ProductAPIError.requestFailed }
         )
         viewModel.currentStep = .profileDetails
 
@@ -431,7 +431,7 @@ final class OnboardingFlowViewModelTests: XCTestCase {
                 await withCheckedContinuation { continuation in
                     releaseSave = continuation
                 }
-                throw SupabaseError.requestFailed
+                throw ProductAPIError.requestFailed
             }
         )
         viewModel.currentStep = .firstPhoto

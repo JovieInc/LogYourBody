@@ -64,9 +64,7 @@ describe('Neon migration runner', () => {
       ),
     ).toThrow('direct Neon');
     expect(() =>
-      assertDirectNeonMigrationConnection(
-        'postgresql://user:password@db.example.supabase.co/postgres',
-      ),
+      assertDirectNeonMigrationConnection('postgresql://user:password@db.example.invalid/postgres'),
     ).toThrow('direct Neon');
   });
 });

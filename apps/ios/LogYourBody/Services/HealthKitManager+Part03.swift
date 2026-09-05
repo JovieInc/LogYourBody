@@ -27,7 +27,7 @@ func observeStepChanges() {
 
                     // Notify sync manager to sync with remote
                     if let userId = AuthManager.shared.currentUser?.id {
-                        await self.syncStepsToSupabase(userId: userId)
+                        await self.syncStepsToProductAPI(userId: userId)
                     }
                 }
             }
@@ -121,9 +121,9 @@ func setupStepCountBackgroundDelivery() async throws {
         )
     }
 
-// MARK: - Step Syncing to Supabase
+// MARK: - Step Syncing to ProductAPI
 
-    func syncStepsToSupabase(userId: String) async {
+    func syncStepsToProductAPI(userId: String) async {
         // Get today's steps
         let todaySteps = todayStepCount
         guard todaySteps > 0 else { return }

@@ -12,7 +12,7 @@ import UIKit
 @testable import LogYourBody
 
 
-final class SupabaseProfilePayloadTests: XCTestCase {
+final class ProductAPIProfilePayloadTests: XCTestCase {
     func testProfilePayloadNormalizesLaunchGateColumns() throws {
         let birthDate = Date(timeIntervalSince1970: 631_152_000)
         let payload: [String: Any] = [
@@ -26,7 +26,7 @@ final class SupabaseProfilePayloadTests: XCTestCase {
             "activity_level": "active"
         ]
 
-        let sanitized = try SupabaseManager.sanitizedProfilePayload(payload)
+        let sanitized = try ProductAPIClient.sanitizedProfilePayload(payload)
 
         XCTAssertEqual(sanitized["fullName"] as? String, "Profile User")
         XCTAssertEqual(sanitized["dateOfBirth"] as? String, "1990-01-01")
@@ -42,7 +42,7 @@ final class SupabaseProfilePayloadTests: XCTestCase {
     }
 
     func testFirstPartyProfilePatchMapsLegacyNameAndDropsUnknownKeys() throws {
-        let payload = try SupabaseManager.firstPartyProfilePatchBody([
+        let payload = try ProductAPIClient.firstPartyProfilePatchBody([
             "name": "Tim White",
             "goalWeightUnit": "lbs",
             "avatarUrl": "https://example.com/avatar.png",

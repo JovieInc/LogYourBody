@@ -56,7 +56,7 @@ jobs:
             changed_files=$(git diff --name-only "$diff_base" "$HEAD_SHA")
           fi
 
-          web_pattern='^(agent/|evals/|apps/web/|packages/|\.github/actions/|\.github/scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|scripts/(eve|supabase|web)/|supabase/|turbo\.json$)'
+          web_pattern='^(agent/|evals/|apps/web/|packages/|\.github/actions/|\.github/scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|scripts/|turbo\.json$)'
           ios_pattern='^(apps/ios/|\.github/actions/setup-ios-build/|\.github/workflows/ci\.yml$|\.github/workflows/ios[^/]*\.yml$|scripts/ios/|package\.json$)'
 
           if printf '%s\n' "$changed_files" | grep -Eq "$web_pattern"; then
@@ -76,10 +76,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.web == 'true'
-    env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || vars.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -96,7 +92,7 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Supabase schema checks
+      - name: Neon migration layout checks
         run: pnpm db:schema:check
 
       - name: Type check

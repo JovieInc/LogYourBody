@@ -60,9 +60,12 @@ describe('/api/auth/mobile/export', () => {
     expect(mockedDirectory.getUser).toHaveBeenCalledWith('owner-a');
   });
 
-  it('dumps the authenticated subject Neon rows without a Supabase path', async () => {
+  it('dumps the authenticated subject Neon rows without a legacy provider path', async () => {
     mockedFetchUserInfo.mockResolvedValue({ sub: 'owner-a' } as never);
-    mockedDirectory.getUser.mockResolvedValue({ subject: 'owner-a', email: 'a@example.com' } as never);
+    mockedDirectory.getUser.mockResolvedValue({
+      subject: 'owner-a',
+      email: 'a@example.com',
+    } as never);
     mockedMetrics.list.mockResolvedValue([{ id: 'metric-1' }] as never);
     mockedRecords.listAll.mockResolvedValue({
       daily_metrics: [{ id: 'daily-1' }],

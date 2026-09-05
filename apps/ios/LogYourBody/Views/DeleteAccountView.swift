@@ -222,7 +222,6 @@ struct AccountDeletionCleanupService {
         HealthKitDefaultsKey.lastObserverSyncDate.rawValue,
         HealthKitDefaultsKey.fullSyncCompleted.rawValue,
         "HasSyncedHistoricalSteps",
-        "lastSupabaseSyncDate",
         "lastHealthKitWeightSyncDate",
         "appleSignInName",
         "lastSyncDate"

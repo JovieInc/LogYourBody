@@ -53,11 +53,11 @@ protocol ErrorTrackingStarting {
 @MainActor
 enum AppServicePorts {
     static var glp1RemoteDataProvider: Glp1RemoteDataProviding {
-        SupabaseManager.shared
+        ProductAPIClient.shared
     }
 
     static var dexaResultRemoteDataProvider: DexaResultRemoteDataProviding {
-        SupabaseManager.shared
+        ProductAPIClient.shared
     }
 
     static var analyticsTracker: AnalyticsTracking {
@@ -69,7 +69,7 @@ enum AppServicePorts {
     }
 }
 
-extension SupabaseManager: Glp1RemoteDataProviding, DexaResultRemoteDataProviding {}
+extension ProductAPIClient: Glp1RemoteDataProviding, DexaResultRemoteDataProviding {}
 extension AnalyticsService: AnalyticsTracking {}
 extension ErrorTrackingService: ErrorTrackingStarting {}
 

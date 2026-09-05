@@ -533,7 +533,7 @@ func saveBodyMetrics(_ metrics: BodyMetrics) async throws {
             updatedAt: metrics.updatedAt
         )
 
-        // Save to CoreData and trigger realtime sync to Supabase
+        // Save to CoreData and trigger realtime sync to ProductAPI
         try await CoreDataManager.shared.saveBodyMetricsAndWait(metricsWithUserId, userId: userId, markAsSynced: false)
         await RealtimeSyncManager.shared.syncIfNeeded()
     }
