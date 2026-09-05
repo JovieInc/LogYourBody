@@ -2,17 +2,14 @@
 // PhotoLibraryScannerTests.swift
 // LogYourBodyTests
 //
-// Coverage boundary: PhotoLibraryScanner has no injection seam at the Photos
-// vendor boundary — fetchPhotos calls PHAsset.fetchAssets directly, analysis
-// uses a hard-wired PHCachingImageManager, and ScannedPhoto requires a concrete
-// PHAsset (no public initializer, not fabricatable in tests). That makes the
-// fetch/analyze/group pipeline (and PhotoGroup.suggestedPrimary) untestable
-// without an app-source refactor (protocol-typed fetcher + value-typed photo
-// model), which is out of scope for a visibility-only seam. These tests pin
-// the pure criteria/metadata contracts and the authorization-state mapping.
+// Discovery tests inject asset metadata, a recording image manager, and a
+// monotonic clock. They exercise the production analysis loop without reading
+// or changing the user's photo library. Authorization tests remain read-only.
 //
 import XCTest
 import Photos
+import Combine
+import UIKit
 @testable import LogYourBody
 
 final class PhotoLibraryScannerTests: XCTestCase {
@@ -100,5 +97,118 @@ final class PhotoLibraryScannerTests: XCTestCase {
         XCTAssertFalse(metadata.hasBeenEdited)
         XCTAssertNotEqual(ScannedPhoto.CameraType.front, .back)
         XCTAssertNotEqual(ScannedPhoto.CameraType.back, .unknown)
+    }
+}
+
+private final class SyntheticScanAsset: PHAsset, @unchecked Sendable {
+    override var pixelWidth: Int { 1_200 }
+    override var pixelHeight: Int { 1_600 }
+    override var creationDate: Date? {
+        Calendar.current.date(from: DateComponents(year: 2_026, month: 9, day: 5, hour: 8))
+    }
+    override var location: CLLocation? { nil }
+}
+
+private final class RecordingScanImageManager: PHImageManager {
+    var requests = 0
+
+    override func requestImage(
+        for asset: PHAsset,
+        targetSize: CGSize,
+        contentMode: PHImageContentMode,
+        options: PHImageRequestOptions?,
+        resultHandler: @escaping (UIImage?, [AnyHashable: Any]?) -> Void
+    ) -> PHImageRequestID {
+        requests += 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 16)).image { _ in }
+        resultHandler(image, nil)
+        return PHImageRequestID(requests)
+    }
+}
+
+extension PhotoLibraryScannerTests {
+    @MainActor
+    func testMetadataScanOfThousandAssetsDoesNotDecodeAndThrottlesProgress() async {
+        let manager = RecordingScanImageManager()
+        var elapsed: TimeInterval = 0
+        let scanner = PhotoLibraryScanner(
+            imageManager: manager,
+            metadataProvider: { _ in
+                ScannedPhoto.PhotoMetadata(location: nil, cameraType: .unknown,
+                                           isScreenshot: false, hasBeenEdited: false)
+            },
+            metadataScanEnabled: { true },
+            monotonicTime: { elapsed += 0.001; return elapsed }
+        )
+        var publications: [Double] = []
+        let subscription = scanner.$scanProgress.dropFirst().sink { publications.append($0) }
+        let assets = (0..<1_000).map { _ in SyntheticScanAsset() }
+
+        let photos = await scanner.analyzePhotos(assets, criteria: PhotoScanCriteria(dateRange: nil))
+
+        XCTAssertEqual(photos.count, 1_000)
+        XCTAssertEqual(photos.first?.confidence ?? 0, 0.9, accuracy: 0.0001)
+        XCTAssertEqual(Set(photos.map(\.confidence)).count, 1, "Metadata ranking must be deterministic")
+        XCTAssertEqual(manager.requests, 0, "Discovery must use asset metadata without requesting pixels")
+        XCTAssertFalse(publications.isEmpty)
+        XCTAssertLessThanOrEqual(publications.count, 10, "At most ten intermediate updates per simulated second")
+        XCTAssertEqual(publications, publications.sorted())
+        withExtendedLifetime(subscription) {}
+    }
+}
+
+
+extension PhotoLibraryScannerTests {
+    @MainActor
+    func testDisabledMetadataGatePreservesLegacyDiscovery() async {
+        let manager = RecordingScanImageManager()
+        let scanner = PhotoLibraryScanner(
+            imageManager: manager,
+            metadataProvider: { _ in
+                ScannedPhoto.PhotoMetadata(location: nil, cameraType: .unknown,
+                                           isScreenshot: false, hasBeenEdited: false)
+            },
+            metadataScanEnabled: { false }
+        )
+        let photos = await scanner.analyzePhotos([SyntheticScanAsset()], criteria: PhotoScanCriteria(dateRange: nil))
+        XCTAssertEqual(photos.count, 1)
+        XCTAssertEqual(manager.requests, 1)
+    }
+
+    @MainActor
+    func testMetadataScanFiltersScreenshotsWithoutDecodingOrOverpublishing() async {
+        let manager = RecordingScanImageManager()
+        var elapsed: TimeInterval = 0
+        let scanner = PhotoLibraryScanner(
+            imageManager: manager,
+            metadataProvider: { _ in
+                ScannedPhoto.PhotoMetadata(location: nil, cameraType: .unknown,
+                                           isScreenshot: true, hasBeenEdited: false)
+            },
+            metadataScanEnabled: { true },
+            monotonicTime: { elapsed += 0.001; return elapsed }
+        )
+        var publications = 0
+        let subscription = scanner.$scanProgress.dropFirst().sink { _ in publications += 1 }
+        let photos = await scanner.analyzePhotos(
+            (0..<1_000).map { _ in SyntheticScanAsset() }, criteria: PhotoScanCriteria(dateRange: nil)
+        )
+        XCTAssertTrue(photos.isEmpty)
+        XCTAssertEqual(manager.requests, 0)
+        XCTAssertGreaterThan(publications, 0)
+        XCTAssertLessThanOrEqual(publications, 10)
+        withExtendedLifetime(subscription) {}
+    }
+
+    @MainActor
+    func testMetadataOptimizationPreservesExplicitThumbnailAndImportImageRequests() async {
+        let manager = RecordingScanImageManager()
+        let scanner = PhotoLibraryScanner(imageManager: manager, metadataScanEnabled: { true })
+        let asset = SyntheticScanAsset()
+        let thumbnail = await scanner.loadThumbnail(for: asset)
+        let fullImage = await scanner.loadFullImage(for: asset)
+        XCTAssertNotNil(thumbnail)
+        XCTAssertNotNil(fullImage)
+        XCTAssertEqual(manager.requests, 2)
     }
 }
