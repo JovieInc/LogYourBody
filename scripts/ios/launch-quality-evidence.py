@@ -10,6 +10,10 @@ import sys
 from datetime import datetime, timezone
 
 CRITICAL_TEST = 'LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces()'
+TIMELINE_TEST = 'LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()'
+ONBOARDING_TEST = 'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()'
+FIRST_PHOTO_TEST = 'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA()'
+REQUIRED_TESTS = (CRITICAL_TEST, ONBOARDING_TEST, FIRST_PHOTO_TEST, TIMELINE_TEST)
 REQUIRED_CAPTURES = (
     'launch-quality-chat-composer',
     'launch-quality-chat-tab',
@@ -20,6 +24,10 @@ REQUIRED_CAPTURES = (
     'launch-quality-analytics',
 )
 
+CAPTURE_OWNERS = dict(zip(REQUIRED_CAPTURES, (
+    CRITICAL_TEST, CRITICAL_TEST, ONBOARDING_TEST, FIRST_PHOTO_TEST,
+    TIMELINE_TEST, TIMELINE_TEST, TIMELINE_TEST,
+)))
 
 def walk(nodes):
     for node in nodes:
@@ -52,12 +60,15 @@ def digest(path):
 
 
 def validate_captures(manifest, directory, started_at):
-    groups = [item for item in manifest if item.get('testIdentifier') == CRITICAL_TEST]
-    if len(groups) != 1:
-        raise ValueError('Missing or ambiguous critical-test attachment manifest')
+    groups = {}
+    for identifier in REQUIRED_TESTS:
+        matches = [item for item in manifest if item.get('testIdentifier') == identifier]
+        if len(matches) != 1:
+            raise ValueError(f'Missing or ambiguous required-test attachment manifest: {identifier}')
+        groups[identifier] = matches[0]
     captures = []
     for name in REQUIRED_CAPTURES:
-        matches = [item for item in groups[0]['attachments']
+        matches = [item for item in groups[CAPTURE_OWNERS[name]]['attachments']
                    if item.get('suggestedHumanReadableName', '').startswith((name + '_', name + '.'))
                    or item.get('suggestedHumanReadableName') == name]
         if len(matches) != 1:
@@ -132,13 +143,13 @@ def main():
                                  'purchase': 'not_verified', 'restore': 'not_verified'},
         }
         if args.critical_captures:
-            if CRITICAL_TEST not in args.expected_test:
-                raise ValueError('Critical captures require the exact passing critical test')
+            if not set(REQUIRED_TESTS).issubset(args.expected_test):
+                raise ValueError('Critical captures require all exact passing surface tests')
             directory = args.bundle.with_suffix('.attachments')
             # One immutable export per attempt; never combine old/new attachments.
             directory.mkdir(exist_ok=False)
             subprocess.run(['xcrun', 'xcresulttool', 'export', 'attachments',
-                            '--path', str(args.bundle), '--test-id', CRITICAL_TEST,
+                            '--path', str(args.bundle),
                             '--output-path', str(directory)], check=True)
             manifest_path = directory / 'manifest.json'
             receipt['captures'] = validate_captures(json.loads(manifest_path.read_text()),

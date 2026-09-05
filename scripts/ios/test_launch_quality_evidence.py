@@ -24,21 +24,33 @@ class EvidenceTests(unittest.TestCase):
         self.bundle.mkdir()
         self.bundle.with_suffix('.log').write_text('Running critical (attempt 1)\n')
         self.payload = {'testNodes': [{'nodeType': 'UI test bundle', 'children': [
-            {'nodeType': 'Test Case', 'nodeIdentifier': evidence.CRITICAL_TEST, 'result': 'Passed'}
+            {'nodeType': 'Test Case', 'nodeIdentifier': identifier, 'result': 'Passed'}
+            for identifier in evidence.REQUIRED_TESTS
         ]}], 'devices': [{'deviceId': 'simulator', 'osVersion': '26.5'}]}
         self.case = self.payload['testNodes'][0]['children'][0]
-        self.manifest = [{'testIdentifier': evidence.CRITICAL_TEST, 'attachments': []}]
-        for index, name in enumerate(evidence.REQUIRED_CAPTURES):
+        # Expected ownership comes from the Swift capture sites, independently of the validator map.
+        capture_groups = [
+            (evidence.CRITICAL_TEST, ['launch-quality-chat-composer', 'launch-quality-chat-tab']),
+            (evidence.ONBOARDING_TEST, ['launch-quality-onboarding-fixed-cta']),
+            (evidence.FIRST_PHOTO_TEST, ['launch-quality-onboarding-first-photo']),
+            (evidence.TIMELINE_TEST, ['launch-quality-home-timeline',
+                                      'launch-quality-body-score-share', 'launch-quality-analytics']),
+        ]
+        self.manifest = [{'testIdentifier': identifier, 'attachments': []}
+                         for identifier, _ in capture_groups]
+        captures = [(group_index, name) for group_index, (_, names) in enumerate(capture_groups)
+                    for name in names]
+        for index, (group_index, name) in enumerate(captures):
             filename = f'{index}.png'
             (self.root / filename).write_bytes(b'\x89PNG\r\n\x1a\nfixture-payload')
-            self.manifest[0]['attachments'].append({
+            self.manifest[group_index]['attachments'].append({
                 'exportedFileName': filename, 'suggestedHumanReadableName': name + '_0.png',
                 'timestamp': 101, 'isAssociatedWithFailure': False,
                 'deviceId': 'simulator', 'configurationName': 'Debug',
             })
 
     def validate(self):
-        return evidence.validate_cases(self.payload, [evidence.CRITICAL_TEST])
+        return evidence.validate_cases(self.payload, evidence.REQUIRED_TESTS)
 
     def captures(self):
         return evidence.validate_captures(self.manifest, self.root, 100)
@@ -79,19 +91,35 @@ class EvidenceTests(unittest.TestCase):
     def test_optional_unit_skips_remain_visible_without_counting_as_passes(self):
         self.payload['testNodes'].append({'nodeType': 'Test Case', 'result': 'Skipped',
                                          'nodeIdentifier': 'Optional/testKeychain()'})
-        self.assertEqual([case['result'] for case in self.validate()], ['Passed', 'Skipped'])
+        self.assertEqual([case['result'] for case in self.validate()], ['Passed'] * len(evidence.REQUIRED_TESTS) + ['Skipped'])
 
     def test_every_capture_is_required(self):
-        for index in range(7):
-            manifest = copy.deepcopy(self.manifest)
-            del manifest[0]['attachments'][index]
-            with self.subTest(index=index), self.assertRaises(ValueError):
-                evidence.validate_captures(manifest, self.root, 100)
+        for group_index, group in enumerate(self.manifest):
+            for index in range(len(group['attachments'])):
+                manifest = copy.deepcopy(self.manifest)
+                del manifest[group_index]['attachments'][index]
+                with self.subTest(group=group_index, index=index), self.assertRaises(ValueError):
+                    evidence.validate_captures(manifest, self.root, 100)
 
     def test_duplicate_or_wrong_test_capture_manifest_rejected(self):
         for manifest in ([], self.manifest * 2, [{'testIdentifier': 'other', 'attachments': []}]):
             with self.subTest(manifest=manifest), self.assertRaises(ValueError):
                 evidence.validate_captures(manifest, self.root, 100)
+
+    def test_timeline_case_is_required_and_must_pass(self):
+        cases = self.payload['testNodes'][0]['children']
+        timeline = cases.pop()
+        with self.assertRaises(ValueError):
+            self.validate()
+        cases.append(timeline)
+        timeline['result'] = 'Skipped'
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_capture_from_wrong_surface_test_cannot_satisfy_gate(self):
+        self.manifest[0]['attachments'].append(self.manifest[1]['attachments'].pop())
+        with self.assertRaises(ValueError):
+            self.captures()
 
     def test_failed_stale_missing_and_ambiguous_capture_rejected(self):
         item = self.manifest[0]['attachments'][0]
@@ -115,7 +143,8 @@ class EvidenceTests(unittest.TestCase):
     def run_main(self, critical=True, expected=True):
         args = ['validator', '--bundle', str(self.bundle), '--started-at', '100']
         if expected:
-            args += ['--expected-test', evidence.CRITICAL_TEST]
+            for identifier in evidence.REQUIRED_TESTS:
+                args += ['--expected-test', identifier]
         if critical:
             args += ['--critical-captures']
         with patch.object(sys, 'argv', args):
@@ -124,7 +153,7 @@ class EvidenceTests(unittest.TestCase):
     def export(self, command, **kwargs):
         directory = Path(command[command.index('--output-path') + 1])
         (directory / 'manifest.json').write_text(json.dumps(self.manifest))
-        for item in self.manifest[0]['attachments']:
+        for item in [item for group in self.manifest for item in group['attachments']]:
             filename = item['exportedFileName']
             (directory / filename).write_bytes((self.root / filename).read_bytes())
         return subprocess.CompletedProcess(command, 0)

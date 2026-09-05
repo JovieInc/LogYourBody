@@ -261,7 +261,10 @@ assert_xcresult_evidence \
 UI_RESULT_BUNDLES=()
 run_ui_test_group \
   "launch-quality-ui-critical-surfaces" \
-  "testLaunchQualityGateCapturesCriticalSurfaces"
+  "testLaunchQualityGateCapturesCriticalSurfaces" \
+  "testLaunchQualityGateCapturesOnboardingFixedCTA" \
+  "testLaunchQualityGateCapturesOnboardingFirstPhotoCTA" \
+  "testLaunchQualityGateCapturesTimelineSurfaces"
 
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
@@ -284,7 +287,7 @@ fi
   printf -- '- Required passing test IDs and seven screenshot hashes: `launch-quality-ui-critical-surfaces.evidence.json`. First failed attempt bundles are retained.\n'
   printf -- '- Source: `source-revision.txt` plus `source-working-tree.patch`; this is not exact deployed-build certification.\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
-  printf -- '- Build strategy: one `build-for-testing`, unit selectors in one `test-without-building` run, and one composite launch-quality UI selector that captures all required screenshot surfaces with simulator parallelism disabled\n'
+  printf -- '- Build strategy: one `build-for-testing`, unit selectors in one `test-without-building` run, and four independently timed launch-quality UI selectors that capture all required screenshot surfaces with simulator parallelism disabled\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"
