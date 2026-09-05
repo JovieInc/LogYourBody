@@ -22,7 +22,7 @@ struct DashboardPrimaryMetricCard<BodyFatProgress: View>: View {
                         DSMetricValue(
                             value: String(format: "%.1f", animatedBodyFat),
                             unit: nil,
-                            size: .system(size: 28, weight: .bold),
+                            size: Font.jovieDisplay,
                             color: theme.colors.text
                         )
                         .tracking(-0.3)
@@ -49,7 +49,7 @@ struct DashboardPrimaryMetricCard<BodyFatProgress: View>: View {
                 DSMetricValue(
                     value: "—",
                     unit: nil,
-                    size: .system(size: 28, weight: .bold),
+                    size: Font.jovieDisplay,
                     color: theme.colors.text.opacity(0.30)
                 )
                 .tracking(-0.3)

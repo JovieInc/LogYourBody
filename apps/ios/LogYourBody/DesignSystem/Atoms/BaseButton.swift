@@ -67,18 +67,17 @@ struct ButtonConfiguration {
 
         var height: CGFloat {
             switch self {
-            case .small: return JovieTokens.compactControlHeight
-            case .medium: return JovieTokens.controlHeight
-            case .large: return 56
+            // ActionButton 32 / 510 / r999: one visible height for the CTA family.
+            case .small, .medium, .large: return JovieTokens.actionControlHeight
             case .custom(let height, _, _): return height
             }
         }
 
         var padding: EdgeInsets {
             switch self {
-            case .small: return EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
-            case .medium: return EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20)
-            case .large: return EdgeInsets(top: 16, leading: 24, bottom: 16, trailing: 24)
+            case .small: return EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)
+            case .medium: return EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
+            case .large: return EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20)
             case .custom(_, let padding, _): return padding
             }
         }
@@ -100,6 +99,20 @@ struct ButtonConfiguration {
     enum IconPosition {
         case leading
         case trailing
+    }
+}
+
+// MARK: - Geometry policy
+
+/// Source-bound contract for the locked ActionButton atom: a 32pt visible pill
+/// whose hit area is expanded to at least 44pt without changing the visual.
+enum BaseButtonGeometry {
+    static func visibleHeight(for size: ButtonConfiguration.ButtonSizeVariant) -> CGFloat {
+        size.height
+    }
+
+    static func tapTargetHeight(for size: ButtonConfiguration.ButtonSizeVariant) -> CGFloat {
+        max(size.height, JovieTokens.minimumHitTarget)
     }
 }
 
@@ -138,20 +151,17 @@ struct BaseButton<Label: View>: View {
         }
     }
 
-    private var minimumHeight: CGFloat {
-        max(configuration.size.height, JovieTokens.minimumHitTarget)
-    }
-
     var body: some View {
         Button(action: handleTap, label: {
             buttonContent
                 .frame(maxWidth: configuration.fullWidth ? .infinity : nil)
-                .frame(minHeight: minimumHeight)
+                .frame(minHeight: BaseButtonGeometry.visibleHeight(for: configuration.size))
                 .padding(.horizontal, configuration.size.padding.leading)
                 .background(backgroundView)
                 .clipShape(buttonShape)
                 .overlay(borderOverlay)
-                .contentShape(buttonShape)
+                .frame(minHeight: BaseButtonGeometry.tapTargetHeight(for: configuration.size))
+                .contentShape(Rectangle())
                 .scaleEffect(reduceMotion ? 1 : (isPressed || configuration.isLoading ? 0.96 : 1.0))
                 .opacity(isEnabled ? 1.0 : 0.6)
                 .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: isPressed)
@@ -180,7 +190,7 @@ struct BaseButton<Label: View>: View {
                 .scaleEffect(0.8)
         } else {
             label()
-                .font(.system(labelTextStyle, design: .default).weight(.semibold))
+                .font(.system(labelTextStyle, design: .default).weight(JovieTokens.actionLabelWeight))
                 .foregroundColor(configuration.style.foregroundColor)
                 .multilineTextAlignment(.center)
         }

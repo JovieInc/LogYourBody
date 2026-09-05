@@ -440,7 +440,7 @@ struct DefaultTheme: Theme {
     let typography = TypographyTheme(
         // Display
         displayLarge: .system(.largeTitle, design: .default).weight(.bold),
-        displayMedium: .system(.title, design: .default).weight(.bold),
+        displayMedium: .system(.title, design: .default).weight(JovieTokens.displayTypeWeight),
         displaySmall: .system(.title2, design: .default).weight(.semibold),
 
         // Headline
@@ -664,4 +664,26 @@ struct ThemePreview<Content: View>: View {
             .theme(DefaultTheme())
             .preferredColorScheme(.dark)
     }
+}
+
+// MARK: - Locked atoms (native-swift-locked-atoms-v1)
+
+/// ActionButton 32 / 510 / r999 and type 28 / 620 are locked company-wide and
+/// must not be remocked. SF Pro exposes no numeric weights, so 510 resolves to
+/// `.medium` and 620 to `.semibold`; r999 is a `Capsule`. The 32pt height is
+/// the visible control; the tap target stays >= `minimumHitTarget` (44).
+extension JovieTokens {
+    static let actionControlHeight: CGFloat = 32
+    static let actionLabelWeight: Font.Weight = .medium
+    static let actionRadius: CGFloat = 999
+    static let displayTypeSize: CGFloat = 28
+    static let displayTypeWeight: Font.Weight = .semibold
+}
+
+extension Font {
+    /// Locked display atom: type 28 / 620.
+    static let jovieDisplay: Font = .system(
+        size: JovieTokens.displayTypeSize,
+        weight: JovieTokens.displayTypeWeight
+    )
 }
