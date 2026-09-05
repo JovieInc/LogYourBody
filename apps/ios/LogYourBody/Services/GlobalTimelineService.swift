@@ -201,9 +201,13 @@ final class GlobalTimelineService {
            bodyFat.presence == .present || bodyFat.presence == .estimated,
            let weightKg = weight.value,
            let bodyFatPercentage = bodyFat.value {
-            let heightMeters = heightInches * 0.0254
-            let leanMassKg = weightKg * (1 - bodyFatPercentage / 100)
-            let ffmi = leanMassKg / (heightMeters * heightMeters)
+            guard let ffmi = UnitConversion.calculateFFMI(
+                weightKg: weightKg,
+                bodyFatPercentage: bodyFatPercentage,
+                heightCm: heightInches * 2.54
+            ) else {
+                return missingValue()
+            }
 
             return GlobalTimelineMetricValue(
                 value: roundedOneDecimal(ffmi),
