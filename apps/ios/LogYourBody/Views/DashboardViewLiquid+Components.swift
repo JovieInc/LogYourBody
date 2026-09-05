@@ -80,7 +80,7 @@ struct DashboardHomeTimelineHero: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             ZStack {
                 if shouldShowPhoto {
                     ProgressPhotoCarouselView(
@@ -138,13 +138,13 @@ struct DashboardHomeTimelineHero: View {
     }
 
     private var timelineDateBar: some View {
-        DashboardChromeGlass.cluster(spacing: 10) {
-            HStack(spacing: 10) {
+        DashboardChromeGlass.cluster(spacing: 12) {
+            HStack(spacing: 12) {
                 Text(dateText)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(theme.colors.text)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 7)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                     .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
                     .allowsHitTesting(false)
 
@@ -172,8 +172,8 @@ struct DashboardHomeTimelineHero: View {
                     .font(.system(size: 12, weight: .semibold))
                     .monospacedDigit()
                     .foregroundColor(theme.colors.textSecondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                     .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
                     .allowsHitTesting(false)
             }
@@ -182,11 +182,11 @@ struct DashboardHomeTimelineHero: View {
 
     @ViewBuilder
     private var timelineMetricsHUD: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             bodyScoreSummary
 
             if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     timelineMetricButton(
                         title: "Weight",
                         value: weightValue,
@@ -330,7 +330,7 @@ struct DashboardHomeTimelineHero: View {
         Rectangle()
             .fill(theme.colors.border)
             .frame(width: 1, height: 44)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
     }
 
     private var horizontalMetricDivider: some View {
@@ -363,7 +363,7 @@ private struct DashboardQuickAnswerField: View {
             .padding(.vertical, 28)
             .opacity(0.8)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(headline)
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(theme.colors.text)
@@ -402,7 +402,7 @@ private struct DashboardHomeTimelineMetricButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 4) {
                 Rectangle()
                     .fill(color)
                     .frame(width: 28, height: 2)
@@ -675,7 +675,7 @@ struct DashboardStepsCard<ProgressView: View>: View {
                 cardContent
             }
         }
-        .padding(14)
+        .padding(16)
         .dashboardContentSurface(cornerRadius: theme.radius.card, border: theme.colors.border)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Steps: " + formattedSteps + " of " + formattedGoal)
@@ -688,7 +688,7 @@ struct DashboardStepsCard<ProgressView: View>: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(theme.colors.textSecondary)
 
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(formattedSteps)
                     .font(.system(size: 26, weight: .semibold, design: .rounded))
                     .foregroundColor(theme.colors.text)
@@ -748,7 +748,7 @@ struct LaunchTimelineSurface: View {
                         .frame(height: stageHeight)
 
                     metricStrip
-                        .padding(.top, 14)
+                        .padding(.top, 16)
                 }
                 .padding(.horizontal, JovieTokens.compactInset)
                 .padding(.top, 4)
@@ -784,14 +784,14 @@ struct LaunchTimelineSurface: View {
 
             VStack(spacing: 0) {
                 stageChrome
-                    .padding(.horizontal, 10)
-                    .padding(.top, 10)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 12)
 
                 Spacer(minLength: 0)
 
                 recessedSlider
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 10)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
             }
         }
         .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous))
@@ -821,13 +821,13 @@ struct LaunchTimelineSurface: View {
     }
 
     private var stageChrome: some View {
-        DashboardChromeGlass.cluster(spacing: 10) {
-            HStack(spacing: 10) {
+        DashboardChromeGlass.cluster(spacing: 12) {
+            HStack(spacing: 12) {
                 Text(dateText)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 7)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                     .lineLimit(1)
                     .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
 
@@ -863,9 +863,9 @@ struct LaunchTimelineSurface: View {
         )
         .frame(height: 64)
         .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(theme.colors.background.opacity(0.35))
         )
         .accessibilityIdentifier("launch_timeline_scrubber")
@@ -879,7 +879,7 @@ struct LaunchTimelineSurface: View {
                 endPoint: .bottomTrailing
             )
 
-            VStack(spacing: 7) {
+            VStack(spacing: 8) {
                 Image(systemName: "camera.metering.center.weighted")
                     .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(theme.colors.textSecondary)
@@ -932,7 +932,7 @@ struct LaunchTimelineSurface: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Capsule()
                     .fill(accent)
                     .frame(width: 22, height: 2)
@@ -964,7 +964,7 @@ struct LaunchTimelineSurface: View {
                 .minimumScaleFactor(0.72)
             }
             .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .dashboardContentSurface(cornerRadius: 12, border: theme.colors.border)
             .contentShape(Rectangle())

@@ -336,12 +336,12 @@ struct ProgressBar: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 // Background
-                RoundedRectangle(cornerRadius: 3)
+                RoundedRectangle(cornerRadius: 4)
                     .fill(Color.appCard.opacity(0.5))
                     .frame(height: 6)
 
                 // Progress
-                RoundedRectangle(cornerRadius: 3)
+                RoundedRectangle(cornerRadius: 4)
                     .fill(Color.appPrimary)
                     .frame(width: geometry.size.width * progress, height: 6)
                     .animation(.easeInOut(duration: 0.3), value: progress)

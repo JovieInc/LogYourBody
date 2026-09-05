@@ -51,7 +51,7 @@ var historyBlock: some View {
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundColor(Color.metricTextTertiary)
                                     .padding(.top, index == 0 ? 4 : 12)
-                                    .padding(.bottom, 6)
+                                    .padding(.bottom, 8)
                             }
 
                             ForEach(section.entries) { entry in
@@ -110,7 +110,7 @@ func historyRow(for entry: MetricHistoryEntry, config: MetricEntriesConfiguratio
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
 
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     historySourceIcon(for: entry.source)
 
                     Text(sourceLabel(for: entry.source))

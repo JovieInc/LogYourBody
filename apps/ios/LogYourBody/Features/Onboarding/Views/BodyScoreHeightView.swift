@@ -105,7 +105,7 @@ struct BodyScoreHeightView: View {
             .onChange(of: viewModel.heightCentimetersText) { _, newValue in
                 validateHeightCentimeters(newValue)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 20)
             .frame(minHeight: JovieTokens.controlHeight)
             .systemBGlassSurface(
                 cornerRadius: JovieTokens.controlHeight,

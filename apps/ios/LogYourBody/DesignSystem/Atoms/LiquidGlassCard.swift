@@ -234,7 +234,7 @@ struct GlassChip: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             if let icon = icon {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .medium))
@@ -245,7 +245,7 @@ struct GlassChip: View {
                 .foregroundColor(color.opacity(0.9))
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .background(
             Capsule()
                 .fill(Color.black.opacity(0.3))
@@ -274,7 +274,7 @@ struct FrostedTabItem: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 24, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? Color(hex: "#6EE7F0") : .white.opacity(0.55))
+                    .foregroundColor(isSelected ? Color.appPrimary : .white.opacity(0.55))
                     .symbolEffect(.bounce, value: isSelected)
             }
             .frame(maxWidth: .infinity)
@@ -288,7 +288,7 @@ struct FrostedTabItem: View {
 
 #Preview {
     ZStack {
-        Color(hex: "#0B0D10")
+        Color.appBackground
             .ignoresSafeArea()
 
         VStack(spacing: 20) {

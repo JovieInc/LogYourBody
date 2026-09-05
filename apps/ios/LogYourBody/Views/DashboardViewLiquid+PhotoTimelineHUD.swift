@@ -392,7 +392,7 @@ extension DashboardViewLiquid {
                     .font(.system(size: 34, weight: .semibold))
                     .foregroundColor(theme.colors.textSecondary)
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Start with a photo")
                         .font(Font.jovieDisplay)
                         .foregroundColor(theme.colors.text)
@@ -564,7 +564,7 @@ private struct PhotoTimelineNavigationMenu: View {
         }
         .font(.system(size: 18, weight: .semibold))
         .foregroundStyle(isSelected ? theme.colors.text : theme.colors.textSecondary)
-        .padding(.vertical, 13)
+        .padding(.vertical, 12)
         .padding(.horizontal, JovieTokens.compactInset)
         .background(
             isSelected ? theme.colors.surface : Color.clear,

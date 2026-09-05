@@ -145,7 +145,7 @@ struct PaywallView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.system(.title, design: .default).weight(.semibold))
                 .foregroundStyle(theme.colors.text)
@@ -198,7 +198,7 @@ struct PaywallView: View {
             selectedPackageIdentifier = package.packageIdentifier
             HapticManager.shared.impact(style: .light)
         } label: {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(package.planTitle)
                         .font(theme.typography.labelLarge)

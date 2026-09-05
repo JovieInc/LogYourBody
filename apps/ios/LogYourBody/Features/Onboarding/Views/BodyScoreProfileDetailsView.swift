@@ -277,7 +277,7 @@ struct BodyScoreProfileDetailsView: View {
                         .autocorrectionDisabled(true)
                         .submitLabel(.next)
                         .focused($focusedNameField, equals: .firstName)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
                             cornerRadius: JovieTokens.controlHeight,
@@ -311,7 +311,7 @@ struct BodyScoreProfileDetailsView: View {
                         .autocorrectionDisabled(true)
                         .submitLabel(.next)
                         .focused($focusedNameField, equals: .lastName)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
                             cornerRadius: JovieTokens.controlHeight,
@@ -370,7 +370,7 @@ struct BodyScoreProfileDetailsView: View {
 
     private var heightSection: some View {
         OnboardingFormSection(title: nil, caption: "You can update this later in Settings.") {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 20) {
                 OnboardingSegmentedControl(
                     options: HeightUnit.allCases,
                     selection: $viewModel.profileHeightUnit
@@ -386,7 +386,7 @@ struct BodyScoreProfileDetailsView: View {
                         .font(theme.typography.headlineLarge)
                         .multilineTextAlignment(.center)
                         .focused($heightFieldFocused)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
                             cornerRadius: JovieTokens.controlHeight,

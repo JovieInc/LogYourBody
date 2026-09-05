@@ -127,7 +127,7 @@ extension PreferencesView {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Circle()
                             .fill(subscriptionManager.isSubscribed ? Color.appSuccess : Color.appWarning)
                             .frame(width: 8, height: 8)
@@ -145,7 +145,7 @@ extension PreferencesView {
                     }
                 }
             } else {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Circle()
                         .fill(subscriptionManager.isSubscribed ? Color.appSuccess : Color.appWarning)
                         .frame(width: 8, height: 8)

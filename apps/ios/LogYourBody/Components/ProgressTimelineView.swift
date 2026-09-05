@@ -133,7 +133,7 @@ struct ProgressTimelineView: View {
             .font(.footnote.weight(.medium))
             .foregroundColor(Color.liquidTextPrimary)
             .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.vertical, 8)
             .padding(.bottom, 4)
             .accessibilityHidden(true)
 

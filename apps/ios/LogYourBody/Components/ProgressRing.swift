@@ -20,7 +20,7 @@ struct ProgressRing: View {
         progress: Double,
         size: CGFloat = 80,
         lineWidth: CGFloat = 8,
-        accentColor: Color = Color(hex: "#6EE7F0"),
+        accentColor: Color = Color.appPrimary,
         showPercentage: Bool = false
     ) {
         self.progress = min(max(progress, 0), 1.0)  // Clamp 0-1
@@ -95,7 +95,7 @@ struct ProgressRing: View {
 
 #Preview {
     ZStack {
-        Color(hex: "#0B0D10")
+        Color.appBackground
             .ignoresSafeArea()
 
         VStack(spacing: 40) {

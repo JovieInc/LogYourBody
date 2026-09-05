@@ -77,8 +77,8 @@ var body: some View {
     }
 
 var headlineBlock: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(iconColor)
@@ -93,7 +93,7 @@ var headlineBlock: some View {
                     .foregroundColor(Color.metricTextSecondary)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(headlineValueText)
                         .font(.system(size: headlineValueFontSize, weight: .semibold, design: .default))
@@ -120,7 +120,7 @@ var headlineBlock: some View {
             }
 
             if let stats = computeSeriesStats(for: displayedSeries) {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     statsCell(
                         title: "Average",
                         value: formatStatValue(stats.average),
@@ -243,23 +243,23 @@ var chartCard: some View {
 @ViewBuilder
     var relatedMetricsRow: some View {
         if !relatedMetrics.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("Related")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.white)
 
                 if dynamicTypeSize.isAccessibilitySize {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         ForEach(relatedMetrics) { metric in
                             relatedMetricTile(metric)
                         }
                     }
                 } else {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         ForEach(relatedMetricRows.indices, id: \.self) { index in
                             let row = relatedMetricRows[index]
 
-                            HStack(spacing: 10) {
+                            HStack(spacing: 12) {
                                 ForEach(row) { metric in
                                     relatedMetricTile(metric)
                                 }
@@ -287,8 +287,8 @@ var chartCard: some View {
     }
 
 func relatedMetricTile(_ metric: MetricDetailRelatedMetric) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
                 Image(systemName: metric.systemImageName)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(relatedMetricAccent(for: metric.id))
@@ -348,7 +348,7 @@ func relatedMetricAccent(for id: String) -> Color {
 var chartSkeleton: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Subtitle placeholder
-            SkeletonView(width: 140, height: 14, cornerRadius: 7)
+            SkeletonView(width: 140, height: 14, cornerRadius: 8)
 
             // Chart area placeholder
             SkeletonView(height: chartHeight - 40, cornerRadius: 16)
@@ -358,7 +358,7 @@ var chartSkeleton: some View {
     }
 
 var chartHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             timeRangeSelector
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -382,7 +382,7 @@ var chartPresenceLegend: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(visiblePresenceLegendItems) { item in
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Circle()
                             .fill(chartPointColor(for: item.presence))
                             .frame(width: 7, height: 7)
@@ -397,8 +397,8 @@ var chartPresenceLegend: some View {
                                 .foregroundColor(Color.metricTextTertiary)
                         }
                     }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
                     .background(
                         Capsule()
                             .fill(Color.white.opacity(0.06))
@@ -423,7 +423,7 @@ var chartPresenceLegend: some View {
                             isSelected ? Color.metricAccent : Color.metricTextSecondary
                         )
                         .padding(.vertical, 8)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .frame(minWidth: 44, minHeight: 44)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
@@ -445,7 +445,7 @@ var chartPresenceLegend: some View {
         let value = formatHeadlineValue(goalValue)
         let displayValue = unit.isEmpty ? value : "\(value) \(unit)"
 
-        return HStack(spacing: 7) {
+        return HStack(spacing: 8) {
             Circle()
                 .fill(Color.metricAccent.opacity(0.8))
                 .frame(width: 7, height: 7)
@@ -454,8 +454,8 @@ var chartPresenceLegend: some View {
                 .font(.footnote.weight(.semibold))
                 .foregroundColor(Color.metricTextSecondary)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(
             Capsule()
                 .fill(Color.white.opacity(0.06))
@@ -637,7 +637,7 @@ func selectedPointCallout(for point: MetricChartDataPoint) -> some View {
                 .foregroundColor(.black.opacity(0.62))
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .background(
             Capsule()
                 .fill(Color.white)

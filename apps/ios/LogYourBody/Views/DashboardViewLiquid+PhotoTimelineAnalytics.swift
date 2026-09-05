@@ -105,7 +105,7 @@ extension DashboardViewLiquid {
                         .foregroundColor(theme.colors.textSecondary)
                         .monospacedDigit()
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
                     theme.colors.backgroundSecondary,

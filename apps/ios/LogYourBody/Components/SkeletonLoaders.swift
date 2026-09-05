@@ -134,8 +134,8 @@ struct CoreMetricsRowSkeleton: View {
     private func metricCardSkeleton(icon: String, title: String, unit: String?) -> some View {
         VStack(spacing: 0) {
             // Value placeholder
-            HStack(alignment: .bottom, spacing: 6) {
-                RoundedRectangle(cornerRadius: 6)
+            HStack(alignment: .bottom, spacing: 8) {
+                RoundedRectangle(cornerRadius: 8)
                     .fill(Color.white.opacity(0.1))
                     .frame(width: 80, height: 36)
                     .shimmer()

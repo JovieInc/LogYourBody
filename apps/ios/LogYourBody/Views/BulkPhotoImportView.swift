@@ -153,7 +153,7 @@ struct BulkPhotoImportView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, JovieTokens.screenInset)
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     Label("Scans on this iPhone before anything is imported", systemImage: "lock.shield")
                     Label("Preserves original photo dates", systemImage: "calendar")
                     Label("Uploads only the photos you select", systemImage: "checkmark.circle")
@@ -644,7 +644,7 @@ struct PhotoGridItem: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.black.opacity(0.6))
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         Spacer()
                     }
                     .padding(8)

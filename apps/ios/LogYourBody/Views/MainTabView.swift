@@ -223,8 +223,8 @@ private struct PaidWeightLoggerMVPView: View {
                     .frame(maxWidth: .infinity, minHeight: 84)
             } else if let latestWeight, let weight = latestWeight.weight {
                 let display = displayWeight(weight)
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(display.value)
                             .font(.system(.largeTitle, design: .rounded, weight: .bold))
                             .foregroundColor(.appText)
@@ -239,7 +239,7 @@ private struct PaidWeightLoggerMVPView: View {
                         .foregroundColor(.appTextSecondary)
                 }
             } else {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("No weight yet")
                         .font(.title2.weight(.semibold))
                         .foregroundColor(.appText)
@@ -261,7 +261,7 @@ private struct PaidWeightLoggerMVPView: View {
     }
 
     private var syncStatusLabel: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Circle()
                 .fill(syncStatusColor)
                 .frame(width: 7, height: 7)
@@ -312,7 +312,7 @@ private struct PaidWeightLoggerMVPView: View {
     }
 
     private var entryCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 20) {
             Text("Add weight")
                 .font(.title3.weight(.semibold))
                 .foregroundColor(.appText)
@@ -324,7 +324,7 @@ private struct PaidWeightLoggerMVPView: View {
             .pickerStyle(.segmented)
             .accessibilityIdentifier("mvp_weight_unit_picker")
 
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
                 TextField("0.0", text: $weightText)
                     .keyboardType(.decimalPad)
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
@@ -337,7 +337,7 @@ private struct PaidWeightLoggerMVPView: View {
                     .foregroundColor(.appTextSecondary)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 16)
             .background(Color.appBackground)
             .overlay(
                 RoundedRectangle(cornerRadius: Constants.cornerRadiusLarge)
@@ -476,7 +476,7 @@ private struct PaidWeightLoggerMVPView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 16)
     }
 
     private var syncStatusText: String {
@@ -822,9 +822,9 @@ struct ChatTabView: View {
     private var chatMessages: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                LazyVStack(alignment: .leading, spacing: 18) {
+                LazyVStack(alignment: .leading, spacing: 20) {
                     if isLoadingConversation {
-                        HStack(spacing: 10) {
+                        HStack(spacing: 12) {
                             ProgressView()
                                 .controlSize(.small)
                                 .tint(theme.colors.textSecondary)
@@ -845,22 +845,22 @@ struct ChatTabView: View {
                     }
 
                     if isResponding {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             ForEach(0..<3, id: \.self) { _ in
                                 Circle()
                                     .fill(theme.colors.textSecondary)
                                     .frame(width: 5, height: 5)
                             }
                         }
-                        .padding(.horizontal, 15)
-                        .padding(.vertical, 13)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                         .background(theme.colors.surface, in: Capsule())
                         .accessibilityLabel("Thinking")
                         .accessibilityIdentifier("chat_thinking_indicator")
                     }
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 22)
+                .padding(.horizontal, 20)
+                .padding(.top, 24)
                 .padding(.bottom, 12)
             }
             .scrollDismissesKeyboard(.interactively)
@@ -885,7 +885,7 @@ struct ChatTabView: View {
     private var starterPrompts: some View {
         VStack(spacing: 0) {
             if let chatErrorMessage {
-                HStack(alignment: .center, spacing: 10) {
+                HStack(alignment: .center, spacing: 12) {
                     Image(systemName: "exclamationmark.circle.fill")
                         .foregroundStyle(Color.appWarning)
 
@@ -912,8 +912,8 @@ struct ChatTabView: View {
                         .accessibilityIdentifier("chat_reload_button")
                     }
                 }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
                 .background(theme.colors.surface.opacity(0.92))
                 .accessibilityElement(children: .contain)
             }
@@ -925,7 +925,7 @@ struct ChatTabView: View {
                         starterPrompt("Summarize my trend")
                         starterPrompt("What changed recently?")
                     }
-                    .padding(.horizontal, 18)
+                    .padding(.horizontal, 20)
                     .padding(.vertical, 8)
                 }
                 .transition(.opacity)
@@ -939,7 +939,7 @@ struct ChatTabView: View {
         }
         .font(.system(size: 13, weight: .medium))
         .foregroundStyle(theme.colors.text)
-        .padding(.horizontal, 13)
+        .padding(.horizontal, 12)
         .frame(minHeight: 38)
         .background(theme.colors.surface, in: Capsule())
         .overlay {
@@ -1338,7 +1338,7 @@ private struct ChatBubble: View {
     let message: ChatMessage
 
     var body: some View {
-        VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 5) {
+        VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
             HStack {
                 if message.role == .user {
                     Spacer(minLength: 36)
@@ -1349,17 +1349,17 @@ private struct ChatBubble: View {
                     .foregroundStyle(message.role == .user ? theme.colors.background : theme.colors.text)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 15)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .background(
                         message.role == .user
                             ? theme.colors.text
                             : theme.colors.surface,
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
                     )
                     .overlay {
                         if message.role == .assistant {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
                                 .stroke(theme.colors.border, lineWidth: 1)
                         }
                     }
