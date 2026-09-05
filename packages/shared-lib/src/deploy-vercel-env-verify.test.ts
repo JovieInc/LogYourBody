@@ -86,6 +86,7 @@ describe('deploy Vercel env verify uses POSIX grep', () => {
       expect(workflow).toContain(`VERCEL_ORG_ID: ${vercelOrgId}`);
       expect(workflow).toContain(`VERCEL_PROJECT_ID: ${vercelProjectId}`);
       expect(workflow).toContain('--scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"');
+      expect(workflow).not.toContain('--token="$VERCEL_TOKEN"');
     }
   });
 
