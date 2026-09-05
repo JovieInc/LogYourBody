@@ -240,6 +240,7 @@ function makeHarness() {
   const getUser = jest.fn(async (subject: string) => user(subject));
   const listMetrics = jest.fn(async (subject: string) => [metric(subject)]);
   let lease = 0;
+  const reportStreamOutcome = jest.fn();
   const handlers = createChatRouteHandlers({
     authenticate: async (request) => {
       const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
@@ -258,10 +259,11 @@ function makeHarness() {
       deleteUser: jest.fn(),
     } as UserDirectoryPort,
     createModel: () => model,
+    reportStreamOutcome,
     modelName: 'fixture-model',
     createLeaseToken: () => `33333333-3333-4333-8333-${String(++lease).padStart(12, '0')}`,
   });
-  return { handlers, store, model, getUser, listMetrics };
+  return { handlers, store, model, getUser, listMetrics, reportStreamOutcome };
 }
 
 function request(method: 'GET' | 'POST' | 'DELETE', token = 'user-a', body?: unknown, query = '') {
@@ -402,6 +404,55 @@ describe('/api/auth/mobile/chat/v1', () => {
     const conversation = await store.getLatest('user-a');
     expect(conversation?.messages.filter(({ role }) => role === 'user')).toHaveLength(1);
     expect(conversation?.messages.filter(({ role }) => role === 'assistant')).toHaveLength(1);
+  });
+
+  it('delivers a terminal stream error even when failure persistence is unavailable', async () => {
+    const { handlers, model, store, reportStreamOutcome } = makeHarness();
+    model.shouldFail = true;
+    jest.spyOn(store, 'failTurn').mockRejectedValue(new Error('synthetic persistence outage'));
+    const response = await handlers.POST(request('POST', 'user-a', chatBody('Say hello.')));
+    const stream = await response.text();
+    expect(stream).toContain('event: meta');
+    expect(stream).toContain('event: error');
+    expect(stream).not.toContain('event: done');
+    expect(stream).not.toContain('synthetic persistence outage');
+    expect(reportStreamOutcome.mock.calls).toEqual([
+      ['started'],
+      ['provider_error'],
+      ['failure_persistence_error'],
+    ]);
+  });
+
+  it('distinguishes completion persistence failure from model failure without exposing content', async () => {
+    const { handlers, store, reportStreamOutcome } = makeHarness();
+    jest.spyOn(store, 'completeTurn').mockRejectedValue(new Error('private database detail'));
+    const response = await handlers.POST(request('POST', 'user-a', chatBody('Say hello.')));
+    const stream = await response.text();
+    expect(stream).toContain('event: error');
+    expect(stream).not.toContain('event: done');
+    expect(stream).not.toContain('private database detail');
+    expect(reportStreamOutcome.mock.calls).toEqual([['started'], ['completion_persistence_error']]);
+    expect([...store.turns.values()][0]?.status).toBe('failed');
+  });
+
+  it('keeps the answer lifecycle intact when diagnostics throw', async () => {
+    const { handlers, reportStreamOutcome } = makeHarness();
+    reportStreamOutcome.mockImplementation(() => {
+      throw new Error('diagnostic sink unavailable');
+    });
+    const response = await handlers.POST(request('POST', 'user-a', chatBody('Say hello.')));
+    expect(await response.text()).toContain('event: done');
+    expect(reportStreamOutcome.mock.calls).toEqual([['started'], ['completed']]);
+  });
+
+  it('reports an empty provider stream as failure rather than completed', async () => {
+    const { handlers, model, reportStreamOutcome } = makeHarness();
+    model.chunks = [];
+    const response = await handlers.POST(request('POST', 'user-a', chatBody('Say hello.')));
+    const stream = await response.text();
+    expect(stream).toContain('event: error');
+    expect(stream).not.toContain('event: done');
+    expect(reportStreamOutcome.mock.calls).toEqual([['started'], ['provider_error']]);
   });
 
   it('enforces persisted request limits and permits owner deletion', async () => {

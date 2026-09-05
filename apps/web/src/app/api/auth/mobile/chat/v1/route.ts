@@ -23,6 +23,7 @@ const handlers = createChatRouteHandlers({
   createModel: createChatModelPort,
   modelName: process.env.LYB_CHAT_MODEL || 'gpt-4o-mini',
   createLeaseToken: randomUUID,
+  reportStreamOutcome: (outcome) => console.info('LYB_CHAT_STREAM', { outcome }),
 });
 
 export const GET = handlers.GET;
