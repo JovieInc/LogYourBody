@@ -17,8 +17,7 @@ for result_bundle in "$@"; do
   fi
 
   xcrun xcresulttool get test-results tests \
-    --path "$result_bundle" \
-    --format json |
+    --path "$result_bundle" |
     python3 -c '
 import json
 import sys

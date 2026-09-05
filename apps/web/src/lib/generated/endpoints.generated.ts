@@ -133,6 +133,11 @@ export const endpoints = {
       reason: 'SwiftLint build-tool repository.',
     },
     {
+      value: 'https://github.com/SvenTiigi/WhatsNewKit',
+      reason:
+        'Researched and rejected option in whats-new-review-contract.md; not a runtime dependency.',
+    },
+    {
       value: 'https://github.com/JovieInc/certificates',
       reason: 'Fastlane Match certificates repository.',
     },
@@ -291,6 +296,27 @@ export const endpoints = {
     {
       value: 'https://github.com/johnno1962/injectionforxcode',
       reason: 'Xcode tooling reference in gitignore boilerplate.',
+    },
+    {
+      value: 'https://github.com/rsms/inter',
+      reason: 'Inter font attribution and license reference for the shared typography projection.',
+    },
+    {
+      value: 'https://github.com/rsms/inter/blob/master/LICENSE.txt',
+      reason: 'Inter SIL Open Font License reference for the shared typography projection.',
+    },
+    {
+      value: 'http://scripts.sil.org/OFL',
+      reason:
+        'Inter SIL Open Font License FAQ reference bundled with the shared typography assets.',
+    },
+    {
+      value: 'https://www.fontshare.com/fonts/satoshi',
+      reason: 'Satoshi font provenance reference for the shared typography projection.',
+    },
+    {
+      value: 'https://www.fontshare.com/licenses/itf-ffl',
+      reason: 'Satoshi ITF Free Font License reference for the shared typography projection.',
     },
     {
       value: 'https://github.com/',
