@@ -6,8 +6,15 @@ import SwiftUI
 
 // MARK: - LoadingScreen Organism
 
-/// A quiet continuity surface. Launch should feel like returning to data, not
-/// waiting through branded progress theatre.
+/// Splash B (splash-b-everywhere-v1): a tiny centered cream mark on an empty
+/// night field. No type, no hero, no wordmark. Progress is a 2pt hairline the
+/// width of the mark so launch still reads as returning to data.
+enum SplashBGeometry {
+    static let markSize: CGFloat = 32
+    static let progressHeight: CGFloat = 2
+    static let progressWidth: CGFloat = markSize
+}
+
 struct LoadingScreen: View {
     @Binding var progress: Double
     @Binding var loadingStatus: String
@@ -25,41 +32,27 @@ struct LoadingScreen: View {
             backgroundColor
                 .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
-                Spacer()
-
-                Text("Loading your latest data")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(Color.jovieText)
-
-                Text(loadingStatus.isEmpty ? "Your last view is ready first. Sync continues quietly." : loadingStatus)
-                    .font(.body)
-                    .foregroundStyle(Color.jovieTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: JovieTokens.tightGap) {
+                Image("LaunchLogo")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: SplashBGeometry.markSize, height: SplashBGeometry.markSize)
+                    .foregroundStyle(Color.jovieCream)
+                    .accessibilityHidden(true)
 
                 DSProgressBar(
                     progress: clampedProgress,
-                    height: 2,
+                    height: SplashBGeometry.progressHeight,
                     backgroundColor: .jovieHairline,
-                    foregroundColor: .jovieText,
+                    foregroundColor: .jovieCream,
                     animationDuration: JovieTokens.cinematicDuration
                 )
-                .padding(.top, 8)
-
-                if showPercentage {
-                    Text("\(Int(clampedProgress * 100))%")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(Color.jovieTextSecondary)
-                }
-
-                Spacer()
+                .frame(width: SplashBGeometry.progressWidth)
             }
-            .padding(.horizontal, JovieTokens.screenInset)
-            .padding(.vertical, 64)
-            .frame(maxWidth: 440, alignment: .leading)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Loading your latest data")
-            .accessibilityValue(loadingStatus)
+            .accessibilityValue(loadingStatus.isEmpty ? "Your last view is ready first. Sync continues quietly." : loadingStatus)
         }
         .onAppear {
             checkCompletion()

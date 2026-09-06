@@ -25,12 +25,30 @@ enum JovieTokens {
     static let cinematicDuration: Double = 0.42
 }
 
-/// Dark-only canvas steps for `DefaultTheme`. Accents stay reserved for metrics.
+/// Dark-only canvas steps for `DefaultTheme` — the Noir Ion night ladder
+/// (night-dj-harmony-v1). page → main → rail → card → dropdown → modal are one
+/// stepped hue family. Accents stay reserved for metric meaning and state
+/// (palette-core-accents-v1: Ion blue, Pulse pink, Ultra purple, one gold, one
+/// error; success is blue, never green).
 enum JoviePalette {
-    static let canvasHex = "#08090A"
-    static let surfaceHex = "#0F1011"
-    static let elevatedHex = "#17171A"
-    static let raisedHex = "#1C1C1E"
+    static let canvasHex = "#030407"
+    static let shellHex = "#06080D"
+    static let panelHex = "#0A0D16"
+    static let cardHex = "#0F1420"
+    static let elevatedHex = "#151B2A"
+    static let floatingHex = "#1B2436"
+
+    /// Card/input step. Kept under its historical name for existing consumers.
+    static let surfaceHex = cardHex
+    /// Modal/floating step. Kept under its historical name for existing consumers.
+    static let raisedHex = floatingHex
+
+    static let ionHex = "#11AFFF"
+    static let pulseHex = "#FF48D2"
+    static let ultraHex = "#A982FF"
+    static let goldHex = "#FFC857"
+    static let errorHex = "#FF677D"
+    static let creamHex = "#F5F4F0"
 }
 
 enum ChatComposerGeometry {
@@ -392,13 +410,13 @@ struct DefaultTheme: Theme {
     let colors = ColorTheme(
         // Background
         background: Color(hex: JoviePalette.canvasHex),
-        backgroundSecondary: Color(hex: JoviePalette.surfaceHex),
-        backgroundTertiary: Color(hex: JoviePalette.elevatedHex),
+        backgroundSecondary: Color(hex: JoviePalette.shellHex),
+        backgroundTertiary: Color(hex: JoviePalette.panelHex),
 
         // Surface
-        surface: Color(hex: JoviePalette.surfaceHex),
+        surface: Color(hex: JoviePalette.cardHex),
         surfaceSecondary: Color(hex: JoviePalette.elevatedHex),
-        surfaceTertiary: Color(hex: JoviePalette.raisedHex),
+        surfaceTertiary: Color(hex: JoviePalette.floatingHex),
 
         // Primary
         primary: .jovieAction,
@@ -406,11 +424,11 @@ struct DefaultTheme: Theme {
         primarySubtle: .jovieAction.opacity(0.12),
 
         // Accents
-        accentViolet: Color(hex: "#8b1eff"),
-        accentPink: Color(hex: "#d61a7f"),
-        accentTeal: Color(hex: "#0f9b8e"),
-        accentOrange: Color(hex: "#ff9800"),
-        accentGreen: Color(hex: "#2f9e44"),
+        accentViolet: Color(hex: JoviePalette.ultraHex),
+        accentPink: Color(hex: JoviePalette.pulseHex),
+        accentTeal: Color(hex: JoviePalette.ionHex),
+        accentOrange: Color(hex: JoviePalette.goldHex),
+        accentGreen: Color(hex: JoviePalette.ionHex),
 
         // Text
         text: Color(hex: "#F7F8F8"),
@@ -420,13 +438,13 @@ struct DefaultTheme: Theme {
 
         // Borders
         border: .jovieHairline,
-        borderSecondary: Color(hex: "#1A1A1C"),
+        borderSecondary: Color(hex: JoviePalette.elevatedHex),
         borderFocused: .jovieAction.opacity(0.72),
 
         // States
-        success: Color(hex: "#2F9E44"),
-        warning: Color(hex: "#ff9800"),
-        error: Color(hex: "#F3122D"),
+        success: Color(hex: JoviePalette.ionHex),
+        warning: Color(hex: JoviePalette.goldHex),
+        error: Color(hex: JoviePalette.errorHex),
         info: .jovieMetricAccent,
 
         // Interactive
