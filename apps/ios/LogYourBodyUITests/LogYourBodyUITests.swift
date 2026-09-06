@@ -361,7 +361,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["Open Menu"].exists)
-        XCTAssertTrue(app.buttons["Settings"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_settings"].exists)
         XCTAssertFalse(app.buttons["Chat"].exists)
         XCTAssertFalse(app.buttons["Open sidebar"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["chat_sidebar"].exists)
@@ -534,7 +534,7 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
-        app.buttons["Settings"].tap()
+        openSettingsFromPhotoTimelineMenu(in: app)
 
         let profileLink = app.buttons["settings_profile_link"]
         XCTAssertTrue(profileLink.waitForExistence(timeout: 10))
@@ -852,6 +852,8 @@ final class LogYourBodyUITests: XCTestCase {
         // Preserve the loaded history and selected snapshot across all three
         // surfaces; a relaunch briefly exposes only the newest measurement.
         try assertAndCaptureTimelineAnalytics(in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_settings"].exists)
+        openSettingsFromPhotoTimelineMenu(in: app)
     }
 
     func testLaunchQualityGateCapturesBodyScoreShareSheet() throws {
@@ -1145,6 +1147,16 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 5))
     }
 
+    private func openSettingsFromPhotoTimelineMenu(in app: XCUIApplication) {
+        openPhotoTimelineMenu(in: app)
+        let settings = app.buttons["Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        XCTAssertTrue(settings.isHittable)
+        settings.tap()
+        XCTAssertTrue(app.buttons["settings_profile_link"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_settings"].exists)
+    }
+
     private func openStatsPage(in app: XCUIApplication) {
         if app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists {
             return
@@ -1253,6 +1265,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
         _ = try homeFFMIValue(in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_settings"].exists)
         attachScreenshot(named: "launch-quality-home-timeline", from: app)
     }
 
