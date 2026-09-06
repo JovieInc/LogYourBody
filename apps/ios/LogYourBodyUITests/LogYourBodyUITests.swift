@@ -527,6 +527,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertEqual(shell.frame.minX, singleLineFrame.minX, accuracy: 1)
         XCTAssertEqual(shell.frame.width, singleLineFrame.width, accuracy: 1)
         XCTAssertLessThanOrEqual(sendButton.frame.maxY, shell.frame.maxY)
+        XCTAssertEqual(composer.frame.maxY, sendButton.frame.maxY, accuracy: 2)
         attachScreenshot(named: "chat-composer-multiline", from: app)
     }
 
@@ -1120,6 +1121,12 @@ final class LogYourBodyUITests: XCTestCase {
 
         let composer = app.textFields["chat_composer"]
         XCTAssertTrue(composer.waitForExistence(timeout: 8))
+        let sendButton = app.buttons["chat_send_button"]
+        XCTAssertTrue(sendButton.waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            composer.frame.midY, sendButton.frame.midY, accuracy: 2,
+            "Single-line text must be vertically centered beside the send control."
+        )
         XCTAssertTrue(app.descendants(matching: .any)["home_chat_composer_dock"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["chat_sidebar"].exists)
         XCTAssertFalse(app.tabBars.firstMatch.exists)

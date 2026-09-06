@@ -953,7 +953,7 @@ struct ChatTabView: View {
         let isMultiline = ChatComposerGeometry.isMultiline(textHeight: composerTextHeight)
         let cornerRadius = ChatComposerGeometry.cornerRadius(isMultiline: isMultiline)
 
-        return HStack(alignment: .bottom, spacing: JovieTokens.itemGap) {
+        return HStack(alignment: isMultiline ? .bottom : .center, spacing: JovieTokens.itemGap) {
             TextField("Message LogYourBody", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($isComposerFocused)
