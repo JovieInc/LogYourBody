@@ -14,14 +14,20 @@ final class DashboardViewModel: ObservableObject {
 
     private let healthKitManager: HealthKitManager
     private let healthSyncCoordinator: HealthSyncCoordinating
+    private let latestMetricLoader: @MainActor (String) async -> BodyMetrics?
     private var historicalLoadTask: Task<Void, Never>?
 
     init(
         healthKitManager: HealthKitManager = .shared,
-        healthSyncCoordinator: HealthSyncCoordinating
+        healthSyncCoordinator: HealthSyncCoordinating,
+        latestMetricLoader: @escaping @MainActor (String) async -> BodyMetrics? = { userId in
+            let cached = await CoreDataManager.shared.fetchLatestBodyMetric(for: userId)
+            return cached?.toBodyMetrics()
+        }
     ) {
         self.healthKitManager = healthKitManager
         self.healthSyncCoordinator = healthSyncCoordinator
+        self.latestMetricLoader = latestMetricLoader
     }
 
     convenience init(healthKitManager: HealthKitManager = .shared) {
@@ -50,21 +56,23 @@ final class DashboardViewModel: ObservableObject {
         )
         let recentDaily = recentDailyCached.map { $0.toDailyMetrics() }
 
-        if loadOnlyNewest {
-            if let latestCached = await CoreDataManager.shared.fetchLatestBodyMetric(for: userId),
-               let newest = latestCached.toBodyMetrics() {
-                bodyMetrics = [newest]
-                sortedBodyMetricsAscending = [newest]
+        // Only the first paint may use a single measurement. Later refreshes
+        // must retain complete history and reconcile updates and deletions.
+        if loadOnlyNewest && !hasLoadedInitialData {
+            let newest = await latestMetricLoader(userId)
+            // Another load may have completed while the first-paint fetch was
+            // suspended. Never replace that newer result with this singleton.
+            if !hasLoadedInitialData {
+                bodyMetrics = newest.map { [$0] } ?? []
+                sortedBodyMetricsAscending = bodyMetrics
                 hasLoadedInitialData = true
-
-                // Defer full list assignment to a follow-up task so the UI can show something quickly
-                scheduleHistoricalLoadIfNeeded(for: userId)
-            } else {
-                bodyMetrics = []
-                sortedBodyMetricsAscending = []
-                hasLoadedInitialData = true
+                if newest != nil {
+                    scheduleHistoricalLoadIfNeeded(for: userId)
+                }
             }
         } else {
+            historicalLoadTask?.cancel()
+            historicalLoadTask = nil
             let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
             let allMetrics = fetchedMetrics
                 .compactMap { $0.toBodyMetrics() }
@@ -91,7 +99,7 @@ final class DashboardViewModel: ObservableObject {
             return
         }
 
-        historicalLoadTask = Task.detached(priority: .background) {
+        historicalLoadTask = Task(priority: .background) {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled else { return }
 
@@ -100,14 +108,14 @@ final class DashboardViewModel: ObservableObject {
                 .compactMap { $0.toBodyMetrics() }
                 .sorted { $0.date > $1.date }
 
-            await MainActor.run {
-                self.historicalLoadTask = nil
-                guard self.bodyMetrics.count <= 1 else { return }
+            guard !Task.isCancelled else { return }
+            self.historicalLoadTask = nil
+            guard self.bodyMetrics.count <= 1,
+                  self.bodyMetrics.first?.userId == userId else { return }
 
-                self.bodyMetrics = allMetrics
-                self.sortedBodyMetricsAscending = allMetrics.sorted {
-                    $0.date < $1.date
-                }
+            self.bodyMetrics = allMetrics
+            self.sortedBodyMetricsAscending = allMetrics.sorted {
+                $0.date < $1.date
             }
         }
     }
