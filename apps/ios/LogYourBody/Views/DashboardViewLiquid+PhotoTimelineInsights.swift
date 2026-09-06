@@ -208,19 +208,4 @@ extension DashboardViewLiquid {
     func formatPhaseInsightDelta(_ value: Double) -> String {
         String(format: "%+.1f%%/wk", value)
     }
-
-    func photoTimelinePresenceLabel(for presence: MetricPresence) -> String {
-        switch presence {
-        case .present:
-            return "Measured"
-        case .estimated:
-            return "Estimated"
-        case .interpolated:
-            return "Interpolated"
-        case .lastKnown:
-            return "Last known"
-        case .missing:
-            return "Missing"
-        }
-    }
 }

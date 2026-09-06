@@ -108,7 +108,6 @@ enum UIAccessibilityContract {
         "photo_timeline_root_menu",
         "photo_timeline_menu",
         "home_chat_collapse",
-        "photo_timeline_stats_presence_summary",
         "photo_timeline_stats_metric_stack",
         "photo_timeline_stats_metric_card_weight",
         "photo_timeline_stats_metric_card_body_fat",

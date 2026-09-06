@@ -342,27 +342,6 @@ extension DashboardViewLiquid {
         }
     }
 
-    var timelinePresenceValues: [GlobalTimelineMetricValue] {
-        globalTimelineStore.weeklyBuckets.flatMap { bucket in
-            [
-                bucket.metrics.weight,
-                bucket.metrics.bodyFat,
-                bucket.metrics.ffmi,
-                bucket.metrics.steps
-            ]
-        }
-    }
-
-    var timelinePresenceCounts: [MetricPresence: Int] {
-        timelinePresenceValues.reduce(into: [:]) { counts, value in
-            counts[value.presence, default: 0] += 1
-        }
-    }
-
-    var timelinePresenceValueCount: Int {
-        timelinePresenceValues.count
-    }
-
     func selectClosestMetric(to date: Date) {
         PerfSignpost.measure("scrub_select_closest") {
             guard let index = nearestBodyMetricIndex(in: bodyMetrics, to: date) else {
