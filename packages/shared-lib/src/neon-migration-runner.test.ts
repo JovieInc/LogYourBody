@@ -52,6 +52,25 @@ describe('Neon migration runner', () => {
     expect(client.calls[4]?.values).toEqual(['20260905120000_multi_statement']);
   });
 
+  it('sends migration contents as a valueless query (simple protocol)', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'lyb-neon-migrations-'));
+    tempDirs.push(directory);
+    writeFileSync(
+      join(directory, '20260905130000_two_statements.sql'),
+      'create table a (id integer);\ncreate table b (id integer);\n',
+    );
+    const client = new RecordingClient();
+
+    await applyNeonMigrations(client, directory, () => undefined);
+
+    const contentsCall = client.calls.find(({ query }) => query.includes('create table a'));
+    expect(contentsCall).toBeDefined();
+    // pg dispatches valueless queries over the simple protocol — the only path
+    // that accepts multi-statement text; bound values switch to prepared
+    // statements, which Postgres rejects for such files.
+    expect(contentsCall?.values).toBeUndefined();
+  });
+
   it('requires a direct Neon endpoint for migration execution', () => {
     expect(() =>
       assertDirectNeonMigrationConnection(
