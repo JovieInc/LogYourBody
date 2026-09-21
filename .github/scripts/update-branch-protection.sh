@@ -84,8 +84,8 @@ update_branch_protection "dev" -1 false false
 # Preview branch - set up for auto-merge with 0 required reviews
 update_branch_protection "preview" 0 false false
 
-# Main branch - production with strict requirements
-update_branch_protection "main" 1 true true
+# Main branch - native merge queue + CI Summary is the gate; no human review required
+update_branch_protection "main" -1 false false
 
 echo "🎉 Branch protection rules updated successfully!"
 echo ""
@@ -94,7 +94,7 @@ echo "- All branches now use 'ci-summary' as the required status check"
 echo "- This check aggregates results from the appropriate CI loop:"
 echo "  • Dev: Rapid loop (web + iOS fast checks)"
 echo "  • Preview: Confidence loop (comprehensive tests)"
-echo "  • Main: Release loop (promotion checks)"
+echo "  • Main: Release loop (ci-summary + native merge queue, no required reviews)"
 echo ""
 echo "🔍 To verify the changes:"
 echo "gh api repos/$REPO/branches/{branch}/protection | jq '.required_status_checks.contexts'"

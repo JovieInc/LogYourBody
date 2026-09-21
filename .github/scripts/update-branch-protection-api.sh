@@ -81,22 +81,18 @@ PREVIEW_PAYLOAD='{
   "allow_fork_syncing": true
 }'
 
-# Main branch - 1 review + code owners
+# Main branch - native merge queue + CI Summary is the gate; no human review required
 MAIN_PAYLOAD='{
   "required_status_checks": {
     "strict": true,
     "contexts": ["ci-summary"]
   },
   "enforce_admins": false,
-  "required_pull_request_reviews": {
-    "required_approving_review_count": 1,
-    "dismiss_stale_reviews": true,
-    "require_code_owner_reviews": true
-  },
+  "required_pull_request_reviews": null,
   "restrictions": null,
   "allow_force_pushes": false,
   "allow_deletions": false,
-  "required_conversation_resolution": true,
+  "required_conversation_resolution": false,
   "lock_branch": false,
   "allow_fork_syncing": true
 }'
@@ -104,7 +100,7 @@ MAIN_PAYLOAD='{
 # Update branches
 update_branch_protection "dev" "$DEV_PAYLOAD" "Rapid loop, no reviews"
 update_branch_protection "preview" "$PREVIEW_PAYLOAD" "Confidence loop, auto-merge friendly"
-update_branch_protection "main" "$MAIN_PAYLOAD" "Release loop, strict reviews"
+update_branch_protection "main" "$MAIN_PAYLOAD" "Release loop, queue-gated, no required reviews"
 
 echo ""
 echo "🔍 Verifying changes:"
