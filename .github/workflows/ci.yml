@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, production]
   merge_group:
-    branches: [main]
+    branches: [main, production]
     types: [checks_requested]
   push:
     branches: [main]
@@ -35,6 +35,11 @@ jobs:
 
       - name: Verify repository merge queue policy
         run: node --test .github/scripts/verify-merge-queue-policy.test.mjs
+
+      - name: Verify live branch ruleset targets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node --test .github/scripts/verify-ruleset-targets.test.mjs && node .github/scripts/verify-ruleset-targets.mjs
 
       - name: Detect changed surfaces locally
         id: filter
