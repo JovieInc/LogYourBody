@@ -13,7 +13,9 @@
     }
   ],
   "git": {
-    "deploymentEnabled": false
+    "deploymentEnabled": {
+      "main": false
+    }
   },
   "github": {
     "silent": true
