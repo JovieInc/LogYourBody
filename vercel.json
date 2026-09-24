@@ -3,7 +3,7 @@
   "version": 2,
   "buildCommand": "pnpm --filter apps/web build",
   "outputDirectory": "apps/web/.next",
-  "installCommand": "node -v && corepack enable && corepack prepare pnpm@10.34.1 --activate && pnpm install --no-frozen-lockfile",
+  "installCommand": "node -v && corepack enable && corepack prepare pnpm@10.34.1 --activate && pnpm install --frozen-lockfile",
   "devCommand": "pnpm --filter apps/web dev",
   "framework": "nextjs",
   "crons": [
