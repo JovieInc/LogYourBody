@@ -13,7 +13,7 @@ describe('Vercel Git deployment configuration', () => {
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       const installCommand =
         scope === 'web project root'
-          ? 'cd ../.. && pnpm install --frozen-lockfile'
+          ? 'cd ../.. && pnpm install --frozen-lockfile && cd apps/web'
           : 'pnpm install --frozen-lockfile';
 
       expect(config.git.deploymentEnabled).toEqual({ main: false });
