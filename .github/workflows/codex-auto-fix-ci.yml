@@ -79,19 +79,19 @@ jobs:
           ref: ${{ env.FAILED_HEAD_SHA }}
           fetch-depth: 0
 
-      - name: Use Node.js 20 with pnpm
-        if: steps.pr.outputs.is-fork != 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-
+      # pnpm must be on PATH before setup-node's pnpm cache lookup; version comes from packageManager.
       - name: Setup pnpm
         if: steps.pr.outputs.is-fork != 'true'
         uses: pnpm/action-setup@v4
         with:
-          version: 9
           run_install: false
+
+      - name: Use Node.js with pnpm cache
+        if: steps.pr.outputs.is-fork != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
 
       - name: Install dependencies
         if: steps.pr.outputs.is-fork != 'true'
