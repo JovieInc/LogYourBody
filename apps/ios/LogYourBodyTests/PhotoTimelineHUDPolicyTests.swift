@@ -119,6 +119,36 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         XCTAssertNotEqual(PaidAppSurfacePolicy.surface(), .legacyFullDashboardBeta)
     }
 
+    // Regression: the FFMI caption ("↓ −0.2 last 30d · Athletic") was clamped to one line and
+    // truncated with an ellipsis in its 1/3-width cell. It must wrap (grow the cell) instead.
+    @MainActor
+    func testLaunchMetricCellWrapsLongCaptionInsteadOfTruncating() {
+        // Narrowest supported phone (375pt) split into three cells with 16pt gutters and 8pt spacing.
+        let cellWidth: CGFloat = (375 - 32 - 16) / 3
+
+        func fittedHeight(caption: String) -> CGFloat {
+            let host = UIHostingController(
+                rootView: LaunchTimelineMetricCell(
+                    title: "FFMI",
+                    value: "22.0",
+                    caption: caption,
+                    accent: .teal,
+                    action: {}
+                )
+            )
+            return host.sizeThatFits(in: CGSize(width: cellWidth, height: .greatestFiniteMagnitude)).height
+        }
+
+        let singleLine = fittedHeight(caption: "Athletic")
+        let longCaption = fittedHeight(caption: "↓ −0.2 last 30d · Athletic")
+
+        XCTAssertGreaterThan(
+            longCaption,
+            singleLine,
+            "A caption wider than its cell must wrap to a second line rather than truncate"
+        )
+    }
+
     func testPhotoTimelineHUDMetricStateCopyIsExplicit() {
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .present), "Measured")
         XCTAssertEqual(

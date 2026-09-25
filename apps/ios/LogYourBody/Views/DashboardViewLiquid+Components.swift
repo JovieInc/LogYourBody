@@ -896,9 +896,10 @@ struct LaunchTimelineSurface: View {
         }
     }
 
+    // Equal-height row: the tallest cell (a wrapped caption) sets the height for all three.
     private var metricStrip: some View {
-        HStack(spacing: 8) {
-            launchMetricCell(
+        HStack(alignment: .top, spacing: 8) {
+            LaunchTimelineMetricCell(
                 title: metricTitles[0],
                 value: ffmiValue,
                 caption: ffmiCaption,
@@ -906,7 +907,7 @@ struct LaunchTimelineSurface: View {
                 action: onTapFFMI
             )
 
-            launchMetricCell(
+            LaunchTimelineMetricCell(
                 title: metricTitles[1],
                 value: weightValue,
                 caption: weightCaption,
@@ -914,7 +915,7 @@ struct LaunchTimelineSurface: View {
                 action: onTapWeight
             )
 
-            launchMetricCell(
+            LaunchTimelineMetricCell(
                 title: metricTitles[2],
                 value: bodyFatValue,
                 caption: bodyFatCaption,
@@ -922,15 +923,20 @@ struct LaunchTimelineSurface: View {
                 action: onTapBodyFat
             )
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
+}
 
-    private func launchMetricCell(
-        title: String,
-        value: String,
-        caption: String,
-        accent: Color,
-        action: @escaping () -> Void
-    ) -> some View {
+struct LaunchTimelineMetricCell: View {
+    @Environment(\.theme) private var theme
+
+    let title: String
+    let value: String
+    let caption: String
+    let accent: Color
+    let action: () -> Void
+
+    var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 4) {
                 Capsule()
@@ -954,16 +960,18 @@ struct LaunchTimelineSurface: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
 
+                // Captions like "↓ −0.2 last 30d · Athletic" wrap instead of truncating in a 1/3-width cell.
                 DSMetricLabel(
                     text: caption,
                     size: .system(size: 11),
                     weight: .medium,
                     color: theme.colors.textSecondary
                 )
-                .lineLimit(1)
+                .lineLimit(2)
                 .minimumScaleFactor(0.72)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 68, maxHeight: .infinity, alignment: .topLeading)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .dashboardContentSurface(cornerRadius: 12, border: theme.colors.border)
