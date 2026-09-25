@@ -149,6 +149,33 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         )
     }
 
+    // Regression: the paid Home metric cells used fixed point sizes, so Dynamic Type had no effect.
+    @MainActor
+    func testLaunchMetricCellTextScalesWithDynamicType() {
+        func fittedHeight(_ size: DynamicTypeSize) -> CGFloat {
+            let host = UIHostingController(
+                rootView: LaunchTimelineMetricCell(
+                    title: "Weight",
+                    value: "181.0 lbs",
+                    caption: "↓ −4.2 lbs last 30d",
+                    accent: .purple,
+                    action: {}
+                )
+                .environment(\.dynamicTypeSize, size)
+            )
+            return host.sizeThatFits(in: CGSize(width: CGFloat(360), height: CGFloat.greatestFiniteMagnitude)).height
+        }
+
+        let defaultHeight = fittedHeight(.large)
+        let accessibilityHeight = fittedHeight(.accessibility3)
+
+        XCTAssertGreaterThan(
+            accessibilityHeight,
+            defaultHeight * 1.3,
+            "Metric cell text must grow with Dynamic Type, not stay at fixed point sizes"
+        )
+    }
+
     func testPhotoTimelineHUDMetricStateCopyIsExplicit() {
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .present), "Measured")
         XCTAssertEqual(
