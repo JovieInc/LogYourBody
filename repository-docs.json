@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "repository": "JovieInc/LogYourBody",
+  "entrypoints": [
+    "README.md",
+    "AGENTS.md",
+    "docs/DOCUMENTATION.md"
+  ],
+  "sources": [
+    {
+      "path": ".github/workflows/advisory-ai-review.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/codeql-analysis.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/codex-auto-fix-ci.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/dependabot-auto-merge.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ios-app-store-approved-release.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ios-release-loop.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/ios-testflight-deploy.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/native-merge-queue.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/regenerate-certificates.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/security-scan.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/web-release-loop.yml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".nvmrc",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "apps/web/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "packages/design-tokens/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "packages/product-registry/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "packages/shared-lib/package.json",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "purpose": "Local manifest or workflow; review related instructions when changed"
+    },
+    {
+      "path": ".github/workflows/repository-docs-shadow.yml",
+      "purpose": "Nonblocking parity qualification"
+    }
+  ],
+  "imports": [
+    {
+      "repository": "JovieInc/Jovie",
+      "revision": "b9c1bb7ca2ba0dd0bbb79cbeff265e21ef8791b1",
+      "path": "docs/company/REPOSITORY_SOURCE_CONTRACT.md",
+      "destination": "docs/company/REPOSITORY_SOURCE_CONTRACT.md",
+      "sha256": "f6bb8cdfdc317ed4ac3b99f8d2fc18a9647124c4fb807b1eef274892447b184f"
+    },
+    {
+      "repository": "JovieInc/ci",
+      "revision": "192faf12e4bfdd024ee3badfe83f60c7d65bb65b",
+      "path": "scripts/repository_docs.py",
+      "destination": "scripts/repository_docs.py",
+      "sha256": "645470f1bb531ed57d1c668b3eb1049cf0db6354d0319c9a4ca3745738956ebc"
+    },
+    {
+      "repository": "JovieInc/ci",
+      "revision": "192faf12e4bfdd024ee3badfe83f60c7d65bb65b",
+      "path": "tests/test_repository_docs.py",
+      "destination": "tests/test_repository_docs.py",
+      "sha256": "bb7206733b1e5fd370bf82bae4786355f787e82b7c04b6a28699252a1d1628cc"
+    },
+    {
+      "repository": "JovieInc/ci",
+      "revision": "192faf12e4bfdd024ee3badfe83f60c7d65bb65b",
+      "path": "LICENSE",
+      "destination": "docs/company/CI_TOOL_LICENSE",
+      "sha256": "c8465c8b9f97966f84ca0ef5f8440f37315a73ef76044b7bdfa74a3fbef4f143"
+    }
+  ],
+  "output": "docs/REPOSITORY_SOURCES.md"
+}

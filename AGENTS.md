@@ -752,3 +752,9 @@ pnpm --filter @jovieinc/product-registry test
 Remember: When in doubt, follow the existing patterns in the codebase. Consistency is more important than perfection.
 
 **Agents ship through gates. `main` only contains PR-merged, CI-passing, deployable code with release evidence.**
+
+## Repository documentation
+
+See [source parity](docs/DOCUMENTATION.md) and the generated
+[source map](docs/REPOSITORY_SOURCES.md). Shared policy is pinned; local
+manifest, build, test and release instructions remain owned by this repository.

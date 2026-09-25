@@ -57,3 +57,9 @@ From the repo root (pnpm + Turborepo):
 Proprietary. See [LICENSE](LICENSE). This repository is public solely to support CI; it is not open source.
 
 Support: support@logyourbody.com
+
+## Repository documentation
+
+See [source parity](docs/DOCUMENTATION.md) and the generated
+[source map](docs/REPOSITORY_SOURCES.md). Shared policy is pinned; local
+manifest, build, test and release instructions remain owned by this repository.
