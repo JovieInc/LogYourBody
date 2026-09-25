@@ -36,6 +36,9 @@ jobs:
       - name: Verify repository merge queue policy
         run: node --test .github/scripts/verify-merge-queue-policy.test.mjs
 
+      - name: Verify iOS release config requires observability
+        run: node --test .github/scripts/verify-ios-release-config.test.mjs
+
       - name: Detect changed surfaces locally
         id: filter
         env:

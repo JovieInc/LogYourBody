@@ -106,9 +106,10 @@ case "$REVENUE_CAT_PUBLIC_KEY" in
   *) fail "REVENUE_CAT_PUBLIC_KEY must be a RevenueCat iOS public SDK key that starts with appl_." ;;
 esac
 
-if [ -n "$SENTRY_DSN" ]; then
-  require_https_url "SENTRY_DSN" "$SENTRY_DSN"
-fi
+# Crash reporting is required: an empty DSN silently disables Sentry (ErrorTrackingService no-ops),
+# which is how TestFlight builds shipped with zero crash reports.
+require_value "SENTRY_DSN" "$SENTRY_DSN"
+require_https_url "SENTRY_DSN" "$SENTRY_DSN"
 
 if [ "$STATSIG_ENVIRONMENT_TIER" != "production" ]; then
   fail "STATSIG_ENVIRONMENT_TIER must be production for iOS production releases."
