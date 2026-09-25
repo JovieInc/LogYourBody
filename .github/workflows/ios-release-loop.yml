@@ -233,6 +233,15 @@ jobs:
 
           echo "📱 Building iOS app for release..."
 
+      - name: Install sentry-cli (pinned)
+        env:
+          SENTRY_CLI_VERSION: '3.8.0'
+        run: |
+          curl -fsSL -o /usr/local/bin/sentry-cli \
+            "https://github.com/getsentry/sentry-cli/releases/download/${SENTRY_CLI_VERSION}/sentry-cli-Darwin-universal"
+          chmod +x /usr/local/bin/sentry-cli
+          sentry-cli --version
+
       - name: Archive and export
         run: |
           set -o pipefail
@@ -241,6 +250,7 @@ jobs:
           # Use Fastlane to build while preserving its exit status through tee.
           bundle exec fastlane build_release 2>&1 | tee fastlane.log
         env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
