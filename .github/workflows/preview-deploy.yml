@@ -1,0 +1,73 @@
+name: Preview Deploy
+
+# main's ruleset requires a successful `Preview` deployment before merge, but
+# vercel.json disables Vercel's Git integration, so nothing produced one.
+# This job is that producer: a job-level `environment: Preview` makes GitHub
+# record the deployment against the PR head. Preview only — never --prod,
+# never runs database migrations.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: preview-deploy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  preview:
+    name: Vercel Preview
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: Preview
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: team_bpNDbti6srVLYPKdmQLu4UgT
+      VERCEL_PROJECT_ID: prj_6seYBdTtY3TuFqrJek1puaFG6Trj
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # vercel.json's buildCommand doesn't build workspace packages, which is
+      # why remote Vercel previews fail on @jovieinc/product-registry.
+      - name: Build web and its workspace dependencies
+        run: pnpm turbo run build --filter=logyourbody...
+
+      - name: Pull Vercel preview environment
+        run: pnpm dlx vercel@latest pull --yes --environment=preview --scope="$VERCEL_ORG_ID" --token="$VERCEL_TOKEN"
+
+      - name: Build Vercel output
+        run: pnpm dlx vercel@latest build --scope="$VERCEL_ORG_ID" --token="$VERCEL_TOKEN"
+
+      # The CLI can exit non-zero on advisory warnings (e.g. runtime deprecation)
+      # even when the deployment is live, so success is judged by readyState.
+      - name: Deploy preview
+        id: deploy
+        run: |
+          pnpm dlx vercel@latest deploy --prebuilt --format json --scope="$VERCEL_ORG_ID" --token="$VERCEL_TOKEN" > deploy.json || true
+          state=$(jq -r '.deployment.readyState // empty' deploy.json)
+          url=$(jq -r '.deployment.url // empty' deploy.json)
+          if [ "$state" != "READY" ] || [ -z "$url" ]; then
+            echo "::error::Preview deployment not ready (state='${state}')"
+            cat deploy.json
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
