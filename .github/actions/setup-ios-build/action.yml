@@ -42,18 +42,16 @@ runs:
     - name: Install SwiftLint and xcbeautify
       shell: bash
       run: |
-        # Check if tools are already available
-        if ! command -v swiftlint &> /dev/null; then
-          echo "Installing SwiftLint..."
-          # Try to link first if already installed
-          brew link swiftlint 2>/dev/null || brew install swiftlint || {
-            echo "::warning::Failed to install SwiftLint via Homebrew"
-            # Fallback: Download binary directly
-            SWIFTLINT_VERSION="0.57.0"
-            curl -L "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
-            unzip swiftlint.zip -d /usr/local/bin
-            chmod +x /usr/local/bin/swiftlint
-          }
+        # Pin SwiftLint to a known-good version instead of Homebrew's
+        # floating latest: an unpinned `brew install swiftlint` silently
+        # picks up new/renamed default-enabled rules (e.g. legacy_swiftui_aspect_ratio)
+        # and breaks --strict CI on unrelated PRs with no local repro.
+        SWIFTLINT_VERSION="0.63.3"
+        if ! command -v swiftlint &> /dev/null || [[ "$(swiftlint version)" != "$SWIFTLINT_VERSION" ]]; then
+          echo "Installing SwiftLint ${SWIFTLINT_VERSION}..."
+          curl -L "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
+          unzip -o swiftlint.zip -d /usr/local/bin
+          chmod +x /usr/local/bin/swiftlint
         else
           echo "SwiftLint already installed: $(swiftlint version)"
         fi
