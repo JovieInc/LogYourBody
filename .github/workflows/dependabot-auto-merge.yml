@@ -10,3 +10,7 @@ permissions: {}
 jobs:
   call:
     uses: JovieInc/ci/.github/workflows/dependabot-auto-merge.yml@main
+    with:
+      # Native enrollment (.github/workflows/native-merge-queue.yml) admits on
+      # machine-certified, not the shared default labels.
+      certification_labels: 'machine-certified'
