@@ -35,12 +35,12 @@ test('release config fails when SENTRY_DSN is missing', () => {
 
 test('release config writes SENTRY_DSN when provided', () => {
   const { result, outputDir } = runReleaseConfig({
-    SENTRY_DSN: 'https://publickey@o1.ingest.us.sentry.io/2',
+    SENTRY_DSN: 'https://publickey@o1.example.com/2',
   });
   try {
     assert.equal(result.status, 0, result.stderr);
     const config = readFileSync(join(outputDir, 'LogYourBody', 'Config.xcconfig'), 'utf8');
-    assert.match(config, /^SENTRY_DSN = https:\/\$\(\)\/publickey@o1\.ingest\.us\.sentry\.io\/2$/m);
+    assert.match(config, /^SENTRY_DSN = https:\/\$\(\)\/publickey@o1\.example\.com\/2$/m);
   } finally {
     rmSync(outputDir, { recursive: true, force: true });
   }
