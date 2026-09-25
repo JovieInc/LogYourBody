@@ -131,5 +131,5 @@ if gh secret list | grep -q "ASC_API_KEY_JSON"; then
     echo -e "${GREEN}✅ ASC_API_KEY_JSON is configured${NC}"
 else
     echo -e "${YELLOW}⚠️  ASC_API_KEY_JSON not found - needed for TestFlight upload${NC}"
-    echo "   See CONFIGURE_IOS_CODESIGNING.md for setup instructions"
+    echo "   See docs/archive/CONFIGURE_IOS_CODESIGNING.md for setup instructions"
 fi

@@ -3,6 +3,7 @@
 ## Overview
 
 To deploy to TestFlight via GitHub Actions, you need:
+
 1. **Apple Developer Certificate** (p12 file)
 2. **Provisioning Profile** (App Store distribution)
 3. **App Store Connect API Key** (for upload)
@@ -10,11 +11,13 @@ To deploy to TestFlight via GitHub Actions, you need:
 ## Required Secrets Per Environment
 
 Add these secrets to each environment that deploys to TestFlight:
+
 - `development` - For rapid alpha builds
 - `Preview` - For beta builds
 - `Production` - For release builds
 
 ### Secrets Needed:
+
 1. `IOS_P12_BASE64` - Certificate in base64 format
 2. `IOS_P12_PASSWORD` - Certificate password
 3. `IOS_PROVISIONING_PROFILE_BASE64` - Provisioning profile in base64
@@ -23,6 +26,7 @@ Add these secrets to each environment that deploys to TestFlight:
 ## Step 1: Create/Export Certificate
 
 ### Option A: Using Xcode (Recommended)
+
 1. Open Xcode → Preferences → Accounts
 2. Select your Apple ID
 3. Click "Manage Certificates"
@@ -31,6 +35,7 @@ Add these secrets to each environment that deploys to TestFlight:
 6. Save as `distribution.p12` with a strong password
 
 ### Option B: Using Keychain Access
+
 1. Open Keychain Access
 2. Find "Apple Distribution: [Your Name]" certificate
 3. Right-click → Export
@@ -60,6 +65,7 @@ base64 -i "LogYourBody_App_Store.mobileprovision" -o profile.txt
 ## Step 4: Add Secrets to GitHub
 
 ### Using the Script (Recommended)
+
 ```bash
 # For each environment
 ./scripts/add-ios-codesigning-secrets.sh development
@@ -68,6 +74,7 @@ base64 -i "LogYourBody_App_Store.mobileprovision" -o profile.txt
 ```
 
 ### Manual Method
+
 1. Go to https://github.com/JovieInc/LogYourBody/settings/environments
 2. Select an environment (e.g., `development`)
 3. Add each secret:
@@ -106,6 +113,7 @@ team_id ENV["APPLE_TEAM_ID"]
 7. Note the Key ID and Issuer ID
 
 Create a JSON file:
+
 ```json
 {
   "key_id": "YOUR_KEY_ID",
@@ -116,6 +124,7 @@ Create a JSON file:
 ```
 
 Add as repository secret (not environment):
+
 ```bash
 gh secret set ASC_API_KEY_JSON < api-key.json
 ```
@@ -123,21 +132,25 @@ gh secret set ASC_API_KEY_JSON < api-key.json
 ## Troubleshooting
 
 ### Certificate Issues
+
 - Ensure certificate is "Apple Distribution" not "Apple Development"
 - Certificate must not be expired
 - Password must match exactly
 
 ### Provisioning Profile Issues
+
 - Profile must be "App Store" distribution type
 - Must include the certificate you're using
 - Must match the app's bundle identifier
 
 ### Build Failures
+
 - Check Xcode project signing settings
 - Ensure "Automatically manage signing" is OFF for Release
 - Team ID must match your Apple Developer account
 
 ## Security Notes
+
 - Delete local certificate files after uploading to GitHub
 - Use strong passwords for p12 files
 - Rotate certificates annually

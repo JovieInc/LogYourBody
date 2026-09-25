@@ -43,7 +43,7 @@ describe('web surface cleanup', () => {
 
     expect(packageJson.pnpm).toBeUndefined();
     expect(workspaceConfig).toContain('overrides:');
-    expect(workspaceConfig).toContain('js-yaml: 4.1.1');
+    expect(workspaceConfig).toContain('js-yaml: 4.3.2');
     expect(workspaceConfig).toContain('prismjs: 1.30.0');
   });
 

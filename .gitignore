@@ -134,3 +134,4 @@ sentry-wizard
 # gbrain (brain-first knowledge) local artifacts — see scripts/setup-gbrain.sh
 .gbrain-source
 .gbrain/
+.env*

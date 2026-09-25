@@ -42,17 +42,20 @@
 ## Finding Your IDs
 
 ### Team ID
+
 1. Go to https://developer.apple.com
 2. Click Account → Membership
 3. Look for "Team ID" (10 characters like A1B2C3D4E5)
 
 ### App Store App ID
+
 1. Go to https://appstoreconnect.apple.com
 2. Select your app
 3. Go to App Information
 4. Look for "Apple ID" (10 digits like 1234567890)
 
 ### Bundle ID
+
 Should be: `com.logyourbody.app`
 
 ## Common Issues
@@ -64,6 +67,7 @@ Should be: `com.logyourbody.app`
 ## Test Your Setup
 
 After configuration, the iOS Rapid Loop should:
+
 1. Build successfully
 2. Upload to TestFlight
 3. Show in TestFlight within 5-10 minutes
