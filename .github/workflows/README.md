@@ -60,7 +60,7 @@ Opens a repair pull request when the primary `CI` workflow fails on a pull reque
 
 ### `deploy.yml`
 
-Runs after changes land on `main`. The web job installs, validates, builds, and deploys a prebuilt Vercel production artifact from GitHub Actions. Vercel GitHub auto-deploys are disabled in `vercel.json` so Vercel preview install failures do not block pull requests.
+Runs after changes land on `main`. The web job installs, validates, builds, and deploys a prebuilt Vercel production artifact from GitHub Actions. Vercel Git deployments stay disabled on `main`, while non-main branches can produce the required Preview deployments through the existing GitHub integration.
 
 ### `web-release-loop.yml`
 
