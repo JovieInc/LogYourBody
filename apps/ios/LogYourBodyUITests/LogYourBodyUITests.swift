@@ -871,6 +871,117 @@ final class LogYourBodyUITests: XCTestCase {
         try assertAndCaptureBodyScoreShareSheet(in: app)
     }
 
+    /// JOV-6089 gesture replay: horizontal and diagonal drags must never
+    /// dismiss the share sheet, a committed vertical drag must, and repeated
+    /// open/close must leave no orphan overlay or click-through surface.
+    func testShareSheetGestureArbitrationAndAccessibleEscape() throws {
+        let app = XCUIApplication()
+        launch(
+            app,
+            with: [
+                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestPhaseInsightFixture",
+                "-lybUITestGlp1WeeklyCheckInFixture"
+            ]
+        )
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+
+        let shareSheet = app.descendants(matching: .any)["body_score_share_sheet"]
+        let closeButton = app.descendants(matching: .any)["body_score_share_close_button"]
+        let saveButton = app.descendants(matching: .any)["body_score_share_save_button"]
+
+        // Fast repeated open/close must leave no orphan overlay behind.
+        for _ in 0..<3 {
+            openBodyScoreShareSheet(in: app)
+            XCTAssertTrue(closeButton.isHittable, "Close must stay reachable with expanded controls")
+            closeButton.tap()
+            XCTAssertTrue(
+                shareSheet.waitForNonExistence(timeout: 3),
+                "Share sheet must fully dismiss on Close"
+            )
+        }
+
+        openBodyScoreShareSheet(in: app)
+
+        let window = app.windows.firstMatch
+        let midX = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.0)).screenPoint.x
+        let midY = window.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5)).screenPoint.y
+        let dragDistance = CGFloat(220)
+
+        func drag(fromX: CGFloat, fromY: CGFloat, toX: CGFloat, toY: CGFloat) {
+            window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: fromX, dy: fromY))
+                .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: toX, dy: toY)))
+        }
+
+        // Horizontal drag across the card (format-control axis): no dismissal.
+        drag(
+            fromX: midX - dragDistance, fromY: midY,
+            toX: midX + dragDistance, toY: midY
+        )
+        XCTAssertTrue(shareSheet.exists, "Horizontal drag must not dismiss the share sheet")
+
+        // Diagonal drag with a vertical component past the dismiss threshold:
+        // still no dismissal, because the gesture is not vertical-dominant.
+        drag(
+            fromX: midX - dragDistance * 0.7, fromY: midY - dragDistance * 0.5,
+            toX: midX + dragDistance * 0.7, toY: midY + dragDistance * 0.5
+        )
+        XCTAssertTrue(shareSheet.exists, "Diagonal drag must not dismiss the share sheet")
+
+        // Visible controls stay on-screen and hittable after the replays.
+        XCTAssertTrue(closeButton.isHittable, "Close must remain hittable after gesture replays")
+        XCTAssertTrue(saveButton.exists, "Save must remain reachable after gesture replays")
+
+        // A committed vertical drag is the drag-dismiss owner and must dismiss.
+        drag(
+            fromX: midX, fromY: midY,
+            toX: midX, toY: midY + dragDistance * 1.4
+        )
+        XCTAssertTrue(
+            shareSheet.waitForNonExistence(timeout: 3),
+            "Vertical drag past the threshold must dismiss the share sheet"
+        )
+
+        // Reopen and confirm accessible + hardware escape paths still work.
+        openBodyScoreShareSheet(in: app)
+        XCTAssertTrue(closeButton.isHittable)
+        closeButton.tap()
+        XCTAssertTrue(shareSheet.waitForNonExistence(timeout: 3))
+
+        openBodyScoreShareSheet(in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists
+        )
+        // Hardware escape (Esc) path mirrors the VoiceOver escape action.
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+        XCTAssertTrue(
+            shareSheet.waitForNonExistence(timeout: 3),
+            "Hardware escape must dismiss the share sheet"
+        )
+
+        // Focus returns to the invoking control: the home share button is back.
+        let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
+        XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
+        attachScreenshot(named: "share-sheet-gesture-arbitration", from: app)
+    }
+
+    private func openBodyScoreShareSheet(in app: XCUIApplication) {
+        let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
+        XCTAssertTrue(shareButton.exists || shareButton.waitForExistence(timeout: 5))
+        scrollUntilHittable(shareButton, in: app)
+        XCTAssertTrue(shareButton.isHittable)
+        shareButton.tap()
+
+        let sheet = app.descendants(matching: .any)["body_score_share_sheet"]
+        XCTAssertTrue(
+            sheet.waitForExistence(timeout: 8) || app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists,
+            "Share overlay must appear after tapping share"
+        )
+    }
+
     func testLaunchQualityGateCapturesOnboardingFixedCTA() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
