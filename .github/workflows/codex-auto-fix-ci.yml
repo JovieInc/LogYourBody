@@ -82,7 +82,7 @@ jobs:
       # pnpm must be on PATH before setup-node's pnpm cache lookup; version comes from packageManager.
       - name: Setup pnpm
         if: steps.pr.outputs.is-fork != 'true'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           run_install: false
 

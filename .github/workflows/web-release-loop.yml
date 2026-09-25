@@ -44,7 +44,7 @@ jobs:
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "deployment_name=v${{ needs.validate-release.outputs.version }}-$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v4
         with:
