@@ -90,6 +90,22 @@
     {
       "path": ".github/workflows/repository-docs-shadow.yml",
       "purpose": "Nonblocking parity qualification"
+    },
+    {
+      "path": "apps/ios/LogYourBody.xcodeproj/project.pbxproj",
+      "purpose": "Native iOS build or dependency manifest; review related instructions when changed"
+    },
+    {
+      "path": "apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+      "purpose": "Native iOS build or dependency manifest; review related instructions when changed"
+    },
+    {
+      "path": "apps/ios/Gemfile",
+      "purpose": "Native iOS build or dependency manifest; review related instructions when changed"
+    },
+    {
+      "path": "apps/ios/Gemfile.lock",
+      "purpose": "Native iOS build or dependency manifest; review related instructions when changed"
     }
   ],
   "imports": [
