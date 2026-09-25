@@ -36,6 +36,7 @@
 ## Step 4: Verify You Have Everything
 
 After these steps, you should have:
+
 - ✅ `distribution.p12` - Your certificate with private key
 - ✅ Password for the .p12 file
 - ✅ `Github_CI_App_Store.mobileprovision` - Already have this

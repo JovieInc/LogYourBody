@@ -22,7 +22,8 @@ corepack pnpm --config.engine-strict=false eve:smoke
 
 The command uses pinned Node 24.12.0 for eve 0.27.13, explicitly enables the loopback-only auth path, and verifies deterministic connected and unconnected account states without a provider credential. The smoke wrapper alone removes eve's generated local runtime and workflow state before and after the run so stale fixtures cannot affect the result or repository guards; normal `eve:info`, `eve:build`, and `eve:dev` commands preserve framework state. It does not create a project, external connection, schedule, or deployment.
 
-The web workspace remains on Node 20.x. Do not change that application engine
-contract to satisfy eve's Node 24 runtime requirement. `eve:dev` needs a model
-credential and remains a local, interactive command; never add that credential
-to the repository.
+The web workspace has its own engine contract (see root `.nvmrc`/`package.json`).
+Do not couple that application engine to eve's pinned Node 24.12.0 runtime
+requirement — eve stays isolated via `pnpm dlx node@24.12.0`. `eve:dev` needs a
+model credential and remains a local, interactive command; never add that
+credential to the repository.

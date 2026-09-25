@@ -19,7 +19,7 @@
     "db:schema:check": "bash scripts/neon/check-migration-layout.sh",
     "ios": "cd apps/ios && open LogYourBody.xcodeproj",
     "prepush": "turbo run lint --filter='...[origin/main]' && turbo run typecheck --filter='...[origin/main]' && turbo run test --filter='...[origin/main]' && node packages/product-registry/scripts/url-drift.test.mjs",
-    "prepare": "husky install",
+    "prepare": "husky",
     "check": "pnpm --filter logyourbody check",
     "format": "prettier --write .",
     "lint:swift": "cd apps/ios && swiftlint lint --strict",
@@ -41,26 +41,26 @@
     "eve:smoke": "bash scripts/eve/local-smoke.sh"
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.0.0",
-    "@commitlint/config-conventional": "^19.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.16.0",
-    "@typescript-eslint/parser": "^8.16.0",
-    "eslint": "^9.31.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-react": "^7.37.0",
-    "eslint-plugin-react-hooks": "^5.0.0",
-    "husky": "^9.0.0",
-    "lint-staged": "^15.0.0",
-    "prettier": "^3.4.0",
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@typescript-eslint/eslint-plugin": "^8.70.1",
+    "@typescript-eslint/parser": "^8.70.1",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.6.14",
-    "turbo": "^2.5.4",
-    "typescript": "^5.8.3",
-    "vitest": "^4.0.14"
+    "turbo": "^2.11.4",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   },
   "packageManager": "pnpm@10.34.1",
   "engines": {
-    "node": "20.x",
+    "node": "22.x",
     "pnpm": ">=10.34.1"
   },
   "lint-staged": {
@@ -83,8 +83,8 @@
     ]
   },
   "dependencies": {
-    "ai": "^7.0.42",
+    "ai": "^7.0.114",
     "eve": "0.27.13",
-    "zod": "^4.1.13"
+    "zod": "^4.6.5"
   }
 }

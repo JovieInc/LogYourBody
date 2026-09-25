@@ -20,11 +20,11 @@
     "clean": "rm -rf build"
   },
   "dependencies": {
-    "style-dictionary": "^5.4.4"
+    "style-dictionary": "^5.5.5"
   },
   "devDependencies": {
-    "chroma-js": "^3.1.1",
-    "nodemon": "^3.1.7"
+    "chroma-js": "^3.2.0",
+    "nodemon": "^3.1.14"
   },
   "keywords": [
     "design-tokens",
