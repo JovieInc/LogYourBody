@@ -90,7 +90,8 @@ describe('eve.dev core-chat boundary', () => {
     expect(nativeChatService).toMatch(/static let endpointPath = "\/api\/auth\/mobile\/chat\/v1"/);
     expect(mobileChatRoute).toMatch(/createModel: createChatModelPort/);
     expect(nativeChatService).not.toMatch(/\beve\b/i);
-    expect(packageJson.engines?.node).toBe('20.x');
+    expect(packageJson.engines?.node).toBe('22.x');
+    expect(packageJson.engines?.node).not.toMatch(/^24/);
     expect(packageJson.scripts?.['eve:build']).toBe('bash scripts/eve/run-node24.sh build');
     expect(packageJson.scripts?.['eve:smoke']).toBe('bash scripts/eve/local-smoke.sh');
     expect(packageJson.dependencies?.eve).toBe('0.27.13');
