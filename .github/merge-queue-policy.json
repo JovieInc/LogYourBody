@@ -18,5 +18,10 @@
     "exact_head_required": true,
     "same_repository_only": true,
     "drafts_allowed": false
+  },
+  "merge_group_ci": {
+    "kicker_workflow": ".github/workflows/merge-queue-ci-kicker.yml",
+    "dispatch_input": "merge_group_base_sha",
+    "reason": "merge_group events caused by GITHUB_TOKEN start no workflow run; workflow_dispatch is the documented exception"
   }
 }

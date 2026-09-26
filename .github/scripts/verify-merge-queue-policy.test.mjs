@@ -27,7 +27,25 @@ env:
 run: |
   assert_expected_result
   [[ "\${{ needs.detect-changes.result }}" == "success" ]]
+  workflow_dispatch:
+    inputs:
+      merge_group_base_sha:
 `;
+
+const validKicker = `
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+script: |
+  github.rest.git.listMatchingRefs({ ref: 'heads/gh-readonly-queue/main/' })
+  github.rest.actions.listWorkflowRuns({ head_sha })
+  github.rest.actions.createWorkflowDispatch({ inputs: { merge_group_base_sha: baseSha } })
+`;
+
+const kickerPolicy = {
+  ...validPolicy,
+  merge_group_ci: { kicker_workflow: 'kicker.yml', dispatch_input: 'merge_group_base_sha' },
+};
 
 const validEnrollment = `
 on:
@@ -45,6 +63,51 @@ script: |
 
 test('current repository satisfies the native queue contract', () => {
   assert.equal(verifyRepository(process.cwd()), true);
+});
+
+test('merge-group CI kicker contract is accepted when secret-free and scheduled', () => {
+  assert.equal(
+    verifyPolicy({
+      policy: kickerPolicy,
+      ciWorkflow: validCI,
+      enrollmentWorkflow: validEnrollment,
+      kickerWorkflow: validKicker,
+    }),
+    true,
+  );
+});
+
+test('deliberate red: a kicker that receives secrets or runs on pull requests is rejected', () => {
+  assert.throws(
+    () => verifyPolicy({
+      policy: kickerPolicy,
+      ciWorkflow: validCI,
+      enrollmentWorkflow: validEnrollment,
+      kickerWorkflow: validKicker + 'token: \${{ secrets.MERGE_QUEUE_TOKEN }}\n',
+    }),
+    /must not receive repository secrets/,
+  );
+  assert.throws(
+    () => verifyPolicy({
+      policy: kickerPolicy,
+      ciWorkflow: validCI,
+      enrollmentWorkflow: validEnrollment,
+      kickerWorkflow: validKicker.replace('schedule:', 'pull_request_target:'),
+    }),
+    /missing required contract|must not run on pull request/,
+  );
+});
+
+test('deliberate red: CI without the merge-group dispatch input is rejected', () => {
+  assert.throws(
+    () => verifyPolicy({
+      policy: kickerPolicy,
+      ciWorkflow: validCI.replace('merge_group_base_sha:', 'other_input:'),
+      enrollmentWorkflow: validEnrollment,
+      kickerWorkflow: validKicker,
+    }),
+    /CI workflow is missing required contract/,
+  );
 });
 
 test('deliberate red: quoted branch patterns are rejected', () => {
