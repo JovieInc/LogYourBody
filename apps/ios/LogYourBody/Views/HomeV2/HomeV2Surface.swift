@@ -22,6 +22,9 @@ struct HomeV2Surface: View {
     let onTapBodyFat: () -> Void
     let onTapFFMI: () -> Void
     let onOpenPhoto: () -> Void
+    let chartDaily: [MetricChartDataPoint]
+    let chartTrend: [MetricChartDataPoint]
+    @Binding var selectedRange: TimeRange
 
     var body: some View {
         GeometryReader { geometry in
@@ -91,6 +94,14 @@ struct HomeV2Surface: View {
                 numberBlock(size: HomeV2Tokens.TypeSize.heroMetricFirst, kerning: -2.5, topPadding: 24)
             }
 
+            HomeV2TrendChart(
+                daily: chartDaily,
+                trend: chartTrend,
+                accent: HomeV2Tokens.Metric.weight,
+                range: $selectedRange
+            )
+            .padding(.top, HomeV2Tokens.Space.compact)
+
             VStack(spacing: 0) {
                 HomeV2TableRow(label: "Body fat", detail: bodyFatDetail, value: bodyFatValue, action: onTapBodyFat)
                     .accessibilityIdentifier("home_v2_body_fat_row")
@@ -115,7 +126,7 @@ struct HomeV2Surface: View {
                 .accessibilityIdentifier("home_v2_add_photo_row")
             }
             .overlay(alignment: .top) { HomeV2Hairline() }
-            .padding(.top, 20)
+            .padding(.top, HomeV2Tokens.Space.compact)
         }
     }
 }

@@ -36,6 +36,7 @@ enum HomeV2Tokens {
 
     static let photoAspectRatio: CGFloat = 4.0 / 5.0
     static let rowHeight: CGFloat = 52
+    static let chartHeight: CGFloat = 150
     static let rowHeightWithSubline: CGFloat = 60
     static let thumbSize = CGSize(width: 32, height: 40)
     static let thumbRadius: CGFloat = 8
