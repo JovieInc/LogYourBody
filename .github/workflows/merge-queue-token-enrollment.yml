@@ -1,0 +1,116 @@
+name: Merge Queue Token Enrollment
+
+# GitHub creates no workflow runs for events caused by GITHUB_TOKEN, so a
+# merge group created by auto-enrollment never gets merge-group CI and the
+# queue's check timeout drops the entry. After enrollment completes, this job
+# re-enqueues bot-owned entries with the machine-user token so the merge_group
+# event starts CI. It never runs on pull-request events, never checks out
+# code, re-proves "CI Summary" on the exact head, and is a no-op until the
+# MERGE_QUEUE_TOKEN secret exists.
+on:
+  workflow_run:
+    workflows: [Native Merge Queue Enrollment]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: merge-queue-token-enrollment
+  cancel-in-progress: false
+
+jobs:
+  reenqueue:
+    name: Re-enqueue bot-owned queue entries with the machine-user token
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for the machine-user token
+        id: gate
+        env:
+          MERGE_QUEUE_TOKEN: ${{ secrets.MERGE_QUEUE_TOKEN }}
+        run: |
+          if [ -z "$MERGE_QUEUE_TOKEN" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SKIPPED: MERGE_QUEUE_TOKEN is not set; queue entries stay bot-owned and need a user-token enqueue"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Re-enqueue with the machine-user token
+        if: steps.gate.outputs.present == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.MERGE_QUEUE_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const { repository } = await github.graphql(`
+              query Queue($owner: String!, $repo: String!) {
+                repository(owner: $owner, name: $repo) {
+                  mergeQueue(branch: "main") {
+                    entries(first: 20) {
+                      nodes {
+                        state
+                        enqueuer { login }
+                        pullRequest {
+                          id
+                          number
+                          isDraft
+                          baseRefName
+                          headRefOid
+                          headRepository { nameWithOwner }
+                          commits(last: 1) {
+                            nodes {
+                              commit {
+                                statusCheckRollup {
+                                  contexts(first: 50) {
+                                    nodes { ... on CheckRun { name conclusion } }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { owner, repo });
+            const entries = repository.mergeQueue?.entries?.nodes ?? [];
+            if (!entries.length) {
+              core.info('Queue is empty.');
+              return;
+            }
+            for (const entry of entries) {
+              const pull = entry.pullRequest;
+              const enqueuer = entry.enqueuer?.login ?? '';
+              if (!/^github-actions(\[bot\])?$/.test(enqueuer)) {
+                core.info(`#${pull.number}: enqueued by ${enqueuer}; nothing to do`);
+                continue;
+              }
+              if (pull.isDraft || pull.baseRefName !== 'main' || pull.headRepository?.nameWithOwner !== `${owner}/${repo}`) {
+                core.info(`#${pull.number}: not eligible (draft, base, or fork)`);
+                continue;
+              }
+              const checks = pull.commits.nodes[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? [];
+              const summary = checks.find((check) => check.name === 'CI Summary');
+              if (summary?.conclusion !== 'SUCCESS') {
+                core.info(`#${pull.number}: CI Summary on ${pull.headRefOid.slice(0, 9)} is ${summary?.conclusion ?? 'missing'}; leaving it`);
+                continue;
+              }
+              await github.graphql(`
+                mutation Dequeue($id: ID!) {
+                  dequeuePullRequest(input: { id: $id }) { mergeQueueEntry { id } }
+                }
+              `, { id: pull.id });
+              const result = await github.graphql(`
+                mutation Enqueue($id: ID!, $expectedHeadOid: GitObjectID!) {
+                  enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $expectedHeadOid }) {
+                    mergeQueueEntry { id position }
+                  }
+                }
+              `, { id: pull.id, expectedHeadOid: pull.headRefOid });
+              core.notice(`RE-ENQUEUED: #${pull.number} at ${pull.headRefOid.slice(0, 9)} position=${result.enqueuePullRequest.mergeQueueEntry.position}`);
+            }

@@ -16,6 +16,15 @@ Primary pull request workflow for `main`.
 
 `CI Summary` is the normal hard merge gate. Keep it deterministic and fast enough for agent throughput.
 
+## Merge Queue Auto-Land
+
+`main` uses GitHub's native merge queue (ruleset "Main - Protect", `ALLGREEN`, `MERGE`, required check `CI Summary`, 60-minute check timeout). Two secret-boundaried workflows make landing hands-off:
+
+1. **`native-merge-queue.yml` — enrollment.** After `CI` completes on a same-repo, non-draft PR (or when a draft is marked ready), it enqueues the PR at its exact green head with `enqueuePullRequest`. It runs in the pull-request-triggered context, so it must never checkout code or receive secrets (`.github/scripts/verify-merge-queue-policy.mjs` enforces this).
+2. **`merge-queue-token-enrollment.yml` — token re-enqueue.** GitHub creates no workflow runs for events caused by `GITHUB_TOKEN`, and the queue only honours checks from the `merge_group` event's own run, so a bot-owned entry never gets merge-group CI and times out. After enrollment completes (`workflow_run`), this job dequeues bot-owned entries and re-enqueues them with the machine-user secret `MERGE_QUEUE_TOKEN` after re-proving `CI Summary` on the exact head. It never checks out code and never runs on pull-request events; without the secret it is a no-op.
+
+`ALLGREEN` batches every queued entry, so one bot-owned entry blocks the batch. Manual recovery while the secret is absent: `gh pr merge <n> --merge --auto` with a user token (a user-token enqueue starts merge-group CI natively); a stuck entry can be removed with the `dequeuePullRequest` mutation first.
+
 ## Advisory Automation
 
 ### `advisory-ai-review.yml`
