@@ -49,6 +49,7 @@ extension DashboardViewLiquid {
             onOpenPhoto: { isHomeV2ViewerPresented = true },
             onViewProgress: { openHomeV2Progress(metric: .weight) },
             onTodayDetails: { openHomeV2Context() },
+            onAllPhotos: { isHomeV2AllPhotosPresented = true },
             onLogWeight: { presentHomeV2LogSheet() },
             onDone: { homeV2Logged = nil },
             onUndo: { Task { await undoHomeV2Logged() } }
@@ -196,33 +197,5 @@ extension DashboardViewLiquid {
             selectedIndex = min(selectedIndex, bodyMetrics.count - 1)
             updateAnimatedValues(for: selectedIndex)
         }
-    }
-
-    /// Presented from `photoTimelineRoot`, the same level as the menu cover, so
-    /// the presentation context is the HUD's own.
-    var homeV2PhotoViewer: some View {
-        HomeV2PhotoViewer(
-            bodyMetrics: bodyMetrics,
-            selectedIndex: $selectedIndex,
-            formatters: homeV2Formatters(unit: homeV2DisplayUnit),
-            onClose: { isHomeV2ViewerPresented = false }
-        )
-    }
-
-    private func homeV2Formatters(unit: String) -> HomeV2Formatters {
-        let system = currentMeasurementSystem
-        return HomeV2Formatters(
-            dateText: { formatHUDDate($0.date) },
-            weightText: { formatTrendWeightHeadline($0, usesTrend: weightUsesTrend) },
-            weightValue: { metric in
-                guard let weight = metric.weight else { return nil }
-                return convertWeight(weight, to: system) ?? weight
-            },
-            bodyFatText: { metric in
-                let base = formatBodyFatValue(metric.bodyFatPercentage)
-                return base == "–" ? base : "\(base)%"
-            },
-            weightUnit: unit
-        )
     }
 }

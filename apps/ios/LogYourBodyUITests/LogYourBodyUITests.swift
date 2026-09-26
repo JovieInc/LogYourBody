@@ -1448,6 +1448,79 @@ final class LogYourBodyUITests: XCTestCase {
         )
     }
 
+    func testHomeV2ViewerDisclosesDetailsToolsAndAllPhotos() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let stage = app.descendants(matching: .any)["home_v2_photo_stage"]
+        XCTAssertTrue(stage.waitForExistence(timeout: 30))
+        stage.tap()
+
+        let details = app.buttons["home_v2_viewer_details"]
+        XCTAssertTrue(details.waitForExistence(timeout: 8), "The viewer keeps the numbers behind one disclosure")
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_photo_ruler"].exists, "Collapsed by default")
+        attachScreenshot(named: "home-v2-viewer-collapsed", from: app)
+        details.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_photo_ruler"].waitForExistence(timeout: 5),
+            "Details open the ruler"
+        )
+        XCTAssertTrue(app.buttons["home_v2_viewer_action_compare"].exists, "and the photo tools")
+        attachScreenshot(named: "home-v2-viewer-details", from: app)
+
+        app.buttons["home_v2_viewer_tools"].tap()
+        let allPhotosTool = app.buttons["home_v2_photo_tool_all_photos"]
+        XCTAssertTrue(allPhotosTool.waitForExistence(timeout: 8), "Tools lists every photo destination")
+        attachScreenshot(named: "home-v2-photo-tools", from: app)
+        allPhotosTool.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_all_photos"].waitForExistence(timeout: 8), "All photos opens")
+        let cell = app.buttons["home_v2_all_photos_cell"].firstMatch
+        XCTAssertTrue(cell.waitForExistence(timeout: 5), "Every photo lists")
+        attachScreenshot(named: "home-v2-all-photos", from: app)
+        cell.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_viewer_stage"].waitForExistence(timeout: 8),
+            "A cell returns to the viewer"
+        )
+    }
+
+    func testHomeV2CompareSlidesBetweenTwoPhotos() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let stage = app.descendants(matching: .any)["home_v2_photo_stage"]
+        XCTAssertTrue(stage.waitForExistence(timeout: 30))
+        stage.tap()
+        let details = app.buttons["home_v2_viewer_details"]
+        XCTAssertTrue(details.waitForExistence(timeout: 8))
+        details.tap()
+
+        let compare = app.buttons["home_v2_viewer_action_compare"]
+        XCTAssertTrue(compare.waitForExistence(timeout: 5))
+        compare.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_compare"].waitForExistence(timeout: 8), "Compare opens")
+        let compareStage = app.descendants(matching: .any)["home_v2_compare_stage"]
+        XCTAssertTrue(compareStage.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(compareStage.frame.width, app.frame.width - 1, "The stage runs edge to edge")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_compare_deltas"].exists, "The change between the two days shows")
+        attachScreenshot(named: "home-v2-compare", from: app)
+
+        let sideBySide = app.buttons["home_v2_compare_mode_sideBySide"]
+        XCTAssertTrue(sideBySide.exists)
+        sideBySide.tap()
+        XCTAssertTrue(sideBySide.isSelected, "Modes are one segmented choice")
+        attachScreenshot(named: "home-v2-compare-side-by-side", from: app)
+
+        app.buttons["home_v2_compare_close"].tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_viewer_stage"].waitForExistence(timeout: 8),
+            "Back returns to the viewer"
+        )
+    }
+
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
