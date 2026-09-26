@@ -13,7 +13,7 @@ on:
 
 permissions:
   actions: read
-  contents: read
+  contents: write # enqueuePullRequest is a merge-side mutation; read-only fails with "Resource not accessible by integration"
   pull-requests: write
 
 concurrency:
