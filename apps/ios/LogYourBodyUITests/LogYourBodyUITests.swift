@@ -908,6 +908,33 @@ final class LogYourBodyUITests: XCTestCase {
         try assertAndCaptureOnboardingFirstPhotoCTA(in: app)
     }
 
+    // Regression: the paid Home metric strip used fixed point sizes and a non-scrolling container, so at
+    // accessibility text sizes the stacked cells were clipped and Weight/Body Fat were unreachable.
+    func testPaidHomeMetricsReachableAtAccessibilityDynamicType() throws {
+        let app = XCUIApplication()
+        launch(
+            app,
+            with: [
+                "-lybUITestPhotoTimelineHUDFixture",
+                "-UIPreferredContentSizeCategoryName",
+                "UICTContentSizeCategoryAccessibilityXXXL"
+            ]
+        )
+
+        let scroll = app.scrollViews["launch_timeline_accessibility_scroll"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 45), "Accessibility sizes must make the Home timeline scrollable")
+
+        let bodyFat = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Body Fat")).firstMatch
+        XCTAssertTrue(bodyFat.waitForExistence(timeout: 5))
+
+        var swipes = 0
+        while !bodyFat.isHittable && swipes < 6 {
+            scroll.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(bodyFat.isHittable, "The last metric card must be reachable by scrolling, not clipped")
+    }
+
     func testOnboardingConcisionSurvivesAccessibilityDynamicType() throws {
         let app = XCUIApplication()
         let accessibilityArguments = [
