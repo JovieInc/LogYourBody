@@ -458,32 +458,22 @@ jobs:
             echo "version=$VERSION"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Tag release
+      - name: Check for an existing release tag
         id: tag_release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.release_metadata.outputs.tag }}"
-
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
             echo "created=false" >> "$GITHUB_OUTPUT"
             echo "Tag already exists: $TAG"
-            exit 0
+          else
+            # The tag itself is created by the release below (Releases API,
+            # pinned to the built commit). A git push of the tag with
+            # GITHUB_TOKEN is refused whenever the tagged commit's workflow
+            # files differ from main's ("create or update workflow without
+            # workflows permission"), which broke the evidence for build
+            # 20260926135712.
+            echo "created=true" >> "$GITHUB_OUTPUT"
           fi
-
-          # Create git tag
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git tag -a "$TAG" -m "iOS Release $TAG
-
-          Build: ${{ needs.validate-release.outputs.build_number }}
-          Deployment: ${{ steps.release_metadata.outputs.deployment_type }}"
-
-          # Push tag
-          git push origin "$TAG"
-
-          echo "created=true" >> "$GITHUB_OUTPUT"
-          echo "Tagged release: $TAG"
 
       - name: Create GitHub release
         env:
@@ -506,6 +496,7 @@ jobs:
 
           # Generate release notes
           gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
             --title "iOS Release $TAG" \
             "${RELEASE_ARGS[@]}" \
             --notes "## 📱 iOS Release $TAG
