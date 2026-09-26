@@ -44,6 +44,7 @@ extension DashboardViewLiquid {
             phaseSentence: homeV2PhaseSentence,
             loggedSentence: homeV2Logged.map { HomeV2Copy.loggedSentence(value: $0.valueText, unit: $0.unit) },
             latestPhotoCaption: homeV2LatestPhotoMetric.map { HomeV2Copy.latestPhotoCaption(date: formatHUDDate($0.date)) },
+            systemState: homeV2SystemState,
             chartDaily: fullChartCache[.weight] ?? [],
             chartTrend: fullTrendChartCache[.weight] ?? [],
             onOpenPhoto: { isHomeV2ViewerPresented = true },
@@ -51,6 +52,9 @@ extension DashboardViewLiquid {
             onTodayDetails: { openHomeV2Context() },
             onAllPhotos: { isHomeV2AllPhotosPresented = true },
             onLogWeight: { presentHomeV2LogSheet() },
+            onConnectHealth: {
+                Task { _ = await HealthKitManager.shared.requestAuthorization() }
+            },
             onDone: { homeV2Logged = nil },
             onUndo: { Task { await undoHomeV2Logged() } }
         )
@@ -67,6 +71,20 @@ extension DashboardViewLiquid {
                 weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: bodyMetrics)
             )
         }
+    }
+
+    /// Loading, offline or Apple Health off, in that order; nil when all is well.
+    var homeV2SystemState: HomeV2SystemState? {
+        let isAuthorized = HealthKitManager.shared.isAuthorized
+        HomeV2SystemStatePolicy.recordAuthorization(isAuthorized)
+        return HomeV2SystemStatePolicy.state(
+            hasLoadedInitialData: viewModel.hasLoadedInitialData,
+            isOnline: realtimeSyncManager.isOnline,
+            healthSyncEnabled: UserDefaults.standard.object(forKey: Constants.healthKitSyncEnabledKey) as? Bool ?? true,
+            healthAuthorized: isAuthorized,
+            healthEverAuthorized: UserDefaults.standard.bool(forKey: HomeV2SystemStatePolicy.everAuthorizedKey),
+            hasHealthData: bodyMetrics.contains { $0.metricSource == .healthKit }
+        )
     }
 
     /// H0, shown instead of the legacy empty state while the gate is on.
