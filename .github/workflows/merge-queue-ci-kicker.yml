@@ -7,6 +7,12 @@ name: Merge Queue CI Kicker
 # "CI Summary" check can report before check_response_timeout_minutes.
 # No secrets, no checkout, no pull-request code runs here.
 on:
+  # Right after auto-enrollment enqueues a PR (workflow_run events fire even
+  # for workflows that ran under GITHUB_TOKEN), with cron as the backstop for
+  # GitHub's scheduling delays.
+  workflow_run:
+    workflows: [Native Merge Queue Enrollment]
+    types: [completed]
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
@@ -29,11 +35,19 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
-            const { data: refs } = await github.rest.git.listMatchingRefs({
-              owner,
-              repo,
-              ref: 'heads/gh-readonly-queue/main/',
-            });
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            // The queue creates its temporary ref a little after the enqueue
+            // that completed the enrollment run; give it up to two minutes.
+            let refs = [];
+            for (let attempt = 0; attempt < 8; attempt += 1) {
+              ({ data: refs } = await github.rest.git.listMatchingRefs({
+                owner,
+                repo,
+                ref: 'heads/gh-readonly-queue/main/',
+              }));
+              if (refs.length || context.eventName !== 'workflow_run') break;
+              await sleep(15000);
+            }
             if (!refs.length) {
               core.info('No merge-group refs waiting.');
               return;
