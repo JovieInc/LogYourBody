@@ -514,7 +514,10 @@ struct LogYourBodyApp: App {
         realtimeSyncManager.pendingSyncCount = 0
 
         if usesFullDashboardFixture || usesPhotoTimelineHUDFixture {
-            await seedFullDashboardUITestFixtureData(userId: userId)
+            let fixturePhotoURL = arguments.contains(HomeV2Policy.photoFixtureArgument)
+                ? writeHomeV2FixturePhoto()
+                : nil
+            await seedFullDashboardUITestFixtureData(userId: userId, photoURL: fixturePhotoURL)
         }
 
         if arguments.contains("-lybUITestGlp1WeeklyCheckInFixture") &&
@@ -542,7 +545,34 @@ struct LogYourBodyApp: App {
         return true
     }
 
-    private func seedFullDashboardUITestFixtureData(userId: String) async {
+    /// A deterministic 4:5 "photo" so the photo-first Home is testable without a
+    /// network: a soft gradient with a darker figure in the middle.
+    private func writeHomeV2FixturePhoto() -> String? {
+        let size = CGSize(width: 400, height: 500)
+        let image = UIGraphicsImageRenderer(size: size).image { context in
+            let colors = [UIColor.lightGray.cgColor, UIColor.darkGray.cgColor] as CFArray
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
+                context.cgContext.drawLinearGradient(
+                    gradient,
+                    start: .zero,
+                    end: CGPoint(x: 0, y: size.height),
+                    options: []
+                )
+            }
+            UIColor.black.withAlphaComponent(0.85).setFill()
+            UIBezierPath(roundedRect: CGRect(x: 150, y: 90, width: 100, height: 360), cornerRadius: 48).fill()
+        }
+        guard let data = image.jpegData(compressionQuality: 0.9) else { return nil }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("lyb-ui-test-home-v2-photo.jpg")
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            return nil
+        }
+        return url.absoluteString
+    }
+
+    private func seedFullDashboardUITestFixtureData(userId: String, photoURL: String? = nil) async {
         let calendar = Calendar.current
         let now = Date()
         let entries: [
@@ -574,7 +604,7 @@ struct LogYourBodyApp: App {
                 hipCm: nil,
                 waistUnit: nil,
                 notes: entry.notes,
-                photoUrl: nil,
+                photoUrl: photoURL,
                 dataSource: entry.source,
                 createdAt: date,
                 updatedAt: now

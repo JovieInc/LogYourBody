@@ -322,7 +322,7 @@ extension DashboardViewLiquid {
         return "\(directionSymbol) \(formatted) last 30d"
     }
 
-    private func heroWeightDelta30d() -> Double? {
+    func heroWeightDelta30d() -> Double? {
         let system = currentMeasurementSystem
         let recentMetrics = filteredMetrics(for: .month1)
 
@@ -341,7 +341,7 @@ extension DashboardViewLiquid {
         return stats.delta
     }
 
-    private func heroBodyFatDelta30d() -> Double? {
+    func heroBodyFatDelta30d() -> Double? {
         let interpolationContext = MetricsInterpolationService.shared
             .makeBodyFatInterpolationContext(for: bodyMetrics)
         let recentMetrics = filteredMetrics(for: .month1)
@@ -363,7 +363,7 @@ extension DashboardViewLiquid {
         return stats.delta
     }
 
-    private func heroFFMIDelta30d() -> Double? {
+    func heroFFMIDelta30d() -> Double? {
         let heightInches = convertHeightToInches(
             height: authManager.currentUser?.profile?.height,
             heightUnit: authManager.currentUser?.profile?.heightUnit

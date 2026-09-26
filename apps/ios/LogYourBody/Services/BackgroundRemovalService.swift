@@ -33,43 +33,24 @@ class BackgroundRemovalService {
             throw BackgroundRemovalError.invalidImage
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
-            // Create Vision request for person segmentation
-            let request = VNGeneratePersonSegmentationRequest { request, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
+        let mask = try await personMask(for: cgImage, quality: quality)
+        return try applySegmentationMask(to: cgImage, mask: mask, quality: quality)
+    }
 
-                guard let result = request.results?.first as? VNPixelBufferObservation else {
-                    continuation.resume(throwing: BackgroundRemovalError.noPersonFound)
-                    return
-                }
-
-                do {
-                    let maskedImage = try self.applySegmentationMask(
-                        to: cgImage,
-                        mask: result.pixelBuffer,
-                        quality: quality
-                    )
-                    continuation.resume(returning: maskedImage)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-
-            // Set quality level (higher = better quality but slower)
+    /// Person mask from Vision. `perform` either throws or fills `results`, so
+    /// there is no completion handler and nothing that can be resumed twice
+    /// (the simulator trap that BackgroundRemovalServiceTests used to document).
+    func personMask(for cgImage: CGImage, quality: Float) async throws -> CVPixelBuffer {
+        try await Task.detached(priority: .userInitiated) {
+            let request = VNGeneratePersonSegmentationRequest()
             request.qualityLevel = quality > 0.8 ? .accurate : .balanced
-
-            // Process the image
             let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-
-            do {
-                try handler.perform([request])
-            } catch {
-                continuation.resume(throwing: error)
+            try handler.perform([request])
+            guard let result = request.results?.first else {
+                throw BackgroundRemovalError.noPersonFound
             }
-        }
+            return result.pixelBuffer
+        }.value
     }
 
     /// Apply the segmentation mask to create transparent background
