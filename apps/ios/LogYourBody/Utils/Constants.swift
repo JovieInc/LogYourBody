@@ -143,6 +143,13 @@ enum PhotoTimelineHUDPolicy {
         true
     }
 
+    static let noRecentTrendCaption = "No 30d trend"
+
+    // Metric captions show the 30-day trend; never fall back to a bare unit that repeats the value's own unit.
+    static func metricCaption(trend: String?) -> String {
+        trend ?? noRecentTrendCaption
+    }
+
     static func stateText(
         presence: MetricPresence,
         confidence: GlobalTimelineMetricConfidence? = nil

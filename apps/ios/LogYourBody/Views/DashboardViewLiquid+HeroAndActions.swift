@@ -144,10 +144,9 @@ extension DashboardViewLiquid {
     }
 
     func heroBodyFatCaption() -> String {
-        if let delta = heroBodyFatDelta30d() {
-            return heroTrendCaption(delta: delta, unit: "%")
-        }
-        return "%"
+        PhotoTimelineHUDPolicy.metricCaption(
+            trend: heroBodyFatDelta30d().map { heroTrendCaption(delta: $0, unit: "%") }
+        )
     }
 
     func heroWeightValue() -> String {
@@ -159,11 +158,9 @@ extension DashboardViewLiquid {
     }
 
     func heroWeightCaption() -> String {
-        if let delta = heroWeightDelta30d() {
-            let system = currentMeasurementSystem
-            return heroTrendCaption(delta: delta, unit: system.weightUnit)
-        }
-        return weightUnit
+        PhotoTimelineHUDPolicy.metricCaption(
+            trend: heroWeightDelta30d().map { heroTrendCaption(delta: $0, unit: currentMeasurementSystem.weightUnit) }
+        )
     }
 
     func latestBodyScoreResult() -> BodyScoreResult? {

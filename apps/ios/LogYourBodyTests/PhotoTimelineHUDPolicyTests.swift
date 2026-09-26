@@ -176,6 +176,17 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         )
     }
 
+    // Regression: on device, Weight and Body Fat captions read "lbs" and "%" (repeating the value's unit)
+    // whenever there was no 30-day trend.
+    func testMetricCaptionNeverFallsBackToABareUnit() {
+        XCTAssertEqual(PhotoTimelineHUDPolicy.metricCaption(trend: "↓ −4.2 lbs last 30d"), "↓ −4.2 lbs last 30d")
+        let fallback = PhotoTimelineHUDPolicy.metricCaption(trend: nil)
+        XCTAssertEqual(fallback, "No 30d trend")
+        for unit in ["lbs", "kg", "%"] {
+            XCTAssertNotEqual(fallback, unit)
+        }
+    }
+
     func testPhotoTimelineHUDMetricStateCopyIsExplicit() {
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .present), "Measured")
         XCTAssertEqual(
