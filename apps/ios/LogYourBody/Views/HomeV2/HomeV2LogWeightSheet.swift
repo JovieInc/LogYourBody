@@ -91,7 +91,6 @@ struct HomeV2LogWeightSheet: View {
         .onChange(of: focusedField) { previous, current in
             if previous == .weight, current != .weight { commitTypedWeight() }
         }
-        .accessibilityIdentifier("home_v2_log_sheet")
     }
 
     private var header: some View {
@@ -99,6 +98,8 @@ struct HomeV2LogWeightSheet: View {
             Text(HomeV2Copy.logSheetTitle)
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle, weight: .bold, relativeTo: .title2)
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("home_v2_log_sheet")
 
             Spacer(minLength: HomeV2Tokens.Space.tight)
 
