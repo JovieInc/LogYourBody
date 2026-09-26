@@ -27,24 +27,23 @@ env:
 run: |
   assert_expected_result
   [[ "\${{ needs.detect-changes.result }}" == "success" ]]
-  workflow_dispatch:
-    inputs:
-      merge_group_base_sha:
 `;
 
-const validKicker = `
+const validTokenEnrollment = `
 on:
-  schedule:
-    - cron: '*/5 * * * *'
+  workflow_run:
+    workflows: [Native Merge Queue Enrollment]
 script: |
-  github.rest.git.listMatchingRefs({ ref: 'heads/gh-readonly-queue/main/' })
-  github.rest.actions.listWorkflowRuns({ head_sha })
-  github.rest.actions.createWorkflowDispatch({ inputs: { merge_group_base_sha: baseSha } })
+  github-token: \${{ secrets.MERGE_QUEUE_TOKEN }}
+  const summary = checks.find((check) => check.name === 'CI Summary');
+  if (pull.headRepository?.nameWithOwner !== \`\${owner}/\${repo}\`) continue;
+  dequeuePullRequest(input: { id: $id })
+  enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: pull.headRefOid })
 `;
 
-const kickerPolicy = {
+const tokenPolicy = {
   ...validPolicy,
-  merge_group_ci: { kicker_workflow: 'kicker.yml', dispatch_input: 'merge_group_base_sha' },
+  token_enrollment: { workflow: 'token.yml', secret: 'MERGE_QUEUE_TOKEN' },
 };
 
 const validEnrollment = `
@@ -63,51 +62,6 @@ script: |
 
 test('current repository satisfies the native queue contract', () => {
   assert.equal(verifyRepository(process.cwd()), true);
-});
-
-test('merge-group CI kicker contract is accepted when secret-free and scheduled', () => {
-  assert.equal(
-    verifyPolicy({
-      policy: kickerPolicy,
-      ciWorkflow: validCI,
-      enrollmentWorkflow: validEnrollment,
-      kickerWorkflow: validKicker,
-    }),
-    true,
-  );
-});
-
-test('deliberate red: a kicker that receives secrets or runs on pull requests is rejected', () => {
-  assert.throws(
-    () => verifyPolicy({
-      policy: kickerPolicy,
-      ciWorkflow: validCI,
-      enrollmentWorkflow: validEnrollment,
-      kickerWorkflow: validKicker + 'token: \${{ secrets.MERGE_QUEUE_TOKEN }}\n',
-    }),
-    /must not receive repository secrets/,
-  );
-  assert.throws(
-    () => verifyPolicy({
-      policy: kickerPolicy,
-      ciWorkflow: validCI,
-      enrollmentWorkflow: validEnrollment,
-      kickerWorkflow: validKicker.replace('schedule:', 'pull_request_target:'),
-    }),
-    /missing required contract|must not run on pull request/,
-  );
-});
-
-test('deliberate red: CI without the merge-group dispatch input is rejected', () => {
-  assert.throws(
-    () => verifyPolicy({
-      policy: kickerPolicy,
-      ciWorkflow: validCI.replace('merge_group_base_sha:', 'other_input:'),
-      enrollmentWorkflow: validEnrollment,
-      kickerWorkflow: validKicker,
-    }),
-    /CI workflow is missing required contract/,
-  );
 });
 
 test('deliberate red: quoted branch patterns are rejected', () => {
@@ -129,6 +83,51 @@ test('deliberate red: CI without merge_group coverage is rejected', () => {
       enrollmentWorkflow: validEnrollment,
     }),
     /CI workflow is missing required contract/,
+  );
+});
+
+test('token enrollment contract is accepted when checkout-free and off pull-request events', () => {
+  assert.equal(
+    verifyPolicy({
+      policy: tokenPolicy,
+      ciWorkflow: validCI,
+      enrollmentWorkflow: validEnrollment,
+      tokenEnrollmentWorkflow: validTokenEnrollment,
+    }),
+    true,
+  );
+});
+
+test('deliberate red: token enrollment that checks out code or runs on pull requests is rejected', () => {
+  assert.throws(
+    () => verifyPolicy({
+      policy: tokenPolicy,
+      ciWorkflow: validCI,
+      enrollmentWorkflow: validEnrollment,
+      tokenEnrollmentWorkflow: validTokenEnrollment + '  - uses: actions/checkout@v6\n',
+    }),
+    /must not checkout code/,
+  );
+  assert.throws(
+    () => verifyPolicy({
+      policy: tokenPolicy,
+      ciWorkflow: validCI,
+      enrollmentWorkflow: validEnrollment,
+      tokenEnrollmentWorkflow: validTokenEnrollment.replace('workflow_run:', 'pull_request_target:'),
+    }),
+    /missing required contract|must not run on pull request/,
+  );
+});
+
+test('deliberate red: token enrollment without the exact-head re-proof is rejected', () => {
+  assert.throws(
+    () => verifyPolicy({
+      policy: tokenPolicy,
+      ciWorkflow: validCI,
+      enrollmentWorkflow: validEnrollment,
+      tokenEnrollmentWorkflow: validTokenEnrollment.replace("check.name === 'CI Summary'", "check.name === 'anything'"),
+    }),
+    /missing required contract/,
   );
 });
 

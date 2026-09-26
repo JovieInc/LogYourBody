@@ -8,15 +8,6 @@ on:
     types: [checks_requested]
   push:
     branches: [main]
-  # Dispatched by merge-queue-ci-kicker.yml onto merge-group refs whose
-  # merge_group event started no run (enqueued with GITHUB_TOKEN).
-  workflow_dispatch:
-    inputs:
-      merge_group_base_sha:
-        description: 'Base SHA of the merge-group ref (from its branch name)'
-        required: false
-        type: string
-        default: ''
 
 concurrency:
   # Main-branch runs must not cancel each other. A rapid second merge can
@@ -48,7 +39,7 @@ jobs:
       - name: Detect changed surfaces locally
         id: filter
         env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event_name == 'workflow_dispatch' && github.event.inputs.merge_group_base_sha || github.event.before }}
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.sha }}
         run: |
           set -euo pipefail

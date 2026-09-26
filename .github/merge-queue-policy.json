@@ -19,9 +19,9 @@
     "same_repository_only": true,
     "drafts_allowed": false
   },
-  "merge_group_ci": {
-    "kicker_workflow": ".github/workflows/merge-queue-ci-kicker.yml",
-    "dispatch_input": "merge_group_base_sha",
-    "reason": "merge_group events caused by GITHUB_TOKEN start no workflow run; workflow_dispatch is the documented exception"
+  "token_enrollment": {
+    "workflow": ".github/workflows/merge-queue-token-enrollment.yml",
+    "secret": "MERGE_QUEUE_TOKEN",
+    "reason": "merge_group events caused by GITHUB_TOKEN start no CI run; the queue only honours checks from the merge_group event, so the entry must be enqueued by a non-GITHUB_TOKEN identity"
   }
 }
