@@ -12,6 +12,7 @@
 		04BF4BAC82CF6B37F817592F /* CoreDataModelMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA050E7DCEBA5BAF62341363 /* CoreDataModelMigrationTests.swift */; };
 		04EB1D7AD1947D32BDE7AD70 /* BodyMetricSourceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EBD5BF3F1671BC8D17ABE5D /* BodyMetricSourceContractTests.swift */; };
 		050A49949BCAA09D23C66035 /* DashboardViewModelHealthSyncWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1C56EE58FC0F4BEFDA1345 /* DashboardViewModelHealthSyncWiringTests.swift */; };
+		06E7AF918450DE634F2A906A /* HomeV2ProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C9C472B04458CEC52B54DD /* HomeV2ProgressView.swift */; };
 		07E0F159F526A8319DA5D5FC /* HomeV2ContextPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B950B0AD205E333255C5FEE /* HomeV2ContextPolicy.swift */; };
 		08009BD8B382A4A3372C1D2D /* ExternalServicePortsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A58DAB61B2BBDF2D4EF761B /* ExternalServicePortsTests.swift */; };
 		082DA43020A9A746031675D0 /* TimelinePhotoSamplerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00E508C67F037B77FFA2627 /* TimelinePhotoSamplerTests.swift */; };
@@ -80,6 +81,7 @@
 		7E01D015B886A36E2EB5F3E1 /* LaunchAndBodyCompositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D15E6A333FABD14CA6405A4 /* LaunchAndBodyCompositionTests.swift */; };
 		7EE44B7F0195FDD490B3D5F6 /* FullMetricChartView+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83248F0638FB24D0201A0C1 /* FullMetricChartView+Part01.swift */; };
 		7F81E0D294C9EBD959FA20B8 /* HomeV2PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACBA870282ED5F613A82213D /* HomeV2PrimaryButton.swift */; };
+		805AA4E233D3AD665FD32AF0 /* HomeV2ProgressPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E8847D5053B4100785F556A /* HomeV2ProgressPolicyTests.swift */; };
 		841527E772D0CA94BE0D3F96 /* HealthKitManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */; };
 		87977666693C1FD6C5DDAA8B /* SubjectPlateRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E56886A697AD88A24468E56 /* SubjectPlateRenderer.swift */; };
 		8A693BCF3584DF89630F50C5 /* OnboardingFlowViewModel+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5586EC0657B1F9E652068FBA /* OnboardingFlowViewModel+Part02.swift */; };
@@ -96,6 +98,7 @@
 		9528AB022858D682E801AC01 /* AuthProfileBootstrapPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBDA30F8A24DC3754F3CD216 /* AuthProfileBootstrapPolicyTests.swift */; };
 		95739BB14EBE755CF6081FA0 /* HomeV2ContextPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFB072CB90358ED3EF144059 /* HomeV2ContextPolicyTests.swift */; };
 		96EA9790381A5BEC62D7C902 /* KeychainAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = E67A23519F10FC4172C1E4FD /* KeychainAvailability.swift */; };
+		987BBA9243F88C752E3E19E8 /* DashboardViewLiquid+HomeV2Progress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2980F8006A8CAEBEC189C1D2 /* DashboardViewLiquid+HomeV2Progress.swift */; };
 		98DAEAD9993013F8C7C81764 /* DashboardTimelineAndPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B95EB9919EA722470321074 /* DashboardTimelineAndPolicyTests.swift */; };
 		994AA8612F8DEA8D4BFFC133 /* HomeV2LogWeightSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55EE79E338D0E34DCB4E3FDF /* HomeV2LogWeightSheet.swift */; };
 		9B5611E2F8314E22A5BF7889 /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75034CADEA1D4697BDCB5555 /* ImageCacheService.swift */; };
@@ -466,6 +469,7 @@
 		263831D7F1CDC8BD3DDA85F4 /* DashboardViewLiquid+HomeV2.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HomeV2.swift"; sourceTree = "<group>"; };
 		28344CEE5ADD04381E5F8AAD /* MetricGauge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricGauge.swift; path = DesignSystem/Molecules/MetricGauge.swift; sourceTree = "<group>"; };
 		29553DC6811B06CAE2621869 /* RevenueCatManager+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "RevenueCatManager+Part01.swift"; path = "RevenueCatManager+Part01.swift"; sourceTree = "<group>"; };
+		2980F8006A8CAEBEC189C1D2 /* DashboardViewLiquid+HomeV2Progress.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HomeV2Progress.swift"; sourceTree = "<group>"; };
 		2B90BFF4D5A1EE512C980386 /* OnboardingFlowViewModel+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "OnboardingFlowViewModel+Part01.swift"; path = "OnboardingFlowViewModel+Part01.swift"; sourceTree = "<group>"; };
 		2B950B0AD205E333255C5FEE /* HomeV2ContextPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2ContextPolicy.swift; sourceTree = "<group>"; };
 		2B95EB9919EA722470321074 /* DashboardTimelineAndPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardTimelineAndPolicyTests.swift; sourceTree = "<group>"; };
@@ -477,6 +481,7 @@
 		3CBF4E377107434EA53A2F1B /* PaidWeightLoggerMVPPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaidWeightLoggerMVPPolicyTests.swift; sourceTree = "<group>"; };
 		3CD03E6E0BF889812FE27D44 /* LegalConsentPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LegalConsentPolicyTests.swift; sourceTree = "<group>"; };
 		3DC0DDA700C8A4207B9EBC50 /* NotificationManagerSchedulingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationManagerSchedulingTests.swift; sourceTree = "<group>"; };
+		3E8847D5053B4100785F556A /* HomeV2ProgressPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2ProgressPolicyTests.swift; sourceTree = "<group>"; };
 		3F2E34BC49376B87D43D81AD /* BodyMetricPhotoUpdateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricPhotoUpdateTests.swift; sourceTree = "<group>"; };
 		3FDA4E2154B359271C66879D /* HomeV2TrendPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2TrendPolicyTests.swift; sourceTree = "<group>"; };
 		3FF03916F06E4F2537E89838 /* BiometricLockPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BiometricLockPolicyTests.swift; sourceTree = "<group>"; };
@@ -875,6 +880,7 @@
 		D36E73B3BA4285B178AC2CA2 /* ImageProcessingServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageProcessingServiceTests.swift; sourceTree = "<group>"; };
 		D557A5B9E670DD0A6A8BA893 /* RealtimeSyncManager+Part01.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "RealtimeSyncManager+Part01.swift"; path = "RealtimeSyncManager+Part01.swift"; sourceTree = "<group>"; };
 		D6047B9B9F0280ED4CEC0DFB /* PreferenceGoalValidatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PreferenceGoalValidatorTests.swift; sourceTree = "<group>"; };
+		D6C9C472B04458CEC52B54DD /* HomeV2ProgressView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2ProgressView.swift; sourceTree = "<group>"; };
 		DA456B8668AB1B5DDFA6C5CA /* AuthSurfacePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthSurfacePolicyTests.swift; sourceTree = "<group>"; };
 		DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthSyncCoordinatorPipelineTests.swift; sourceTree = "<group>"; };
 		E2465B2ED058FAFC5389161E /* DSDivider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSDivider.swift; path = DesignSystem/Atoms/DSDivider.swift; sourceTree = "<group>"; };
@@ -1067,6 +1073,7 @@
 				2B950B0AD205E333255C5FEE /* HomeV2ContextPolicy.swift */,
 				8BA8A68A080FCFF9487C1DF3 /* HomeV2ContextView.swift */,
 				699DEE22068AAD22FE7270FA /* HomeV2EntriesView.swift */,
+				D6C9C472B04458CEC52B54DD /* HomeV2ProgressView.swift */,
 			);
 			name = HomeV2;
 			path = HomeV2;
@@ -1233,6 +1240,7 @@
 				A42DAD978808FA956C842F52 /* HealthKitStepCountPolicyTests.swift */,
 				3FDA4E2154B359271C66879D /* HomeV2TrendPolicyTests.swift */,
 				CFB072CB90358ED3EF144059 /* HomeV2ContextPolicyTests.swift */,
+				3E8847D5053B4100785F556A /* HomeV2ProgressPolicyTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1437,6 +1445,7 @@
 				AA8EEF545EE3CB116D9A70D3 /* HomeV2 */,
 				263831D7F1CDC8BD3DDA85F4 /* DashboardViewLiquid+HomeV2.swift */,
 				6F426E17B8C3036E6FCEDEA6 /* DashboardViewLiquid+HomeV2Context.swift */,
+				2980F8006A8CAEBEC189C1D2 /* DashboardViewLiquid+HomeV2Progress.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -2058,6 +2067,7 @@
 				69FE1F8757E6B0643B73F39E /* HealthKitStepCountPolicyTests.swift in Sources */,
 				3D1AFA818E06FB9D3FFDA1C6 /* HomeV2TrendPolicyTests.swift in Sources */,
 				95739BB14EBE755CF6081FA0 /* HomeV2ContextPolicyTests.swift in Sources */,
+				805AA4E233D3AD665FD32AF0 /* HomeV2ProgressPolicyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2335,6 +2345,8 @@
 				0B0F8A35DFED490D0711EAC1 /* HomeV2ContextView.swift in Sources */,
 				EC28049AC685F317C126EEAF /* HomeV2EntriesView.swift in Sources */,
 				B9D22B2B3E4A826B84607DF3 /* DashboardViewLiquid+HomeV2Context.swift in Sources */,
+				06E7AF918450DE634F2A906A /* HomeV2ProgressView.swift in Sources */,
+				987BBA9243F88C752E3E19E8 /* DashboardViewLiquid+HomeV2Progress.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

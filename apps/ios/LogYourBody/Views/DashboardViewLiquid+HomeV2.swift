@@ -10,6 +10,11 @@ extension DashboardViewLiquid {
         HomeV2Policy.isEnabled() && selectedPhotoTimelineRootPage == .timeline && !isHomeChatExpanded
     }
 
+    /// The plain v2 chrome (sidebar glyph, titles) on every v2 root page.
+    var isHomeV2Chrome: Bool {
+        HomeV2Policy.isEnabled() && !isHomeChatExpanded
+    }
+
     var homeV2DisplayUnit: String {
         HomeV2Copy.displayUnit(currentMeasurementSystem)
     }
@@ -42,10 +47,7 @@ extension DashboardViewLiquid {
             chartDaily: fullChartCache[.weight] ?? [],
             chartTrend: fullTrendChartCache[.weight] ?? [],
             onOpenPhoto: { isHomeV2ViewerPresented = true },
-            onViewProgress: {
-                selectedMetricType = .weight
-                isMetricDetailActive = true
-            },
+            onViewProgress: { openHomeV2Progress(metric: .weight) },
             onTodayDetails: { openHomeV2Context() },
             onLogWeight: { presentHomeV2LogSheet() },
             onDone: { homeV2Logged = nil },
