@@ -19,6 +19,8 @@ enum HomeV2Tokens {
     enum TypeSize {
         static let heroPhoto: CGFloat = 38
         static let heroMetricFirst: CGFloat = 84
+        static let progressValue: CGFloat = 72
+        static let lead: CGFloat = 18
         static let sheetValue: CGFloat = 60
         static let sheetTitle: CGFloat = 22
         static let title: CGFloat = 16
@@ -42,6 +44,7 @@ enum HomeV2Tokens {
     static let photoAspectRatio: CGFloat = 4.0 / 5.0
     static let rowHeight: CGFloat = 52
     static let chartHeight: CGFloat = 150
+    static let progressChartHeight: CGFloat = 180
     static let rowHeightWithSubline: CGFloat = 60
     static let thumbSize = CGSize(width: 32, height: 40)
     static let thumbRadius: CGFloat = 8

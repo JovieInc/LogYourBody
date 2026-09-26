@@ -1409,6 +1409,45 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 5))
     }
 
+    func testHomeV2ProgressIsOneMetricWorkspace() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+
+        let viewProgress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 30))
+        viewProgress.tap()
+
+        let value = app.descendants(matching: .any)["home_v2_progress_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 8), "View progress opens the metric workspace")
+        let weightTab = app.buttons["home_v2_progress_tab_weight"]
+        XCTAssertTrue(weightTab.waitForExistence(timeout: 5))
+        XCTAssertTrue(weightTab.isSelected, "Weight is selected on arrival")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_progress_keep_logging"].waitForExistence(timeout: 5),
+            "Five logged days is not yet a trend; the honest state says so"
+        )
+        XCTAssertTrue(app.buttons["home_v2_progress_log_weight"].exists, "Not-enough-data keeps the one action")
+        attachScreenshot(named: "home-v2-progress-weight", from: app)
+
+        let bodyFatTab = app.buttons["home_v2_progress_tab_body_fat"]
+        bodyFatTab.tap()
+        XCTAssertTrue(bodyFatTab.isSelected, "Switching metrics keeps one workspace")
+        XCTAssertTrue(value.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["home_v2_progress_log_weight"].exists, "Only weight is logged here")
+        attachScreenshot(named: "home-v2-progress-body-fat", from: app)
+
+        // The root swipe lives on the header, as on the legacy Stats page; the leading edge opens the menu.
+        let header = app.descendants(matching: .any)["photo_timeline_root_nav"]
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
+        let start = header.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 120, dy: 12))
+        let end = start.withOffset(CGVector(dx: 220, dy: 0))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertTrue(
+            app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8),
+            "Swiping back on the header returns to Today"
+        )
+    }
+
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
