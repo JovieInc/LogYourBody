@@ -100,12 +100,10 @@ extension DashboardViewLiquid {
                 await saveHomeV2Weight(value: value, bodyFat: bodyFat)
             },
             onAddPhoto: { _ in
-                // ponytail: the pose-guided camera (Pencil L2) lands in the photo slice; until then the
-                // existing attach sheet takes the photo for today.
                 isHomeV2LogSheetPresented = false
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(450))
-                    presentProgressPhotoAttach(for: homeV2TodayMetric)
+                    presentProgressPhotoAttach(for: homeV2TodayMetric, startsInCamera: true)
                 }
             }
         )

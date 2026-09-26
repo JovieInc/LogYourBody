@@ -331,8 +331,9 @@ extension DashboardViewLiquid {
         }
     }
 
-    func presentProgressPhotoAttach(for metric: BodyMetrics?) {
+    func presentProgressPhotoAttach(for metric: BodyMetrics?, startsInCamera: Bool = false) {
         progressPhotoAttachTarget = metric
+        progressPhotoAttachStartsInCamera = startsInCamera
         HapticManager.shared.selection()
         isProgressPhotoAttachPresented = true
     }
