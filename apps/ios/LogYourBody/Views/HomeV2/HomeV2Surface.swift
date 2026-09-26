@@ -18,6 +18,7 @@ struct HomeV2Surface: View {
     let phaseSentence: String?
     let loggedSentence: String?
     let latestPhotoCaption: String?
+    var systemState: HomeV2SystemState?
     let chartDaily: [MetricChartDataPoint]
     let chartTrend: [MetricChartDataPoint]
     let onOpenPhoto: () -> Void
@@ -25,15 +26,22 @@ struct HomeV2Surface: View {
     let onTodayDetails: () -> Void
     let onAllPhotos: () -> Void
     let onLogWeight: () -> Void
+    var onConnectHealth: () -> Void = {}
     let onDone: () -> Void
     let onUndo: () -> Void
 
     private var isLogged: Bool { loggedSentence != nil }
+    private var isHealthOff: Bool { systemState == .healthOff }
 
     var body: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 0) {
                 let hasPhoto = PhotoTimelineHUDPolicy.hasUsablePhoto(metric)
+                if systemState == .offline {
+                    HomeV2OfflineBanner()
+                } else if isHealthOff {
+                    HomeV2HealthOffRow()
+                }
                 if hasPhoto, let photoURL = metric.photoUrl {
                     photoStage(photoURL: photoURL, size: geometry.size)
                     photoNumberBlock
@@ -52,11 +60,19 @@ struct HomeV2Surface: View {
                     .frame(maxWidth: .infinity)
                 }
 
-                HomeV2Dock(
-                    title: isLogged ? HomeV2Copy.done : HomeV2Copy.logWeight,
-                    identifier: isLogged ? "home_v2_done" : "home_v2_log_weight",
-                    action: isLogged ? onDone : onLogWeight
-                )
+                if isHealthOff, !isLogged {
+                    HomeV2Dock(
+                        title: HomeV2SystemCopy.connectAppleHealth,
+                        identifier: "home_v2_connect_health",
+                        action: onConnectHealth
+                    )
+                } else {
+                    HomeV2Dock(
+                        title: isLogged ? HomeV2Copy.done : HomeV2Copy.logWeight,
+                        identifier: isLogged ? "home_v2_done" : "home_v2_log_weight",
+                        action: isLogged ? onDone : onLogWeight
+                    )
+                }
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
         }
@@ -150,9 +166,9 @@ struct HomeV2Surface: View {
     }
 
     private var todayDetailsRow: some View {
-        Button(action: onTodayDetails) {
+        Button(action: isHealthOff ? onLogWeight : onTodayDetails) {
             HStack(spacing: HomeV2Tokens.Space.tight) {
-                Text(HomeV2Copy.todayDetails)
+                Text(isHealthOff ? HomeV2SystemCopy.logWeightManually : HomeV2Copy.todayDetails)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
                     .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 Spacer(minLength: HomeV2Tokens.Space.tight)
