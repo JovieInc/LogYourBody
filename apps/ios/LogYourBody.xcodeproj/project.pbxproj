@@ -66,6 +66,7 @@
 		61C198996EE85136862ECEDB /* ProductAPIClient+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC645B4F52DDE739FAFF042E /* ProductAPIClient+Part01.swift */; };
 		6200622347BFBBB809890E19 /* HealthKitFullSyncCompletionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18FA96B2F0B80609BBBC0DE1 /* HealthKitFullSyncCompletionPolicyTests.swift */; };
 		6934AE196684173B83F61482 /* AddEntrySheet+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C10C0E4F8B40568047DA88 /* AddEntrySheet+Part01.swift */; };
+		69FE1F8757E6B0643B73F39E /* HealthKitStepCountPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A42DAD978808FA956C842F52 /* HealthKitStepCountPolicyTests.swift */; };
 		6BA8148A3E9FDCC11517BE7F /* MobileProfileNamePayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492B105B3BA25B5B5864B9BA /* MobileProfileNamePayloadTests.swift */; };
 		73AAD5D6EADA5C5A7BEB0D4B /* HealthKitManager+Part03.swift in Sources */ = {isa = PBXBuildFile; fileRef = 656A7105DE085AFF17E796C8 /* HealthKitManager+Part03.swift */; };
 		75A151025036A3D85388BD19 /* ValidationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3BCDDCDB314367722653A8 /* ValidationServiceTests.swift */; };
@@ -537,6 +538,7 @@
 		9F72F9E9548064844D56AD75 /* OnboardingScoreDisplayPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingScoreDisplayPolicyTests.swift; sourceTree = "<group>"; };
 		9F7D800638256D10A5ACB992 /* Glp1DoseCoreDataTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Glp1DoseCoreDataTests.swift; sourceTree = "<group>"; };
 		A1DEC696E9D9EFBFAE8202F0 /* AppVersionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppVersionTests.swift; sourceTree = "<group>"; };
+		A42DAD978808FA956C842F52 /* HealthKitStepCountPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitStepCountPolicyTests.swift; sourceTree = "<group>"; };
 		A4A1C6C2438CB1EDCEC43C67 /* HealthSyncTestDoubles.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthSyncTestDoubles.swift; sourceTree = "<group>"; };
 		A88D7AC2C7FF4E14A3BB8168 /* CoreDataManager+Part03.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "CoreDataManager+Part03.swift"; path = "CoreDataManager+Part03.swift"; sourceTree = "<group>"; };
 		AB22C3A99D0B42B73AAAD00E /* HomeV2Tokens.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2Tokens.swift; sourceTree = "<group>"; };
@@ -1204,6 +1206,7 @@
 				EC326F70438A47EBD30E41A7 /* TimelineScrollJankRegressionTests.swift */,
 				4877512DEE0F7236151A15AA /* HomeV2PolicyTests.swift */,
 				AB73CC33EB688034C7B8512F /* SubjectPlateRendererTests.swift */,
+				A42DAD978808FA956C842F52 /* HealthKitStepCountPolicyTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -2025,6 +2028,7 @@
 				F80E7F3EED8BA23533A7C1D0 /* TimelineScrollJankRegressionTests.swift in Sources */,
 				CB2DAC6AFD2CCDD76F568339 /* HomeV2PolicyTests.swift in Sources */,
 				A3B2D419E2AED6266506624B /* SubjectPlateRendererTests.swift in Sources */,
+				69FE1F8757E6B0643B73F39E /* HealthKitStepCountPolicyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
