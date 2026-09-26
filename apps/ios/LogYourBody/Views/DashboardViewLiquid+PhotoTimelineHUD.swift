@@ -95,6 +95,9 @@ extension DashboardViewLiquid {
                 .highPriorityGesture(photoTimelineSwipe)
                 .accessibilityHidden(true)
         }
+        .fullScreenCover(isPresented: $isHomeV2ViewerPresented) {
+            homeV2PhotoViewer
+        }
         .fullScreenCover(isPresented: $isShowingPhotoTimelineMenu) {
             PhotoTimelineNavigationMenu(
                 selected: selectedPhotoTimelineRootPage,

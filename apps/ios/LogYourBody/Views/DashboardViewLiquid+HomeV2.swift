@@ -29,7 +29,36 @@ extension DashboardViewLiquid {
             onTapFFMI: {
                 selectedMetricType = .ffmi
                 isMetricDetailActive = true
-            }
+            },
+            onOpenPhoto: { isHomeV2ViewerPresented = true }
+        )
+    }
+
+    /// Presented from `photoTimelineRoot`, the same level as the menu cover, so
+    /// the presentation context is the HUD's own.
+    var homeV2PhotoViewer: some View {
+        HomeV2PhotoViewer(
+            bodyMetrics: bodyMetrics,
+            selectedIndex: $selectedIndex,
+            formatters: homeV2Formatters(unit: currentMeasurementSystem.weightUnit),
+            onClose: { isHomeV2ViewerPresented = false }
+        )
+    }
+
+    private func homeV2Formatters(unit: String) -> HomeV2Formatters {
+        let system = currentMeasurementSystem
+        return HomeV2Formatters(
+            dateText: { formatHUDDate($0.date) },
+            weightText: { formatTrendWeightHeadline($0, usesTrend: weightUsesTrend) },
+            weightValue: { metric in
+                guard let weight = metric.weight else { return nil }
+                return convertWeight(weight, to: system) ?? weight
+            },
+            bodyFatText: { metric in
+                let base = formatBodyFatValue(metric.bodyFatPercentage)
+                return base == "–" ? base : "\(base)%"
+            },
+            weightUnit: unit
         )
     }
 }

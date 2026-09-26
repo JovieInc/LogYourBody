@@ -96,6 +96,7 @@
 		9DA53BBE5C68C157C1C517F4 /* ExportCSVBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D10550744C3D80F49B32A4 /* ExportCSVBuilder.swift */; };
 		9E81C3C41951BB662ADA2C6F /* DebugResetManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEE8DE6FD2A76A65AF63D2D9 /* DebugResetManagerTests.swift */; };
 		9EBBDD6AF2FF4E4FF8B9E3BC /* BodyCompositionMathGoldenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 927B7D58E8E1756BB92364B6 /* BodyCompositionMathGoldenTests.swift */; };
+		9F1405CB5B2F4A0563C3C4A1 /* HomeV2PhotoViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA50D84A24CA405046D5EAFA /* HomeV2PhotoViewer.swift */; };
 		A14230332A86E9780FEAB7F6 /* SyntheticImageFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E5BB7F340376DECDD7ABC3A /* SyntheticImageFixtures.swift */; };
 		A3B2D419E2AED6266506624B /* SubjectPlateRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB73CC33EB688034C7B8512F /* SubjectPlateRendererTests.swift */; };
 		A3CFAB8A53F95BD9F8FA0B82 /* PhotoLibraryScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2715F4BF0E82E86A99821E3 /* PhotoLibraryScannerTests.swift */; };
@@ -843,6 +844,7 @@
 		C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SkeletonLoaders.swift; path = Components/SkeletonLoaders.swift; sourceTree = "<group>"; };
 		CA050E7DCEBA5BAF62341363 /* CoreDataModelMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoreDataModelMigrationTests.swift; sourceTree = "<group>"; };
 		CA338579090538FBCCA21785 /* SyncIntegrationImportAndMappingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncIntegrationImportAndMappingTests.swift; sourceTree = "<group>"; };
+		CA50D84A24CA405046D5EAFA /* HomeV2PhotoViewer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PhotoViewer.swift; sourceTree = "<group>"; };
 		CCD81BE70A7B449921973AEA /* LegalDocumentRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LegalDocumentRow.swift; path = DesignSystem/Molecules/LegalDocumentRow.swift; sourceTree = "<group>"; };
 		CD667EA50710CE217FD95E4C /* Color+Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "Color+Theme.swift"; path = "Color+Theme.swift"; sourceTree = "<group>"; };
 		CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BaseTextField.swift; path = DesignSystem/Atoms/BaseTextField.swift; sourceTree = "<group>"; };
@@ -1038,6 +1040,7 @@
 				E442F03731E41EA713BCAE3E /* HomeV2Policy.swift */,
 				AB22C3A99D0B42B73AAAD00E /* HomeV2Tokens.swift */,
 				FC9C445A5BBDAD9BB34C8E55 /* HomeV2Surface.swift */,
+				CA50D84A24CA405046D5EAFA /* HomeV2PhotoViewer.swift */,
 			);
 			name = HomeV2;
 			path = HomeV2;
@@ -2291,6 +2294,7 @@
 				5803E674F4ACA15635334F15 /* HomeV2Surface.swift in Sources */,
 				F38F981DE886318E350B7CF8 /* DashboardViewLiquid+HomeV2.swift in Sources */,
 				87977666693C1FD6C5DDAA8B /* SubjectPlateRenderer.swift in Sources */,
+				9F1405CB5B2F4A0563C3C4A1 /* HomeV2PhotoViewer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
