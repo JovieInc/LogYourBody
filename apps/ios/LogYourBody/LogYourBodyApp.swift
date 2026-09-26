@@ -560,7 +560,7 @@ struct LogYourBodyApp: App {
                 )
             }
             UIColor.black.withAlphaComponent(0.85).setFill()
-            UIBezierPath(roundedRect: CGRect(x: 150, y: 90, width: 100, height: 360), cornerRadius: 50).fill()
+            UIBezierPath(roundedRect: CGRect(x: 150, y: 90, width: 100, height: 360), cornerRadius: 48).fill()
         }
         guard let data = image.jpegData(compressionQuality: 0.9) else { return nil }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("lyb-ui-test-home-v2-photo.jpg")

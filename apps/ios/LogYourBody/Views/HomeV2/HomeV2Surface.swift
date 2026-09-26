@@ -27,7 +27,7 @@ struct HomeV2Surface: View {
             VStack(alignment: .leading, spacing: 0) {
                 if PhotoTimelineHUDPolicy.hasUsablePhoto(metric), let photoURL = metric.photoUrl {
                     photoStage(photoURL: photoURL, size: geometry.size)
-                    numberBlock(size: HomeV2Tokens.TypeSize.heroPhoto, kerning: -1.2, topPadding: 14)
+                    numberBlock(size: HomeV2Tokens.TypeSize.heroPhoto, kerning: -1.2, topPadding: 16)
                     HomeV2Filmstrip(bodyMetrics: bodyMetrics, selectedIndex: $selectedIndex)
                 } else {
                     metricFirst
@@ -51,7 +51,7 @@ struct HomeV2Surface: View {
 
     private func numberBlock(size: CGFloat, kerning: CGFloat, topPadding: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .lastTextBaseline, spacing: 6) {
+            HStack(alignment: .lastTextBaseline, spacing: 4) {
                 Text(weightValue)
                     .scaledSystemFont(size: size, weight: .bold, relativeTo: .largeTitle)
                     .kerning(kerning)
@@ -197,14 +197,14 @@ struct HomeV2Filmstrip: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
+                HStack(spacing: HomeV2Tokens.Space.tight) {
                     ForEach(photoIndices, id: \.self) { index in
                         thumb(at: index)
                     }
                 }
                 .padding(.horizontal, HomeV2Tokens.Space.inset)
-                .padding(.top, 14)
-                .padding(.bottom, 8)
+                .padding(.top, HomeV2Tokens.Space.row)
+                .padding(.bottom, HomeV2Tokens.Space.tight)
             }
             .onAppear { proxy.scrollTo(selectedIndex, anchor: .center) }
             .onChange(of: selectedIndex) { _, index in
@@ -213,7 +213,7 @@ struct HomeV2Filmstrip: View {
                 }
             }
         }
-        .frame(height: HomeV2Tokens.thumbSize.height + 22)
+        .frame(height: HomeV2Tokens.thumbSize.height + HomeV2Tokens.Space.row + HomeV2Tokens.Space.tight)
         .accessibilityIdentifier("home_v2_filmstrip")
     }
 
