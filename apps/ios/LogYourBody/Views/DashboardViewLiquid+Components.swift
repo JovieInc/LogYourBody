@@ -822,7 +822,7 @@ struct LaunchTimelineSurface: View {
             CachedAsyncImage(urlString: photoURL) { image in
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
             } placeholder: {
                 stagePlaceholder
             }

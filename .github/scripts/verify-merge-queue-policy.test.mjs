@@ -16,8 +16,10 @@ const validPolicy = {
 
 const validCI = `
 on:
+  pull_request:
+    branches: [main, production]
   merge_group:
-    branches: [main]
+    branches: [main, production]
     types: [checks_requested]
 concurrency:
   cancel-in-progress: \${{ github.event_name != 'merge_group' }}

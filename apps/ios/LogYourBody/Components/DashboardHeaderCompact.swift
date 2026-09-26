@@ -131,7 +131,7 @@ struct DashboardHeaderCompact: View {
                     case .success(let image):
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .scaledToFill()
                     case .failure, .empty:
                         Image(systemName: "person.fill")
                             .font(.system(size: 16, weight: .medium))

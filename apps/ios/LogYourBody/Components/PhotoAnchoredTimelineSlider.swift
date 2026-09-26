@@ -627,7 +627,7 @@ struct PhotoThumbnailTick: View {
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
                     .frame(width: 16, height: 16)
                     .clipShape(Circle())
             } else {

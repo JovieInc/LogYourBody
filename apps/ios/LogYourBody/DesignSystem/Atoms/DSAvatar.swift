@@ -47,7 +47,7 @@ struct DSAvatar: View {
                     case .success(let image):
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .scaledToFill()
                             .frame(width: size, height: size)
                             .clipShape(Circle())
                     case .failure:
