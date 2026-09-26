@@ -94,6 +94,7 @@ struct DashboardViewLiquid: View {
     @State var isHomeV2ViewerPresented = false
     @State var isHomeV2LogSheetPresented = false
     @State var isHomeV2ContextPresented = false
+    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .weight
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
     @State var homeV2LogSheetDate = Date()

@@ -40,11 +40,21 @@ enum HomeV2TrendPolicy {
 /// as a straight-segment line (no smoothing that invents peaks), faint grid,
 /// text range tabs. Geometry is identical with and without enough data.
 struct HomeV2TrendChart: View {
+    enum Axis {
+        /// Start date on the left, "7-day average" on the right (Home).
+        case trend
+        /// Month labels along the plot (Progress).
+        case months
+    }
+
     let daily: [MetricChartDataPoint]
     let trend: [MetricChartDataPoint]
     let accent: Color
     @Binding var range: TimeRange
     var showsRangeTabs = true
+    var showsDots = true
+    var chartHeight: CGFloat = HomeV2Tokens.chartHeight
+    var axis: Axis = .trend
     var now = Date()
 
     private static let startFormatter: DateFormatter = {
@@ -66,12 +76,14 @@ struct HomeV2TrendChart: View {
                     placeholder
                 }
             }
-            .frame(height: HomeV2Tokens.chartHeight)
+            .frame(height: chartHeight)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(hasEnoughData ? "Weight trend, \(HomeV2TrendPolicy.sevenDayAverageLabel)" : HomeV2TrendPolicy.notEnoughData)
             .accessibilityIdentifier("home_v2_trend_chart")
 
-            axisRow
+            if axis == .trend {
+                axisRow
+            }
             if showsRangeTabs {
                 rangeTabs
             }
@@ -80,10 +92,12 @@ struct HomeV2TrendChart: View {
 
     private var chart: some View {
         Chart {
-            ForEach(visibleDaily) { point in
-                PointMark(x: .value("Day", point.date), y: .value("Value", point.value))
-                    .symbolSize(10)
-                    .foregroundStyle(accent.opacity(0.35))
+            if showsDots {
+                ForEach(visibleDaily) { point in
+                    PointMark(x: .value("Day", point.date), y: .value("Value", point.value))
+                        .symbolSize(10)
+                        .foregroundStyle(accent.opacity(0.35))
+                }
             }
 
             ForEach(visibleTrend) { point in
@@ -99,7 +113,14 @@ struct HomeV2TrendChart: View {
                     .foregroundStyle(accent)
             }
         }
-        .chartXAxis(.hidden)
+        .chartXAxis {
+            if axis == .months {
+                AxisMarks(values: .automatic(desiredCount: 3)) {
+                    AxisValueLabel(format: monthAxisFormat)
+                        .foregroundStyle(HomeV2Tokens.Colors.quiet)
+                }
+            }
+        }
         .chartYAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) {
                 AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
@@ -109,6 +130,14 @@ struct HomeV2TrendChart: View {
         .chartPlotStyle { plot in
             plot.padding(.trailing, HomeV2Tokens.Space.compact)
         }
+    }
+
+    /// Days inside one month need the day; longer ranges read by month.
+    private var monthAxisFormat: Date.FormatStyle {
+        if let days = range.days, days <= 31 {
+            return .dateTime.month(.abbreviated).day()
+        }
+        return .dateTime.month(.abbreviated)
     }
 
     private var placeholder: some View {

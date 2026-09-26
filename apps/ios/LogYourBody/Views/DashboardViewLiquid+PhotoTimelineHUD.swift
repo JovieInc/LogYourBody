@@ -123,6 +123,7 @@ extension DashboardViewLiquid {
                     isPhotoTimelineSettingsPresented = true
                 },
                 onOpenEntries: homeV2OpenEntriesAction,
+                statsTitle: HomeV2Policy.isEnabled() ? HomeV2ProgressCopy.title : "Stats",
                 onClose: {
                     isShowingPhotoTimelineMenu = false
                 }
@@ -160,7 +161,11 @@ extension DashboardViewLiquid {
                         id: "photo_timeline_root_page_analytics",
                         label: "Stats page"
                     )
-                    photoTimelineAnalyticsPage
+                    if HomeV2Policy.isEnabled() {
+                        homeV2ProgressView
+                    } else {
+                        photoTimelineAnalyticsPage
+                    }
                 }
             }
         }
@@ -177,7 +182,7 @@ extension DashboardViewLiquid {
         case .timeline, .chat:
             return isHomeV2CheckIn ? HomeV2Copy.title : "Home"
         case .analytics:
-            return "Stats"
+            return HomeV2Policy.isEnabled() ? HomeV2ProgressCopy.title : "Stats"
         }
     }
 
@@ -186,7 +191,7 @@ extension DashboardViewLiquid {
             Button {
                 isShowingPhotoTimelineMenu = true
             } label: {
-                if isHomeV2CheckIn {
+                if isHomeV2Chrome {
                     Image(systemName: "sidebar.left")
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(HomeV2Tokens.Colors.ink)
@@ -492,6 +497,7 @@ private struct PhotoTimelineNavigationMenu: View {
     let onSelect: (DashboardViewLiquid.PhotoTimelineRootPage) -> Void
     let onOpenSettings: () -> Void
     var onOpenEntries: (() -> Void)?
+    var statsTitle = "Stats"
     let onClose: () -> Void
 
     var body: some View {
@@ -529,7 +535,7 @@ private struct PhotoTimelineNavigationMenu: View {
                         page: .timeline
                     )
                     menuRow(
-                        title: "Stats",
+                        title: statsTitle,
                         systemImage: "chart.line.uptrend.xyaxis",
                         page: .analytics
                     )
