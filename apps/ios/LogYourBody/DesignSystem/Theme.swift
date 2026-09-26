@@ -688,3 +688,24 @@ extension Font {
         weight: JovieTokens.displayTypeWeight
     )
 }
+
+/// System font at the approved point size by default, scaled with the user's Dynamic Type setting.
+private struct ScaledSystemFont: ViewModifier {
+    @ScaledMetric private var size: CGFloat
+    private let weight: Font.Weight
+
+    init(size: CGFloat, weight: Font.Weight, relativeTo textStyle: Font.TextStyle) {
+        _size = ScaledMetric(wrappedValue: size, relativeTo: textStyle)
+        self.weight = weight
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size, weight: weight))
+    }
+}
+
+extension View {
+    func scaledSystemFont(size: CGFloat, weight: Font.Weight = .regular, relativeTo textStyle: Font.TextStyle) -> some View {
+        modifier(ScaledSystemFont(size: size, weight: weight, relativeTo: textStyle))
+    }
+}

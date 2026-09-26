@@ -175,7 +175,7 @@ extension DashboardViewLiquid {
 
             VStack(spacing: 2) {
                 Text(photoTimelineToolbarTitle)
-                    .font(.system(size: 16, weight: .semibold))
+                    .scaledSystemFont(size: 16, weight: .semibold, relativeTo: .headline)
                     .foregroundStyle(theme.colors.text)
                     .lineLimit(1)
             }
@@ -367,7 +367,7 @@ extension DashboardViewLiquid {
                         .foregroundColor(theme.colors.text)
 
                     Text("Add a progress photo or weight entry to build your body-composition timeline.")
-                        .font(.system(size: 15, weight: .medium))
+                        .scaledSystemFont(size: 15, weight: .medium, relativeTo: .subheadline)
                         .foregroundColor(theme.colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
