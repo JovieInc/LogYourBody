@@ -10,9 +10,9 @@ extension DashboardViewLiquid {
         HomeV2Policy.isEnabled() && selectedPhotoTimelineRootPage == .timeline && !isHomeChatExpanded
     }
 
-    /// The plain v2 chrome (sidebar glyph, titles) on every v2 root page.
+    /// The plain v2 chrome (sidebar glyph, titles) on every v2 root page, Ask included.
     var isHomeV2Chrome: Bool {
-        HomeV2Policy.isEnabled() && !isHomeChatExpanded
+        HomeV2Policy.isEnabled()
     }
 
     var homeV2DisplayUnit: String {
