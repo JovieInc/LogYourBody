@@ -734,6 +734,7 @@ struct LaunchTimelineSurface: View {
     let onTapBodyFat: () -> Void
     let onTapFFMI: () -> Void
     let onShare: (() -> Void)?
+    var onAddPhoto: (() -> Void)?
 
     private let metricTitles = TimelinePhotoScrubLock.visibleMetricTitles
 
@@ -889,21 +890,39 @@ struct LaunchTimelineSurface: View {
                 endPoint: .bottomTrailing
             )
 
-            VStack(spacing: 8) {
-                Image(systemName: "camera.metering.center.weighted")
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(theme.colors.textSecondary)
-
-                Text("No progress photo")
-                    .scaledSystemFont(size: 13, weight: .semibold, relativeTo: .footnote)
-                    .foregroundStyle(theme.colors.text)
-
-                Text("Add one to this day")
-                    .scaledSystemFont(size: 11, weight: .medium, relativeTo: .caption2)
-                    .foregroundStyle(theme.colors.textSecondary)
+            // The copy invites adding a photo, so the placeholder opens the attach sheet for this day.
+            if let onAddPhoto {
+                Button(action: onAddPhoto) {
+                    stagePlaceholderLabel
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add progress photo for \(dateText)")
+                .accessibilityHint("Opens the photo picker for this day")
+                .accessibilityIdentifier("launch_timeline_add_photo")
+                .padding(.bottom, 72)
+            } else {
+                stagePlaceholderLabel
+                    .padding(.bottom, 72)
             }
-            .padding(.bottom, 72)
         }
+    }
+
+    private var stagePlaceholderLabel: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "camera.metering.center.weighted")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(theme.colors.textSecondary)
+
+            Text("No progress photo")
+                .scaledSystemFont(size: 13, weight: .semibold, relativeTo: .footnote)
+                .foregroundStyle(theme.colors.text)
+
+            Text("Add one to this day")
+                .scaledSystemFont(size: 11, weight: .medium, relativeTo: .caption2)
+                .foregroundStyle(theme.colors.textSecondary)
+        }
+        .frame(minWidth: JovieTokens.minimumHitTarget, minHeight: JovieTokens.minimumHitTarget)
+        .contentShape(Rectangle())
     }
 
     // Equal-height row: the tallest cell (a wrapped caption) sets the height for all three.
