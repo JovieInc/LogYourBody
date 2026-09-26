@@ -55,7 +55,7 @@ describe('LaunchLanding', () => {
     expect(screen.getAllByRole('textbox')).toHaveLength(1);
     expect(screen.getByRole('link', { name: waitlistLandingCopy.submitLabel })).toHaveAttribute(
       'href',
-      '#hero-action',
+      '#early-access',
     );
     expect(screen.queryByRole('link', { name: launchLandingCopy.appStoreCta })).toBeNull();
   });

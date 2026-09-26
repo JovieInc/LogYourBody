@@ -25,7 +25,7 @@ function BrandMark() {
   );
 }
 
-const HERO_ACTION_ID = 'hero-action';
+const HERO_ACTION_ID = 'early-access';
 
 /**
  * One form on the page. The pricing section links back to it so the email
@@ -57,7 +57,7 @@ function PrimaryAction({ id }: { id: string }) {
 
 export function LaunchLanding() {
   return (
-    <div className={`${styles.page} min-h-screen overflow-x-hidden`}>
+    <div className={`${styles.page} lyb-landing min-h-screen overflow-x-hidden`}>
       <a
         href="#main-content"
         className="sr-only z-50 rounded-full bg-white px-4 py-2 text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
