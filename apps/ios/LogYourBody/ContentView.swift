@@ -281,16 +281,30 @@ struct ContentView: View {
     private var authenticatedContent: some View {
         Group {
             if shouldShowOnboarding {
-                BodyScoreOnboardingFlowView()
-                    .onAppear {
-                        AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                    }
+                if HomeV2Policy.isOnboardingV2Enabled() {
+                    HomeV2FirstRunView()
+                        .environmentObject(authManager)
+                        .onAppear {
+                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
+                        }
+                } else {
+                    BodyScoreOnboardingFlowView()
+                        .onAppear {
+                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
+                        }
+                }
             } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
             } else if !subscriptionManager.isSubscribed {
-                PaywallView()
-                    .environmentObject(authManager)
-                    .environmentObject(subscriptionManager)
+                if HomeV2Policy.isOnboardingV2Enabled() {
+                    HomeV2PaywallView()
+                        .environmentObject(authManager)
+                        .environmentObject(subscriptionManager)
+                } else {
+                    PaywallView()
+                        .environmentObject(authManager)
+                        .environmentObject(subscriptionManager)
+                }
             } else if shouldShowDailyReminderPrompt {
                 DailyWeighInReminderPromptView(notificationManager: notificationManager)
             } else {
@@ -304,7 +318,12 @@ struct ContentView: View {
 
     private var loginContent: some View {
         NavigationStack {
-            LoginView()
+            if HomeV2Policy.isOnboardingV2Enabled() {
+                HomeV2SignInView()
+                    .environmentObject(authManager)
+            } else {
+                LoginView()
+            }
         }
     }
 

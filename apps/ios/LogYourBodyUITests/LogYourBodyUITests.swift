@@ -1554,6 +1554,40 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8), "Back returns to Today")
     }
 
+    func testOnboardingV2SignInFirstRunAndPaywallReadAsTheDesign() throws {
+        let app = XCUIApplication()
+
+        launch(app, with: ["-lybUITestSignedOutFixture", "-lybUITestOnboardingV2Fixture"])
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_sign_in"].waitForExistence(timeout: 30), "Sign in is the promise")
+        XCTAssertTrue(app.buttons["home_v2_sign_in_apple"].exists, "One Apple action")
+        attachScreenshot(named: "onboarding-v2-sign-in", from: app)
+
+        launch(app, with: ["-lybUITestBodyScoreOnboardingFixture", "-lybUITestOnboardingV2Fixture"])
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_first_run_health"].waitForExistence(timeout: 30),
+            "First run starts with Apple Health"
+        )
+        XCTAssertTrue(app.buttons["home_v2_first_run_connect"].exists)
+        attachScreenshot(named: "onboarding-v2-health", from: app)
+        app.buttons["home_v2_first_run_not_now"].tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_first_run_target"].waitForExistence(timeout: 8),
+            "Not now moves on to the optional target"
+        )
+        XCTAssertTrue(app.buttons["home_v2_first_run_save_target"].exists)
+        XCTAssertTrue(app.buttons["home_v2_first_run_skip"].exists, "Skip stays quiet but visible")
+        attachScreenshot(named: "onboarding-v2-target", from: app)
+
+        launch(app, with: ["-lybUITestPaywallFixture", "-lybUITestOnboardingV2Fixture"])
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_paywall"].waitForExistence(timeout: 30),
+            "The paywall keeps the timeline"
+        )
+        XCTAssertTrue(app.buttons["home_v2_paywall_restore"].exists, "Restore stays visible")
+        XCTAssertTrue(app.buttons["home_v2_paywall_log_out"].exists, "A way out stays visible")
+        attachScreenshot(named: "onboarding-v2-paywall", from: app)
+    }
+
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])

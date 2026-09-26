@@ -14,6 +14,10 @@ enum HomeV2Policy {
     static let photoFixtureArgument = "-lybUITestHomeV2PhotoFixture"
     /// Signed in, nothing logged yet: the H0 day-zero state.
     static let emptyFixtureArgument = "-lybUITestHomeV2EmptyFixture"
+    /// The first run (Pencil O1–O4) has its own gate so sign-in and the
+    /// paywall can roll out apart from Home.
+    static let onboardingGateKey = "onboarding_v2_focus"
+    static let onboardingFixtureArgument = "-lybUITestOnboardingV2Fixture"
 
     /// `isGateEnabled` defaults to the Statsig-backed analytics port; tests inject
     /// their own so the policy stays deterministic.
@@ -30,6 +34,18 @@ enum HomeV2Policy {
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
         return checkGate(gateKey)
+    }
+
+    @MainActor
+    static func isOnboardingV2Enabled(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        isGateEnabled: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        if arguments.contains(onboardingFixtureArgument) { return true }
+        #endif
+        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return checkGate(onboardingGateKey)
     }
 }
 
