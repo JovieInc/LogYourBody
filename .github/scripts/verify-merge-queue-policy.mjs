@@ -20,7 +20,7 @@ const requiredFragments = {
     /run\.conclusion !== 'success'/,
     /recordOutcome/,
     /pull\.head\.sha !== run\.head_sha/,
-    /machine-certified/,
+    /pull\.draft/,
     /enqueuePullRequest/,
     /expectedHeadOid:\s*pull\.head\.sha/,
   ],
@@ -40,9 +40,10 @@ export function verifyPolicy({ policy, ciWorkflow, enrollmentWorkflow }) {
   assert(policy.required_status_check === 'CI Summary', 'required status must be CI Summary');
   assert(policy.merge_queue?.required === true, 'native merge queue must be required');
   assert(policy.merge_queue?.merge_method === 'MERGE', 'queue merge method must be MERGE');
+  // PRs land on normal checks alone; certification happens post-merge (canary/dogfood), never as a PR gate.
   assert(
-    policy.auto_enrollment?.certification_label === 'machine-certified',
-    'auto-enrollment must require the machine-certified label',
+    policy.auto_enrollment?.certification_label === undefined,
+    'auto-enrollment must not require a certification label',
   );
   assert(policy.auto_enrollment?.exact_head_required === true, 'exact-head proof is required');
   assert(policy.auto_enrollment?.same_repository_only === true, 'fork auto-enrollment is forbidden');
@@ -57,6 +58,7 @@ export function verifyPolicy({ policy, ciWorkflow, enrollmentWorkflow }) {
     );
   }
 
+  assert(!/labels\.some|\.labels\b/.test(enrollmentWorkflow), 'auto-enrollment must not gate on PR labels');
   assert(!/actions\/checkout@/.test(enrollmentWorkflow), 'privileged enrollment must not checkout code');
   assert(!/secrets\./.test(enrollmentWorkflow), 'auto-enrollment must not receive repository secrets');
   return true;
