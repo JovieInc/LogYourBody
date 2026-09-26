@@ -124,6 +124,10 @@ export const endpoints = {
       reason: 'SPM dependency repository.',
     },
     {
+      value: 'https://github.com/getsentry/sentry-cli/releases/download/',
+      reason: 'Pinned sentry-cli binary for release dSYM upload in CI.',
+    },
+    {
       value: 'https://github.com/statsig-io/statsig-kit',
       reason: 'SPM dependency repository.',
     },
