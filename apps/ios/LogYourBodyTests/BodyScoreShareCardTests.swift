@@ -47,6 +47,69 @@ final class BodyScoreShareCardTests: XCTestCase {
         )
     }
 
+    /// JOV-6089: only predominantly vertical drags may drive dismissal. A
+    /// diagonal drag whose vertical component passes the threshold must never
+    /// dismiss, and the format-control (horizontal) axis keeps its gesture.
+    func testDismissDragRequiresVerticalAxisDominance() {
+        // Predominantly vertical drags stay eligible for dismissal.
+        XCTAssertTrue(
+            BodyScoreShareSheet.isVerticalGesture(
+                translationWidth: 0,
+                translationHeight: 160
+            )
+        )
+        XCTAssertTrue(
+            BodyScoreShareSheet.isVerticalGesture(
+                translationWidth: 24,
+                translationHeight: 180
+            )
+        )
+        // Equal components still count as vertical; dismissal then also
+        // requires the downward-threshold policy to pass.
+        XCTAssertTrue(
+            BodyScoreShareSheet.isVerticalGesture(
+                translationWidth: 120,
+                translationHeight: 120
+            )
+        )
+        // Horizontal format-control swipes never dismiss.
+        XCTAssertFalse(
+            BodyScoreShareSheet.isVerticalGesture(
+                translationWidth: 160,
+                translationHeight: 8
+            )
+        )
+        // A diagonal drag with the same vertical travel as a dismissing
+        // vertical drag must NOT qualify once the horizontal component wins.
+        XCTAssertFalse(
+            BodyScoreShareSheet.isVerticalGesture(
+                translationWidth: 220,
+                translationHeight: 180
+            )
+        )
+        // Axis dominance is direction-aware: an upward vertical drag is a
+        // gesture-owned scroll-back, not a dismissal.
+        XCTAssertFalse(
+            BodyScoreShareSheet.shouldDismiss(
+                afterDragTranslation: -180,
+                predictedEndTranslation: 160
+            )
+        )
+        // And a diagonal drag that would pass the threshold vertically is
+        // rejected once the gesture is not vertical-dominant.
+        let diagonalIsVertical = BodyScoreShareSheet.isVerticalGesture(
+            translationWidth: 220,
+            translationHeight: 180
+        )
+        XCTAssertFalse(
+            diagonalIsVertical
+                && BodyScoreShareSheet.shouldDismiss(
+                    afterDragTranslation: 180,
+                    predictedEndTranslation: 260
+                )
+        )
+    }
+
     func testPhotoShareAspectTracksNativeImageShape() {
         XCTAssertEqual(
             BodyScoreShareAspect.preferredExportAspect(
