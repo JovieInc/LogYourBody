@@ -1,0 +1,108 @@
+.page {
+  --lyb-canvas: #030406;
+  --lyb-shell: #07080a;
+  --lyb-card: #131417;
+  --lyb-floating: #232427;
+  --lyb-ink: #f5f7fb;
+  --lyb-secondary: #a0a5af;
+  --lyb-muted: #8f95a0;
+  --lyb-quiet: #7d8593;
+  --lyb-border: rgba(168, 176, 195, 0.1);
+  --lyb-border-strong: rgba(168, 176, 195, 0.2);
+  --lyb-ion: #11afff;
+  --lyb-cta-fill: #f8fafd;
+  --lyb-cta-ink: #030407;
+  background: var(--lyb-canvas);
+  color: var(--lyb-ink);
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.display {
+  font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+}
+
+.heading {
+  font-family: var(--font-satoshi), var(--font-inter), system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.secondary {
+  color: var(--lyb-secondary);
+}
+
+.muted {
+  color: var(--lyb-muted);
+}
+
+.quiet {
+  color: var(--lyb-quiet);
+}
+
+.hairline {
+  border-color: var(--lyb-border);
+}
+
+.hairlineStrong {
+  border-color: var(--lyb-border-strong);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 28px;
+  border-radius: 999px;
+  background: var(--lyb-cta-fill);
+  color: var(--lyb-cta-ink);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 150ms ease;
+}
+
+.pill:hover {
+  background: #ffffff;
+}
+
+.pill:focus-visible {
+  outline: 2px solid var(--lyb-ion);
+  outline-offset: 3px;
+}
+
+.phone {
+  overflow: hidden;
+  border-radius: 46px;
+  background: #000;
+  box-shadow:
+    0 0 0 1px var(--lyb-border-strong),
+    0 40px 120px rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise 600ms ease-out both;
+  }
+
+  .riseLate {
+    animation: rise 700ms ease-out 120ms both;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
