@@ -23,6 +23,7 @@ struct HomeV2Surface: View {
     let onOpenPhoto: () -> Void
     let onViewProgress: () -> Void
     let onTodayDetails: () -> Void
+    let onAllPhotos: () -> Void
     let onLogWeight: () -> Void
     let onDone: () -> Void
     let onUndo: () -> Void
@@ -32,7 +33,8 @@ struct HomeV2Surface: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 0) {
-                if PhotoTimelineHUDPolicy.hasUsablePhoto(metric), let photoURL = metric.photoUrl {
+                let hasPhoto = PhotoTimelineHUDPolicy.hasUsablePhoto(metric)
+                if hasPhoto, let photoURL = metric.photoUrl {
                     photoStage(photoURL: photoURL, size: geometry.size)
                     photoNumberBlock
                 } else {
@@ -40,6 +42,15 @@ struct HomeV2Surface: View {
                 }
 
                 Spacer(minLength: 0)
+
+                if hasPhoto {
+                    HomeV2DisclosureLink(
+                        title: HomeV2PhotoCopy.allPhotos,
+                        identifier: "home_v2_all_photos_row",
+                        action: onAllPhotos
+                    )
+                    .frame(maxWidth: .infinity)
+                }
 
                 HomeV2Dock(
                     title: isLogged ? HomeV2Copy.done : HomeV2Copy.logWeight,
