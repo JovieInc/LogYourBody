@@ -9,7 +9,6 @@ const validPolicy = {
   required_status_check: 'CI Summary',
   merge_queue: { required: true, merge_method: 'MERGE' },
   auto_enrollment: {
-    certification_label: 'machine-certified',
     exact_head_required: true,
     same_repository_only: true,
   },
@@ -39,8 +38,8 @@ permissions:
 script: |
   const recordOutcome = () => {};
   if (run.conclusion !== 'success') return;
+  if (pull.draft) return;
   if (pull.head.sha !== run.head_sha) return;
-  const label = 'machine-certified';
   enqueuePullRequest(input: { expectedHeadOid: pull.head.sha })
 `;
 
@@ -92,6 +91,31 @@ test('deliberate red: enrollment without exact-head proof is rejected', () => {
       enrollmentWorkflow: validEnrollment.replace('pull.head.sha !== run.head_sha', 'false'),
     }),
     /auto-enrollment workflow is missing required contract/,
+  );
+});
+
+test('deliberate red: a label gate on enrollment is rejected', () => {
+  assert.throws(
+    () => verifyPolicy({
+      policy: validPolicy,
+      ciWorkflow: validCI,
+      enrollmentWorkflow: `${validEnrollment}\n  if (!pull.labels.some(({ name }) => name === 'machine-certified')) return;`,
+    }),
+    /must not gate on PR labels/,
+  );
+});
+
+test('deliberate red: a policy requiring a certification label is rejected', () => {
+  assert.throws(
+    () => verifyPolicy({
+      policy: {
+        ...validPolicy,
+        auto_enrollment: { ...validPolicy.auto_enrollment, certification_label: 'machine-certified' },
+      },
+      ciWorkflow: validCI,
+      enrollmentWorkflow: validEnrollment,
+    }),
+    /must not require a certification label/,
   );
 });
 

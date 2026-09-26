@@ -368,6 +368,29 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "timeline-add-photo-for-day", from: app)
     }
 
+    // Regression: starter prompts and the composer used fixed point sizes, ignoring Dynamic Type.
+    func testHomeChatPromptsScaleWithAccessibilityDynamicType() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 45))
+        try waitForHomeChatComposer(in: app)
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        // Fixed-size text leaves the chip at exactly its 38pt minimum; scaled text must visibly exceed it.
+        XCTAssertGreaterThan(
+            prompt.frame.height,
+            38 + 4,
+            "Starter prompt text must grow with Dynamic Type beyond its 38pt default chip height"
+        )
+    }
+
     func testHomePinsChatComposerWithoutTabBar() throws {
         let app = XCUIApplication()
         launch(app, with: [

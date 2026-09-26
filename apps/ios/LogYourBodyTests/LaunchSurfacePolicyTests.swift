@@ -42,6 +42,14 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 textHeight: ChatComposerGeometry.multilineTextHeightThreshold + 1
             )
         )
+        // A Dynamic Type-scaled threshold keeps one line of large text in the single-line layout.
+        let scaledThreshold = ChatComposerGeometry.multilineTextHeightThreshold * 2
+        XCTAssertFalse(
+            ChatComposerGeometry.isMultiline(
+                textHeight: ChatComposerGeometry.multilineTextHeightThreshold + 1,
+                threshold: scaledThreshold
+            )
+        )
         XCTAssertEqual(
             ChatComposerGeometry.cornerRadius(isMultiline: false),
             JovieTokens.controlHeight

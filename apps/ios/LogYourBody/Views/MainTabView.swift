@@ -712,6 +712,11 @@ struct ChatTabView: View {
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // Approved sizes at the default text setting; they scale only with the user's Dynamic Type choice.
+    @ScaledMetric(relativeTo: .footnote) private var starterPromptFontSize: CGFloat = 13
+    @ScaledMetric(relativeTo: .body) private var composerFontSize: CGFloat = 16
+    @ScaledMetric(relativeTo: .body) private var composerMultilineThreshold: CGFloat =
+        ChatComposerGeometry.multilineTextHeightThreshold
     @State private var draft = ""
     @State private var composerTextHeight: CGFloat = 0
     @State private var isResponding = false
@@ -937,7 +942,7 @@ struct ChatTabView: View {
         Button(text) {
             send(text)
         }
-        .font(.system(size: 13, weight: .medium))
+        .font(.system(size: starterPromptFontSize, weight: .medium))
         .foregroundStyle(theme.colors.text)
         .padding(.horizontal, 12)
         .frame(minHeight: 38)
@@ -950,14 +955,17 @@ struct ChatTabView: View {
     }
 
     private var composer: some View {
-        let isMultiline = ChatComposerGeometry.isMultiline(textHeight: composerTextHeight)
+        let isMultiline = ChatComposerGeometry.isMultiline(
+            textHeight: composerTextHeight,
+            threshold: composerMultilineThreshold
+        )
         let cornerRadius = ChatComposerGeometry.cornerRadius(isMultiline: isMultiline)
 
         return HStack(alignment: isMultiline ? .bottom : .center, spacing: JovieTokens.itemGap) {
             TextField("Message LogYourBody", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($isComposerFocused)
-                .font(.system(size: 16))
+                .font(.system(size: composerFontSize))
                 .foregroundStyle(theme.colors.text)
                 .tint(theme.colors.primary)
                 .submitLabel(.send)

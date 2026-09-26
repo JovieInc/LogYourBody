@@ -112,6 +112,10 @@ export const logYourBody = {
       { value: 'https://testflight.apple.com', reason: 'TestFlight public links.' },
       { value: 'https://github.com/RevenueCat/purchases-ios', reason: 'SPM dependency repository.' },
       { value: 'https://github.com/getsentry/sentry-cocoa', reason: 'SPM dependency repository.' },
+      {
+        value: 'https://github.com/getsentry/sentry-cli/releases/download/',
+        reason: 'Pinned sentry-cli binary for release dSYM upload in CI.',
+      },
       { value: 'https://github.com/statsig-io/statsig-kit', reason: 'SPM dependency repository.' },
       { value: 'https://github.com/realm/SwiftLint', reason: 'SwiftLint build-tool repository.' },
       {
