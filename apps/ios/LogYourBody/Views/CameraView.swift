@@ -4,6 +4,7 @@
 //
 import SwiftUI
 import UIKit
+import PhotosUI
 
 struct CameraView: View {
     let onImageCaptured: (UIImage) -> Void
@@ -12,6 +13,8 @@ struct CameraView: View {
     @State private var selectedPose = "Front"
     @State private var showsSettings = false
     @State private var showsSystemCamera = false
+    @State private var showsLibrary = false
+    @State private var libraryItem: PhotosPickerItem?
     @State private var reviewImage: UIImage?
     @State private var timerSeconds = 0
 
@@ -41,6 +44,15 @@ struct CameraView: View {
                 reviewImage = image
             }
             .ignoresSafeArea()
+        }
+        .photosPicker(isPresented: $showsLibrary, selection: $libraryItem, matching: .images)
+        .onChange(of: libraryItem) { _, item in
+            guard let item else { return }
+            Task {
+                guard let data = try? await item.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data) else { return }
+                await MainActor.run { reviewImage = image }
+            }
         }
         .onAppear {
             #if DEBUG
@@ -82,10 +94,11 @@ struct CameraView: View {
     private var captureBar: some View {
         VStack(spacing: 14) {
             HStack {
-                Text("Library")
+                Button("Library") { showsLibrary = true }
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.78))
                     .frame(width: 76)
+                    .accessibilityLabel("Choose from Library")
                     .accessibilityIdentifier("progress_photo_camera_library")
                 Button { showsSystemCamera = true } label: {
                     Circle()

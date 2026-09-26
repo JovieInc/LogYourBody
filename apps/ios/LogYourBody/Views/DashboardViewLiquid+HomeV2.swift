@@ -103,7 +103,7 @@ extension DashboardViewLiquid {
                 isHomeV2LogSheetPresented = false
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(450))
-                    presentProgressPhotoAttach(for: homeV2TodayMetric)
+                    presentProgressPhotoAttach(for: homeV2TodayMetric, startsInCamera: true)
                 }
             }
         )

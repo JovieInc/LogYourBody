@@ -368,6 +368,30 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "timeline-add-photo-for-day", from: app)
     }
 
+    func testProgressPhotoFixtureShowsReviewState() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestProgressPhotoAttachFixture",
+            "-lybUITestProgressPhotoReviewFixture"
+        ])
+
+        let addPhoto = app.buttons["launch_timeline_add_photo"]
+        XCTAssertTrue(addPhoto.waitForExistence(timeout: 10))
+        addPhoto.tap()
+
+        let fixtureButton = app.buttons["progress_photo_attach_fixture_button"]
+        XCTAssertTrue(fixtureButton.waitForExistence(timeout: 8))
+        fixtureButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Review photo"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Front · '")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Not saved · Pose matched to '")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["progress_photo_review_retake"].exists)
+        XCTAssertTrue(app.buttons["progress_photo_review_save"].exists)
+        attachScreenshot(named: "progress-photo-review", from: app)
+    }
+
     // Regression: starter prompts and the composer used fixed point sizes, ignoring Dynamic Type.
     func testHomeChatPromptsScaleWithAccessibilityDynamicType() throws {
         let app = XCUIApplication()
