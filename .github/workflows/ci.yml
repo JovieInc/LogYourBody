@@ -151,6 +151,26 @@ jobs:
             echo "No unit-tier result bundle found to report on." | tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Onboarding golden-path UI test
+        run: |
+          cd apps/ios
+          DESTINATION=$(SCHEME=LogYourBodyTiers bash ../../scripts/ios/resolve-simulator-destination.sh)
+          bundle exec fastlane test_ui \
+            scheme:LogYourBodyTiers \
+            testplan:UITests \
+            destination:"$DESTINATION" \
+            only_testing:LogYourBodyUITests/OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal \
+            output_directory:./test_results/ui-tier
+
+      - name: Upload onboarding UI test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-onboarding-ui-tests-${{ github.run_id }}
+          path: apps/ios/test_results/ui-tier
+          if-no-files-found: warn
+          retention-days: 14
+
   ios_quality:
     name: iOS Launch Quality Gate
     runs-on: macos-15
