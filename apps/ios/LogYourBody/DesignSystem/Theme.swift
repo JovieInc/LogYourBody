@@ -36,8 +36,9 @@ enum JoviePalette {
 enum ChatComposerGeometry {
     static let multilineTextHeightThreshold = JovieTokens.sectionGap
 
-    static func isMultiline(textHeight: CGFloat) -> Bool {
-        textHeight > multilineTextHeightThreshold
+    // Pass a Dynamic Type-scaled threshold so one line of large text isn't treated as multiline.
+    static func isMultiline(textHeight: CGFloat, threshold: CGFloat = multilineTextHeightThreshold) -> Bool {
+        textHeight > threshold
     }
 
     static func cornerRadius(isMultiline: Bool) -> CGFloat {
