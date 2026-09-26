@@ -1333,6 +1333,19 @@ final class LogYourBodyUITests: XCTestCase {
         )
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_weight_value"].waitForExistence(timeout: 5))
 
+        let chart = app.descendants(matching: .any)["home_v2_trend_chart"]
+        XCTAssertTrue(chart.waitForExistence(timeout: 5), "Metric-first Home keeps the trend chart geometry even before 7 days")
+        let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        XCTAssertGreaterThanOrEqual(chart.frame.minY, value.frame.maxY - 1, "The chart sits below the number")
+        XCTAssertTrue(
+            chart.label.contains("7 days") || chart.label.contains("7-day average"),
+            "The chart says whether it is a trend or still waiting for 7 days"
+        )
+        let threeMonths = app.buttons["home_v2_range_3M"]
+        XCTAssertTrue(threeMonths.waitForExistence(timeout: 5))
+        threeMonths.tap()
+        XCTAssertTrue(threeMonths.isSelected, "Tapping a range tab selects it")
+
         let addPhoto = app.buttons["home_v2_add_photo_row"]
         XCTAssertTrue(addPhoto.waitForExistence(timeout: 5))
         attachScreenshot(named: "home-v2-metric-first", from: app)

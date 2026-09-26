@@ -30,8 +30,19 @@ extension DashboardViewLiquid {
                 selectedMetricType = .ffmi
                 isMetricDetailActive = true
             },
-            onOpenPhoto: { isHomeV2ViewerPresented = true }
+            onOpenPhoto: { isHomeV2ViewerPresented = true },
+            chartDaily: fullChartCache[.weight] ?? [],
+            chartTrend: fullTrendChartCache[.weight] ?? [],
+            selectedRange: $selectedRange
         )
+        // The whole-history chart series are built off the main actor by
+        // prewarmMetricCaches; never regenerate them inside body. The caches
+        // reset to [:] whenever metrics change, so this re-warms on demand.
+        .task(id: bodyMetrics.count) {
+            if fullChartCache[.weight] == nil {
+                await prewarmMetricCaches()
+            }
+        }
     }
 
     /// Presented from `photoTimelineRoot`, the same level as the menu cover, so
