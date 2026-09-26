@@ -24,22 +24,26 @@ func fetchTodayStepCount() async throws -> Int {
                 quantitySamplePredicate: predicate,
                 options: .cumulativeSum
             ) { _, statistics, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
+                let stepCount: Int
+                if let error {
+                    guard let noData = HealthKitStepCountPolicy.stepCount(forNoData: error) else {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+                    stepCount = noData
+                } else {
+                    stepCount = Int(statistics?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0)
                 }
-
-                let stepCount = statistics?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
 
                 Task {
                     await MainActor.run {
-                        self.todayStepCount = Int(stepCount)
-                        self.latestStepCount = Int(stepCount)
+                        self.todayStepCount = stepCount
+                        self.latestStepCount = stepCount
                         self.latestStepCountDate = now
                     }
                 }
 
-                continuation.resume(returning: Int(stepCount))
+                continuation.resume(returning: stepCount)
             }
 
             healthStore.execute(query)
@@ -628,5 +632,18 @@ func scheduleObservedBodyMetricSync() {
                 }
             }
         }
+    }
+}
+
+/// HealthKit answers a cumulative-sum query with `HKError.errorNoData` when
+/// nothing has been recorded for the predicate yet. For today's steps that is
+/// zero, not a failure, so it must not reach Sentry as a non-fatal error.
+enum HealthKitStepCountPolicy {
+    static func stepCount(forNoData error: Error) -> Int? {
+        let nsError = error as NSError
+        guard nsError.domain == HKErrorDomain, nsError.code == HKError.Code.errorNoData.rawValue else {
+            return nil
+        }
+        return 0
     }
 }
