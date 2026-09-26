@@ -64,8 +64,8 @@ The canonical product and brand standards are:
 - Do not build a web app before the product has at least 1,000 activated iOS users, or 250 paying subscribers plus repeated web-access requests. Web work before then is limited to marketing, legal, support, and billing/account surfaces that unblock iOS.
 - Do not build an Apple Watch app unless users explicitly ask for it. Initial Watch scope is read-only basic stats and trend direction.
 - Do not build iPad-specific layouts unless there is clear user pull, a measurable kiosk experiment, or enough active iPad usage to justify it. Target future landscape layout: photo left, stats right, timeline along the bottom.
-- AI starts as short deterministic insight, not chat: classify cutting, maintenance, or gaining from trends and warn when a phase has likely gone too long. Jovie-style chat comes later only after the timeline is retained and users ask for recommendations.
-- Do not build a food logger or workout tracker. This app is a body-composition heads-up display for people who already have those systems.
+- The product includes an evidence-grounded hypertrophy coach. A deterministic programming engine owns all training prescriptions; the conversation model may explain only engine-returned output and cite the opaque evidence IDs supplied with it. It must not create, calculate, or adjust numeric prescriptions.
+- Do not build a food logger or a general-purpose workout tracker. Hypertrophy programming is in scope as an engine-led product capability alongside the body-composition heads-up display.
 
 ---
 
