@@ -193,7 +193,7 @@ extension DashboardViewLiquid {
 
     private var photoTimelineToolbarTitle: String {
         if isHomeChatExpanded {
-            return "Chat"
+            return HomeV2Policy.isEnabled() ? HomeV2AskCopy.title : "Chat"
         }
 
         switch selectedPhotoTimelineRootPage {
@@ -255,12 +255,20 @@ extension DashboardViewLiquid {
                 Button {
                     isHomeChatExpanded = false
                 } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(theme.colors.text)
-                        .frame(width: 32, height: 32)
-                        .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
-                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    if isHomeV2Chrome {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(HomeV2Tokens.Colors.ink)
+                            .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                            .contentShape(Rectangle())
+                    } else {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(theme.colors.text)
+                            .frame(width: 32, height: 32)
+                            .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
+                            .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close chat")

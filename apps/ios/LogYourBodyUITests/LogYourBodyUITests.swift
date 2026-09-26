@@ -1554,6 +1554,29 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8), "Back returns to Today")
     }
 
+    func testHomeV2AskOpensFromTheSidebarWithTheQuietComposer() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+
+        // Home's dock appears once the fixture has seeded; tapping the menu earlier can be lost to the re-route.
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 8), "The sidebar lists Ask")
+        ask.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8), "Ask opens the chat surface")
+        XCTAssertTrue(app.staticTexts["Ask"].waitForExistence(timeout: 5), "The root header owns the title")
+        XCTAssertFalse(app.staticTexts["Private body chat"].exists, "No second header inside the surface")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["chat_composer"].waitForExistence(timeout: 5),
+            "The quiet composer is there"
+        )
+        attachScreenshot(named: "home-v2-ask", from: app)
+    }
+
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
