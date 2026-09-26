@@ -205,7 +205,7 @@ struct CameraView: View {
     private var matchedDateText: String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
-        return formatter.string(from: Date().addingTimeInterval(-86400))
+        return formatter.string(from: Date().addingTimeInterval(-86_400))
     }
 
     private var ghostPhoto: some View {
@@ -235,7 +235,12 @@ private struct PoseGuide: View {
             Path { path in
                 let width = proxy.size.width * 0.46
                 let height = proxy.size.height * 0.78
-                let rect = CGRect(x: (proxy.size.width - width) / 2, y: (proxy.size.height - height) / 2, width: width, height: height)
+                let rect = CGRect(
+                    x: (proxy.size.width - width) / 2,
+                    y: (proxy.size.height - height) / 2,
+                    width: width,
+                    height: height
+                )
                 path.addRoundedRect(in: rect, cornerSize: CGSize(width: width / 2, height: width / 2))
             }
             .stroke(.white.opacity(0.62), style: StrokeStyle(lineWidth: 2, dash: [7, 6]))

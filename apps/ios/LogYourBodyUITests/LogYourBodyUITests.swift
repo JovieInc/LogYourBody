@@ -386,7 +386,10 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Review photo"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Front · '")).firstMatch.exists)
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Not saved · Pose matched to '")).firstMatch.exists)
+        let metadata = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Not saved · Pose matched to '")
+        ).firstMatch
+        XCTAssertTrue(metadata.exists)
         XCTAssertTrue(app.buttons["progress_photo_review_retake"].exists)
         XCTAssertTrue(app.buttons["progress_photo_review_save"].exists)
         attachScreenshot(named: "progress-photo-review", from: app)
