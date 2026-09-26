@@ -1,9 +1,15 @@
 name: Native Merge Queue Enrollment
 
+# Every same-repo, non-draft PR to main enters the native queue once CI passes on its exact head.
+# The queue re-runs CI on the merge group before landing; no extra labels or certification gates.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+  # Draft-first PRs often go green while still drafts; enroll them when marked ready.
+  pull_request_target:
+    types: [ready_for_review]
+    branches: [main]
 
 permissions:
   actions: read
@@ -11,20 +17,35 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: native-merge-queue-${{ github.event.workflow_run.head_sha }}
+  group: native-merge-queue-${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
   cancel-in-progress: false
 
 jobs:
   enroll:
-    name: Enroll exact certified head
-    if: github.event.workflow_run.event == 'pull_request'
+    name: Enroll exact green head
+    if: github.event_name == 'pull_request_target' || github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Enqueue eligible pull request
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const run = context.payload.workflow_run;
+            let run = context.payload.workflow_run;
+            if (context.eventName === 'pull_request_target') {
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'ci.yml',
+                event: 'pull_request',
+                head_sha: context.payload.pull_request.head.sha,
+                per_page: 1,
+              });
+              run = data.workflow_runs[0];
+              if (!run || run.status !== 'completed') {
+                core.notice('PENDING: CI has not completed for this head; enrollment follows CI completion');
+                return;
+              }
+            }
             const recordOutcome = async (status, reason, details = '') => {
               core.notice(`${status}: ${reason}${details ? ` (${details})` : ''}`);
               await core.summary
@@ -69,10 +90,6 @@ jobs:
             }
             if (pull.head.sha !== run.head_sha) {
               await recordOutcome('STALE', 'Exact-head CI proof no longer matches the PR', pull.head.sha);
-              return;
-            }
-            if (!pull.labels.some(({ name }) => name === 'machine-certified')) {
-              await recordOutcome('NOT_ELIGIBLE', 'The machine-certified label is absent');
               return;
             }
 

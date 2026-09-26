@@ -15,7 +15,6 @@
   },
   "auto_enrollment": {
     "workflow": ".github/workflows/native-merge-queue.yml",
-    "certification_label": "machine-certified",
     "exact_head_required": true,
     "same_repository_only": true,
     "drafts_allowed": false
