@@ -52,6 +52,8 @@ enum HomeV2Palette {
     static let mint = Color(hex: "#3FFA8B")
     static let orange = Color(hex: "#FF7800")
     static let red = Color(hex: "#F72A36")
+    static let ctaFill = Color(hex: "#F8FAFD")
+    static let ctaInk = Color(hex: "#030407")
 }
 
 enum ChatComposerGeometry {

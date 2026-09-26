@@ -513,7 +513,8 @@ struct LogYourBodyApp: App {
         realtimeSyncManager.syncStatus = .offline
         realtimeSyncManager.pendingSyncCount = 0
 
-        if usesFullDashboardFixture || usesPhotoTimelineHUDFixture {
+        if (usesFullDashboardFixture || usesPhotoTimelineHUDFixture) &&
+            !arguments.contains(HomeV2Policy.emptyFixtureArgument) {
             let fixturePhotoURL = arguments.contains(HomeV2Policy.photoFixtureArgument)
                 ? writeHomeV2FixturePhoto()
                 : nil

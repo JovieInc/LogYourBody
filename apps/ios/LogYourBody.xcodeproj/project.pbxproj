@@ -77,6 +77,7 @@
 		7D497AAAA2BAEEBCDB6A590E /* AddEntrySheet+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B717977805C943E5BA1410B /* AddEntrySheet+Part02.swift */; };
 		7E01D015B886A36E2EB5F3E1 /* LaunchAndBodyCompositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D15E6A333FABD14CA6405A4 /* LaunchAndBodyCompositionTests.swift */; };
 		7EE44B7F0195FDD490B3D5F6 /* FullMetricChartView+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83248F0638FB24D0201A0C1 /* FullMetricChartView+Part01.swift */; };
+		7F81E0D294C9EBD959FA20B8 /* HomeV2PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACBA870282ED5F613A82213D /* HomeV2PrimaryButton.swift */; };
 		841527E772D0CA94BE0D3F96 /* HealthKitManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */; };
 		87977666693C1FD6C5DDAA8B /* SubjectPlateRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E56886A697AD88A24468E56 /* SubjectPlateRenderer.swift */; };
 		8A693BCF3584DF89630F50C5 /* OnboardingFlowViewModel+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5586EC0657B1F9E652068FBA /* OnboardingFlowViewModel+Part02.swift */; };
@@ -93,6 +94,7 @@
 		9528AB022858D682E801AC01 /* AuthProfileBootstrapPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBDA30F8A24DC3754F3CD216 /* AuthProfileBootstrapPolicyTests.swift */; };
 		96EA9790381A5BEC62D7C902 /* KeychainAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = E67A23519F10FC4172C1E4FD /* KeychainAvailability.swift */; };
 		98DAEAD9993013F8C7C81764 /* DashboardTimelineAndPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B95EB9919EA722470321074 /* DashboardTimelineAndPolicyTests.swift */; };
+		994AA8612F8DEA8D4BFFC133 /* HomeV2LogWeightSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55EE79E338D0E34DCB4E3FDF /* HomeV2LogWeightSheet.swift */; };
 		9B5611E2F8314E22A5BF7889 /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75034CADEA1D4697BDCB5555 /* ImageCacheService.swift */; };
 		9BCEB21BE7B69676BCA5C211 /* HealthSyncCoordinatorPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */; };
 		9DA53BBE5C68C157C1C517F4 /* ExportCSVBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D10550744C3D80F49B32A4 /* ExportCSVBuilder.swift */; };
@@ -486,6 +488,7 @@
 		50EBF62AD8F9F25BB301D998 /* ProgressPhotoAttachPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProgressPhotoAttachPolicyTests.swift; sourceTree = "<group>"; };
 		55090E3269B8A8F8E45E46D0 /* SecondaryMetricsRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SecondaryMetricsRow.swift; path = DesignSystem/Organisms/SecondaryMetricsRow.swift; sourceTree = "<group>"; };
 		5586EC0657B1F9E652068FBA /* OnboardingFlowViewModel+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "OnboardingFlowViewModel+Part02.swift"; path = "OnboardingFlowViewModel+Part02.swift"; sourceTree = "<group>"; };
+		55EE79E338D0E34DCB4E3FDF /* HomeV2LogWeightSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2LogWeightSheet.swift; sourceTree = "<group>"; };
 		59C400E664F1B03F8C2556C9 /* AccountDeletionConfirmationPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccountDeletionConfirmationPolicyTests.swift; sourceTree = "<group>"; };
 		5D15E6A333FABD14CA6405A4 /* LaunchAndBodyCompositionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchAndBodyCompositionTests.swift; sourceTree = "<group>"; };
 		5E56886A697AD88A24468E56 /* SubjectPlateRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SubjectPlateRenderer.swift; sourceTree = "<group>"; };
@@ -548,6 +551,7 @@
 		AB73CC33EB688034C7B8512F /* SubjectPlateRendererTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SubjectPlateRendererTests.swift; sourceTree = "<group>"; };
 		AB992727D1333B365F93F30E /* AccountDeletionCleanupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccountDeletionCleanupServiceTests.swift; sourceTree = "<group>"; };
 		AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PasswordStrengthIndicator.swift; path = DesignSystem/Molecules/PasswordStrengthIndicator.swift; sourceTree = "<group>"; };
+		ACBA870282ED5F613A82213D /* HomeV2PrimaryButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PrimaryButton.swift; sourceTree = "<group>"; };
 		AD0054DC2E20C9DF0029E0FF /* LegalConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalConsentView.swift; sourceTree = "<group>"; };
 		AD0054DE2E20CDB00029E0FF /* ProgressPhotoCarouselView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoCarouselView.swift; sourceTree = "<group>"; };
 		AD0054E72E2197600029E0FF /* health-disclosure.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "health-disclosure.md"; sourceTree = "<group>"; };
@@ -1048,6 +1052,8 @@
 				FC9C445A5BBDAD9BB34C8E55 /* HomeV2Surface.swift */,
 				CA50D84A24CA405046D5EAFA /* HomeV2PhotoViewer.swift */,
 				BA9844F348C4675E22E4592F /* HomeV2TrendChart.swift */,
+				ACBA870282ED5F613A82213D /* HomeV2PrimaryButton.swift */,
+				55EE79E338D0E34DCB4E3FDF /* HomeV2LogWeightSheet.swift */,
 			);
 			name = HomeV2;
 			path = HomeV2;
@@ -2307,6 +2313,8 @@
 				87977666693C1FD6C5DDAA8B /* SubjectPlateRenderer.swift in Sources */,
 				9F1405CB5B2F4A0563C3C4A1 /* HomeV2PhotoViewer.swift in Sources */,
 				C7B9E48E55256B991FBCDEF0 /* HomeV2TrendChart.swift in Sources */,
+				7F81E0D294C9EBD959FA20B8 /* HomeV2PrimaryButton.swift in Sources */,
+				994AA8612F8DEA8D4BFFC133 /* HomeV2LogWeightSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

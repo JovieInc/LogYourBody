@@ -92,6 +92,9 @@ struct DashboardViewLiquid: View {
     @State var isShowingPhotoTimelineMenu = false
     @State var isPhotoTimelineSettingsPresented = false
     @State var isHomeV2ViewerPresented = false
+    @State var isHomeV2LogSheetPresented = false
+    @State var homeV2Logged: HomeV2LoggedEntry?
+    @State var homeV2PhaseSentence: String?
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
     @State private var isStatsDestinationActive = false
