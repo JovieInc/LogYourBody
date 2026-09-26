@@ -114,6 +114,26 @@ extension DashboardViewLiquid {
             homeV2EntriesView
         }
         .fullScreenCover(isPresented: $isShowingPhotoTimelineMenu) {
+            if HomeV2Policy.isEnabled() {
+                homeV2Sidebar
+            } else {
+                photoTimelineNavigationMenuCover
+            }
+        }
+        .navigationDestination(isPresented: $isHomeV2SettingsPresented) {
+            homeV2SettingsView
+        }
+        .sheet(isPresented: $isHomeV2HelpPresented) {
+            BugReportPromptSheet()
+                .environmentObject(BugReportManager.shared)
+        }
+        .navigationDestination(isPresented: $isPhotoTimelineSettingsPresented) {
+            PreferencesView()
+                .environmentObject(authManager)
+        }
+    }
+
+    private var photoTimelineNavigationMenuCover: some View {
             PhotoTimelineNavigationMenu(
                 selected: selectedPhotoTimelineRootPage,
                 onSelect: { page in
@@ -131,11 +151,6 @@ extension DashboardViewLiquid {
                     isShowingPhotoTimelineMenu = false
                 }
             )
-        }
-        .navigationDestination(isPresented: $isPhotoTimelineSettingsPresented) {
-            PreferencesView()
-                .environmentObject(authManager)
-        }
     }
 
     @ViewBuilder
