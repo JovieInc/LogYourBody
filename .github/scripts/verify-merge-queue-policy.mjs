@@ -12,6 +12,16 @@ const requiredFragments = {
     /github\.event\.merge_group\.head_sha/,
     /assert_expected_result/,
     /needs\.detect-changes\.result[^\n]+success/,
+    /\n\s*workflow_dispatch:\s*\n/,
+    /merge_group_base_sha/,
+  ],
+  kicker: [
+    /\n\s*schedule:\s*\n/,
+    /listMatchingRefs/,
+    /gh-readonly-queue\/main\//,
+    /listWorkflowRuns/,
+    /createWorkflowDispatch/,
+    /merge_group_base_sha/,
   ],
   enrollment: [
     /workflow_run:/,
@@ -30,7 +40,7 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-export function verifyPolicy({ policy, ciWorkflow, enrollmentWorkflow }) {
+export function verifyPolicy({ policy, ciWorkflow, enrollmentWorkflow, kickerWorkflow }) {
   assert(policy.schema_version === 1, 'policy schema_version must be 1');
   assert(policy.repository === 'JovieInc/LogYourBody', 'policy must remain repository-local');
   assert(
@@ -61,6 +71,20 @@ export function verifyPolicy({ policy, ciWorkflow, enrollmentWorkflow }) {
   assert(!/labels\.some|\.labels\b/.test(enrollmentWorkflow), 'auto-enrollment must not gate on PR labels');
   assert(!/actions\/checkout@/.test(enrollmentWorkflow), 'privileged enrollment must not checkout code');
   assert(!/secrets\./.test(enrollmentWorkflow), 'auto-enrollment must not receive repository secrets');
+
+  if (policy.merge_group_ci) {
+    assert(
+      policy.merge_group_ci.dispatch_input === 'merge_group_base_sha',
+      'merge-group CI dispatch input must be merge_group_base_sha',
+    );
+    assert(typeof kickerWorkflow === 'string', 'merge-group CI kicker workflow must exist');
+    for (const fragment of requiredFragments.kicker) {
+      assert(fragment.test(kickerWorkflow), `merge-group CI kicker is missing required contract: ${fragment}`);
+    }
+    assert(!/actions\/checkout@/.test(kickerWorkflow), 'merge-group CI kicker must not checkout code');
+    assert(!/secrets\./.test(kickerWorkflow), 'merge-group CI kicker must not receive repository secrets');
+    assert(!/pull_request/.test(kickerWorkflow), 'merge-group CI kicker must not run on pull request events');
+  }
   return true;
 }
 
@@ -72,7 +96,10 @@ export function verifyRepository(rootDirectory) {
     path.join(rootDirectory, policy.auto_enrollment.workflow),
     'utf8',
   );
-  return verifyPolicy({ policy, ciWorkflow, enrollmentWorkflow });
+  const kickerWorkflow = policy.merge_group_ci
+    ? fs.readFileSync(path.join(rootDirectory, policy.merge_group_ci.kicker_workflow), 'utf8')
+    : undefined;
+  return verifyPolicy({ policy, ciWorkflow, enrollmentWorkflow, kickerWorkflow });
 }
 
 const isMainModule = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
