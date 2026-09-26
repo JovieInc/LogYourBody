@@ -1278,6 +1278,48 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(timelinePage.waitForExistence(timeout: 8))
     }
 
+    func testHomeV2PhotoFirstKeepsTheNumberBelowThePhoto() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let stage = app.descendants(matching: .any)["home_v2_photo_stage"]
+        XCTAssertTrue(stage.waitForExistence(timeout: 30), "Photo-first Home must show the 4:5 photo stage")
+
+        let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 5))
+        XCTContext.runActivity(named: "home-v2-hierarchy") { activity in
+            activity.add(XCTAttachment(string: app.debugDescription))
+        }
+        XCTAssertGreaterThanOrEqual(
+            value.frame.minY,
+            stage.frame.maxY - 1,
+            "Nothing is drawn over the person: the number sits below the photo. stage=\(stage.frame) value=\(value.frame)"
+        )
+        XCTAssertGreaterThanOrEqual(stage.frame.width, app.frame.width - 1, "The photo runs edge to edge")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_filmstrip"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "home-v2-photo-first", from: app)
+    }
+
+    func testHomeV2WithoutAPhotoShowsMetricFirstAndOffersToAddOne() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 30),
+            "Without a photo the Home is metric first"
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_weight_value"].waitForExistence(timeout: 5))
+
+        let addPhoto = app.buttons["home_v2_add_photo_row"]
+        XCTAssertTrue(addPhoto.waitForExistence(timeout: 5))
+        attachScreenshot(named: "home-v2-metric-first", from: app)
+        addPhoto.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["progress_photo_attach_sheet"].waitForExistence(timeout: 8),
+            "The add-photo row opens the attach sheet for that day"
+        )
+    }
+
     private func attachScreenshot(named name: String, from app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

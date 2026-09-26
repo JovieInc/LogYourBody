@@ -9,34 +9,38 @@ extension DashboardViewLiquid {
 
             Group {
                 if let metric = currentMetric {
-                    let bodyScore = bodyScoreText()
+                    if HomeV2Policy.isEnabled() {
+                        homeV2Surface(for: metric)
+                    } else {
+                        let bodyScore = bodyScoreText()
 
-                    LaunchTimelineSurface(
-                        metric: metric,
-                        bodyMetrics: bodyMetrics,
-                        selectedIndex: $selectedIndex,
-                        dateText: formatHUDDate(metric.date),
-                        weightValue: heroWeightValue(),
-                        weightCaption: heroWeightCaption(),
-                        bodyFatValue: heroBodyFatValue(),
-                        bodyFatCaption: heroBodyFatCaption(),
-                        ffmiValue: heroFFMIValue(),
-                        ffmiCaption: heroFFMICaption(),
-                        onTapWeight: {
-                            selectedMetricType = .weight
-                            isMetricDetailActive = true
-                        },
-                        onTapBodyFat: {
-                            selectedMetricType = .bodyFat
-                            isMetricDetailActive = true
-                        },
-                        onTapFFMI: {
-                            selectedMetricType = .ffmi
-                            isMetricDetailActive = true
-                        },
-                        onShare: makeBodyScoreShareAction(metric: metric, score: bodyScore.score),
-                        onAddPhoto: { presentProgressPhotoAttach(for: metric) }
-                    )
+                        LaunchTimelineSurface(
+                            metric: metric,
+                            bodyMetrics: bodyMetrics,
+                            selectedIndex: $selectedIndex,
+                            dateText: formatHUDDate(metric.date),
+                            weightValue: heroWeightValue(),
+                            weightCaption: heroWeightCaption(),
+                            bodyFatValue: heroBodyFatValue(),
+                            bodyFatCaption: heroBodyFatCaption(),
+                            ffmiValue: heroFFMIValue(),
+                            ffmiCaption: heroFFMICaption(),
+                            onTapWeight: {
+                                selectedMetricType = .weight
+                                isMetricDetailActive = true
+                            },
+                            onTapBodyFat: {
+                                selectedMetricType = .bodyFat
+                                isMetricDetailActive = true
+                            },
+                            onTapFFMI: {
+                                selectedMetricType = .ffmi
+                                isMetricDetailActive = true
+                            },
+                            onShare: makeBodyScoreShareAction(metric: metric, score: bodyScore.score),
+                            onAddPhoto: { presentProgressPhotoAttach(for: metric) }
+                        )
+                    }
                 } else {
                     photoTimelineHUDEmptyState
                 }
