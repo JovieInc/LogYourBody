@@ -718,6 +718,7 @@ struct DashboardStepsCard<ProgressView: View>: View {
 /// Share is the only chrome action. Body Score stays off this surface.
 struct LaunchTimelineSurface: View {
     @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
@@ -740,20 +741,29 @@ struct LaunchTimelineSurface: View {
         GeometryReader { geometry in
             let stageHeight = min(420, max(280, geometry.size.height * 0.58))
 
+            let content = VStack(alignment: .leading, spacing: 0) {
+                fusedPhotoStage
+                    .frame(height: stageHeight)
+
+                metricStrip
+                    .padding(.top, 16)
+            }
+            .padding(.horizontal, JovieTokens.compactInset)
+            .padding(.top, 4)
+            .padding(.bottom, 12)
+
             ZStack(alignment: .topLeading) {
                 launchAccessibilityMarker(id: "launch_timeline_surface", label: "Timeline")
 
-                VStack(alignment: .leading, spacing: 0) {
-                    fusedPhotoStage
-                        .frame(height: stageHeight)
-
-                    metricStrip
-                        .padding(.top, 16)
+                // At accessibility text sizes the stacked metric cells outgrow the screen; scroll instead of clipping.
+                if dynamicTypeSize.isAccessibilitySize {
+                    ScrollView(.vertical) {
+                        content.frame(width: geometry.size.width, alignment: .top)
+                    }
+                    .accessibilityIdentifier("launch_timeline_accessibility_scroll")
+                } else {
+                    content.frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
                 }
-                .padding(.horizontal, JovieTokens.compactInset)
-                .padding(.top, 4)
-                .padding(.bottom, 12)
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
             }
         }
     }
@@ -897,8 +907,13 @@ struct LaunchTimelineSurface: View {
     }
 
     // Equal-height row: the tallest cell (a wrapped caption) sets the height for all three.
+    // Accessibility text sizes can't fit three columns, so the cells stack.
     private var metricStrip: some View {
-        HStack(alignment: .top, spacing: 8) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 8))
+
+        return layout {
             LaunchTimelineMetricCell(
                 title: metricTitles[0],
                 value: ffmiValue,
@@ -929,6 +944,10 @@ struct LaunchTimelineSurface: View {
 
 struct LaunchTimelineMetricCell: View {
     @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    // Same point sizes as the approved design at the default text size; they scale only with Dynamic Type.
+    @ScaledMetric(relativeTo: .caption2) private var labelSize: CGFloat = 11
+    @ScaledMetric(relativeTo: .title3) private var valueSize: CGFloat = 20
 
     let title: String
     let value: String
@@ -945,7 +964,7 @@ struct LaunchTimelineMetricCell: View {
 
                 DSMetricLabel(
                     text: title,
-                    size: .system(size: 11),
+                    size: .system(size: labelSize),
                     weight: .bold,
                     color: theme.colors.textSecondary
                 )
@@ -954,7 +973,7 @@ struct LaunchTimelineMetricCell: View {
                 DSMetricValue(
                     value: value,
                     unit: nil,
-                    size: .system(size: 20, weight: .semibold, design: .rounded),
+                    size: .system(size: valueSize, weight: .semibold, design: .rounded),
                     color: theme.colors.text
                 )
                 .lineLimit(1)
@@ -963,11 +982,11 @@ struct LaunchTimelineMetricCell: View {
                 // Captions like "↓ −0.2 last 30d · Athletic" wrap instead of truncating in a 1/3-width cell.
                 DSMetricLabel(
                     text: caption,
-                    size: .system(size: 11),
+                    size: .system(size: labelSize),
                     weight: .medium,
                     color: theme.colors.textSecondary
                 )
-                .lineLimit(2)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 .minimumScaleFactor(0.72)
                 .fixedSize(horizontal: false, vertical: true)
             }
