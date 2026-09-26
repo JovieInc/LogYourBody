@@ -16,6 +16,16 @@ Primary pull request workflow for `main`.
 
 `CI Summary` is the normal hard merge gate. Keep it deterministic and fast enough for agent throughput.
 
+## Merge Queue Auto-Land
+
+`main` uses GitHub's native merge queue (ruleset "Main - Protect", `ALLGREEN`, `MERGE`, required check `CI Summary`, 60-minute check timeout). Three secret-free workflows make landing hands-off:
+
+1. **`native-merge-queue.yml` — enrollment.** After `CI` completes on a same-repo, non-draft PR (or when a draft is marked ready), it enqueues the PR at its exact green head with `enqueuePullRequest`. It needs `contents: write` for that mutation and must never checkout code or receive secrets (`.github/scripts/verify-merge-queue-policy.mjs` enforces this).
+2. **`merge-queue-ci-kicker.yml` — merge-group CI.** A merge group created by an enqueue performed with `GITHUB_TOKEN` starts no CI run (GitHub creates no workflow runs for events caused by `GITHUB_TOKEN`), so the queue would time out. `workflow_dispatch` is the documented exception: the kicker runs when enrollment completes (`workflow_run`) and on a 5-minute cron backstop, and dispatches `ci.yml` onto every `gh-readonly-queue/main/*` ref that has no run yet, passing `merge_group_base_sha` from the ref name so Detect Changes diffs against the right base.
+3. **`ci.yml`** accepts that `workflow_dispatch` input; `CI Summary` on the merge-group commit is what the queue waits for.
+
+`ALLGREEN` batches every queued entry, so each entry's group needs CI; the kicker covers all refs. If an entry still times out (queue empty, PR open and `CLEAN`), re-enqueue it through the normal merge path (`gh pr merge <n> --merge --auto`); a user-token enqueue starts merge-group CI natively.
+
 ## Advisory Automation
 
 ### `advisory-ai-review.yml`
