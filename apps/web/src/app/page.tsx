@@ -1,6 +1,4 @@
-import { MinimalWaitlistLanding } from './MinimalWaitlistLanding';
-import { LegacyMinimalWaitlistLanding } from './LegacyMinimalWaitlistLanding';
-import { LANDING_FLAGS } from '@/lib/flags/landing';
+import { LaunchLanding } from './LaunchLanding';
 import { endpoints } from '@/lib/generated/endpoints.generated';
 
 const marketingUrl = endpoints.hosts.marketing.url;
@@ -45,11 +43,7 @@ export default function HomePage() {
           __html: JSON.stringify(landingStructuredData).replace(/</g, '\\u003c'),
         }}
       />
-      {LANDING_FLAGS.ART_DIRECTION_V2_ENABLED ? (
-        <MinimalWaitlistLanding />
-      ) : (
-        <LegacyMinimalWaitlistLanding />
-      )}
+      <LaunchLanding />
     </>
   );
 }

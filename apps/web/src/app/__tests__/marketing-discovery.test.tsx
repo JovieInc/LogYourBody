@@ -3,6 +3,10 @@ import HomePage from '../page';
 import robots from '../robots';
 import sitemap from '../sitemap';
 
+jest.mock('@/lib/analytics', () => ({
+  analytics: { track: jest.fn() },
+}));
+
 jest.mock('../MinimalWaitlistLanding', () => ({
   MinimalWaitlistLanding: () => <main data-testid="minimal-landing" />,
 }));
