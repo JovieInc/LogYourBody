@@ -23,6 +23,8 @@ Pull requests should target `main`. CI is configured around `main` as the trunk,
 
 Pull requests into `main` should be small and focused. The required merge signal is the aggregate `CI Summary` status from `.github/workflows/ci.yml`.
 
+`main` requires no approving reviews. Admission is the native merge queue: `CI Summary` (strict, up-to-date) plus the `machine-certified` label are the gate, enforced by `.github/workflows/native-merge-queue.yml`. Review and conversation-resolution requirements are intentionally absent so certified heads land unattended; advisory review output remains advisory. Apply with `.github/scripts/update-branch-protection.sh`.
+
 `CI Summary` fails only when changed-path deterministic validation fails:
 
 - Web/package changes: `pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test:ci`.
