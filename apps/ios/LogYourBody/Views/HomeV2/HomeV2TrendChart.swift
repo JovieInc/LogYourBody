@@ -44,6 +44,7 @@ struct HomeV2TrendChart: View {
     let trend: [MetricChartDataPoint]
     let accent: Color
     @Binding var range: TimeRange
+    var showsRangeTabs = true
     var now = Date()
 
     private static let startFormatter: DateFormatter = {
@@ -71,7 +72,9 @@ struct HomeV2TrendChart: View {
             .accessibilityIdentifier("home_v2_trend_chart")
 
             axisRow
-            rangeTabs
+            if showsRangeTabs {
+                rangeTabs
+            }
         }
     }
 

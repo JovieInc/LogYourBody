@@ -18,7 +18,9 @@ enum HomeV2Tokens {
 
     enum TypeSize {
         static let heroPhoto: CGFloat = 38
-        static let heroMetricFirst: CGFloat = 64
+        static let heroMetricFirst: CGFloat = 84
+        static let sheetValue: CGFloat = 60
+        static let sheetTitle: CGFloat = 22
         static let title: CGFloat = 16
         static let body: CGFloat = 15
         static let secondary: CGFloat = 14
@@ -27,6 +29,9 @@ enum HomeV2Tokens {
     }
 
     enum Space {
+        static let dayZeroTop: CGFloat = 72
+        static let heroTop: CGFloat = 40
+        static let margin: CGFloat = 24
         static let inset: CGFloat = 20
         static let compact: CGFloat = 16
         static let row: CGFloat = 12
@@ -40,4 +45,6 @@ enum HomeV2Tokens {
     static let rowHeightWithSubline: CGFloat = 60
     static let thumbSize = CGSize(width: 32, height: 40)
     static let thumbRadius: CGFloat = 8
+    static let photoSlotHeight: CGFloat = 128
+    static let photoSlotRadius: CGFloat = 12
 }

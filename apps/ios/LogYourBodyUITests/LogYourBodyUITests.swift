@@ -1296,7 +1296,12 @@ final class LogYourBodyUITests: XCTestCase {
             "Nothing is drawn over the person: the number sits below the photo. stage=\(stage.frame) value=\(value.frame)"
         )
         XCTAssertGreaterThanOrEqual(stage.frame.width, app.frame.width - 1, "The photo runs edge to edge")
-        XCTAssertTrue(app.descendants(matching: .any)["home_v2_filmstrip"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_photo_caption"].waitForExistence(timeout: 5))
+
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 5), "One check-in action")
+        XCTAssertGreaterThanOrEqual(logWeight.frame.minY, value.frame.maxY - 1, "The dock sits below the number")
+        XCTAssertGreaterThan(logWeight.frame.minY, app.frame.height * 0.72, "The dock sits at the bottom")
         attachScreenshot(named: "home-v2-photo-first", from: app)
     }
 
@@ -1323,7 +1328,29 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(viewerStage.exists)
     }
 
-    func testHomeV2WithoutAPhotoShowsMetricFirstAndOffersToAddOne() throws {
+    func testHomeV2DayZeroOffersOneCheckIn() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2EmptyFixture"])
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_day_zero"].waitForExistence(timeout: 30),
+            "With nothing logged, Home is the first check-in"
+        )
+        XCTAssertTrue(
+            app.buttons["home_v2_connect_health"].waitForExistence(timeout: 5),
+            "The alternative stays quiet but visible"
+        )
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 5), "One check-in action")
+        XCTAssertGreaterThan(logWeight.frame.minY, app.frame.height * 0.72, "The dock sits at the bottom")
+        XCTAssertFalse(
+            app.descendants(matching: .any)["home_v2_trend_chart"].exists,
+            "No chart before there is anything to chart"
+        )
+        attachScreenshot(named: "home-v2-day-zero", from: app)
+    }
+
+    func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
 
@@ -1331,29 +1358,48 @@ final class LogYourBodyUITests: XCTestCase {
             app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 30),
             "Without a photo the Home is metric first"
         )
-        XCTAssertTrue(app.descendants(matching: .any)["home_v2_weight_value"].waitForExistence(timeout: 5))
+        let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 5))
 
         let chart = app.descendants(matching: .any)["home_v2_trend_chart"]
         XCTAssertTrue(chart.waitForExistence(timeout: 5), "Metric-first Home keeps the trend chart geometry even before 7 days")
-        let value = app.descendants(matching: .any)["home_v2_weight_value"]
         XCTAssertGreaterThanOrEqual(chart.frame.minY, value.frame.maxY - 1, "The chart sits below the number")
         XCTAssertTrue(
             chart.label.contains("7 days") || chart.label.contains("7-day average"),
             "The chart says whether it is a trend or still waiting for 7 days"
         )
-        let threeMonths = app.buttons["home_v2_range_3M"]
-        XCTAssertTrue(threeMonths.waitForExistence(timeout: 5))
-        threeMonths.tap()
-        XCTAssertTrue(threeMonths.isSelected, "Tapping a range tab selects it")
+        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Home keeps a fixed 30-day window; ranges live in Progress")
+        let viewProgress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 5), "Progress is one disclosure away")
+        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, chart.frame.maxY - 1)
 
-        let addPhoto = app.buttons["home_v2_add_photo_row"]
-        XCTAssertTrue(addPhoto.waitForExistence(timeout: 5))
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 5), "One check-in action")
+        XCTAssertGreaterThan(logWeight.frame.minY, app.frame.height * 0.72, "The dock sits at the bottom")
         attachScreenshot(named: "home-v2-metric-first", from: app)
-        addPhoto.tap()
+        logWeight.tap()
+
         XCTAssertTrue(
-            app.descendants(matching: .any)["progress_photo_attach_sheet"].waitForExistence(timeout: 8),
-            "The add-photo row opens the attach sheet for that day"
+            app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 8),
+            "Log weight opens the sheet"
         )
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_details"].exists, "Optional detail sits behind one disclosure")
+        attachScreenshot(named: "home-v2-log-sheet", from: app)
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        let logged = app.descendants(matching: .any)["home_v2_logged_sentence"]
+        XCTAssertTrue(logged.waitForExistence(timeout: 10), "Saving confirms in place")
+        XCTAssertTrue(logged.label.hasPrefix("Logged "), logged.label)
+        XCTAssertTrue(app.buttons["home_v2_undo"].exists, "Recovery stays visible")
+        attachScreenshot(named: "home-v2-logged", from: app)
+
+        let done = app.buttons["home_v2_done"]
+        XCTAssertTrue(done.exists)
+        done.tap()
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
     }
 
     private func attachScreenshot(named name: String, from app: XCUIApplication) {

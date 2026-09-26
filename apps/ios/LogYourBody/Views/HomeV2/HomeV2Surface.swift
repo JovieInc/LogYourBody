@@ -4,9 +4,10 @@
 //
 import SwiftUI
 
-/// Photo-first Home (Pencil H2). Shows the metric-first layout (H1) until the
-/// selected day has a photo. Nothing is drawn over the person: the number and
-/// the filmstrip sit below the photo.
+/// Home on the focus contract (Pencil H1/H2/C2): one check-in action, the
+/// number, a fixed 30-day trend, and quiet disclosures. Shows the metric-first
+/// layout (H1) until the selected day has a photo. Nothing is drawn over the
+/// person: the number sits below the photo.
 struct HomeV2Surface: View {
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
@@ -14,30 +15,36 @@ struct HomeV2Surface: View {
     let weightValue: String
     let weightUnit: String
     let changeSentence: String
-    let bodyFatValue: String
-    let bodyFatDetail: String
-    let ffmiValue: String
-    let ffmiDetail: String
-    let onAddPhoto: () -> Void
-    let onTapBodyFat: () -> Void
-    let onTapFFMI: () -> Void
-    let onOpenPhoto: () -> Void
+    let phaseSentence: String?
+    let loggedSentence: String?
+    let latestPhotoCaption: String?
     let chartDaily: [MetricChartDataPoint]
     let chartTrend: [MetricChartDataPoint]
-    @Binding var selectedRange: TimeRange
+    let onOpenPhoto: () -> Void
+    let onViewProgress: () -> Void
+    let onLogWeight: () -> Void
+    let onDone: () -> Void
+    let onUndo: () -> Void
+
+    private var isLogged: Bool { loggedSentence != nil }
 
     var body: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 0) {
                 if PhotoTimelineHUDPolicy.hasUsablePhoto(metric), let photoURL = metric.photoUrl {
                     photoStage(photoURL: photoURL, size: geometry.size)
-                    numberBlock(size: HomeV2Tokens.TypeSize.heroPhoto, kerning: -1.2, topPadding: 16)
-                    HomeV2Filmstrip(bodyMetrics: bodyMetrics, selectedIndex: $selectedIndex)
+                    photoNumberBlock
                 } else {
                     metricFirst
                 }
 
                 Spacer(minLength: 0)
+
+                HomeV2Dock(
+                    title: isLogged ? HomeV2Copy.done : HomeV2Copy.logWeight,
+                    identifier: isLogged ? "home_v2_done" : "home_v2_log_weight",
+                    action: isLogged ? onDone : onLogWeight
+                )
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
         }
@@ -57,29 +64,40 @@ struct HomeV2Surface: View {
         .accessibilityIdentifier("home_v2_photo_stage")
     }
 
-    private func numberBlock(size: CGFloat, kerning: CGFloat, topPadding: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .lastTextBaseline, spacing: 4) {
-                Text(weightValue)
-                    .scaledSystemFont(size: size, weight: .bold, relativeTo: .largeTitle)
-                    .kerning(kerning)
-                    .foregroundStyle(HomeV2Tokens.Colors.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .accessibilityIdentifier("home_v2_weight_value")
-
-                Text(weightUnit)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .title3)
-                    .foregroundStyle(HomeV2Tokens.Colors.muted)
+    private var photoNumberBlock: some View {
+        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
+            if let latestPhotoCaption {
+                Text(latestPhotoCaption)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    .accessibilityIdentifier("home_v2_photo_caption")
             }
+
+            numberRow(size: HomeV2Tokens.TypeSize.heroPhoto, weight: .semibold, kerning: -1.2)
 
             Text(changeSentence)
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .accessibilityIdentifier("home_v2_change_sentence")
         }
-        .padding(.horizontal, HomeV2Tokens.Space.inset)
-        .padding(.top, topPadding)
+        .padding(.horizontal, HomeV2Tokens.Space.margin)
+        .padding(.top, HomeV2Tokens.Space.compact)
+    }
+
+    private func numberRow(size: CGFloat, weight: Font.Weight, kerning: CGFloat) -> some View {
+        HStack(alignment: .lastTextBaseline, spacing: HomeV2Tokens.Space.tight) {
+            Text(weightValue)
+                .scaledSystemFont(size: size, weight: weight, relativeTo: .largeTitle)
+                .kerning(kerning)
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .accessibilityIdentifier("home_v2_weight_value")
+
+            Text(weightUnit)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .title3)
+                .foregroundStyle(HomeV2Tokens.Colors.muted)
+        }
     }
 
     private var metricFirst: some View {
@@ -88,46 +106,82 @@ struct HomeV2Surface: View {
                 Color.clear
                     .frame(height: 1)
                     .accessibilityElement()
-                    .accessibilityLabel("Today")
+                    .accessibilityLabel(HomeV2Copy.title)
                     .accessibilityIdentifier("home_v2_metric_first")
 
-                numberBlock(size: HomeV2Tokens.TypeSize.heroMetricFirst, kerning: -2.5, topPadding: 24)
+                VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
+                    numberRow(size: HomeV2Tokens.TypeSize.heroMetricFirst, weight: .bold, kerning: -2.5)
+
+                    Text(changeSentence)
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .body)
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        .accessibilityIdentifier("home_v2_change_sentence")
+
+                    statusLine
+                }
+                .padding(.top, HomeV2Tokens.Space.heroTop)
             }
+            .padding(.horizontal, HomeV2Tokens.Space.margin)
 
             HomeV2TrendChart(
                 daily: chartDaily,
                 trend: chartTrend,
                 accent: HomeV2Tokens.Metric.weight,
-                range: $selectedRange
+                range: .constant(.month1),
+                showsRangeTabs: false
             )
-            .padding(.top, HomeV2Tokens.Space.compact)
+            .padding(.top, HomeV2Tokens.Space.margin)
 
-            VStack(spacing: 0) {
-                HomeV2TableRow(label: "Body fat", detail: bodyFatDetail, value: bodyFatValue, action: onTapBodyFat)
-                    .accessibilityIdentifier("home_v2_body_fat_row")
-
-                HomeV2TableRow(
-                    label: "FFMI",
-                    subline: HomeV2Copy.estimatedSubline,
-                    detail: ffmiDetail,
-                    value: ffmiValue,
-                    action: onTapFFMI
-                )
-                .accessibilityIdentifier("home_v2_ffmi_row")
-
-                HomeV2TableRow(
-                    label: HomeV2Copy.addPhotoRow,
-                    detail: HomeV2Copy.addPhotoDetail,
-                    value: nil,
-                    leadingSystemImage: "camera",
-                    showsChevron: true,
-                    action: onAddPhoto
-                )
-                .accessibilityIdentifier("home_v2_add_photo_row")
-            }
-            .overlay(alignment: .top) { HomeV2Hairline() }
-            .padding(.top, HomeV2Tokens.Space.compact)
+            rangeRow
         }
+    }
+
+    /// C2 replaces the phase line with what was just logged and a way back.
+    @ViewBuilder
+    private var statusLine: some View {
+        if let loggedSentence {
+            HStack(spacing: HomeV2Tokens.Space.tight) {
+                Text(loggedSentence)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .subheadline)
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    .accessibilityIdentifier("home_v2_logged_sentence")
+
+                Spacer(minLength: HomeV2Tokens.Space.tight)
+
+                Button(action: onUndo) {
+                    Text(HomeV2Copy.undo)
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .subheadline)
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        .frame(minWidth: JovieTokens.minimumHitTarget, minHeight: JovieTokens.minimumHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("home_v2_undo")
+            }
+        } else if let phaseSentence {
+            Text(phaseSentence)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .subheadline)
+                .foregroundStyle(HomeV2Tokens.Colors.muted)
+                .accessibilityIdentifier("home_v2_phase")
+        }
+    }
+
+    private var rangeRow: some View {
+        HStack(spacing: HomeV2Tokens.Space.tight) {
+            Text(HomeV2Copy.lastThirtyDays)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+
+            Spacer(minLength: HomeV2Tokens.Space.tight)
+
+            HomeV2DisclosureLink(
+                title: HomeV2Copy.viewProgress,
+                identifier: "home_v2_view_progress",
+                action: onViewProgress
+            )
+        }
+        .padding(.horizontal, HomeV2Tokens.Space.margin)
+        .frame(minHeight: HomeV2Tokens.rowHeight)
     }
 }
 

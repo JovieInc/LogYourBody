@@ -65,7 +65,7 @@ extension DashboardViewLiquid {
                 .accessibilityHidden(isHomeChatExpanded)
                 .clipped()
 
-            if HomeChatChromePolicy.shouldShowComposer(
+            if !isHomeV2CheckIn, HomeChatChromePolicy.shouldShowComposer(
                 isChatExpanded: isHomeChatExpanded,
                 isOnStats: selectedPhotoTimelineRootPage == .analytics
             ) {
@@ -97,6 +97,9 @@ extension DashboardViewLiquid {
         }
         .fullScreenCover(isPresented: $isHomeV2ViewerPresented) {
             homeV2PhotoViewer
+        }
+        .sheet(isPresented: $isHomeV2LogSheetPresented) {
+            homeV2LogWeightSheet
         }
         .fullScreenCover(isPresented: $isShowingPhotoTimelineMenu) {
             PhotoTimelineNavigationMenu(
@@ -132,7 +135,11 @@ extension DashboardViewLiquid {
                         label: "Timeline page"
                     )
                     if bodyMetrics.isEmpty {
-                        photoTimelineHUDEmptyState
+                        if isHomeV2CheckIn {
+                            homeV2DayZero
+                        } else {
+                            photoTimelineHUDEmptyState
+                        }
                     } else {
                         photoTimelineHUD
                     }
@@ -158,7 +165,7 @@ extension DashboardViewLiquid {
 
         switch selectedPhotoTimelineRootPage {
         case .timeline, .chat:
-            return "Home"
+            return isHomeV2CheckIn ? HomeV2Copy.title : "Home"
         case .analytics:
             return "Stats"
         }
@@ -169,12 +176,20 @@ extension DashboardViewLiquid {
             Button {
                 isShowingPhotoTimelineMenu = true
             } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(theme.colors.text)
-                    .frame(width: 32, height: 32)
-                    .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
-                    .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                if isHomeV2CheckIn {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(HomeV2Tokens.Colors.ink)
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                        .contentShape(Rectangle())
+                } else {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(theme.colors.text)
+                        .frame(width: 32, height: 32)
+                        .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                }
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Open Menu")
