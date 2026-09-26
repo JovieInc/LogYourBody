@@ -93,6 +93,11 @@ struct DashboardViewLiquid: View {
     @State var isPhotoTimelineSettingsPresented = false
     @State var isHomeV2ViewerPresented = false
     @State var isHomeV2LogSheetPresented = false
+    @State var isHomeV2ContextPresented = false
+    @State var isHomeV2EntriesPresented = false
+    @State var homeV2ContextDay = Date()
+    @State var homeV2LogSheetDate = Date()
+    @State var homeV2EditingMetric: BodyMetrics?
     @State var homeV2Logged: HomeV2LoggedEntry?
     @State var homeV2PhaseSentence: String?
     @State var isMetricDetailActive = false

@@ -46,7 +46,8 @@ extension DashboardViewLiquid {
                 selectedMetricType = .weight
                 isMetricDetailActive = true
             },
-            onLogWeight: presentHomeV2LogSheet,
+            onTodayDetails: { openHomeV2Context() },
+            onLogWeight: { presentHomeV2LogSheet() },
             onDone: { homeV2Logged = nil },
             onUndo: { Task { await undoHomeV2Logged() } }
         )
@@ -71,11 +72,12 @@ extension DashboardViewLiquid {
             onConnectHealth: {
                 Task { _ = await HealthKitManager.shared.requestAuthorization() }
             },
-            onLogWeight: presentHomeV2LogSheet
+            onLogWeight: { presentHomeV2LogSheet() }
         )
     }
 
-    func presentHomeV2LogSheet() {
+    func presentHomeV2LogSheet(for date: Date = Date()) {
+        homeV2LogSheetDate = date
         HapticManager.shared.selection()
         isHomeV2LogSheetPresented = true
     }
@@ -85,19 +87,21 @@ extension DashboardViewLiquid {
     var homeV2LogWeightSheet: some View {
         let system = currentMeasurementSystem
         let unit = homeV2DisplayUnit
-        let today = homeV2TodayMetric
-        let latestKilograms = today?.weight
-            ?? bodyMetrics.filter { $0.weight != nil }.max { $0.date < $1.date }?.weight
+        let date = homeV2LogSheetDate
+        let isToday = Calendar.current.isDateInToday(date)
+        let existing = homeV2Metric(on: date)
+        let latestKilograms = existing?.weight
+            ?? bodyMetrics.filter { $0.weight != nil && $0.date <= date }.max { $0.date < $1.date }?.weight
         let initial = latestKilograms.map { convertWeight($0, to: system) ?? $0 }
             ?? HomeV2WeightStepPolicy.defaultValue(unit: unit)
 
         return HomeV2LogWeightSheet(
             unit: unit,
             initialValue: initial,
-            initialBodyFat: today?.bodyFatPercentage,
-            dateText: HomeV2Copy.todayDateText(Date()),
+            initialBodyFat: existing?.bodyFatPercentage,
+            dateText: isToday ? HomeV2Copy.todayDateText(Date()) : HomeV2ContextCopy.entryDateText(date),
             onSave: { value, bodyFat in
-                await saveHomeV2Weight(value: value, bodyFat: bodyFat)
+                await saveHomeV2Weight(value: value, bodyFat: bodyFat, on: date)
             },
             onAddPhoto: { _ in
                 // ponytail: the pose-guided camera (Pencil L2) lands in the photo slice; until then the
@@ -105,21 +109,23 @@ extension DashboardViewLiquid {
                 isHomeV2LogSheetPresented = false
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(450))
-                    presentProgressPhotoAttach(for: homeV2TodayMetric)
+                    presentProgressPhotoAttach(for: homeV2Metric(on: date))
                 }
             }
         )
     }
 
+    /// Saves a weight (and optional body fat) for a day. Today gets the C2
+    /// logged state with Undo; other days just save and refresh.
     @MainActor
-    func saveHomeV2Weight(value: Double, bodyFat: Double?) async -> Bool {
+    func saveHomeV2Weight(value: Double, bodyFat: Double?, on date: Date = Date()) async -> Bool {
         guard let userId = authManager.currentUser?.id else { return false }
         let kilograms = currentMeasurementSystem == .imperial ? value.lbsToKg : value
-        let before = homeV2TodayMetric
+        let before = homeV2Metric(on: date)
 
         do {
             let saved = try await PhotoMetadataService.shared.createOrUpdateMetrics(
-                for: Date(),
+                for: date,
                 weight: kilograms,
                 bodyFatPercentage: bodyFat,
                 bodyFatMethod: bodyFat == nil ? nil : BodyFatEntryMethod.bioelectrical.rawValue,
@@ -130,15 +136,17 @@ extension DashboardViewLiquid {
             BodyScoreRecalculationService.shared.scheduleRecalculation()
             HapticManager.shared.successAction()
 
-            homeV2Logged = HomeV2LoggedEntry(
-                metricId: saved.id,
-                date: saved.date,
-                existedBefore: before != nil,
-                previousWeightKilograms: before?.weight,
-                previousBodyFat: before?.bodyFatPercentage,
-                valueText: HomeV2WeightStepPolicy.text(value),
-                unit: homeV2DisplayUnit
-            )
+            if Calendar.current.isDateInToday(date) {
+                homeV2Logged = HomeV2LoggedEntry(
+                    metricId: saved.id,
+                    date: saved.date,
+                    existedBefore: before != nil,
+                    previousWeightKilograms: before?.weight,
+                    previousBodyFat: before?.bodyFatPercentage,
+                    valueText: HomeV2WeightStepPolicy.text(value),
+                    unit: homeV2DisplayUnit
+                )
+            }
             await refreshHomeV2AfterWrite(selecting: saved.id)
             return true
         } catch {
@@ -172,7 +180,7 @@ extension DashboardViewLiquid {
     }
 
     @MainActor
-    private func refreshHomeV2AfterWrite(selecting id: String?) async {
+    func refreshHomeV2AfterWrite(selecting id: String?) async {
         await viewModel.refreshData(
             authManager: authManager,
             realtimeSyncManager: realtimeSyncManager

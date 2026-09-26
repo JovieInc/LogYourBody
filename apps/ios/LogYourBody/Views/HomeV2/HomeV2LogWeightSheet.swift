@@ -8,19 +8,30 @@ import SwiftUI
 /// details behind one disclosure, one Save action. Persistence stays with the
 /// caller; the sheet reports success or shows why it could not save.
 struct HomeV2LogWeightSheet: View {
+    enum Mode {
+        case log
+        case edit
+    }
+
+    let mode: Mode
     let unit: String
     let initialValue: Double
     let dateText: String
+    let deleteScope: String?
+    /// The day's existing photo, shown in the Front slot instead of a camera.
+    let existingPhotoURL: String?
     let onSave: (_ value: Double, _ bodyFat: Double?) async -> Bool
+    let onDelete: (() async -> Bool)?
     let onAddPhoto: (_ pose: String) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var valueText: String
     @State private var bodyFatText: String
-    @State private var showsDetails = false
+    @State private var showsDetails: Bool
     @State private var isSaving = false
+    @State private var isConfirmingDelete = false
     @State private var errorText: String?
-    @State private var detent: PresentationDetent = .medium
+    @State private var detent: PresentationDetent
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
@@ -29,20 +40,38 @@ struct HomeV2LogWeightSheet: View {
     }
 
     init(
+        mode: Mode = .log,
         unit: String,
         initialValue: Double,
         initialBodyFat: Double?,
         dateText: String,
+        deleteScope: String? = nil,
+        existingPhotoURL: String? = nil,
         onSave: @escaping (_ value: Double, _ bodyFat: Double?) async -> Bool,
+        onDelete: (() async -> Bool)? = nil,
         onAddPhoto: @escaping (_ pose: String) -> Void
     ) {
+        self.mode = mode
         self.unit = unit
         self.initialValue = initialValue
         self.dateText = dateText
+        self.deleteScope = deleteScope
+        self.existingPhotoURL = existingPhotoURL
         self.onSave = onSave
+        self.onDelete = onDelete
         self.onAddPhoto = onAddPhoto
         _valueText = State(initialValue: HomeV2WeightStepPolicy.text(initialValue))
         _bodyFatText = State(initialValue: initialBodyFat.map { String(format: "%.1f", $0) } ?? "")
+        _showsDetails = State(initialValue: mode == .edit)
+        _detent = State(initialValue: mode == .edit ? .large : .medium)
+    }
+
+    private var title: String {
+        mode == .edit ? HomeV2ContextCopy.editEntry : HomeV2Copy.logSheetTitle
+    }
+
+    private var saveTitle: String {
+        mode == .edit ? HomeV2ContextCopy.saveChanges : HomeV2Copy.saveWeight
     }
 
     var body: some View {
@@ -71,11 +100,36 @@ struct HomeV2LogWeightSheet: View {
             Spacer(minLength: HomeV2Tokens.Space.compact)
 
             HomeV2PrimaryButton(
-                title: HomeV2Copy.saveWeight,
+                title: saveTitle,
                 isEnabled: !isSaving,
                 identifier: "home_v2_log_sheet_save",
                 action: save
             )
+
+            if onDelete != nil {
+                Button {
+                    isConfirmingDelete = true
+                } label: {
+                    Text(HomeV2ContextCopy.deleteEntry)
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isSaving)
+                .accessibilityIdentifier("home_v2_log_sheet_delete")
+                .confirmationDialog(
+                    HomeV2ContextCopy.deleteTitle,
+                    isPresented: $isConfirmingDelete,
+                    titleVisibility: .visible
+                ) {
+                    Button(HomeV2ContextCopy.deleteEntry, role: .destructive, action: performDelete)
+                    Button(HomeV2ContextCopy.cancel, role: .cancel) {}
+                } message: {
+                    Text(deleteScope ?? "")
+                }
+            }
         }
         .padding(.horizontal, HomeV2Tokens.Space.inset)
         .padding(.top, HomeV2Tokens.Space.margin)
@@ -95,7 +149,7 @@ struct HomeV2LogWeightSheet: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: HomeV2Tokens.Space.tight) {
-            Text(HomeV2Copy.logSheetTitle)
+            Text(title)
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle, weight: .bold, relativeTo: .title2)
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
                 .accessibilityAddTraits(.isHeader)
@@ -221,24 +275,45 @@ struct HomeV2LogWeightSheet: View {
     }
 
     private func photoSlot(_ pose: String) -> some View {
-        Button {
+        let showsExisting = pose == HomeV2Copy.poses.first && existingPhotoURL != nil
+        return Button {
             onAddPhoto(pose)
         } label: {
-            VStack(spacing: HomeV2Tokens.Space.tight) {
-                Image(systemName: "camera")
-                    .font(.system(size: 20, weight: .medium))
-                Text(pose)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+            ZStack(alignment: .bottom) {
+                if showsExisting, let existingPhotoURL {
+                    GeometryReader { geometry in
+                        SubjectPlateView(
+                            urlString: existingPhotoURL,
+                            size: CGSize(width: geometry.size.width, height: HomeV2Tokens.photoSlotHeight)
+                        )
+                    }
+                    Text(pose)
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, weight: .medium, relativeTo: .caption)
+                        .foregroundStyle(HomeV2Tokens.Colors.ink)
+                        .padding(.horizontal, HomeV2Tokens.Space.tight)
+                        .padding(.vertical, HomeV2Tokens.Space.tight / 2)
+                        .background(HomeV2Tokens.Colors.canvas.opacity(0.65), in: Capsule())
+                        .padding(.bottom, HomeV2Tokens.Space.tight)
+                } else {
+                    VStack(spacing: HomeV2Tokens.Space.tight) {
+                        Image(systemName: "camera")
+                            .font(.system(size: 20, weight: .medium))
+                        Text(pose)
+                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                    }
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    .frame(maxWidth: .infinity, minHeight: HomeV2Tokens.photoSlotHeight)
+                }
             }
-            .foregroundStyle(HomeV2Tokens.Colors.secondary)
             .frame(maxWidth: .infinity, minHeight: HomeV2Tokens.photoSlotHeight)
             .background(
                 HomeV2Tokens.Colors.card,
                 in: RoundedRectangle(cornerRadius: HomeV2Tokens.photoSlotRadius, style: .continuous)
             )
+            .clipShape(RoundedRectangle(cornerRadius: HomeV2Tokens.photoSlotRadius, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Add \(pose) photo")
+        .accessibilityLabel(showsExisting ? "Retake \(pose) photo" : "Add \(pose) photo")
         .accessibilityIdentifier("home_v2_log_sheet_photo_\(pose.lowercased())")
     }
 
@@ -252,6 +327,21 @@ struct HomeV2LogWeightSheet: View {
     private func commitTypedWeight() {
         guard let typed = HomeV2WeightStepPolicy.parse(valueText) else { return }
         valueText = HomeV2WeightStepPolicy.text(HomeV2WeightStepPolicy.clamped(typed, unit: unit))
+    }
+
+    private func performDelete() {
+        guard let onDelete else { return }
+        focusedField = nil
+        isSaving = true
+        Task { @MainActor in
+            let deleted = await onDelete()
+            isSaving = false
+            if deleted {
+                dismiss()
+            } else {
+                errorText = HomeV2ContextCopy.deleteFailed
+            }
+        }
     }
 
     private func save() {

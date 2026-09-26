@@ -40,6 +40,7 @@ enum HomeV2Copy {
     static let done = "Done"
     static let undo = "Undo"
     static let lastThirtyDays = "Last 30 days"
+    static let todayDetails = "Today’s details"
     static let viewProgress = "View progress"
     static let firstCheckInTitle = "Your first check-in"
     static let firstCheckInBody = "Log your weight to begin. Your trend appears after 7 days."
