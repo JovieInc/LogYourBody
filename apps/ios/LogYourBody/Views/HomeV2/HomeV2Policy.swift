@@ -232,8 +232,8 @@ struct HomeV2LoggedEntry: Equatable {
 /// when it fits, and gives up height (never width) on short screens so the
 /// number and the check-in action stay on screen.
 enum HomeV2Layout {
-    /// Caption, number, change sentence and the dock below the photo.
-    static let belowPhotoHeight: CGFloat = 180
+    /// Caption, number, change sentence, the All photos row and the dock below the photo.
+    static let belowPhotoHeight: CGFloat = 224
     static let minimumStageHeight: CGFloat = 200
 
     static func stageHeight(width: CGFloat, height: CGFloat) -> CGFloat {

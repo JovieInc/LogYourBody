@@ -80,8 +80,9 @@ final class HomeV2PolicyTests: XCTestCase {
     }
 
     func testStageKeepsFourByFiveWhenItFitsAndGivesUpHeightOnShortScreens() {
-        XCTAssertEqual(HomeV2Layout.stageHeight(width: 390, height: 700), 487.5, accuracy: 0.01)
-        XCTAssertEqual(HomeV2Layout.stageHeight(width: 375, height: 470), 290, accuracy: 0.01)
+        XCTAssertEqual(HomeV2Layout.stageHeight(width: 390, height: 760), 487.5, accuracy: 0.01)
+        XCTAssertEqual(HomeV2Layout.stageHeight(width: 390, height: 700), 476, accuracy: 0.01)
+        XCTAssertEqual(HomeV2Layout.stageHeight(width: 375, height: 470), 246, accuracy: 0.01)
         XCTAssertEqual(HomeV2Layout.stageHeight(width: 320, height: 300), 200, accuracy: 0.01)
     }
 

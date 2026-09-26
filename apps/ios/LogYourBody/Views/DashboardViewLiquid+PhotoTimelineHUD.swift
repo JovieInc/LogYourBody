@@ -98,6 +98,9 @@ extension DashboardViewLiquid {
         .fullScreenCover(isPresented: $isHomeV2ViewerPresented) {
             homeV2PhotoViewer
         }
+        .fullScreenCover(isPresented: $isHomeV2AllPhotosPresented) {
+            homeV2AllPhotosFromHome
+        }
         .sheet(isPresented: $isHomeV2LogSheetPresented) {
             homeV2LogWeightSheet
         }
