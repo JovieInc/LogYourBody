@@ -13,6 +13,24 @@ import UIKit
 
 
 final class LaunchSurfacePolicyTests: XCTestCase {
+    // Regression: Home chrome text (title, date pill, empty states) used fixed point sizes.
+    @MainActor
+    func testScaledSystemFontMatchesApprovedSizeByDefaultAndGrowsWithDynamicType() {
+        func height<V: View>(_ view: V, _ size: DynamicTypeSize) -> CGFloat {
+            UIHostingController(rootView: view.environment(\.dynamicTypeSize, size))
+                .sizeThatFits(in: CGSize(width: CGFloat(390), height: CGFloat.greatestFiniteMagnitude))
+                .height
+        }
+
+        let fixed = Text("Home").font(.system(size: 16, weight: .semibold))
+        let scaled = Text("Home").scaledSystemFont(size: 16, weight: .semibold, relativeTo: .headline)
+
+        XCTAssertEqual(height(scaled, .large), height(fixed, .large), accuracy: 0.5,
+                       "At the default text size the approved design must be unchanged")
+        XCTAssertGreaterThan(height(scaled, .accessibility3), height(fixed, .accessibility3) * 1.3,
+                             "Text must grow with Dynamic Type where fixed sizes do not")
+    }
+
     func testChatComposerGeometryUsesOnlyCanonicalPillAndMultilineRadii() {
         XCTAssertFalse(
             ChatComposerGeometry.isMultiline(

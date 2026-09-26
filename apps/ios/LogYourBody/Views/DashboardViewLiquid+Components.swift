@@ -834,7 +834,7 @@ struct LaunchTimelineSurface: View {
         DashboardChromeGlass.cluster(spacing: 12) {
             HStack(spacing: 12) {
                 Text(dateText)
-                    .font(.system(size: 13, weight: .semibold))
+                    .scaledSystemFont(size: 13, weight: .semibold, relativeTo: .footnote)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -895,11 +895,11 @@ struct LaunchTimelineSurface: View {
                     .foregroundStyle(theme.colors.textSecondary)
 
                 Text("No progress photo")
-                    .font(.system(size: 13, weight: .semibold))
+                    .scaledSystemFont(size: 13, weight: .semibold, relativeTo: .footnote)
                     .foregroundStyle(theme.colors.text)
 
                 Text("Add one to this day")
-                    .font(.system(size: 11, weight: .medium))
+                    .scaledSystemFont(size: 11, weight: .medium, relativeTo: .caption2)
                     .foregroundStyle(theme.colors.textSecondary)
             }
             .padding(.bottom, 72)
