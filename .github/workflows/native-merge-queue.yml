@@ -29,6 +29,10 @@ jobs:
       - name: Enqueue eligible pull request
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
+          # Events caused by GITHUB_TOKEN never start workflows, so a merge group
+          # enqueued with it gets no CI and hits the 60-minute check timeout.
+          # Use the machine-user token when present; fall back so outcomes still record.
+          github-token: ${{ secrets.MERGE_QUEUE_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             let run = context.payload.workflow_run;
             if (context.eventName === 'pull_request_target') {
