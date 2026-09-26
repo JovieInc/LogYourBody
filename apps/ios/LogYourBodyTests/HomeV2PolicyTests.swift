@@ -46,6 +46,14 @@ final class HomeV2PolicyTests: XCTestCase {
         XCTAssertEqual(HomeV2Copy.changeSentence(delta: nil, unit: "lb"), "No 30-day trend yet")
     }
 
+    func testSinceSentenceAndPhotoPositionReadAsSentences() {
+        XCTAssertEqual(HomeV2Copy.sinceSentence(delta: -12.8, unit: "lb", since: "Apr 2"), "Down 12.8 lb since Apr 2")
+        XCTAssertEqual(HomeV2Copy.sinceSentence(delta: 0.3, unit: "kg", since: "Apr 2"), "Up 0.3 kg since Apr 2")
+        XCTAssertEqual(HomeV2Copy.sinceSentence(delta: 0.01, unit: "lb", since: "Apr 2"), "No change since Apr 2")
+        XCTAssertEqual(HomeV2Copy.photoPosition(3, of: 24), "Photo 3 of 24")
+        XCTAssertEqual(HomeV2Copy.firstPhoto, "First photo")
+    }
+
     func testCompactChangeNeverFallsBackToABareUnit() {
         XCTAssertEqual(HomeV2Copy.compactChange(delta: -0.9, unit: "pts"), "−0.9 pts")
         XCTAssertEqual(HomeV2Copy.compactChange(delta: 0.2, unit: ""), "+0.2")

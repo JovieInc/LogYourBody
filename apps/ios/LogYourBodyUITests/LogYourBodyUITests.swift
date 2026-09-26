@@ -1300,6 +1300,29 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "home-v2-photo-first", from: app)
     }
 
+    func testHomeV2PhotoStageOpensTheViewerAndClosesBackToHome() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let stage = app.descendants(matching: .any)["home_v2_photo_stage"]
+        XCTAssertTrue(stage.waitForExistence(timeout: 30))
+        stage.tap()
+
+        let viewerStage = app.descendants(matching: .any)["home_v2_viewer_stage"]
+        XCTAssertTrue(viewerStage.waitForExistence(timeout: 8), "Tapping the photo opens the viewer")
+        XCTAssertGreaterThanOrEqual(viewerStage.frame.width, app.frame.width - 1, "The viewer photo runs edge to edge")
+        let weight = app.descendants(matching: .any)["home_v2_viewer_weight"]
+        XCTAssertTrue(weight.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(weight.frame.minY, viewerStage.frame.maxY - 1, "Numbers sit below the photo")
+        attachScreenshot(named: "home-v2-viewer", from: app)
+
+        let close = app.buttons["home_v2_viewer_close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
+        XCTAssertTrue(stage.waitForExistence(timeout: 8), "Closing returns to Home")
+        XCTAssertFalse(viewerStage.exists)
+    }
+
     func testHomeV2WithoutAPhotoShowsMetricFirstAndOffersToAddOne() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])

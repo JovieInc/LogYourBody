@@ -21,6 +21,7 @@ struct HomeV2Surface: View {
     let onAddPhoto: () -> Void
     let onTapBodyFat: () -> Void
     let onTapFFMI: () -> Void
+    let onOpenPhoto: () -> Void
 
     var body: some View {
         GeometryReader { geometry in
@@ -40,13 +41,17 @@ struct HomeV2Surface: View {
     }
 
     private func photoStage(photoURL: String, size: CGSize) -> some View {
-        SubjectPlateView(
-            urlString: photoURL,
-            size: CGSize(width: size.width, height: HomeV2Layout.stageHeight(width: size.width, height: size.height))
-        )
-        .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Progress photo")
-            .accessibilityIdentifier("home_v2_photo_stage")
+        Button(action: onOpenPhoto) {
+            SubjectPlateView(
+                urlString: photoURL,
+                size: CGSize(width: size.width, height: HomeV2Layout.stageHeight(width: size.width, height: size.height))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Progress photo")
+        .accessibilityHint("Opens the photo")
+        .accessibilityIdentifier("home_v2_photo_stage")
     }
 
     private func numberBlock(size: CGFloat, kerning: CGFloat, topPadding: CGFloat) -> some View {

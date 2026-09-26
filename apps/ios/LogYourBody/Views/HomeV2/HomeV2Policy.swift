@@ -44,6 +44,20 @@ enum HomeV2Copy {
         return "\(direction) \(String(format: "%.1f", magnitude)) \(unit) in \(days) days"
     }
 
+    static let firstPhoto = "First photo"
+
+    /// "Down 12.8 lb since Apr 2" — change against the first photo.
+    static func sinceSentence(delta: Double, unit: String, since: String) -> String {
+        let magnitude = abs(delta)
+        guard magnitude >= 0.05 else { return "No change since \(since)" }
+        let direction = delta < 0 ? "Down" : "Up"
+        return "\(direction) \(String(format: "%.1f", magnitude)) \(unit) since \(since)"
+    }
+
+    static func photoPosition(_ position: Int, of total: Int) -> String {
+        "Photo \(position) of \(total)"
+    }
+
     /// Row detail: "−0.9 pts", "+0.2", "No change", "No 30-day trend".
     static func compactChange(delta: Double?, unit: String, days: Int = 30) -> String {
         guard let delta else { return "No \(days)-day trend" }
