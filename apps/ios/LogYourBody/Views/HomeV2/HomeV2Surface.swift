@@ -22,6 +22,7 @@ struct HomeV2Surface: View {
     let chartTrend: [MetricChartDataPoint]
     let onOpenPhoto: () -> Void
     let onViewProgress: () -> Void
+    let onTodayDetails: () -> Void
     let onLogWeight: () -> Void
     let onDone: () -> Void
     let onUndo: () -> Void
@@ -133,7 +134,27 @@ struct HomeV2Surface: View {
             .padding(.top, HomeV2Tokens.Space.margin)
 
             rangeRow
+            todayDetailsRow
         }
+    }
+
+    private var todayDetailsRow: some View {
+        Button(action: onTodayDetails) {
+            HStack(spacing: HomeV2Tokens.Space.tight) {
+                Text(HomeV2Copy.todayDetails)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                Spacer(minLength: HomeV2Tokens.Space.tight)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HomeV2Tokens.Colors.quiet)
+            }
+            .padding(.horizontal, HomeV2Tokens.Space.margin)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("home_v2_today_details")
     }
 
     /// C2 replaces the phase line with what was just logged and a way back.

@@ -101,6 +101,15 @@ extension DashboardViewLiquid {
         .sheet(isPresented: $isHomeV2LogSheetPresented) {
             homeV2LogWeightSheet
         }
+        .sheet(item: $homeV2EditingMetric) { metric in
+            homeV2EditEntrySheet(for: metric)
+        }
+        .navigationDestination(isPresented: $isHomeV2ContextPresented) {
+            homeV2ContextView
+        }
+        .navigationDestination(isPresented: $isHomeV2EntriesPresented) {
+            homeV2EntriesView
+        }
         .fullScreenCover(isPresented: $isShowingPhotoTimelineMenu) {
             PhotoTimelineNavigationMenu(
                 selected: selectedPhotoTimelineRootPage,
@@ -113,6 +122,7 @@ extension DashboardViewLiquid {
                     isShowingPhotoTimelineMenu = false
                     isPhotoTimelineSettingsPresented = true
                 },
+                onOpenEntries: homeV2OpenEntriesAction,
                 onClose: {
                     isShowingPhotoTimelineMenu = false
                 }
@@ -204,7 +214,21 @@ extension DashboardViewLiquid {
             }
             .frame(maxWidth: .infinity)
 
-            if isHomeChatExpanded {
+            if isHomeV2CheckIn {
+                Button {
+                    openHomeV2Context()
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(HomeV2Tokens.Colors.ink)
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Today’s details")
+                .accessibilityHint("Opens the selected day")
+                .accessibilityIdentifier("home_v2_context_button")
+            } else if isHomeChatExpanded {
                 Button {
                     isHomeChatExpanded = false
                 } label: {
@@ -252,6 +276,10 @@ extension DashboardViewLiquid {
         case .menu:
             isShowingPhotoTimelineMenu = true
         case .stats:
+            if isHomeV2CheckIn {
+                openHomeV2Context()
+                return
+            }
             selectedPhotoTimelineRootPage = .analytics
             isHomeChatExpanded = false
             HapticManager.shared.selection()
@@ -463,6 +491,7 @@ private struct PhotoTimelineNavigationMenu: View {
     let selected: DashboardViewLiquid.PhotoTimelineRootPage
     let onSelect: (DashboardViewLiquid.PhotoTimelineRootPage) -> Void
     let onOpenSettings: () -> Void
+    var onOpenEntries: (() -> Void)?
     let onClose: () -> Void
 
     var body: some View {
@@ -504,6 +533,18 @@ private struct PhotoTimelineNavigationMenu: View {
                         systemImage: "chart.line.uptrend.xyaxis",
                         page: .analytics
                     )
+                    if let onOpenEntries {
+                        Button(action: onOpenEntries) {
+                            menuLabel(
+                                title: "Entries",
+                                systemImage: "list.bullet",
+                                isSelected: false
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Entries")
+                        .accessibilityIdentifier("photo_timeline_menu_entries")
+                    }
                     Button(action: onOpenSettings) {
                         menuLabel(
                             title: "Settings",

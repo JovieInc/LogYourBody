@@ -1350,6 +1350,65 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "home-v2-day-zero", from: app)
     }
 
+    func testHomeV2ContextShowsTheDayAndEditsTheEntry() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let contextButton = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(contextButton.waitForExistence(timeout: 30), "Home offers the day's details from its header")
+        contextButton.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context"].waitForExistence(timeout: 8), "Context opens")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 5),
+            "The day's weight is listed with its source"
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_photo"].exists, "The day's photo shows")
+        attachScreenshot(named: "home-v2-context", from: app)
+
+        let edit = app.buttons["home_v2_edit_entry"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5), "Edit entry is the only prominent action")
+        edit.tap()
+
+        let title = app.descendants(matching: .any)["home_v2_log_sheet"]
+        XCTAssertTrue(title.waitForExistence(timeout: 8))
+        XCTAssertEqual(title.label, "Edit entry")
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_delete"].exists, "Deletion stays visible, never disclosed away")
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_photo_side"].exists, "Editing shows the details without a disclosure")
+        attachScreenshot(named: "home-v2-edit-entry", from: app)
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(edit.waitForExistence(timeout: 8), "Saving returns to the day")
+        app.buttons["home_v2_context_close"].tap()
+        let home = app.descendants(matching: .any)["home_v2_change_sentence"]
+        XCTAssertTrue(home.waitForExistence(timeout: 8), "Closing returns Home")
+        XCTAssertTrue(
+            app.buttons["home_v2_done"].exists || app.buttons["home_v2_log_weight"].exists,
+            "Home shows the logged state for today's edit, or the check-in"
+        )
+    }
+
+    func testHomeV2EntriesListsTheMonthAndOpensADay() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+        // The menu's container identifier shadows its rows' identifiers, so rows are found by label.
+        let entries = app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch
+        XCTAssertTrue(entries.waitForExistence(timeout: 8), "The menu offers Entries under the gate")
+        entries.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_entries"].waitForExistence(timeout: 8), "Entries opens")
+        let row = app.buttons["home_v2_entries_row"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "Every logged day lists")
+        attachScreenshot(named: "home-v2-entries", from: app)
+        row.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context"].waitForExistence(timeout: 8), "A row opens that day")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 5))
+    }
+
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
