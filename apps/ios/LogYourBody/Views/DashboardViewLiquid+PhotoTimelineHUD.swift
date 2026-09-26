@@ -34,7 +34,8 @@ extension DashboardViewLiquid {
                             selectedMetricType = .ffmi
                             isMetricDetailActive = true
                         },
-                        onShare: makeBodyScoreShareAction(metric: metric, score: bodyScore.score)
+                        onShare: makeBodyScoreShareAction(metric: metric, score: bodyScore.score),
+                        onAddPhoto: { presentProgressPhotoAttach(for: metric) }
                     )
                 } else {
                     photoTimelineHUDEmptyState

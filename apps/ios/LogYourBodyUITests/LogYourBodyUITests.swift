@@ -351,6 +351,23 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.firstMatch.exists)
     }
 
+    // Regression: the empty photo stage said "Add one to this day" but had no action once any data existed.
+    func testEmptyPhotoStageOpensAttachSheetForThatDay() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        let addPhoto = app.buttons["launch_timeline_add_photo"]
+        XCTAssertTrue(addPhoto.waitForExistence(timeout: 8), "A day without a photo must offer an add-photo action")
+        addPhoto.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["progress_photo_attach_sheet"].waitForExistence(timeout: 8),
+            "Tapping the empty stage must open the photo attach sheet"
+        )
+        attachScreenshot(named: "timeline-add-photo-for-day", from: app)
+    }
+
     func testHomePinsChatComposerWithoutTabBar() throws {
         let app = XCUIApplication()
         launch(app, with: [
