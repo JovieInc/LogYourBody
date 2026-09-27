@@ -24,7 +24,10 @@ enum HomeV2Policy {
     ) -> Bool {
         #if DEBUG
         if arguments.contains(fixtureArgument) || arguments.contains(photoFixtureArgument) ||
-            arguments.contains(emptyFixtureArgument) {
+            arguments.contains(emptyFixtureArgument) ||
+            arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument) ||
+            arguments.contains(HomeV2SystemStatePolicy.healthOffFixtureArgument) ||
+            arguments.contains(HomeV2SystemStatePolicy.loadingFixtureArgument) {
             return true
         }
         #endif

@@ -1554,6 +1554,38 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8), "Back returns to Today")
     }
 
+    func testHomeV2SystemStatesNeverHideOfflineHealthOffOrLoading() throws {
+        let app = XCUIApplication()
+
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2OfflineFixture"])
+        let banner = app.descendants(matching: .any)["home_v2_offline_banner"]
+        XCTAssertTrue(banner.waitForExistence(timeout: 30), "Offline is a banner under the header, never hidden")
+        let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 5))
+        XCTAssertLessThanOrEqual(banner.frame.maxY, value.frame.minY + 1, "The banner sits above the number")
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].exists, "Home otherwise unchanged")
+        attachScreenshot(named: "home-v2-offline", from: app)
+
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2HealthOffFixture"])
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_health_off"].waitForExistence(timeout: 30),
+            "Apple Health off is a status row"
+        )
+        XCTAssertTrue(
+            app.buttons["home_v2_connect_health"].waitForExistence(timeout: 5),
+            "The one action becomes Connect Apple Health"
+        )
+        XCTAssertEqual(app.buttons["home_v2_today_details"].label, "Log weight manually", "The details row offers manual logging")
+        attachScreenshot(named: "home-v2-health-off", from: app)
+
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2LoadingFixture"])
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_loading"].waitForExistence(timeout: 30), "Loading says so")
+        let dock = app.buttons["home_v2_loading_dock"]
+        XCTAssertTrue(dock.waitForExistence(timeout: 5))
+        XCTAssertFalse(dock.isEnabled, "The dock is disabled while loading")
+        attachScreenshot(named: "home-v2-loading", from: app)
+    }
+
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])

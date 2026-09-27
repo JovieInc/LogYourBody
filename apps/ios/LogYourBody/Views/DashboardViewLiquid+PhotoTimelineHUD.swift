@@ -163,7 +163,9 @@ extension DashboardViewLiquid {
                         id: "photo_timeline_root_page_timeline",
                         label: "Timeline page"
                     )
-                    if bodyMetrics.isEmpty {
+                    if isHomeV2CheckIn, homeV2SystemState == .loading {
+                        HomeV2LoadingHome()
+                    } else if bodyMetrics.isEmpty {
                         if isHomeV2CheckIn {
                             homeV2DayZero
                         } else {
