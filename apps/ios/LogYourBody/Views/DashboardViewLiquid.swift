@@ -100,6 +100,12 @@ struct DashboardViewLiquid: View {
     @State var homeV2LogSheetDate = Date()
     @State var homeV2EditingMetric: BodyMetrics?
     @State var homeV2PhotoRoute: HomeV2PhotoRoute?
+    @State var isHomeV2SettingsPresented = false
+    @State var homeV2SettingsRoute: HomeV2SettingsRoute?
+    @State var isHomeV2PaywallPresented = false
+    @State var homeV2GoalEditor: PreferenceGoalKind?
+    @State var isHomeV2HelpPresented = false
+    @AppStorage("biometricLockEnabled") var homeV2FaceIDLock = false
     @State var isHomeV2AllPhotosPresented = false
     @State var homeV2Logged: HomeV2LoggedEntry?
     @State var homeV2PhaseSentence: String?

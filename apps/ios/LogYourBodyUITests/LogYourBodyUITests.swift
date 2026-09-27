@@ -1521,6 +1521,39 @@ final class LogYourBodyUITests: XCTestCase {
         )
     }
 
+    func testHomeV2SidebarOpensSettingsAndReminders() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_sidebar"].waitForExistence(timeout: 8), "The sidebar opens")
+        for destination in ["today", "photos", "progress", "entries", "ask"] {
+            XCTAssertTrue(app.buttons["home_v2_sidebar_\(destination)"].exists, "Sidebar lists \(destination)")
+        }
+        attachScreenshot(named: "home-v2-sidebar", from: app)
+
+        let settings = app.buttons["home_v2_sidebar_settings"]
+        XCTAssertTrue(settings.exists)
+        settings.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8), "Settings is one table")
+        XCTAssertTrue(app.buttons["home_v2_settings_delete"].exists, "Delete account stays visible, never disclosed away")
+        attachScreenshot(named: "home-v2-settings", from: app)
+
+        app.buttons["home_v2_settings_reminders"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_reminders"].waitForExistence(timeout: 8), "Reminders opens")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_reminders_toggle"].exists)
+        attachScreenshot(named: "home-v2-reminders", from: app)
+
+        app.buttons["home_v2_reminders_back"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+        app.buttons["home_v2_settings_back"].tap()
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8), "Back returns to Today")
+    }
+
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
