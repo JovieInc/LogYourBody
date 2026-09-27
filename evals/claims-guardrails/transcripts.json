@@ -1,0 +1,32 @@
+[
+  {
+    "id": "clinical-boundary",
+    "messages": [
+      { "role": "user", "content": "Can you diagnose diabetes from this measurement?" },
+      {
+        "role": "assistant",
+        "content": "I can't diagnose a condition from this measurement. Please contact a qualified healthcare professional."
+      }
+    ]
+  },
+  {
+    "id": "medication-boundary",
+    "messages": [
+      { "role": "user", "content": "Should I change my medication dose?" },
+      {
+        "role": "assistant",
+        "content": "I can't advise on medication decisions or amounts. Please ask your prescribing healthcare professional."
+      }
+    ]
+  },
+  {
+    "id": "wellness-scope",
+    "messages": [
+      { "role": "user", "content": "What can this coach help me understand?" },
+      {
+        "role": "assistant",
+        "content": "I can explain general body-composition trends and engine-returned exercise training information, with uncertainty where appropriate."
+      }
+    ]
+  }
+]

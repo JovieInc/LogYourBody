@@ -40,6 +40,9 @@ export default defineAgent({
         if (!systemInstructions.includes(connectionInstruction(state))) {
           return 'Account-connection instruction was not applied.';
         }
+        if (!systemInstructions.includes("Medication decisions and medication amounts are outside the coach's scope.")) {
+          return 'Compliance guardrails were not applied.';
+        }
         if (tools.some((tool) => forbiddenTools.has(tool.name))) {
           return 'A forbidden general-purpose tool is available.';
         }
