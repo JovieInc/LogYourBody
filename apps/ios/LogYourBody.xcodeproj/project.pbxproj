@@ -82,7 +82,7 @@
 		6CD79FAE1B8BE0D48DB90DB5 /* HomeV2PhotoJourneyPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2FAA8408CBA2168F58B80D9 /* HomeV2PhotoJourneyPolicyTests.swift */; };
 		73AAD5D6EADA5C5A7BEB0D4B /* HealthKitManager+Part03.swift in Sources */ = {isa = PBXBuildFile; fileRef = 656A7105DE085AFF17E796C8 /* HealthKitManager+Part03.swift */; };
 		75A151025036A3D85388BD19 /* ValidationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3BCDDCDB314367722653A8 /* ValidationServiceTests.swift */; };
-		75A53A0D54A438DDC9F12B2E /* HomeV2SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFCF003F85B6FCE7D15EE6B6 /* HomeV2SettingsView.swift */; };
+		75A53A0D54A438DDC9F12B2E /* HomeV2SettingsCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFCF003F85B6FCE7D15EE6B6 /* HomeV2SettingsCopy.swift */; };
 		773F3C5B9FF015B9A66418D1 /* AnalyticsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC41129661E6DC33C6C4877 /* AnalyticsServiceTests.swift */; };
 		77AE209CC221E82496CC8771 /* OnboardingScoreDisplayPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F72F9E9548064844D56AD75 /* OnboardingScoreDisplayPolicyTests.swift */; };
 		7C37907A5334D86B6A905A8A /* EditEntrySavePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7CC52C2F710012ABB7E7219 /* EditEntrySavePolicy.swift */; };
@@ -375,7 +375,6 @@
 		C2465BE618C74154F47B1E1F /* HealthSyncTestDoubles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A1C6C2438CB1EDCEC43C67 /* HealthSyncTestDoubles.swift */; };
 		C2926582BB6E34D664FC211B /* HomeV2AllPhotosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A245724F193D7E7ABF1D7086 /* HomeV2AllPhotosView.swift */; };
 		C5C96F424F3D65A1180A3EA7 /* SyncIntegrationRemotePayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 128B0622423D7E7711DCD94D /* SyncIntegrationRemotePayloadTests.swift */; };
-		C646DB1268671A81DE9B47F7 /* HomeV2SettingsDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC9EFE2B9EF665850871E867 /* HomeV2SettingsDetailViews.swift */; };
 		C65D81F714890E4F28FFBC9B /* HomeV2SystemStatePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2112475E73F20D464413207 /* HomeV2SystemStatePolicyTests.swift */; };
 		C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED9F05E697F00813F824903 /* LogoutButton.swift */; };
 		C7A700022F20000000C0A702 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A700012F20000000C0A701 /* ChatService.swift */; };
@@ -597,7 +596,6 @@
 		AB73CC33EB688034C7B8512F /* SubjectPlateRendererTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SubjectPlateRendererTests.swift; sourceTree = "<group>"; };
 		AB992727D1333B365F93F30E /* AccountDeletionCleanupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccountDeletionCleanupServiceTests.swift; sourceTree = "<group>"; };
 		AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PasswordStrengthIndicator.swift; path = DesignSystem/Molecules/PasswordStrengthIndicator.swift; sourceTree = "<group>"; };
-		AC9EFE2B9EF665850871E867 /* HomeV2SettingsDetailViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2SettingsDetailViews.swift; sourceTree = "<group>"; };
 		ACBA870282ED5F613A82213D /* HomeV2PrimaryButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PrimaryButton.swift; sourceTree = "<group>"; };
 		AD0054DC2E20C9DF0029E0FF /* LegalConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalConsentView.swift; sourceTree = "<group>"; };
 		AD0054DE2E20CDB00029E0FF /* ProgressPhotoCarouselView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoCarouselView.swift; sourceTree = "<group>"; };
@@ -925,7 +923,7 @@
 		D856C71302D4F5358A9C217A /* DashboardViewLiquid+HomeV2Photos.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HomeV2Photos.swift"; sourceTree = "<group>"; };
 		DA456B8668AB1B5DDFA6C5CA /* AuthSurfacePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthSurfacePolicyTests.swift; sourceTree = "<group>"; };
 		DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthSyncCoordinatorPipelineTests.swift; sourceTree = "<group>"; };
-		DFCF003F85B6FCE7D15EE6B6 /* HomeV2SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2SettingsView.swift; sourceTree = "<group>"; };
+		DFCF003F85B6FCE7D15EE6B6 /* HomeV2SettingsCopy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2SettingsCopy.swift; sourceTree = "<group>"; };
 		E2465B2ED058FAFC5389161E /* DSDivider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSDivider.swift; path = DesignSystem/Atoms/DSDivider.swift; sourceTree = "<group>"; };
 		E2715F4BF0E82E86A99821E3 /* PhotoLibraryScannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoLibraryScannerTests.swift; sourceTree = "<group>"; };
 		E2AC3C23E6923176F103B414 /* StepsIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StepsIndicator.swift; path = DesignSystem/Molecules/StepsIndicator.swift; sourceTree = "<group>"; };
@@ -1128,8 +1126,7 @@
 				509C2DEE545A83990C02B1BE /* HomeV2ShareView.swift */,
 				CB9A3103FAF35316B5451267 /* HomeV2TimelapseView.swift */,
 				E484B3BBE5650558AF9F18D2 /* HomeV2SidebarView.swift */,
-				DFCF003F85B6FCE7D15EE6B6 /* HomeV2SettingsView.swift */,
-				AC9EFE2B9EF665850871E867 /* HomeV2SettingsDetailViews.swift */,
+				DFCF003F85B6FCE7D15EE6B6 /* HomeV2SettingsCopy.swift */,
 				01BD02DCEF0318DCF497AA0D /* HomeV2SystemStates.swift */,
 				6199FE2F37FD5DB5339ABD58 /* HomeV2OnboardingViews.swift */,
 				F0F54FEB79B3EA400E377193 /* HomeV2AskPolicy.swift */,
@@ -2433,8 +2430,7 @@
 				49D5988F7EC628943163A2FB /* HomeV2TimelapseView.swift in Sources */,
 				81A33EF8A149BD31F7933863 /* DashboardViewLiquid+HomeV2Photos.swift in Sources */,
 				8A4E2FE2E07BE7A995941A6E /* HomeV2SidebarView.swift in Sources */,
-				75A53A0D54A438DDC9F12B2E /* HomeV2SettingsView.swift in Sources */,
-				C646DB1268671A81DE9B47F7 /* HomeV2SettingsDetailViews.swift in Sources */,
+				75A53A0D54A438DDC9F12B2E /* HomeV2SettingsCopy.swift in Sources */,
 				E7C7A871B2C96214AF2D825F /* DashboardViewLiquid+HomeV2Settings.swift in Sources */,
 				06DB21FE7EF2F40D3F83561A /* HomeV2SystemStates.swift in Sources */,
 				B0E8F67906FEAE7E0D6CB969 /* HomeV2OnboardingViews.swift in Sources */,

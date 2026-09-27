@@ -11,23 +11,56 @@ extension PreferencesView {
             heroHeader
         }
 
-        SettingsSection(header: "Personal") {
+        SettingsSection(header: "Account") {
             SettingsNavigationLink(
                 icon: "person.crop.circle",
                 title: "Profile",
-                subtitle: "Personal details and profile photo"
+                subtitle: "Personal details and profile photo",
+                accessibilityIdentifier: "settings_profile_link",
+                titleAccessibilityIdentifier: "home_v2_settings_profile"
             ) {
                 SettingsDetailScreen(title: "Profile") {
                     accountSection
                     profileSection
                 }
+                .confirmationDialog(
+                    "Log out of LogYourBody?",
+                    isPresented: $showingLogoutConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Log Out", role: .destructive) {
+                        Task {
+                            await authManager.logout()
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
             }
-            .accessibilityIdentifier("settings_profile_link")
+            SettingsNavigationLink(
+                icon: "crown.fill",
+                title: "Subscription",
+                subtitle: accountSubscriptionSummary,
+                accessibilityIdentifier: "settings_account_subscription_link",
+                titleAccessibilityIdentifier: "home_v2_settings_subscription"
+            ) {
+                SettingsDetailScreen(title: "Account & subscription", accessibilityIdentifier: "home_v2_subscription") {
+                    subscriptionSection
+                    changePlanSection
+                    advancedSection
+                    subscriptionBenefitsSection
+                    securitySection
+                }
+            }
+        }
+
+        SettingsSection(header: "Data") {
+            integrationsLauncherRow
 
             SettingsNavigationLink(
                 icon: "target",
                 title: "Tracking",
-                subtitle: "Goals, units, and reminders"
+                subtitle: "Body composition targets and reminders",
+                accessibilityIdentifier: "settings_tracking_link"
             ) {
                 SettingsDetailScreen(title: "Tracking") {
                     trackingGoalsSection
@@ -35,30 +68,86 @@ extension PreferencesView {
                 }
                 .worldClassScreen(.trackingAndGoals)
             }
-            .accessibilityIdentifier("settings_tracking_link")
-
-            integrationsLauncherRow
-                .accessibilityIdentifier("settings_integrations_link")
-        }
-
-        SettingsSection(header: "Account & data") {
             SettingsNavigationLink(
-                icon: "person.badge.key",
-                title: "Account & subscription",
-                subtitle: accountSubscriptionSummary
+                icon: "globe",
+                title: "Units",
+                subtitle: HomeV2SettingsCopy.unitsText(currentSystem),
+                accessibilityIdentifier: "home_v2_settings_units"
             ) {
-                SettingsDetailScreen(title: "Account & subscription") {
-                    subscriptionSection
-                    advancedSection
-                    securitySection
+                SettingsDetailScreen(title: "Units", accessibilityIdentifier: "home_v2_units") {
+                    unitSettingsSection
                 }
             }
-            .accessibilityIdentifier("settings_account_subscription_link")
+            SettingsNavigationLink(
+                icon: "scope",
+                title: "Target",
+                subtitle: goalValueText(for: .weight),
+                accessibilityIdentifier: "home_v2_settings_target"
+            ) {
+                SettingsDetailScreen(title: "Target", accessibilityIdentifier: "home_v2_target") {
+                    targetSettingsSection
+                }
+            }
+            SettingsNavigationLink(
+                icon: "bell.badge",
+                title: "Reminders",
+                subtitle: dailyReminderSubtitle,
+                accessibilityIdentifier: "home_v2_settings_reminders"
+            ) {
+                SettingsDetailScreen(
+                    title: "Reminders",
+                    accessibilityIdentifier: "home_v2_reminders",
+                    backIdentifier: "home_v2_reminders_back"
+                ) {
+                    remindersSection
+                }
+                .worldClassScreen(.dailyReminder)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("home_v2_reminders")
+            }
+            SettingsNavigationLink(
+                icon: "figure.walk",
+                title: "Activity",
+                subtitle: "Daily step goal"
+            ) {
+                SettingsDetailScreen(title: "Activity") {
+                    SettingsSection(header: "Daily activity") {
+                        stepGoalRow
+                    }
+                }
+            }
+        }
 
+        SettingsSection(header: "Privacy & data") {
+            SettingsToggleRow(
+                icon: "faceid",
+                title: "Face ID lock",
+                isOn: $biometricLockEnabled
+            )
+            .accessibilityIdentifier("home_v2_settings_face_id")
+
+            SettingsNavigationLink(
+                icon: "square.and.arrow.down",
+                title: "Export data",
+                accessibilityIdentifier: "home_v2_settings_export"
+            ) {
+                ExportDataView()
+                    .environmentObject(authManager)
+            }
+            SettingsNavigationLink(
+                icon: "trash",
+                title: "Delete account",
+                accessibilityIdentifier: "home_v2_settings_delete",
+                tintColor: Color.appError
+            ) {
+                DeleteAccountView()
+                    .environmentObject(authManager)
+            }
             SettingsNavigationLink(
                 icon: "hand.raised",
                 title: "Privacy & data",
-                subtitle: "Photo handling and account deletion"
+                subtitle: "Photo handling and account actions",
+                accessibilityIdentifier: "settings_privacy_data_link"
             ) {
                 SettingsDetailScreen(title: "Privacy & data") {
                     photosSection
@@ -66,7 +155,42 @@ extension PreferencesView {
                 }
                 .worldClassScreen(.privacyAndData)
             }
-            .accessibilityIdentifier("settings_privacy_data_link")
+        }
+    }
+
+    var unitSettingsSection: some View {
+        SettingsSection(header: "Units", footer: HomeV2SettingsCopy.unitsNote) {
+            measurementSystemSection
+            SettingsRow(
+                title: HomeV2SettingsCopy.height,
+                titleAccessibilityIdentifier: "home_v2_units_height",
+                value: HomeV2SettingsCopy.heightUnitText(currentSystem)
+            )
+            SettingsRow(
+                title: HomeV2SettingsCopy.bodyFat,
+                titleAccessibilityIdentifier: "home_v2_units_body_fat",
+                value: "%"
+            )
+            SettingsRow(
+                title: HomeV2SettingsCopy.circumference,
+                titleAccessibilityIdentifier: "home_v2_units_circumference",
+                value: HomeV2SettingsCopy.circumferenceUnitText(currentSystem)
+            )
+        }
+    }
+
+    var targetSettingsSection: some View {
+        SettingsSection(header: "Targets", footer: HomeV2SettingsCopy.targetNote) {
+            goalRow(for: .weight, titleAccessibilityIdentifier: "home_v2_target_weight")
+            goalRow(for: .bodyFat, titleAccessibilityIdentifier: "home_v2_target_body_fat")
+            if customWeightGoalKilograms != nil || customBodyFatGoal != nil {
+                SettingsButtonRow(
+                    title: HomeV2SettingsCopy.removeTarget,
+                    titleAccessibilityIdentifier: "home_v2_target_remove",
+                    action: resetToDefaults
+                )
+                .accessibilityIdentifier("home_v2_target_remove")
+            }
         }
     }
 
@@ -98,6 +222,7 @@ extension PreferencesView {
             }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(WorldClassScreen.settings.accessibilityIdentifier)
     }
 
     var heroIdentityText: some View {

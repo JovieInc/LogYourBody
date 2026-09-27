@@ -16,6 +16,7 @@ enum PreferencesProfileEditor: String, Identifiable {
 
 struct PreferencesView: View {
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) var openURL
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @StateObject var subscriptionManager = SubscriptionManager.shared
@@ -53,6 +54,7 @@ struct PreferencesView: View {
     @State var isTriggeringHealthResync = false
     @State var isHealthSyncSetupInProgress = false
     @State var dailyReminderDate = Date()
+    @State var isShowingSettingsPaywall = false
 
     static var defaultMeasurementSystem: String {
         MeasurementSystem.localeDefault.rawValue
@@ -63,7 +65,7 @@ struct PreferencesView: View {
     }
 
     var body: some View {
-        List {
+        Form {
             settingsLauncher
         }
         .listStyle(.insetGrouped)
@@ -72,6 +74,7 @@ struct PreferencesView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(restoreAlertMessage)
+                .accessibilityIdentifier("home_v2_subscription_restore_message")
         }
         .alert("Profile photo couldn’t be updated", isPresented: $showingProfilePhotoError) {
             Button("OK", role: .cancel) {}
@@ -97,6 +100,17 @@ struct PreferencesView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Label("Back", systemImage: "chevron.backward")
+                }
+                .accessibilityIdentifier("home_v2_settings_back")
+            }
+        }
         .toolbar(.hidden, for: .tabBar)
         .sheet(item: $activeProfileEditor) { editor in
             profileEditorSheet(for: editor)
@@ -128,6 +142,12 @@ struct PreferencesView: View {
             }
         }
         .worldClassScreen(.settings)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home_v2_settings")
+        .sheet(isPresented: $isShowingSettingsPaywall) {
+            PaywallView()
+                .environmentObject(authManager)
+        }
     }
 
     @ViewBuilder

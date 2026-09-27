@@ -23,7 +23,8 @@ extension PreferencesView {
         SettingsSection(header: "Restore purchases") {
             SettingsButtonRow(
                 icon: "arrow.triangle.2.circlepath",
-                title: isRestoringPurchases ? "Restoring purchases…" : "Restore purchases"
+                title: isRestoringPurchases ? "Restoring purchases…" : "Restore purchases",
+                titleAccessibilityIdentifier: "home_v2_subscription_restore"
             ) {
                 restorePurchases()
             }

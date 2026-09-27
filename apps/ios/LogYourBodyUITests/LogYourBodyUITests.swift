@@ -208,6 +208,27 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(restoreButton.exists)
     }
 
+    func testProfileLogoutSignsOutFromPushedDetail() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+
+        try openSettings(in: app)
+
+        let profileLink = app.descendants(matching: .any)["settings_profile_link"]
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 5))
+        profileLink.tap()
+
+        let logoutButton = app.descendants(matching: .any)["settings_logout_button"]
+        XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
+        logoutButton.tap()
+
+        let confirmLogout = app.buttons["Log Out"]
+        XCTAssertTrue(confirmLogout.waitForExistence(timeout: 5))
+        confirmLogout.tap()
+
+        XCTAssertTrue(app.buttons["continueWithAppleButton"].waitForExistence(timeout: 8))
+    }
+
     func testProfileEditorProvidesAnEscapeRoute() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
@@ -1540,7 +1561,11 @@ final class LogYourBodyUITests: XCTestCase {
         settings.tap()
 
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8), "Settings is one table")
-        XCTAssertTrue(app.buttons["home_v2_settings_delete"].exists, "Delete account stays visible, never disclosed away")
+        let deleteAccount = app.buttons["home_v2_settings_delete"]
+        for _ in 0..<4 where !deleteAccount.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(deleteAccount.exists, "Delete account stays in the root list, never disclosed away")
         attachScreenshot(named: "home-v2-settings", from: app)
 
         app.buttons["home_v2_settings_reminders"].tap()
