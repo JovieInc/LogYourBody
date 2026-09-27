@@ -23,6 +23,19 @@ final class AppVersionTests: XCTestCase {
         XCTAssertEqual(AppVersion.build, expectedBuild)
     }
 
+    func testVoiceInputPurposeStringsAreIncludedInAppBundle() {
+        let info = Bundle.main.infoDictionary
+
+        XCTAssertEqual(
+            info?["NSMicrophoneUsageDescription"] as? String,
+            "Voice input uses the microphone so you can talk to your coach."
+        )
+        XCTAssertEqual(
+            info?["NSSpeechRecognitionUsageDescription"] as? String,
+            "Speech recognition turns your voice into text for your coach."
+        )
+    }
+
     func testShortVersionIsCurrentVersionWithoutPrefix() {
         XCTAssertEqual(AppVersion.shortVersion, AppVersion.current)
         XCTAssertFalse(AppVersion.shortVersion.hasPrefix("Version"))

@@ -40,6 +40,10 @@
 	<string>LogYourBody uses HealthKit to read your weight and body composition data and sync it with your profile.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>LogYourBody uses HealthKit to save your weight and body fat measurements.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Voice input uses the microphone so you can talk to your coach.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition turns your voice into text for your coach.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>LogYourBody uses Face ID to secure your personal health data and progress photos.</string>
 	<key>NSCameraUsageDescription</key>
