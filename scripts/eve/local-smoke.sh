@@ -19,3 +19,9 @@ for connection_state in unconnected connected; do
     --max-concurrency 1 \
     --skip-report
 done
+
+export LYB_EVE_KNOWLEDGE_EVAL=1
+bash scripts/eve/run-node24.sh eval knowledge-golden \
+  --strict \
+  --max-concurrency 1 \
+  --skip-report

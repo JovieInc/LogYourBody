@@ -5,8 +5,10 @@ import {
   localConnectionFixture,
   smokeReply,
 } from './lib/account-connection';
+import { knowledgeEvalFixtureModel } from './lib/knowledge-eval-fixture';
 
 const isLocalSmokeEval = process.env.LYB_EVE_LOCAL_SMOKE === '1';
+const isKnowledgeSkillEval = process.env.LYB_EVE_KNOWLEDGE_EVAL === '1';
 
 /**
  * The external eve.dev runtime for LogYourBody's core agent chat. Product data
@@ -14,7 +16,9 @@ const isLocalSmokeEval = process.env.LYB_EVE_LOCAL_SMOKE === '1';
  * never grants data access by itself.
  */
 export default defineAgent({
-  model: isLocalSmokeEval
+  model: isKnowledgeSkillEval
+    ? knowledgeEvalFixtureModel()
+    : isLocalSmokeEval
     ? mockModel(({ messages, tools, userMessageCount }) => {
         const state = localConnectionFixture();
         const systemInstructions = messages
@@ -43,7 +47,7 @@ export default defineAgent({
         return smokeReply(state, userMessageCount);
       })
     : 'openai/gpt-5.4-mini',
-  ...(isLocalSmokeEval
+  ...(isLocalSmokeEval || isKnowledgeSkillEval
     ? {
         modelContextWindowTokens: 16_384,
         compaction: { modelContextWindowTokens: 16_384 },
