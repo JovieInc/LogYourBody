@@ -206,6 +206,54 @@ export const logYourBody = {
       { value: 'http://www.w3.org', reason: 'SVG XML namespace identifiers.' },
       { value: 'https://linkedin.com/in/timwhite', reason: 'Founder social link.' },
       { value: 'https://smpl-x.is.tue.mpg.de', reason: 'SMPL-X body-model reference in avatar docs.' },
+      {
+        value: 'https://threadreaderapp.com/thread/1481118406749220868.html',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://threadreaderapp.com/thread/1798372438960730423.html',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://threadreaderapp.com/thread/1820660351366738276.html',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://threadreaderapp.com/thread/1857896428317630893.html',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://github.com/ChatPRD/lennys-podcast-transcripts/blob/main/episodes/nikita-bier/transcript.md',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://www.lennysnewsletter.com/p/how-to-consistently-go-viral-nikita-bier',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://techcrunch.com/2024/06/12/ios-18-cracks-down-on-apps-asking-for-full-address-book-access/',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://m.ebrun.com/571975.html',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://app.dealroom.co/news/note/nikita-bier-advises-protector-launch-with-viral-growth-playbook',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://x.com/nikitabier/status/1813735668276928682',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://www.skillsdirectory.com/skills/heyimjames-nikita-bier-consumer-apps',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
+      {
+        value: 'https://techiegamers.com/nikita-bier-viral-success/',
+        reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+      },
       { value: 'https://e', reason: 'Compact fixture host in timeline scrub tests.' },
     ],
   },
