@@ -552,31 +552,16 @@ func persistEmailCapture() {
         )
     }
 
-func createAccount(authManager: AuthManager) async {
+func beginAccountCreation() {
         guard canContinueAccountCreation else { return }
+        isCreatingAccount = true
+        accountCreationError = nil
+        accountCreationStage = .preparing
+        accountCreationStage = .creatingAccount
+}
 
-        await MainActor.run {
-            isCreatingAccount = true
-            accountCreationError = nil
-            accountCreationStage = .preparing
-        }
-
-        if authManager.isAuthenticated {
-            await MainActor.run {
-                accountCreationStage = .finalizing
-                accountCreationStage = .idle
-                isCreatingAccount = false
-                goToNextStep()
-            }
-            return
-        }
-
-        do {
-            await MainActor.run {
-                accountCreationStage = .creatingAccount
-            }
-            try await authManager.signInWithApple()
-
+func completeAccountCreation(didSignIn: Bool) {
+        if didSignIn {
             AppServicePorts.analyticsTracker.track(
                 event: "onboarding_account_created",
                 properties: [
@@ -584,31 +569,30 @@ func createAccount(authManager: AuthManager) async {
                     "method": "apple"
                 ]
             )
-
-            await MainActor.run {
-                accountCreationStage = .finalizing
-            }
-
-            await MainActor.run {
-                self.accountCreationStage = .idle
-                self.isCreatingAccount = false
-                self.goToNextStep()
-            }
-        } catch {
-            AppServicePorts.analyticsTracker.track(
-                event: "onboarding_account_creation_failed",
-                properties: [
-                    "entry_context": entryContext.analyticsContext
-                ]
-            )
-
-            await MainActor.run {
-                self.isCreatingAccount = false
-                self.accountCreationStage = .idle
-                self.accountCreationError = error.localizedDescription
-            }
         }
-    }
+
+        accountCreationStage = .finalizing
+        accountCreationStage = .idle
+        isCreatingAccount = false
+        goToNextStep()
+}
+
+func cancelAccountCreation() {
+        accountCreationStage = .idle
+        isCreatingAccount = false
+}
+
+func failAccountCreation(_ error: Error) {
+        AppServicePorts.analyticsTracker.track(
+            event: "onboarding_account_creation_failed",
+            properties: [
+                "entry_context": entryContext.analyticsContext
+            ]
+        )
+        isCreatingAccount = false
+        accountCreationStage = .idle
+        accountCreationError = error.localizedDescription
+}
 
 var accountCreationStatusMessage: String? {
         accountCreationStage.statusMessage

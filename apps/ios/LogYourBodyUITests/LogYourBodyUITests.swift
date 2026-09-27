@@ -374,6 +374,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_home"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_photoTimeline"].exists)
         XCTAssertTrue(app.staticTexts["No progress photo"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_scrubber"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_photo_strip"].exists)

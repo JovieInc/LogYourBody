@@ -54,6 +54,7 @@ final class UIAccessibilityContractTests: XCTestCase {
         XCTAssertTrue(required.contains("paywall_purchase_button"))
         XCTAssertTrue(required.contains(WorldClassScreen.signIn.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.home.accessibilityIdentifier))
+        XCTAssertTrue(required.contains(WorldClassScreen.photoTimeline.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.settings.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.paywall.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.bodyScoreIntro.accessibilityIdentifier))
@@ -146,6 +147,7 @@ enum UIAccessibilityContract {
         "integrations_bulk_photo_import_link",
         "world_class_screen_signIn",
         "world_class_screen_home",
+        "world_class_screen_photoTimeline",
         "world_class_screen_settings",
         "world_class_screen_paywall",
         "world_class_screen_bodyScoreIntro",

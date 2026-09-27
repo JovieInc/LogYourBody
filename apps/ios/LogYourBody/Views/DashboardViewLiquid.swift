@@ -92,7 +92,6 @@ struct DashboardViewLiquid: View {
     @State var isShowingPhotoTimelineMenu = false
     @State var isPhotoTimelineSettingsPresented = false
     @State var isHomeV2ViewerPresented = false
-    @State var isHomeV2LogSheetPresented = false
     @State var isHomeV2ContextPresented = false
     @State var homeV2ProgressMetric: HomeV2ProgressMetric = .weight
     @State var isHomeV2EntriesPresented = false
@@ -118,6 +117,13 @@ struct DashboardViewLiquid: View {
     @State var featureGateRefreshToken = UUID()
     @State var addEntryInitialTab = 0
     @State var addEntryIncludesGlp1Entry = false
+    @State var addEntryInitialDate = Date()
+    @State var addEntryInitialWeight: String?
+    @State var addEntryInitialBodyFat: Double?
+    @State var isHomeV2LoggingWeight = false
+    @State var homeV2LogHadExistingEntry = false
+    @State var homeV2LogPreviousWeightKilograms: Double?
+    @State var homeV2LogPreviousBodyFat: Double?
 
     init(
         layoutMode: LayoutMode = .photoTimelineHUD,
@@ -282,7 +288,12 @@ struct DashboardViewLiquid: View {
                 AddEntrySheet(
                     isPresented: $showAddEntrySheet,
                     initialTab: addEntryInitialTab,
-                    includesGlp1Entry: addEntryIncludesGlp1Entry
+                    includesGlp1Entry: addEntryIncludesGlp1Entry,
+                    initialDate: addEntryInitialDate,
+                    initialWeight: addEntryInitialWeight,
+                    initialBodyFat: addEntryInitialBodyFat,
+                    isHomeV2LogEntry: isHomeV2LoggingWeight,
+                    onWeightSaved: handleHomeV2WeightEntrySaved
                 )
                     .environmentObject(authManager)
             }
@@ -322,6 +333,10 @@ struct DashboardViewLiquid: View {
                 guard !isPresented else { return }
                 addEntryInitialTab = 0
                 addEntryIncludesGlp1Entry = false
+                addEntryInitialDate = Date()
+                addEntryInitialWeight = nil
+                addEntryInitialBodyFat = nil
+                isHomeV2LoggingWeight = false
             }
 
         return withSheetsAndNavigation

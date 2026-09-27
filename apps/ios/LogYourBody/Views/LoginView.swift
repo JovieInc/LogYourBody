@@ -5,6 +5,73 @@
 
 import SwiftUI
 
+struct AppleSignInActionButton<Label: View>: View {
+    @EnvironmentObject private var authManager: AuthManager
+    @Binding private var isLoading: Bool
+
+    private let identifier: String
+    private let isEnabled: Bool
+    private let onAttempt: () -> Void
+    private let onSignedIn: () -> Void
+    private let onAlreadySignedIn: () -> Void
+    private let onCancelled: () -> Void
+    private let onFailure: (Error) -> Void
+    private let label: (Bool) -> Label
+
+    init(
+        isLoading: Binding<Bool>,
+        identifier: String,
+        isEnabled: Bool = true,
+        onAttempt: @escaping () -> Void = {},
+        onSignedIn: @escaping () -> Void = {},
+        onAlreadySignedIn: @escaping () -> Void = {},
+        onCancelled: @escaping () -> Void = {},
+        onFailure: @escaping (Error) -> Void,
+        @ViewBuilder label: @escaping (Bool) -> Label
+    ) {
+        self._isLoading = isLoading
+        self.identifier = identifier
+        self.isEnabled = isEnabled
+        self.onAttempt = onAttempt
+        self.onSignedIn = onSignedIn
+        self.onAlreadySignedIn = onAlreadySignedIn
+        self.onCancelled = onCancelled
+        self.onFailure = onFailure
+        self.label = label
+    }
+
+    var body: some View {
+        Button(action: authenticate) {
+            label(isLoading)
+        }
+        .disabled(!isEnabled || isLoading || (!authManager.isAuthenticated && !authManager.isAuthProviderReady))
+        .accessibilityIdentifier(identifier)
+    }
+
+    private func authenticate() {
+        guard !isLoading else { return }
+        isLoading = true
+        onAttempt()
+
+        Task { @MainActor in
+            defer { isLoading = false }
+            guard !authManager.isAuthenticated else {
+                onAlreadySignedIn()
+                return
+            }
+
+            do {
+                try await authManager.signInWithApple()
+                onSignedIn()
+            } catch AuthError.cancelled {
+                onCancelled()
+            } catch {
+                onFailure(error)
+            }
+        }
+    }
+}
+
 struct LoginView: View {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -105,55 +172,46 @@ struct LoginView: View {
     }
 
     private var appleSignInControl: some View {
-        Button(action: authenticate) {
-            HStack(spacing: 12) {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .tint(theme.colors.background)
-                } else {
-                    Image(systemName: "apple.logo")
-                }
-
-                Text(isLoading ? "Opening Apple…" : "Continue with Apple")
-                    .font(theme.typography.labelLarge)
-            }
-            .foregroundColor(theme.colors.background)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: JovieTokens.controlHeight)
-            .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .background(theme.colors.text, in: Capsule(style: .continuous))
-        .jovieTouchTarget()
-        .disabled(isLoading || !authManager.isAuthProviderReady)
-        .accessibilityIdentifier("continueWithAppleButton")
-        .accessibilityHint("Starts Sign in with Apple through Jovie Better Auth.")
-    }
-
-    private func authenticate() {
-        guard !isLoading else { return }
-        isLoading = true
-        AppServicePorts.analyticsTracker.track(
-            event: "login_attempt",
-            properties: ["method": "apple"]
-        )
-
-        Task { @MainActor in
-            defer { isLoading = false }
-            do {
-                try await authManager.signInWithApple()
-            } catch AuthError.cancelled {
-                return
-            } catch {
+        AppleSignInActionButton(
+            isLoading: $isLoading,
+            identifier: "continueWithAppleButton",
+            onAttempt: {
+                AppServicePorts.analyticsTracker.track(
+                    event: "login_attempt",
+                    properties: ["method": "apple"]
+                )
+            },
+            onFailure: { error in
                 errorMessage = authManager.loginErrorMessage(for: error)
                 showError = true
                 AppServicePorts.analyticsTracker.track(
                     event: "login_failed",
                     properties: ["method": "apple"]
                 )
+            },
+            label: { isLoading in
+                HStack(spacing: 12) {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(theme.colors.background)
+                    } else {
+                        Image(systemName: "apple.logo")
+                    }
+
+                    Text(isLoading ? "Opening Apple…" : "Continue with Apple")
+                        .font(theme.typography.labelLarge)
+                }
+                .foregroundColor(theme.colors.background)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: JovieTokens.controlHeight)
+                .contentShape(Capsule(style: .continuous))
             }
-        }
+        )
+        .buttonStyle(.plain)
+        .background(theme.colors.text, in: Capsule(style: .continuous))
+        .jovieTouchTarget()
+        .accessibilityHint("Starts Sign in with Apple through Jovie Better Auth.")
     }
 }
 

@@ -123,13 +123,40 @@ struct HomeV2SignInView: View {
                     .accessibilityIdentifier("home_v2_sign_in_error")
             }
 
-            HomeV2PrimaryButton(
-                title: isLoading ? HomeV2OnboardingCopy.openingApple : HomeV2OnboardingCopy.continueWithApple,
-                systemImage: "apple.logo",
-                isEnabled: !isLoading,
+            AppleSignInActionButton(
+                isLoading: $isLoading,
                 identifier: "home_v2_sign_in_apple",
-                action: authenticate
+                onAttempt: {
+                    errorText = nil
+                    AppServicePorts.analyticsTracker.track(
+                        event: "login_attempt",
+                        properties: ["method": "apple"]
+                    )
+                },
+                onFailure: { error in
+                    errorText = authManager.loginErrorMessage(for: error)
+                    AppServicePorts.analyticsTracker.track(
+                        event: "login_failed",
+                        properties: ["method": "apple"]
+                    )
+                },
+                label: { isLoading in
+                    HStack(spacing: HomeV2Tokens.Space.tight) {
+                        Image(systemName: "apple.logo")
+                            .font(.system(size: 18, weight: .semibold))
+                        Text(isLoading ? HomeV2OnboardingCopy.openingApple : HomeV2OnboardingCopy.continueWithApple)
+                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .foregroundStyle(HomeV2Tokens.Colors.ctaInk)
+                    .frame(maxWidth: .infinity, minHeight: JovieTokens.controlHeight)
+                    .background(HomeV2Tokens.Colors.ctaFill, in: Capsule())
+                    .contentShape(Capsule())
+                }
             )
+            .buttonStyle(.plain)
+            .accessibilityHint("Starts Sign in with Apple through Jovie Better Auth.")
             .padding(.top, HomeV2Tokens.Space.margin)
 
             legalLine
@@ -159,24 +186,6 @@ struct HomeV2SignInView: View {
         .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
         .foregroundStyle(HomeV2Tokens.Colors.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func authenticate() {
-        guard !isLoading else { return }
-        isLoading = true
-        errorText = nil
-        AppServicePorts.analyticsTracker.track(event: "login_attempt", properties: ["method": "apple"])
-        Task { @MainActor in
-            defer { isLoading = false }
-            do {
-                try await authManager.signInWithApple()
-            } catch AuthError.cancelled {
-                return
-            } catch {
-                errorText = authManager.loginErrorMessage(for: error)
-                AppServicePorts.analyticsTracker.track(event: "login_failed", properties: ["method": "apple"])
-            }
-        }
     }
 }
 
