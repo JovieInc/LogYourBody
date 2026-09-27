@@ -771,7 +771,7 @@ struct ChatTabView: View {
         }
         .frame(maxHeight: showsTranscript ? .infinity : nil)
         .safeAreaInset(edge: .top, spacing: 0) {
-            if showsTranscript {
+            if showsTranscript, !usesHomeV2Style {
                 chatHeader
             }
         }
@@ -824,6 +824,12 @@ struct ChatTabView: View {
         }
     }
 
+    /// The Ask surface (Pencil C4/C5) under the gate: the root header owns
+    /// the title, replies read as prose, the proof line stays visible.
+    private var usesHomeV2Style: Bool {
+        HomeV2Policy.isEnabled()
+    }
+
     private var chatMessages: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
@@ -844,9 +850,28 @@ struct ChatTabView: View {
 
                     ForEach(messages) { message in
                         if !message.text.isEmpty {
-                            ChatBubble(message: message)
-                                .id(message.id)
+                            if usesHomeV2Style {
+                                HomeV2AskMessage(message: message)
+                                    .id(message.id)
+                            } else {
+                                ChatBubble(message: message)
+                                    .id(message.id)
+                            }
                         }
+                    }
+
+                    if usesHomeV2Style, showsTranscript, messages.contains(where: { $0.role == .user }) {
+                        Button {
+                            isDeleteConfirmationPresented = true
+                        } label: {
+                            Text(HomeV2AskCopy.deleteChat)
+                                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                                .frame(minHeight: JovieTokens.minimumHitTarget)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("home_v2_ask_delete")
                     }
 
                     if isResponding {
@@ -962,7 +987,7 @@ struct ChatTabView: View {
         let cornerRadius = ChatComposerGeometry.cornerRadius(isMultiline: isMultiline)
 
         return HStack(alignment: isMultiline ? .bottom : .center, spacing: JovieTokens.itemGap) {
-            TextField("Message LogYourBody", text: $draft, axis: .vertical)
+            TextField(usesHomeV2Style ? HomeV2AskCopy.composerPlaceholder : "Message LogYourBody", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($isComposerFocused)
                 .font(.system(size: composerFontSize))
@@ -1337,6 +1362,54 @@ private struct ChatTabWorldClassScreenModifier: ViewModifier {
             content.worldClassScreen(.chat)
         } else {
             content
+        }
+    }
+}
+
+/// A message on the Ask surface: the person's words in a quiet pill on the
+/// right, the reply as plain prose with its proof line quieter below.
+private struct HomeV2AskMessage: View {
+    let message: ChatMessage
+
+    var body: some View {
+        if message.role == .user {
+            HStack {
+                Spacer(minLength: 36)
+                Text(message.text)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
+                    .foregroundStyle(HomeV2Tokens.Colors.ink)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, HomeV2Tokens.Space.compact)
+                    .padding(.vertical, HomeV2Tokens.Space.row)
+                    .background(HomeV2Tokens.Colors.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .opacity(message.delivery == .failed ? 0.72 : 1)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("You: \(message.text)")
+        } else {
+            let reply = HomeV2AskReply.split(message.text)
+            VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
+                Text(reply.body)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
+                    .foregroundStyle(HomeV2Tokens.Colors.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let proof = reply.proof {
+                    Text(proof)
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("home_v2_ask_proof")
+                }
+                if message.delivery == .failed || message.delivery == .stopped {
+                    Text(message.delivery == .stopped ? "Stopped" : "Not delivered")
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, weight: .medium, relativeTo: .caption)
+                        .foregroundStyle(HomeV2Tokens.Colors.quiet)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("LogYourBody: \(message.text)")
         }
     }
 }

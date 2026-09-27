@@ -71,7 +71,8 @@ extension DashboardViewLiquid {
         case .entries:
             isHomeV2EntriesPresented = true
         case .ask:
-            selectedPhotoTimelineRootPage = .chat
+            // Changing the page resets the expanded chat, so Ask expands it on Today.
+            selectedPhotoTimelineRootPage = .timeline
             isHomeChatExpanded = true
         }
     }
