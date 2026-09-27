@@ -402,106 +402,6 @@
       "expected_fact_ids": ["k:459f924b"]
     },
     {
-      "topic": "frequency_splits",
-      "question": "What can guide how often I train a muscle?",
-      "expected_fact_ids": ["k:0f907350"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "What signs suggest a muscle has recovered enough to train again?",
-      "expected_fact_ids": ["k:18af6f5c"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "Can biceps and quadriceps recover at different rates after similar relative training volume?",
-      "expected_fact_ids": ["k:28d02fe6"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "What weekly frequencies were used as an example for quadriceps and biceps with different recovery times?",
-      "expected_fact_ids": ["k:2beb5da6"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "What might happen if I increase a faster-recovering muscle’s per-session volume to match a slower-recovering muscle’s schedule?",
-      "expected_fact_ids": ["k:67089b20"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "Do general rankings of muscle recovery speed apply to every individual?",
-      "expected_fact_ids": ["k:764e0844"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "In the example with six failure sets per muscle group, how long did biceps and quadriceps recovery take for most people?",
-      "expected_fact_ids": ["k:a1116bd2"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "At roughly how many near-failure sets in one session might additional sets start adding more damage than benefit for many muscles?",
-      "expected_fact_ids": ["k:be0e4142"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "How does muscle size generally relate to recovery time after a comparable stimulus?",
-      "expected_fact_ids": ["k:ef663446"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "Should muscle training frequency be based only on a fixed weekly schedule?",
-      "expected_fact_ids": ["k:0f907350", "k:764e0844"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "Why might two muscles receive different weekly training frequencies?",
-      "expected_fact_ids": ["k:28d02fe6", "k:2beb5da6"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "What recovery indicators can be checked before repeating a muscle’s training?",
-      "expected_fact_ids": ["k:18af6f5c"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "What could be a downside of adding more sets within a single session once a muscle has many near-failure sets?",
-      "expected_fact_ids": ["k:be0e4142"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "Why might matching one muscle’s session volume to another’s schedule create recovery issues?",
-      "expected_fact_ids": ["k:67089b20"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "In the illustrative schedule, which muscle was trained more frequently, and what were the example frequencies?",
-      "expected_fact_ids": ["k:2beb5da6"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "What was the approximate recovery time for quadriceps after six failure sets in the example?",
-      "expected_fact_ids": ["k:a1116bd2"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "What was the approximate recovery time for biceps after six failure sets in the example?",
-      "expected_fact_ids": ["k:a1116bd2"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "Why might larger muscles need more time before being trained again after a comparable stimulus?",
-      "expected_fact_ids": ["k:ef663446"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "What could indicate that it is reasonable to train a muscle again after its hard session?",
-      "expected_fact_ids": ["k:18af6f5c"]
-    },
-    {
-      "topic": "frequency_splits",
-      "question": "What does the example say about how per-session set count relates to possible damage and benefit?",
-      "expected_fact_ids": ["k:be0e4142"]
-    },
-    {
       "topic": "mesocycle_deload",
       "question": "What repetition range is given for sets in the summary of training for muscle growth?",
       "expected_fact_ids": ["k:7263971f", "k:cc4a8cc4"]
@@ -900,6 +800,106 @@
       "topic": "volume_landmarks",
       "question": "What caveats were given about very high weekly set volumes and applying them across a whole-body routine?",
       "expected_fact_ids": ["k:bc9ce13c", "k:ed46b889", "k:f1a38a31"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "How should I decide how often to train a muscle after a hard workout?",
+      "expected_fact_ids": ["k:28d02fe6"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "What signs can I use to judge whether a muscle is ready for another hard session?",
+      "expected_fact_ids": ["k:5aeb7bcb"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "If a muscle is still sore or my performance has not returned, should I stick to the planned training day?",
+      "expected_fact_ids": ["k:fbce808e"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Why might one weekly training frequency not work equally well for every muscle?",
+      "expected_fact_ids": ["k:a1116bd2"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "What is one practical way to group muscles that recover at different rates?",
+      "expected_fact_ids": ["k:5757e834"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "In the example, how often are quads and biceps trained when their recovery times differ?",
+      "expected_fact_ids": ["k:75d40fd0"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "What set counts are used as an illustrative way to coordinate biceps and quad recovery at a shared frequency?",
+      "expected_fact_ids": ["k:2beb5da6"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "How can session volume be adjusted when coordinating muscles with different recovery times on the same schedule?",
+      "expected_fact_ids": ["k:be0e4142"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "What can happen if I use the same session volume and frequency for muscles that recover at different rates?",
+      "expected_fact_ids": ["k:67089b20"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Why might matching a faster-recovering muscle to a slower muscle's schedule by keeping its volume low be limiting?",
+      "expected_fact_ids": ["k:764e0844"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "If I change per-session volume to align recovery between muscles, what extra scheduling issue might arise?",
+      "expected_fact_ids": ["k:0f907350"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "How do six failure sets compare for biceps and quads in the recovery-time example?",
+      "expected_fact_ids": ["k:ef663446"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Does the evidence suggest that all people can rely on the same categories of fast- and slow-recovering muscles?",
+      "expected_fact_ids": ["k:36f228b3"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "What characteristics are associated with a muscle taking longer to recover from a given training stimulus?",
+      "expected_fact_ids": ["k:8565ddb0"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Can training different muscles at different frequencies let each follow a schedule suited to its recovery?",
+      "expected_fact_ids": ["k:bc55920d"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Is using one frequency for every muscle necessarily ineffective?",
+      "expected_fact_ids": ["k:e7042293"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Around what per-session set volume does the evidence raise a concern about damage interfering with adaptation for many muscles?",
+      "expected_fact_ids": ["k:18af6f5c"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Why might changing session volume be used to coordinate muscles at a shared frequency?",
+      "expected_fact_ids": ["k:2beb5da6", "k:be0e4142"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "How can using one common schedule create a mismatch for muscles with different recovery times?",
+      "expected_fact_ids": ["k:67089b20", "k:a1116bd2"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "In the example, what recovery windows are suggested for six failure sets of biceps versus quads?",
+      "expected_fact_ids": ["k:ef663446"]
     }
   ]
 }
