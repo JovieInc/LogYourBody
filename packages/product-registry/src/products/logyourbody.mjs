@@ -105,6 +105,7 @@ export const logYourBody = {
       apple: { appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876' },
     },
     allowlist: [
+      { value: 'https://github.com/ChatPRD/lennys-podcast-transcripts', reason: 'Podcast transcript citation in docs/research; not a dependency.' },
       { value: 'https://threadreaderapp.com', reason: 'Research-note citation links in docs/research; not runtime endpoints.' },
       { value: 'https://www.lennysnewsletter.com', reason: 'Research-note citation links in docs/research; not runtime endpoints.' },
       { value: 'https://techcrunch.com', reason: 'Research-note citation links in docs/research; not runtime endpoints.' },
