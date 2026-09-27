@@ -16,6 +16,7 @@ struct PreferenceMeasurementSystemRow: View {
             Label {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Units")
+                        .accessibilityIdentifier("home_v2_units_weight")
                     Text(currentSystem == .metric ? "Metric (kg, cm)" : "Imperial (lbs, ft)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -54,15 +55,34 @@ struct PreferenceStepGoalRow: View {
 struct PreferenceGoalRow: View {
     let goal: PreferenceGoalKind
     let valueText: String
+    let titleAccessibilityIdentifier: String?
     let edit: () -> Void
+
+    init(
+        goal: PreferenceGoalKind,
+        valueText: String,
+        titleAccessibilityIdentifier: String? = nil,
+        edit: @escaping () -> Void
+    ) {
+        self.goal = goal
+        self.valueText = valueText
+        self.titleAccessibilityIdentifier = titleAccessibilityIdentifier
+        self.edit = edit
+    }
 
     var body: some View {
         Button(action: edit) {
             Label {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(goal.title)
-                            .foregroundStyle(.primary)
+                        Group {
+                            if let titleAccessibilityIdentifier {
+                                Text(goal.title).accessibilityIdentifier(titleAccessibilityIdentifier)
+                            } else {
+                                Text(goal.title)
+                            }
+                        }
+                        .foregroundStyle(.primary)
                         Text(valueText)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)

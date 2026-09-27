@@ -112,6 +112,7 @@ struct SettingsRow: View {
 
     let icon: String?
     let title: String
+    var titleAccessibilityIdentifier: String?
     var subtitle: String?
     var subtitleColor: Color?
     var value: String?
@@ -122,6 +123,7 @@ struct SettingsRow: View {
     init(
         icon: String? = nil,
         title: String,
+        titleAccessibilityIdentifier: String? = nil,
         subtitle: String? = nil,
         subtitleColor: Color? = nil,
         value: String? = nil,
@@ -131,6 +133,7 @@ struct SettingsRow: View {
     ) {
         self.icon = icon
         self.title = title
+        self.titleAccessibilityIdentifier = titleAccessibilityIdentifier
         self.subtitle = subtitle
         self.subtitleColor = subtitleColor
         self.value = value
@@ -195,11 +198,18 @@ struct SettingsRow: View {
             }
 
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
-                Text(title)
-                    .font(.body)
-                    .foregroundStyle(resolvedTint)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                    .fixedSize(horizontal: false, vertical: true)
+                Group {
+                    if let titleAccessibilityIdentifier {
+                        Text(title)
+                            .accessibilityIdentifier(titleAccessibilityIdentifier)
+                    } else {
+                        Text(title)
+                    }
+                }
+                .font(.body)
+                .foregroundStyle(resolvedTint)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                .fixedSize(horizontal: false, vertical: true)
 
                 if let subtitle {
                     Text(subtitle)
@@ -235,6 +245,8 @@ struct SettingsNavigationLink<Destination: View>: View {
     let title: String
     let subtitle: String?
     let value: String?
+    let accessibilityIdentifier: String?
+    let titleAccessibilityIdentifier: String?
     let destination: Destination
     var tintColor: Color?
 
@@ -243,6 +255,8 @@ struct SettingsNavigationLink<Destination: View>: View {
         title: String,
         subtitle: String? = nil,
         value: String? = nil,
+        accessibilityIdentifier: String? = nil,
+        titleAccessibilityIdentifier: String? = nil,
         tintColor: Color? = nil,
         @ViewBuilder destination: () -> Destination
     ) {
@@ -250,15 +264,27 @@ struct SettingsNavigationLink<Destination: View>: View {
         self.title = title
         self.subtitle = subtitle
         self.value = value
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.titleAccessibilityIdentifier = titleAccessibilityIdentifier
         self.tintColor = tintColor
         self.destination = destination()
     }
 
+    @ViewBuilder
     var body: some View {
+        if let accessibilityIdentifier {
+            navigationLink.accessibilityIdentifier(accessibilityIdentifier)
+        } else {
+            navigationLink
+        }
+    }
+
+    private var navigationLink: some View {
         NavigationLink(destination: destination) {
             SettingsRow(
                 icon: icon,
                 title: title,
+                titleAccessibilityIdentifier: titleAccessibilityIdentifier,
                 subtitle: subtitle,
                 value: value,
                 showChevron: false,
@@ -270,48 +296,56 @@ struct SettingsNavigationLink<Destination: View>: View {
 
 // MARK: - Detail Screen
 
-struct SettingsBackButton: View {
-    @Environment(\.dismiss)
-    private var dismiss
-
-    var body: some View {
-        Button {
-            dismiss()
-        } label: {
-            Image(systemName: "chevron.left")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.primary)
-                .frame(
-                    width: JovieTokens.minimumHitTarget,
-                    height: JovieTokens.minimumHitTarget
-                )
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Settings")
-        .accessibilityHint("Returns to Settings")
-    }
-}
-
 struct SettingsDetailScreen<Content: View>: View {
+    @Environment(\.dismiss) private var dismiss
+
     let title: String
+    let accessibilityIdentifier: String?
+    let backIdentifier: String?
     let content: Content
 
     init(
         title: String,
+        accessibilityIdentifier: String? = nil,
+        backIdentifier: String? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.backIdentifier = backIdentifier
         self.content = content()
     }
 
     var body: some View {
+        Group {
+            if let accessibilityIdentifier {
+                detailList.accessibilityIdentifier(accessibilityIdentifier)
+            } else {
+                detailList
+            }
+        }
+    }
+
+    private var detailList: some View {
         List {
             content
         }
         .listStyle(.insetGrouped)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(backIdentifier != nil)
+        .toolbar {
+            if let backIdentifier {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Label("Settings", systemImage: "chevron.backward")
+                    }
+                    .accessibilityIdentifier(backIdentifier)
+                }
+            }
+        }
     }
 }
 
@@ -323,6 +357,7 @@ struct SettingsToggleRow: View {
 
     let icon: String?
     let title: String
+    var titleAccessibilityIdentifier: String?
     @Binding var isOn: Bool
     var tintColor: Color?
     var subtitle: String?
@@ -331,6 +366,7 @@ struct SettingsToggleRow: View {
     init(
         icon: String? = nil,
         title: String,
+        titleAccessibilityIdentifier: String? = nil,
         isOn: Binding<Bool>,
         tintColor: Color? = nil,
         subtitle: String? = nil,
@@ -338,6 +374,7 @@ struct SettingsToggleRow: View {
     ) {
         self.icon = icon
         self.title = title
+        self.titleAccessibilityIdentifier = titleAccessibilityIdentifier
         self._isOn = isOn
         self.tintColor = tintColor
         self.subtitle = subtitle
@@ -356,11 +393,18 @@ struct SettingsToggleRow: View {
                 }
 
                 VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
-                    Text(title)
-                        .font(.body)
-                        .foregroundStyle(resolvedTint)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Group {
+                        if let titleAccessibilityIdentifier {
+                            Text(title)
+                                .accessibilityIdentifier(titleAccessibilityIdentifier)
+                        } else {
+                            Text(title)
+                        }
+                    }
+                    .font(.body)
+                    .foregroundStyle(resolvedTint)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                     if let subtitle {
                         Text(subtitle)
@@ -391,25 +435,36 @@ struct SettingsToggleRow: View {
 struct SettingsButtonRow: View {
     let icon: String?
     let title: String
+    var titleAccessibilityIdentifier: String?
     let role: ButtonRole?
     let action: () -> Void
 
     init(
         icon: String? = nil,
         title: String,
+        titleAccessibilityIdentifier: String? = nil,
         role: ButtonRole? = nil,
         action: @escaping () -> Void
     ) {
         self.icon = icon
         self.title = title
+        self.titleAccessibilityIdentifier = titleAccessibilityIdentifier
         self.role = role
         self.action = action
     }
 
     var body: some View {
         Button(role: role, action: action) {
-            if let icon {
+            if let icon, let titleAccessibilityIdentifier {
+                Label {
+                    Text(title).accessibilityIdentifier(titleAccessibilityIdentifier)
+                } icon: {
+                    Image(systemName: icon)
+                }
+            } else if let icon {
                 Label(title, systemImage: icon)
+            } else if let titleAccessibilityIdentifier {
+                Text(title).accessibilityIdentifier(titleAccessibilityIdentifier)
             } else {
                 Text(title)
             }
