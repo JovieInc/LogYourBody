@@ -58,6 +58,9 @@ final class UIAccessibilityContractTests: XCTestCase {
         XCTAssertTrue(required.contains(WorldClassScreen.paywall.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.bodyScoreIntro.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.dailyReminder.accessibilityIdentifier))
+        XCTAssertTrue(required.contains("home_v2_paywall"))
+        XCTAssertTrue(required.contains("home_v2_paywall_restore"))
+        XCTAssertTrue(required.contains("home_v2_paywall_log_out"))
         XCTAssertEqual(
             "settings_\(PreferenceGoalKind.weight.rawValue)_goal_edit_button",
             "settings_weight_goal_edit_button"
@@ -82,6 +85,13 @@ enum UIAccessibilityContract {
         "paywall_restore_purchases_button",
         "paywall_logout_button",
         "paywall_purchase_button",
+        "home_v2_paywall",
+        "home_v2_paywall_status",
+        "home_v2_paywall_purchase",
+        "home_v2_paywall_restore",
+        "home_v2_paywall_log_out",
+        "home_v2_paywall_plans_unavailable",
+        "home_v2_paywall_plan_",
         "settings_profile_link",
         "settings_logout_button",
         "settings_account_subscription_link",

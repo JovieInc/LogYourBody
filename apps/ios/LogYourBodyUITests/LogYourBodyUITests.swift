@@ -128,6 +128,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)["paywall_plans_unavailable_state"].waitForExistence(timeout: 8)
         )
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_paywall_plans_unavailable"].exists)
         XCTAssertFalse(app.staticTexts["$79.99"].exists, "Unavailable offerings must not show a stale price")
 
         let supportButton = app.buttons["paywall_contact_support_button"]
@@ -142,6 +143,11 @@ final class LogYourBodyUITests: XCTestCase {
         let restoreButton = app.buttons["paywall_restore_purchases_button"]
         XCTAssertTrue(restoreButton.waitForExistence(timeout: 3))
         XCTAssertTrue(restoreButton.isHittable)
+        XCTAssertEqual(
+            app.buttons.matching(identifier: "paywall_restore_purchases_button").count,
+            1,
+            "The canonical paywall exposes one restore action"
+        )
 
         let logoutButton = app.buttons["paywall_logout_button"]
         XCTAssertTrue(logoutButton.waitForExistence(timeout: 3))
@@ -150,9 +156,13 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPaywallPlansFixtureShowsMonthlyAnnualAndSavings() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPaywallPlansFixture"])
+        launch(app, with: ["-lybUITestPaywallPlansFixture", "-lybUITestOnboardingV2Fixture"])
 
         XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_paywall"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_paywall_plan_monthly"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_paywall_plan_annual"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_paywall_purchase"].exists)
 
         let monthlyPlan = app.buttons["Monthly plan"]
         XCTAssertTrue(monthlyPlan.waitForExistence(timeout: 3))
@@ -1615,8 +1625,8 @@ final class LogYourBodyUITests: XCTestCase {
             app.descendants(matching: .any)["home_v2_paywall"].waitForExistence(timeout: 30),
             "The paywall keeps the timeline"
         )
-        XCTAssertTrue(app.buttons["home_v2_paywall_restore"].exists, "Restore stays visible")
-        XCTAssertTrue(app.buttons["home_v2_paywall_log_out"].exists, "A way out stays visible")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_paywall_restore"].exists, "Restore stays visible")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_paywall_log_out"].exists, "A way out stays visible")
         attachScreenshot(named: "onboarding-v2-paywall", from: app)
     }
 
