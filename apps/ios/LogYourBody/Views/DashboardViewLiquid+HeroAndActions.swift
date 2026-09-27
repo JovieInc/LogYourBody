@@ -480,11 +480,11 @@ extension DashboardViewLiquid {
                 HStack(spacing: 4) {
                     Image(systemName: "hand.tap.fill")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(theme.colors.textQuaternary)
+                        .foregroundColor(theme.colors.textTertiary)
 
                     Text("Tap to set")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(theme.colors.textQuaternary)
+                        .foregroundColor(theme.colors.textTertiary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 8, alignment: .leading)
             )

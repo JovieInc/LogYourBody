@@ -150,11 +150,11 @@ public struct MetricSummaryCard: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: headerIconSize, weight: .semibold))
-                    .foregroundStyle(accentColor.opacity(0.8))
+                    .foregroundStyle(accentColor)
 
                 Text(titleText)
                     .font(.system(size: 15, weight: .semibold, design: .default))
-                    .foregroundStyle(accentColor.opacity(0.8))
+                    .foregroundStyle(accentColor)
                     .lineLimit(1)
             }
 
@@ -167,7 +167,7 @@ public struct MetricSummaryCard: View {
                 if isButtonContext && hasActionableState {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(secondaryTextColor.opacity(0.7))
+                        .foregroundStyle(secondaryTextColor)
                 }
             }
         }
@@ -215,7 +215,7 @@ public struct MetricSummaryCard: View {
                 if let time = content.timestamp {
                     Text(time)
                         .font(.system(.footnote, design: .rounded))
-                        .foregroundStyle(secondaryTextColor.opacity(0.8))
+                        .foregroundStyle(secondaryTextColor)
                         .transition(.opacity)
                 }
             default:
