@@ -21,6 +21,18 @@ extension PreferencesView {
                     accountSection
                     profileSection
                 }
+                .confirmationDialog(
+                    "Log out of LogYourBody?",
+                    isPresented: $showingLogoutConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Log Out", role: .destructive) {
+                        Task {
+                            await authManager.logout()
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
             }
             .accessibilityIdentifier("settings_profile_link")
 

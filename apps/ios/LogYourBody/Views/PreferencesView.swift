@@ -87,14 +87,6 @@ struct PreferencesView: View {
         } message: {
             Text("Allow notifications in iOS Settings to receive your daily weigh-in reminder.")
         }
-        .confirmationDialog("Log out of LogYourBody?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
-            Button("Log Out", role: .destructive) {
-                Task {
-                    await authManager.logout()
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
