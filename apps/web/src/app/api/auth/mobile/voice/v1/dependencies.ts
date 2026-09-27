@@ -23,6 +23,6 @@ export const voiceHandlers = createVoiceRouteHandlers({
     const providerId = getVoiceProviderId(process.env.LYB_VOICE_PROVIDER);
     return providerId ? providers[providerId] : null;
   },
-  voiceId: () => process.env.LYB_VOICE_ID ?? 'PLACEHOLDER_VOICE_ID',
+  voiceId: () => process.env.LYB_VOICE_ID ?? 'A4j35F5T4XsPMeXd06Pm',
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
 });

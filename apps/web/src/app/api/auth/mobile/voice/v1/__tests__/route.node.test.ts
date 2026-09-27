@@ -21,7 +21,7 @@ function createHandlers(overrides: Partial<Parameters<typeof createVoiceRouteHan
     authenticate: jest.fn(async () => ({ sub: 'user-1' }) as never),
     enabled: () => true,
     provider: () => provider,
-    voiceId: () => 'PLACEHOLDER_VOICE_ID',
+    voiceId: () => 'A4j35F5T4XsPMeXd06Pm',
     reserveRequest: jest.fn(async () => ({
       allowed: true,
       remainingInWindow: 11,
@@ -47,7 +47,7 @@ describe('mobile voice routes', () => {
     expect(response.headers.get('content-type')).toBe('audio/mpeg');
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4]));
-    expect(provider.tts).toHaveBeenCalledWith('A short spoken response.', 'PLACEHOLDER_VOICE_ID', {
+    expect(provider.tts).toHaveBeenCalledWith('A short spoken response.', 'A4j35F5T4XsPMeXd06Pm', {
       signal: request.signal,
     });
   });

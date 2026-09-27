@@ -1513,7 +1513,8 @@ struct ChatTabView: View {
                     accessToken: accessToken,
                     conversationId: conversationId,
                     clientMessageId: clientMessageId,
-                    message: message
+                    message: message,
+                    voiceMode: pendingSpokenReply.shouldSpeakReply(for: clientMessageId)
                 )
 
                 for try await event in stream {

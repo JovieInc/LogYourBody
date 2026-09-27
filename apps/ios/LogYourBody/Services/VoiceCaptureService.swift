@@ -190,6 +190,10 @@ struct PendingSpokenReply {
         self.clientMessageId = shouldSpeakReply ? clientMessageId : nil
     }
 
+    func shouldSpeakReply(for clientMessageId: String) -> Bool {
+        self.clientMessageId == clientMessageId
+    }
+
     mutating func consumeIfMatching(clientMessageId: String) -> Bool {
         guard self.clientMessageId == clientMessageId else { return false }
         self.clientMessageId = nil

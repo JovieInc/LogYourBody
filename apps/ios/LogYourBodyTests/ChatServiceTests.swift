@@ -82,6 +82,8 @@ final class ChatServiceTests: XCTestCase {
         var pending = PendingSpokenReply()
         pending.track(clientMessageId: "voice-turn", shouldSpeakReply: true)
 
+        XCTAssertTrue(pending.shouldSpeakReply(for: "voice-turn"))
+        XCTAssertFalse(pending.shouldSpeakReply(for: "different-turn"))
         XCTAssertFalse(pending.consumeIfMatching(clientMessageId: "different-turn"))
         XCTAssertEqual(pending.clientMessageId, "voice-turn")
         XCTAssertTrue(pending.consumeIfMatching(clientMessageId: "voice-turn"))
@@ -298,6 +300,7 @@ final class ChatServiceTests: XCTestCase {
             XCTAssertEqual(json["conversationId"] as? String, "conversation-1")
             XCTAssertEqual(json["clientMessageId"] as? String, "client-1")
             XCTAssertEqual(json["message"] as? String, "How am I doing?")
+            XCTAssertEqual(json["voiceMode"] as? Bool, true)
 
             let body = """
             event: meta
@@ -325,7 +328,8 @@ final class ChatServiceTests: XCTestCase {
             accessToken: "access-token",
             conversationId: "conversation-1",
             clientMessageId: "client-1",
-            message: "How am I doing?"
+            message: "How am I doing?",
+            voiceMode: true
         ) {
             events.append(event)
         }
@@ -378,7 +382,8 @@ final class ChatServiceTests: XCTestCase {
                 accessToken: "access-token",
                 conversationId: "conversation-1",
                 clientMessageId: "client-1",
-                message: "Retry"
+                message: "Retry",
+                voiceMode: false
             ) {}
             XCTFail("Expected rate-limit failure")
         } catch let error as ChatServiceError {
