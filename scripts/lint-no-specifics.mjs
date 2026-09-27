@@ -56,6 +56,7 @@ export async function run() {
   const targets = [
     path.join(root, 'agent/skills'),
     path.join(root, 'evals/knowledge-golden'),
+    path.join(root, 'evals/claims-guardrails'),
     path.join(root, 'docs/compliance'),
   ];
   const files = (await Promise.all(targets.map(filesUnder))).flat();
