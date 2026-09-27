@@ -5,6 +5,10 @@ const migrationSql = readFileSync(
   join(process.cwd(), 'db/migrations/20260813130000_native_product_records.sql'),
   'utf8',
 );
+const trainingMigrationSql = readFileSync(
+  join(process.cwd(), 'db/migrations/20260927102000_training_record_collections.sql'),
+  'utf8',
+);
 
 describe('native product records Neon schema', () => {
   it('stores remaining native collections as subject-scoped jsonb without backfill', () => {
@@ -23,5 +27,15 @@ describe('native product records Neon schema', () => {
   it('indexes incremental pull by owner, collection, and updated_at', () => {
     expect(migrationSql).toContain('create index if not exists native_records_owner_updated_idx');
     expect(migrationSql).toContain('(user_subject, collection, updated_at asc, id asc)');
+  });
+
+  it('adds subject-scoped training collections without backfilling existing records', () => {
+    expect(trainingMigrationSql).toContain(
+      'drop constraint if exists native_records_collection_check',
+    );
+    expect(trainingMigrationSql).toContain("'training_sessions'");
+    expect(trainingMigrationSql).toContain("'logged_sets'");
+    expect(trainingMigrationSql).toContain("'training_feedback'");
+    expect(trainingMigrationSql).toContain("values ('20260927102000_training_record_collections')");
   });
 });

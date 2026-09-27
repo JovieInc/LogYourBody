@@ -730,6 +730,12 @@ struct ChatTabView: View {
     @State private var chatErrorMessage: String?
     @State private var isConversationLoadRetryAvailable = false
     @State private var isDeleteConfirmationPresented = false
+    @State private var trainingResponse: TrainingNextResponse?
+    @State private var isTrainingLoading = false
+    @State private var trainingEnrollmentRequired = false
+    @State private var trainingErrorMessage: String?
+    @State private var trainingPresentation: TrainingPresentation?
+    private let trainingService: TrainingServicing = URLSessionTrainingService()
     @FocusState private var isComposerFocused: Bool
 
     var body: some View {
@@ -748,6 +754,10 @@ struct ChatTabView: View {
         .modifier(ChatTabWorldClassScreenModifier(isEnabled: showsTranscript))
         .task(id: authManager.currentUser?.id) {
             await loadLatestConversation()
+            await loadTrainingNext()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            Task { await loadTrainingNext() }
         }
         .onDisappear {
             currentRequestTask?.cancel()
@@ -759,6 +769,37 @@ struct ChatTabView: View {
             }
         } message: {
             Text("This permanently removes the conversation from LogYourBody.")
+        }
+        .sheet(item: $trainingPresentation) { presentation in
+            switch presentation {
+            case .setup:
+                TrainingEnrollmentView { sessionsPerWeek, equipment in
+                    try await enrollTraining(sessionsPerWeek: sessionsPerWeek, equipment: equipment)
+                }
+            case .session(let session):
+                TrainingLiveSessionView(
+                    session: session,
+                    onLogSet: { exercise, setNumber, reps, loadKg, rir in
+                        try await logTrainingSet(
+                            sessionId: session.id,
+                            exercise: exercise,
+                            setNumber: setNumber,
+                            reps: reps,
+                            loadKg: loadKg,
+                            rir: rir
+                        )
+                    },
+                    onFeedback: { soreness, pump, performance, jointPain in
+                        try await recordTrainingFeedback(
+                            sessionId: session.id,
+                            soreness: soreness,
+                            pump: pump,
+                            performance: performance,
+                            jointPain: jointPain
+                        )
+                    }
+                )
+            }
         }
     }
 
@@ -834,6 +875,10 @@ struct ChatTabView: View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: 20) {
+                    if showsTranscript && trainingCoachEnabled {
+                        trainingCard
+                    }
+
                     if isLoadingConversation {
                         HStack(spacing: 12) {
                             ProgressView()
@@ -960,6 +1005,145 @@ struct ChatTabView: View {
                 }
                 .transition(.opacity)
             }
+        }
+    }
+
+    private var trainingCoachEnabled: Bool {
+        TrainingCoachPolicy.isEnabled { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+    }
+
+    @ViewBuilder
+    private var trainingCard: some View {
+        if isTrainingLoading && trainingResponse == nil && !trainingEnrollmentRequired {
+            HStack(spacing: 10) {
+                ProgressView().controlSize(.small)
+                Text("Loading your next session")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(theme.colors.textSecondary)
+            }
+            .padding(.horizontal, 4)
+            .accessibilityIdentifier("training_loading_card")
+        } else if trainingEnrollmentRequired {
+            TrainingSetupCard { trainingPresentation = .setup }
+        } else if let session = trainingResponse?.session {
+            TrainingCoachCard(
+                session: session,
+                onStart: { trainingPresentation = .session(session) },
+                onStop: { Task { await revokeTraining() } }
+            )
+        } else if let week = trainingResponse?.week {
+            TrainingWeekCompleteCard(week: week)
+        } else if let trainingErrorMessage {
+            Text(trainingErrorMessage)
+                .font(.system(size: 13))
+                .foregroundStyle(theme.colors.textSecondary)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .accessibilityIdentifier("training_error_card")
+        }
+    }
+
+    private func loadTrainingNext() async {
+        guard showsTranscript, trainingCoachEnabled else {
+            trainingResponse = nil
+            trainingEnrollmentRequired = false
+            trainingErrorMessage = nil
+            return
+        }
+        isTrainingLoading = true
+        defer { isTrainingLoading = false }
+        guard let accessToken = await chatAccessToken() else {
+            trainingErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
+            return
+        }
+        do {
+            let response = try await trainingService.loadNext(accessToken: accessToken)
+            trainingResponse = response
+            trainingEnrollmentRequired = false
+            trainingErrorMessage = nil
+        } catch let error as TrainingServiceError {
+            if error == .server(code: "program_not_enrolled") {
+                trainingResponse = nil
+                trainingEnrollmentRequired = true
+                trainingErrorMessage = nil
+            } else {
+                trainingErrorMessage = error.localizedDescription
+            }
+        } catch {
+            trainingErrorMessage = "Training is temporarily unavailable. Please try again."
+        }
+    }
+
+    private func enrollTraining(sessionsPerWeek: Int, equipment: String) async throws {
+        guard let accessToken = await chatAccessToken() else { throw TrainingServiceError.authenticationExpired }
+        _ = try await trainingService.enroll(
+            accessToken: accessToken,
+            sessionsPerWeek: sessionsPerWeek,
+            equipment: equipment
+        )
+        trainingEnrollmentRequired = false
+        await loadTrainingNext()
+    }
+
+    private func logTrainingSet(
+        sessionId: String,
+        exercise: TrainingExercisePrescription,
+        setNumber: Int,
+        reps: Int,
+        loadKg: Double?,
+        rir: Int
+    ) async throws {
+        guard let accessToken = await chatAccessToken() else { throw TrainingServiceError.authenticationExpired }
+        try await trainingService.logSet(
+            accessToken: accessToken,
+            request: TrainingSetLogRequest(
+                sessionId: sessionId,
+                exerciseId: exercise.id,
+                setNumber: setNumber,
+                reps: reps,
+                loadKg: loadKg,
+                rir: rir
+            )
+        )
+        await loadTrainingNext()
+    }
+
+    private func recordTrainingFeedback(
+        sessionId: String,
+        soreness: Int,
+        pump: Int,
+        performance: String,
+        jointPain: Int
+    ) async throws {
+        guard let accessToken = await chatAccessToken() else { throw TrainingServiceError.authenticationExpired }
+        try await trainingService.recordFeedback(
+            accessToken: accessToken,
+            request: TrainingFeedbackRequest(
+                sessionId: sessionId,
+                soreness: soreness,
+                pump: pump,
+                performance: performance,
+                jointPain: jointPain
+            )
+        )
+        await loadTrainingNext()
+    }
+
+    private func revokeTraining() async {
+        guard let accessToken = await chatAccessToken() else {
+            trainingErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
+            return
+        }
+        do {
+            _ = try await trainingService.revoke(accessToken: accessToken)
+            trainingResponse = nil
+            trainingEnrollmentRequired = true
+            trainingErrorMessage = nil
+        } catch let error as LocalizedError {
+            trainingErrorMessage = error.errorDescription ?? "Training data could not be deleted."
+        } catch {
+            trainingErrorMessage = "Training data could not be deleted."
         }
     }
 

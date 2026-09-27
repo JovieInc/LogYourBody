@@ -380,6 +380,8 @@
 		C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED9F05E697F00813F824903 /* LogoutButton.swift */; };
 		C7A700022F20000000C0A702 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A700012F20000000C0A701 /* ChatService.swift */; };
 		C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A700032F20000000C0A703 /* ChatServiceTests.swift */; };
+		E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C001 /* TrainingService.swift */; };
+		E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C003 /* TrainingViews.swift */; };
 		C7B9E48E55256B991FBCDEF0 /* HomeV2TrendChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA9844F348C4675E22E4592F /* HomeV2TrendChart.swift */; };
 		CB2DAC6AFD2CCDD76F568339 /* HomeV2PolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4877512DEE0F7236151A15AA /* HomeV2PolicyTests.swift */; };
 		CB4A7A11426D64B74959C447 /* HealthKitManager+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1DE682AE51BF7A3EFF75FF /* HealthKitManager+Part02.swift */; };
@@ -895,6 +897,8 @@
 		C639B8116483011892C95543 /* BodyMetricLoggingServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricLoggingServiceTests.swift; sourceTree = "<group>"; };
 		C7A700012F20000000C0A701 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
 		C7A700032F20000000C0A703 /* ChatServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatServiceTests.swift; sourceTree = "<group>"; };
+		E4172D019C9F4A30A881C001 /* TrainingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingService.swift; sourceTree = "<group>"; };
+		E4172D019C9F4A30A881C003 /* TrainingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingViews.swift; sourceTree = "<group>"; };
 		C7CC52C2F710012ABB7E7219 /* EditEntrySavePolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditEntrySavePolicy.swift; sourceTree = "<group>"; };
 		C7E0D5025A2839599F4E281D /* PhotoMetadataAndImportPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoMetadataAndImportPolicyTests.swift; sourceTree = "<group>"; };
 		C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SkeletonLoaders.swift; path = Components/SkeletonLoaders.swift; sourceTree = "<group>"; };
@@ -1357,6 +1361,7 @@
 			isa = PBXGroup;
 			children = (
 				C7A700012F20000000C0A701 /* ChatService.swift */,
+				E4172D019C9F4A30A881C001 /* TrainingService.swift */,
 				AD8F12F42ED7C987003C4559 /* BugReportManager.swift */,
 				ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */,
 				ADF1F6B52ED4C61400745F33 /* GlobalTimelineService.swift */,
@@ -1486,6 +1491,7 @@
 				AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */,
 				AD723B032E15FA5C002376C6 /* LoginView.swift */,
 				AD723B052E15FA5C002376C6 /* MainTabView.swift */,
+				E4172D019C9F4A30A881C003 /* TrainingViews.swift */,
 				8E3A26E632164AACAA5D77FD /* MainTabViewPolicies.swift */,
 				AD723B062E15FA5C002376C6 /* PreferencesView.swift */,
 				AD3147A12F0B000100ABCDEF /* PreferenceGoalEditing.swift */,
@@ -2169,6 +2175,8 @@
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
 				ADAD00022F10000000ABCDEF /* ExternalServicePorts.swift in Sources */,
 				C7A700022F20000000C0A702 /* ChatService.swift in Sources */,
+				E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */,
+				E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */,
 				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,
 				AD3145C12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift in Sources */,
 				AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */,

@@ -17,6 +17,7 @@ import type {
 } from '@/lib/ports/chat-model';
 import type { BodyMetricsPort, ProductBodyMetric } from '@/lib/ports/body-metrics';
 import type { ProductUserRecord, UserDirectoryPort } from '@/lib/ports/user-directory';
+import type { NextWorkoutResult } from '@/lib/training/service';
 
 const now = '2026-08-02T22:00:00.000Z';
 const conversationId = '11111111-1111-4111-8111-111111111111';
@@ -234,13 +235,14 @@ function metric(subject: string): ProductBodyMetric {
   };
 }
 
-function makeHarness() {
+function makeHarness(trainingOutput?: NextWorkoutResult) {
   const store = new MemoryConversationStore();
   const model = new FixtureModel();
   const getUser = jest.fn(async (subject: string) => user(subject));
   const listMetrics = jest.fn(async (subject: string) => [metric(subject)]);
   let lease = 0;
   const reportStreamOutcome = jest.fn();
+  const getTrainingOutput = jest.fn(async () => trainingOutput ?? null);
   const handlers = createChatRouteHandlers({
     authenticate: async (request) => {
       const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
@@ -260,10 +262,11 @@ function makeHarness() {
     } as UserDirectoryPort,
     createModel: () => model,
     reportStreamOutcome,
+    getTrainingOutput,
     modelName: 'fixture-model',
     createLeaseToken: () => `33333333-3333-4333-8333-${String(++lease).padStart(12, '0')}`,
   });
-  return { handlers, store, model, getUser, listMetrics, reportStreamOutcome };
+  return { handlers, store, model, getUser, listMetrics, reportStreamOutcome, getTrainingOutput };
 }
 
 function request(method: 'GET' | 'POST' | 'DELETE', token = 'user-a', body?: unknown, query = '') {
@@ -323,6 +326,146 @@ describe('/api/auth/mobile/chat/v1', () => {
         ],
       },
     });
+  });
+
+  it('loads engine output only for training questions and keeps it server-scoped', async () => {
+    const engineOutput: NextWorkoutResult = {
+      kind: 'workout',
+      week: 1,
+      weekCount: 2,
+      weeklyFractionalVolume: { chest: 4 },
+      session: {
+        id: conversationId,
+        week: 1,
+        slot: 0,
+        pattern: 'A',
+        title: 'Full body A',
+        safetyStop: false,
+        explanation: null,
+        evidenceIds: ['k:81c218db'],
+        exercises: [
+          {
+            id: 'goblet_squat',
+            name: 'Goblet squat',
+            primaryMuscle: 'quads',
+            muscleContribution: { quads: 1 },
+            sets: 2,
+            repRange: { min: 8, max: 12 },
+            targetReps: 9,
+            targetRir: 4,
+            targetLoadKg: null,
+            loadInstruction: null,
+            progression: 'add_reps',
+            evidenceIds: ['k:1795aef0'],
+          },
+        ],
+      },
+    };
+    const { handlers, model, getTrainingOutput } = makeHarness(engineOutput);
+    await (
+      await handlers.POST(request('POST', 'user-a', chatBody('What is my next training session?')))
+    ).text();
+    expect(getTrainingOutput).toHaveBeenCalledWith('user-a');
+    expect(model.calls[0]?.messages[0]?.content).toContain('"targetReps":9');
+    expect(model.calls[0]?.messages[0]?.content).toContain('[k:1795aef0]');
+
+    const nonTraining = makeHarness(engineOutput);
+    await (
+      await nonTraining.handlers.POST(
+        request('POST', 'user-a', chatBody('Summarize my body trend.')),
+      )
+    ).text();
+    expect(nonTraining.getTrainingOutput).not.toHaveBeenCalled();
+    expect(nonTraining.model.calls[0]?.messages[0]?.content).not.toContain('targetReps');
+  });
+
+  it('withholds unsupported set, rep, and load numbers before streaming or persistence', async () => {
+    const engineOutput: NextWorkoutResult = {
+      kind: 'workout',
+      week: 1,
+      weekCount: 4,
+      weeklyFractionalVolume: { chest: 4 },
+      session: {
+        id: conversationId,
+        week: 1,
+        slot: 0,
+        pattern: 'A',
+        title: 'Full body A',
+        safetyStop: false,
+        explanation: null,
+        evidenceIds: ['k:81c218db'],
+        exercises: [
+          {
+            id: 'goblet_squat',
+            name: 'Goblet squat',
+            primaryMuscle: 'quads',
+            muscleContribution: { quads: 1 },
+            sets: 2,
+            repRange: { min: 8, max: 12 },
+            targetReps: 9,
+            targetRir: 4,
+            targetLoadKg: null,
+            loadInstruction: null,
+            progression: 'add_reps',
+            evidenceIds: ['k:1795aef0'],
+          },
+        ],
+      },
+    };
+    const { handlers, model, store } = makeHarness(engineOutput);
+    model.chunks = ['Try 3 sets of 12 reps at 20 kg.'];
+
+    const response = await handlers.POST(
+      request('POST', 'user-a', chatBody('How many reps should I do for my workout?')),
+    );
+    const stream = await response.text();
+    expect(stream).not.toContain('Try 3 sets');
+    expect(stream).toContain('I cannot add quantities the engine did not return.');
+    expect([...store.turns.values()][0]?.assistantMessage?.content).toContain(
+      'I cannot add quantities the engine did not return.',
+    );
+  });
+
+  it('streams engine-returned training quantities when the answer stays within the result', async () => {
+    const engineOutput: NextWorkoutResult = {
+      kind: 'workout',
+      week: 1,
+      weekCount: 4,
+      weeklyFractionalVolume: { chest: 4 },
+      session: {
+        id: conversationId,
+        week: 1,
+        slot: 0,
+        pattern: 'A',
+        title: 'Full body A',
+        safetyStop: false,
+        explanation: null,
+        evidenceIds: ['k:81c218db'],
+        exercises: [
+          {
+            id: 'goblet_squat',
+            name: 'Goblet squat',
+            primaryMuscle: 'quads',
+            muscleContribution: { quads: 1 },
+            sets: 2,
+            repRange: { min: 8, max: 12 },
+            targetReps: 9,
+            targetRir: 4,
+            targetLoadKg: null,
+            loadInstruction: null,
+            progression: 'add_reps',
+            evidenceIds: ['k:1795aef0'],
+          },
+        ],
+      },
+    };
+    const { handlers, model } = makeHarness(engineOutput);
+    model.chunks = ['The engine returns 2 sets of 9 reps at 4 RIR.'];
+
+    const stream = await (
+      await handlers.POST(request('POST', 'user-a', chatBody('What is in my workout?')))
+    ).text();
+    expect(stream).toContain('The engine returns 2 sets of 9 reps at 4 RIR.');
   });
 
   it('isolates conversations across authenticated subjects', async () => {

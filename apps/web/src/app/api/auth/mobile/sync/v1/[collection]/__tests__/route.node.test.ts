@@ -26,7 +26,8 @@ class MemoryNativeRecords implements NativeProductRecordsPort {
     records: Array<Record<string, unknown>>;
   }> = [];
   pulled: Array<{ subject: string; collection: NativeProductRecordCollection; since: string }> = [];
-  removed: Array<{ subject: string; collection: NativeProductRecordCollection; ids: string[] }> = [];
+  removed: Array<{ subject: string; collection: NativeProductRecordCollection; ids: string[] }> =
+    [];
   ended: Array<{ subject: string; endedAt: string }> = [];
 
   async push(
@@ -81,13 +82,18 @@ class MemoryNativeRecords implements NativeProductRecordsPort {
       glp1_dose_logs: [],
       dexa_results: [],
       progress_photos: [],
+      training_sessions: [],
+      logged_sets: [],
+      training_feedback: [],
     };
   }
 
   async deleteAllForSubject() {}
 }
 
-function makeHarness(users: Record<string, string> = { 'access-a': 'owner-a', 'access-b': 'owner-b' }) {
+function makeHarness(
+  users: Record<string, string> = { 'access-a': 'owner-a', 'access-b': 'owner-b' },
+) {
   const records = new MemoryNativeRecords();
   const handlers = createNativeProductRecordHandlers({
     authenticate: async (request) => {
@@ -121,11 +127,12 @@ describe('/api/auth/mobile/sync/v1/[collection]', () => {
   it('rejects missing bearer tokens before touching persistence', async () => {
     const { handlers, records } = makeHarness();
     expect((await handlers.GET(request('GET', 'daily-metrics'))).status).toBe(401);
-    expect((await handlers.POST(request('POST', 'daily-metrics', undefined, [morning]))).status).toBe(
-      401,
-    );
     expect(
-      (await handlers.DELETE(request('DELETE', 'daily-metrics', undefined, { ids: [morningId] }))).status,
+      (await handlers.POST(request('POST', 'daily-metrics', undefined, [morning]))).status,
+    ).toBe(401);
+    expect(
+      (await handlers.DELETE(request('DELETE', 'daily-metrics', undefined, { ids: [morningId] })))
+        .status,
     ).toBe(401);
     expect(records.pushed).toEqual([]);
     expect(records.pulled).toEqual([]);
@@ -136,6 +143,24 @@ describe('/api/auth/mobile/sync/v1/[collection]', () => {
     const { handlers, records } = makeHarness();
     expect((await handlers.GET(request('GET', 'food-logs', 'access-a'))).status).toBe(404);
     expect(records.pulled).toEqual([]);
+  });
+
+  it('keeps training collections behind the consent-aware training API', async () => {
+    const { handlers, records } = makeHarness();
+    expect((await handlers.GET(request('GET', 'training-sessions', 'access-a'))).status).toBe(403);
+    expect(
+      (await handlers.POST(request('POST', 'logged-sets', 'access-a', [morning]))).status,
+    ).toBe(403);
+    expect(
+      (
+        await handlers.DELETE(
+          request('DELETE', 'training-feedback', 'access-a', { ids: [morningId] }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(records.pulled).toEqual([]);
+    expect(records.pushed).toEqual([]);
+    expect(records.removed).toEqual([]);
   });
 
   it('pushes passthrough native fields scoped to the authenticated subject', async () => {

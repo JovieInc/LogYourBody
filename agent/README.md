@@ -8,9 +8,9 @@ This directory is the backend agent definition for LogYourBody's core chat on th
 - `agent/instructions/account-connection.ts` adds connection-state instructions from server-verified session attributes.
 - `agent/agent.ts` selects the eve runtime model.
 - `agent/channels/eve.ts` fails closed until Jovie route authentication and per-session authorization are implemented. Loopback development requires the explicit `LYB_EVE_ALLOW_LOCAL_DEV=1` opt-in and is still disabled when `VERCEL_ENV=production`.
-- General shell, file, web, delegation, and planning tools are explicitly disabled. No health-data tool or external connection is present in this slice.
+- General shell, file, web, delegation, and planning tools are explicitly disabled. Typed training tools are present as fail-closed declarations: they return an unavailable status and do not read or write records.
 
-The agent cannot infer a LogYourBody connection from Jovie identity. A future first-party data adapter must provide a server-verified connection state, explicit scopes, and caller-scoped data. Until then, an unconnected caller receives connection guidance and no health data is read.
+The agent cannot infer a LogYourBody connection from identity. Even when the runtime reports a connected account, training tools remain unavailable until first-party bearer authorization, per-session ownership, consent scopes, and revocation are enforced. The authenticated first-party mobile API is authoritative; this eve channel reads and writes no product records.
 
 ## Local validation
 
