@@ -21,7 +21,7 @@ struct TrainingCoachCard: View {
     @State private var isStopConfirmationPresented = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("NEXT SESSION")
@@ -85,11 +85,11 @@ struct TrainingCoachCard: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("training_revoke_button")
         }
-        .padding(18)
+        .padding(JovieTokens.compactInset)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
                 .stroke(theme.colors.border.opacity(0.7), lineWidth: 1)
         }
         .confirmationDialog(
@@ -139,9 +139,9 @@ struct TrainingSetupCard: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("training_setup_button")
         }
-        .padding(18)
+        .padding(JovieTokens.compactInset)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous))
     }
 }
 
@@ -279,7 +279,7 @@ struct TrainingLiveSessionView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 20) {
                     if session.safetyStop {
                         Text(session.explanation ?? "Pause this session and seek qualified guidance if pain persists or worsens.")
                             .font(.system(size: 15))
@@ -349,11 +349,11 @@ struct TrainingLiveSessionView: View {
 
     private func setRow(_ exercise: TrainingExercisePrescription, setNumber: Int) -> some View {
         let key = setKey(exercise, setNumber: setNumber)
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: JovieTokens.tightGap) {
             Text("Set \(setNumber)")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(theme.colors.textSecondary)
-            HStack(spacing: 10) {
+            HStack(spacing: JovieTokens.tightGap) {
                 TextField("Reps", text: repsBinding(for: exercise, setNumber: setNumber))
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
