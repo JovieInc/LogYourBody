@@ -150,11 +150,11 @@ public struct MetricSummaryCard: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: headerIconSize, weight: .semibold))
-                    .foregroundStyle(accentColor.opacity(0.8))
+                    .foregroundStyle(accentColor)
 
                 Text(titleText)
                     .font(.system(size: 15, weight: .semibold, design: .default))
-                    .foregroundStyle(accentColor.opacity(0.8))
+                    .foregroundStyle(accentColor)
                     .lineLimit(1)
             }
 
