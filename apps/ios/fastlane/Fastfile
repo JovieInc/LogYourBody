@@ -646,7 +646,6 @@ platform :ios do
     run_tests(
       project: proj_path,
       scheme: "LogYourBody",
-      testplan: "UITests",
       device: device,
       destination: destination.empty? ? nil : destination,
       configuration: "Debug",
