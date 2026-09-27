@@ -281,6 +281,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             result.analyzeTime = analyzeTime
             result.vatMassKg = 1.23
             result.vatVolumeCm3 = 456.0
+            result.scanWeight = 79.2
+            result.scanWeightUnit = "kg"
+            result.bodyFatPercentage = 18.4
+            result.muscleMass = 62.0
+            result.boneMass = 3.2
             result.resultPdfUrl = "https://example.com/result.pdf"
             result.resultPdfName = "result.pdf"
             result.createdAt = createdAt
@@ -315,6 +320,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertEqual(payload["external_source"] as? String, "BodySpec")
         XCTAssertEqual(payload["result_pdf_url"] as? String, "https://example.com/result.pdf")
         XCTAssertEqual(payload["result_pdf_name"] as? String, "result.pdf")
+        XCTAssertEqual(payload["scan_weight"] as? Double, 79.2)
+        XCTAssertEqual(payload["scan_weight_unit"] as? String, "kg")
+        XCTAssertEqual(payload["body_fat_percentage"] as? Double, 18.4)
+        XCTAssertEqual(payload["muscle_mass"] as? Double, 62.0)
+        XCTAssertEqual(payload["bone_mass"] as? Double, 3.2)
 
         if let vatMass = payload["vat_mass_kg"] as? Double {
             XCTAssertEqual(vatMass, 1.23, accuracy: 0.001)
@@ -372,6 +382,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             withVat.analyzeTime = now.addingTimeInterval(-1_800)
             withVat.vatMassKg = 2.5
             withVat.vatVolumeCm3 = 789.0
+            withVat.scanWeight = 80.1
+            withVat.scanWeightUnit = "kg"
+            withVat.bodyFatPercentage = 18.5
+            withVat.muscleMass = 63.0
+            withVat.boneMass = 3.3
             withVat.resultPdfUrl = "https://example.com/result.pdf"
             withVat.resultPdfName = "result.pdf"
             withVat.createdAt = createdAt
@@ -413,6 +428,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
 
         let vatVolume = try XCTUnwrap(withVat.vatVolumeCm3)
         XCTAssertEqual(vatVolume, 789.0, accuracy: 0.001)
+        XCTAssertEqual(withVat.scanWeight, 80.1)
+        XCTAssertEqual(withVat.scanWeightUnit, "kg")
+        XCTAssertEqual(withVat.bodyFatPercentage, 18.5)
+        XCTAssertEqual(withVat.muscleMass, 63.0)
+        XCTAssertEqual(withVat.boneMass, 3.3)
 
         XCTAssertEqual(withVat.resultPdfUrl, "https://example.com/result.pdf")
         XCTAssertEqual(withVat.resultPdfName, "result.pdf")

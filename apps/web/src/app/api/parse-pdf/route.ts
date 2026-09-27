@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authCookies } from '@/lib/auth/constants';
+import { fetchUserInfo } from '@/lib/auth/jovie-oauth';
 import { createJsonCompletionPort } from '@/lib/ports/openai-json-completion';
+import { parsePDFServer } from '@/lib/pdf-parser';
 
 type WeightUnit = 'kg' | 'lbs';
 
@@ -24,19 +27,25 @@ interface ExtractionResult {
   extraction_notes?: string;
 }
 
-// Dynamic import with error handling
-async function loadPdfParse() {
-  try {
-    const pdfParse = await import('pdf-parse');
-    return pdfParse.default || pdfParse;
-  } catch (error) {
-    console.error('Failed to load pdf-parse:', error);
-    return null;
-  }
+async function authenticate(request: NextRequest) {
+  const bearer = request.headers.get('authorization')?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
+  const token = bearer || request.cookies.get(authCookies.accessToken)?.value;
+  return token ? fetchUserInfo(token) : null;
+}
+
+function isISOCalendarDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await authenticate(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Check if OpenAI API key is configured
     if (!process.env.OPENAI_API_KEY) {
       console.error('OpenAI API key not configured');
@@ -59,22 +68,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: 'PDF is too large. Choose a file under 10 MB.' },
+        { status: 413 },
+      );
+    }
+
     // Convert file to buffer
     const buffer = Buffer.from(await file.arrayBuffer());
-
     let pdfText = '';
-
-    // Try to load and use pdf-parse
-    const pdfParse = await loadPdfParse();
-
-    if (pdfParse) {
-      try {
-        const pdfData = await pdfParse(buffer);
-        pdfText = pdfData.text;
-      } catch (parseError) {
-        console.error('Error parsing PDF:', parseError);
-        // Continue to fallback method
-      }
+    try {
+      pdfText = await parsePDFServer(buffer);
+    } catch (parseError) {
+      void parseError;
     }
 
     // If pdf-parse didn't work, try pdf-lib as fallback
@@ -143,12 +150,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('PDF Text Extraction:', {
-      textLength: pdfText.length,
-      fullText: pdfText.substring(0, 2000), // Log more text for debugging
-      hasContent: pdfText.trim().length > 0,
-    });
-
     // If we have very little text, it might be an image-based PDF
     if (pdfText.trim().length < 100) {
       console.warn('Very little text extracted from PDF - might be image-based');
@@ -210,13 +211,6 @@ export async function POST(request: NextRequest) {
 
     const extractedData = JSON.parse(completionContent) as ExtractionResult;
 
-    console.log('OpenAI extraction result:', {
-      scanCount: extractedData.total_scans,
-      confidence: extractedData.extraction_confidence,
-      notes: extractedData.extraction_notes,
-      firstScan: extractedData.scans?.[0],
-    });
-
     // Validate the extraction
     if (
       extractedData.extraction_confidence === 'low' ||
@@ -241,7 +235,13 @@ export async function POST(request: NextRequest) {
         return false;
       }
       // Basic validation - must have at least a date and weight
-      if (typeof scan.date !== 'string' || typeof scan.weight !== 'number') {
+      if (
+        typeof scan.date !== 'string' ||
+        !isISOCalendarDate(scan.date) ||
+        typeof scan.weight !== 'number' ||
+        !Number.isFinite(scan.weight) ||
+        (scan.weight_unit !== 'kg' && scan.weight_unit !== 'lbs')
+      ) {
         return false;
       }
 
@@ -254,8 +254,10 @@ export async function POST(request: NextRequest) {
 
       // Body fat percentage should be reasonable (3-60%)
       if (
-        scan.body_fat_percentage &&
-        (scan.body_fat_percentage < 3 || scan.body_fat_percentage > 60)
+        scan.body_fat_percentage != null &&
+        (!Number.isFinite(scan.body_fat_percentage) ||
+          scan.body_fat_percentage < 3 ||
+          scan.body_fat_percentage > 60)
       ) {
         console.warn('Invalid body fat percentage:', scan.body_fat_percentage);
         return false;
@@ -283,25 +285,14 @@ export async function POST(request: NextRequest) {
       scanCount: validScans.length,
       textLength: pdfText.length,
     });
-  } catch (error) {
-    console.error('Error parsing PDF:', error);
-
-    // Log more details about the error
-    if (error instanceof Error) {
-      console.error('Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        // Check if it's an OpenAI specific error
-        isOpenAIError: error.message.includes('OpenAI') || error.message.includes('API'),
-      });
-    }
+  } catch {
+    console.error('PDF scan extraction failed');
 
     return NextResponse.json(
       {
         error: 'Failed to parse PDF',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        errorType: error instanceof Error ? error.name : 'Unknown',
+        details:
+          'The scan could not be read. Try a text-based PDF or enter the measurements manually.',
       },
       { status: 500 },
     );

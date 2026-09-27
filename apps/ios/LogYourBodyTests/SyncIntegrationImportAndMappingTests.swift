@@ -419,4 +419,84 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         XCTAssertEqual(metric.hipCircumference, 106.68, accuracy: 0.0001)
         XCTAssertEqual(metric.waistUnit, "cm")
     }
+
+    func testInBodyScanMapsToDatedMetricAndDurableDexaRecord() throws {
+        let scan = DexaPDFScan(
+            date: "2026-09-20",
+            weight: 82.4,
+            weightUnit: "kg",
+            bodyFatPercentage: 21.2,
+            muscleMass: 61.8,
+            boneMass: 3.1,
+            source: "InBody 770"
+        )
+
+        let plan = DexaPDFScanMapper.makePlan(
+            scans: [scan],
+            userId: "pdf-import-user",
+            existingResults: [],
+            now: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        let metric = try XCTUnwrap(plan.metrics.first)
+        let result = try XCTUnwrap(plan.results.first)
+        XCTAssertEqual(plan.metrics.count, 1)
+        XCTAssertEqual(plan.results.count, 1)
+        XCTAssertEqual(metric.localDate, "2026-09-20")
+        XCTAssertEqual(metric.dataSource, "inbody_pdf")
+        XCTAssertEqual(metric.bodyFatPercentage, 21.2)
+        XCTAssertEqual(metric.sourceMetadata?.sourceName, "InBody PDF")
+        XCTAssertEqual(result.externalSource, "inbody_pdf")
+        XCTAssertEqual(result.scanWeight, 82.4)
+        XCTAssertEqual(result.muscleMass, 61.8)
+        XCTAssertNil(result.resultPdfName)
+        XCTAssertEqual(result.bodyMetricsId, metric.id)
+    }
+
+    func testSameDayEntryIsPreservedAndRepeatImportIsDeduplicated() throws {
+        let scan = DexaPDFScan(
+            date: "2026-09-20",
+            weight: 82.4,
+            weightUnit: "kg",
+            bodyFatPercentage: 21.2,
+            muscleMass: nil,
+            boneMass: nil,
+            source: "DEXA Scan"
+        )
+        let existingMetric = BodyMetrics(
+            id: "manual-same-day",
+            userId: "pdf-import-user",
+            date: Date(timeIntervalSince1970: 1_790_000_000),
+            localDate: "2026-09-20",
+            weight: 83,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "manual",
+            createdAt: Date(timeIntervalSince1970: 1_790_000_000),
+            updatedAt: Date(timeIntervalSince1970: 1_790_000_000)
+        )
+        let firstImport = DexaPDFScanMapper.makePlan(
+            scans: [scan],
+            userId: existingMetric.userId,
+            existingResults: []
+        )
+
+        XCTAssertEqual(firstImport.metrics.count, 1)
+        XCTAssertNotEqual(firstImport.results.first?.bodyMetricsId, existingMetric.id)
+        XCTAssertEqual(existingMetric.weight, 83)
+
+        let repeatedImport = DexaPDFScanMapper.makePlan(
+            scans: [scan],
+            userId: existingMetric.userId,
+            existingResults: firstImport.results
+        )
+        XCTAssertTrue(repeatedImport.metrics.isEmpty)
+        XCTAssertTrue(repeatedImport.results.isEmpty)
+        XCTAssertEqual(repeatedImport.skippedDuplicateCount, 1)
+    }
 }

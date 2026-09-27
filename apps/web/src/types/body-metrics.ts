@@ -48,6 +48,8 @@ export type BodyMetricSource =
   | 'healthkit'
   | 'smart_scale'
   | 'bodyspec_dexa'
+  | 'dexa_pdf'
+  | 'inbody_pdf'
   | 'caliper'
   | 'photo';
 
@@ -84,11 +86,7 @@ export interface UserProfile {
   height_unit?: 'cm' | 'ft';
   gender?: 'male' | 'female';
   activity_level?:
-    | 'sedentary'
-    | 'lightly_active'
-    | 'moderately_active'
-    | 'very_active'
-    | 'extremely_active';
+    'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | 'extremely_active';
 
   // Goal metrics based on research
   goal_body_fat_percentage?: number;
@@ -144,12 +142,7 @@ export interface FFMIResult {
   normalized_ffmi: number;
   fat_free_mass: number;
   interpretation:
-    | 'below_average'
-    | 'average'
-    | 'above_average'
-    | 'excellent'
-    | 'superior'
-    | 'suspiciously_high';
+    'below_average' | 'average' | 'above_average' | 'excellent' | 'superior' | 'suspiciously_high';
 }
 
 export interface BodyFatResult {

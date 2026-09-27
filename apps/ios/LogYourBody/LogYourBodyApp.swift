@@ -685,6 +685,11 @@ struct LogYourBodyApp: App {
             return
         }
 
+        if url.isFileURL, url.pathExtension.lowercased() == "pdf" {
+            NotificationCenter.default.post(name: .dexaPDFReceived, object: url)
+            return
+        }
+
         guard let destination = LogYourBodyDeepLink.destination(for: url) else {
             return
         }

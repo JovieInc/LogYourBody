@@ -5,6 +5,10 @@ const migrationSql = readFileSync(
   join(process.cwd(), 'db/migrations/20260813120000_native_body_metrics_sync.sql'),
   'utf8',
 );
+const pdfSourceMigrationSql = readFileSync(
+  join(process.cwd(), 'db/migrations/20260927200000_pdf_scan_data_sources.sql'),
+  'utf8',
+);
 
 describe('native body metrics Neon schema', () => {
   it('adds native identity, local date, timestamps, and bone mass without truncating them', () => {
@@ -29,9 +33,13 @@ describe('native body metrics Neon schema', () => {
   });
 
   it('scopes incremental pull to owner plus server updated_at', () => {
-    expect(migrationSql).toContain(
-      'create index if not exists body_metrics_owner_updated_idx',
-    );
+    expect(migrationSql).toContain('create index if not exists body_metrics_owner_updated_idx');
     expect(migrationSql).toContain('(user_subject, updated_at asc, id asc)');
+  });
+
+  it('allows DEXA and InBody PDF provenance values', () => {
+    expect(pdfSourceMigrationSql).toContain("'dexa_pdf'");
+    expect(pdfSourceMigrationSql).toContain("'inbody_pdf'");
+    expect(pdfSourceMigrationSql).toContain('body_metrics_data_source_check');
   });
 });

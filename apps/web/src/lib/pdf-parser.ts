@@ -1,19 +1,20 @@
 // Server-side PDF parsing utility
-import { Buffer } from 'buffer'
+import { Buffer } from 'buffer';
 
 export async function parsePDFServer(buffer: Buffer): Promise<string> {
   try {
     // Dynamically import pdf-parse only on server
     if (typeof window === 'undefined') {
-      const pdfParseModule = await import('pdf-parse')
-      const pdfParse = pdfParseModule.default || pdfParseModule
-      const data = await pdfParse(buffer)
-      return data.text
+      const pdfParseModule = await import('pdf-parse');
+      const pdfParse = pdfParseModule.default || pdfParseModule;
+      const data = await pdfParse(buffer);
+      return data.text;
     }
-    throw new Error('PDF parsing is only available on server')
+    throw new Error('PDF parsing is only available on server');
   } catch (error) {
-    console.error('Error in parsePDFServer:', error)
-    throw error
+    void error;
+    console.error('PDF text extraction failed');
+    throw error;
   }
 }
 
@@ -21,30 +22,29 @@ export async function parsePDFServer(buffer: Buffer): Promise<string> {
 export async function parsePDFWithPdfJs(arrayBuffer: ArrayBuffer): Promise<string> {
   try {
     // Import PDF.js dynamically
-    const pdfjsLib = await import('pdfjs-dist')
+    const pdfjsLib = await import('pdfjs-dist');
 
     // Set worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
-    const pdf = await loadingTask.promise
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
 
-    let fullText = ''
+    let fullText = '';
 
     for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i)
-      const textContent = await page.getTextContent()
-      const itemsWithText = textContent.items
-        .filter((item) => typeof (item as { str?: unknown }).str === 'string') as { str: string }[]
-      const pageText = itemsWithText
-        .map((item) => item.str)
-        .join(' ')
-      fullText += pageText + '\n'
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const itemsWithText = textContent.items.filter(
+        (item) => typeof (item as { str?: unknown }).str === 'string',
+      ) as { str: string }[];
+      const pageText = itemsWithText.map((item) => item.str).join(' ');
+      fullText += pageText + '\n';
     }
 
-    return fullText
+    return fullText;
   } catch (error) {
-    console.error('Error parsing with PDF.js:', error)
-    throw error
+    console.error('Error parsing with PDF.js:', error);
+    throw error;
   }
 }

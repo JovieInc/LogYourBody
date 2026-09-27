@@ -59,4 +59,16 @@ describe('/api/body-metrics', () => {
       source_metadata: {},
     });
   });
+
+  it.each(['dexa_pdf', 'inbody_pdf'] as const)('accepts PDF scan source %s', async (dataSource) => {
+    mockedMetrics.upsert.mockResolvedValue({ id: 'metric-1' } as never);
+    const response = await POST(
+      request({ date: '2026-09-20', weight: 80, weightUnit: 'kg', dataSource }),
+    );
+    expect(response.status).toBe(201);
+    expect(mockedMetrics.upsert).toHaveBeenCalledWith(
+      'jovie-user-1',
+      expect.objectContaining({ data_source: dataSource }),
+    );
+  });
 });

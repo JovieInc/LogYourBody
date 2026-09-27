@@ -4,6 +4,12 @@
 import { NextRequest } from 'next/server';
 import { POST } from '../route';
 
+jest.mock('@/lib/auth/jovie-oauth', () => ({
+  fetchUserInfo: jest.fn(async (token: string) =>
+    token === 'test-token' ? { sub: 'fixture-user' } : null,
+  ),
+}));
+
 type WeightUnit = 'kg' | 'lbs';
 
 interface MockScan {
@@ -96,6 +102,32 @@ describe('PDF Parsing API', () => {
     process.env.OPENAI_API_KEY = 'test-api-key';
   });
 
+  it('rejects an invalid token when credentials are supplied', async () => {
+    const formData = new FormData();
+    formData.append('file', new File(['valid-pdf'], 'scan.pdf', { type: 'application/pdf' }));
+    const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+      method: 'POST',
+      headers: { authorization: 'Bearer invalid-token' },
+      body: formData,
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects uploads when no authenticated user is present', async () => {
+    const formData = new FormData();
+    formData.append('file', new File(['valid-pdf'], 'scan.pdf', { type: 'application/pdf' }));
+    const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ error: 'Unauthorized' });
+  });
+
   describe('Single Scan Extraction', () => {
     it('should extract data from a valid PDF with single scan', async () => {
       mockOpenAIResponse({
@@ -118,6 +150,7 @@ describe('PDF Parsing API', () => {
       formData.append('file', file);
 
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -168,6 +201,7 @@ describe('PDF Parsing API', () => {
       formData.append('file', file);
 
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -208,6 +242,7 @@ describe('PDF Parsing API', () => {
       formData.append('file', file);
 
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -240,6 +275,7 @@ describe('PDF Parsing API', () => {
       formData.append('file', file);
 
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -265,6 +301,7 @@ describe('PDF Parsing API', () => {
       formData.append('file', file);
 
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -287,6 +324,7 @@ describe('PDF Parsing API', () => {
       formData.append('file', file);
 
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -304,6 +342,7 @@ describe('PDF Parsing API', () => {
       formData.append('file', file);
 
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -327,6 +366,7 @@ describe('PDF Parsing API', () => {
       formData.append('file', file);
 
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
