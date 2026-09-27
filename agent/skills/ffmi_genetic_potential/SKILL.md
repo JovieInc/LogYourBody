@@ -1,6 +1,6 @@
 ---
 name: ffmi_genetic_potential
-description: 'Use when the user asks about ffmi and genetic potential.'
+description: 'Use when the user asks what FFMI means or about fat-free mass and natural muscular potential.'
 ---
 
 # FFMI and genetic potential

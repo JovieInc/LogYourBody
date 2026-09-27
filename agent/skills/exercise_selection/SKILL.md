@@ -1,6 +1,6 @@
 ---
 name: exercise_selection
-description: 'Use when the user asks about exercise selection by muscle group.'
+description: 'Use when the user asks which exercises target a muscle, how to compare variations, or how range of motion affects exercise selection.'
 ---
 
 # Exercise selection by muscle group

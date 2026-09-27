@@ -1,6 +1,6 @@
 ---
 name: hypertrophy-index
-description: 'Use to route questions to a topic-specific training knowledge skill.'
+description: 'Use when the user asks a broad training question spanning topics or needs help choosing which training knowledge area applies.'
 ---
 
 # Hypertrophy knowledge index

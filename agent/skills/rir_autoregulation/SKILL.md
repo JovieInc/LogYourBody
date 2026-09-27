@@ -1,6 +1,6 @@
 ---
 name: rir_autoregulation
-description: 'Use when the user asks about reps in reserve and autoregulation.'
+description: 'Use when the user asks how close to failure to train, what reps in reserve mean, or how to autoregulate effort.'
 ---
 
 # Reps in reserve and autoregulation

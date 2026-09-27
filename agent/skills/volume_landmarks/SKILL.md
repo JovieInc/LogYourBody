@@ -1,6 +1,6 @@
 ---
 name: volume_landmarks
-description: 'Use when the user asks about volume landmarks.'
+description: 'Use when the user asks how many weekly sets to do for a muscle, or what MEV, MAV, or MRV means.'
 ---
 
 # Volume landmarks

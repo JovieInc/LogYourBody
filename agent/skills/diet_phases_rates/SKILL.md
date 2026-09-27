@@ -1,6 +1,6 @@
 ---
 name: diet_phases_rates
-description: 'Use when the user asks about diet phases and rates.'
+description: 'Use when the user asks about rates of weight loss or gain, cutting versus maintenance, or retaining muscle during a diet.'
 ---
 
 # Diet phases and rates
