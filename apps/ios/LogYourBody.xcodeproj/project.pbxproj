@@ -427,6 +427,7 @@
 		FE20A0A100000000000000B1 /* JovieTokensTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A100000000000000F1 /* JovieTokensTests.swift */; };
 		FE20A0A200000000000000B2 /* JovieGlassSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */; };
 		FE20A0A300000000000000B3 /* WorldClassScreenInventoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */; };
+		FE20A0A400000000000000B4 /* MetricAccentContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */; };
 		FFC041175CAD1871B45B8FE6 /* RevenueCatPurchaseRestoreFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F9119B26AB2A527AA6E344 /* RevenueCatPurchaseRestoreFlowTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -940,6 +941,7 @@
 		FE20A0A100000000000000F1 /* JovieTokensTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JovieTokensTests.swift; sourceTree = "<group>"; };
 		FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JovieGlassSurfaceTests.swift; sourceTree = "<group>"; };
 		FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldClassScreenInventoryTests.swift; sourceTree = "<group>"; };
+		FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricAccentContrastTests.swift; sourceTree = "<group>"; };
 		FE9C6D5CF67D9E4FA0995EC1 /* BodySpecAuthManagerTokenStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodySpecAuthManagerTokenStateTests.swift; sourceTree = "<group>"; };
 		FECEBC7B2B956D26BF45822F /* DSLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLogo.swift; path = DesignSystem/Atoms/DSLogo.swift; sourceTree = "<group>"; };
 		FEE8DE6FD2A76A65AF63D2D9 /* DebugResetManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugResetManagerTests.swift; sourceTree = "<group>"; };
@@ -1073,6 +1075,7 @@
 				FE20A0A100000000000000F1 /* JovieTokensTests.swift */,
 				FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */,
 				FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */,
+				FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */,
 			);
 			name = DesignSystem;
 			path = DesignSystem;
@@ -2044,6 +2047,7 @@
 				FE20A0A100000000000000B1 /* JovieTokensTests.swift in Sources */,
 				FE20A0A200000000000000B2 /* JovieGlassSurfaceTests.swift in Sources */,
 				FE20A0A300000000000000B3 /* WorldClassScreenInventoryTests.swift in Sources */,
+				FE20A0A400000000000000B4 /* MetricAccentContrastTests.swift in Sources */,
 				E740BE7171B6D98EEC5796B5 /* ErrorStateViewTests.swift in Sources */,
 				57EE5D3DE35D32DFC0A60E02 /* KeychainManagerTests.swift in Sources */,
 				0EC249B0ED61CDC66976258E /* AuthManagerSessionTests.swift in Sources */,
