@@ -617,6 +617,11 @@ platform :ios do
     # so the gate survives Xcode/simulator image changes on runners.
     destination = options[:destination].to_s.strip
     device = destination.empty? ? (options[:device] || "iPhone 16") : nil
+    logout_ui_output = options[:logout_ui_output_directory] || "./test_results/logout-ui"
+    logout_ui_result_bundle = File.expand_path(
+      File.join(logout_ui_output, "LogYourBody.xcresult"),
+      ios_dir
+    )
 
     run_tests(
       project: proj_path,
@@ -634,6 +639,29 @@ platform :ios do
       xcargs: "CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO",
       xcodebuild_formatter: ENV["CI"] ? "xcbeautify --renderer github-actions" : "xcbeautify"
     )
+
+    # Keep the profile logout hierarchy regression in the required iOS CI path.
+    # Run it separately and serially so the unit-tier selector and coverage
+    # report above remain unchanged.
+    run_tests(
+      project: proj_path,
+      scheme: "LogYourBody",
+      testplan: "UITests",
+      device: device,
+      destination: destination.empty? ? nil : destination,
+      configuration: "Debug",
+      clean: false,
+      code_coverage: true,
+      output_types: "junit",
+      output_directory: logout_ui_output,
+      result_bundle: true,
+      disable_concurrent_testing: true,
+      only_testing: "LogYourBodyUITests/LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail",
+      xcargs: "CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO",
+      xcodebuild_formatter: ENV["CI"] ? "xcbeautify --renderer github-actions" : "xcbeautify"
+    )
+
+    sh("xcrun xccov view --report --functions-for-file 'PreferencesView+Header.swift' '#{logout_ui_result_bundle}'")
   end
 
   desc "PR verification - lint, build, and test"
