@@ -1,6 +1,6 @@
 ---
 name: mesocycle_deload
-description: 'Use when the user asks about mesocycle structure and deloads.'
+description: 'Use when the user asks how to structure training weeks, progress a mesocycle, or decide when to deload.'
 ---
 
 # Mesocycle structure and deloads

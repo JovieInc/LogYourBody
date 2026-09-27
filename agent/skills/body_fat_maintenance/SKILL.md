@@ -1,6 +1,6 @@
 ---
 name: body_fat_maintenance
-description: 'Use when the user asks about body-fat and maintenance guidance.'
+description: 'Use when the user asks how to interpret a body-fat estimate or connect body composition with maintenance planning.'
 ---
 
 # Body-fat and maintenance guidance

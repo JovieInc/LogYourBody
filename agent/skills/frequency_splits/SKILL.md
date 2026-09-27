@@ -1,6 +1,6 @@
 ---
 name: frequency_splits
-description: 'Use when the user asks about training frequency and splits.'
+description: 'Use when the user asks how often to train a muscle, how to spread weekly sets, or how to choose a training split.'
 ---
 
 # Training frequency and splits
