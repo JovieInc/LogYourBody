@@ -495,8 +495,7 @@ func validateGlp1Dose(_ value: String) {
 
 var glp1DoseOptions: [Double] {
         guard let medication = glp1SelectedMedication else { return [] }
-        let config = Glp1MedicationCatalog.doseConfig(for: medication)
-        return config.doses
+        return Glp1DoseDraftResolver.options(for: medication, doseLogs: glp1DoseLogs)
     }
 
 var glp1UnitForSelectedMedication: String? {

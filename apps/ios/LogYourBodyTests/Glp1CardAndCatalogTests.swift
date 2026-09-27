@@ -142,12 +142,12 @@ final class Glp1CardAndCatalogTests: XCTestCase {
         XCTAssertEqual(draft.source, .latestLog)
         XCTAssertEqual(draft.doseText, "5")
         XCTAssertEqual(draft.doseUnit, "mg/week")
-        XCTAssertEqual(draft.selectedDoseIndex, 1)
+        XCTAssertEqual(draft.selectedDoseIndex, 0)
         XCTAssertFalse(draft.usesCustomDose)
         XCTAssertEqual(draft.lastLoggedDoseText, "5 mg/week")
     }
 
-    func testDoseDraftUsesCustomValueForDoseOutsideCatalog() {
+    func testDoseDraftUsesPreviouslyLoggedAmountOutsideCatalog() {
         let medication = makeMedication(
             id: "zepbound-current",
             brand: "Zepbound",
@@ -168,9 +168,40 @@ final class Glp1CardAndCatalogTests: XCTestCase {
         )
 
         XCTAssertEqual(draft.doseText, "6.25")
-        XCTAssertNil(draft.selectedDoseIndex)
-        XCTAssertTrue(draft.usesCustomDose)
+        XCTAssertEqual(draft.selectedDoseIndex, 0)
+        XCTAssertFalse(draft.usesCustomDose)
         XCTAssertEqual(draft.lastLoggedDoseText, "6.25 mg/week")
+    }
+
+    func testDoseOptionsContainOnlyTheLatestLoggedAmount() {
+        let medication = makeMedication(
+            id: "zepbound-current",
+            brand: "Zepbound",
+            genericName: "tirzepatide",
+            doseUnit: "mg/week"
+        )
+
+        let options = Glp1DoseDraftResolver.options(
+            for: medication,
+            doseLogs: [
+                makeDoseLog(
+                    id: "older",
+                    takenAt: base,
+                    doseAmount: 2.5,
+                    medicationID: medication.id,
+                    brand: "Zepbound"
+                ),
+                makeDoseLog(
+                    id: "latest",
+                    takenAt: base.addingTimeInterval(86_400),
+                    doseAmount: 6.25,
+                    medicationID: medication.id,
+                    brand: "Zepbound"
+                )
+            ]
+        )
+
+        XCTAssertEqual(options, [6.25])
     }
 
     func testDoseDraftPrefersMedicationIDOverNewerBrandFallback() {
@@ -208,7 +239,7 @@ final class Glp1CardAndCatalogTests: XCTestCase {
         )
 
         XCTAssertEqual(draft.doseText, "5")
-        XCTAssertEqual(draft.selectedDoseIndex, 1)
+        XCTAssertEqual(draft.selectedDoseIndex, 0)
         XCTAssertEqual(draft.lastLoggedDoseText, "5 mg/week")
     }
 
@@ -234,11 +265,11 @@ final class Glp1CardAndCatalogTests: XCTestCase {
 
         XCTAssertEqual(draft.source, .latestLog)
         XCTAssertEqual(draft.doseText, "7.5")
-        XCTAssertEqual(draft.selectedDoseIndex, 2)
+        XCTAssertEqual(draft.selectedDoseIndex, 0)
         XCTAssertFalse(draft.usesCustomDose)
     }
 
-    func testDoseDraftUsesFirstCatalogDoseWhenThereIsNoCompatibleHistory() {
+    func testDoseDraftStartsBlankWhenThereIsNoCompatibleHistory() {
         let medication = makeMedication(
             id: "zepbound-current",
             brand: "Zepbound",
@@ -258,10 +289,10 @@ final class Glp1CardAndCatalogTests: XCTestCase {
             ]
         )
 
-        XCTAssertEqual(draft.source, .catalogDefault)
-        XCTAssertEqual(draft.doseText, "2.5")
-        XCTAssertEqual(draft.selectedDoseIndex, 0)
-        XCTAssertFalse(draft.usesCustomDose)
+        XCTAssertEqual(draft.source, .noHistory)
+        XCTAssertEqual(draft.doseText, "")
+        XCTAssertNil(draft.selectedDoseIndex)
+        XCTAssertTrue(draft.usesCustomDose)
         XCTAssertNil(draft.lastLoggedDoseText)
     }
 

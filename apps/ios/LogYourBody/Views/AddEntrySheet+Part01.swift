@@ -163,6 +163,11 @@ var body: some View {
                 .font(.appHeadline)
                 .padding(.top)
 
+            Text(Glp1DoseLogCopy.trackingNotice)
+                .font(.appCaption)
+                .foregroundColor(.appTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
             if glp1IsLoadingMedications {
                 HStack {
                     ProgressView()
@@ -177,7 +182,7 @@ var body: some View {
                     Text("Add your GLP-1 medication")
                         .font(.appBody)
 
-                    Text("Select the medication you're taking so logging is just a quick dose pick.")
+                    Text("Choose the medication you track to make logging and reminders easier.")
                         .font(.appBodySmall)
                         .foregroundColor(.appTextSecondary)
 
@@ -268,7 +273,7 @@ var body: some View {
                                 }
 
                             if glp1IsRestDay {
-                                Text("Record this date as a planned no-dose day.")
+                                Text(Glp1DoseLogCopy.noDoseTaken)
                                     .font(.appBodySmall)
                                     .foregroundColor(.appTextTertiary)
                             } else if !glp1UseCustomDose && !options.isEmpty {
@@ -306,7 +311,7 @@ var body: some View {
                                     .accessibilityIdentifier("glp1_last_logged_dose_status")
                             }
 
-                            if !glp1IsRestDay {
+                            if !glp1IsRestDay && !options.isEmpty {
                                 Toggle("Custom dose", isOn: $glp1UseCustomDose)
                                     .font(.appBodySmall)
                                     .foregroundColor(.appTextSecondary)
@@ -317,7 +322,7 @@ var body: some View {
                                     }
                             }
 
-                            if glp1UseCustomDose && !glp1IsRestDay {
+                            if (glp1UseCustomDose || options.isEmpty) && !glp1IsRestDay {
                                 HStack(spacing: 12) {
                                     TextField("0.0", text: $glp1Dose)
                                         .keyboardType(.decimalPad)
@@ -343,7 +348,7 @@ var body: some View {
                                     .font(.appBodySmall)
                                     .foregroundColor(.error)
                             } else {
-                                Text("Pick your dose from the wheel or enter a custom dose if needed.")
+                                Text(options.isEmpty ? Glp1DoseLogCopy.enterRecordedDose : Glp1DoseLogCopy.usePreviousDose)
                                     .font(.appBodySmall)
                                     .foregroundColor(.appTextTertiary)
                             }

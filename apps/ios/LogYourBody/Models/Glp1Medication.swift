@@ -374,7 +374,14 @@ enum Glp1MedicationCatalog {
 
 enum Glp1DoseDraftSource: Equatable {
     case latestLog
-    case catalogDefault
+    case noHistory
+}
+
+enum Glp1DoseLogCopy {
+    static let trackingNotice = "Tracking and reminders only. Dose guidance isn’t included."
+    static let noDoseTaken = "Log a date when you did not take a dose."
+    static let enterRecordedDose = "Enter the dose you took for this log."
+    static let usePreviousDose = "Choose a previous logged dose or enter the amount you took."
 }
 
 struct Glp1DoseDraft: Equatable {
@@ -391,6 +398,13 @@ struct Glp1DoseDraft: Equatable {
 /// A matching medication ID is authoritative. Brand matching is a fallback for
 /// legacy or re-created medication records.
 enum Glp1DoseDraftResolver {
+    static func options(for medication: Glp1Medication, doseLogs: [Glp1DoseLog]) -> [Double] {
+        guard let amount = latestCompatibleLog(for: medication, in: doseLogs)?.doseAmount else {
+            return []
+        }
+        return [amount]
+    }
+
     static func resolve(
         for medication: Glp1Medication,
         doseLogs: [Glp1DoseLog]
@@ -399,44 +413,25 @@ enum Glp1DoseDraftResolver {
 
         guard let latestLog = latestCompatibleLog(for: medication, in: doseLogs),
               let amount = latestLog.doseAmount else {
-            return catalogDefault(using: config)
-        }
-
-        let unit = nonEmptyString(latestLog.doseUnit) ?? config.unit
-        let matchesCatalogUnit = normalized(unit) == normalized(config.unit)
-        let selectedDoseIndex = matchesCatalogUnit
-            ? config.doses.firstIndex(where: { abs($0 - amount) < 0.0001 })
-            : nil
-
-        return Glp1DoseDraft(
-            doseText: Glp1DoseHistoryFormatter.numberText(amount),
-            doseUnit: unit,
-            selectedDoseIndex: selectedDoseIndex,
-            usesCustomDose: selectedDoseIndex == nil,
-            source: .latestLog,
-            lastLoggedDoseText: "\(Glp1DoseHistoryFormatter.numberText(amount)) \(unit)"
-        )
-    }
-
-    private static func catalogDefault(using config: Glp1MedicationDoseConfig) -> Glp1DoseDraft {
-        guard let firstDose = config.doses.first else {
             return Glp1DoseDraft(
                 doseText: "",
                 doseUnit: config.unit,
                 selectedDoseIndex: nil,
                 usesCustomDose: true,
-                source: .catalogDefault,
+                source: .noHistory,
                 lastLoggedDoseText: nil
             )
         }
 
+        let unit = nonEmptyString(latestLog.doseUnit) ?? config.unit
+
         return Glp1DoseDraft(
-            doseText: Glp1DoseHistoryFormatter.numberText(firstDose),
-            doseUnit: config.unit,
+            doseText: Glp1DoseHistoryFormatter.numberText(amount),
+            doseUnit: unit,
             selectedDoseIndex: 0,
             usesCustomDose: false,
-            source: .catalogDefault,
-            lastLoggedDoseText: nil
+            source: .latestLog,
+            lastLoggedDoseText: "\(Glp1DoseHistoryFormatter.numberText(amount)) \(unit)"
         )
     }
 

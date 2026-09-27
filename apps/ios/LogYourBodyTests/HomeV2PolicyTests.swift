@@ -49,6 +49,65 @@ final class HomeV2PolicyTests: XCTestCase {
         XCTAssertEqual(HomeV2Copy.changeSentence(delta: nil, unit: "lb"), "No 30-day trend yet")
     }
 
+    func testCompositionHeadlineShowsDirectComparableBodyFatTrend() {
+        let calendar = Calendar.current
+        let now = calendar.startOfDay(for: Date())
+        let older = calendar.date(byAdding: .day, value: -20, to: now) ?? now
+        let otherMethod = calendar.date(byAdding: .day, value: -10, to: now) ?? now
+        let latest = calendar.date(byAdding: .day, value: -4, to: now) ?? now
+
+        let headline = HomeV2CompositionPolicy.headline(
+            metrics: [
+                compositionMetric(date: older, bodyFat: 24.1, method: "dexa"),
+                compositionMetric(date: otherMethod, bodyFat: 28.0, method: "manual"),
+                compositionMetric(date: latest, bodyFat: 21.2, method: "DEXA (BodySpec)")
+            ],
+            now: now,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(headline, "DEXA body fat 21.2% · Down 2.9 pts in 16 days")
+    }
+
+    func testCompositionHeadlineLabelsEstimatesAndDoesNotInventATrend() {
+        let now = Date()
+        let estimate = compositionMetric(date: now, bodyFat: 25.4, method: "visual_estimate")
+        XCTAssertEqual(
+            HomeV2CompositionPolicy.headline(metrics: [estimate], now: now),
+            "Estimated body fat 25.4% · trend starts with another check-in"
+        )
+
+        let stale = compositionMetric(
+            date: now.addingTimeInterval(-40 * 86_400),
+            bodyFat: 24.0,
+            method: "dexa"
+        )
+        XCTAssertEqual(
+            HomeV2CompositionPolicy.headline(metrics: [stale], now: now),
+            HomeV2Copy.compositionTrackingPrompt
+        )
+    }
+
+    private func compositionMetric(date: Date, bodyFat: Double, method: String) -> BodyMetrics {
+        BodyMetrics(
+            id: UUID().uuidString,
+            userId: "home-composition-test",
+            date: date,
+            localDate: BodyMetricLocalDate.key(for: date),
+            weight: 80,
+            weightUnit: "kg",
+            bodyFatPercentage: bodyFat,
+            bodyFatMethod: method,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+
     func testSinceSentenceAndPhotoPositionReadAsSentences() {
         XCTAssertEqual(HomeV2Copy.sinceSentence(delta: -12.8, unit: "lb", since: "Apr 2"), "Down 12.8 lb since Apr 2")
         XCTAssertEqual(HomeV2Copy.sinceSentence(delta: 0.3, unit: "kg", since: "Apr 2"), "Up 0.3 kg since Apr 2")

@@ -41,6 +41,7 @@ extension DashboardViewLiquid {
             weightValue: formatTrendWeightHeadline(metric, usesTrend: weightUsesTrend),
             weightUnit: unit,
             changeSentence: HomeV2Copy.changeSentence(delta: heroWeightDelta30d(), unit: unit),
+            compositionSentence: HomeV2CompositionPolicy.headline(metrics: bodyMetrics),
             phaseSentence: homeV2PhaseSentence,
             loggedSentence: homeV2Logged.map { HomeV2Copy.loggedSentence(value: $0.valueText, unit: $0.unit) },
             latestPhotoCaption: homeV2LatestPhotoMetric.map { HomeV2Copy.latestPhotoCaption(date: formatHUDDate($0.date)) },
